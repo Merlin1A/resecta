@@ -1,0 +1,2223 @@
+{
+  "entries": [
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "bates"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "bates label"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "bates no."
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "bates number"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "bates stamp"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "deposition"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "deposition exhibit"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "discovery"
+    },
+    {
+      "category": "bates",
+      "confidence": "medium",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "document no."
+    },
+    {
+      "category": "bates",
+      "confidence": "medium",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "document number"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "exhibit"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "foia"
+    },
+    {
+      "category": "bates",
+      "confidence": "medium",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "page id"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "produced"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "production"
+    },
+    {
+      "category": "bates",
+      "confidence": "medium-high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "production number"
+    },
+    {
+      "category": "bates",
+      "confidence": "medium-high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "production stamp"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "response"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "responsive"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "stamp"
+    },
+    {
+      "category": "bates",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "stamped"
+    },
+    {
+      "category": "dea",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "CSA registration"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Controlled Substance Registration Certificate"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Controlled Substances Act"
+    },
+    {
+      "category": "dea",
+      "confidence": "low",
+      "detector_requires_secondary": true,
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "DEA"
+    },
+    {
+      "category": "dea",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "DEA #"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "DEA Form 222"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "DEA Form 224"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "DEA Form 363"
+    },
+    {
+      "category": "dea",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "DEA No."
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "DEA Number"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "foia",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "DEA Registrant"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "DEA Registration"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "foia",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "DEA Registration Number"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "DEA expiration date"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "DEA-registered"
+    },
+    {
+      "category": "dea",
+      "confidence": "medium",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "EPCS"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Schedule II"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Schedule III"
+    },
+    {
+      "category": "dea",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Schedule IV"
+    },
+    {
+      "category": "dea",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Schedule V"
+    },
+    {
+      "category": "dea",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "X-waiver"
+    },
+    {
+      "category": "dea",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "business activity code"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "controlled substance"
+    },
+    {
+      "category": "dea",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "diversion control"
+    },
+    {
+      "category": "dea",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "mid-level practitioner"
+    },
+    {
+      "category": "dea",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "narcotic treatment program"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "pharmacy DEA"
+    },
+    {
+      "category": "dea",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "practitioner registration"
+    },
+    {
+      "category": "dea",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "prescriber DEA"
+    },
+    {
+      "category": "dob",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "D.O.B."
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "detector_note": "F-52: engine windowed-matching must require `birth` head-noun within the window; do NOT fire on `date of <other>` (service/death/admission/discharge/injury/diagnosis).",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "DOB"
+    },
+    {
+      "category": "dob",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "age"
+    },
+    {
+      "category": "dob",
+      "confidence": "medium",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "age on date of service"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "birth certificate"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "detector_note": "F-52: engine windowed-matching must require `birth` head-noun within the window; do NOT fire on `date of <other>` (service/death/admission/discharge/injury/diagnosis).",
+      "doctypes": [
+        "court",
+        "foia",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "birth date"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "doctypes": [
+        "financial",
+        "foia",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "birth information"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "doctypes": [
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "birthDate"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "doctypes": [
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "birthdate"
+    },
+    {
+      "category": "dob",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "generic"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "birthday"
+    },
+    {
+      "category": "dob",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "foia",
+        "generic"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "born"
+    },
+    {
+      "category": "dob",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "generic"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "born on"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "doctypes": [
+        "financial",
+        "foia",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "country of birth"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "detector_note": "F-52: engine windowed-matching must require `birth` head-noun within the window; do NOT fire on `date of <other>` (service/death/admission/discharge/injury/diagnosis).",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "date of birth"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "detector_note": "F-52: engine windowed-matching must require `birth` head-noun within the window; do NOT fire on `date of <other>` (service/death/admission/discharge/injury/diagnosis).",
+      "doctypes": [
+        "financial",
+        "foia",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "date of birth (mm/dd/yyyy)"
+    },
+    {
+      "category": "dob",
+      "confidence": "medium",
+      "detector_note": "F-52: engine windowed-matching must require `birth` head-noun within the window; do NOT fire on `date of <other>` (service/death/admission/discharge/injury/diagnosis).",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "date of birth change"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "detector_note": "F-52: engine windowed-matching must require `birth` head-noun within the window; do NOT fire on `date of <other>` (service/death/admission/discharge/injury/diagnosis).",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "decedent date of birth"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "detector_note": "F-52: engine windowed-matching must require `birth` head-noun within the window; do NOT fire on `date of <other>` (service/death/admission/discharge/injury/diagnosis).",
+      "doctypes": [
+        "financial",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "insured's date of birth"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "detector_note": "F-52: engine windowed-matching must require birth head-noun within the window; do NOT fire on date of other (service/death/admission/discharge/injury/diagnosis).",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "member birth date"
+    },
+    {
+      "category": "dob",
+      "confidence": "medium",
+      "detector_note": "F-52: engine windowed-matching must require `birth` head-noun within the window; do NOT fire on `date of <other>` (service/death/admission/discharge/injury/diagnosis).",
+      "doctypes": [
+        "court",
+        "foia",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "mother's date of birth"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "detector_note": "F-52: engine windowed-matching must require `birth` head-noun within the window; do NOT fire on `date of <other>` (service/death/admission/discharge/injury/diagnosis).",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "patient birth date"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "detector_note": "F-52: engine windowed-matching must require birth head-noun within the window; do NOT fire on date of other (service/death/admission/discharge/injury/diagnosis).",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "patient dob"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "detector_note": "F-52: engine windowed-matching must require `birth` head-noun within the window; do NOT fire on `date of <other>` (service/death/admission/discharge/injury/diagnosis).",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "patient's birth date"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "place of birth"
+    },
+    {
+      "category": "dob",
+      "confidence": "medium",
+      "detector_note": "F-52: engine windowed-matching must require `birth` head-noun within the window; do NOT fire on `date of <other>` (service/death/admission/discharge/injury/diagnosis).",
+      "doctypes": [
+        "financial",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "subscriber date of birth"
+    },
+    {
+      "category": "dob",
+      "confidence": "high",
+      "doctypes": [
+        "foia",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "year of birth"
+    },
+    {
+      "category": "ein",
+      "confidence": "high",
+      "detector_note": "Primary IRS label for the 9-digit EIN field on W-2, 1099, and 1040 forms",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "employer identification number"
+    },
+    {
+      "category": "ein",
+      "confidence": "high",
+      "detector_note": "W-2 box b label for the employer EIN field",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "employer's ein"
+    },
+    {
+      "category": "ein",
+      "confidence": "high",
+      "detector_note": "IRS label on Form W-9 and 1099 for the federal tax identification number",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "federal tax id"
+    },
+    {
+      "category": "ein",
+      "confidence": "high",
+      "detector_note": "Federal employer identification number abbreviation used on tax forms",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "fein"
+    },
+    {
+      "category": "ein",
+      "confidence": "high",
+      "detector_note": "1099 box label for the payer EIN field",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "payer's ein"
+    },
+    {
+      "category": "ein",
+      "confidence": "medium",
+      "detector_note": "Short form; medium confidence because 'tax id' also appears in SSN context",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "tax id"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Application for IRS Individual Taxpayer Identification Number"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "CP565"
+    },
+    {
+      "category": "itin",
+      "confidence": "medium-high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "CP566"
+    },
+    {
+      "category": "itin",
+      "confidence": "medium-high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "CP567"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Certifying Acceptance Agent"
+    },
+    {
+      "category": "itin",
+      "confidence": "low",
+      "doctypes": [
+        "court",
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Country of citizenship"
+    },
+    {
+      "category": "itin",
+      "confidence": "medium-high",
+      "doctypes": [
+        "court",
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Dependent of U.S. citizen/resident alien"
+    },
+    {
+      "category": "itin",
+      "confidence": "medium",
+      "doctypes": [
+        "court",
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Foreign tax identification number"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Form W-7"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Form W-7 (COA)"
+    },
+    {
+      "category": "itin",
+      "confidence": "medium (flag)",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "IRSN"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia",
+        "generic"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ITIN"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ITIN Operation"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ITIN TO BE REQUESTED"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ITIN applicant"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ITIN application"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ITIN holder"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ITIN number"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ITIN renewal"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Individual Taxpayer Identification Number"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Nonresident alien"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Nonresident alien required to get an ITIN"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Publication 1915"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Resident alien for tax purposes"
+    },
+    {
+      "category": "itin",
+      "confidence": "low",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "TIN"
+    },
+    {
+      "category": "itin",
+      "confidence": "low",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Taxpayer Identification Number"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "assigned ITIN"
+    },
+    {
+      "category": "itin",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "expired ITIN"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "car"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "dmv"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "driver"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "make"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "model"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "motorcycle"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "owner"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "registration"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "truck"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "vehicle"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "vin"
+    },
+    {
+      "category": "mrn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "admission"
+    },
+    {
+      "category": "mrn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "chart"
+    },
+    {
+      "category": "mrn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "chart number"
+    },
+    {
+      "category": "mrn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "date of birth"
+    },
+    {
+      "category": "mrn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "diagnosis"
+    },
+    {
+      "category": "mrn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "discharge"
+    },
+    {
+      "category": "mrn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "dob"
+    },
+    {
+      "category": "mrn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "hospital"
+    },
+    {
+      "category": "mrn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "medical record"
+    },
+    {
+      "category": "mrn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "mr#"
+    },
+    {
+      "category": "mrn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "mrn"
+    },
+    {
+      "category": "mrn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "patient"
+    },
+    {
+      "category": "mrn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "physician"
+    },
+    {
+      "category": "name",
+      "confidence": "medium",
+      "detector_note": "Statement/account label; medium because 'account holder' can appear without a following name token",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "account holder"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "applicant name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "beneficiary name"
+    },
+    {
+      "category": "name",
+      "confidence": "medium",
+      "detector_note": "Credit-card statement label",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "cardholder name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "decedent"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "defendant"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "financial",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "dependent's name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "financial",
+        "generic"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "employee name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "detector_note": "W-2 box c label (exact IRS language)",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "employer's name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "first name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "full name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "insured's name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "last name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "generic"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "legal name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "financial",
+        "foia",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "maiden name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "middle initial"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "middle name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "name (as shown on your income tax return)"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "financial",
+        "foia",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "name at birth"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "name of requester"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "name to be shown on card"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "other insured's name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "other names used"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "patient name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "patient's name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "detector_note": "1099/W-2 box label; financial-only to avoid FOIA false-positive on 'payer'",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "payer's name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "petitioner"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "plaintiff"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "printed name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "detector_note": "1099-series box label",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "recipient's name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "respondent"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "spouse's name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "subscriber name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "surname"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "taxpayer name"
+    },
+    {
+      "category": "npi",
+      "confidence": "medium-high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "10-digit NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Attending Provider NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Billing Provider NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "medium",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Deactivated NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "medium-high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Enumeration Date"
+    },
+    {
+      "category": "npi",
+      "confidence": "medium",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Enumerator"
+    },
+    {
+      "category": "npi",
+      "confidence": "medium-high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Group NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "medium-high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Individual NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "NPI #"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "NPI Number"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "foia",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "NPPES"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "foia",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "NPPES NPI Registry"
+    },
+    {
+      "category": "npi",
+      "confidence": "medium-high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "National Provider ID"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "National Provider Identifier"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Operating Provider NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Ordering Provider NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "medium-high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Other Provider NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "medium",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Practitioner.identifier (NPI)"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Prescriber NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "medium",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Provider Enumeration"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Provider NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "medium",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Provider Taxonomy Code"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Referring Provider NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Rendering Provider NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Service Facility NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Type 1 NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "Type 2 NPI"
+    },
+    {
+      "category": "npi",
+      "confidence": "high",
+      "doctypes": [
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "us-npi"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "detector_note": "W-2 box label (exact IRS language)",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "employee's social security number"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "detector_note": "1099 payer-side TIN box label",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "payer's tin"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "detector_note": "1099-series box label; TIN = SSN for individuals",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "recipient's tin"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "social security"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "social security no"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "social security number"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ss no"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ss num"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ss number"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ss#"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ssan"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ssn"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ssno"
+    },
+    {
+      "category": "ssn",
+      "confidence": "high",
+      "detector_note": "IRS W-2/1099/1040 label for the 9-digit SSN field",
+      "doctypes": [
+        "financial",
+        "foia"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "taxpayer identification number"
+    },
+    {
+      "category": "ssn",
+      "confidence": "medium",
+      "detector_note": "Short-form TIN; medium confidence because abbreviation is ambiguous without doctype scope; financial-only",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "tin"
+    }
+  ],
+  "generated_by": "resecta-data/gazetteers/context_keywords",
+  "seed": 20260416,
+  "version": 1
+}

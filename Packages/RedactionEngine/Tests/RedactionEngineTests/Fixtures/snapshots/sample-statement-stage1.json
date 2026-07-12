@@ -1,0 +1,781 @@
+{
+  "balancedPreset" : {
+    "account" : 0.6,
+    "address" : 0.6,
+    "creditCard" : 0.88,
+    "dea" : 0.6,
+    "dob" : 0.3,
+    "driversLicense" : 0.72,
+    "ein" : 0.55,
+    "email" : 0.83,
+    "itin" : 0.65,
+    "licensePlate" : 0.65,
+    "mrn" : 0.6,
+    "name" : 0.6,
+    "npi" : 0.602,
+    "passport" : 0.72,
+    "phone" : 0.7,
+    "routingNumber" : 0.6,
+    "ssn" : 0.6
+  },
+  "fixture" : {
+    "name" : "sample-bank-statement.pdf",
+    "pageCount" : 3,
+    "sha256" : "992ca0543eb1a2eaab8d8dba0a4ad4b8339cf95b804a0347ab1b0987ce18fa20"
+  },
+  "generatedBy" : "SampleStatementSnapshotTests (S01/W2, resecta-sample-packet-2026-06-12)",
+  "note" : "Dual-leg Stage-1 snapshot of the FROZEN shipped statement. thresholdVector=nil → every detection surfaces; `aboveBalanced` applies the calibrated balanced preset (preset-thresholds.json, status=calibrated) in post. `confidence` is the post-posterior score (absorbing-state floor 0.35, empty priors). MEASUREMENT ONLY — no Stage-2 regression freeze (gated on Jesse's review). The text leg is fully deterministic; OCR-leg numbers may vary by ±epsilon across Vision / simulator-runtime versions.",
+  "pages" : [
+    {
+      "ocrLeg" : {
+        "detectionCount" : 9,
+        "detections" : [
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "address",
+            "confidence" : 0.65,
+            "matchedText" : "Boise, ID 83701",
+            "normalizedRect" : [
+              0.8424,
+              0.9323,
+              0.0976,
+              0.0095
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "account",
+            "confidence" : 0.75,
+            "matchedText" : "0510112026",
+            "normalizedRect" : [
+              0.7506,
+              0.8823,
+              0.0847,
+              0.01
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "account",
+            "confidence" : 0.75,
+            "matchedText" : "0513112026",
+            "normalizedRect" : [
+              0.8553,
+              0.8823,
+              0.0841,
+              0.01
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.8,
+            "matchedText" : "4100773265",
+            "normalizedRect" : [
+              0.8353,
+              0.8105,
+              0.0882,
+              0.0082
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "address",
+            "confidence" : 0.65,
+            "matchedText" : "Boise, ID 83702",
+            "normalizedRect" : [
+              0.0894,
+              0.7855,
+              0.1282,
+              0.0123
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "account",
+            "confidence" : 0.75,
+            "matchedText" : "0610112026",
+            "normalizedRect" : [
+              0.8429,
+              0.76,
+              0.0806,
+              0.0095
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.83,
+            "category" : "email",
+            "confidence" : 0.9,
+            "matchedText" : "d.hartwell@example.net",
+            "normalizedRect" : [
+              0.7594,
+              0.7423,
+              0.1594,
+              0.01
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.6,
+            "matchedText" : "9100004821",
+            "normalizedRect" : [
+              0.3441,
+              0.5036,
+              0.0876,
+              0.0077
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.6,
+            "matchedText" : "9100004821",
+            "normalizedRect" : [
+              0.3441,
+              0.4741,
+              0.0876,
+              0.0077
+            ]
+          }
+        ],
+        "doctype" : {
+          "primary" : "financial",
+          "runnerUp" : "foia",
+          "softmax" : {
+            "court" : 0.006,
+            "financial" : 0.9657,
+            "foia" : 0.0163,
+            "generic" : 0.006,
+            "medical" : 0.006
+          },
+          "topKeywords" : [
+            "information→foia:1.0",
+            "bank→financial:0.5",
+            "payroll→financial:0.5",
+            "transfer→financial:0.5",
+            "checking→financial:0.5"
+          ]
+        },
+        "leg" : "ocr",
+        "ocrSkipped" : false,
+        "renderDPI" : 200
+      },
+      "pageIndex" : 0,
+      "textLeg" : {
+        "coverage" : 0.1054,
+        "detectionCount" : 8,
+        "detections" : [
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "address",
+            "confidence" : 0.7,
+            "matchedText" : "P.O. Box 4827",
+            "normalizedRect" : [
+              0.8514,
+              0.9445,
+              0.0898,
+              0.0122
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "address",
+            "confidence" : 0.65,
+            "matchedText" : "Sablebrook Bank Boise ID 83701",
+            "normalizedRect" : [
+              0.0588,
+              0.9279,
+              0.8824,
+              0.0321
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.6,
+            "matchedText" : "800-555-0199",
+            "normalizedRect" : [
+              0.8332,
+              0.9166,
+              0.108,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.8,
+            "matchedText" : "4100773265",
+            "normalizedRect" : [
+              0.8348,
+              0.808,
+              0.09,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "address",
+            "confidence" : 0.8,
+            "matchedText" : "Delia R Hartwell, 4127 N Wrenfield Pl Account Number 4100773265, Boise ID 83702 Account Type Personal Checking",
+            "normalizedRect" : [
+              0.0882,
+              0.7847,
+              0.8366,
+              0.0489
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.83,
+            "category" : "email",
+            "confidence" : 0.9,
+            "matchedText" : "d.hartwell@example.net",
+            "normalizedRect" : [
+              0.7591,
+              0.7424,
+              0.1603,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.6,
+            "matchedText" : "9100004821",
+            "normalizedRect" : [
+              0.3435,
+              0.5012,
+              0.0901,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.6,
+            "matchedText" : "9100004821",
+            "normalizedRect" : [
+              0.3435,
+              0.4715,
+              0.0901,
+              0.013
+            ]
+          }
+        ],
+        "doctype" : {
+          "primary" : "financial",
+          "runnerUp" : "foia",
+          "softmax" : {
+            "court" : 0.006,
+            "financial" : 0.9657,
+            "foia" : 0.0163,
+            "generic" : 0.006,
+            "medical" : 0.006
+          },
+          "topKeywords" : [
+            "information→foia:1.0",
+            "total→financial:0.5",
+            "customer→financial:0.5",
+            "amount→financial:0.5",
+            "checking→financial:0.5"
+          ]
+        },
+        "leg" : "text",
+        "ocrSkipped" : true
+      }
+    },
+    {
+      "ocrLeg" : {
+        "detectionCount" : 7,
+        "detections" : [
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "account",
+            "confidence" : 0.75,
+            "matchedText" : "0510112026",
+            "normalizedRect" : [
+              0.3753,
+              0.9477,
+              0.0812,
+              0.0095
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "account",
+            "confidence" : 0.75,
+            "matchedText" : "0513112026",
+            "normalizedRect" : [
+              0.4741,
+              0.9477,
+              0.0812,
+              0.0095
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.6,
+            "matchedText" : "8120049173",
+            "normalizedRect" : [
+              0.3441,
+              0.8686,
+              0.0876,
+              0.0077
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.6,
+            "matchedText" : "7330081265",
+            "normalizedRect" : [
+              0.3441,
+              0.7895,
+              0.0876,
+              0.0077
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.6,
+            "matchedText" : "6650094412",
+            "normalizedRect" : [
+              0.3441,
+              0.6941,
+              0.0876,
+              0.0077
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.6,
+            "matchedText" : "5540063370",
+            "normalizedRect" : [
+              0.3441,
+              0.6155,
+              0.0882,
+              0.0077
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "name",
+            "confidence" : 0.8,
+            "matchedText" : "POS",
+            "normalizedRect" : [
+              0.1412,
+              0.5991,
+              0.0271,
+              0.0082
+            ]
+          }
+        ],
+        "doctype" : {
+          "primary" : "financial",
+          "runnerUp" : "medical",
+          "softmax" : {
+            "court" : 0.006,
+            "financial" : 0.9657,
+            "foia" : 0.006,
+            "generic" : 0.006,
+            "medical" : 0.0163
+          },
+          "topKeywords" : [
+            "pharmacy→medical:1.0",
+            "purchase→financial:0.7143",
+            "account→financial:0.7143",
+            "fee→financial:0.7143",
+            "amount→financial:0.7143"
+          ]
+        },
+        "leg" : "ocr",
+        "ocrSkipped" : false,
+        "renderDPI" : 200
+      },
+      "pageIndex" : 1,
+      "textLeg" : {
+        "coverage" : 0.2058,
+        "detectionCount" : 11,
+        "detections" : [
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "name",
+            "confidence" : 0.8,
+            "matchedText" : "Hartwell",
+            "normalizedRect" : [
+              0.1121,
+              0.9469,
+              0.055,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.6,
+            "matchedText" : "8120049173",
+            "normalizedRect" : [
+              0.3435,
+              0.8661,
+              0.0901,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.6,
+            "matchedText" : "7330081265",
+            "normalizedRect" : [
+              0.3435,
+              0.7872,
+              0.0901,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "name",
+            "confidence" : 0.8,
+            "matchedText" : "Pos",
+            "normalizedRect" : [
+              0.1405,
+              0.7708,
+              0.0284,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.6,
+            "matchedText" : "6650094412",
+            "normalizedRect" : [
+              0.3435,
+              0.6919,
+              0.0901,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "name",
+            "confidence" : 0.8,
+            "matchedText" : "Lulu",
+            "normalizedRect" : [
+              0.271,
+              0.659,
+              0.0495,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.6,
+            "matchedText" : "5540063370",
+            "normalizedRect" : [
+              0.3435,
+              0.6129,
+              0.0901,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "name",
+            "confidence" : 0.8,
+            "matchedText" : "POS",
+            "normalizedRect" : [
+              0.1405,
+              0.5965,
+              0.0284,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "name",
+            "confidence" : 0.8,
+            "matchedText" : "Pos",
+            "normalizedRect" : [
+              0.1405,
+              0.5473,
+              0.0284,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "name",
+            "confidence" : 0.8,
+            "matchedText" : "Pos",
+            "normalizedRect" : [
+              0.1405,
+              0.5309,
+              0.0284,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "name",
+            "confidence" : 0.8,
+            "matchedText" : "Pos",
+            "normalizedRect" : [
+              0.1405,
+              0.4324,
+              0.0284,
+              0.013
+            ]
+          }
+        ],
+        "doctype" : {
+          "primary" : "financial",
+          "runnerUp" : "medical",
+          "softmax" : {
+            "court" : 0.006,
+            "financial" : 0.9657,
+            "foia" : 0.006,
+            "generic" : 0.006,
+            "medical" : 0.0163
+          },
+          "topKeywords" : [
+            "pharmacy→medical:1.0",
+            "account→financial:0.625",
+            "transfer→financial:0.625",
+            "purchase→financial:0.625",
+            "bank→financial:0.625"
+          ]
+        },
+        "leg" : "text",
+        "ocrSkipped" : true
+      }
+    },
+    {
+      "ocrLeg" : {
+        "detectionCount" : 4,
+        "detections" : [
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "account",
+            "confidence" : 0.75,
+            "matchedText" : "0510112026",
+            "normalizedRect" : [
+              0.3753,
+              0.9477,
+              0.0812,
+              0.0095
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "account",
+            "confidence" : 0.75,
+            "matchedText" : "0513112026",
+            "normalizedRect" : [
+              0.4741,
+              0.9477,
+              0.0812,
+              0.0095
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "name",
+            "confidence" : 0.8,
+            "matchedText" : "P.o",
+            "normalizedRect" : [
+              0.4294,
+              0.64,
+              0.0171,
+              0.0068
+            ]
+          },
+          {
+            "aboveBalanced" : false,
+            "balancedThreshold" : 0.6,
+            "category" : "address",
+            "confidence" : 0.45,
+            "matchedText" : "In Case of Errors or Questions About Your Electronic Transfers, Telephone us at I-BOO- SSS-0199 or Write us at Sablebrook Bank, P.O. Box 4827, Boise, ID 83701 as soon as you can, if you think your statement or receipt is",
+            "normalizedRect" : [
+              0.0594,
+              0.6382,
+              0.8635,
+              0.0255
+            ]
+          }
+        ],
+        "doctype" : {
+          "primary" : "financial",
+          "runnerUp" : "foia",
+          "softmax" : {
+            "court" : 0.0326,
+            "financial" : 0.7099,
+            "foia" : 0.2411,
+            "generic" : 0.012,
+            "medical" : 0.0044
+          },
+          "topKeywords" : [
+            "case→court:1.0",
+            "complaint→court:1.0",
+            "investigation→foia:1.0",
+            "records→foia:1.0",
+            "information→foia:1.0"
+          ]
+        },
+        "leg" : "ocr",
+        "ocrSkipped" : false,
+        "renderDPI" : 200
+      },
+      "pageIndex" : 2,
+      "textLeg" : {
+        "coverage" : 0.1786,
+        "detectionCount" : 6,
+        "detections" : [
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "name",
+            "confidence" : 0.8,
+            "matchedText" : "Hartwell",
+            "normalizedRect" : [
+              0.1121,
+              0.9469,
+              0.055,
+              0.013
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "address",
+            "confidence" : 0.65,
+            "matchedText" : "In Case of Errors or Questions About Your Electronic Transfers, Telephone us at 1 800 555 0199 or Write us at Sablebrook Bank P.O Box 4827 Boise ID 83701 as soon as you can if you think your statement or receipt is",
+            "normalizedRect" : [
+              0.0588,
+              0.638,
+              0.865,
+              0.0283
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.8,
+            "matchedText" : "800-555-0199",
+            "normalizedRect" : [
+              0.1634,
+              0.638,
+              0.089,
+              0.0107
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.6,
+            "category" : "name",
+            "confidence" : 0.8,
+            "matchedText" : "P.o",
+            "normalizedRect" : [
+              0.4283,
+              0.638,
+              0.0191,
+              0.0107
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.8,
+            "matchedText" : "800-555-0199",
+            "normalizedRect" : [
+              0.3328,
+              0.5087,
+              0.089,
+              0.0107
+            ]
+          },
+          {
+            "aboveBalanced" : true,
+            "balancedThreshold" : 0.7,
+            "category" : "phone",
+            "confidence" : 0.8,
+            "matchedText" : "800-555-0199",
+            "normalizedRect" : [
+              0.1994,
+              0.3172,
+              0.089,
+              0.0107
+            ]
+          }
+        ],
+        "doctype" : {
+          "primary" : "financial",
+          "runnerUp" : "foia",
+          "softmax" : {
+            "court" : 0.0326,
+            "financial" : 0.7099,
+            "foia" : 0.2411,
+            "generic" : 0.012,
+            "medical" : 0.0044
+          },
+          "topKeywords" : [
+            "complaint→court:1.0",
+            "case→court:1.0",
+            "information→foia:1.0",
+            "request→foia:1.0",
+            "investigation→foia:1.0"
+          ]
+        },
+        "leg" : "text",
+        "ocrSkipped" : true
+      }
+    }
+  ],
+  "schemaVersion" : 1
+}

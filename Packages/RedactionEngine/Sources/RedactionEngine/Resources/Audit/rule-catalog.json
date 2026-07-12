@@ -1,0 +1,175 @@
+{
+  "entries": [
+    {
+      "detector": "AccountDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.account.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "PIIDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.address.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "BarcodeDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.barcode.vision.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "PIIDetector",
+      "family": "pii",
+      "is_checksum_gated": true,
+      "rule_id": "pii.cc.luhn.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "DEADetector",
+      "family": "pii",
+      "is_checksum_gated": true,
+      "rule_id": "pii.dea.checksum.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "PIIDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.dl.v1",
+      "source_artifact": "dl_patterns.json",
+      "version": "1.0"
+    },
+    {
+      "detector": "DOBDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.dob.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "PIIDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.ein.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "PIIDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.email.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "PIIDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.itin.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "PIIDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.lp.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "PIIDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.mrn.institution.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "PIIDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.mrn.labeled.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "PIIDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.mrn.patient_id.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "PIIDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.name.nltagger.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "NPIDetector",
+      "family": "pii",
+      "is_checksum_gated": true,
+      "rule_id": "pii.npi.luhn.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "PIIDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.passport.v1",
+      "source_artifact": "passport_patterns.json",
+      "version": "1.0"
+    },
+    {
+      "detector": "PIIDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.phone.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "RoutingNumberDetector",
+      "family": "pii",
+      "is_checksum_gated": true,
+      "rule_id": "pii.routing_number.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "SignatureHeuristicDetector",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.signature.heuristic.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    },
+    {
+      "detector": "SSNStateMachine",
+      "family": "pii",
+      "is_checksum_gated": false,
+      "rule_id": "pii.ssn.state_machine.v1",
+      "source_artifact": null,
+      "version": "1.0"
+    }
+  ],
+  "generated_by": "resecta-data/rules",
+  "seed": 20260416,
+  "version": 1
+}

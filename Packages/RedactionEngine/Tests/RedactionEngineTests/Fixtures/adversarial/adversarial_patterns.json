@@ -1,0 +1,494 @@
+{
+  "generated_by": "resecta-data/adversarial/patterns",
+  "patterns": [
+    {
+      "category": "detector_shape_fp",
+      "expected_detector": "ssn",
+      "expected_outcome": "suppress",
+      "id": "fp_000",
+      "source_plan_ref": "REDACTION_ENGINE.md 4.3",
+      "text": "Call 555-12-3456 for support."
+    },
+    {
+      "category": "detector_shape_fp",
+      "expected_detector": "ssn",
+      "expected_outcome": "suppress",
+      "id": "fp_001",
+      "source_plan_ref": "REDACTION_ENGINE.md 4.3",
+      "text": "Our office phone is 800-55-1212."
+    },
+    {
+      "category": "detector_shape_fp",
+      "expected_detector": "ssn",
+      "expected_outcome": "suppress",
+      "id": "fp_002",
+      "source_plan_ref": "REDACTION_ENGINE.md 4.3",
+      "text": "Account 123456789 credit $1,200.00 posted."
+    },
+    {
+      "category": "detector_shape_fp",
+      "expected_detector": "npi",
+      "expected_outcome": "suppress",
+      "id": "fp_003",
+      "source_plan_ref": "REDACTION_ENGINE.md 4.4",
+      "text": "Please call (206) 555-0199 for questions."
+    },
+    {
+      "category": "detector_shape_fp",
+      "expected_detector": "npi",
+      "expected_outcome": "suppress",
+      "id": "fp_004",
+      "source_plan_ref": "REDACTION_ENGINE.md 4.4",
+      "text": "Fax: 4155551234 (no dashes)."
+    },
+    {
+      "category": "detector_shape_fp",
+      "expected_detector": "dea",
+      "expected_outcome": "suppress",
+      "id": "fp_005",
+      "source_plan_ref": "REDACTION_ENGINE.md 4.5",
+      "text": "Vehicle plate AB1234567 impounded at lot 4."
+    },
+    {
+      "category": "detector_shape_fp",
+      "expected_detector": "dea",
+      "expected_outcome": "suppress",
+      "id": "fp_006",
+      "source_plan_ref": "REDACTION_ENGINE.md 4.5",
+      "text": "Tracking number US9876543 in transit."
+    },
+    {
+      "category": "detector_shape_fp",
+      "expected_detector": "address",
+      "expected_outcome": "suppress",
+      "id": "fp_007",
+      "source_plan_ref": "REDACTION_ENGINE.md 4.6",
+      "text": "Order total 49201 items, ready to ship."
+    },
+    {
+      "category": "detector_shape_fp",
+      "expected_detector": "address",
+      "expected_outcome": "suppress",
+      "id": "fp_008",
+      "source_plan_ref": "REDACTION_ENGINE.md 4.6",
+      "text": "Unit 12345 reporting: all clear."
+    },
+    {
+      "category": "detector_shape_fp",
+      "expected_detector": "none",
+      "expected_outcome": "suppress",
+      "id": "fp_009",
+      "source_plan_ref": "REDACTION_ENGINE.md 4.0",
+      "text": "Theme color: #A1B2C3 across the dashboard."
+    },
+    {
+      "category": "detector_shape_fp",
+      "expected_detector": "ssn",
+      "expected_outcome": "flag",
+      "id": "fp_010",
+      "source_plan_ref": "REDACTION_ENGINE.md 4.3",
+      "text": "Case 078-05-1120 docket entry 42."
+    },
+    {
+      "category": "keyword_stuffing_g5",
+      "expected_detector": "none",
+      "expected_outcome": "flag",
+      "id": "stuff_000",
+      "source_plan_ref": "G5",
+      "text": "docket plaintiff case docket docket docket court filing docket docket plaintiff case plaintiff docket motion docket plaintiff case docket plaintiff docket plaintiff case docket plaintiff"
+    },
+    {
+      "category": "keyword_stuffing_g5",
+      "expected_detector": "none",
+      "expected_outcome": "flag",
+      "id": "stuff_001",
+      "source_plan_ref": "G5",
+      "text": "patient diagnosis mrn patient diagnosis mrn patient diagnosis mrn patient diagnosis mrn patient diagnosis mrn patient diagnosis mrn patient patient patient diagnosis diagnosis diagnosis mrn mrn mrn"
+    },
+    {
+      "category": "keyword_stuffing_g5",
+      "expected_detector": "none",
+      "expected_outcome": "flag",
+      "id": "stuff_002",
+      "source_plan_ref": "G5",
+      "text": "invoice account balance invoice account balance invoice account balance invoice account balance invoice account balance invoice account balance transaction transaction transaction invoice"
+    },
+    {
+      "category": "keyword_stuffing_g5",
+      "expected_detector": "none",
+      "expected_outcome": "flag",
+      "id": "stuff_003",
+      "source_plan_ref": "G5",
+      "text": "foia request foia request foia request foia request foia request document released document released document released foia request foia request foia request redacted exemption foia request document"
+    },
+    {
+      "category": "keyword_stuffing_g5",
+      "expected_detector": "none",
+      "expected_outcome": "flag",
+      "id": "stuff_004",
+      "source_plan_ref": "G5",
+      "text": "patient docket invoice foia patient docket invoice foia patient docket invoice foia patient docket invoice foia patient docket invoice foia patient docket invoice foia patient docket invoice"
+    },
+    {
+      "category": "homoglyph",
+      "expected_detector": "ssn",
+      "expected_outcome": "redact",
+      "id": "homo_000",
+      "source_plan_ref": "G10",
+      "text": "SSN: １２３-４５-６７８９"
+    },
+    {
+      "category": "homoglyph",
+      "expected_detector": "npi",
+      "expected_outcome": "redact",
+      "id": "homo_001",
+      "source_plan_ref": "G10",
+      "text": "NPI: １２３４５６７８９０ registered."
+    },
+    {
+      "category": "homoglyph",
+      "expected_detector": "ssn",
+      "expected_outcome": "redact",
+      "id": "homo_002",
+      "source_plan_ref": "G10",
+      "text": "Member SSN 𝟏𝟐𝟑-𝟒𝟓-𝟔𝟕𝟖𝟗 on file."
+    },
+    {
+      "category": "homoglyph",
+      "expected_detector": "ssn",
+      "expected_outcome": "suppress",
+      "id": "homo_003",
+      "source_plan_ref": "G10",
+      "text": "SЅN: 555-00-1234 entry"
+    },
+    {
+      "category": "homoglyph",
+      "expected_detector": "ssn",
+      "expected_outcome": "redact",
+      "id": "homo_004",
+      "source_plan_ref": "G10",
+      "text": "ITIN аccount 9XX-82-1234 closed."
+    },
+    {
+      "category": "homoglyph",
+      "expected_detector": "ssn",
+      "expected_outcome": "flag",
+      "id": "homo_005",
+      "source_plan_ref": "G10",
+      "text": "Greek Ι-label 078-05-1120 noted."
+    },
+    {
+      "category": "homoglyph",
+      "expected_detector": "ssn",
+      "expected_outcome": "redact",
+      "id": "homo_006",
+      "source_plan_ref": "G10",
+      "text": "SSN: 1‍23-45-6789 (ZWJ in digits)"
+    },
+    {
+      "category": "homoglyph",
+      "expected_detector": "dea",
+      "expected_outcome": "redact",
+      "id": "homo_007",
+      "source_plan_ref": "G10",
+      "text": "DEA #: AB1‌234567 (ZWNJ in license)"
+    },
+    {
+      "category": "homoglyph",
+      "expected_detector": "npi",
+      "expected_outcome": "redact",
+      "id": "homo_008",
+      "source_plan_ref": "G10",
+      "text": "NPI 12​3456789​0 registered."
+    },
+    {
+      "category": "homoglyph",
+      "expected_detector": "dea",
+      "expected_outcome": "suppress",
+      "id": "homo_009",
+      "source_plan_ref": "G10",
+      "text": "Reference Аb1234567 logged."
+    },
+    {
+      "category": "invisible_style",
+      "expected_detector": "ssn",
+      "expected_outcome": "redact",
+      "id": "inv_000",
+      "source_plan_ref": "G10",
+      "text": "<span style=\"color:#ffffff\">SSN: 123-45-6789</span>"
+    },
+    {
+      "category": "invisible_style",
+      "expected_detector": "npi",
+      "expected_outcome": "redact",
+      "id": "inv_001",
+      "source_plan_ref": "G10",
+      "text": "<div style=\"color: white; background: white\">NPI: 1234567890</div>"
+    },
+    {
+      "category": "invisible_style",
+      "expected_detector": "dea",
+      "expected_outcome": "redact",
+      "id": "inv_002",
+      "source_plan_ref": "G10",
+      "text": "<p style=\"font-size:0.5pt\">DEA AB1234567 pending.</p>"
+    },
+    {
+      "category": "invisible_style",
+      "expected_detector": "none",
+      "expected_outcome": "flag",
+      "id": "inv_003",
+      "source_plan_ref": "G10",
+      "text": "<span style=\"opacity:0\">Card 4111 1111 1111 1111 queued.</span>"
+    },
+    {
+      "category": "whitespace_injection",
+      "expected_detector": "ssn",
+      "expected_outcome": "redact",
+      "id": "ws_000",
+      "source_plan_ref": "G10",
+      "text": "SSN 1​23-45-6789 on record."
+    },
+    {
+      "category": "whitespace_injection",
+      "expected_detector": "npi",
+      "expected_outcome": "redact",
+      "id": "ws_001",
+      "source_plan_ref": "G10",
+      "text": "NPI 12345​67890 billed."
+    },
+    {
+      "category": "whitespace_injection",
+      "expected_detector": "ssn",
+      "expected_outcome": "flag",
+      "id": "ws_002",
+      "source_plan_ref": "G10",
+      "text": "Account 078​-05-1120 on ledger."
+    },
+    {
+      "category": "whitespace_injection",
+      "expected_detector": "ssn",
+      "expected_outcome": "suppress",
+      "id": "ws_003",
+      "source_plan_ref": "G10",
+      "text": "Phone 800-55​-1212 no redact."
+    },
+    {
+      "category": "multiline_date_collision",
+      "expected_detector": "none",
+      "expected_outcome": "flag",
+      "id": "date_000",
+      "source_plan_ref": "G10",
+      "text": "Filed: 03/15/2024\nDOB: 03/15/1984"
+    },
+    {
+      "category": "multiline_date_collision",
+      "expected_detector": "none",
+      "expected_outcome": "flag",
+      "id": "date_001",
+      "source_plan_ref": "G10",
+      "text": "Application received 2024-01-15\nDate of Birth: 2024-01-15"
+    },
+    {
+      "category": "multiline_date_collision",
+      "expected_detector": "none",
+      "expected_outcome": "flag",
+      "id": "date_002",
+      "source_plan_ref": "G10",
+      "text": "Signed 12/31/2023\nBirth 12/31/1955\nExpires 12/31/2028"
+    },
+    {
+      "category": "multiline_date_collision",
+      "expected_detector": "none",
+      "expected_outcome": "flag",
+      "id": "date_003",
+      "source_plan_ref": "G10",
+      "text": "Order date 01/01/2025\nDOB 01/01/2000\nDue 02/01/2025"
+    },
+    {
+      "category": "multiline_date_collision",
+      "expected_detector": "none",
+      "expected_outcome": "flag",
+      "id": "date_004",
+      "source_plan_ref": "G10",
+      "text": "Filing stamp 06-15-24\nPatient DOB 06-15-1960"
+    },
+    {
+      "bbox_context": [
+        {
+          "h": 18.0,
+          "role": "header",
+          "w": 80.0,
+          "x": 0.0,
+          "y": 0.0
+        },
+        {
+          "h": 18.0,
+          "role": "data",
+          "w": 80.0,
+          "x": 0.0,
+          "y": 20.0
+        }
+      ],
+      "category": "column_header_label",
+      "expected_detector": "ssn",
+      "expected_outcome": "redact",
+      "id": "col_000",
+      "source_plan_ref": "G10",
+      "text": "SSN\n123-45-6789"
+    },
+    {
+      "bbox_context": [
+        {
+          "h": 18.0,
+          "role": "header",
+          "w": 110.0,
+          "x": 90.0,
+          "y": 0.0
+        },
+        {
+          "h": 18.0,
+          "role": "data",
+          "w": 110.0,
+          "x": 90.0,
+          "y": 20.0
+        }
+      ],
+      "category": "column_header_label",
+      "expected_detector": "npi",
+      "expected_outcome": "redact",
+      "id": "col_001",
+      "source_plan_ref": "G10",
+      "text": "NPI\n1234567890"
+    },
+    {
+      "bbox_context": [
+        {
+          "h": 18.0,
+          "role": "header",
+          "w": 90.0,
+          "x": 210.0,
+          "y": 0.0
+        },
+        {
+          "h": 18.0,
+          "role": "data",
+          "w": 90.0,
+          "x": 210.0,
+          "y": 20.0
+        }
+      ],
+      "category": "column_header_label",
+      "expected_detector": "dea",
+      "expected_outcome": "redact",
+      "id": "col_002",
+      "source_plan_ref": "G10",
+      "text": "DEA\nAB1234567"
+    },
+    {
+      "bbox_context": [
+        {
+          "h": 18.0,
+          "role": "header",
+          "w": 60.0,
+          "x": 310.0,
+          "y": 0.0
+        },
+        {
+          "h": 18.0,
+          "role": "data",
+          "w": 60.0,
+          "x": 310.0,
+          "y": 20.0
+        }
+      ],
+      "category": "column_header_label",
+      "expected_detector": "address",
+      "expected_outcome": "redact",
+      "id": "col_003",
+      "source_plan_ref": "G10",
+      "text": "ZIP\n94103"
+    },
+    {
+      "bbox_context": [
+        {
+          "h": 18.0,
+          "role": "header",
+          "w": 100.0,
+          "x": 0.0,
+          "y": 40.0
+        },
+        {
+          "h": 18.0,
+          "role": "data",
+          "w": 100.0,
+          "x": 0.0,
+          "y": 60.0
+        }
+      ],
+      "category": "column_header_label",
+      "expected_detector": "ssn",
+      "expected_outcome": "suppress",
+      "id": "col_004",
+      "source_plan_ref": "G10",
+      "text": "Amount\n123-45-6789"
+    },
+    {
+      "bbox_context": [
+        {
+          "h": 18.0,
+          "role": "header",
+          "w": 120.0,
+          "x": 0.0,
+          "y": 80.0
+        },
+        {
+          "h": 18.0,
+          "role": "data",
+          "w": 120.0,
+          "x": 0.0,
+          "y": 100.0
+        },
+        {
+          "h": 18.0,
+          "role": "data",
+          "w": 120.0,
+          "x": 0.0,
+          "y": 120.0
+        }
+      ],
+      "category": "column_header_label",
+      "expected_detector": "ssn",
+      "expected_outcome": "redact",
+      "id": "col_005",
+      "source_plan_ref": "G10",
+      "text": "Patient SSN\n123-45-6789\n987-65-4321"
+    },
+    {
+      "bbox_context": [
+        {
+          "h": 18.0,
+          "role": "header",
+          "w": 80.0,
+          "x": 0.0,
+          "y": 140.0
+        },
+        {
+          "h": 18.0,
+          "role": "data",
+          "w": 80.0,
+          "x": 0.0,
+          "y": 160.0
+        }
+      ],
+      "category": "column_header_label",
+      "expected_detector": "ssn",
+      "expected_outcome": "flag",
+      "id": "col_006",
+      "source_plan_ref": "G10",
+      "text": "SSN\n078-05-1120"
+    }
+  ],
+  "seed": 20260416,
+  "version": 2
+}

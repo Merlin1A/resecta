@@ -1,0 +1,357 @@
+{
+  "generated_by": "resecta-data/vectors/dob",
+  "seed": 20260416,
+  "vectors": [
+    {
+      "date_part": "6/12/1955",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "Birthdate: 6/12/1955",
+      "valid": true
+    },
+    {
+      "date_part": "9-18-1960",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "D.O.B.: 9-18-1960",
+      "valid": true
+    },
+    {
+      "date_part": "3/9/2004",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "Date of Birth: 3/9/2004",
+      "valid": true
+    },
+    {
+      "date_part": "9/6/1960",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "Born: 9/6/1960",
+      "valid": true
+    },
+    {
+      "date_part": "12/18/2008",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "Date of Birth: 12/18/2008",
+      "valid": true
+    },
+    {
+      "date_part": "12-10-1976",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "Birth Date: 12-10-1976",
+      "valid": true
+    },
+    {
+      "date_part": "8/8/1981",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "Date of Birth: 8/8/1981",
+      "valid": true
+    },
+    {
+      "date_part": "1/30/2023",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "D.O.B.: 1/30/2023",
+      "valid": true
+    },
+    {
+      "date_part": "5-1-2000",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "Birth Date: 5-1-2000",
+      "valid": true
+    },
+    {
+      "date_part": "6-18-1976",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "Birth Date: 6-18-1976",
+      "valid": true
+    },
+    {
+      "date_part": "6-30-2007",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "Birth Date: 6-30-2007",
+      "valid": true
+    },
+    {
+      "date_part": "8-26-2004",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "Birth Date: 8-26-2004",
+      "valid": true
+    },
+    {
+      "date_part": "11/13/1926",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "Date of Birth: 11/13/1926",
+      "valid": true
+    },
+    {
+      "date_part": "4/16/1958",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "D.O.B.: 4/16/1958",
+      "valid": true
+    },
+    {
+      "date_part": "3-25-1936",
+      "notes": "Numeric date with label prefix; passes per-month validation.",
+      "rejection_reason": null,
+      "text": "Birthdate: 3-25-1936",
+      "valid": true
+    },
+    {
+      "date_part": "June 26, 1960",
+      "notes": "Textual month-name date with label prefix.",
+      "rejection_reason": null,
+      "text": "Birth Date: June 26, 1960",
+      "valid": true
+    },
+    {
+      "date_part": "September 30, 1975",
+      "notes": "Textual month-name date with label prefix.",
+      "rejection_reason": null,
+      "text": "Born: September 30, 1975",
+      "valid": true
+    },
+    {
+      "date_part": "October 17, 1992",
+      "notes": "Textual month-name date with label prefix.",
+      "rejection_reason": null,
+      "text": "Date of Birth: October 17, 1992",
+      "valid": true
+    },
+    {
+      "date_part": "August 15, 1928",
+      "notes": "Textual month-name date with label prefix.",
+      "rejection_reason": null,
+      "text": "Born: August 15, 1928",
+      "valid": true
+    },
+    {
+      "date_part": "November 11, 1974",
+      "notes": "Textual month-name date with label prefix.",
+      "rejection_reason": null,
+      "text": "Birthdate: November 11, 1974",
+      "valid": true
+    },
+    {
+      "date_part": "2/29/2000",
+      "notes": "Feb 29 2000 — leap year, valid.",
+      "rejection_reason": null,
+      "text": "DOB: 2/29/2000",
+      "valid": true
+    },
+    {
+      "date_part": "2/29/2004",
+      "notes": "Feb 29 2004 — leap year, valid.",
+      "rejection_reason": null,
+      "text": "DOB: 2/29/2004",
+      "valid": true
+    },
+    {
+      "date_part": "2/29/2020",
+      "notes": "Feb 29 2020 — leap year, valid.",
+      "rejection_reason": null,
+      "text": "DOB: 2/29/2020",
+      "valid": true
+    },
+    {
+      "date_part": "2/29/2024",
+      "notes": "Feb 29 2024 — leap year, valid.",
+      "rejection_reason": null,
+      "text": "DOB: 2/29/2024",
+      "valid": true
+    },
+    {
+      "date_part": "2/29/1900",
+      "notes": "Feb 29 1900 — not a leap year.",
+      "rejection_reason": "non_leap_feb_29",
+      "text": "DOB: 2/29/1900",
+      "valid": false
+    },
+    {
+      "date_part": "2/29/2021",
+      "notes": "Feb 29 2021 — not a leap year.",
+      "rejection_reason": "non_leap_feb_29",
+      "text": "DOB: 2/29/2021",
+      "valid": false
+    },
+    {
+      "date_part": "2/29/2023",
+      "notes": "Feb 29 2023 — not a leap year.",
+      "rejection_reason": "non_leap_feb_29",
+      "text": "DOB: 2/29/2023",
+      "valid": false
+    },
+    {
+      "date_part": "2/29/2100",
+      "notes": "Feb 29 2100 — not a leap year.",
+      "rejection_reason": "non_leap_feb_29",
+      "text": "DOB: 2/29/2100",
+      "valid": false
+    },
+    {
+      "date_part": "13/6/2009",
+      "notes": "Month 13 outside 1..12.",
+      "rejection_reason": "invalid_month",
+      "text": "DOB: 13/6/2009",
+      "valid": false
+    },
+    {
+      "date_part": "14/3/1995",
+      "notes": "Month 14 outside 1..12.",
+      "rejection_reason": "invalid_month",
+      "text": "DOB: 14/3/1995",
+      "valid": false
+    },
+    {
+      "date_part": "15/12/2011",
+      "notes": "Month 15 outside 1..12.",
+      "rejection_reason": "invalid_month",
+      "text": "DOB: 15/12/2011",
+      "valid": false
+    },
+    {
+      "date_part": "13/3/1923",
+      "notes": "Month 13 outside 1..12.",
+      "rejection_reason": "invalid_month",
+      "text": "DOB: 13/3/1923",
+      "valid": false
+    },
+    {
+      "date_part": "0/3/1950",
+      "notes": "Month 0 outside 1..12.",
+      "rejection_reason": "invalid_month",
+      "text": "DOB: 0/3/1950",
+      "valid": false
+    },
+    {
+      "date_part": "13/12/1975",
+      "notes": "Month 13 outside 1..12.",
+      "rejection_reason": "invalid_month",
+      "text": "DOB: 13/12/1975",
+      "valid": false
+    },
+    {
+      "date_part": "7/33/2005",
+      "notes": "Day 33 outside 1..31.",
+      "rejection_reason": "invalid_day",
+      "text": "DOB: 7/33/2005",
+      "valid": false
+    },
+    {
+      "date_part": "5/32/2014",
+      "notes": "Day 32 outside 1..31.",
+      "rejection_reason": "invalid_day",
+      "text": "DOB: 5/32/2014",
+      "valid": false
+    },
+    {
+      "date_part": "1/33/1979",
+      "notes": "Day 33 outside 1..31.",
+      "rejection_reason": "invalid_day",
+      "text": "DOB: 1/33/1979",
+      "valid": false
+    },
+    {
+      "date_part": "9/33/2015",
+      "notes": "Day 33 outside 1..31.",
+      "rejection_reason": "invalid_day",
+      "text": "DOB: 9/33/2015",
+      "valid": false
+    },
+    {
+      "date_part": "12/32/2012",
+      "notes": "Day 32 outside 1..31.",
+      "rejection_reason": "invalid_day",
+      "text": "DOB: 12/32/2012",
+      "valid": false
+    },
+    {
+      "date_part": "7/32/1920",
+      "notes": "Day 32 outside 1..31.",
+      "rejection_reason": "invalid_day",
+      "text": "DOB: 7/32/1920",
+      "valid": false
+    },
+    {
+      "date_part": "11/32/1934",
+      "notes": "Day 32 outside 1..31.",
+      "rejection_reason": "invalid_day",
+      "text": "DOB: 11/32/1934",
+      "valid": false
+    },
+    {
+      "date_part": "2/33/1950",
+      "notes": "Day 33 outside 1..31.",
+      "rejection_reason": "invalid_day",
+      "text": "DOB: 2/33/1950",
+      "valid": false
+    },
+    {
+      "date_part": "2/30/2020",
+      "notes": "feb_30: day 30 exceeds February length.",
+      "rejection_reason": "month_day_overflow",
+      "text": "DOB: 2/30/2020",
+      "valid": false
+    },
+    {
+      "date_part": "4/31/2020",
+      "notes": "apr_31: day 31 exceeds April length.",
+      "rejection_reason": "month_day_overflow",
+      "text": "DOB: 4/31/2020",
+      "valid": false
+    },
+    {
+      "date_part": "6/31/2020",
+      "notes": "jun_31: day 31 exceeds June length.",
+      "rejection_reason": "month_day_overflow",
+      "text": "DOB: 6/31/2020",
+      "valid": false
+    },
+    {
+      "date_part": "9/31/2020",
+      "notes": "sep_31: day 31 exceeds September length.",
+      "rejection_reason": "month_day_overflow",
+      "text": "DOB: 9/31/2020",
+      "valid": false
+    },
+    {
+      "date_part": "11/31/2020",
+      "notes": "nov_31: day 31 exceeds November length.",
+      "rejection_reason": "month_day_overflow",
+      "text": "DOB: 11/31/2020",
+      "valid": false
+    },
+    {
+      "date_part": "2/30/2024",
+      "notes": "feb_30_leap: day 30 exceeds February length.",
+      "rejection_reason": "month_day_overflow",
+      "text": "DOB: 2/30/2024",
+      "valid": false
+    },
+    {
+      "date_part": "4/31/1995",
+      "notes": "apr_31_alt: day 31 exceeds April length.",
+      "rejection_reason": "month_day_overflow",
+      "text": "DOB: 4/31/1995",
+      "valid": false
+    },
+    {
+      "date_part": "6/31/1985",
+      "notes": "jun_31_alt: day 31 exceeds June length.",
+      "rejection_reason": "month_day_overflow",
+      "text": "DOB: 6/31/1985",
+      "valid": false
+    }
+  ],
+  "version": 1
+}

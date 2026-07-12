@@ -1,0 +1,483 @@
+{
+  "generated_by": "resecta-data/vectors/passport",
+  "seed": 20260416,
+  "vectors": [
+    {
+      "notes": "Label ``Passport No`` with 2L+7D number.",
+      "passport_number": "TK8863248",
+      "rejection_reason": null,
+      "text": "Passport No TK8863248",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport`` with 2L+7D number.",
+      "passport_number": "ZC6804749",
+      "rejection_reason": null,
+      "text": "Passport ZC6804749",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport Number`` with 2L+7D number.",
+      "passport_number": "ZE5012407",
+      "rejection_reason": null,
+      "text": "Passport Number: ZE5012407",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport Number`` with 2L+8D number.",
+      "passport_number": "NX75061443",
+      "rejection_reason": null,
+      "text": "Passport Number NX75061443",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport Number`` with 1L+7D number.",
+      "passport_number": "E8795568",
+      "rejection_reason": null,
+      "text": "Passport Number#E8795568",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport Number`` with 2L+6D number.",
+      "passport_number": "OO765932",
+      "rejection_reason": null,
+      "text": "Passport Number# OO765932",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport No`` with 2L+8D number.",
+      "passport_number": "WE10801335",
+      "rejection_reason": null,
+      "text": "Passport No:WE10801335",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport Number`` with 2L+7D number.",
+      "passport_number": "IX4075832",
+      "rejection_reason": null,
+      "text": "Passport Number IX4075832",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport Number`` with 1L+6D number.",
+      "passport_number": "K136803",
+      "rejection_reason": null,
+      "text": "Passport Number:K136803",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport`` with 2L+8D number.",
+      "passport_number": "RW79860442",
+      "rejection_reason": null,
+      "text": "Passport: RW79860442",
+      "valid": true
+    },
+    {
+      "notes": "Label ``PP`` with 2L+6D number.",
+      "passport_number": "YV562109",
+      "rejection_reason": null,
+      "text": "PP: YV562109",
+      "valid": true
+    },
+    {
+      "notes": "Label ``PP`` with 1L+6D number.",
+      "passport_number": "G285136",
+      "rejection_reason": null,
+      "text": "PP G285136",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport No`` with 1L+7D number.",
+      "passport_number": "A8335513",
+      "rejection_reason": null,
+      "text": "Passport No:A8335513",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport No`` with 1L+6D number.",
+      "passport_number": "O361141",
+      "rejection_reason": null,
+      "text": "Passport No:O361141",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport Number`` with 2L+9D number.",
+      "passport_number": "WC031162498",
+      "rejection_reason": null,
+      "text": "Passport Number#WC031162498",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport Number`` with 2L+6D number.",
+      "passport_number": "GW096593",
+      "rejection_reason": null,
+      "text": "Passport Number#GW096593",
+      "valid": true
+    },
+    {
+      "notes": "Label ``PP`` with 2L+9D number.",
+      "passport_number": "SQ170136999",
+      "rejection_reason": null,
+      "text": "PP# SQ170136999",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport No`` with 1L+9D number.",
+      "passport_number": "D579125913",
+      "rejection_reason": null,
+      "text": "Passport No:D579125913",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport No`` with 2L+6D number.",
+      "passport_number": "YU956951",
+      "rejection_reason": null,
+      "text": "Passport No:YU956951",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport No`` with 1L+9D number.",
+      "passport_number": "O879413522",
+      "rejection_reason": null,
+      "text": "Passport No O879413522",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport No`` with 2L+8D number.",
+      "passport_number": "AW53655236",
+      "rejection_reason": null,
+      "text": "Passport No AW53655236",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport Number`` with 1L+7D number.",
+      "passport_number": "E7263581",
+      "rejection_reason": null,
+      "text": "Passport Number# E7263581",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport`` with 2L+8D number.",
+      "passport_number": "SU92568076",
+      "rejection_reason": null,
+      "text": "Passport#SU92568076",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport No`` with 1L+8D number.",
+      "passport_number": "D30872287",
+      "rejection_reason": null,
+      "text": "Passport No# D30872287",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport Number`` with 2L+7D number.",
+      "passport_number": "WK3829355",
+      "rejection_reason": null,
+      "text": "Passport Number:WK3829355",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport`` with 1L+7D number.",
+      "passport_number": "Q9462870",
+      "rejection_reason": null,
+      "text": "Passport Q9462870",
+      "valid": true
+    },
+    {
+      "notes": "Label ``PP`` with 2L+7D number.",
+      "passport_number": "HE9609226",
+      "rejection_reason": null,
+      "text": "PP# HE9609226",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport Number`` with 2L+6D number.",
+      "passport_number": "UI559144",
+      "rejection_reason": null,
+      "text": "Passport Number# UI559144",
+      "valid": true
+    },
+    {
+      "notes": "Label ``PP`` with 2L+8D number.",
+      "passport_number": "GC84832339",
+      "rejection_reason": null,
+      "text": "PP#GC84832339",
+      "valid": true
+    },
+    {
+      "notes": "Label ``PP`` with 1L+7D number.",
+      "passport_number": "V5658841",
+      "rejection_reason": null,
+      "text": "PP:V5658841",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport Number`` with 1L+7D number.",
+      "passport_number": "I7620243",
+      "rejection_reason": null,
+      "text": "Passport Number:I7620243",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport Number`` with 2L+6D number.",
+      "passport_number": "VW106535",
+      "rejection_reason": null,
+      "text": "Passport Number VW106535",
+      "valid": true
+    },
+    {
+      "notes": "Label ``PP`` with 1L+6D number.",
+      "passport_number": "S463413",
+      "rejection_reason": null,
+      "text": "PP:S463413",
+      "valid": true
+    },
+    {
+      "notes": "Label ``PP`` with 2L+8D number.",
+      "passport_number": "OJ54110011",
+      "rejection_reason": null,
+      "text": "PP OJ54110011",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport`` with 2L+8D number.",
+      "passport_number": "LZ26865920",
+      "rejection_reason": null,
+      "text": "Passport# LZ26865920",
+      "valid": true
+    },
+    {
+      "notes": "Label ``PP`` with 1L+6D number.",
+      "passport_number": "A727497",
+      "rejection_reason": null,
+      "text": "PP: A727497",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport No`` with 2L+7D number.",
+      "passport_number": "NA3294278",
+      "rejection_reason": null,
+      "text": "Passport No:NA3294278",
+      "valid": true
+    },
+    {
+      "notes": "Label ``PP`` with 2L+8D number.",
+      "passport_number": "ZR97594016",
+      "rejection_reason": null,
+      "text": "PP:ZR97594016",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport`` with 1L+9D number.",
+      "passport_number": "M395653985",
+      "rejection_reason": null,
+      "text": "Passport#M395653985",
+      "valid": true
+    },
+    {
+      "notes": "Label ``Passport No`` with 2L+6D number.",
+      "passport_number": "BW188485",
+      "rejection_reason": null,
+      "text": "Passport No: BW188485",
+      "valid": true
+    },
+    {
+      "notes": "Passport regex requires a Passport / PP label prefix.",
+      "passport_number": "Y614089082",
+      "rejection_reason": "no_label",
+      "text": "Y614089082",
+      "valid": false
+    },
+    {
+      "notes": "Passport regex requires a Passport / PP label prefix.",
+      "passport_number": "K767554258",
+      "rejection_reason": "no_label",
+      "text": "K767554258",
+      "valid": false
+    },
+    {
+      "notes": "Passport regex requires a Passport / PP label prefix.",
+      "passport_number": "XQ29998064",
+      "rejection_reason": "no_label",
+      "text": "XQ29998064",
+      "valid": false
+    },
+    {
+      "notes": "Passport regex requires a Passport / PP label prefix.",
+      "passport_number": "M9060381",
+      "rejection_reason": "no_label",
+      "text": "M9060381",
+      "valid": false
+    },
+    {
+      "notes": "Passport regex requires a Passport / PP label prefix.",
+      "passport_number": "Y0079790",
+      "rejection_reason": "no_label",
+      "text": "Y0079790",
+      "valid": false
+    },
+    {
+      "notes": "Passport regex requires a Passport / PP label prefix.",
+      "passport_number": "BI22442499",
+      "rejection_reason": "no_label",
+      "text": "BI22442499",
+      "valid": false
+    },
+    {
+      "notes": "Passport regex requires a Passport / PP label prefix.",
+      "passport_number": "L129248908",
+      "rejection_reason": "no_label",
+      "text": "L129248908",
+      "valid": false
+    },
+    {
+      "notes": "Passport regex requires a Passport / PP label prefix.",
+      "passport_number": "SA6230349",
+      "rejection_reason": "no_label",
+      "text": "SA6230349",
+      "valid": false
+    },
+    {
+      "notes": "[A-Z]{1,2} requires uppercase prefix letters.",
+      "passport_number": "id870210",
+      "rejection_reason": "lowercase_letters",
+      "text": "Passport Number id870210",
+      "valid": false
+    },
+    {
+      "notes": "[A-Z]{1,2} requires uppercase prefix letters.",
+      "passport_number": "jj66887578",
+      "rejection_reason": "lowercase_letters",
+      "text": "Passport jj66887578",
+      "valid": false
+    },
+    {
+      "notes": "[A-Z]{1,2} requires uppercase prefix letters.",
+      "passport_number": "ag975431653",
+      "rejection_reason": "lowercase_letters",
+      "text": "Passport Number ag975431653",
+      "valid": false
+    },
+    {
+      "notes": "[A-Z]{1,2} requires uppercase prefix letters.",
+      "passport_number": "j08821709",
+      "rejection_reason": "lowercase_letters",
+      "text": "Passport Number j08821709",
+      "valid": false
+    },
+    {
+      "notes": "[A-Z]{1,2} requires uppercase prefix letters.",
+      "passport_number": "hf910897641",
+      "rejection_reason": "lowercase_letters",
+      "text": "Passport No hf910897641",
+      "valid": false
+    },
+    {
+      "notes": "[A-Z]{1,2} requires uppercase prefix letters.",
+      "passport_number": "gd359273853",
+      "rejection_reason": "lowercase_letters",
+      "text": "Passport gd359273853",
+      "valid": false
+    },
+    {
+      "notes": "Less than 6 digits; \\d{6,9} fails.",
+      "passport_number": "Q6392",
+      "rejection_reason": "digits_too_few",
+      "text": "Passport No Q6392",
+      "valid": false
+    },
+    {
+      "notes": "Less than 6 digits; \\d{6,9} fails.",
+      "passport_number": "QL64454",
+      "rejection_reason": "digits_too_few",
+      "text": "Passport No QL64454",
+      "valid": false
+    },
+    {
+      "notes": "Less than 6 digits; \\d{6,9} fails.",
+      "passport_number": "D89",
+      "rejection_reason": "digits_too_few",
+      "text": "Passport No D89",
+      "valid": false
+    },
+    {
+      "notes": "Less than 6 digits; \\d{6,9} fails.",
+      "passport_number": "TZ3124",
+      "rejection_reason": "digits_too_few",
+      "text": "PP TZ3124",
+      "valid": false
+    },
+    {
+      "notes": "Less than 6 digits; \\d{6,9} fails.",
+      "passport_number": "PL98",
+      "rejection_reason": "digits_too_few",
+      "text": "Passport PL98",
+      "valid": false
+    },
+    {
+      "notes": "Less than 6 digits; \\d{6,9} fails.",
+      "passport_number": "WS05113",
+      "rejection_reason": "digits_too_few",
+      "text": "Passport Number WS05113",
+      "valid": false
+    },
+    {
+      "notes": "More than 9 digits; \\d{6,9} caps the trailing run.",
+      "passport_number": "J187985404343",
+      "rejection_reason": "digits_too_many",
+      "text": "Passport Number J187985404343",
+      "valid": false
+    },
+    {
+      "notes": "More than 9 digits; \\d{6,9} caps the trailing run.",
+      "passport_number": "GB0710317786",
+      "rejection_reason": "digits_too_many",
+      "text": "Passport Number GB0710317786",
+      "valid": false
+    },
+    {
+      "notes": "More than 9 digits; \\d{6,9} caps the trailing run.",
+      "passport_number": "FA2086740915",
+      "rejection_reason": "digits_too_many",
+      "text": "PP FA2086740915",
+      "valid": false
+    },
+    {
+      "notes": "More than 9 digits; \\d{6,9} caps the trailing run.",
+      "passport_number": "WH8805414240",
+      "rejection_reason": "digits_too_many",
+      "text": "Passport Number WH8805414240",
+      "valid": false
+    },
+    {
+      "notes": "[A-Z]{1,2} caps prefix at two letters.",
+      "passport_number": "NNQ24558900",
+      "rejection_reason": "letter_prefix_too_long",
+      "text": "Passport NNQ24558900",
+      "valid": false
+    },
+    {
+      "notes": "[A-Z]{1,2} caps prefix at two letters.",
+      "passport_number": "HJR021186",
+      "rejection_reason": "letter_prefix_too_long",
+      "text": "Passport HJR021186",
+      "valid": false
+    },
+    {
+      "notes": "[A-Z]{1,2} caps prefix at two letters.",
+      "passport_number": "AYW08797422",
+      "rejection_reason": "letter_prefix_too_long",
+      "text": "Passport AYW08797422",
+      "valid": false
+    },
+    {
+      "notes": "[A-Z]{1,2} caps prefix at two letters.",
+      "passport_number": "VUF63943475",
+      "rejection_reason": "letter_prefix_too_long",
+      "text": "Passport No VUF63943475",
+      "valid": false
+    }
+  ],
+  "version": 1
+}

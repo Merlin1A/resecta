@@ -1,0 +1,1177 @@
+{
+  "_advisory_note": "F-32 Tier 2 advisory: WA driver-license specimen audit — JSON-only fact-extraction; no specimen images are redistributed. WA legacy PIC filler is moot under the AAMVA M1 envelope substitution (WA ships as envelope; per-state PIC format not reproduced). License-posture distribution: 11 state-work + 26 permissive-OSS-MIT + 3 state-statute-anchored + 11 aamva-envelope = 51; zero needs-legal-review.",
+  "generated_by": "resecta-data/gazetteers/dl_patterns",
+  "generated_date": "2026-04-26",
+  "rows": [
+    {
+      "alphabet": "A-Z0-9",
+      "attestation": "aamva-envelope",
+      "confidence": "medium",
+      "f_flags": [
+        "F-25-closed"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 8
+      },
+      "license_notes": "AAMVA M1 envelope substitution per V1 shipping disposition; canonical envelope per the V1 canonical register; state-format claim retracted; no per-state format reproduced. W-R-3 had `^[0-9]{1,7}$` (visual-only attestation per W-R-5 §3.1); pattern is superseded by envelope.",
+      "license_posture": "aamva-envelope",
+      "patterns": [
+        "^[A-Z0-9]{8,13}$"
+      ],
+      "sample": "06244114",
+      "source_url": "internal license register (AAMVA M1 envelope)",
+      "source_verified_date": "2026-04-25",
+      "state_code": "AK",
+      "state_format_claimed": false,
+      "state_name": "Alaska"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "oss-mit-baseline",
+      "confidence": "medium",
+      "f_flags": [],
+      "length_range": {
+        "max": 8,
+        "min": 1
+      },
+      "license_notes": "MIT baseline (gas-buddy/usdl-regex; adambullmer/USDLRegex) attests; ALEA site shows specimen but no prose format. Older aggregators say `{1,7}`; MIT baseline widened to `{1,8}`.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[0-9]{1,8}$"
+      ],
+      "sample": "6996164",
+      "source_url": "https://www.alea.gov/dps/driver-license/license-and-id-cards",
+      "source_verified_date": "2026-04-22",
+      "state_code": "AL",
+      "state_format_claimed": true,
+      "state_name": "Alabama"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "dmv-prose-publication",
+      "confidence": "medium-high",
+      "dln_overlap_note": "Legacy 9-digit DL is visually indistinguishable from SSN; two-way DLN/SSN ambiguity (was three-way in an earlier revision; D-36 V1-WITHDRAWN). Detector mitigation routes via D-12 / D-16 A21 anchors — no D-36 dependency.",
+      "f_flags": [
+        "F-35"
+      ],
+      "length_range": {
+        "max": 9,
+        "min": 8
+      },
+      "license_notes": "AR INA TVR help page (ark.org state portal) prose-defines DL as 9-digit integer; 8-digit legacy normalized to 9 via zero-padding (`012345678`). Promoted from W-R-3 needs-legal-review per W-R-5 §3.2; tightened from {4,9} to {8,9}. Disconfirms aggregator (Skyhigh/MyShn-lineage) claim that AR DLs always begin with 9.",
+      "license_posture": "state-work",
+      "patterns": [
+        "^[0-9]{8,9}$"
+      ],
+      "sample": "123456789",
+      "source_url": "https://www.ark.org/itvr-demo/help.html",
+      "source_verified_date": "2026-04-23",
+      "state_code": "AR",
+      "state_format_claimed": true,
+      "state_name": "Arkansas"
+    },
+    {
+      "alphabet": "alpha-prefixed OR numeric",
+      "attestation": "dmv-issued-specimen",
+      "confidence": "medium-high",
+      "f_flags": [],
+      "length_range": {
+        "max": 9,
+        "min": 9
+      },
+      "license_notes": "ADOT MVD blog `Evolution of Arizona's Driver License` shows specimens; MIT baseline attests. Legacy 9-numeric (SSN-era) still in circulation.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z][0-9]{8}$|^[0-9]{9}$"
+      ],
+      "sample": "B13654424",
+      "source_url": "https://azdot.gov/mvd/services/driver-services/driver-license-information",
+      "source_verified_date": "2026-04-22",
+      "state_code": "AZ",
+      "state_format_claimed": true,
+      "state_name": "Arizona"
+    },
+    {
+      "alphabet": "alpha-prefixed",
+      "attestation": "dmv-prose-publication",
+      "confidence": "high",
+      "f_flags": [],
+      "length_range": {
+        "max": 8,
+        "min": 8
+      },
+      "license_notes": "DMV handbook shows specimen (1 alpha + 7 numeric); 4 independent MIT libs agree; stable for decades.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z][0-9]{7}$"
+      ],
+      "sample": "A1234567",
+      "source_url": "https://www.dmv.ca.gov/portal/handbook/california-driver-handbook/the-california-driver-license/",
+      "source_verified_date": "2026-04-22",
+      "state_code": "CA",
+      "state_format_claimed": true,
+      "state_name": "California"
+    },
+    {
+      "alphabet": "numeric OR alpha-prefixed",
+      "attestation": "oss-mit-baseline",
+      "confidence": "medium",
+      "f_flags": [],
+      "length_range": {
+        "max": 9,
+        "min": 4
+      },
+      "license_notes": "CO DMV silent; MIT baseline provides 3 alternations; primary form is 9-numeric. Legacy alpha-prefixed variants still circulate.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[0-9]{9}$|^[A-Z][0-9]{3,6}$|^[A-Z]{2}[0-9]{2,5}$"
+      ],
+      "sample": "943320101",
+      "source_url": "https://dmv.colorado.gov/",
+      "source_verified_date": "2026-04-22",
+      "state_code": "CO",
+      "state_format_claimed": true,
+      "state_name": "Colorado"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "oss-mit-baseline",
+      "confidence": "medium",
+      "f_flags": [],
+      "length_range": {
+        "max": 9,
+        "min": 9
+      },
+      "license_notes": "CT DMV silent on format; industry-wide convergent agreement on 9 numeric. Some legacy CT DLs historically encoded DOB in first 2 digits; shape unchanged.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[0-9]{9}$"
+      ],
+      "sample": "146825129",
+      "source_url": "https://portal.ct.gov/DMV",
+      "source_verified_date": "2026-04-22",
+      "state_code": "CT",
+      "state_format_claimed": true,
+      "state_name": "Connecticut"
+    },
+    {
+      "alphabet": "A-Z0-9",
+      "attestation": "aamva-envelope",
+      "confidence": "medium",
+      "f_flags": [
+        "F-25-closed"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 8
+      },
+      "license_notes": "AAMVA M1 envelope substitution per V1 shipping disposition; canonical envelope per the V1 canonical register; state-format claim retracted; no per-state format reproduced. W-R-3 had `^[0-9]{7}$` with secondary `^[0-9]{9}$` cohort per W-R-5 §3.12; live-vs-legacy unresolvable from primary sources, now moot under envelope.",
+      "license_posture": "aamva-envelope",
+      "patterns": [
+        "^[A-Z0-9]{8,13}$"
+      ],
+      "sample": "04829105",
+      "source_url": "internal license register (AAMVA M1 envelope)",
+      "source_verified_date": "2026-04-25",
+      "state_code": "DC",
+      "state_format_claimed": false,
+      "state_name": "District of Columbia"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "oss-mit-baseline",
+      "confidence": "medium",
+      "f_flags": [],
+      "length_range": {
+        "max": 7,
+        "min": 1
+      },
+      "license_notes": "DE DMV site carries State-of-Delaware footer copyright; factual format not restricted (Feist). MIT baseline attests.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[0-9]{1,7}$"
+      ],
+      "sample": "1232805",
+      "source_url": "https://dmv.de.gov/DriverServices/drivers_license/index.shtml",
+      "source_verified_date": "2026-04-22",
+      "state_code": "DE",
+      "state_format_claimed": true,
+      "state_name": "Delaware"
+    },
+    {
+      "alphabet": "alpha-prefixed (Soundex-derived; current partially random)",
+      "attestation": "dmv-prose-publication",
+      "confidence": "high",
+      "f_flags": [
+        "F-29",
+        "F-34"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 13
+      },
+      "license_notes": "Fla. Stat. § 322.14(1)(a) prescribes format; FLHSMV release confirms shape unchanged and ≥4 digits now randomized post-2024-07-31. F-34: V1 regex shape unchanged; no checksum validation in V1 scope. Legacy algorithmic (Soundex of last name + DOB + gender) still in circulation.",
+      "license_posture": "state-work",
+      "patterns": [
+        "^[A-Z][0-9]{12}$"
+      ],
+      "pii_severity": "elevated",
+      "sample": "G544061739250",
+      "source_url": "https://www.flhsmv.gov/2024/07/19/flhsmv-implements-legislation-requiring-driver-licenses-and-identification-card-numbers-to-change/",
+      "source_verified_date": "2026-04-22",
+      "state_code": "FL",
+      "state_format_claimed": true,
+      "state_name": "Florida"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "dmv-issued-specimen",
+      "confidence": "medium-high",
+      "f_flags": [],
+      "length_range": {
+        "max": 9,
+        "min": 7
+      },
+      "license_notes": "DDS (Driver Services) shows specimen but does not prose-document format. MIT baseline attests. 7-digit legacy numbers still exist.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[0-9]{7,9}$"
+      ],
+      "sample": "099999999",
+      "source_url": "https://dds.georgia.gov/georgia-licenseid",
+      "source_verified_date": "2026-04-22",
+      "state_code": "GA",
+      "state_format_claimed": true,
+      "state_name": "Georgia"
+    },
+    {
+      "alphabet": "alpha-prefixed OR numeric",
+      "attestation": "oss-mit-baseline",
+      "confidence": "medium",
+      "dln_overlap_note": "Legacy 9-digit DL is visually indistinguishable from SSN; two-way DLN/SSN ambiguity (was three-way in an earlier revision; D-36 V1-WITHDRAWN). Detector mitigation routes via D-12 / D-16 A21 anchors — no D-36 dependency.",
+      "f_flags": [
+        "F-35"
+      ],
+      "length_range": {
+        "max": 9,
+        "min": 9
+      },
+      "license_notes": "HI DLs are issued at the county level; no centralized format page. MIT baseline attests. Legacy 9-numeric (SSN-era) still in circulation.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z][0-9]{8}$|^[0-9]{9}$"
+      ],
+      "sample": "H00000002",
+      "source_url": "https://hidot.hawaii.gov/highways/motor-vehicle-safety-office/drivers-licensing-cdl/",
+      "source_verified_date": "2026-04-22",
+      "state_code": "HI",
+      "state_format_claimed": true,
+      "state_name": "Hawaii"
+    },
+    {
+      "alphabet": "numeric OR mixed (3n+2a+4n)",
+      "attestation": "oss-mit-baseline",
+      "confidence": "medium",
+      "f_flags": [],
+      "length_range": {
+        "max": 9,
+        "min": 9
+      },
+      "license_notes": "Iowa DOT says DL number is assigned but does not publish structure; MIT baseline attests both variants. 3n+2a+4n is the newer RecID form.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[0-9]{9}$|^[0-9]{3}[A-Z]{2}[0-9]{4}$"
+      ],
+      "sample": "123AB4567",
+      "source_url": "https://iowadot.gov/drivers-licenses-ids",
+      "source_verified_date": "2026-04-22",
+      "state_code": "IA",
+      "state_format_claimed": true,
+      "state_name": "Iowa"
+    },
+    {
+      "alphabet": "2alpha+6num+1alpha OR numeric",
+      "attestation": "oss-mit-baseline",
+      "confidence": "medium",
+      "dln_overlap_note": "Legacy 9-digit DL is visually indistinguishable from SSN; two-way DLN/SSN ambiguity (was three-way in an earlier revision; D-36 V1-WITHDRAWN). Detector mitigation routes via D-12 / D-16 A21 anchors — no D-36 dependency.",
+      "f_flags": [
+        "F-35"
+      ],
+      "length_range": {
+        "max": 9,
+        "min": 9
+      },
+      "license_notes": "ITD DMV silent; MIT baseline provides distinctive AA######A format and legacy SSN alt. Legacy SSN-based 9-digit still in circulation.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z]{2}[0-9]{6}[A-Z]$|^[0-9]{9}$"
+      ],
+      "sample": "AB123456C",
+      "source_url": "https://itd.idaho.gov/dmv/",
+      "source_verified_date": "2026-04-22",
+      "state_code": "ID",
+      "state_format_claimed": true,
+      "state_name": "Idaho"
+    },
+    {
+      "alphabet": "A-Z0-9",
+      "attestation": "aamva-envelope",
+      "confidence": "medium",
+      "f_flags": [
+        "F-39-closed",
+        "F-29"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 8
+      },
+      "license_notes": "AAMVA M1 envelope substitution per V1 shipping disposition; aggregator lineage retired per V1 shipping disposition; canonical envelope per the V1 canonical register; state-format claim retracted; no per-state format reproduced. Underlying real-world IL DL is Soundex-derived (per ISP LEADS manual); F-29 elevated PII-severity flagged at row level.",
+      "license_posture": "aamva-envelope",
+      "patterns": [
+        "^[A-Z0-9]{8,13}$"
+      ],
+      "pii_severity": "elevated",
+      "sample": "D40078360001",
+      "source_url": "internal license register (AAMVA M1 envelope)",
+      "source_verified_date": "2026-04-25",
+      "state_code": "IL",
+      "state_format_claimed": false,
+      "state_name": "Illinois"
+    },
+    {
+      "alphabet": "numeric OR alpha-prefixed",
+      "attestation": "oss-mit-baseline",
+      "confidence": "medium",
+      "f_flags": [],
+      "length_range": {
+        "max": 10,
+        "min": 9
+      },
+      "license_notes": "BMV does not document format; printed with dashes as `####-##-####`. Legacy SSN-based 9-digit still in circulation.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[0-9]{10}$|^[A-Z][0-9]{9}$|^[0-9]{9}$"
+      ],
+      "sample": "0299116078",
+      "source_url": "https://www.in.gov/bmv/",
+      "source_verified_date": "2026-04-22",
+      "state_code": "IN",
+      "state_format_claimed": true,
+      "state_name": "Indiana"
+    },
+    {
+      "alphabet": "alpha-prefixed OR interleaved OR numeric",
+      "attestation": "oss-mit-baseline",
+      "confidence": "medium",
+      "f_flags": [],
+      "length_range": {
+        "max": 9,
+        "min": 5
+      },
+      "license_notes": "KDOR silent; K-prefix variant is dominant today. Multiple legacy variants coexist.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z][0-9]{8}$|^[A-Z][0-9][A-Z][0-9][A-Z]$|^[0-9]{9}$"
+      ],
+      "sample": "K00097443",
+      "source_url": "https://www.ksrevenue.gov/dovdrlic.html",
+      "source_verified_date": "2026-04-22",
+      "state_code": "KS",
+      "state_format_claimed": true,
+      "state_name": "Kansas"
+    },
+    {
+      "alphabet": "alpha-prefixed OR numeric",
+      "attestation": "oss-mit-baseline",
+      "confidence": "medium",
+      "f_flags": [],
+      "length_range": {
+        "max": 10,
+        "min": 9
+      },
+      "license_notes": "KYTC silent; alpha prefix loosely tracks surname region. KY DL modernization c.2019–2022; number shape unchanged.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z][0-9]{8,9}$|^[0-9]{9}$"
+      ],
+      "sample": "V12345678",
+      "source_url": "https://drive.ky.gov/",
+      "source_verified_date": "2026-04-22",
+      "state_code": "KY",
+      "state_format_claimed": true,
+      "state_name": "Kentucky"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "oss-mit-baseline",
+      "confidence": "medium",
+      "dln_overlap_note": "Legacy 9-digit DL is visually indistinguishable from SSN; two-way DLN/SSN ambiguity (was three-way in an earlier revision; D-36 V1-WITHDRAWN). Detector mitigation routes via D-12 / D-16 A21 anchors — no D-36 dependency.",
+      "f_flags": [
+        "F-35"
+      ],
+      "length_range": {
+        "max": 9,
+        "min": 1
+      },
+      "license_notes": "OMV silent on format; MIT baseline attests; 9-digit is current standard. Historically allowed SSN; current DLs are OMV-assigned.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[0-9]{1,9}$"
+      ],
+      "sample": "007000100",
+      "source_url": "https://dps.expresslane.org/driverslicense",
+      "source_verified_date": "2026-04-22",
+      "state_code": "LA",
+      "state_format_claimed": true,
+      "state_name": "Louisiana"
+    },
+    {
+      "alphabet": "alpha-prefixed OR 2alpha+7num OR numeric",
+      "attestation": "oss-mit-baseline",
+      "confidence": "high",
+      "f_flags": [],
+      "historical_variants": [
+        {
+          "coexistence_window_notes": "S-prefix combinations exhausted; SA-prefix variant added; both coexist until renewal cycle completes.",
+          "current_pattern": "^[A-Z]{2}[0-9]{7}$",
+          "legacy_pattern": "^[A-Z][0-9]{8}$",
+          "transition_date": "2018-11-13"
+        }
+      ],
+      "length_range": {
+        "max": 9,
+        "min": 9
+      },
+      "license_notes": "RMV does not document; MIT baseline includes SA-prefix variant added in gas-buddy v1.4.2. F-30: legacy `[0-9]{9}` retained (FP cost already incurred for MS/CT/NM/NY/LA).",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z][0-9]{8}$|^[A-Z]{2}[0-9]{7}$|^[0-9]{9}$"
+      ],
+      "sample": "SA1234567",
+      "source_url": "https://www.mass.gov/orgs/massachusetts-registry-of-motor-vehicles",
+      "source_verified_date": "2026-04-22",
+      "state_code": "MA",
+      "state_format_claimed": true,
+      "state_name": "Massachusetts"
+    },
+    {
+      "alphabet": "alpha-prefixed (Soundex-derived)",
+      "attestation": "dmv-prose-publication",
+      "confidence": "high",
+      "f_flags": [
+        "F-29"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 13
+      },
+      "license_notes": "MVA IDVR User Guide states `the driver's license number must start with a letter followed by 12 numbers` — explicit state-published prose. Soundex system long-standing; encodes last name + initials + DOB.",
+      "license_posture": "state-work",
+      "patterns": [
+        "^[A-Z][0-9]{12}$"
+      ],
+      "pii_severity": "elevated",
+      "sample": "S514778616977",
+      "source_url": "https://egov.maryland.gov/mva/idvr/support/userguide",
+      "source_verified_date": "2026-04-22",
+      "state_code": "MD",
+      "state_format_claimed": true,
+      "state_name": "Maryland"
+    },
+    {
+      "alphabet": "numeric OR 7num+1alpha",
+      "attestation": "oss-mit-baseline",
+      "confidence": "medium",
+      "f_flags": [],
+      "length_range": {
+        "max": 8,
+        "min": 7
+      },
+      "license_notes": "BMV silent; MIT baseline attests both forms. Legacy 7-digit + alpha overflow exists.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[0-9]{7,8}$|^[0-9]{7}[A-Z]$"
+      ],
+      "sample": "8205059A",
+      "source_url": "https://www.maine.gov/sos/bmv",
+      "source_verified_date": "2026-04-22",
+      "state_code": "ME",
+      "state_format_claimed": true,
+      "state_name": "Maine"
+    },
+    {
+      "alphabet": "alpha-prefixed (Soundex-derived)",
+      "attestation": "oss-mit-baseline",
+      "confidence": "high",
+      "f_flags": [
+        "F-29"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 11
+      },
+      "license_notes": "SOS does not prose-document; Gallian and Highprogrammer document algorithm. MI redesigned cards 2024; number format unchanged.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z][0-9]{10}$|^[A-Z][0-9]{12}$"
+      ],
+      "pii_severity": "elevated",
+      "sample": "M123456789012",
+      "source_url": "https://www.michigan.gov/sos/license-id/license-and-id",
+      "source_verified_date": "2026-04-22",
+      "state_code": "MI",
+      "state_format_claimed": true,
+      "state_name": "Michigan"
+    },
+    {
+      "alphabet": "alpha-prefixed",
+      "attestation": "oss-mit-baseline",
+      "confidence": "high",
+      "f_flags": [
+        "F-29"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 13
+      },
+      "license_notes": "DPS shows specimen; MIT baseline attests. Transitioned 2004-12-13 from Gallian-style encoded to non-encoded/random; shape unchanged. Legacy algorithmic DLs (pre-2004) still in circulation; F-29 elevated PII-severity for the legacy cohort.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z][0-9]{12}$"
+      ],
+      "pii_severity": "elevated",
+      "sample": "P800000224322",
+      "source_url": "https://dps.mn.gov/divisions/dvs/license-and-id/dl-and-id-card-information",
+      "source_verified_date": "2026-04-22",
+      "state_code": "MN",
+      "state_format_claimed": true,
+      "state_name": "Minnesota"
+    },
+    {
+      "alphabet": "alphanumeric (1 alpha + 9 digits)",
+      "attestation": "dmv-issued-specimen",
+      "confidence": "medium",
+      "f_flags": [
+        "F-26-closed"
+      ],
+      "length_range": {
+        "max": 10,
+        "min": 10
+      },
+      "license_notes": "DOR Form 5443 specimen shows current DL as `T123456789`; DOR prose narrates Dec 2012 central-issuance migration + Apr 2017 director-signature removal + Jun 2020 redesign. RSMo § 302.181 delegates format to DOR Director (no statutory format spec). F-26 closed: collapsed from W-R-3 6 alternations to single live `^[A-Z][0-9]{9}$` per W-R-5 §3.3. Pre-2005 SSN-as-DLN cohort expired; pre-Dec-2012 alpha+5-9 alternations are legacy.",
+      "license_posture": "state-work",
+      "patterns": [
+        "^[A-Z][0-9]{9}$"
+      ],
+      "sample": "T123456789",
+      "source_url": "https://dor.mo.gov/forms/5443.pdf",
+      "source_verified_date": "2026-04-23",
+      "state_code": "MO",
+      "state_format_claimed": true,
+      "state_name": "Missouri"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "oss-mit-baseline",
+      "confidence": "medium",
+      "dln_overlap_note": "9-digit DL is visually indistinguishable from SSN; two-way DLN/SSN ambiguity (was three-way in an earlier revision; D-36 V1-WITHDRAWN). MS highest-risk per spec §1.15. Detector mitigation routes via D-12 / D-16 A21 anchors — no D-36 dependency.",
+      "f_flags": [
+        "F-35"
+      ],
+      "length_range": {
+        "max": 9,
+        "min": 9
+      },
+      "license_notes": "DPS silent; MIT baseline attests 9-numeric. Often printed SSN-style `###-##-####`. Historical SSN-as-DL; modern numbers are not SSN but look like one.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[0-9]{9}$"
+      ],
+      "sample": "125012050",
+      "source_url": "https://www.dps.ms.gov/",
+      "source_verified_date": "2026-04-22",
+      "state_code": "MS",
+      "state_format_claimed": true,
+      "state_name": "Mississippi"
+    },
+    {
+      "alphabet": "A-Z0-9",
+      "attestation": "aamva-envelope",
+      "confidence": "medium",
+      "f_flags": [
+        "F-25-closed"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 8
+      },
+      "license_notes": "AAMVA M1 envelope substitution per V1 shipping disposition; canonical envelope per the V1 canonical register; state-format claim retracted; no per-state format reproduced. W-R-3 had 4 alternations (^[0-9]{13}$ | ^[A-Z][0-9]{8}$ | ^[0-9]{9}$ | ^[0-9]{14}$); MCA 61-5-111(2) requires only `distinguishing number` (no format spec); the `41-prefix birthdate-embedded 13-digit` narrative traces to non-authoritative aggregators per W-R-5 §3.4 — pattern superseded by envelope.",
+      "license_posture": "aamva-envelope",
+      "patterns": [
+        "^[A-Z0-9]{8,13}$"
+      ],
+      "sample": "0312345200141",
+      "source_url": "internal license register (AAMVA M1 envelope)",
+      "source_verified_date": "2026-04-25",
+      "state_code": "MT",
+      "state_format_claimed": false,
+      "state_name": "Montana"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "primary-published-spec",
+      "confidence": "low",
+      "f_flags": [
+        "F-25-closed"
+      ],
+      "length_range": {
+        "max": 12,
+        "min": 8
+      },
+      "license_notes": "Anchored to N.C. G.S. § 20-7(n)(7) (format provision; UVC paraphrase as `identifying number`). Re-verified 2026-04-26 against ncleg.gov direct fetch. Range tightened from W-R-3 {1,12} to {8,12} per W-R-5 §3.5 (no NC primary backs <8 digits; aggregator-only lower bound dropped). NC § 20-7(b1)–(b2) mandate SSN/ITIN submission and bar SSN-as-DLN public disclosure but do not specify DL number length, alphabet, or check-digit; the format provision (n)(7) anchors the identifier's existence without format spec.",
+      "license_posture": "state-statute-anchored",
+      "patterns": [
+        "^[0-9]{8,12}$"
+      ],
+      "sample": "801330315987",
+      "source_url": "https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_20/GS_20-7.pdf",
+      "source_verified_date": "2026-04-26",
+      "state_code": "NC",
+      "state_format_claimed": true,
+      "state_name": "North Carolina"
+    },
+    {
+      "alphabet": "3alpha+6num OR numeric",
+      "attestation": "dmv-issued-specimen",
+      "confidence": "medium",
+      "f_flags": [],
+      "length_range": {
+        "max": 9,
+        "min": 9
+      },
+      "license_notes": "NDDOT shows specimens; 3-alpha prefix = first 3 letters of last name (padded with X). Mild re-identification risk.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z]{3}[0-9]{6}$|^[0-9]{9}$"
+      ],
+      "sample": "SMI850001",
+      "source_url": "https://www.dot.nd.gov/driver/driver-license-and-non-driver-id",
+      "source_verified_date": "2026-04-22",
+      "state_code": "ND",
+      "state_format_claimed": true,
+      "state_name": "North Dakota"
+    },
+    {
+      "alphabet": "alpha-prefixed OR numeric",
+      "attestation": "dmv-issued-specimen",
+      "confidence": "medium-high",
+      "f_flags": [],
+      "length_range": {
+        "max": 9,
+        "min": 1
+      },
+      "license_notes": "DMV specimen brochure shows sample `N99999999`; federal E-Verify fact sheet corroborates. MIT baseline (gas-buddy v1.0.3) widened alpha form. Legacy 1–7 numeric persists from earlier issuance.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-HJ-NP-Z][0-9]{8}$|^[0-9]{1,7}$"
+      ],
+      "sample": "N12345678",
+      "source_url": "https://dmv.nebraska.gov/sites/dmv.nebraska.gov/files/doc/dls/2021_DLID_BROCHURE.pdf",
+      "source_verified_date": "2026-04-22",
+      "state_code": "NE",
+      "state_format_claimed": true,
+      "state_name": "Nebraska"
+    },
+    {
+      "alphabet": "alpha-prefixed OR mixed",
+      "attestation": "dmv-prose-publication",
+      "confidence": "high",
+      "f_flags": [
+        "F-29"
+      ],
+      "historical_variants": [
+        {
+          "coexistence_window_notes": "10-char name/DOB-derived → 11-char 3A+8N; both valid until renewal cycle completes.",
+          "current_pattern": "^[A-Z]{3}[0-9]{8}$",
+          "legacy_pattern": "^[0-9]{2}[A-Z]{3}[0-9]{5}$",
+          "transition_date": "2017-10-11"
+        }
+      ],
+      "length_range": {
+        "max": 11,
+        "min": 10
+      },
+      "license_notes": "DMV press release explicitly states: `three letters and eight randomly assigned digits for a total of 11 characters` (new) vs. `10 digit numbers...based on a person's name and birth date` (legacy). F-29 elevated PII-severity for legacy 10-char name/DOB-derived cohort still in circulation.",
+      "license_posture": "state-work",
+      "patterns": [
+        "^[A-Z]{3}[0-9]{8}$|^[0-9]{2}[A-Z]{3}[0-9]{5}$"
+      ],
+      "pii_severity": "elevated",
+      "sample": "ABC12345678",
+      "source_url": "https://www.nh.gov/safety/divisions/dmv/news-events/2017/20171206-driver-license-number.htm",
+      "source_verified_date": "2026-04-22",
+      "state_code": "NH",
+      "state_format_claimed": true,
+      "state_name": "New Hampshire"
+    },
+    {
+      "alphabet": "A-Z0-9",
+      "attestation": "aamva-envelope",
+      "confidence": "medium",
+      "f_flags": [
+        "F-39-closed"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 8
+      },
+      "license_notes": "AAMVA M1 envelope substitution per V1 shipping disposition; aggregator lineage retired per V1 shipping disposition; canonical envelope per the V1 canonical register; state-format claim retracted; no per-state format reproduced. W-R-3 had `^[A-Z][0-9]{14}$` (15 chars; first char = surname initial; digits encode name/DOB/sex) — outside envelope's 8-13 range, so real NJ DLs of the 15-char form will not match the envelope (accepted V1 detection gap per V1 shipping disposition false-positive-vs-false-negative tradeoff).",
+      "license_posture": "aamva-envelope",
+      "patterns": [
+        "^[A-Z0-9]{8,13}$"
+      ],
+      "sample": "S123456789012",
+      "source_url": "internal license register (AAMVA M1 envelope)",
+      "source_verified_date": "2026-04-25",
+      "state_code": "NJ",
+      "state_format_claimed": false,
+      "state_name": "New Jersey"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "dmv-prose-publication",
+      "confidence": "high",
+      "f_flags": [],
+      "length_range": {
+        "max": 9,
+        "min": 9
+      },
+      "license_notes": "MVD online renewal service explicitly states `This 9-digit number can be found at the top of your license.`",
+      "license_posture": "state-work",
+      "patterns": [
+        "^[0-9]{9}$"
+      ],
+      "sample": "013696424",
+      "source_url": "https://secure.mvd.newmexico.gov/RenewalServices/default.aspx",
+      "source_verified_date": "2026-04-22",
+      "state_code": "NM",
+      "state_format_claimed": true,
+      "state_name": "New Mexico"
+    },
+    {
+      "alphabet": "A-Z0-9",
+      "attestation": "aamva-envelope",
+      "confidence": "medium",
+      "f_flags": [
+        "F-39-closed"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 8
+      },
+      "license_notes": "AAMVA M1 envelope substitution per V1 shipping disposition; aggregator lineage retired per V1 shipping disposition; canonical envelope per the V1 canonical register; state-format claim retracted; no per-state format reproduced. W-R-3 had 4 alternations (10-digit dominant; 9-digit legacy; 12-digit; X-prefix non-REAL-ID); pattern superseded by envelope.",
+      "license_posture": "aamva-envelope",
+      "patterns": [
+        "^[A-Z0-9]{8,13}$"
+      ],
+      "sample": "1234567890",
+      "source_url": "internal license register (AAMVA M1 envelope)",
+      "source_verified_date": "2026-04-25",
+      "state_code": "NV",
+      "state_format_claimed": false,
+      "state_name": "Nevada"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "dmv-prose-publication",
+      "confidence": "high",
+      "f_flags": [],
+      "length_range": {
+        "max": 9,
+        "min": 9
+      },
+      "license_notes": "DMV explicitly: `9 digit DMV ID Number on the front of the document under the phrase DRIVER LICENSE.` The 8-or-10-char `document number` is a separate security field (DD), not the DL number. F-27 closed: OSS-baseline exotic alternations (`^[A-Z][0-9]{18}$`, `^[0-9]{16}$`, `^[A-Z]{8}$`) not present on dmv.ny.gov as primary DL identifiers — treated as legacy/commercial variants outside V1 scope.",
+      "license_posture": "state-work",
+      "patterns": [
+        "^[0-9]{9}$"
+      ],
+      "sample": "123456789",
+      "source_url": "https://dmv.ny.gov/driver-license/sample-photo-documents",
+      "source_verified_date": "2026-04-22",
+      "state_code": "NY",
+      "state_format_claimed": true,
+      "state_name": "New York"
+    },
+    {
+      "alphabet": "alpha-prefixed OR numeric",
+      "attestation": "dmv-issued-specimen",
+      "confidence": "medium",
+      "f_flags": [],
+      "length_range": {
+        "max": 9,
+        "min": 5
+      },
+      "license_notes": "BMV shows specimens; 2A+6N is common current form. 2018 central-issuance redesign; format unchanged.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z]{2}[0-9]{6}$|^[A-Z][0-9]{4,8}$|^[0-9]{8}$"
+      ],
+      "sample": "TL545796",
+      "source_url": "https://www.bmv.ohio.gov/dl-identity-documents.aspx",
+      "source_verified_date": "2026-04-22",
+      "state_code": "OH",
+      "state_format_claimed": true,
+      "state_name": "Ohio"
+    },
+    {
+      "alphabet": "alpha-prefixed OR numeric",
+      "attestation": "news-quoted-spokesperson",
+      "confidence": "medium-high",
+      "f_flags": [],
+      "length_range": {
+        "max": 10,
+        "min": 9
+      },
+      "license_notes": "DPS announced new 10-char alpha+9N via news releases c.2014; state portal silent; MIT baseline attests. Transition c.2014: 9N → 1A+9N; legacy 9-numeric still valid. Alpha prefix serves as fraud check.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z][0-9]{9}$|^[0-9]{9}$"
+      ],
+      "sample": "B000062835",
+      "source_url": "https://oklahoma.gov/servicedriver-license.html",
+      "source_verified_date": "2026-04-22",
+      "state_code": "OK",
+      "state_format_claimed": true,
+      "state_name": "Oklahoma"
+    },
+    {
+      "alphabet": "numeric OR A/B-prefixed",
+      "attestation": "dmv-issued-specimen",
+      "confidence": "medium",
+      "f_flags": [],
+      "length_range": {
+        "max": 9,
+        "min": 1
+      },
+      "license_notes": "ODOT DMV shows sample cards; no explicit digit count. MIT baseline (gas-buddy v1.0.2) added `A/B`+6N historical variant. Low lower-bound reflects historical low-serial cards still valid.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[0-9]{1,9}$|^[AB][0-9]{6}$"
+      ],
+      "sample": "6110033",
+      "source_url": "https://www.oregon.gov/odot/dmv/pages/driverid/samplecards.aspx",
+      "source_verified_date": "2026-04-22",
+      "state_code": "OR",
+      "state_format_claimed": true,
+      "state_name": "Oregon"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "dmv-prose-publication",
+      "confidence": "high",
+      "f_flags": [],
+      "length_range": {
+        "max": 8,
+        "min": 8
+      },
+      "license_notes": "PennDOT explicitly: `Your eight (8) digit Driver's License Number (DLN).` The `DD number` on PA cards is a document discriminator, not the DLN.",
+      "license_posture": "state-work",
+      "patterns": [
+        "^[0-9]{8}$"
+      ],
+      "sample": "99900104",
+      "source_url": "https://www.pa.gov/agencies/dmv/faqs/driver-licensing-faqs/find-your-drivers-license-photo-id-number",
+      "source_verified_date": "2026-04-22",
+      "state_code": "PA",
+      "state_format_claimed": true,
+      "state_name": "Pennsylvania"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "dmv-prose-publication",
+      "confidence": "high",
+      "f_flags": [],
+      "historical_variants": [
+        {
+          "coexistence_window_notes": "RIMS launch July 5 2017; both 7-digit and 8-digit valid until renewal cycle completes.",
+          "current_pattern": "^[0-9]{8}$",
+          "legacy_pattern": "^[0-9]{7}$",
+          "transition_date": "2017-07-05"
+        }
+      ],
+      "length_range": {
+        "max": 8,
+        "min": 7
+      },
+      "license_notes": "RI DBR Industry Alert 2017-2 explicitly documents 7→8 transition July 5 2017 (RIMS launch). Some sources also report rare 1A+6N variant (unconfirmed; not shipped).",
+      "license_posture": "state-work",
+      "patterns": [
+        "^[0-9]{8}$|^[0-9]{7}$"
+      ],
+      "sample": "12345678",
+      "source_url": "https://dbr.ri.gov/sites/g/files/xkgbur696/files/documents/divisions/insurance/consumers/IndustryAlert2017-2.pdf",
+      "source_verified_date": "2026-04-22",
+      "state_code": "RI",
+      "state_format_claimed": true,
+      "state_name": "Rhode Island"
+    },
+    {
+      "alphabet": "A-Z0-9",
+      "attestation": "aamva-envelope",
+      "confidence": "medium",
+      "f_flags": [
+        "F-25-closed"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 8
+      },
+      "license_notes": "AAMVA M1 envelope substitution per V1 shipping disposition; canonical envelope per the V1 canonical register; state-format claim retracted; no per-state format reproduced. W-R-3 had `^[0-9]{5,11}$`; W-R-5 §3.6 tightened to `^[0-9]{6,11}$` but tightening is superseded by envelope. SC Code § 56-1-90 governs application identification but does not prescribe DL format.",
+      "license_posture": "aamva-envelope",
+      "patterns": [
+        "^[A-Z0-9]{8,13}$"
+      ],
+      "sample": "100179226",
+      "source_url": "internal license register (AAMVA M1 envelope)",
+      "source_verified_date": "2026-04-25",
+      "state_code": "SC",
+      "state_format_claimed": false,
+      "state_name": "South Carolina"
+    },
+    {
+      "alphabet": "A-Z0-9",
+      "attestation": "aamva-envelope",
+      "confidence": "medium",
+      "f_flags": [
+        "F-25-closed"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 8
+      },
+      "license_notes": "AAMVA M1 envelope substitution per V1 shipping disposition; canonical envelope per the V1 canonical register; state-format claim retracted; no per-state format reproduced. W-R-3 had `^[0-9]{6,10}$|^[0-9]{12}$`; W-R-5 §3.7 recommended striking the 12-digit aggregator-only branch (single commercial-aggregator origin); both per-state forms superseded by envelope. SDCL § 32-12-17.10 requires only `distinguishing number` (no format spec).",
+      "license_posture": "aamva-envelope",
+      "patterns": [
+        "^[A-Z0-9]{8,13}$"
+      ],
+      "sample": "12345678",
+      "source_url": "internal license register (AAMVA M1 envelope)",
+      "source_verified_date": "2026-04-25",
+      "state_code": "SD",
+      "state_format_claimed": false,
+      "state_name": "South Dakota"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "primary-published-spec",
+      "confidence": "low-medium",
+      "f_flags": [
+        "F-25-closed"
+      ],
+      "length_range": {
+        "max": 9,
+        "min": 7
+      },
+      "license_notes": "Anchored to Tenn. Code Ann. § 55-50-331(b)(1) (`distinguishing number`). Re-verified 2026-04-26 against W-R-5 §3.8 evidence_paragraph verbatim quotation. Range retained at W-R-3 {7,9} per W-R-5 §3.8 (no primary basis to tighten or broaden). TN DSHS distinguishes the 16-char DD (document discriminator) from the DL number; statute does not prescribe length, alphabet, or check-digit.",
+      "license_posture": "state-statute-anchored",
+      "patterns": [
+        "^[0-9]{7,9}$"
+      ],
+      "sample": "101915638",
+      "source_url": "https://law.justia.com/codes/tennessee/title-55/chapter-50/part-3/section-55-50-331/",
+      "source_verified_date": "2026-04-26",
+      "state_code": "TN",
+      "state_format_claimed": true,
+      "state_name": "Tennessee"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "dmv-prose-publication",
+      "confidence": "high",
+      "f_flags": [],
+      "length_range": {
+        "max": 8,
+        "min": 8
+      },
+      "license_notes": "TxDPS DL status form explicitly: `Drivers License or ID Card # (8 digits number).` Card design changed 2025-08-18 (polycarbonate); number format unchanged.",
+      "license_posture": "state-work",
+      "patterns": [
+        "^[0-9]{8}$"
+      ],
+      "sample": "17600550",
+      "source_url": "https://www.dps.texas.gov/apps/driverlicense/dlsearch/dlstatus.aspx",
+      "source_verified_date": "2026-04-22",
+      "state_code": "TX",
+      "state_format_claimed": true,
+      "state_name": "Texas"
+    },
+    {
+      "alphabet": "numeric",
+      "attestation": "primary-published-spec",
+      "confidence": "low",
+      "f_flags": [
+        "F-25-closed"
+      ],
+      "length_range": {
+        "max": 10,
+        "min": 4
+      },
+      "license_notes": "Anchored to Utah Code Ann. § 53-3-207(3)(a)(i) (`distinguishing number`). Re-verified 2026-04-26 against le.utah.gov direct fetch. Range retained at W-R-3 {4,10} per W-R-5 §3.9 (W-R-5 rules forbid tightening without primary basis; Gallian 1991/2004 Luhn-style claim is academic exposition not Utah primary). Title 53 ch. 3 Parts 2/4/8 do not specify length or character set.",
+      "license_posture": "state-statute-anchored",
+      "patterns": [
+        "^[0-9]{4,10}$"
+      ],
+      "sample": "400138831",
+      "source_url": "https://le.utah.gov/xcode/Title53/Chapter3/53-3-S207.html",
+      "source_verified_date": "2026-04-26",
+      "state_code": "UT",
+      "state_format_claimed": true,
+      "state_name": "Utah"
+    },
+    {
+      "alphabet": "alpha-prefixed OR numeric",
+      "attestation": "dmv-issued-specimen",
+      "confidence": "medium-high",
+      "f_flags": [],
+      "length_range": {
+        "max": 12,
+        "min": 9
+      },
+      "license_notes": "VA DMV AAMVA PDF417 spec doc shows DAQ field example `T16700588` (1A+8N); MIT baseline attests broader alternation. Often hyphenated for display `L##-##-####`. `Customer Number` in VA terminology.",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z][0-9]{8}$|^[A-Z][0-9]{9,11}$|^[0-9]{9}$"
+      ],
+      "sample": "T16700588",
+      "source_url": "https://www.dmv.virginia.gov/sites/default/files/documents/VA-DMV-DL-ID-AAMVA.pdf",
+      "source_verified_date": "2026-04-22",
+      "state_code": "VA",
+      "state_format_claimed": true,
+      "state_name": "Virginia"
+    },
+    {
+      "alphabet": "numeric OR 7num+literal A",
+      "attestation": "dmv-prose-publication",
+      "confidence": "high",
+      "f_flags": [],
+      "length_range": {
+        "max": 8,
+        "min": 8
+      },
+      "license_notes": "VT DMV MVR help page explicitly: `Vermont PID is either an 8 digit number or a seven digit number followed by the character A.` Gold-standard primary-source state attestation. `A` variant preserved from legacy.",
+      "license_posture": "state-work",
+      "patterns": [
+        "^[0-9]{8}$|^[0-9]{7}A$"
+      ],
+      "sample": "8205059A",
+      "source_url": "https://secure.vermont.gov/DMV/mvr/help/",
+      "source_verified_date": "2026-04-22",
+      "state_code": "VT",
+      "state_format_claimed": true,
+      "state_name": "Vermont"
+    },
+    {
+      "alphabet": "A-Z0-9",
+      "attestation": "aamva-envelope",
+      "confidence": "medium",
+      "f_flags": [
+        "F-39-closed",
+        "F-29"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 8
+      },
+      "license_notes": "AAMVA M1 envelope substitution per V1 shipping disposition; aggregator lineage retired per V1 shipping disposition; canonical envelope per the V1 canonical register; state-format claim retracted; no per-state format reproduced. W-R-3 had `^WDL[A-Z0-9]{9}$|^(?=.{12}$)[A-Z]{1,7}[A-Z0-9\\*]{4,11}$` (post-2018-09-04 DRIVES system + legacy name-PIC with `*` filler). F-31 moot under envelope (legacy PIC `*` does not appear in shipped pattern). F-29 elevated PII-severity retained for legacy PIC cohort still in circulation through ~2024–2026 renewal. F-32 [Tier 2 advisory] WA specimen-image audit per `_advisory_note` at file root.",
+      "license_posture": "aamva-envelope",
+      "patterns": [
+        "^[A-Z0-9]{8,13}$"
+      ],
+      "pii_severity": "elevated",
+      "sample": "WDL123ABC23B",
+      "source_url": "internal license register (AAMVA M1 envelope)",
+      "source_verified_date": "2026-04-25",
+      "state_code": "WA",
+      "state_format_claimed": false,
+      "state_name": "Washington"
+    },
+    {
+      "alphabet": "alpha-prefixed (Soundex-derived)",
+      "attestation": "federal-section-105",
+      "confidence": "high",
+      "f_flags": [
+        "F-29"
+      ],
+      "length_range": {
+        "max": 14,
+        "min": 14
+      },
+      "license_notes": "Federal E-Verify RIDE fact sheet explicitly: `fourteen characters — one letter...` WisDOT itself does not publish; federal fact sheet is authoritative for cross-state. Long-standing Gallian-style Soundex (first letter = soundex of surname); stable for decades. Displayed as `L###-####-####-##`. Attestation is federal §105 PD; license_posture remains permissive-OSS-MIT per the 4-value enum (no `pd-federal-105` slot — federal-section-105 attestation is captured in the attestation field).",
+      "license_posture": "permissive-OSS-MIT",
+      "patterns": [
+        "^[A-Z][0-9]{13}$"
+      ],
+      "pii_severity": "elevated",
+      "sample": "J525420904650",
+      "source_url": "https://www.e-verify.gov/sites/default/files/everify/factsheets/factsheetsArchive/WisconsinRIDEFactSheet.pdf",
+      "source_verified_date": "2026-04-22",
+      "state_code": "WI",
+      "state_format_claimed": true,
+      "state_name": "Wisconsin"
+    },
+    {
+      "alphabet": "A-Z0-9",
+      "attestation": "aamva-envelope",
+      "confidence": "medium",
+      "f_flags": [
+        "F-25-closed"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 8
+      },
+      "license_notes": "AAMVA M1 envelope substitution per V1 shipping disposition; canonical envelope per the V1 canonical register; state-format claim retracted; no per-state format reproduced. W-R-3 had `^[0-9]{7}$|^[A-Z]{1,2}[0-9]{5,6}$`; W-R-5 §3.10 recommended striking the alpha-prefix branch (aggregator-only, NTSI/Wikipedia-upstream); both per-state forms superseded by envelope. WV Code § 17B-2-8 requires only `coded number` (no format spec).",
+      "license_posture": "aamva-envelope",
+      "patterns": [
+        "^[A-Z0-9]{8,13}$"
+      ],
+      "sample": "03054217",
+      "source_url": "internal license register (AAMVA M1 envelope)",
+      "source_verified_date": "2026-04-25",
+      "state_code": "WV",
+      "state_format_claimed": false,
+      "state_name": "West Virginia"
+    },
+    {
+      "alphabet": "A-Z0-9",
+      "attestation": "aamva-envelope",
+      "confidence": "medium",
+      "f_flags": [
+        "F-25-closed"
+      ],
+      "length_range": {
+        "max": 13,
+        "min": 8
+      },
+      "license_notes": "AAMVA M1 envelope substitution per V1 shipping disposition; canonical envelope per the V1 canonical register; state-format claim retracted; no per-state format reproduced. W-R-3 had `^[0-9]{9,10}$`; W-R-5 §3.11 tightened to exactly 9 (federal RIDE fact sheet snippet `nine numbers`); F-33 closed by W-R-5 with WY archived RIDE fact sheet preserved via Wayback (2025-02-01 snapshot). Both per-state forms superseded by envelope. Wyo. Stat. Title 31 Ch. 7 does not prescribe format.",
+      "license_posture": "aamva-envelope",
+      "patterns": [
+        "^[A-Z0-9]{8,13}$"
+      ],
+      "sample": "203847516",
+      "source_url": "internal license register (AAMVA M1 envelope)",
+      "source_verified_date": "2026-04-25",
+      "state_code": "WY",
+      "state_format_claimed": false,
+      "state_name": "Wyoming"
+    }
+  ],
+  "seed": 20260416,
+  "source_briefs": [
+    "W-R-3 (2026-04-22)",
+    "W-R-5 (2026-04-23)",
+    "V1 shipping dispositions §2 + §8 (2026-04-25)"
+  ],
+  "version": 1
+}

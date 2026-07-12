@@ -1,0 +1,823 @@
+{
+  "generated_by": "resecta-data/vectors/mrn",
+  "seed": 20260416,
+  "vectors": [
+    {
+      "notes": "Labeled MRN with prefix ``mrn``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "mrn# MU79YMJR8B",
+      "valid": true,
+      "value": "MU79YMJR8B"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``mrn``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "mrn# EY9CR2S",
+      "valid": true,
+      "value": "EY9CR2S"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MRN#``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MRN#:5OJWDELRA22W",
+      "valid": true,
+      "value": "5OJWDELRA22W"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MRN#``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MRN## 13UDZFTTO5",
+      "valid": true,
+      "value": "13UDZFTTO5"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MR``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MR I65UX18",
+      "valid": true,
+      "value": "I65UX18"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``Mr#``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "Mr##E3341UMKQ",
+      "valid": true,
+      "value": "E3341UMKQ"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MRN``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MRN#XJEB7CFPPX1",
+      "valid": true,
+      "value": "XJEB7CFPPX1"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``mrn``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "mrn:RSC3X6M",
+      "valid": true,
+      "value": "RSC3X6M"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MR``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MR  YAKHUGP",
+      "valid": true,
+      "value": "YAKHUGP"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``Mr#``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "Mr#  MBZXW",
+      "valid": true,
+      "value": "MBZXW"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MRN#``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MRN#  60BSQKL284EW",
+      "valid": true,
+      "value": "60BSQKL284EW"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``Mr#``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "Mr# CLSBBM",
+      "valid": true,
+      "value": "CLSBBM"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MR``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MR#FP1XBALA8P",
+      "valid": true,
+      "value": "FP1XBALA8P"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MR``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MR# GNUFCG2N1F",
+      "valid": true,
+      "value": "GNUFCG2N1F"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MRN``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MRN# 4PXYFC",
+      "valid": true,
+      "value": "4PXYFC"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MR``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MR: YKS72K",
+      "valid": true,
+      "value": "YKS72K"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``Mr#``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "Mr#: D0XOO9V0",
+      "valid": true,
+      "value": "D0XOO9V0"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MRN#``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MRN##2BGNZW",
+      "valid": true,
+      "value": "2BGNZW"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MRN``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MRN#1GW5EJVG",
+      "valid": true,
+      "value": "1GW5EJVG"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MR``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MR# 39EU1V",
+      "valid": true,
+      "value": "39EU1V"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MR``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MR  UV7J43",
+      "valid": true,
+      "value": "UV7J43"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MR``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MR#QHPVIKWQ7XVA",
+      "valid": true,
+      "value": "QHPVIKWQ7XVA"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MR``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MR# ZVWLO13M",
+      "valid": true,
+      "value": "ZVWLO13M"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MR``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MR LZNU9H9EPXRK",
+      "valid": true,
+      "value": "LZNU9H9EPXRK"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``mrn``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "mrn  8C40R6FUGOA",
+      "valid": true,
+      "value": "8C40R6FUGOA"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MRN#``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MRN#:J950G4K",
+      "valid": true,
+      "value": "J950G4K"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MR``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MR# 7KPXV76G",
+      "valid": true,
+      "value": "7KPXV76G"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``mrn``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "mrn 6S1K63A",
+      "valid": true,
+      "value": "6S1K63A"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MRN#``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MRN##7RPOIYA",
+      "valid": true,
+      "value": "7RPOIYA"
+    },
+    {
+      "notes": "Labeled MRN with prefix ``MRN#``.",
+      "pattern_variant": "labeled",
+      "rejection_reason": null,
+      "text": "MRN# Y42GRUV",
+      "valid": true,
+      "value": "Y42GRUV"
+    },
+    {
+      "notes": "Labeled MRN regex requires the MR / MRN prefix.",
+      "pattern_variant": "labeled",
+      "rejection_reason": "no_label",
+      "text": "QTIK0X",
+      "valid": false,
+      "value": "QTIK0X"
+    },
+    {
+      "notes": "Labeled MRN regex requires the MR / MRN prefix.",
+      "pattern_variant": "labeled",
+      "rejection_reason": "no_label",
+      "text": "E6T8NKNM",
+      "valid": false,
+      "value": "E6T8NKNM"
+    },
+    {
+      "notes": "[A-Z0-9]{5,12} caps value length to [5, 12].",
+      "pattern_variant": "labeled",
+      "rejection_reason": "value_length_out_of_range",
+      "text": "MRN: FMKW",
+      "valid": false,
+      "value": "FMKW"
+    },
+    {
+      "notes": "[A-Z0-9]{5,12} caps value length to [5, 12].",
+      "pattern_variant": "labeled",
+      "rejection_reason": "value_length_out_of_range",
+      "text": "MRN: U97TEYG8PMQ2YL",
+      "valid": false,
+      "value": "U97TEYG8PMQ2YL"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID: SOZQ47B",
+      "valid": true,
+      "value": "SOZQ47B"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID  DYXOV9",
+      "valid": true,
+      "value": "DYXOV9"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID#BPFR1MRF",
+      "valid": true,
+      "value": "BPFR1MRF"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID  JS3S3SWS",
+      "valid": true,
+      "value": "JS3S3SWS"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID: CBHGC9",
+      "valid": true,
+      "value": "CBHGC9"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID#QXIZ7ZWKDJ5J",
+      "valid": true,
+      "value": "QXIZ7ZWKDJ5J"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID: 2K4R5",
+      "valid": true,
+      "value": "2K4R5"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID# UM1AMI",
+      "valid": true,
+      "value": "UM1AMI"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID#K57KF0R93",
+      "valid": true,
+      "value": "K57KF0R93"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID# CEZ6DKL1Y",
+      "valid": true,
+      "value": "CEZ6DKL1Y"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID YUP6UW4QAC",
+      "valid": true,
+      "value": "YUP6UW4QAC"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID  79S8VH",
+      "valid": true,
+      "value": "79S8VH"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID#1FQB8A9IOU4",
+      "valid": true,
+      "value": "1FQB8A9IOU4"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID:3WWQIX8S6XL",
+      "valid": true,
+      "value": "3WWQIX8S6XL"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID  0SBZL",
+      "valid": true,
+      "value": "0SBZL"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID#0DP8F",
+      "valid": true,
+      "value": "0DP8F"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID: AA34BYCQ",
+      "valid": true,
+      "value": "AA34BYCQ"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID# LRRKROX",
+      "valid": true,
+      "value": "LRRKROX"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID  HJKT8D91BI1J",
+      "valid": true,
+      "value": "HJKT8D91BI1J"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID OT963",
+      "valid": true,
+      "value": "OT963"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID:F82CLEBG",
+      "valid": true,
+      "value": "F82CLEBG"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID# 0Y674V481R",
+      "valid": true,
+      "value": "0Y674V481R"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID: Y3XQME1UO5B",
+      "valid": true,
+      "value": "Y3XQME1UO5B"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID  D89JF2C9X",
+      "valid": true,
+      "value": "D89JF2C9X"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID:X5FA75ZSHC41",
+      "valid": true,
+      "value": "X5FA75ZSHC41"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID PXI3N9UO8WG6",
+      "valid": true,
+      "value": "PXI3N9UO8WG6"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID# MKV37W5YRTX",
+      "valid": true,
+      "value": "MKV37W5YRTX"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID# 9FHH9NTWMF",
+      "valid": true,
+      "value": "9FHH9NTWMF"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID AQ5X6B620",
+      "valid": true,
+      "value": "AQ5X6B620"
+    },
+    {
+      "notes": "Patient ID label with alphanumeric value.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": null,
+      "text": "Patient ID  CVHHOYOTH637",
+      "valid": true,
+      "value": "CVHHOYOTH637"
+    },
+    {
+      "notes": "Patient ID regex requires the ``Patient ID`` prefix.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": "no_label",
+      "text": "RBSMQN94ZN",
+      "valid": false,
+      "value": "RBSMQN94ZN"
+    },
+    {
+      "notes": "Patient ID regex requires the ``Patient ID`` prefix.",
+      "pattern_variant": "patient_id",
+      "rejection_reason": "no_label",
+      "text": "IA4FA",
+      "valid": false,
+      "value": "IA4FA"
+    },
+    {
+      "notes": "[A-Z0-9]{5,12} caps value length to [5, 12].",
+      "pattern_variant": "patient_id",
+      "rejection_reason": "value_length_out_of_range",
+      "text": "Patient ID: E357",
+      "valid": false,
+      "value": "E357"
+    },
+    {
+      "notes": "[A-Z0-9]{5,12} caps value length to [5, 12].",
+      "pattern_variant": "patient_id",
+      "rejection_reason": "value_length_out_of_range",
+      "text": "Patient ID: PWKBNLA7Y3RBGW",
+      "valid": false,
+      "value": "PWKBNLA7Y3RBGW"
+    },
+    {
+      "notes": "Institution shape: 5-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "OWHCR-0541424016",
+      "valid": true,
+      "value": "OWHCR-0541424016"
+    },
+    {
+      "notes": "Institution shape: 5-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "QJFJL-89000348",
+      "valid": true,
+      "value": "QJFJL-89000348"
+    },
+    {
+      "notes": "Institution shape: 2-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "BX-1186004",
+      "valid": true,
+      "value": "BX-1186004"
+    },
+    {
+      "notes": "Institution shape: 2-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "QP-7422842846",
+      "valid": true,
+      "value": "QP-7422842846"
+    },
+    {
+      "notes": "Institution shape: 3-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "SIV-4755298",
+      "valid": true,
+      "value": "SIV-4755298"
+    },
+    {
+      "notes": "Institution shape: 4-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "NCYV-9420370",
+      "valid": true,
+      "value": "NCYV-9420370"
+    },
+    {
+      "notes": "Institution shape: 4-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "GWMZ-9879460144",
+      "valid": true,
+      "value": "GWMZ-9879460144"
+    },
+    {
+      "notes": "Institution shape: 5-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "PVJES-4129157380",
+      "valid": true,
+      "value": "PVJES-4129157380"
+    },
+    {
+      "notes": "Institution shape: 4-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "UGDY-854543657",
+      "valid": true,
+      "value": "UGDY-854543657"
+    },
+    {
+      "notes": "Institution shape: 5-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "GGYAY-1525807795",
+      "valid": true,
+      "value": "GGYAY-1525807795"
+    },
+    {
+      "notes": "Institution shape: 4-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "VGTY-06370372",
+      "valid": true,
+      "value": "VGTY-06370372"
+    },
+    {
+      "notes": "Institution shape: 2-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "NS-4194438477",
+      "valid": true,
+      "value": "NS-4194438477"
+    },
+    {
+      "notes": "Institution shape: 4-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "QRDN-7681022447",
+      "valid": true,
+      "value": "QRDN-7681022447"
+    },
+    {
+      "notes": "Institution shape: 2-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "OV-09364509",
+      "valid": true,
+      "value": "OV-09364509"
+    },
+    {
+      "notes": "Institution shape: 5-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "AMSHM-6435747132",
+      "valid": true,
+      "value": "AMSHM-6435747132"
+    },
+    {
+      "notes": "Institution shape: 4-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "TSTT-535311",
+      "valid": true,
+      "value": "TSTT-535311"
+    },
+    {
+      "notes": "Institution shape: 5-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "GRVKT-2116469",
+      "valid": true,
+      "value": "GRVKT-2116469"
+    },
+    {
+      "notes": "Institution shape: 5-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "GMSFA-4441175",
+      "valid": true,
+      "value": "GMSFA-4441175"
+    },
+    {
+      "notes": "Institution shape: 2-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "VT-3732334402",
+      "valid": true,
+      "value": "VT-3732334402"
+    },
+    {
+      "notes": "Institution shape: 5-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "LDLRU-825469",
+      "valid": true,
+      "value": "LDLRU-825469"
+    },
+    {
+      "notes": "Institution shape: 4-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "MTWX-5456840885",
+      "valid": true,
+      "value": "MTWX-5456840885"
+    },
+    {
+      "notes": "Institution shape: 4-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "AAPE-131706",
+      "valid": true,
+      "value": "AAPE-131706"
+    },
+    {
+      "notes": "Institution shape: 3-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "QUX-265075513",
+      "valid": true,
+      "value": "QUX-265075513"
+    },
+    {
+      "notes": "Institution shape: 4-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "CWKP-1419190",
+      "valid": true,
+      "value": "CWKP-1419190"
+    },
+    {
+      "notes": "Institution shape: 4-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "FMVS-473245",
+      "valid": true,
+      "value": "FMVS-473245"
+    },
+    {
+      "notes": "Institution shape: 4-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "OPQW-32880174",
+      "valid": true,
+      "value": "OPQW-32880174"
+    },
+    {
+      "notes": "Institution shape: 4-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "AUHG-712597",
+      "valid": true,
+      "value": "AUHG-712597"
+    },
+    {
+      "notes": "Institution shape: 4-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "UHKG-7159912845",
+      "valid": true,
+      "value": "UHKG-7159912845"
+    },
+    {
+      "notes": "Institution shape: 5-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "BNPDI-83573794",
+      "valid": true,
+      "value": "BNPDI-83573794"
+    },
+    {
+      "notes": "Institution shape: 3-letter prefix + digits.",
+      "pattern_variant": "institution",
+      "rejection_reason": null,
+      "text": "OUQ-707174",
+      "valid": true,
+      "value": "OUQ-707174"
+    },
+    {
+      "notes": "[A-Z]{2,5} caps the institution prefix to [2, 5] letters.",
+      "pattern_variant": "institution",
+      "rejection_reason": "prefix_length_out_of_range",
+      "text": "ZODTTUW-521601650",
+      "valid": false,
+      "value": "ZODTTUW-521601650"
+    },
+    {
+      "notes": "[A-Z]{2,5} caps the institution prefix to [2, 5] letters.",
+      "pattern_variant": "institution",
+      "rejection_reason": "prefix_length_out_of_range",
+      "text": "BKGFJN-962198573",
+      "valid": false,
+      "value": "BKGFJN-962198573"
+    },
+    {
+      "notes": "\\d{6,10} caps the digit run to [6, 10].",
+      "pattern_variant": "institution",
+      "rejection_reason": "digit_length_out_of_range",
+      "text": "ZG-74317",
+      "valid": false,
+      "value": "ZG-74317"
+    },
+    {
+      "notes": "\\d{6,10} caps the digit run to [6, 10].",
+      "pattern_variant": "institution",
+      "rejection_reason": "digit_length_out_of_range",
+      "text": "YHG-8788",
+      "valid": false,
+      "value": "YHG-8788"
+    }
+  ],
+  "version": 1
+}

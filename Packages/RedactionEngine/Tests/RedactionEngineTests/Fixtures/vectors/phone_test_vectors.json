@@ -1,0 +1,511 @@
+{
+  "generated_by": "resecta-data/vectors/phone",
+  "seed": 20260416,
+  "vectors": [
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(911)-970-4554",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(365)-193-9884",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(996)5419057",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(196)-926-2429",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(874)-559-0469",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(901).945.5185",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(979)8131043",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(709) 842 9200",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(272)4484826",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(738).490.8054",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(815) 149 5742",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(952)-071-3070",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(015)-458-7183",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(546)-862-4653",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(939)9826919",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(817) 795 5156",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(695)-407-1492",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(306).230.8118",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(190)1292244",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(996)-593-5166",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(827)6537166",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(577)-626-8413",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(071)4717619",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(432).698.5233",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Balanced parens; separator variation.",
+      "phone": "(160) 714 4316",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "604-636-6412",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "733 147 1234",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "532.036.1457",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "242-381-7090",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "389-685-2814",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "756 971 4765",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "473.373.8346",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "7559842282",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "007-172-1819",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "1058963841",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "767.523.0619",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "028-726-6483",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "7423528764",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "7806268259",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "023-914-4750",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "1735822983",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "549-495-1224",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "437 189 1093",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "600 190 4748",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "023-204-2816",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "082-242-7144",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "733.021.0251",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "014.546.4006",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "324.334.1598",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Bare 10-digit shape; separator variation.",
+      "phone": "976 801 5308",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Optional +1 country-code lead.",
+      "phone": "+1(693) 613 0618",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Optional +1 country-code lead.",
+      "phone": "+1-221 442 1316",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Optional +1 country-code lead.",
+      "phone": "+1(085)-489-3986",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Optional +1 country-code lead.",
+      "phone": "+1.705 904 1423",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Optional +1 country-code lead.",
+      "phone": "+1.(881)1001983",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Optional +1 country-code lead.",
+      "phone": "+1.2936579646",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Optional +1 country-code lead.",
+      "phone": "+1(406) 016 3130",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Optional +1 country-code lead.",
+      "phone": "+1.375.961.9643",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Optional +1 country-code lead.",
+      "phone": "+1 (666)5755436",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Optional +1 country-code lead.",
+      "phone": "+1 933 908 7405",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "notes": "Open-only or close-only paren; alternation forbids.",
+      "phone": "(216-403-9626",
+      "rejection_reason": "unbalanced_parens",
+      "valid": false
+    },
+    {
+      "notes": "Open-only or close-only paren; alternation forbids.",
+      "phone": "049)5973812",
+      "rejection_reason": "unbalanced_parens",
+      "valid": false
+    },
+    {
+      "notes": "Open-only or close-only paren; alternation forbids.",
+      "phone": "(103 361 8092",
+      "rejection_reason": "unbalanced_parens",
+      "valid": false
+    },
+    {
+      "notes": "Open-only or close-only paren; alternation forbids.",
+      "phone": "149) 976 5403",
+      "rejection_reason": "unbalanced_parens",
+      "valid": false
+    },
+    {
+      "notes": "Open-only or close-only paren; alternation forbids.",
+      "phone": "(866 203 4284",
+      "rejection_reason": "unbalanced_parens",
+      "valid": false
+    },
+    {
+      "notes": "Open-only or close-only paren; alternation forbids.",
+      "phone": "819) 705 7600",
+      "rejection_reason": "unbalanced_parens",
+      "valid": false
+    },
+    {
+      "notes": "Bare ``+`` is dropped; only ``+1`` leads.",
+      "phone": "+783-882-9824",
+      "rejection_reason": "bare_plus_lead",
+      "valid": false
+    },
+    {
+      "notes": "Bare ``+`` is dropped; only ``+1`` leads.",
+      "phone": "+434 775 5587",
+      "rejection_reason": "bare_plus_lead",
+      "valid": false
+    },
+    {
+      "notes": "Bare ``+`` is dropped; only ``+1`` leads.",
+      "phone": "+321.695.5590",
+      "rejection_reason": "bare_plus_lead",
+      "valid": false
+    },
+    {
+      "notes": "Bare ``+`` is dropped; only ``+1`` leads.",
+      "phone": "+8664937488",
+      "rejection_reason": "bare_plus_lead",
+      "valid": false
+    },
+    {
+      "notes": "Group lengths 2-3-4 do not match the fixed 3-3-4 NANP shape.",
+      "phone": "94-135-2254",
+      "rejection_reason": "wrong_group_length",
+      "valid": false
+    },
+    {
+      "notes": "Group lengths 4-3-4 do not match the fixed 3-3-4 NANP shape.",
+      "phone": "8550-536-5523",
+      "rejection_reason": "wrong_group_length",
+      "valid": false
+    },
+    {
+      "notes": "Group lengths 3-2-4 do not match the fixed 3-3-4 NANP shape.",
+      "phone": "679-32-2726",
+      "rejection_reason": "wrong_group_length",
+      "valid": false
+    },
+    {
+      "notes": "Group lengths 3-4-4 do not match the fixed 3-3-4 NANP shape.",
+      "phone": "358-1891-3549",
+      "rejection_reason": "wrong_group_length",
+      "valid": false
+    },
+    {
+      "notes": "Group lengths 3-3-3 do not match the fixed 3-3-4 NANP shape.",
+      "phone": "925-680-764",
+      "rejection_reason": "wrong_group_length",
+      "valid": false
+    },
+    {
+      "notes": "Group lengths 3-3-5 do not match the fixed 3-3-4 NANP shape.",
+      "phone": "981-513-08722",
+      "rejection_reason": "wrong_group_length",
+      "valid": false
+    },
+    {
+      "notes": "Group lengths 5-3-4 do not match the fixed 3-3-4 NANP shape.",
+      "phone": "87617-253-8293",
+      "rejection_reason": "wrong_group_length",
+      "valid": false
+    },
+    {
+      "notes": "Group lengths 3-3-6 do not match the fixed 3-3-4 NANP shape.",
+      "phone": "559-881-529289",
+      "rejection_reason": "wrong_group_length",
+      "valid": false
+    },
+    {
+      "notes": "Letter ``A`` in the prefix group; \\d{3} fails.",
+      "phone": "299-A23-7076",
+      "rejection_reason": "non_digit",
+      "valid": false
+    },
+    {
+      "notes": "Letter ``B`` in the prefix group; \\d{3} fails.",
+      "phone": "175-B45-8393",
+      "rejection_reason": "non_digit",
+      "valid": false
+    },
+    {
+      "notes": "Letter ``X`` in the prefix group; \\d{3} fails.",
+      "phone": "472-X00-8654",
+      "rejection_reason": "non_digit",
+      "valid": false
+    },
+    {
+      "notes": "Letter ``O`` in the prefix group; \\d{3} fails.",
+      "phone": "962-O41-2490",
+      "rejection_reason": "non_digit",
+      "valid": false
+    },
+    {
+      "notes": "Letter ``I`` in the prefix group; \\d{3} fails.",
+      "phone": "670-I53-8477",
+      "rejection_reason": "non_digit",
+      "valid": false
+    },
+    {
+      "notes": "Letter ``Z`` in the prefix group; \\d{3} fails.",
+      "phone": "730-Z82-4037",
+      "rejection_reason": "non_digit",
+      "valid": false
+    }
+  ],
+  "version": 1
+}

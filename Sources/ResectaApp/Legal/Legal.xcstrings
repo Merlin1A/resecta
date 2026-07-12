@@ -1,0 +1,567 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "eula_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Before You Begin"
+          }
+        }
+      }
+    },
+    "eula_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Welcome to Resecta.\n\nThis app helps you redact sensitive information in PDFs and images. All processing happens entirely on your device — the app collects no data and makes no network requests of its own. Links you tap open in Safari or Mail.\n\nImportant: This app is provided \"as is\" without warranty of any kind. Automated redaction tools can miss sensitive content. You are responsible for verifying that all sensitive information has been properly redacted before sharing any document.\n\nBy tapping \"I Agree,\" you agree to the End-User License Agreement and acknowledge the Privacy Policy."
+          }
+        }
+      }
+    },
+    "eula_agree" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I Agree"
+          }
+        }
+      }
+    },
+    "pre_export_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Have You Verified Your Redactions?"
+          }
+        }
+      }
+    },
+    "pre_export_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app provides tools to assist with redaction but cannot guarantee complete removal of all sensitive information.\n\nBefore sharing, please confirm: you have reviewed every page, all sensitive text, images, and metadata have been redacted, and the output meets your requirements."
+          }
+        }
+      }
+    },
+    "pre_export_confirm" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I've Verified — Share"
+          }
+        }
+      }
+    },
+    "pre_export_go_back" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go Back"
+          }
+        }
+      }
+    },
+    "fail_override_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verification Found Issues"
+          }
+        }
+      }
+    },
+    "fail_override_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The verification check found potential issues with this document. Review the verification report before sharing."
+          }
+        }
+      }
+    },
+    "fail_override_go_back" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go Back to Editor"
+          }
+        }
+      }
+    },
+    "fail_override_export_anyway" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export Anyway — I Accept the Risk"
+          }
+        }
+      }
+    },
+    "doctypeDiagnostic.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Document profile"
+          }
+        }
+      }
+    },
+    "doctypeDiagnostic.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Classifier output for the current page. Designed to aid manual review."
+          }
+        }
+      }
+    },
+    "doctypeDiagnostic.topKeywordsHeader" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Top keywords"
+          }
+        }
+      }
+    },
+    "coverageReport.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan coverage"
+          }
+        }
+      }
+    },
+    "coverageReport.scannedPages" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanned pages"
+          }
+        }
+      }
+    },
+    "coverageReport.enabledCategories" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enabled categories"
+          }
+        }
+      }
+    },
+    "coverageReport.candidates" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Candidates"
+          }
+        }
+      }
+    },
+    "coverageReport.applied" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Applied"
+          }
+        }
+      }
+    },
+    "coverageReport.deselected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deselected in review"
+          }
+        }
+      }
+    },
+    "coverageReport.belowThreshold" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Below confidence threshold"
+          }
+        }
+      }
+    },
+    "coverageReport.overlapSuppressed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suppressed by overlap"
+          }
+        }
+      }
+    },
+    "reverseRationale.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Match confidence breakdown"
+          }
+        }
+      }
+    },
+    "reverseRationale.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How each detector scored this text."
+          }
+        }
+      }
+    },
+    "reverseRationale.scopeFooter" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows the score each detector would emit for the selected text in isolation. For full-document context, run the scan."
+          }
+        }
+      }
+    },
+    "search_live_preview_count" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matches this page: %lld · Total: %lld"
+          }
+        }
+      }
+    },
+    "search_live_preview_invalid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regex: invalid"
+          }
+        }
+      }
+    },
+    "search_live_preview_saturated" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "≥ 10,000 matches — refine query"
+          }
+        }
+      }
+    },
+    "search_scope_this_page" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This page"
+          }
+        }
+      }
+    },
+    "search_scope_whole_document" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Whole document"
+          }
+        }
+      }
+    },
+    "search_shortcut_next" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next match"
+          }
+        }
+      }
+    },
+    "search_shortcut_previous" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous match"
+          }
+        }
+      }
+    },
+    "search_shortcut_toggle_selection" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toggle selection for current match"
+          }
+        }
+      }
+    },
+    "search_shortcut_apply" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apply selected matches"
+          }
+        }
+      }
+    },
+    "detector_mrn_name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medical record number"
+          }
+        }
+      }
+    },
+    "detector_license_plate_name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "License plate"
+          }
+        }
+      }
+    },
+    "profile.regex.sentinel.rejected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This pattern could not be added. Resecta rejected it to prevent runaway matches. Adjust the pattern and try again."
+          }
+        }
+      }
+    },
+    "profile.builtin.regex.caseNumber" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Case number"
+          }
+        }
+      }
+    },
+    "profile.builtin.regex.iban" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IBAN"
+          }
+        }
+      }
+    },
+    "profile.builtin.regex.ipv4" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IPv4 address"
+          }
+        }
+      }
+    },
+    "profile.builtin.regex.uuid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "UUID"
+          }
+        }
+      }
+    },
+    "profile.builtin.regex.iso8601" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISO-8601 datetime"
+          }
+        }
+      }
+    },
+    "profile.builtin.regex.ssn" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SSN (US)"
+          }
+        }
+      }
+    },
+    "profile.builtin.regex.ein" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EIN (US)"
+          }
+        }
+      }
+    },
+    "profile.builtin.regex.itin" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ITIN (US)"
+          }
+        }
+      }
+    },
+    "profile.builtin.regex.abaRouting" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ABA Routing Number"
+          }
+        }
+      }
+    },
+    "profile.builtin.regex.accountNumber" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account Number (generic)"
+          }
+        }
+      }
+    },
+    "eula_view_eula" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End-User License Agreement"
+          }
+        }
+      }
+    },
+    "eula_view_privacy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy Policy"
+          }
+        }
+      }
+    },
+    "legal_doc_done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
+    },
+    "legal_doc_unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This document could not be loaded. It is also available from Settings after setup."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

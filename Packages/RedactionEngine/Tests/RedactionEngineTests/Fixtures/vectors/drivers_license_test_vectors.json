@@ -1,0 +1,535 @@
+{
+  "generated_by": "resecta-data/vectors/drivers_license",
+  "seed": 20260416,
+  "vectors": [
+    {
+      "license_number": "L9588632",
+      "notes": "[A-Z]\\d{7} after label ``Driver's Lic``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver's Lic L9588632",
+      "valid": true
+    },
+    {
+      "license_number": "A582168047",
+      "notes": "[A-Z]\\d{9} after label ``Driver's Lic``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver's Lic# A582168047",
+      "valid": true
+    },
+    {
+      "license_number": "O73250124077",
+      "notes": "[A-Z]\\d{11} after label ``Driver's Lic``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver's Lic# O73250124077",
+      "valid": true
+    },
+    {
+      "license_number": "J56750614437322",
+      "notes": "[A-Z]\\d{14} after label ``DL``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "DL# J56750614437322",
+      "valid": true
+    },
+    {
+      "license_number": "Z95568699841",
+      "notes": "[A-Z]\\d{11} after label ``Drivers License``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Drivers License# Z95568699841",
+      "valid": true
+    },
+    {
+      "license_number": "P5932419965",
+      "notes": "[A-Z]\\d{10} after label ``DL.``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "DL.: P5932419965",
+      "valid": true
+    },
+    {
+      "license_number": "A013356462440",
+      "notes": "[A-Z]\\d{12} after label ``Drivers License``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Drivers License:A013356462440",
+      "valid": true
+    },
+    {
+      "license_number": "Y326021513680",
+      "notes": "[A-Z]\\d{12} after label ``DL.``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "DL. Y326021513680",
+      "valid": true
+    },
+    {
+      "license_number": "W5587986044",
+      "notes": "[A-Z]\\d{10} after label ``Driver Lic``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver Lic:W5587986044",
+      "valid": true
+    },
+    {
+      "license_number": "F87156210924",
+      "notes": "[A-Z]\\d{11} after label ``Drivers License``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Drivers License# F87156210924",
+      "valid": true
+    },
+    {
+      "license_number": "G851365",
+      "notes": "[A-Z]\\d{6} after label ``Driver License``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver License:G851365",
+      "valid": true
+    },
+    {
+      "license_number": "F8335",
+      "notes": "[A-Z]\\d{4} after label ``Driver License``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver License:F8335",
+      "valid": true
+    },
+    {
+      "license_number": "G190173611",
+      "notes": "[A-Z]\\d{9} after label ``DL``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "DL:G190173611",
+      "valid": true
+    },
+    {
+      "license_number": "P5610311",
+      "notes": "[A-Z]\\d{7} after label ``Driver's Lic``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver's Lic:P5610311",
+      "valid": true
+    },
+    {
+      "license_number": "J98726030965933",
+      "notes": "[A-Z]\\d{14} after label ``D.L.``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "D.L.#J98726030965933",
+      "valid": true
+    },
+    {
+      "license_number": "W69817013699950",
+      "notes": "[A-Z]\\d{14} after label ``D.L``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "D.L W69817013699950",
+      "valid": true
+    },
+    {
+      "license_number": "D791259134",
+      "notes": "[A-Z]\\d{9} after label ``Driver Lic``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver Lic: D791259134",
+      "valid": true
+    },
+    {
+      "license_number": "R95695",
+      "notes": "[A-Z]\\d{5} after label ``Driver's License``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver's License: R95695",
+      "valid": true
+    },
+    {
+      "license_number": "V989277879",
+      "notes": "[A-Z]\\d{9} after label ``Driver's License``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver's License V989277879",
+      "valid": true
+    },
+    {
+      "license_number": "Y5225485",
+      "notes": "[A-Z]\\d{7} after label ``Driver's Lic``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver's Lic:Y5225485",
+      "valid": true
+    },
+    {
+      "license_number": "W365523679",
+      "notes": "[A-Z]\\d{9} after label ``DL``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "DL:W365523679",
+      "valid": true
+    },
+    {
+      "license_number": "E26358189135",
+      "notes": "[A-Z]\\d{11} after label ``Driver Lic``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver Lic#E26358189135",
+      "valid": true
+    },
+    {
+      "license_number": "U2568076498151",
+      "notes": "[A-Z]\\d{13} after label ``Driver's Lic``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver's Lic# U2568076498151",
+      "valid": true
+    },
+    {
+      "license_number": "Q22876172538",
+      "notes": "[A-Z]\\d{11} after label ``Driver Lic``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Driver Lic:Q22876172538",
+      "valid": true
+    },
+    {
+      "license_number": "H598815292",
+      "notes": "[A-Z]\\d{9} after label ``Drivers License``.",
+      "rejection_reason": null,
+      "shape": "letter_plus_digits",
+      "text": "Drivers License# H598815292",
+      "valid": true
+    },
+    {
+      "license_number": "62870882",
+      "notes": "\\d{8} after label ``D.L``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "D.L# 62870882",
+      "valid": true
+    },
+    {
+      "license_number": "3296092",
+      "notes": "\\d{7} after label ``D.L``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "D.L 3296092",
+      "valid": true
+    },
+    {
+      "license_number": "797145591442",
+      "notes": "\\d{12} after label ``Drivers License``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "Drivers License: 797145591442",
+      "valid": true
+    },
+    {
+      "license_number": "31848323",
+      "notes": "\\d{8} after label ``Drivers License``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "Drivers License: 31848323",
+      "valid": true
+    },
+    {
+      "license_number": "313256588419",
+      "notes": "\\d{12} after label ``Driver Lic``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "Driver Lic# 313256588419",
+      "valid": true
+    },
+    {
+      "license_number": "3347620243",
+      "notes": "\\d{10} after label ``D.L.``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "D.L.:3347620243",
+      "valid": true
+    },
+    {
+      "license_number": "801065358",
+      "notes": "\\d{9} after label ``D.L.``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "D.L. 801065358",
+      "valid": true
+    },
+    {
+      "license_number": "03194634132",
+      "notes": "\\d{11} after label ``D.L``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "D.L#03194634132",
+      "valid": true
+    },
+    {
+      "license_number": "74541100",
+      "notes": "\\d{8} after label ``Driver's Lic``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "Driver's Lic: 74541100",
+      "valid": true
+    },
+    {
+      "license_number": "888745",
+      "notes": "\\d{6} after label ``Driver's License``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "Driver's License:888745",
+      "valid": true
+    },
+    {
+      "license_number": "6592027210",
+      "notes": "\\d{10} after label ``Drivers License``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "Drivers License: 6592027210",
+      "valid": true
+    },
+    {
+      "license_number": "497515360",
+      "notes": "\\d{9} after label ``DL.``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "DL.#497515360",
+      "valid": true
+    },
+    {
+      "license_number": "4278216489",
+      "notes": "\\d{10} after label ``Driver Lic``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "Driver Lic#4278216489",
+      "valid": true
+    },
+    {
+      "license_number": "94016802992",
+      "notes": "\\d{11} after label ``DL.``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "DL. 94016802992",
+      "valid": true
+    },
+    {
+      "license_number": "9565398",
+      "notes": "\\d{7} after label ``D.L.``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "D.L.: 9565398",
+      "valid": true
+    },
+    {
+      "license_number": "74001884",
+      "notes": "\\d{8} after label ``DL``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "DL# 74001884",
+      "valid": true
+    },
+    {
+      "license_number": "996614",
+      "notes": "\\d{6} after label ``D.L``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "D.L 996614",
+      "valid": true
+    },
+    {
+      "license_number": "0823577675",
+      "notes": "\\d{10} after label ``Driver License``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "Driver License# 0823577675",
+      "valid": true
+    },
+    {
+      "license_number": "5848529",
+      "notes": "\\d{7} after label ``DL``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "DL 5848529",
+      "valid": true
+    },
+    {
+      "license_number": "640629060381",
+      "notes": "\\d{12} after label ``D.L``.",
+      "rejection_reason": null,
+      "shape": "pure_digits",
+      "text": "D.L:640629060381",
+      "valid": true
+    },
+    {
+      "license_number": "C0079790",
+      "notes": "DL regex requires a Driver License / DL label prefix.",
+      "rejection_reason": "no_label",
+      "shape": "letter_plus_digits",
+      "text": "C0079790",
+      "valid": false
+    },
+    {
+      "license_number": "M4422",
+      "notes": "DL regex requires a Driver License / DL label prefix.",
+      "rejection_reason": "no_label",
+      "shape": "letter_plus_digits",
+      "text": "M4422",
+      "valid": false
+    },
+    {
+      "license_number": "I24993571",
+      "notes": "DL regex requires a Driver License / DL label prefix.",
+      "rejection_reason": "no_label",
+      "shape": "letter_plus_digits",
+      "text": "I24993571",
+      "valid": false
+    },
+    {
+      "license_number": "E92489086902623",
+      "notes": "DL regex requires a Driver License / DL label prefix.",
+      "rejection_reason": "no_label",
+      "shape": "letter_plus_digits",
+      "text": "E92489086902623",
+      "valid": false
+    },
+    {
+      "license_number": "A4988768",
+      "notes": "DL regex requires a Driver License / DL label prefix.",
+      "rejection_reason": "no_label",
+      "shape": "letter_plus_digits",
+      "text": "A4988768",
+      "valid": false
+    },
+    {
+      "license_number": "H87021",
+      "notes": "DL regex requires a Driver License / DL label prefix.",
+      "rejection_reason": "no_label",
+      "shape": "letter_plus_digits",
+      "text": "H87021",
+      "valid": false
+    },
+    {
+      "license_number": "49",
+      "notes": "L-02 widened the floor to 6 digits for pure-numeric DLs.",
+      "rejection_reason": "pure_digits_too_short",
+      "shape": "pure_digits",
+      "text": "Driver License 49",
+      "valid": false
+    },
+    {
+      "license_number": "68875",
+      "notes": "L-02 widened the floor to 6 digits for pure-numeric DLs.",
+      "rejection_reason": "pure_digits_too_short",
+      "shape": "pure_digits",
+      "text": "DL 68875",
+      "valid": false
+    },
+    {
+      "license_number": "40669",
+      "notes": "L-02 widened the floor to 6 digits for pure-numeric DLs.",
+      "rejection_reason": "pure_digits_too_short",
+      "shape": "pure_digits",
+      "text": "DL. 40669",
+      "valid": false
+    },
+    {
+      "license_number": "4316",
+      "notes": "L-02 widened the floor to 6 digits for pure-numeric DLs.",
+      "rejection_reason": "pure_digits_too_short",
+      "shape": "pure_digits",
+      "text": "DL. 4316",
+      "valid": false
+    },
+    {
+      "license_number": "709",
+      "notes": "L-02 widened the floor to 6 digits for pure-numeric DLs.",
+      "rejection_reason": "pure_digits_too_short",
+      "shape": "pure_digits",
+      "text": "DL 709",
+      "valid": false
+    },
+    {
+      "license_number": "88",
+      "notes": "L-02 widened the floor to 6 digits for pure-numeric DLs.",
+      "rejection_reason": "pure_digits_too_short",
+      "shape": "pure_digits",
+      "text": "Driver's Lic 88",
+      "valid": false
+    },
+    {
+      "license_number": "UC09856757910",
+      "notes": "[A-Z] permits exactly one alphabetic prefix character.",
+      "rejection_reason": "letter_prefix_too_long",
+      "shape": "letter_plus_digits",
+      "text": "Drivers License UC09856757910",
+      "valid": false
+    },
+    {
+      "license_number": "SP4107637359",
+      "notes": "[A-Z] permits exactly one alphabetic prefix character.",
+      "rejection_reason": "letter_prefix_too_long",
+      "shape": "letter_plus_digits",
+      "text": "D.L SP4107637359",
+      "valid": false
+    },
+    {
+      "license_number": "OG85385184639295",
+      "notes": "[A-Z] permits exactly one alphabetic prefix character.",
+      "rejection_reason": "letter_prefix_too_long",
+      "shape": "letter_plus_digits",
+      "text": "Drivers License OG85385184639295",
+      "valid": false
+    },
+    {
+      "license_number": "QL64454581118",
+      "notes": "[A-Z] permits exactly one alphabetic prefix character.",
+      "rejection_reason": "letter_prefix_too_long",
+      "shape": "letter_plus_digits",
+      "text": "DL. QL64454581118",
+      "valid": false
+    },
+    {
+      "license_number": "JT5312409475809",
+      "notes": "[A-Z] permits exactly one alphabetic prefix character.",
+      "rejection_reason": "letter_prefix_too_long",
+      "shape": "letter_plus_digits",
+      "text": "Driver Lic JT5312409475809",
+      "valid": false
+    },
+    {
+      "license_number": "h9705113634",
+      "notes": "Capture-group letter is [A-Z]. Label is case-insensitive; the captured prefix is not.",
+      "rejection_reason": "lowercase_prefix",
+      "shape": "letter_plus_digits",
+      "text": "D.L h9705113634",
+      "valid": false
+    },
+    {
+      "license_number": "i98540434387",
+      "notes": "Capture-group letter is [A-Z]. Label is case-insensitive; the captured prefix is not.",
+      "rejection_reason": "lowercase_prefix",
+      "shape": "letter_plus_digits",
+      "text": "Driver's License i98540434387",
+      "valid": false
+    },
+    {
+      "license_number": "d2071",
+      "notes": "Capture-group letter is [A-Z]. Label is case-insensitive; the captured prefix is not.",
+      "rejection_reason": "lowercase_prefix",
+      "shape": "letter_plus_digits",
+      "text": "D.L. d2071",
+      "valid": false
+    },
+    {
+      "license_number": "d77863",
+      "notes": "Capture-group letter is [A-Z]. Label is case-insensitive; the captured prefix is not.",
+      "rejection_reason": "lowercase_prefix",
+      "shape": "letter_plus_digits",
+      "text": "Driver License d77863",
+      "valid": false
+    }
+  ],
+  "version": 1
+}

@@ -1,0 +1,385 @@
+{
+  "generated_by": "resecta-data/vectors/itin",
+  "seed": 20260416,
+  "vectors": [
+    {
+      "itin": "935-49-6041",
+      "notes": "Boundary sample: YY=49.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "945-50-3100",
+      "notes": "Boundary sample: YY=50.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "977-65-5220",
+      "notes": "Boundary sample: YY=65.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "967-66-9058",
+      "notes": "Boundary sample: YY=66.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "948-69-3141",
+      "notes": "Boundary sample: YY=69.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "984-70-2430",
+      "notes": "Boundary sample: YY=70.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "935-88-8960",
+      "notes": "Boundary sample: YY=88.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "903-89-5328",
+      "notes": "Boundary sample: YY=89.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "940-90-8851",
+      "notes": "Boundary sample: YY=90.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "923-92-1044",
+      "notes": "Boundary sample: YY=92.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "949-93-9201",
+      "notes": "Boundary sample: YY=93.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "998-94-0731",
+      "notes": "Boundary sample: YY=94.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "934-99-7170",
+      "notes": "Boundary sample: YY=99.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "990-00-4827",
+      "notes": "Boundary sample: YY=00.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "958-94-7855",
+      "notes": "YY=94 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "928-85-2398",
+      "notes": "YY=85 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "907-76-1147",
+      "notes": "YY=76 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "980-61-4489",
+      "notes": "YY=61 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "957-50-7184",
+      "notes": "YY=50 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "968-76-4654",
+      "notes": "YY=76 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "987-97-5793",
+      "notes": "YY=97 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "995-81-7425",
+      "notes": "YY=81 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "990-74-0795",
+      "notes": "YY=74 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "950-99-1493",
+      "notes": "YY=99 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "938-73-3691",
+      "notes": "YY=73 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "924-85-3042",
+      "notes": "YY=85 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "917-58-8370",
+      "notes": "YY=58 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "974-85-5167",
+      "notes": "YY=85 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "981-77-7167",
+      "notes": "YY=77 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "955-88-9247",
+      "notes": "YY=88 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "965-95-4588",
+      "notes": "YY=95 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "958-54-7620",
+      "notes": "YY=54 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "954-84-5234",
+      "notes": "YY=84 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "989-92-3280",
+      "notes": "YY=92 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "989-60-4317",
+      "notes": "YY=60 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "975-55-6413",
+      "notes": "YY=55 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "991-77-2361",
+      "notes": "YY=77 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "903-54-8528",
+      "notes": "YY=54 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "911-52-3944",
+      "notes": "YY=52 inside an IRS range.",
+      "rejection_reason": null,
+      "valid": true,
+      "yy_bucket": "valid"
+    },
+    {
+      "itin": "947-15-7091",
+      "notes": "YY=15 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "948-16-2815",
+      "notes": "YY=16 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "994-17-4766",
+      "notes": "YY=17 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "959-02-5976",
+      "notes": "YY=02 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "999-49-8347",
+      "notes": "YY=49 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "924-47-2283",
+      "notes": "YY=47 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "949-67-0123",
+      "notes": "YY=67 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "981-10-1820",
+      "notes": "YY=10 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "913-20-3842",
+      "notes": "YY=20 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "995-26-8382",
+      "notes": "YY=26 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "904-68-3168",
+      "notes": "YY=68 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "990-01-6484",
+      "notes": "YY=01 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "992-23-5644",
+      "notes": "YY=23 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "988-34-7824",
+      "notes": "YY=34 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    },
+    {
+      "itin": "978-48-8260",
+      "notes": "YY=48 outside the four IRS ranges.",
+      "rejection_reason": "yy_out_of_range",
+      "valid": false,
+      "yy_bucket": "invalid"
+    }
+  ],
+  "version": 1
+}

@@ -1,0 +1,247 @@
+{
+  "generated_by": "resecta-data/vectors/ein",
+  "seed": 20260416,
+  "vectors": [
+    {
+      "ein": "44-6185880",
+      "notes": "IRS-assigned prefix 44, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "55-3174297",
+      "notes": "IRS-assigned prefix 55, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "92-5345135",
+      "notes": "IRS-assigned prefix 92, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "81-9275055",
+      "notes": "IRS-assigned prefix 81, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "58-3216106",
+      "notes": "IRS-assigned prefix 58, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "25-4615841",
+      "notes": "IRS-assigned prefix 25, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "83-0480639",
+      "notes": "IRS-assigned prefix 83, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "51-5310056",
+      "notes": "IRS-assigned prefix 51, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "83-3121163",
+      "notes": "IRS-assigned prefix 83, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "12-6543620",
+      "notes": "IRS-assigned prefix 12, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "85-0747850",
+      "notes": "IRS-assigned prefix 85, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "43-7341466",
+      "notes": "IRS-assigned prefix 43, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "46-7637148",
+      "notes": "IRS-assigned prefix 46, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "73-8247306",
+      "notes": "IRS-assigned prefix 73, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "37-2454868",
+      "notes": "IRS-assigned prefix 37, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "54-0980583",
+      "notes": "IRS-assigned prefix 54, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "12-3144327",
+      "notes": "IRS-assigned prefix 12, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "95-4596168",
+      "notes": "IRS-assigned prefix 95, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "02-7518165",
+      "notes": "IRS-assigned prefix 02, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "66-5860334",
+      "notes": "IRS-assigned prefix 66, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "82-4765422",
+      "notes": "IRS-assigned prefix 82, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "99-5931724",
+      "notes": "IRS-assigned prefix 99, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "64-7602740",
+      "notes": "IRS-assigned prefix 64, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "50-0813710",
+      "notes": "IRS-assigned prefix 50, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "60-1528083",
+      "notes": "IRS-assigned prefix 60, 7-digit suffix.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "ein": "4-43732",
+      "notes": "Prefix 1d, suffix 5d — not AA-BBBBBBB.",
+      "rejection_reason": "invalid_length",
+      "valid": false
+    },
+    {
+      "ein": "22-87955",
+      "notes": "Prefix 2d, suffix 5d — not AA-BBBBBBB.",
+      "rejection_reason": "invalid_length",
+      "valid": false
+    },
+    {
+      "ein": "6-86998417",
+      "notes": "Prefix 1d, suffix 8d — not AA-BBBBBBB.",
+      "rejection_reason": "invalid_length",
+      "valid": false
+    },
+    {
+      "ein": "77-65932419",
+      "notes": "Prefix 2d, suffix 8d — not AA-BBBBBBB.",
+      "rejection_reason": "invalid_length",
+      "valid": false
+    },
+    {
+      "ein": "9-652108",
+      "notes": "Prefix 1d, suffix 6d — not AA-BBBBBBB.",
+      "rejection_reason": "invalid_length",
+      "valid": false
+    },
+    {
+      "ein": "01-335646244",
+      "notes": "Prefix 2d, suffix 9d — not AA-BBBBBBB.",
+      "rejection_reason": "invalid_length",
+      "valid": false
+    },
+    {
+      "ein": "0-7583260",
+      "notes": "Prefix 1d, suffix 7d — not AA-BBBBBBB.",
+      "rejection_reason": "invalid_length",
+      "valid": false
+    },
+    {
+      "ein": "21-513680",
+      "notes": "Prefix 2d, suffix 6d — not AA-BBBBBBB.",
+      "rejection_reason": "invalid_length",
+      "valid": false
+    },
+    {
+      "ein": "30655-8798",
+      "notes": "Hyphen not at position 2 — regex anchored shape rejects.",
+      "rejection_reason": "invalid_shape",
+      "valid": false
+    },
+    {
+      "ein": "0-44292787",
+      "notes": "Hyphen not at position 2 — regex anchored shape rejects.",
+      "rejection_reason": "invalid_shape",
+      "valid": false
+    },
+    {
+      "ein": "5-62109240",
+      "notes": "Hyphen not at position 2 — regex anchored shape rejects.",
+      "rejection_reason": "invalid_shape",
+      "valid": false
+    },
+    {
+      "ein": "3-28513650",
+      "notes": "Hyphen not at position 2 — regex anchored shape rejects.",
+      "rejection_reason": "invalid_shape",
+      "valid": false
+    },
+    {
+      "ein": "2083-35513",
+      "notes": "Hyphen not at position 2 — regex anchored shape rejects.",
+      "rejection_reason": "invalid_shape",
+      "valid": false
+    },
+    {
+      "ein": "1901-73611",
+      "notes": "Hyphen not at position 2 — regex anchored shape rejects.",
+      "rejection_reason": "invalid_shape",
+      "valid": false
+    },
+    {
+      "ein": "1-73561031",
+      "notes": "Hyphen not at position 2 — regex anchored shape rejects.",
+      "rejection_reason": "invalid_shape",
+      "valid": false
+    }
+  ],
+  "version": 1
+}

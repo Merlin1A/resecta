@@ -1,0 +1,231 @@
+{
+  "generated_by": "resecta-data/vectors/routing_number",
+  "seed": 20260416,
+  "vectors": [
+    {
+      "context_keyword": "routing number",
+      "has_context": true,
+      "notes": "Design-doc section 4 sanity check: prefix 02 in [01,12], checksum 3*0+7*2+1*1+3*0+7*0+1*0+3*0+7*2+1*1=30, 30%10=0.",
+      "rejection_reason": null,
+      "routing_number": "021000021",
+      "valid": true
+    },
+    {
+      "context_keyword": "ABA routing",
+      "has_context": true,
+      "notes": "Design-doc section 4 sanity check: prefix 32 in [21,32], checksum 3*3+7*2+1*2+3*2+7*7+1*1+3*6+7*2+1*7=120, 120%10=0.",
+      "rejection_reason": null,
+      "routing_number": "322271627",
+      "valid": true
+    },
+    {
+      "context_keyword": "routing/transit",
+      "has_context": true,
+      "notes": "Design-doc section 4 sanity check: prefix 12 in [01,12], checksum 3*1+7*2+1*4+3*3+7*0+1*3+3*1+7*2+1*0=50, 50%10=0.",
+      "rejection_reason": null,
+      "routing_number": "124303120",
+      "valid": true
+    },
+    {
+      "context_keyword": "routing number",
+      "has_context": true,
+      "notes": "Seeded-random valid ABA: prefix 66, checksum 0.",
+      "rejection_reason": null,
+      "routing_number": "665395888",
+      "valid": true
+    },
+    {
+      "context_keyword": "ABA routing",
+      "has_context": true,
+      "notes": "Seeded-random valid ABA: prefix 80, checksum 0.",
+      "rejection_reason": null,
+      "routing_number": "802480556",
+      "valid": true
+    },
+    {
+      "context_keyword": "routing",
+      "has_context": true,
+      "notes": "Seeded-random valid ABA: prefix 22, checksum 0.",
+      "rejection_reason": null,
+      "routing_number": "226804747",
+      "valid": true
+    },
+    {
+      "context_keyword": "ACH",
+      "has_context": true,
+      "notes": "Seeded-random valid ABA: prefix 80, checksum 0.",
+      "rejection_reason": null,
+      "routing_number": "807325014",
+      "valid": true
+    },
+    {
+      "context_keyword": "direct deposit",
+      "has_context": true,
+      "notes": "Seeded-random valid ABA: prefix 31, checksum 0.",
+      "rejection_reason": null,
+      "routing_number": "314077583",
+      "valid": true
+    },
+    {
+      "context_keyword": "wire transfer",
+      "has_context": true,
+      "notes": "Seeded-random valid ABA: prefix 71, checksum 0.",
+      "rejection_reason": null,
+      "routing_number": "715675063",
+      "valid": true
+    },
+    {
+      "context_keyword": "bank routing",
+      "has_context": true,
+      "notes": "Seeded-random valid ABA: prefix 05, checksum 0.",
+      "rejection_reason": null,
+      "routing_number": "054373220",
+      "valid": true
+    },
+    {
+      "context_keyword": "transit number",
+      "has_context": true,
+      "notes": "Seeded-random valid ABA: prefix 31, checksum 0.",
+      "rejection_reason": null,
+      "routing_number": "318795560",
+      "valid": true
+    },
+    {
+      "context_keyword": "routing/transit",
+      "has_context": true,
+      "notes": "Seeded-random valid ABA: prefix 80, checksum 0.",
+      "rejection_reason": null,
+      "routing_number": "801777655",
+      "valid": true
+    },
+    {
+      "context_keyword": "routing number",
+      "has_context": true,
+      "notes": "999999999 shape - prefix 99 not in any ABA range.",
+      "rejection_reason": "invalid_prefix",
+      "routing_number": "999324198",
+      "valid": false
+    },
+    {
+      "context_keyword": "routing number",
+      "has_context": true,
+      "notes": "411111111 shape - prefix 41 not in range; design-doc adversarial case.",
+      "rejection_reason": "invalid_prefix",
+      "routing_number": "419652104",
+      "valid": false
+    },
+    {
+      "context_keyword": "routing number",
+      "has_context": true,
+      "notes": "Prefix 13 is in the reserved gap (13-20).",
+      "rejection_reason": "invalid_prefix",
+      "routing_number": "138013354",
+      "valid": false
+    },
+    {
+      "context_keyword": "routing number",
+      "has_context": true,
+      "notes": "Prefix 55 is in the reserved gap (33-60).",
+      "rejection_reason": "invalid_prefix",
+      "routing_number": "556462448",
+      "valid": false
+    },
+    {
+      "context_keyword": "routing number",
+      "has_context": true,
+      "notes": "Prefix 75 is in the reserved gap (73-79).",
+      "rejection_reason": "invalid_prefix",
+      "routing_number": "750758327",
+      "valid": false
+    },
+    {
+      "context_keyword": "routing number",
+      "has_context": true,
+      "notes": "Prefix 00 is reserved.",
+      "rejection_reason": "invalid_prefix",
+      "routing_number": "006021517",
+      "valid": false
+    },
+    {
+      "context_keyword": "routing",
+      "has_context": true,
+      "notes": "Valid prefix 27, last digit incremented by 1: checksum 1 not equal to 0.",
+      "rejection_reason": "invalid_checksum",
+      "routing_number": "278030654",
+      "valid": false
+    },
+    {
+      "context_keyword": "routing",
+      "has_context": true,
+      "notes": "Valid prefix 69, last digit incremented by 1: checksum 1 not equal to 0.",
+      "rejection_reason": "invalid_checksum",
+      "routing_number": "697986046",
+      "valid": false
+    },
+    {
+      "context_keyword": "routing",
+      "has_context": true,
+      "notes": "Valid prefix 63, last digit incremented by 1: checksum 1 not equal to 0.",
+      "rejection_reason": "invalid_checksum",
+      "routing_number": "639278712",
+      "valid": false
+    },
+    {
+      "context_keyword": "routing",
+      "has_context": true,
+      "notes": "Valid prefix 67, last digit incremented by 1: checksum 1 not equal to 0.",
+      "rejection_reason": "invalid_checksum",
+      "routing_number": "672109246",
+      "valid": false
+    },
+    {
+      "context_keyword": "routing",
+      "has_context": true,
+      "notes": "Valid prefix 01, last digit incremented by 1: checksum 1 not equal to 0.",
+      "rejection_reason": "invalid_checksum",
+      "routing_number": "013285130",
+      "valid": false
+    },
+    {
+      "context_keyword": "routing",
+      "has_context": true,
+      "notes": "Valid prefix 80, last digit incremented by 1: checksum 1 not equal to 0.",
+      "rejection_reason": "invalid_checksum",
+      "routing_number": "800020838",
+      "valid": false
+    },
+    {
+      "context_keyword": null,
+      "has_context": false,
+      "notes": "Valid ABA (prefix 26, checksum 0) with no routing context keyword: the detector emits base confidence 0.50; the balanced preset's W4 gate (0.60) is what withholds it.",
+      "rejection_reason": null,
+      "routing_number": "265135192",
+      "valid": true
+    },
+    {
+      "context_keyword": null,
+      "has_context": false,
+      "notes": "Valid ABA (prefix 02, checksum 0) with no routing context keyword: the detector emits base confidence 0.50; the balanced preset's W4 gate (0.60) is what withholds it.",
+      "rejection_reason": null,
+      "routing_number": "027361146",
+      "valid": true
+    },
+    {
+      "context_keyword": null,
+      "has_context": false,
+      "notes": "Valid ABA (prefix 08, checksum 0) with no routing context keyword: the detector emits base confidence 0.50; the balanced preset's W4 gate (0.60) is what withholds it.",
+      "rejection_reason": null,
+      "routing_number": "083561032",
+      "valid": true
+    },
+    {
+      "context_keyword": null,
+      "has_context": false,
+      "notes": "Valid ABA (prefix 02, checksum 0) with no routing context keyword: the detector emits base confidence 0.50; the balanced preset's W4 gate (0.60) is what withholds it.",
+      "rejection_reason": null,
+      "routing_number": "026249874",
+      "valid": true
+    }
+  ],
+  "version": 1
+}

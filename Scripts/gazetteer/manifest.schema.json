@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "GazetteerManifest",
+  "description": "Metadata for bundled gazetteer Bloom filter assets.",
+  "type": "object",
+  "required": ["version", "hashAlgorithm", "seed", "filters"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the asset bundle."
+    },
+    "hashAlgorithm": {
+      "type": "string",
+      "const": "MurmurHash3_x64_128",
+      "description": "Hash algorithm used for Bloom filter construction."
+    },
+    "seed": {
+      "type": "integer",
+      "description": "Seed passed to the hash function."
+    },
+    "filters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "n", "m", "k", "fprTarget", "sources", "builtAt"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Filter filename stem (e.g. 'surnames')."
+          },
+          "type": {
+            "type": "string",
+            "enum": ["surname", "givenName"],
+            "description": "Filter type."
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of unique entries inserted."
+          },
+          "m": {
+            "type": "integer",
+            "minimum": 64,
+            "description": "Number of bits in the filter."
+          },
+          "k": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of hash functions."
+          },
+          "fprTarget": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "exclusiveMaximum": 1,
+            "description": "Target false-positive rate."
+          },
+          "sources": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Source dataset identifiers."
+          },
+          "builtAt": {
+            "type": "string",
+            "description": "ISO 8601 build timestamp."
+          }
+        }
+      }
+    }
+  }
+}

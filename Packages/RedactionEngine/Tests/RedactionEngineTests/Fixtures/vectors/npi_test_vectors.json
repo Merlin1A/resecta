@@ -1,0 +1,1407 @@
+{
+  "generated_by": "resecta-data/vectors/npi",
+  "seed": 20260416,
+  "vectors": [
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1455395883",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1632480558",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1821680471",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1497773253",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1012407759",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1845675069",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1144373226",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1287955680",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1699841775",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1765932417",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1996521088",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1013356468",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1244075838",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1260215136",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1680306556",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1879860447",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1292787151",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1621092406",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1032851366",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1500208339",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1551351905",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1173611413",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1735610317",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1162498723",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1603096599",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1338569811",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1701369997",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1509361576",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1912591348",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1178195693",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1515598922",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1778794135",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1522548555",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1053655233",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1679322721",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1635818911",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1354992566",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1807649813",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1513087225",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1876172531",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1829355985",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1815292895",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1462870886",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1284332966",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1092267974",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1145591446",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1226531840",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1832339315",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1325658841",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_individual",
+      "expected_luhn_remainder": 0,
+      "npi": "1196183341",
+      "reason": "Prefix 1 (individual provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2762024364",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2478010657",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2358830315",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2946341320",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2474745413",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2100110883",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2874526868",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2592027215",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2072749759",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2153603297",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2427821642",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2897594018",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2680299262",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2639565391",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2859574008",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2188485199",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2966140891",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2082357767",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2755425842",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2852999806",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2640629061",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2038113009",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2797906049",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2422442493",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2935712929",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2489086902",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2262303490",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2887683185",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2702101496",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2956688750",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2786406696",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2754316539",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2709408829",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2170985677",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2579108970",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2641076379",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2359273853",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2385184637",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2929578575",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2644545818",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2118934993",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2531240945",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2758098760",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2970511368",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2341879858",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2404343875",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2630207100",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2317786392",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2520320864",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid_organization",
+      "expected_luhn_remainder": 0,
+      "npi": "2740915675",
+      "reason": "Prefix 2 (organization provider), correct CMS Luhn check digit.",
+      "valid": true
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 3,
+      "npi": "1188054149",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 6,
+      "npi": "2016684241",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 2,
+      "npi": "2890003480",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 1,
+      "npi": "1211860049",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 9,
+      "npi": "2974228422",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 6,
+      "npi": "2639434750",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 5,
+      "npi": "1989561393",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 9,
+      "npi": "1037053686",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 8,
+      "npi": "2946014461",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 6,
+      "npi": "2298412915",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 9,
+      "npi": "2380953167",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 4,
+      "npi": "2454365764",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 8,
+      "npi": "1091525800",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 4,
+      "npi": "2955394065",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 5,
+      "npi": "2037216980",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 6,
+      "npi": "1944384775",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 3,
+      "npi": "1687681020",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 7,
+      "npi": "2470750935",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 7,
+      "npi": "2509706932",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 3,
+      "npi": "2435747139",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 4,
+      "npi": "2999905355",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 2,
+      "npi": "1163859321",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 3,
+      "npi": "1646973690",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 9,
+      "npi": "1244411750",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 5,
+      "npi": "1993732337",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 9,
+      "npi": "2026515818",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 6,
+      "npi": "1546995697",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 6,
+      "npi": "2568408858",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 1,
+      "npi": "1072013175",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 6,
+      "npi": "2387265075",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 5,
+      "npi": "2134157210",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 1,
+      "npi": "1919052691",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 9,
+      "npi": "2732454773",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 6,
+      "npi": "2328801749",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 8,
+      "npi": "1330712599",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 2,
+      "npi": "2353971595",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 5,
+      "npi": "1845606713",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 3,
+      "npi": "2835737946",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 8,
+      "npi": "2817071749",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 2,
+      "npi": "1996521601",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 7,
+      "npi": "2505053248",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 4,
+      "npi": "2962198574",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 8,
+      "npi": "1399374315",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 5,
+      "npi": "1330878835",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 4,
+      "npi": "1212321507",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 4,
+      "npi": "2027466354",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 1,
+      "npi": "2773895183",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 8,
+      "npi": "2434928271",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 1,
+      "npi": "2709500212",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "expected_luhn_remainder": 4,
+      "npi": "2647847934",
+      "reason": "Valid prefix and length, deliberately wrong check digit.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "0666423971",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "9201217988",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "8481398120",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "5263798261",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "8062529440",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "8658125405",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "6183460123",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "5977894042",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "6964201316",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "0325846364",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "3440527513",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "9158386711",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "6141977739",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "7974132871",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "7700168033",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "7004425998",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "7406617549",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "6292157685",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "3478545957",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix",
+      "expected_luhn_remainder": 0,
+      "npi": "0741759035",
+      "reason": "Luhn-valid but prefix is not 1 or 2.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "285780158",
+      "reason": "Length 9 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "739036935",
+      "reason": "Length 9 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "25420310807",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "83548729906",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "99293711459",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "15710927273",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "12322856888",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "08162912787",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "67905814858",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "597014204",
+      "reason": "Length 9 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "617636680",
+      "reason": "Length 9 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "295874233",
+      "reason": "Length 9 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "66111523824",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "94367718365",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "11536536076",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "10235958183",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "37158025004",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "483500135",
+      "reason": "Length 9 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "27475192401",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "expected_luhn_remainder": 0,
+      "npi": "58538465448",
+      "reason": "Length 11 — not a 10-digit NPI.",
+      "valid": false
+    },
+    {
+      "category": "edge_all_same_digit",
+      "expected_luhn_remainder": 4,
+      "npi": "0000000000",
+      "reason": "All digits are 0.",
+      "valid": false
+    },
+    {
+      "category": "edge_all_same_digit",
+      "expected_luhn_remainder": 9,
+      "npi": "1111111111",
+      "reason": "All digits are 1.",
+      "valid": false
+    },
+    {
+      "category": "edge_all_same_digit",
+      "expected_luhn_remainder": 4,
+      "npi": "2222222222",
+      "reason": "All digits are 2.",
+      "valid": false
+    },
+    {
+      "category": "edge_all_same_digit",
+      "expected_luhn_remainder": 9,
+      "npi": "3333333333",
+      "reason": "All digits are 3.",
+      "valid": false
+    },
+    {
+      "category": "edge_all_same_digit",
+      "expected_luhn_remainder": 4,
+      "npi": "4444444444",
+      "reason": "All digits are 4.",
+      "valid": false
+    },
+    {
+      "category": "edge_all_same_digit",
+      "expected_luhn_remainder": 4,
+      "npi": "5555555555",
+      "reason": "All digits are 5.",
+      "valid": false
+    },
+    {
+      "category": "edge_all_same_digit",
+      "expected_luhn_remainder": 9,
+      "npi": "6666666666",
+      "reason": "All digits are 6.",
+      "valid": false
+    },
+    {
+      "category": "edge_all_same_digit",
+      "expected_luhn_remainder": 4,
+      "npi": "7777777777",
+      "reason": "All digits are 7.",
+      "valid": false
+    },
+    {
+      "category": "edge_all_same_digit",
+      "expected_luhn_remainder": 9,
+      "npi": "8888888888",
+      "reason": "All digits are 8.",
+      "valid": false
+    },
+    {
+      "category": "edge_all_same_digit",
+      "expected_luhn_remainder": 4,
+      "npi": "9999999999",
+      "reason": "All digits are 9.",
+      "valid": false
+    }
+  ],
+  "version": 1
+}

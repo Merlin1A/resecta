@@ -1,0 +1,14 @@
+{
+  "machine" : {
+    "deviceClass" : "macOS-iPhone-Simulator",
+    "deviceModel" : "MacBookPro18,1",
+    "osVersion" : "macOS Version 26.5 (Build 23F77)",
+    "simulatorName" : "iPhone 17",
+    "xcodeVersion" : "unspecified"
+  },
+  "pageCount" : 500,
+  "peakMemoryBytes" : 0,
+  "recordedAtISO8601" : "2026-06-13T01:15:38Z",
+  "seed" : 42,
+  "wallClockSeconds" : 2.399379584
+}

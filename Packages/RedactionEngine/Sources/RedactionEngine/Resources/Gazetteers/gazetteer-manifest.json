@@ -1,0 +1,41 @@
+{
+  "filters": [
+    {
+      "builtAt": "2026-04-16T00:00:00Z",
+      "fprTarget": 0.001,
+      "k": 10,
+      "m": 169693480,
+      "n": 11802639,
+      "name": "surnames",
+      "sources": [
+        "census_spanish",
+        "census_spanish_full",
+        "census_surnames",
+        "paranames",
+        "paranames_full",
+        "popnames",
+        "popnames_common_surnames"
+      ],
+      "type": "surname"
+    },
+    {
+      "builtAt": "2026-04-16T00:00:00Z",
+      "fprTarget": 0.001,
+      "k": 10,
+      "m": 167771400,
+      "n": 11668953,
+      "name": "given-names",
+      "sources": [
+        "paranames",
+        "paranames_full",
+        "popnames",
+        "popnames_common_forenames",
+        "ssa_given_names"
+      ],
+      "type": "givenName"
+    }
+  ],
+  "hashAlgorithm": "MurmurHash3_x64_128",
+  "seed": 20260416,
+  "version": "1.0.0"
+}

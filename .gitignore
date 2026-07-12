@@ -1,0 +1,59 @@
+# macOS
+.DS_Store
+*.swp
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+
+# Generated — recreate with ./regenerate.sh
+ResectaApp.xcodeproj/project.pbxproj
+
+# XcodeBuildMCP
+.xcodebuildmcp/
+
+# CAT-232 — advisory coverage report emitted by `make coverage-report`.
+# Regenerated on demand; not a committed artifact.
+/coverage-report.json
+
+# SPM
+.build/
+.swiftpm/
+
+# Editor
+.zed/
+
+# PERF-7 — Stress-test runtime artifacts. The synthetic 500-page
+# fixture is generated at test time (see
+# Packages/RedactionEngine/Tests/.../StressTests/StressFixtureBuilder.swift)
+# and the result JSON is rewritten on each baseline run. The
+# committed `stress-baseline.json` is intentionally NOT ignored.
+stress-corpus-*.pdf
+StressFixtures/
+Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/StressTests/stress-result.json
+
+# Claude Code agent scratch — per-machine session state, not source.
+# (`.claude/commands/` and `.claude/reports/` ARE tracked.)
+.claude/prompts/
+.claude/worktrees/
+
+# SEC-6 — The detached Ed25519 signature + public key are PUBLIC artifacts
+# (the private signing key in ~/.resecta-data/ never enters the repo). They
+# are COMMITTED so a clean clone / Release archive ships a verifiable
+# gazetteer manifest; absence would degrade Auto-Detect to non-gazetteer
+# detectors with the SEC-7 banner (REL-1 / D11-config-golive-F2).
+# The pair is produced by the DataPipeline signing step (gmake install-assets /
+# scripts/reinstall_signatures.sh) and asserted by
+# SignedManifestTests.committedSignaturePairVerifiesShippedManifest; the
+# committed bytes are the currently-signed pair.
+# (no ignore lines — both files are tracked; Jesse commits the binaries per CLAUDE.md 2.8)
+
+# UITestFixtures has no ignore lines — both fixtures are committed
+# synthetics: test_sample.pdf (611-byte single-pager from RawPDFBuilder
+# primitives, F03/CAT-254) and uitest_multipage.pdf (23-page workpaper,
+# regenerable via Scripts/generate_uitest_multipage.py, q38 — it replaced
+# a formerly gitignored real-document copy that served the
+# `--multipageDoc` launch hook), so clean checkouts run the multipage UI
+# tests without manual fixture restoration.

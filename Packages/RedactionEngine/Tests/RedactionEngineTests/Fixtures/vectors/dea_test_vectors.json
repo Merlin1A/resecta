@@ -1,0 +1,1527 @@
+{
+  "generated_by": "resecta-data/vectors/dea",
+  "seed": 20260416,
+  "vectors": [
+    {
+      "category": "valid",
+      "dea": "IL5395884",
+      "expected_check_digit": 4,
+      "prefix": "IL",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "MG2480553",
+      "expected_check_digit": 3,
+      "prefix": "MG",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "RF1680479",
+      "expected_check_digit": 9,
+      "prefix": "RF",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "WJ9777321",
+      "expected_check_digit": 1,
+      "prefix": "WJ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "LZ0124076",
+      "expected_check_digit": 6,
+      "prefix": "LZ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "VO5845675",
+      "expected_check_digit": 5,
+      "prefix": "VO",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "ZY5061445",
+      "expected_check_digit": 5,
+      "prefix": "ZY",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "HP3222875",
+      "expected_check_digit": 5,
+      "prefix": "HP",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "SK5686994",
+      "expected_check_digit": 4,
+      "prefix": "SK",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "QZ4177766",
+      "expected_check_digit": 6,
+      "prefix": "QZ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "VK9324194",
+      "expected_check_digit": 4,
+      "prefix": "VK",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "TM5210808",
+      "expected_check_digit": 8,
+      "prefix": "TM",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "CH3564627",
+      "expected_check_digit": 7,
+      "prefix": "CH",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "IX4075835",
+      "expected_check_digit": 5,
+      "prefix": "IX",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "XX2602159",
+      "expected_check_digit": 9,
+      "prefix": "XX",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "DH6803060",
+      "expected_check_digit": 0,
+      "prefix": "DH",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "LX5879866",
+      "expected_check_digit": 6,
+      "prefix": "LX",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "AJ4292784",
+      "expected_check_digit": 4,
+      "prefix": "AJ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "PY1562102",
+      "expected_check_digit": 2,
+      "prefix": "PY",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "SF4003288",
+      "expected_check_digit": 8,
+      "prefix": "SF",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "UK1365003",
+      "expected_check_digit": 3,
+      "prefix": "UK",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "FA8335514",
+      "expected_check_digit": 4,
+      "prefix": "FA",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "GZ5190171",
+      "expected_check_digit": 1,
+      "prefix": "GZ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "GN1141732",
+      "expected_check_digit": 2,
+      "prefix": "GN",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "VL6103117",
+      "expected_check_digit": 7,
+      "prefix": "VL",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "MF4987268",
+      "expected_check_digit": 8,
+      "prefix": "MF",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "AG0965939",
+      "expected_check_digit": 9,
+      "prefix": "AG",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "HU8569812",
+      "expected_check_digit": 2,
+      "prefix": "HU",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "XO0136994",
+      "expected_check_digit": 4,
+      "prefix": "XO",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "ZT5093618",
+      "expected_check_digit": 8,
+      "prefix": "ZT",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "LP9125914",
+      "expected_check_digit": 4,
+      "prefix": "LP",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "GI1781954",
+      "expected_check_digit": 4,
+      "prefix": "GI",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "NY9515593",
+      "expected_check_digit": 3,
+      "prefix": "NY",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "QT2778794",
+      "expected_check_digit": 4,
+      "prefix": "QT",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "IX1352258",
+      "expected_check_digit": 8,
+      "prefix": "IX",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "IQ5505360",
+      "expected_check_digit": 0,
+      "prefix": "IQ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "XU5523673",
+      "expected_check_digit": 3,
+      "prefix": "XU",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "SG2272639",
+      "expected_check_digit": 9,
+      "prefix": "SG",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "UX5818919",
+      "expected_check_digit": 9,
+      "prefix": "UX",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "HL4992562",
+      "expected_check_digit": 2,
+      "prefix": "HL",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "VR0764983",
+      "expected_check_digit": 3,
+      "prefix": "VR",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "CK1308724",
+      "expected_check_digit": 4,
+      "prefix": "CK",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "EV8761721",
+      "expected_check_digit": 1,
+      "prefix": "EV",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "WK3829352",
+      "expected_check_digit": 2,
+      "prefix": "WK",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "KS8815295",
+      "expected_check_digit": 5,
+      "prefix": "KS",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "EQ9462879",
+      "expected_check_digit": 9,
+      "prefix": "EQ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "AQ8284337",
+      "expected_check_digit": 7,
+      "prefix": "AQ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "ES6092263",
+      "expected_check_digit": 3,
+      "prefix": "ES",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "PS7145596",
+      "expected_check_digit": 6,
+      "prefix": "PS",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "DW4422654",
+      "expected_check_digit": 4,
+      "prefix": "DW",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "GC8483238",
+      "expected_check_digit": 8,
+      "prefix": "GC",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "GU9313254",
+      "expected_check_digit": 4,
+      "prefix": "GU",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "UM5884196",
+      "expected_check_digit": 6,
+      "prefix": "UM",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "MU1833474",
+      "expected_check_digit": 4,
+      "prefix": "MU",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "MY2024367",
+      "expected_check_digit": 7,
+      "prefix": "MY",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "IP8010655",
+      "expected_check_digit": 5,
+      "prefix": "IP",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "HK8830312",
+      "expected_check_digit": 2,
+      "prefix": "HK",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "SW4634134",
+      "expected_check_digit": 4,
+      "prefix": "SW",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "EJ7474543",
+      "expected_check_digit": 3,
+      "prefix": "EJ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "DC0011089",
+      "expected_check_digit": 9,
+      "prefix": "DC",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "QX8745260",
+      "expected_check_digit": 0,
+      "prefix": "QX",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "QU6592023",
+      "expected_check_digit": 3,
+      "prefix": "QU",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "PE1072747",
+      "expected_check_digit": 7,
+      "prefix": "PE",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "SP5153604",
+      "expected_check_digit": 4,
+      "prefix": "SP",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "GE9427825",
+      "expected_check_digit": 5,
+      "prefix": "GE",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "WC6489757",
+      "expected_check_digit": 7,
+      "prefix": "WC",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "XS4016805",
+      "expected_check_digit": 5,
+      "prefix": "XS",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "FT9266392",
+      "expected_check_digit": 2,
+      "prefix": "FT",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "KM5398599",
+      "expected_check_digit": 9,
+      "prefix": "KM",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "LP4001880",
+      "expected_check_digit": 0,
+      "prefix": "LP",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "WJ8519968",
+      "expected_check_digit": 8,
+      "prefix": "WJ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "NC4089086",
+      "expected_check_digit": 6,
+      "prefix": "NC",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "EU3577674",
+      "expected_check_digit": 4,
+      "prefix": "EU",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "LL4258489",
+      "expected_check_digit": 9,
+      "prefix": "LL",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "LF9998064",
+      "expected_check_digit": 4,
+      "prefix": "LF",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "JU0629064",
+      "expected_check_digit": 4,
+      "prefix": "JU",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "BH8113007",
+      "expected_check_digit": 7,
+      "prefix": "BH",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "WO9790608",
+      "expected_check_digit": 8,
+      "prefix": "WO",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "IJ2244248",
+      "expected_check_digit": 8,
+      "prefix": "IJ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "VS9357129",
+      "expected_check_digit": 9,
+      "prefix": "VS",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "XU9248902",
+      "expected_check_digit": 2,
+      "prefix": "XU",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "RN9026231",
+      "expected_check_digit": 1,
+      "prefix": "RN",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "AH4988765",
+      "expected_check_digit": 5,
+      "prefix": "AH",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "RH1870218",
+      "expected_check_digit": 8,
+      "prefix": "RH",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "AD4995669",
+      "expected_check_digit": 9,
+      "prefix": "AD",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "WQ8757861",
+      "expected_check_digit": 1,
+      "prefix": "WQ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "IB6697544",
+      "expected_check_digit": 4,
+      "prefix": "IB",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "GC6537091",
+      "expected_check_digit": 1,
+      "prefix": "GC",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "VZ4088212",
+      "expected_check_digit": 2,
+      "prefix": "VZ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "OB9856759",
+      "expected_check_digit": 9,
+      "prefix": "OB",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "WP9108970",
+      "expected_check_digit": 0,
+      "prefix": "WP",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "MJ1076377",
+      "expected_check_digit": 7,
+      "prefix": "MJ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "YH5927388",
+      "expected_check_digit": 8,
+      "prefix": "YH",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "YY5385186",
+      "expected_check_digit": 6,
+      "prefix": "YY",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "IM3929570",
+      "expected_check_digit": 0,
+      "prefix": "IM",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "QL7644544",
+      "expected_check_digit": 4,
+      "prefix": "QL",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "WK8111899",
+      "expected_check_digit": 9,
+      "prefix": "WK",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "GJ9953123",
+      "expected_check_digit": 3,
+      "prefix": "GJ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "IA9475802",
+      "expected_check_digit": 2,
+      "prefix": "IA",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "valid",
+      "dea": "TQ7697052",
+      "expected_check_digit": 2,
+      "prefix": "TQ",
+      "reason": "Two uppercase letters, seven digits, correct check digit.",
+      "valid": true
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "DD3634181",
+      "expected_check_digit": 3,
+      "prefix": "DD",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "TU8540437",
+      "expected_check_digit": 2,
+      "prefix": "TU",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "GR7630202",
+      "expected_check_digit": 4,
+      "prefix": "GR",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "XC0317781",
+      "expected_check_digit": 4,
+      "prefix": "XC",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "HT5203206",
+      "expected_check_digit": 7,
+      "prefix": "HT",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "WM7409151",
+      "expected_check_digit": 4,
+      "prefix": "WM",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "OW3188054",
+      "expected_check_digit": 9,
+      "prefix": "OW",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "YD4240162",
+      "expected_check_digit": 5,
+      "prefix": "YD",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "QJ2455892",
+      "expected_check_digit": 1,
+      "prefix": "QJ",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "YB0348918",
+      "expected_check_digit": 7,
+      "prefix": "YB",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "XF1186008",
+      "expected_check_digit": 3,
+      "prefix": "XF",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "BQ7974225",
+      "expected_check_digit": 6,
+      "prefix": "BQ",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "WJ2846390",
+      "expected_check_digit": 5,
+      "prefix": "WJ",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "VH4755292",
+      "expected_check_digit": 3,
+      "prefix": "VH",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "TL6139428",
+      "expected_check_digit": 7,
+      "prefix": "TL",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "GX7053689",
+      "expected_check_digit": 0,
+      "prefix": "GX",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "ZP9460147",
+      "expected_check_digit": 2,
+      "prefix": "ZP",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "ZW6742988",
+      "expected_check_digit": 3,
+      "prefix": "ZW",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "CF9157380",
+      "expected_check_digit": 9,
+      "prefix": "CF",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "SK3168546",
+      "expected_check_digit": 0,
+      "prefix": "SK",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "IH6576335",
+      "expected_check_digit": 4,
+      "prefix": "IH",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "YT1525809",
+      "expected_check_digit": 1,
+      "prefix": "YT",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "PT5539407",
+      "expected_check_digit": 0,
+      "prefix": "PT",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "HP0372169",
+      "expected_check_digit": 0,
+      "prefix": "HP",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "ZJ1944385",
+      "expected_check_digit": 0,
+      "prefix": "ZJ",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "PP5881681",
+      "expected_check_digit": 3,
+      "prefix": "PP",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "MR1022447",
+      "expected_check_digit": 9,
+      "prefix": "MR",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "BO5093640",
+      "expected_check_digit": 4,
+      "prefix": "BO",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "AT7069363",
+      "expected_check_digit": 6,
+      "prefix": "AT",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "JG5747137",
+      "expected_check_digit": 4,
+      "prefix": "JG",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "WL9999058",
+      "expected_check_digit": 4,
+      "prefix": "WL",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "LH1163857",
+      "expected_check_digit": 3,
+      "prefix": "LH",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "ED1646976",
+      "expected_check_digit": 2,
+      "prefix": "ED",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "MS2024446",
+      "expected_check_digit": 4,
+      "prefix": "MS",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "CO5819933",
+      "expected_check_digit": 5,
+      "prefix": "CO",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "HU2334406",
+      "expected_check_digit": 3,
+      "prefix": "HU",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "NL1581829",
+      "expected_check_digit": 3,
+      "prefix": "NL",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "JX6995693",
+      "expected_check_digit": 7,
+      "prefix": "JX",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "JK6840886",
+      "expected_check_digit": 0,
+      "prefix": "JK",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "LA0720135",
+      "expected_check_digit": 3,
+      "prefix": "LA",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "OB6387264",
+      "expected_check_digit": 8,
+      "prefix": "OB",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "AO5513414",
+      "expected_check_digit": 8,
+      "prefix": "AO",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "PZ2141912",
+      "expected_check_digit": 1,
+      "prefix": "PZ",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "KF6904738",
+      "expected_check_digit": 5,
+      "prefix": "KF",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "IK4778535",
+      "expected_check_digit": 2,
+      "prefix": "IK",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "QR0174957",
+      "expected_check_digit": 6,
+      "prefix": "QR",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "UH3071252",
+      "expected_check_digit": 4,
+      "prefix": "UH",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "KU3539719",
+      "expected_check_digit": 3,
+      "prefix": "KU",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "SS1284569",
+      "expected_check_digit": 8,
+      "prefix": "SS",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_checksum",
+      "dea": "NP1458351",
+      "expected_check_digit": 3,
+      "prefix": "NP",
+      "reason": "Letters and length correct; trailing digit off by design.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "7S4927818",
+      "expected_check_digit": 8,
+      "prefix": "7S",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "X07174713",
+      "expected_check_digit": 3,
+      "prefix": "X0",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "U65216014",
+      "expected_check_digit": 4,
+      "prefix": "U6",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "0L0532463",
+      "expected_check_digit": 3,
+      "prefix": "0L",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "6Y2198578",
+      "expected_check_digit": 8,
+      "prefix": "6Y",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "3T9374315",
+      "expected_check_digit": 5,
+      "prefix": "3T",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "2Y3308788",
+      "expected_check_digit": 8,
+      "prefix": "2Y",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "G42212328",
+      "expected_check_digit": 8,
+      "prefix": "G4",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "Z50370279",
+      "expected_check_digit": 9,
+      "prefix": "Z5",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "N63593969",
+      "expected_check_digit": 9,
+      "prefix": "N6",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "3R9518056",
+      "expected_check_digit": 6,
+      "prefix": "3R",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "3J9282776",
+      "expected_check_digit": 6,
+      "prefix": "3J",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "S86709503",
+      "expected_check_digit": 3,
+      "prefix": "S8",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "A21056476",
+      "expected_check_digit": 6,
+      "prefix": "A2",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "X47933066",
+      "expected_check_digit": 6,
+      "prefix": "X4",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "4F3977204",
+      "expected_check_digit": 4,
+      "prefix": "4F",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "1P9896486",
+      "expected_check_digit": 6,
+      "prefix": "1P",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "9Q1232634",
+      "expected_check_digit": 4,
+      "prefix": "9Q",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "8F6606252",
+      "expected_check_digit": 2,
+      "prefix": "8F",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_prefix_letter",
+      "dea": "4V4665812",
+      "expected_check_digit": 2,
+      "prefix": "4V",
+      "reason": "Prefix contains a digit where a letter is required.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "ZK404183",
+      "expected_check_digit": 4,
+      "prefix": "ZK",
+      "reason": "Total length 8 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "MB12397789",
+      "expected_check_digit": 7,
+      "prefix": "MB",
+      "reason": "Total length 10 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "BU44964201",
+      "expected_check_digit": 1,
+      "prefix": "BU",
+      "reason": "Total length 10 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "CB325846",
+      "expected_check_digit": 4,
+      "prefix": "CB",
+      "reason": "Total length 8 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "NU144052",
+      "expected_check_digit": 2,
+      "prefix": "NU",
+      "reason": "Total length 8 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "UK187158386",
+      "expected_check_digit": 7,
+      "prefix": "UK",
+      "reason": "Total length 11 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "WD414197773",
+      "expected_check_digit": 5,
+      "prefix": "WD",
+      "reason": "Total length 11 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "TO41328757",
+      "expected_check_digit": 5,
+      "prefix": "TO",
+      "reason": "Total length 10 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "AD68039",
+      "expected_check_digit": 0,
+      "prefix": "AD",
+      "reason": "Total length 7 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "BA44259985",
+      "expected_check_digit": 1,
+      "prefix": "BA",
+      "reason": "Total length 10 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "AM61754842",
+      "expected_check_digit": 5,
+      "prefix": "AM",
+      "reason": "Total length 10 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "CK768147",
+      "expected_check_digit": 7,
+      "prefix": "CK",
+      "reason": "Total length 8 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "JL95074175",
+      "expected_check_digit": 9,
+      "prefix": "JL",
+      "reason": "Total length 10 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "ZG22857",
+      "expected_check_digit": 0,
+      "prefix": "ZG",
+      "reason": "Total length 7 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "UC58073",
+      "expected_check_digit": 0,
+      "prefix": "UC",
+      "reason": "Total length 7 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "ZG69356",
+      "expected_check_digit": 0,
+      "prefix": "ZG",
+      "reason": "Total length 7 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "KJ203108",
+      "expected_check_digit": 3,
+      "prefix": "KJ",
+      "reason": "Total length 8 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "PN83548",
+      "expected_check_digit": 0,
+      "prefix": "PN",
+      "reason": "Total length 7 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "FT906699293",
+      "expected_check_digit": 4,
+      "prefix": "FT",
+      "reason": "Total length 11 — not a 9-character DEA.",
+      "valid": false
+    },
+    {
+      "category": "invalid_length",
+      "dea": "YD145971571",
+      "expected_check_digit": 1,
+      "prefix": "YD",
+      "reason": "Total length 11 — not a 9-character DEA.",
+      "valid": false
+    }
+  ],
+  "version": 1
+}

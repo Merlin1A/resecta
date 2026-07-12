@@ -1,0 +1,263 @@
+{
+  "generated_by": "resecta-data/fuzz/redos",
+  "payloads": [
+    {
+      "attacker_input": "aaaaaaaa",
+      "expected_behavior": "linear",
+      "id": "nested_quantifier_00",
+      "notes": "Length 8.",
+      "pattern_class": "nested_quantifier",
+      "target_regex_shape": "(a+)+b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaa",
+      "expected_behavior": "linear",
+      "id": "nested_quantifier_01",
+      "notes": "Length 16.",
+      "pattern_class": "nested_quantifier",
+      "target_regex_shape": "(a+)+b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "linear",
+      "id": "nested_quantifier_02",
+      "notes": "Length 32.",
+      "pattern_class": "nested_quantifier",
+      "target_regex_shape": "(a+)+b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "nested_quantifier_03",
+      "notes": "Length 64.",
+      "pattern_class": "nested_quantifier",
+      "target_regex_shape": "(a+)+b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "nested_quantifier_04",
+      "notes": "Length 128.",
+      "pattern_class": "nested_quantifier",
+      "target_regex_shape": "(a+)+b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "nested_quantifier_05",
+      "notes": "Length 256.",
+      "pattern_class": "nested_quantifier",
+      "target_regex_shape": "(a+)+b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "nested_quantifier_06",
+      "notes": "Length 512.",
+      "pattern_class": "nested_quantifier",
+      "target_regex_shape": "(a+)+b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "nested_quantifier_07",
+      "notes": "Length 1024.",
+      "pattern_class": "nested_quantifier",
+      "target_regex_shape": "(a+)+b"
+    },
+    {
+      "attacker_input": "aaaaaaaa",
+      "expected_behavior": "linear",
+      "id": "alternation_overlap_00",
+      "notes": "Length 8.",
+      "pattern_class": "alternation_overlap",
+      "target_regex_shape": "(a|ab)*b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaa",
+      "expected_behavior": "linear",
+      "id": "alternation_overlap_01",
+      "notes": "Length 16.",
+      "pattern_class": "alternation_overlap",
+      "target_regex_shape": "(a|ab)*b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "linear",
+      "id": "alternation_overlap_02",
+      "notes": "Length 32.",
+      "pattern_class": "alternation_overlap",
+      "target_regex_shape": "(a|ab)*b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "alternation_overlap_03",
+      "notes": "Length 64.",
+      "pattern_class": "alternation_overlap",
+      "target_regex_shape": "(a|ab)*b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "alternation_overlap_04",
+      "notes": "Length 128.",
+      "pattern_class": "alternation_overlap",
+      "target_regex_shape": "(a|ab)*b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "alternation_overlap_05",
+      "notes": "Length 256.",
+      "pattern_class": "alternation_overlap",
+      "target_regex_shape": "(a|ab)*b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "alternation_overlap_06",
+      "notes": "Length 512.",
+      "pattern_class": "alternation_overlap",
+      "target_regex_shape": "(a|ab)*b"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "alternation_overlap_07",
+      "notes": "Length 1024.",
+      "pattern_class": "alternation_overlap",
+      "target_regex_shape": "(a|ab)*b"
+    },
+    {
+      "attacker_input": "xxxxxxxxx",
+      "expected_behavior": "linear",
+      "id": "backreference_trap_00",
+      "notes": "Length 8.",
+      "pattern_class": "backreference_trap",
+      "target_regex_shape": "^(.*)\\1$"
+    },
+    {
+      "attacker_input": "xxxxxxxxxxxxxxxxx",
+      "expected_behavior": "linear",
+      "id": "backreference_trap_01",
+      "notes": "Length 16.",
+      "pattern_class": "backreference_trap",
+      "target_regex_shape": "^(.*)\\1$"
+    },
+    {
+      "attacker_input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected_behavior": "linear",
+      "id": "backreference_trap_02",
+      "notes": "Length 32.",
+      "pattern_class": "backreference_trap",
+      "target_regex_shape": "^(.*)\\1$"
+    },
+    {
+      "attacker_input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected_behavior": "superlinear",
+      "id": "backreference_trap_03",
+      "notes": "Length 64.",
+      "pattern_class": "backreference_trap",
+      "target_regex_shape": "^(.*)\\1$"
+    },
+    {
+      "attacker_input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected_behavior": "superlinear",
+      "id": "backreference_trap_04",
+      "notes": "Length 128.",
+      "pattern_class": "backreference_trap",
+      "target_regex_shape": "^(.*)\\1$"
+    },
+    {
+      "attacker_input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected_behavior": "superlinear",
+      "id": "backreference_trap_05",
+      "notes": "Length 256.",
+      "pattern_class": "backreference_trap",
+      "target_regex_shape": "^(.*)\\1$"
+    },
+    {
+      "attacker_input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected_behavior": "superlinear",
+      "id": "backreference_trap_06",
+      "notes": "Length 512.",
+      "pattern_class": "backreference_trap",
+      "target_regex_shape": "^(.*)\\1$"
+    },
+    {
+      "attacker_input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected_behavior": "superlinear",
+      "id": "backreference_trap_07",
+      "notes": "Length 1024.",
+      "pattern_class": "backreference_trap",
+      "target_regex_shape": "^(.*)\\1$"
+    },
+    {
+      "attacker_input": "aaaaaaaa!",
+      "expected_behavior": "linear",
+      "id": "catastrophic_anchored_00",
+      "notes": "Length 8.",
+      "pattern_class": "catastrophic_anchored",
+      "target_regex_shape": "^(a+)+$"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaa!",
+      "expected_behavior": "linear",
+      "id": "catastrophic_anchored_01",
+      "notes": "Length 16.",
+      "pattern_class": "catastrophic_anchored",
+      "target_regex_shape": "^(a+)+$"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!",
+      "expected_behavior": "linear",
+      "id": "catastrophic_anchored_02",
+      "notes": "Length 32.",
+      "pattern_class": "catastrophic_anchored",
+      "target_regex_shape": "^(a+)+$"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!",
+      "expected_behavior": "superlinear",
+      "id": "catastrophic_anchored_03",
+      "notes": "Length 64.",
+      "pattern_class": "catastrophic_anchored",
+      "target_regex_shape": "^(a+)+$"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!",
+      "expected_behavior": "superlinear",
+      "id": "catastrophic_anchored_04",
+      "notes": "Length 128.",
+      "pattern_class": "catastrophic_anchored",
+      "target_regex_shape": "^(a+)+$"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!",
+      "expected_behavior": "superlinear",
+      "id": "catastrophic_anchored_05",
+      "notes": "Length 256.",
+      "pattern_class": "catastrophic_anchored",
+      "target_regex_shape": "^(a+)+$"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!",
+      "expected_behavior": "superlinear",
+      "id": "catastrophic_anchored_06",
+      "notes": "Length 512.",
+      "pattern_class": "catastrophic_anchored",
+      "target_regex_shape": "^(a+)+$"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!",
+      "expected_behavior": "superlinear",
+      "id": "catastrophic_anchored_07",
+      "notes": "Length 1024.",
+      "pattern_class": "catastrophic_anchored",
+      "target_regex_shape": "^(a+)+$"
+    }
+  ],
+  "seed": 20260416,
+  "version": 1
+}

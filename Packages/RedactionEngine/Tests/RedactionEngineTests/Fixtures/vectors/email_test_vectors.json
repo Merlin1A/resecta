@@ -1,0 +1,421 @@
+{
+  "generated_by": "resecta-data/vectors/email",
+  "seed": 20260416,
+  "vectors": [
+    {
+      "email": "xwm+u79@umjr8bu.co",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "ey9cr@js345ow.app",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "elr@w228.app",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "w13udzf@lto5mi.org",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "5%ux181_-6r@4331.ai",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "%mkqf%-z@cjeb7f.org",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "x1qykr@ysc3x6mia.org",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "ugp0@86cmbzxw4.app",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "60bsqk_l284e@bw1leclsbm.org",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "vfp1xbala8p@nuugu.com",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "cg2n1feqf4px@yfcmghk.net",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "72kzbmd_0x%o@69v0e.ai",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "bgnz%+-wd%@go1gw5ejvm.net",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "39e+@v1vhu7.co",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "4364+@khpviw.app",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "7xvaxoz@ivwlo13mi.io",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "znu9h@xepxrk0.ai",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "c40r-6fugoa@g5ij9504.org",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "p7k-pxv_@s6gulj61.org",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "3a77j7rpoi_@2ajjy4g.ai",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "uv+hqti@e0xm6.app",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "8nknm-m@7fmkwzu9t.ai",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "%yg8@ymq2l.com",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "sozq4@vbedyxo9.co",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "bpf%r1@jrfms.ai",
+      "notes": "Simple local@domain.tld.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "3sws.ec.hg@7962.net",
+      "notes": "Dotted local part with dots only between local chars.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "z7z.+kdj.jha2k@mr5ueu1.app",
+      "notes": "Dotted local part with dots only between local chars.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "i-t.57k@tf0r9-3wc.app",
+      "notes": "Dotted local part with dots only between local chars.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "6dk+%.1ym@wuyup6u4.net",
+      "notes": "Dotted local part with dots only between local chars.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "h7.s8vh-_@a1fqb89.org",
+      "notes": "Dotted local part with dots only between local chars.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "4203.wqix@0s6xl8bs.ai",
+      "notes": "Dotted local part with dots only between local chars.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "l_a0d.8ff@qpaa34bycs.app",
+      "notes": "Dotted local part with dots only between local chars.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "rrk.%-ox@92hjkt8d1.co",
+      "notes": "Dotted local part with dots only between local chars.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "1jn.ot@f963z8p8.app",
+      "notes": "Dotted local part with dots only between local chars.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "le.gq.+x0y67@dv481rz.io",
+      "notes": "Dotted local part with dots only between local chars.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "3xqme1u+5b+@ctd89jf29.net",
+      "notes": "``+`` subaddressing tag in the local part.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "2x5+fa+_5zshc@i1n3px3.org",
+      "notes": "``+`` subaddressing tag in the local part.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "9uo8wg6q+m%k+v@t7w5yrx.net",
+      "notes": "``+`` subaddressing tag in the local part.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "u9fhh9+n++_wm@alqq.io",
+      "notes": "``+`` subaddressing tag in the local part.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": "6b+62+%3cvh@ooyt.app",
+      "notes": "``+`` subaddressing tag in the local part.",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "email": ".h63+7xrb@nsmqn94zc.org",
+      "notes": "Leading dot violates the non-dot anchor.",
+      "rejection_reason": "leading_dot_local",
+      "valid": false
+    },
+    {
+      "email": ".4fa@7e35y.org",
+      "notes": "Leading dot violates the non-dot anchor.",
+      "rejection_reason": "leading_dot_local",
+      "valid": false
+    },
+    {
+      "email": ".wkbnla7@2y3rbgwzo.com",
+      "notes": "Leading dot violates the non-dot anchor.",
+      "rejection_reason": "leading_dot_local",
+      "valid": false
+    },
+    {
+      "email": ".9aurhqi@tsdg116tlw.net",
+      "notes": "Leading dot violates the non-dot anchor.",
+      "rejection_reason": "leading_dot_local",
+      "valid": false
+    },
+    {
+      "email": "._bdcot8@zhclgf9d.com",
+      "notes": "Leading dot violates the non-dot anchor.",
+      "rejection_reason": "leading_dot_local",
+      "valid": false
+    },
+    {
+      "email": "d74_..sli6t@rk7tzmqp4.net",
+      "notes": "Consecutive dots fail the dot-followed-by-local lookahead.",
+      "rejection_reason": "consecutive_dot_local",
+      "valid": false
+    },
+    {
+      "email": "k+8+..1fn_@dkdm4u.org",
+      "notes": "Consecutive dots fail the dot-followed-by-local lookahead.",
+      "rejection_reason": "consecutive_dot_local",
+      "valid": false
+    },
+    {
+      "email": "6-95%..ybeq@8y5sjs.com",
+      "notes": "Consecutive dots fail the dot-followed-by-local lookahead.",
+      "rejection_reason": "consecutive_dot_local",
+      "valid": false
+    },
+    {
+      "email": "_hu..m6d%u@pnhz8vrvqy.net",
+      "notes": "Consecutive dots fail the dot-followed-by-local lookahead.",
+      "rejection_reason": "consecutive_dot_local",
+      "valid": false
+    },
+    {
+      "email": "zmna+..wk@x7b44x.ai",
+      "notes": "Consecutive dots fail the dot-followed-by-local lookahead.",
+      "rejection_reason": "consecutive_dot_local",
+      "valid": false
+    },
+    {
+      "email": "-qb1@.bo3ih0.org",
+      "notes": "Leading-dot domain.",
+      "rejection_reason": "domain_dot_anchor",
+      "valid": false
+    },
+    {
+      "email": "6tf-qrm@44w78..co",
+      "notes": "Consecutive dots in the domain.",
+      "rejection_reason": "domain_dot_anchor",
+      "valid": false
+    },
+    {
+      "email": "092@.dlk.io",
+      "notes": "Leading-dot domain.",
+      "rejection_reason": "domain_dot_anchor",
+      "valid": false
+    },
+    {
+      "email": "qq4d3wa+@rva3by..org",
+      "notes": "Consecutive dots in the domain.",
+      "rejection_reason": "domain_dot_anchor",
+      "valid": false
+    },
+    {
+      "email": "pz_0snx@.3gmlw.io",
+      "notes": "Leading-dot domain.",
+      "rejection_reason": "domain_dot_anchor",
+      "valid": false
+    },
+    {
+      "email": "%+-axmw@hfzn",
+      "notes": "No ``.tld`` suffix; ``\\.[a-zA-Z]{2,}`` fails.",
+      "rejection_reason": "no_tld",
+      "valid": false
+    },
+    {
+      "email": "v-ojhh1@13mz",
+      "notes": "No ``.tld`` suffix; ``\\.[a-zA-Z]{2,}`` fails.",
+      "rejection_reason": "no_tld",
+      "valid": false
+    },
+    {
+      "email": "aktq@ge2x7",
+      "notes": "No ``.tld`` suffix; ``\\.[a-zA-Z]{2,}`` fails.",
+      "rejection_reason": "no_tld",
+      "valid": false
+    },
+    {
+      "email": "--p@okoprr",
+      "notes": "No ``.tld`` suffix; ``\\.[a-zA-Z]{2,}`` fails.",
+      "rejection_reason": "no_tld",
+      "valid": false
+    },
+    {
+      "email": "i0x@x9h",
+      "notes": "No ``.tld`` suffix; ``\\.[a-zA-Z]{2,}`` fails.",
+      "rejection_reason": "no_tld",
+      "valid": false
+    },
+    {
+      "email": "kut1++w@vsv18s.88",
+      "notes": "All-digit TLD fails the letter-only anchor.",
+      "rejection_reason": "numeric_tld",
+      "valid": false
+    },
+    {
+      "email": "wab4j@hmf.063",
+      "notes": "All-digit TLD fails the letter-only anchor.",
+      "rejection_reason": "numeric_tld",
+      "valid": false
+    },
+    {
+      "email": "3k1wa2v@goreu.214",
+      "notes": "All-digit TLD fails the letter-only anchor.",
+      "rejection_reason": "numeric_tld",
+      "valid": false
+    },
+    {
+      "email": "_e-@vkz.9047",
+      "notes": "All-digit TLD fails the letter-only anchor.",
+      "rejection_reason": "numeric_tld",
+      "valid": false
+    },
+    {
+      "email": "mj79cg5t-vbomd5elv%4vpvn-4fw%%fl6quzd05hqw9nw4p2%r%i37g4c4f2r3h++zvjgyafzwaxdumks04%1je-9x4mem+-m4rpe2iona8368mskjejpjhwcn5bk2t0znu+m%z25m8+ug6bxspt%l8i426%912d+xdakebwyr48q4_oob0y1tln+53kagle5-8+0r7go_6hkpizo2_6lz1b0lwk%styyw6glutcsf7nsycfln@lrvr356u.org",
+      "notes": "Length 255 exceeds RFC 5321 cap of 254; rejected by the inline guard.",
+      "rejection_reason": "length_cap_exceeded",
+      "valid": false
+    },
+    {
+      "email": "skbfmecnjv8szm0fttbvl4uh62gv7p7y3gtgtf-524ow+2qemi95x2bbh18dm%ucatriw-+9xrbz0f5ws9ti+kfu3z8fr48vsx_ua2th2w_bmij7w36aex6d4o+cn1%mvzlvtkaogb8d407pvq93k-+dyz%%l+p5hhqv%3fu5gb%j4l2pthknji7w08793c7eyj+gl2828vz5%bv8gs6u9bw%2bgricq-h1h4yn0y8cdl%x84skn@538rcsqz.co",
+      "notes": "Length 256 exceeds RFC 5321 cap of 254; rejected by the inline guard.",
+      "rejection_reason": "length_cap_exceeded",
+      "valid": false
+    },
+    {
+      "email": "n9jqz+qny32g8p1x3fgum1wp1d50rediov-v6g6p4p3gu7biwcbrpq7pxaahmvvi3t5vh_jsdg+vv8xp9q1xts7azzwmtnmh+68cedmpe1u6naev0v+f2ck7w3echhmc830wf%jjo8pwjhq9wljkwp3wuo5eo58agf%2edbbgq-pieo6r5vbogitd8ensub_8--5e_72+bbs_mod73o-7-gm9qr3o+e_0vzv4aoa_9i_+2nqrqma@wy1hegwk.org",
+      "notes": "Length 257 exceeds RFC 5321 cap of 254; rejected by the inline guard.",
+      "rejection_reason": "length_cap_exceeded",
+      "valid": false
+    },
+    {
+      "email": "z4qngl9hnowyhq4c8g4yeo17c_fzzl7i5xcdq5n7jro4a_ifipu%e2bzmjubamw1m-66ca5y0nxjmt0a_bt1mgt70%pec+__8nffty3+76j91v+13qg8cnrkbq9o9ijj0cpekiz%wf_7v%im4jf_x1eoysur535-rj_+djl14d0m8xb_6+vsvsy2rtb_vq_xh6d1n+xejz0clmnddwr8tq69uguc7rrx4+_u7soun7thktv_xdz5i@q4txh6ji.org",
+      "notes": "Length 258 exceeds RFC 5321 cap of 254; rejected by the inline guard.",
+      "rejection_reason": "length_cap_exceeded",
+      "valid": false
+    },
+    {
+      "email": "vcpcseo9r13d0-1ovp2rwlngjbocbb62via-_fvmwuq4zx3exvnlya61u27cwmggmokpvy85v8wkdt3h7q67z2qs0_kkq_6lay1s1moo01a_zwwo3tk+s6trrvn0b1bejk_+5ayt8pw9iyaep69q6wd7fa2-+_rg0qhknrh1y4gv%mny%nfw5_ru2ql6a%sjs11tb%hfx2vw6f+9owkfgqvlvo7m_zjnos7h_96y7s27w-mv9z2dy6@27kgzvdq.app",
+      "notes": "Length 259 exceeds RFC 5321 cap of 254; rejected by the inline guard.",
+      "rejection_reason": "length_cap_exceeded",
+      "valid": false
+    }
+  ],
+  "version": 1
+}

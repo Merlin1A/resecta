@@ -1,0 +1,189 @@
+name: ResectaApp
+options:
+  bundleIdPrefix: com.resecta
+  # GAP-DEPTARGET-NER (D04-F3 == D11-F3) — floor stays iOS 26.0 by design. The
+  # runtime `.nameType` NER name model is reliably provisioned only on 26.4+ (per
+  # the detection harness pin); the 26.0 floor is INTENTIONAL because non-NER
+  # detectors + the degraded banner (now also fired on NER-asset absence)
+  # cover the 26.0–26.3 gap. Do NOT raise to 26.4 — Jesse decision
+  # (J-DEPTARGET / J-NER-ONDEVICE option B); on-device proof = GAP-REL-ONDEVICE.
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+packages:
+  RedactionEngine:
+    path: Packages/RedactionEngine
+
+settings:
+  base:
+    SWIFT_VERSION: "6.2"
+    # Default Actor Isolation = MainActor (SE-0466), pinned across all Xcode
+    # targets (app + unit/UI test bundles). Jesse ruling 2026-06-12 (fix-series
+    # s04): the Swift 6.2 compiler default is `nonisolated`, so this
+    # MainActor assumption and PipelineCoordinator's @unchecked Sendable
+    # rationale was previously unenforced. Set explicitly here rather than
+    # relying on the toolchain default. The RedactionEngine SPM package keeps
+    # its own `nonisolated` + @concurrent default (Packages/.../Package.swift).
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+
+targets:
+  ResectaApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/ResectaApp
+      - path: Resources/Assets.xcassets
+      # Bundled sample document, loaded by
+      # ImportService.loadSampleDocument. Routed through `sources:` because
+      # the target's `resources:` block silently fails to enumerate.
+      - path: Resources/SampleDocument.pdf
+      # Second bundled sample: the synthetic Hartwell loan-packet (12 pp).
+      # Ships as a bundled asset only — no UI picker yet. Same `sources:`
+      # routing as SampleDocument.pdf. Held
+      # byte-identical to the engine fixture
+      # (Packages/RedactionEngine/Tests/.../TestResources/packet.pdf) — one SHA,
+      # guarded by BundleContentsTests (app side) + audit-lint.sh M-10 (cmp).
+      - path: Resources/packet.pdf
+      # Privacy manifest — must ship in the bundle root or every
+      # App Store submission trips ITMS-91053. Routed through `sources:`
+      # because the target's `resources:` block silently fails to enumerate
+      # (guarded by BundleContentsTests).
+      - path: Resources/PrivacyInfo.xcprivacy
+      # Custom-terms starter templates, loaded by
+      # CustomTermsTemplateLoader.licensePlate50StateStarter. Same
+      # `resources:` no-op routing (guarded by BundleContentsTests).
+      - path: Resources/CustomTermsTemplates
+      # Repo-root legal documents, bundled so the first-launch
+      # gate can present them read-only in-app (LegalDocumentView) with no
+      # egress. Routed through `sources:` with an explicit resources
+      # buildPhase — the target's `resources:` block silently fails to
+      # enumerate, and XcodeGen gives .md files no build phase by default.
+      # Bundled copies are byte-compared to the repo-root files by
+      # LegalDocumentBundleTests, so the two cannot drift apart.
+      - path: EULA.md
+        buildPhase: resources
+      - path: PRIVACY.md
+        buildPhase: resources
+      # DEBUG-only: committed synthetic UI-test document fixtures, bundled
+      # via `sources:` because the target's `resources:` block silently
+      # fails to enumerate. Loaded by the `--loadTestDocument` /
+      # `--multipageDoc` launch hooks. Both PDFs are tracked synthetics
+      # (uitest_multipage.pdf regenerates via
+      # Scripts/generate_uitest_multipage.py), so they exist on a clean
+      # checkout; `optional` stays as tolerance for local deletion.
+      - path: UITestFixtures
+        optional: true
+    resources:
+      - path: Resources
+    settings:
+      base:
+        # NSPhotoLibraryUsageDescription is deliberately absent:
+        # photo import uses SwiftUI PhotosPicker, an out-of-process picker
+        # that grants the app no library access. Re-add only if App Review
+        # requires it.
+        PRODUCT_BUNDLE_IDENTIFIER: com.resecta.app
+        PRODUCT_NAME: ResectaApp
+        INFOPLIST_KEY_CFBundleDisplayName: Resecta
+        GENERATE_INFOPLIST_FILE: YES
+        # Global accent: AccentColor.colorset in Resources/Assets.xcassets
+        # (brand teal, light #0B646F / dark #128697). Without this setting the
+        # colorset is inert. A root .tint in ResectaApp.swift carries the same
+        # pair for SwiftUI ambient color (the iOS 26.4 sim runtime does not
+        # adopt the colorset); a lockstep test pins the two sources equal.
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_EMIT_LOC_STRINGS: YES
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        SWIFT_STRICT_CONCURRENCY: complete
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        # iPhone-only (device family "1"). Deliberate: without this build
+        # setting the target defaults to universal
+        # ("1,2"), which makes App Store Connect demand iPad 13" screenshots for
+        # an app with no iPad UI. TARGETED_DEVICE_FAMILY is a standard build
+        # setting, not an INFOPLIST_KEY_; Xcode derives UIDeviceFamily from it.
+        # The iPad orientation key is dropped as moot for the same reason.
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
+        # Export compliance: the app's only
+        # cryptography is CryptoKit Ed25519 signature verification of its OWN
+        # bundled gazetteer manifest (GazetteerLoader verify path) — nothing is
+        # encrypted in transit and no proprietary encryption ships — so it
+        # qualifies for the ITSAppUsesNonExemptEncryption exemption. Shipping the
+        # key (synthesized into Info.plist via GENERATE_INFOPLIST_FILE above)
+        # makes the App Store Connect export-compliance answer "No"
+        # non-interactive. App target only — never the test targets.
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+    dependencies:
+      - package: RedactionEngine
+    postBuildScripts:
+      # UITestFixtures is routed via sources:
+      # above, and neither sources: nor optional: gates on build
+      # configuration — optional: only tolerates absence at xcodegen time.
+      # On machines where the gitignored fixtures exist when
+      # ./regenerate.sh runs, they would otherwise ship in Release
+      # archives. Resources copy flat into the bundle root, so strip by
+      # basename. Clean checkouts have no UITestFixtures/ and are
+      # unaffected.
+      - name: Strip UI-test fixtures from non-Debug bundles
+        shell: /bin/bash
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ "${CONFIGURATION}" != "Debug" ] && [ -d "${SRCROOT}/UITestFixtures" ]; then
+            for fixture in "${SRCROOT}/UITestFixtures"/*; do
+              rm -f "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/$(basename "${fixture}")"
+            done
+          fi
+
+  ResectaAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/ResectaAppTests
+    resources:
+      - path: Tests/ResectaAppTests/Resources/g8_corpus.json
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.resecta.app.tests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        SWIFT_STRICT_CONCURRENCY: complete
+    dependencies:
+      - target: ResectaApp
+
+  ResectaAppUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/ResectaAppUITests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.resecta.app.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: ResectaApp
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        SWIFT_STRICT_CONCURRENCY: complete
+    dependencies:
+      - target: ResectaApp
+
+schemes:
+  ResectaApp:
+    build:
+      targets:
+        ResectaApp: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - ResectaAppTests
+        - ResectaAppUITests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+

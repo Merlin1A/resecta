@@ -1,0 +1,483 @@
+{
+  "generated_by": "resecta-data/vectors/credit_card",
+  "seed": 20260416,
+  "vectors": [
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix 4, Luhn-valid.",
+      "pan": "4455395886324801",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix 4, Luhn-valid.",
+      "pan": "4558216804749778",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix 4, Luhn-valid.",
+      "pan": "4732501240775845",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix 4, Luhn-valid.",
+      "pan": "4567506144373225",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix 4, Luhn-valid.",
+      "pan": "4287955686998411",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix 4, Luhn-valid.",
+      "pan": "4777659324199658",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix 4, Luhn-valid.",
+      "pan": "4210801335646245",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix 4, Luhn-valid.",
+      "pan": "4407583260215138",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix 4, Luhn-valid.",
+      "pan": "4680306558798609",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Legacy 13-digit Visa, Luhn-valid.",
+      "pan": "4442927871566",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix, Luhn-broken.",
+      "pan": "4210924003285133",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix, Luhn-broken.",
+      "pan": "4500208335513518",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix, Luhn-broken.",
+      "pan": "4173611417356103",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix, Luhn-broken.",
+      "pan": "4116249872603090",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "visa",
+      "notes": "Visa prefix, Luhn-broken.",
+      "pan": "4593385698170138",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC prefix 55, Luhn-valid.",
+      "pan": "5599509361579127",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC prefix 53, Luhn-valid.",
+      "pan": "5391341781956952",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC prefix 51, Luhn-valid.",
+      "pan": "5155989277879413",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC prefix 52, Luhn-valid.",
+      "pan": "5252254855053655",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC prefix 53, Luhn-valid.",
+      "pan": "5323679322726357",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC prefix 55, Luhn-valid.",
+      "pan": "5518913549925681",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC prefix 51, Luhn-valid.",
+      "pan": "5176498151308726",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC prefix 52, Luhn-valid.",
+      "pan": "5287617253829356",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC 2-series prefix 2396, Luhn-valid.",
+      "pan": "2396988152928945",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC 2-series prefix 2682, Luhn-valid.",
+      "pan": "2682628708828438",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC 2-series prefix 2677, Luhn-valid.",
+      "pan": "2677329609226791",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC 2-series prefix 2452, Luhn-valid.",
+      "pan": "2452145591442266",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC prefix, Luhn-broken.",
+      "pan": "5331848323393136",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC prefix, Luhn-broken.",
+      "pan": "5365884196183340",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC prefix, Luhn-broken.",
+      "pan": "5420243647801060",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC prefix, Luhn-broken.",
+      "pan": "5258830319463412",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "mastercard",
+      "notes": "MC prefix, Luhn-broken.",
+      "pan": "5247474541100111",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "amex",
+      "notes": "Amex prefix 37, Luhn-valid.",
+      "pan": "374526865920278",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "amex",
+      "notes": "Amex prefix 34, Luhn-valid.",
+      "pan": "341072749751530",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "amex",
+      "notes": "Amex prefix 37, Luhn-valid.",
+      "pan": "370329427821645",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "amex",
+      "notes": "Amex prefix 37, Luhn-valid.",
+      "pan": "375940168029928",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "amex",
+      "notes": "Amex prefix 37, Luhn-valid.",
+      "pan": "376395653985952",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "amex",
+      "notes": "Amex prefix 37, Luhn-valid.",
+      "pan": "374001884851995",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "amex",
+      "notes": "Amex prefix, Luhn-broken.",
+      "pan": "376140890823576",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "amex",
+      "notes": "Amex prefix, Luhn-broken.",
+      "pan": "377554258485291",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "amex",
+      "notes": "Amex prefix, Luhn-broken.",
+      "pan": "346406290603814",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "amex",
+      "notes": "Amex prefix, Luhn-broken.",
+      "pan": "340079790604421",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "discover",
+      "notes": "Discover prefix 6011, Luhn-valid.",
+      "pan": "6011442499357125",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "discover",
+      "notes": "Discover prefix 6011, Luhn-valid.",
+      "pan": "6011924890869022",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "discover",
+      "notes": "Discover prefix 6011, Luhn-valid.",
+      "pan": "6011623034988769",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "discover",
+      "notes": "Discover prefix 6011, Luhn-valid.",
+      "pan": "6011831870210145",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "discover",
+      "notes": "Discover prefix 65, Luhn-valid.",
+      "pan": "6599566887578643",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "discover",
+      "notes": "Discover prefix 65, Luhn-valid.",
+      "pan": "6506697543165376",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "discover",
+      "notes": "Discover prefix 65, Luhn-valid.",
+      "pan": "6509408821709852",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "discover",
+      "notes": "Discover prefix 65, Luhn-valid.",
+      "pan": "6567579108976411",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "discover",
+      "notes": "Discover prefix 6011, Luhn-broken.",
+      "pan": "6011763735927389",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "discover",
+      "notes": "Discover prefix 6011, Luhn-broken.",
+      "pan": "6011851846392957",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "discover",
+      "notes": "Discover prefix 65, Luhn-broken.",
+      "pan": "6576445458111897",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "jcb",
+      "notes": "JCB prefix 3547, Luhn-valid.",
+      "pan": "3547995312409472",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "jcb",
+      "notes": "JCB prefix 3551, Luhn-valid.",
+      "pan": "3551809876970519",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "jcb",
+      "notes": "JCB prefix 3535, Luhn-valid.",
+      "pan": "3535363418798542",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "jcb",
+      "notes": "JCB prefix 3571, Luhn-valid.",
+      "pan": "3571043438763024",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "jcb",
+      "notes": "JCB prefix 3528, Luhn-valid.",
+      "pan": "3528710317786391",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "jcb",
+      "notes": "JCB prefix 3550, Luhn-valid.",
+      "pan": "3550203208674091",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "jcb",
+      "notes": "JCB prefix 3580, Luhn-broken.",
+      "pan": "3580156731880542",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "jcb",
+      "notes": "JCB prefix 3544, Luhn-broken.",
+      "pan": "3544240166842455",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "jcb",
+      "notes": "JCB prefix 3585, Luhn-broken.",
+      "pan": "3585890003489105",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "unionpay",
+      "notes": "UnionPay prefix 62, Luhn-valid.",
+      "pan": "6211860040879743",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "unionpay",
+      "notes": "UnionPay prefix 62, Luhn-valid.",
+      "pan": "6222842846394348",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "unionpay",
+      "notes": "UnionPay prefix 62, Luhn-valid.",
+      "pan": "6275529895613944",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "unionpay",
+      "notes": "UnionPay prefix 62, Luhn-valid.",
+      "pan": "6220370536898792",
+      "rejection_reason": null,
+      "valid": true
+    },
+    {
+      "card_brand": "unionpay",
+      "notes": "UnionPay prefix 62, Luhn-broken.",
+      "pan": "6246014467429845",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    },
+    {
+      "card_brand": "unionpay",
+      "notes": "UnionPay prefix 62, Luhn-broken.",
+      "pan": "6229157380953165",
+      "rejection_reason": "luhn_failed",
+      "valid": false
+    }
+  ],
+  "version": 1
+}

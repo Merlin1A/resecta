@@ -1,0 +1,314 @@
+{
+  "description": "Per-state US license-plate shape regexes for the 50 states + DC. Editable on import (F-4): copying a row makes it user-owned with no template-lineage tracking. The shipped per-state regex is a permissive shape default ([A-Z0-9 -]{4,8}); tighten per-row against state-DMV plate inventories before relying on this for production redaction.",
+  "entries": [
+    {
+      "label": "AK plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "AL plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "AR plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "AZ plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "CA plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "CO plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "CT plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "DC plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "DE plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "FL plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "GA plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "HI plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "IA plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "ID plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "IL plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "IN plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "KS plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "KY plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "LA plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "MA plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "MD plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "ME plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "MI plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "MN plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "MO plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "MS plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "MT plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "NC plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "ND plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "NE plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "NH plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "NJ plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "NM plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "NV plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "NY plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "OH plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "OK plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "OR plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "PA plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "RI plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "SC plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "SD plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "TN plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "TX plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "UT plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "VA plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "VT plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "WA plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "WI plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "WV plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    },
+    {
+      "label": "WY plate",
+      "polarity": "positive",
+      "regex": "^[A-Z0-9 -]{4,8}$",
+      "scope": "any-doctype"
+    }
+  ],
+  "template_id": "license_plate_us_50_state_starter",
+  "template_name": "US License Plate — 50-State Starter",
+  "template_version": 1
+}
