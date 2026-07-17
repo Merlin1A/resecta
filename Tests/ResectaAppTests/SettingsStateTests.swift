@@ -191,11 +191,11 @@ struct SettingsStateTests {
 
     // MARK: - design 04 §4.6 — saveRecentSearches round-trip
 
-    @Test("saveRecentSearches defaults to true with no stored value")
+    @Test("saveRecentSearches defaults to false with no stored value (private by default)")
     func saveRecentSearchesDefault() {
         cleanDefaults()
         let state = SettingsState()
-        #expect(state.saveRecentSearches == true)
+        #expect(state.saveRecentSearches == false)
     }
 
     @Test("saveRecentSearches false persists and reads back")
@@ -221,13 +221,13 @@ struct SettingsStateTests {
         cleanDefaults()
     }
 
-    @Test("resetToDefaults restores saveRecentSearches to true")
+    @Test("resetToDefaults restores saveRecentSearches to false (the factory default)")
     func resetRestoresSaveRecentSearches() {
         cleanDefaults()
         let state = SettingsState()
-        state.saveRecentSearches = false
+        state.saveRecentSearches = true
         state.resetToDefaults()
-        #expect(state.saveRecentSearches == true)
+        #expect(state.saveRecentSearches == false)
         cleanDefaults()
     }
 

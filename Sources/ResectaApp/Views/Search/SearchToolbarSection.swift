@@ -166,10 +166,23 @@ struct SearchToolbarSection: View {
 
             // Page-level conjunction toggle. OR is
             // the historical default; flipping re-triggers so the result
-            // list reflects the new combination immediately.
+            // list reflects the new combination immediately. The re-run
+            // fires from the toggle's own set (a user gesture) rather
+            // than from value observation: the conjunction now round-trips
+            // through saved searches, and an observation-based re-trigger
+            // would fire a duplicate scan alongside a recall's own
+            // trigger whenever the recalled value differs.
             if searchState.searchModeType == .multiTerm {
                 HStack {
-                    Toggle("All terms must match", isOn: $searchState.options.multiTermConjunction)
+                    Toggle("All terms must match", isOn: Binding(
+                        get: { searchState.options.multiTermConjunction },
+                        set: { newValue in
+                            searchState.options.multiTermConjunction = newValue
+                            if !searchState.searchTerms.isEmpty {
+                                onTriggerSearch()
+                            }
+                        }
+                    ))
                         .toggleStyle(.button)
                         .controlSize(.small)
                         .accessibilityLabel("All terms must match")
@@ -177,11 +190,6 @@ struct SearchToolbarSection: View {
                     Spacer()
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.md)
-                .onChange(of: searchState.options.multiTermConjunction) { _, _ in
-                    if !searchState.searchTerms.isEmpty {
-                        onTriggerSearch()
-                    }
-                }
             }
 
             // Multi-term chips

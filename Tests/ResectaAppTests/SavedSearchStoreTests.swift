@@ -13,6 +13,23 @@ import RedactionEngine
 @MainActor
 struct SavedSearchStoreTests {
 
+    // MARK: - Scratch storage helpers (schema v2 file-backed store)
+
+    /// Unique on-disk location for a file-backed store. Caller removes
+    /// the parent directory in a `defer`.
+    private static func makeScratchFileURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("SavedSearchStoreTests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("saved-searches.v2.json")
+    }
+
+    /// Scratch UserDefaults suite for the legacy-key cleanup seam so
+    /// tests never touch `.standard`.
+    private static func makeScratchDefaults() -> (UserDefaults, suiteName: String) {
+        let name = UUID().uuidString
+        return (UserDefaults(suiteName: name)!, name)
+    }
+
     // MARK: - Round-trip
 
     @Test("Round-trip encode/decode preserves single-mode SavedSearch")
@@ -69,13 +86,29 @@ struct SavedSearchStoreTests {
         #expect(decoded.foldDiacritics)
     }
 
-    @Test("Pre-S7 11-key blob decodes with the engine-default flag values")
-    func preS7BlobDecodesWithDefaults() throws {
+    @Test("Round-trip preserves the v2 option keys (includeOCR + conjunction)")
+    func roundTripV2OptionKeys() throws {
+        let original = SavedSearch(
+            name: "v2 options",
+            mode: .multiTerm,
+            searchTerms: ["routing", "account"],
+            includeOCR: false,
+            multiTermConjunction: true
+        )
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(SavedSearch.self, from: encoded)
+        #expect(decoded == original)
+        #expect(!decoded.includeOCR)
+        #expect(decoded.multiTermConjunction)
+    }
+
+    @Test("Blob without optional option keys decodes with the engine-default values")
+    func partialBlobDecodesWithDefaults() throws {
         let json = #"""
         {
             "id": "00000000-0000-0000-0000-000000000003",
             "name": "legacy",
-            "mode": "Text",
+            "mode": "text",
             "queryText": "alpha",
             "caseSensitive": false,
             "wholeWord": false,
@@ -88,18 +121,42 @@ struct SavedSearchStoreTests {
         #expect(!decoded.stripDigitSeparators)
         #expect(decoded.normalizeSmartPunctuation)
         #expect(!decoded.foldDiacritics)
+        #expect(decoded.includeOCR)
+        #expect(!decoded.multiTermConjunction)
     }
 
-    @Test("Rename preserves the normalization-extension flags")
-    func renamePreservesNormalizationFlags() {
-        let suite = UUID().uuidString
-        let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite) }
+    // MARK: - Stable wire values (mode is decoupled from display strings)
 
-        let store = SavedSearchStore(defaults: defaults)
+    @Test("Mode wire values are frozen and decoupled from display names")
+    func modeWireValuesAreFrozen() {
+        // The persisted rawValues are a compatibility contract; the
+        // user-facing strings live in `displayName` only. A failure here
+        // means a rename reached the wire layer — that is a schema
+        // migration, not a copy edit.
+        #expect(SearchModeType.text.rawValue == "text")
+        #expect(SearchModeType.regex.rawValue == "regex")
+        #expect(SearchModeType.multiTerm.rawValue == "multiTerm")
+        #expect(SearchModeType.piiScan.rawValue == "scan")
+        #expect(SearchModeType.text.displayName == "Text")
+        #expect(SearchModeType.regex.displayName == "Regex")
+        #expect(SearchModeType.multiTerm.displayName == "Multi-term")
+        #expect(SearchModeType.piiScan.displayName == "PII Scan")
+    }
+
+    @Test("Rename preserves the normalization-extension and v2 option flags")
+    func renamePreservesNormalizationFlags() {
+        let fileURL = Self.makeScratchFileURL()
+        let (defaults, suiteName) = Self.makeScratchDefaults()
+        defer {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
         let original = SavedSearch(
             name: "before", mode: .text, queryText: "x",
-            stripDigitSeparators: true, normalizeSmartPunctuation: false, foldDiacritics: true
+            stripDigitSeparators: true, normalizeSmartPunctuation: false, foldDiacritics: true,
+            includeOCR: false, multiTermConjunction: true
         )
         store.add(original)
         store.rename(id: original.id, to: "after")
@@ -108,6 +165,8 @@ struct SavedSearchStoreTests {
         #expect(renamed?.stripDigitSeparators == true)
         #expect(renamed?.normalizeSmartPunctuation == false)
         #expect(renamed?.foldDiacritics == true)
+        #expect(renamed?.includeOCR == false)
+        #expect(renamed?.multiTermConjunction == true)
     }
 
     // MARK: - Reject unknown keys ([D-25])
@@ -118,7 +177,7 @@ struct SavedSearchStoreTests {
         {
             "id": "00000000-0000-0000-0000-000000000001",
             "name": "rogue",
-            "mode": "Text",
+            "mode": "text",
             "caseSensitive": false,
             "wholeWord": false,
             "sourceFilter": "All",
@@ -156,7 +215,7 @@ struct SavedSearchStoreTests {
         {
             "id": "00000000-0000-0000-0000-000000000002",
             "name": "leak",
-            "mode": "Text",
+            "mode": "text",
             "caseSensitive": false,
             "wholeWord": false,
             "sourceFilter": "All",
@@ -187,7 +246,9 @@ struct SavedSearchStoreTests {
             minimumPIIConfidence: 0.8,
             stripDigitSeparators: true,
             normalizeSmartPunctuation: false,
-            foldDiacritics: true
+            foldDiacritics: true,
+            includeOCR: false,
+            multiTermConjunction: true
         )
         SavedSearchListSheet.apply(saved, to: searchState)
 
@@ -198,6 +259,8 @@ struct SavedSearchStoreTests {
         #expect(searchState.options.stripDigitSeparators)
         #expect(!searchState.options.normalizeSmartPunctuation)
         #expect(searchState.options.foldDiacritics)
+        #expect(!searchState.options.includeOCR)
+        #expect(searchState.options.multiTermConjunction)
         #expect(searchState.sourceFilter == .textOnly)
         #expect(searchState.minimumOCRConfidence == 0.7)
         #expect(searchState.minimumPIIConfidence == 0.8)
@@ -225,6 +288,8 @@ struct SavedSearchStoreTests {
         original.searchTerms = ["routing", "account"]
         original.options.caseSensitive = true
         original.options.stripDigitSeparators = true
+        original.options.includeOCR = false
+        original.options.multiTermConjunction = true
         original.sourceFilter = .ocrOnly
         original.minimumOCRConfidence = 0.6
 
@@ -236,8 +301,70 @@ struct SavedSearchStoreTests {
         #expect(restored.searchTerms == ["routing", "account"])
         #expect(restored.options.caseSensitive)
         #expect(restored.options.stripDigitSeparators)
+        #expect(!restored.options.includeOCR)
+        #expect(restored.options.multiTermConjunction)
         #expect(restored.sourceFilter == .ocrOnly)
         #expect(restored.minimumOCRConfidence == 0.6)
+    }
+
+    /// Schema-v2 acceptance: for EVERY mode, save → encode → decode →
+    /// restore reproduces each sheet-settable option field-for-field.
+    /// The option surface enumerated here is the full set the live sheet
+    /// can set (mode, query/terms/categories, matching + normalization
+    /// options, includeOCR, conjunction, source filter, confidence
+    /// floors). Session-scoped result state (applied filter, sort order,
+    /// navigation scope) is excluded by design — it is not query shape.
+    @Test(
+        "Save → load → restore round-trips every persisted option per mode",
+        arguments: [SearchModeType.text, .regex, .multiTerm, .piiScan]
+    )
+    func fullOptionRoundTripPerMode(mode: SearchModeType) throws {
+        let original = SearchState()
+        original.searchModeType = mode
+        switch mode {
+        case .text: original.queryText = "John Doe"
+        case .regex: original.queryText = "\\d{3}-\\d{2}-\\d{4}"
+        case .multiTerm: original.searchTerms = ["routing", "account"]
+        case .piiScan: original.enabledPIICategories = [.ssn, .phone]
+        }
+        // Depart from every option default so a dropped field cannot
+        // hide behind its default value.
+        original.options.caseSensitive = true
+        original.options.wholeWord = true
+        original.options.stripDigitSeparators = true
+        original.options.normalizeSmartPunctuation = false
+        original.options.foldDiacritics = true
+        original.options.includeOCR = false
+        original.options.multiTermConjunction = true
+        original.sourceFilter = .ocrOnly
+        original.minimumOCRConfidence = 0.65
+        original.minimumPIIConfidence = 0.85
+
+        // Full persistence pass: capture → JSON → decode → restore.
+        let captured = SavedSearchListSheet.capture(from: original, name: "per-mode")
+        let data = try JSONEncoder().encode(captured)
+        let decoded = try JSONDecoder().decode(SavedSearch.self, from: data)
+        #expect(decoded == captured)
+
+        let restored = SearchState()
+        SavedSearchListSheet.apply(decoded, to: restored)
+
+        #expect(restored.searchModeType == mode)
+        #expect(restored.queryText == original.queryText)
+        #expect(restored.searchTerms == original.searchTerms)
+        if mode == .piiScan {
+            #expect(restored.enabledPIICategories == [.ssn, .phone])
+        }
+        #expect(restored.options.caseSensitive == original.options.caseSensitive)
+        #expect(restored.options.wholeWord == original.options.wholeWord)
+        #expect(restored.options.stripDigitSeparators == original.options.stripDigitSeparators)
+        #expect(restored.options.normalizeSmartPunctuation == original.options.normalizeSmartPunctuation)
+        #expect(restored.options.foldDiacritics == original.options.foldDiacritics)
+        #expect(restored.options.includeOCR == original.options.includeOCR)
+        #expect(restored.options.multiTermConjunction == original.options.multiTermConjunction)
+        #expect(restored.sourceFilter == original.sourceFilter)
+        #expect(restored.minimumOCRConfidence == original.minimumOCRConfidence)
+        #expect(restored.minimumPIIConfidence == original.minimumPIIConfidence)
     }
 
     @Test("Capture stores shape only — never results or matched text")
@@ -335,21 +462,24 @@ struct SavedSearchStoreTests {
 
     // MARK: - Store mutation
 
-    @Test("Store add/remove/rename round-trips through UserDefaults")
+    @Test("Store add/remove/rename round-trips through the storage file")
     func storeMutationRoundTrip() {
-        let suite = UUID().uuidString
-        let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let fileURL = Self.makeScratchFileURL()
+        let (defaults, suiteName) = Self.makeScratchDefaults()
+        defer {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            defaults.removePersistentDomain(forName: suiteName)
+        }
 
-        let store = SavedSearchStore(defaults: defaults)
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
         let s1 = SavedSearch(name: "A", mode: .text, queryText: "alpha")
         let s2 = SavedSearch(name: "B", mode: .text, queryText: "beta")
         store.add(s1)
         store.add(s2)
 
-        // Re-hydrate from the same suite — exercises the full
-        // encode/decode round-trip through UserDefaults.
-        let rehydrated = SavedSearchStore(defaults: defaults)
+        // Re-hydrate from the same file — exercises the full
+        // encode/decode round-trip through disk.
+        let rehydrated = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
         #expect(rehydrated.savedSearches.count == 2)
         #expect(rehydrated.lookup(id: s1.id) == s1)
 
@@ -362,12 +492,167 @@ struct SavedSearchStoreTests {
 
     @Test("Empty store hydrates as empty list, not crash")
     func emptyStoreHydrate() {
-        let suite = UUID().uuidString
-        let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let fileURL = Self.makeScratchFileURL()
+        let (defaults, suiteName) = Self.makeScratchDefaults()
+        defer {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            defaults.removePersistentDomain(forName: suiteName)
+        }
 
-        let store = SavedSearchStore(defaults: defaults)
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
         #expect(store.savedSearches.isEmpty)
+    }
+
+    // MARK: - Lenient per-element decode (one bad row never zeroes the list)
+
+    /// Minimal valid v2 row as a JSON object string.
+    private static func validRowJSON(id: String, name: String) -> String {
+        #"{"id": "\#(id)", "name": "\#(name)", "mode": "text", "queryText": "q", "caseSensitive": false, "wholeWord": false, "sourceFilter": "All", "minimumOCRConfidence": 0.0, "minimumPIIConfidence": 0.5}"#
+    }
+
+    @Test("Envelope decode drops an undecodable row and keeps the rest")
+    func lenientDecodeOneBadRowSurvives() throws {
+        let good1 = Self.validRowJSON(id: "00000000-0000-0000-0000-00000000000A", name: "keep one")
+        let good2 = Self.validRowJSON(id: "00000000-0000-0000-0000-00000000000B", name: "keep two")
+        // Bad row: forbidden key → the per-row fail-closed decoder throws.
+        let bad = #"{"id": "00000000-0000-0000-0000-00000000000C", "name": "bad", "mode": "text", "caseSensitive": false, "wholeWord": false, "sourceFilter": "All", "minimumOCRConfidence": 0.0, "minimumPIIConfidence": 0.5, "matchedText": "leak"}"#
+        let json = #"{"schemaVersion": 2, "savedSearches": [\#(good1), \#(bad), \#(good2)]}"#
+            .data(using: .utf8)!
+
+        let envelope = try JSONDecoder().decode(SavedSearchEnvelope.self, from: json)
+        #expect(envelope.savedSearches.count == 2)
+        #expect(envelope.savedSearches.map(\.name) == ["keep one", "keep two"])
+    }
+
+    @Test("Envelope decode with every row undecodable yields empty, not a throw")
+    func lenientDecodeAllBadRowsYieldEmpty() throws {
+        let bad1 = #"{"id": "not-a-uuid", "name": "x", "mode": "text", "caseSensitive": false, "wholeWord": false, "sourceFilter": "All", "minimumOCRConfidence": 0.0, "minimumPIIConfidence": 0.5}"#
+        let bad2 = #"{"totally": "unrelated"}"#
+        let json = #"{"schemaVersion": 2, "savedSearches": [\#(bad1), \#(bad2)]}"#
+            .data(using: .utf8)!
+
+        let envelope = try JSONDecoder().decode(SavedSearchEnvelope.self, from: json)
+        #expect(envelope.savedSearches.isEmpty)
+    }
+
+    @Test("A row carrying a legacy display-string mode drops without taking the list with it")
+    func legacyModeStringRowDropsAlone() throws {
+        // Pre-v2 rows persisted the display strings as mode values
+        // ("PII Scan"-class). Under the v2 clean break those rows fail
+        // per-element decode and drop; the defect this pins is the old
+        // blast radius, where one such row read the WHOLE list as empty.
+        let legacy = #"{"id": "00000000-0000-0000-0000-00000000000D", "name": "old", "mode": "PII Scan", "caseSensitive": false, "wholeWord": false, "sourceFilter": "All", "minimumOCRConfidence": 0.0, "minimumPIIConfidence": 0.5}"#
+        let good = Self.validRowJSON(id: "00000000-0000-0000-0000-00000000000E", name: "survivor")
+        let json = #"{"schemaVersion": 2, "savedSearches": [\#(legacy), \#(good)]}"#
+            .data(using: .utf8)!
+
+        let envelope = try JSONDecoder().decode(SavedSearchEnvelope.self, from: json)
+        #expect(envelope.savedSearches.map(\.name) == ["survivor"])
+    }
+
+    @Test("Store hydrating a file with one bad row keeps the good rows")
+    func storeHydratesPastBadRow() throws {
+        let fileURL = Self.makeScratchFileURL()
+        let (defaults, suiteName) = Self.makeScratchDefaults()
+        defer {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        // Hand-craft the double envelope (outer FileJSONBlob envelope +
+        // inner SavedSearchEnvelope) with one undecodable row baked in.
+        let good = Self.validRowJSON(id: "00000000-0000-0000-0000-00000000000F", name: "good row")
+        let bad = #"{"id": "00000000-0000-0000-0000-000000000010", "name": "bad", "mode": "Regex Legacy", "caseSensitive": false, "wholeWord": false, "sourceFilter": "All", "minimumOCRConfidence": 0.0, "minimumPIIConfidence": 0.5}"#
+        let fileJSON = #"{"schemaVersion": 2, "payload": {"schemaVersion": 2, "savedSearches": [\#(good), \#(bad)]}}"#
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fileJSON.data(using: .utf8)!.write(to: fileURL)
+
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
+        #expect(store.savedSearches.map(\.name) == ["good row"])
+    }
+
+    // MARK: - Clean-break storage move (v1 blob + legacy key)
+
+    @Test("A v1-versioned storage file reads as the empty fallback (deliberate clean break)")
+    func v1FileFallsBackEmpty() throws {
+        let fileURL = Self.makeScratchFileURL()
+        let (defaults, suiteName) = Self.makeScratchDefaults()
+        defer {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let row = Self.validRowJSON(id: "00000000-0000-0000-0000-000000000011", name: "v1 row")
+        let fileJSON = #"{"schemaVersion": 1, "payload": {"schemaVersion": 1, "savedSearches": [\#(row)]}}"#
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fileJSON.data(using: .utf8)!.write(to: fileURL)
+
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
+        #expect(store.savedSearches.isEmpty)
+    }
+
+    @Test("An inner-envelope version mismatch alone reads as empty (both declared versions are load-bearing)")
+    func innerVersionMismatchFallsBackEmpty() throws {
+        let fileURL = Self.makeScratchFileURL()
+        let (defaults, suiteName) = Self.makeScratchDefaults()
+        defer {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        // Outer envelope current, inner envelope stale — discriminates
+        // the store-level gate from FileJSONBlob's outer gate.
+        let row = Self.validRowJSON(id: "00000000-0000-0000-0000-000000000012", name: "skewed")
+        let fileJSON = #"{"schemaVersion": 2, "payload": {"schemaVersion": 1, "savedSearches": [\#(row)]}}"#
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fileJSON.data(using: .utf8)!.write(to: fileURL)
+
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
+        #expect(store.savedSearches.isEmpty)
+    }
+
+    @Test("The store's storage file carries protection + backup exclusion after a write")
+    func storeFileIsProtectedAndBackupExcluded() throws {
+        let fileURL = Self.makeScratchFileURL()
+        let (defaults, suiteName) = Self.makeScratchDefaults()
+        defer {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
+        store.add(SavedSearch(name: "protected", mode: .text, queryText: "x"))
+
+        // Simulator coalescing tolerance (see FileJSONBlobTests header);
+        // strict on nil by design — this iOS-only bundle always runs on
+        // an iOS destination, where nil means never-applied.
+        let protection = try TempFileHardening.currentProtection(of: fileURL)
+        let acceptable: Set<URLFileProtection> = [
+            .complete, .completeUntilFirstUserAuthentication,
+        ]
+        #expect(protection.map(acceptable.contains) == true,
+                "expected a complete-class protection attribute, got \(String(describing: protection))")
+
+        let values = try fileURL.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        #expect(values.isExcludedFromBackup == true)
+    }
+
+    @Test("Init removes the pre-v2 UserDefaults blob (no data migration)")
+    func initRemovesLegacyDefaultsKey() {
+        let fileURL = Self.makeScratchFileURL()
+        let (defaults, suiteName) = Self.makeScratchDefaults()
+        defer {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        defaults.set(Data([0x7B, 0x7D]), forKey: SavedSearchStore.legacyDefaultsKey)
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
+        #expect(store.savedSearches.isEmpty)
+        #expect(defaults.object(forKey: SavedSearchStore.legacyDefaultsKey) == nil)
     }
 
     // MARK: - Name length clamp (Pkg G.2 — TRUST-savedsearch-name-no-cap)
@@ -380,7 +665,7 @@ struct SavedSearchStoreTests {
         let blob: [String: Any] = [
             "id": "00000000-0000-0000-0000-000000000099",
             "name": name,
-            "mode": "Text",
+            "mode": "text",
             "caseSensitive": false,
             "wholeWord": false,
             "sourceFilter": "All",
@@ -404,12 +689,15 @@ struct SavedSearchStoreTests {
 
     @Test("Rename clamps a 300-char name to nameLengthCap, matching decoder")
     func testRenameAndDecoderClampMatch() {
-        let suite = UUID().uuidString
-        let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let fileURL = Self.makeScratchFileURL()
+        let (defaults, suiteName) = Self.makeScratchDefaults()
+        defer {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            defaults.removePersistentDomain(forName: suiteName)
+        }
 
         let oversize = String(repeating: "r", count: 300)
-        let store = SavedSearchStore(defaults: defaults)
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
         let original = SavedSearch(name: "before", mode: .text, queryText: "x")
         store.add(original)
         store.rename(id: original.id, to: oversize)

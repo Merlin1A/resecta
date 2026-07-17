@@ -19,9 +19,11 @@ private struct AnyCodingKey: CodingKey {
 // `SavedSearchStore` is the single named departure from `SearchState`
 // ephemerality (a deliberate exception).
 // Persists query *shape* only — mode, query text, search terms,
-// enabled categories, filter shape, threshold floors. Never persists
-// matched text, page indices, applied IDs, OCR confidences, or any
-// document-derived data.
+// enabled categories, matching options, filter shape, threshold floors.
+// Never persists matched text, page indices, applied IDs, OCR
+// confidences, or any document-derived data. Storage is one JSON file
+// under Application Support (protected + backup-excluded via
+// `FileJSONBlob`); the pre-v2 UserDefaults blob is removed on init.
 //
 // The decoder fails closed on unknown keys
 // — `init(from:)` walks the keyed container's `allKeys` against an
@@ -68,6 +70,12 @@ nonisolated struct SavedSearch: Codable, Identifiable, Sendable, Equatable {
     let stripDigitSeparators: Bool
     let normalizeSmartPunctuation: Bool
     let foldDiacritics: Bool
+    // Schema v2 completes the option round-trip: the two remaining
+    // sheet-settable options join the whitelist (14 → 16 keys). Both are
+    // query *shape*; decoded with `decodeIfPresent` + the engine defaults
+    // (same idiom as the normalization trio).
+    let includeOCR: Bool
+    let multiTermConjunction: Bool
 
     init(
         id: UUID = UUID(),
@@ -83,7 +91,9 @@ nonisolated struct SavedSearch: Codable, Identifiable, Sendable, Equatable {
         minimumPIIConfidence: Double = 0.50,
         stripDigitSeparators: Bool = false,
         normalizeSmartPunctuation: Bool = true,
-        foldDiacritics: Bool = false
+        foldDiacritics: Bool = false,
+        includeOCR: Bool = true,
+        multiTermConjunction: Bool = false
     ) {
         self.id = id
         self.name = String(name.prefix(Self.nameLengthCap))
@@ -99,6 +109,8 @@ nonisolated struct SavedSearch: Codable, Identifiable, Sendable, Equatable {
         self.stripDigitSeparators = stripDigitSeparators
         self.normalizeSmartPunctuation = normalizeSmartPunctuation
         self.foldDiacritics = foldDiacritics
+        self.includeOCR = includeOCR
+        self.multiTermConjunction = multiTermConjunction
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
@@ -107,6 +119,7 @@ nonisolated struct SavedSearch: Codable, Identifiable, Sendable, Equatable {
         case caseSensitive, wholeWord
         case sourceFilter, minimumOCRConfidence, minimumPIIConfidence
         case stripDigitSeparators, normalizeSmartPunctuation, foldDiacritics
+        case includeOCR, multiTermConjunction
     }
 
     /// Whitelist for the fail-closed decoder. Every key the schema
@@ -151,59 +164,144 @@ nonisolated struct SavedSearch: Codable, Identifiable, Sendable, Equatable {
         self.stripDigitSeparators = try container.decodeIfPresent(Bool.self, forKey: .stripDigitSeparators) ?? false
         self.normalizeSmartPunctuation = try container.decodeIfPresent(Bool.self, forKey: .normalizeSmartPunctuation) ?? true
         self.foldDiacritics = try container.decodeIfPresent(Bool.self, forKey: .foldDiacritics) ?? false
+        // Schema v2 option round-trip — engine defaults on absence.
+        self.includeOCR = try container.decodeIfPresent(Bool.self, forKey: .includeOCR) ?? true
+        self.multiTermConjunction = try container.decodeIfPresent(Bool.self, forKey: .multiTermConjunction) ?? false
     }
 }
 
 // MARK: - Persistence envelope
 
-/// Wraps the saved-search list with a schema version. `schemaVersion = 1`
-/// in V1.x. Persisted at `UserDefaults` key `savedSearches.v1`.
-// nonisolated: persisted via `UserDefaultsJSONBlob<T: Codable & Sendable>` and
-// read off-MainActor; keep its synthesized Codable conformance nonisolated under
+/// Wraps the saved-search list with a schema version. `schemaVersion = 2`
+/// as of the pre-1.0 clean break (stable mode wire values + the full
+/// option round-trip landed together as the one deliberate schema
+/// change). Persisted as a protected Application Support file via
+/// `FileJSONBlob`.
+// nonisolated: persisted via `FileJSONBlob<T: Codable & Sendable>` and
+// read off-MainActor; keep its Codable conformance nonisolated under
 // the s04 SE-0466 MainActor-default flip (mirrors UserTermsBlob).
 nonisolated struct SavedSearchEnvelope: Codable, Sendable, Equatable {
     let schemaVersion: Int
     let savedSearches: [SavedSearch]
+
+    init(schemaVersion: Int, savedSearches: [SavedSearch]) {
+        self.schemaVersion = schemaVersion
+        self.savedSearches = savedSearches
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, savedSearches
+    }
+
+    /// Lenient per-element decode: an element that fails to decode is
+    /// DROPPED and the rest survive, so one bad row can never zero the
+    /// whole list. The per-row posture is unchanged — each element still
+    /// fails closed on unknown keys via the `SavedSearch` whitelist
+    /// decoder; what this bounds is the blast radius of a row-level
+    /// failure. Logs the dropped COUNT only (never content, never names),
+    /// DEBUG builds only.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        let wrapped = try container.decode([FailableSavedSearch].self, forKey: .savedSearches)
+        let survivors = wrapped.compactMap(\.value)
+        #if DEBUG
+        let dropped = wrapped.count - survivors.count
+        if dropped > 0 {
+            envelopeLogger.debug("SavedSearchEnvelope: dropped \(dropped) undecodable row(s)")
+        }
+        #endif
+        self.savedSearches = survivors
+    }
 }
+
+/// Never-throwing element wrapper for the lenient envelope decode. The
+/// wrapper's `init` always succeeds, so the unkeyed container advances
+/// past a failing element instead of aborting the whole array.
+nonisolated private struct FailableSavedSearch: Decodable {
+    let value: SavedSearch?
+    init(from decoder: Decoder) {
+        self.value = try? SavedSearch(from: decoder)
+    }
+}
+
+// nonisolated: a Sendable Logger referenced from the nonisolated envelope
+// decoder. Globals default to MainActor under the s04 flip.
+nonisolated private let envelopeLogger = Logger(subsystem: "app.resecta", category: "SavedSearchStore")
 
 // MARK: - SavedSearchStore
 
-/// `@Observable` store backed by `UserDefaultsJSONBlob<SavedSearchEnvelope>`.
-/// Hydrates from UserDefaults on init.
+/// `@Observable` store backed by `FileJSONBlob<SavedSearchEnvelope>` —
+/// one JSON file under Application Support, written atomically with
+/// `.completeFileProtection` and excluded from backups. Hydrates from
+/// the file on init.
 @Observable
 @MainActor
 final class SavedSearchStore {
 
-    static let storageKey = "savedSearches.v1"
-    static let schemaVersion: UInt8 = 1
+    /// Pre-v2 storage location (`UserDefaults`). Removed on init as a
+    /// clean break — no data migration: schema v2 changed the mode wire
+    /// values, and the store moved to a protected file at the same time.
+    static let legacyDefaultsKey = "savedSearches.v1"
+    /// Bumped 1 → 2 with the stable mode wire values + full option
+    /// round-trip. A version mismatch reads as the empty fallback —
+    /// deliberate: the pre-1.0 clean break carries nothing forward, and
+    /// this stays the fail-safe posture for any future version skew.
+    static let schemaVersion: UInt8 = 2
+
+    /// Production file location: one JSON file under Application
+    /// Support. File protection + backup exclusion are applied by
+    /// `FileJSONBlob` on every write.
+    static var defaultFileURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("SavedSearches", isDirectory: true)
+            .appendingPathComponent("saved-searches.v2.json")
+    }
 
     private(set) var savedSearches: [SavedSearch]
 
-    private let blob: UserDefaultsJSONBlob<SavedSearchEnvelope>
+    private let blob: FileJSONBlob<SavedSearchEnvelope>
 
-    /// Default production init — reads from `UserDefaults.standard`.
+    /// Default production init — reads the Application Support file.
     convenience init() {
-        self.init(defaults: .standard, asyncHydrate: true)
+        self.init(fileURL: Self.defaultFileURL, asyncHydrate: true)
     }
 
-    // P2.1: `asyncHydrate` moves the UserDefaults read off the cold-start
-    // critical path. Default is false so tests calling `init(defaults:)`
+    // P2.1: `asyncHydrate` moves the file read off the cold-start
+    // critical path. Default is false so tests calling `init(fileURL:)`
     // keep their synchronous round-trip contract.
-    init(defaults: UserDefaults, asyncHydrate: Bool = false) {
-        self.blob = UserDefaultsJSONBlob(
-            key: Self.storageKey,
+    init(
+        fileURL: URL,
+        legacyDefaults: UserDefaults = .standard,
+        asyncHydrate: Bool = false
+    ) {
+        self.blob = FileJSONBlob(
+            fileURL: fileURL,
             schemaVersion: Self.schemaVersion,
-            defaults: defaults,
-            fallback: SavedSearchEnvelope(schemaVersion: 1, savedSearches: [])
+            fallback: SavedSearchEnvelope(schemaVersion: Int(Self.schemaVersion), savedSearches: [])
         )
+        // One-time cleanup of the pre-v2 UserDefaults blob (idempotent —
+        // nothing writes that key anymore).
+        legacyDefaults.removeObject(forKey: Self.legacyDefaultsKey)
         if asyncHydrate {
             self.savedSearches = []
             Task { @MainActor in
-                self.savedSearches = self.blob.load().savedSearches
+                self.savedSearches = Self.hydrate(from: self.blob)
             }
         } else {
-            self.savedSearches = blob.load().savedSearches
+            self.savedSearches = Self.hydrate(from: blob)
         }
+    }
+
+    /// Hydration gate for the INNER envelope version. The outer
+    /// `FileJSONBlob` envelope already gates its own version; this keeps
+    /// the two declared versions honest against each other — a future
+    /// edit that bumps one without the other reads as the empty fallback
+    /// instead of silently succeeding on stale-shaped data.
+    private static func hydrate(from blob: FileJSONBlob<SavedSearchEnvelope>) -> [SavedSearch] {
+        let envelope = blob.load()
+        guard envelope.schemaVersion == Int(Self.schemaVersion) else { return [] }
+        return envelope.savedSearches
     }
 
     // MARK: - Read
@@ -243,12 +341,14 @@ final class SavedSearchStore {
             minimumPIIConfidence: existing.minimumPIIConfidence,
             stripDigitSeparators: existing.stripDigitSeparators,
             normalizeSmartPunctuation: existing.normalizeSmartPunctuation,
-            foldDiacritics: existing.foldDiacritics
+            foldDiacritics: existing.foldDiacritics,
+            includeOCR: existing.includeOCR,
+            multiTermConjunction: existing.multiTermConjunction
         )
         persist()
     }
 
     private func persist() {
-        blob.save(SavedSearchEnvelope(schemaVersion: 1, savedSearches: savedSearches))
+        blob.save(SavedSearchEnvelope(schemaVersion: Int(Self.schemaVersion), savedSearches: savedSearches))
     }
 }

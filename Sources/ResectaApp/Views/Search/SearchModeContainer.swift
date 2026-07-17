@@ -29,14 +29,14 @@ struct SearchModeContainer: View {
             if Self.shouldUseMenuStyle(for: dynamicTypeSize) {
                 Picker("Mode", selection: $searchState.searchModeType) {
                     ForEach(SearchModeType.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
+                        Text(mode.displayName).tag(mode)
                     }
                 }
                 .pickerStyle(.menu)
             } else {
                 Picker("Mode", selection: $searchState.searchModeType) {
                     ForEach(SearchModeType.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
+                        Text(mode.displayName).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)

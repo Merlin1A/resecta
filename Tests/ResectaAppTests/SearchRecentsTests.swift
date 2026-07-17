@@ -25,11 +25,14 @@ struct SearchRecentsTests {
 
     // MARK: textQueryRecordedOnTrigger
 
-    @Test("Text query recorded on trigger: most-recent-first + dedupe move-to-front")
+    @Test("With persistence opted in, text queries record most-recent-first + dedupe move-to-front")
     func textQueryRecordedOnTrigger() {
         let (defaults, suiteName) = makeScratchDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
+        // Persistence is opt-in (default OFF); this test covers the
+        // opted-in write-through path.
+        defaults.set(true, forKey: "search.recents.enabled.v1")
         let state = SearchState(defaults: defaults)
         state.recordRecentQuery("foo", mode: .text)
         state.recordRecentQuery("bar", mode: .text)
@@ -62,10 +65,10 @@ struct SearchRecentsTests {
         #expect(state.recentTextQueries.first == "q11")
     }
 
-    // MARK: privacyToggleDisablesRecording
+    // MARK: privacyToggleKeepsRecentsInMemory
 
-    @Test("Privacy toggle (search.recents.enabled.v1 = false) makes recording a no-op")
-    func privacyToggleDisablesRecording() {
+    @Test("Privacy toggle (search.recents.enabled.v1 = false) keeps recents in-memory only")
+    func privacyToggleKeepsRecentsInMemory() {
         let (defaults, suiteName) = makeScratchDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
@@ -74,8 +77,68 @@ struct SearchRecentsTests {
         state.recordRecentQuery("sensitive-term", mode: .text)
         state.recordRecentQuery("another-pattern", mode: .regex)
 
-        #expect(state.recentTextQueries.isEmpty)
-        #expect(state.recentRegexQueries.isEmpty)
+        // In-memory recall still works for the session…
+        #expect(state.recentTextQueries == ["sensitive-term"])
+        #expect(state.recentRegexQueries == ["another-pattern"])
+        // …but nothing reaches UserDefaults.
+        #expect(defaults.object(forKey: "search.recents.text.v1") == nil)
+        #expect(defaults.object(forKey: "search.recents.regex.v1") == nil)
+    }
+
+    // MARK: defaultIsPrivate
+
+    @Test("Absent preference key means OFF: recents stay in-memory, nothing persisted")
+    func defaultIsPrivate() {
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        // No enabled key written — the shipping default.
+        let state = SearchState(defaults: defaults)
+        state.recordRecentQuery("query-one", mode: .text)
+        state.recordRecentQuery("\\d{3}", mode: .regex)
+
+        #expect(state.recentTextQueries == ["query-one"])
+        #expect(state.recentRegexQueries == ["\\d{3}"])
+        #expect(defaults.object(forKey: "search.recents.text.v1") == nil)
+        #expect(defaults.object(forKey: "search.recents.regex.v1") == nil)
+    }
+
+    // MARK: oneTimeDeletion
+
+    @Test("deletePersistedRecentsOnce removes both lists exactly once")
+    func oneTimeDeletionRemovesListsOnce() {
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        // Lists persisted by an earlier build, preference never set.
+        defaults.set(["old-query"], forKey: "search.recents.text.v1")
+        defaults.set(["old-\\d{2}"], forKey: "search.recents.regex.v1")
+
+        SearchState.deletePersistedRecentsOnce(defaults: defaults)
+        #expect(defaults.object(forKey: "search.recents.text.v1") == nil)
+        #expect(defaults.object(forKey: "search.recents.regex.v1") == nil)
+
+        // Lists recorded AFTER the user opts back in must survive the
+        // next launch's call — the flag guard is load-bearing.
+        defaults.set(true, forKey: "search.recents.enabled.v1")
+        let state = SearchState(defaults: defaults)
+        state.recordRecentQuery("new-query", mode: .text)
+        SearchState.deletePersistedRecentsOnce(defaults: defaults)
+        #expect(defaults.array(forKey: "search.recents.text.v1") as? [String] == ["new-query"])
+    }
+
+    @Test("deletePersistedRecentsOnce runs unconditionally — even with persistence opted in")
+    func oneTimeDeletionIgnoresPreference() {
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        // User had opted in on an earlier build; the one-shot deletion
+        // still clears the previously persisted lists.
+        defaults.set(true, forKey: "search.recents.enabled.v1")
+        defaults.set(["kept-on"], forKey: "search.recents.text.v1")
+
+        SearchState.deletePersistedRecentsOnce(defaults: defaults)
+        #expect(defaults.object(forKey: "search.recents.text.v1") == nil)
     }
 
     // MARK: clearSearchHistoryClearsAll
@@ -85,6 +148,9 @@ struct SearchRecentsTests {
         let (defaults, suiteName) = makeScratchDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
+        // Opt in so the persisted keys exist and the clear has both
+        // stores (memory + disk) to empty.
+        defaults.set(true, forKey: "search.recents.enabled.v1")
         let state = SearchState(defaults: defaults)
         state.recordRecentQuery("alpha", mode: .text)
         state.recordRecentQuery("beta", mode: .regex)
@@ -191,11 +257,12 @@ struct SearchRecentsTests {
 
     // MARK: persistenceRoundTripAcrossInstances
 
-    @Test("Recents persist across SearchState instances sharing the same UserDefaults suite")
+    @Test("With persistence opted in, recents persist across SearchState instances sharing the same UserDefaults suite")
     func persistenceRoundTripAcrossInstances() {
         let (defaults, suiteName) = makeScratchDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
+        defaults.set(true, forKey: "search.recents.enabled.v1")
         let first = SearchState(defaults: defaults)
         first.recordRecentQuery("term-one", mode: .text)
         first.recordRecentQuery("pattern-one", mode: .regex)

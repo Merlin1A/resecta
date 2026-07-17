@@ -119,12 +119,14 @@ class SettingsState {
 
     // MARK: - Search recents preference
 
-    /// When true (default), text and regex query strings are recorded to
-    /// UserDefaults after each search. Turning this off stops recording;
-    /// existing history is cleared by the Settings UI write path.
+    /// When true, text and regex query strings are recorded to
+    /// UserDefaults after each search. Default OFF (private by default):
+    /// recents then stay in-memory for the session only. Turning this
+    /// off stops on-device recording; existing history is cleared by the
+    /// Settings UI write path.
     /// didSet persistence pattern (the property-wrapper alternative
     /// is banned inside @Observable).
-    var saveRecentSearches: Bool = true {
+    var saveRecentSearches: Bool = false {
         didSet { guard !isInitializing else { return }
                 UserDefaults.standard.set(saveRecentSearches, forKey: "search.recents.enabled.v1") }
     }
@@ -185,8 +187,9 @@ class SettingsState {
         let storedPreset = UserDefaults.standard.string(forKey: "detectionPreset.v1")
         self.detectionPreset = storedPreset
             .flatMap(SettingsPreset.init(rawValue:)) ?? .balanced
-        // Absent key → true (default-on).
-        self.saveRecentSearches = UserDefaults.standard.object(forKey: "search.recents.enabled.v1") as? Bool ?? true
+        // Absent key → false (default-off, private by default). Keep in
+        // lockstep with `SearchState.recordRecentQuery`'s gate.
+        self.saveRecentSearches = UserDefaults.standard.object(forKey: "search.recents.enabled.v1") as? Bool ?? false
         isInitializing = false
     }
 
@@ -207,7 +210,10 @@ class SettingsState {
         paranoidMode = false
         appearancePreference = .system
         detectionPreset = .balanced
-        saveRecentSearches = true
+        // Factory default is OFF (private by default). Reset restores
+        // the preference only; explicit history clearing stays with the
+        // dedicated Clear Search History affordance.
+        saveRecentSearches = false
     }
 }
 

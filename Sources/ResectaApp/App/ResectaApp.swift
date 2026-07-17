@@ -43,6 +43,11 @@ struct ResectaApp: App {
         // `_meta.git_head` (engineer-facing diagnostic; not consumed at runtime).
         ColdStartTimer.shared.captureProcessStart()
 
+        // Recents privacy: one-shot removal of the recents lists
+        // persisted by earlier builds (recents are private-by-default
+        // now; see the flag guard on the callee).
+        SearchState.deletePersistedRecentsOnce()
+
         // App-wide stores for the power-user library: saved regexes and
         // always/never-flag custom terms. Both persist via UserDefaults
         // JSON blobs and are read by the search trigger path at scan
@@ -83,14 +88,15 @@ struct ResectaApp: App {
         }
     }
 
-    /// S7 sim-verification: `--searchMode=` arg value → SearchModeType
-    /// rawValue (the rawValues carry spaces/hyphens that are awkward on a
-    /// command line).
-    static let searchModeArgMap: [String: String] = [
-        "text": "Text",
-        "regex": "Regex",
-        "multiTerm": "Multi-term",
-        "piiScan": "PII Scan",
+    /// S7 sim-verification: `--searchMode=` arg value → SearchModeType.
+    /// Arg names are a stable external contract (verification scripts +
+    /// UI tests), mapped to cases directly so a wire-value change can't
+    /// silently break the hook.
+    static let searchModeArgMap: [String: SearchModeType] = [
+        "text": .text,
+        "regex": .regex,
+        "multiTerm": .multiTerm,
+        "piiScan": .piiScan,
     ]
     #endif
 
@@ -168,7 +174,7 @@ struct ResectaApp: App {
                                         if let modeArg = launchArguments
                                             .first(where: { $0.hasPrefix("--searchMode=") })?
                                             .split(separator: "=").last,
-                                           let mode = SearchModeType(rawValue: Self.searchModeArgMap[String(modeArg)] ?? "") {
+                                           let mode = Self.searchModeArgMap[String(modeArg)] {
                                             seeded.searchModeType = mode
                                         }
                                         ws.redactionState.activeSearch = seeded

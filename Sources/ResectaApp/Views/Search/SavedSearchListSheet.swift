@@ -135,7 +135,7 @@ struct SavedSearchListSheet: View {
                     .font(.headline)
                     .foregroundStyle(.primary)
                 HStack(spacing: ResectaTokens.Spacing.xs) {
-                    Text(search.mode.rawValue)
+                    Text(search.mode.displayName)
                         .font(.caption2.bold())
                         .padding(.horizontal, ResectaTokens.Spacing.sm)
                         .padding(.vertical, ResectaTokens.Spacing.xxs)
@@ -156,7 +156,7 @@ struct SavedSearchListSheet: View {
                 }
             }
         }
-        .accessibilityLabel("Saved search \(search.name), \(search.mode.rawValue) mode")
+        .accessibilityLabel("Saved search \(search.name), \(search.mode.displayName) mode")
         .swipeActions(edge: .trailing) {
             Button("Delete", role: .destructive) {
                 deleteTarget = search
@@ -195,6 +195,8 @@ struct SavedSearchListSheet: View {
         searchState.options.stripDigitSeparators = saved.stripDigitSeparators
         searchState.options.normalizeSmartPunctuation = saved.normalizeSmartPunctuation
         searchState.options.foldDiacritics = saved.foldDiacritics
+        searchState.options.includeOCR = saved.includeOCR
+        searchState.options.multiTermConjunction = saved.multiTermConjunction
         searchState.sourceFilter = saved.sourceFilter
         searchState.minimumOCRConfidence = saved.minimumOCRConfidence
         searchState.minimumPIIConfidence = saved.minimumPIIConfidence
@@ -218,7 +220,9 @@ struct SavedSearchListSheet: View {
             minimumPIIConfidence: searchState.minimumPIIConfidence,
             stripDigitSeparators: searchState.options.stripDigitSeparators,
             normalizeSmartPunctuation: searchState.options.normalizeSmartPunctuation,
-            foldDiacritics: searchState.options.foldDiacritics
+            foldDiacritics: searchState.options.foldDiacritics,
+            includeOCR: searchState.options.includeOCR,
+            multiTermConjunction: searchState.options.multiTermConjunction
         )
     }
 
@@ -240,7 +244,7 @@ struct SavedSearchListSheet: View {
             let terms = searchState.searchTerms.prefix(3).joined(separator: ", ")
             return "Terms: \(String(terms.prefix(30)))"
         case .text, .regex:
-            return "\(searchState.searchModeType.rawValue): \(String(searchState.queryText.prefix(30)))"
+            return "\(searchState.searchModeType.displayName): \(String(searchState.queryText.prefix(30)))"
         }
     }
 

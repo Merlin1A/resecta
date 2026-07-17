@@ -3,12 +3,14 @@ import RedactionEngine
 
 // Ephemeral search session state.
 // Results and document-derived fields are in-memory only; cleared on dismiss.
-// Recents (query strings) and last-used filter shape are cross-session and
-// persisted to UserDefaults. Never log.
+// Last-used filter shape is cross-session and persisted to UserDefaults.
+// Recents (query strings) are in-memory by default and persist only when
+// the user opts in via Settings. Never log.
 
 /// Ephemeral search session state.
 /// Document-derived state is in-memory only; cleared on dismiss.
-/// Query recents and last-used filter shape persist via UserDefaults.
+/// Last-used filter shape persists via UserDefaults; query recents
+/// persist only when the user opts in (in-memory otherwise).
 @Observable
 @MainActor
 final class SearchState: Identifiable {
@@ -51,15 +53,19 @@ final class SearchState: Identifiable {
     private static let recentsTextKey    = "search.recents.text.v1"
     private static let recentsRegexKey   = "search.recents.regex.v1"
     private static let recentsEnabledKey = "search.recents.enabled.v1"
+    /// One-shot flag for `deletePersistedRecentsOnce(defaults:)`.
+    private static let recentsDeletionDoneKey = "search.recents.oneTimeDeletion.v1"
 
     // MARK: - Persistent recents
 
-    /// Persisted text-mode query history, most-recent-first. Never contains
+    /// Text-mode query history, most-recent-first. Never contains
     /// matched text or document content — query strings only.
-    /// Cross-session by design: NOT wiped by clear() or clearResults().
+    /// In-memory by default; written through to UserDefaults only when
+    /// the user opts in (`search.recents.enabled.v1`).
+    /// NOT wiped by clear() or clearResults().
     private(set) var recentTextQueries: [String] = []
 
-    /// Persisted regex-mode query history, most-recent-first. Same
+    /// Regex-mode query history, most-recent-first. Same
     /// carve-out class as recentTextQueries — survives both clear paths.
     private(set) var recentRegexQueries: [String] = []
 
@@ -669,21 +675,19 @@ final class SearchState: Identifiable {
     ///
     /// - No-op for empty query strings.
     /// - No-op for modes other than `.text` / `.regex`.
-    /// - No-op when `search.recents.enabled.v1` reads `false`
-    ///   (absent key treated as `true` — default on).
+    /// - Always records into the in-memory list; writes through to
+    ///   UserDefaults only when `search.recents.enabled.v1` reads `true`
+    ///   (absent key treated as `false` — private by default; recents
+    ///   stay in-memory for the session unless the user opts in).
     /// - Stores the QUERY string only — NEVER persists matched text
     ///   or document content.
     /// - Deduplicates with move-to-front; caps at `recentQueriesCap`.
-    /// - Writes through to UserDefaults on each record.
     func recordRecentQuery(_ query: String, mode: SearchModeType) {
         guard !query.isEmpty else { return }
         guard mode == .text || mode == .regex else { return }
-        // Absent key treated as true (default-on).
-        let enabled: Bool = {
-            guard defaults.object(forKey: Self.recentsEnabledKey) != nil else { return true }
-            return defaults.bool(forKey: Self.recentsEnabledKey)
-        }()
-        guard enabled else { return }
+        // Absent key treated as false (default-off). Keep in lockstep
+        // with `SettingsState.saveRecentSearches` hydration.
+        let persistenceEnabled = defaults.bool(forKey: Self.recentsEnabledKey)
 
         switch mode {
         case .text:
@@ -691,13 +695,17 @@ final class SearchState: Identifiable {
                 inserting: query,
                 into: recentTextQueries
             )
-            defaults.set(recentTextQueries, forKey: Self.recentsTextKey)
+            if persistenceEnabled {
+                defaults.set(recentTextQueries, forKey: Self.recentsTextKey)
+            }
         case .regex:
             recentRegexQueries = dedupedAndCapped(
                 inserting: query,
                 into: recentRegexQueries
             )
-            defaults.set(recentRegexQueries, forKey: Self.recentsRegexKey)
+            if persistenceEnabled {
+                defaults.set(recentRegexQueries, forKey: Self.recentsRegexKey)
+            }
         default:
             break
         }
@@ -717,6 +725,19 @@ final class SearchState: Identifiable {
         recentMultiTermSets = []
         defaults.removeObject(forKey: Self.recentsTextKey)
         defaults.removeObject(forKey: Self.recentsRegexKey)
+    }
+
+    /// One-time deletion of the two persisted recents lists, run at app
+    /// launch. Recents are private-by-default from this build on; lists
+    /// persisted by earlier builds are removed unconditionally —
+    /// regardless of the enabled preference — exactly once. The flag
+    /// guard is load-bearing: recents recorded AFTER the user opts back
+    /// in must survive subsequent launches.
+    static func deletePersistedRecentsOnce(defaults: UserDefaults = .standard) {
+        guard !defaults.bool(forKey: recentsDeletionDoneKey) else { return }
+        defaults.removeObject(forKey: recentsTextKey)
+        defaults.removeObject(forKey: recentsRegexKey)
+        defaults.set(true, forKey: recentsDeletionDoneKey)
     }
 
     // MARK: - Filter flush (debounced 500 ms)
@@ -1212,13 +1233,26 @@ final class SearchState: Identifiable {
 
 /// UI selector for search mode (simpler than SearchMode enum for picker).
 /// `Codable` conformance is consumed by `SavedSearchStore`.
-/// Once published, renaming a case is a
-/// migration event.
+/// rawValues are stable wire identifiers (persistence + launch-arg
+/// mapping), deliberately decoupled from the user-facing strings so a
+/// display rename can never invalidate persisted data. Wire values are
+/// frozen; display strings live in `displayName` only.
 enum SearchModeType: String, CaseIterable, Sendable, Codable {
-    case text = "Text"
-    case regex = "Regex"
-    case multiTerm = "Multi-term"
-    case piiScan = "PII Scan"
+    case text = "text"
+    case regex = "regex"
+    case multiTerm = "multiTerm"
+    case piiScan = "scan"
+
+    /// User-facing name. Display-only — never persisted, never compared
+    /// against stored data.
+    var displayName: String {
+        switch self {
+        case .text: "Text"
+        case .regex: "Regex"
+        case .multiTerm: "Multi-term"
+        case .piiScan: "PII Scan"
+        }
+    }
 }
 
 /// U1: Source type filter for search results.

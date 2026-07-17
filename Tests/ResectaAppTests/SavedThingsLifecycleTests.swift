@@ -234,6 +234,14 @@ struct SavedSearchDeleteConfirmationTests {
         return suite
     }
 
+    /// Scratch storage file for the v2 file-backed store. Caller removes
+    /// the parent directory in a `defer`.
+    private static func makeScratchFileURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("SavedSearchDelete-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("saved-searches.v2.json")
+    }
+
     private func makeSaved(name: String) -> SavedSearch {
         SavedSearch(
             name: name,
@@ -261,7 +269,9 @@ struct SavedSearchDeleteConfirmationTests {
 
     @Test("Arming the confirm (swipe Delete) does not remove the entry")
     func armingConfirmDoesNotRemove() {
-        let store = SavedSearchStore(defaults: Self.makeSuite())
+        let fileURL = Self.makeScratchFileURL()
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: Self.makeSuite())
         let saved = makeSaved(name: "Keep me")
         store.add(saved)
 
@@ -275,7 +285,9 @@ struct SavedSearchDeleteConfirmationTests {
 
     @Test("Destructive role removes exactly the armed entry")
     func destructiveRoleRemovesEntry() {
-        let store = SavedSearchStore(defaults: Self.makeSuite())
+        let fileURL = Self.makeScratchFileURL()
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: Self.makeSuite())
         let doomed = makeSaved(name: "Doomed")
         let survivor = makeSaved(name: "Survivor")
         store.add(doomed)
