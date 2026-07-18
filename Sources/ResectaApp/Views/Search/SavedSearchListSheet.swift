@@ -5,6 +5,13 @@ import RedactionEngine
 // (`SavedSearchStore`) shipped in V1.0 with no consuming surface;
 // this sheet adds list / recall / rename / delete / save affordances.
 //
+// The list is typed per interface: opened from the Search interface it
+// lists text / regex / multi-term entries; opened from Scan it lists
+// saved scans. One store and one file underneath — the partition is a
+// read-side filter on each entry's persisted mode (whose wire value
+// carries interface identity), so nothing migrates and capture stays
+// interface-correct by construction (it saves the active shape).
+//
 // Presented through the hub's single `.sheet(item:)` slot as
 // `SearchModal.savedSearches` (F-5 single-modal contract). The capture
 // monitor arrives as a `let` per the 37b56c9 injection pattern — never an
@@ -29,36 +36,50 @@ struct SavedSearchListSheet: View {
     /// shape as Settings' Reset dialogs).
     @State private var deleteTarget: SavedSearch?
 
+    /// The interface whose entries this list shows — the active one.
+    /// Stable for the sheet's lifetime (the switcher is unreachable
+    /// behind this modal).
+    private var activeInterface: SearchInterface {
+        searchState.searchModeType.interface
+    }
+
+    private var visibleSearches: [SavedSearch] {
+        Self.visibleEntries(
+            savedSearchStore.savedSearches, interface: activeInterface)
+    }
+
     var body: some View {
         NavigationStack {
             List {
-                if savedSearchStore.savedSearches.isEmpty {
+                if visibleSearches.isEmpty {
                     Section {
                         ContentUnavailableView(
-                            "No Saved Searches",
+                            Self.emptyStateTitle(for: activeInterface),
                             systemImage: "bookmark",
-                            description: Text("Save a search to reuse it later on this or other documents.")
+                            description: Text(Self.emptyStateDescription(for: activeInterface))
                         )
                         .listRowBackground(Color.clear)
                     }
                 } else {
-                    Section("Saved Searches") {
-                        ForEach(savedSearchStore.savedSearches) { search in
+                    Section(Self.sectionHeader(for: activeInterface)) {
+                        ForEach(visibleSearches) { search in
                             savedSearchRow(search)
                         }
                     }
                 }
 
                 // Save entry point — always visible while the sheet is open
-                // (design §4.1), pre-filled with a generated name.
+                // (design §4.1), pre-filled with a generated name. Saves
+                // the active interface's shape, so the new entry always
+                // lands in the list the user is looking at.
                 Section {
                     Button {
                         savePromptName = Self.generatedName(for: searchState)
                         showSavePrompt = true
                     } label: {
-                        Label("Save current search…", systemImage: "plus.circle")
+                        Label(Self.saveCurrentLabel(for: activeInterface), systemImage: "plus.circle")
                     }
-                    .accessibilityLabel("Save current search")
+                    .accessibilityLabel(Self.saveCurrentLabel(for: activeInterface))
                 }
             }
             .navigationTitle("Saved Searches")
@@ -174,6 +195,38 @@ struct SavedSearchListSheet: View {
     }
 
     // MARK: - Testable static seams (S6 testable-static pattern)
+
+    /// The typed-list partition: entries whose persisted mode belongs
+    /// to `interface`. One store underneath; the mode's frozen wire
+    /// value carries interface identity, so no second field exists and
+    /// nothing migrates. Order is preserved (the store's append order).
+    static func visibleEntries(
+        _ all: [SavedSearch],
+        interface: SearchInterface
+    ) -> [SavedSearch] {
+        all.filter { $0.mode.interface == interface }
+    }
+
+    /// Per-interface list chrome. Functional minimum only: the labels
+    /// must not claim the other interface's entries are absent from the
+    /// store — they are listed on their own side.
+    static func sectionHeader(for interface: SearchInterface) -> String {
+        interface == .scan ? "Saved Scans" : "Saved Searches"
+    }
+
+    static func emptyStateTitle(for interface: SearchInterface) -> String {
+        interface == .scan ? "No Saved Scans" : "No Saved Searches"
+    }
+
+    static func emptyStateDescription(for interface: SearchInterface) -> String {
+        interface == .scan
+            ? "Save a scan to reuse its category and option setup later. Text searches are listed on the Search side."
+            : "Save a search to reuse it later on this or other documents. Saved scans are listed on the Scan side."
+    }
+
+    static func saveCurrentLabel(for interface: SearchInterface) -> String {
+        interface == .scan ? "Save current scan…" : "Save current search…"
+    }
 
     /// Apply a saved shape to the live `SearchState` (recall). The
     /// programmatic-mode-change flag is armed only when the mode actually

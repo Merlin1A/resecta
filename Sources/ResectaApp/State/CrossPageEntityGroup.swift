@@ -16,8 +16,8 @@ import RedactionEngine
 // and reproducible. Clustering is **within a single PII category** — the
 // same canonical text in two categories does not merge.
 //
-// The shipping companion to this type is `RedactionState.applyEntityGroup`
-// which mirrors `applySearchResults`'s undo-grouping pattern so one
+// The shipping companion to this type is the entity-group origin of
+// `RedactionState.applyFindings`, whose shared commit's undo grouping means one
 // `undoManager.undo()` reverses an entire group accept atomically.
 
 /// A cluster of detections across multiple pages that share a normalized

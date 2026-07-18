@@ -10,8 +10,8 @@ import RedactionEngine
 // overlay intersects every region's `normalizedRect` against the
 // marquee and routes the hit set through
 // `RedactionState.applyBatch(_:undoManager:toastManager:)` — a peer of
-// `applySearchResults` / `applyTriagedResults`, not a collapse onto
-// either. The 500-region cap and warning toast surface inside
+// the region-creating `applyFindings` seam, not a collapse onto
+// it. The 500-region cap and warning toast surface inside
 // `applyBatch` itself; see `ApplyBatchCapTests` for that side.
 //
 // These tests pin three behaviors without a UITouch host:

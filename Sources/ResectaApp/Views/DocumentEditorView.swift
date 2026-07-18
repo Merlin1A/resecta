@@ -1234,7 +1234,7 @@ struct DocumentEditorView: View {
 
     /// DRAW-5: open / re-use the SearchAndRedactSheet with the magic-wand
     /// term pre-filled and `exactMatch` engaged. Reuses
-    /// `RedactionState.applySearchResults` (plan §0.4 hard stop — do not
+    /// the search-origin apply (plan §0.4 hard stop — do not
     /// introduce a new apply method). If a search session is already
     /// active we mutate it in place; otherwise a fresh `SearchState` is
     /// created via the existing `redactionState.activeSearch = ...`
@@ -1722,13 +1722,10 @@ struct DocumentEditorView: View {
         guard !redactionState.triagePromotionOccurred,
               !redactionState.detectionResults.isEmpty else { return }
         redactionState.pendingTriage = redactionState.detectionResults
-        // Review-first arrival: re-staged detections arrive all-DESELECTED, like every
-        // arrival. Entries are EXPLICIT per detection because the apply
-        // path's absent-id fallback still reads accepted (its re-guard
-        // is a later session's work).
-        redactionState.triageSelections = RedactionState.reviewArrivalSelections(
-            for: redactionState.detectionResults
-        )
+        // Review-first arrival: re-staged detections arrive
+        // all-DESELECTED, like every arrival — an empty map, since the
+        // one apply path reads an absent id as not accepted.
+        redactionState.triageSelections = [:]
         // Deterministic presentation (the observer above also fires,
         // but a direct call doesn't depend on change delivery).
         presentReviewInScanInterface()
@@ -1746,26 +1743,56 @@ struct DocumentEditorView: View {
             searchSheetDetent = .medium
         }
         if let state = redactionState.activeSearch {
-            // Sheet already up: surface the review by switching its
-            // interface. The write takes the ordinary user-transition
-            // path in the sheet's mode-switch handler (clear + undo
-            // toast for any live results) — the review must not
-            // silently absorb another interface's session. The touched
-            // tracker resets with it: the review arriving here is a
+            // Sheet already up: surface the review by re-targeting its
+            // interface. This is a PROGRAMMATIC transition (no user
+            // gesture), so it must not ride the user-transition path:
+            // that path's undo toast offered to restore the cleared
+            // session — and taking that restore during the pending
+            // review buried the review behind the parked switcher (its
+            // every entry point disables while detections are staged).
+            // Instead the arrival owns the whole transition: cancel any
+            // in-flight run (an orphaned task would keep streaming into
+            // the review's interface and its completion tail would
+            // record a false run outcome), clear the session state the
+            // user-transition path would have cleared, and name the
+            // drop with a plain notice — no restore affordance. The
+            // touched tracker resets with it: the arriving review is a
             // fresh all-deselected selection context, and a Dismiss
             // confirmation about the just-cleared session's work would
             // reference selections the user can no longer see.
             if state.searchModeType != .piiScan {
+                state.cancelSearchWithoutAwait()
+                let dropped = SearchAndRedactSheet.unappliedMatchCount(in: state)
+                if let message = Self.reviewArrivalClearedMessage(unappliedCount: dropped) {
+                    toastManager.enqueue(message, severity: .info)
+                }
+                state.isProgrammaticModeChange = true
                 state.searchModeType = .piiScan
+                state.clearResults()
+                state.piiCategoryFilter = nil
+                state.sortOrder = .discoveryOrder
                 state.userModifiedSelections = false
             }
         } else {
             let state = SearchState()
             state.searchModeType = .piiScan
             // Deliberately NOT arming `pendingAutoRunScan`: a review
-            // arrival presents findings; it never starts a run.
+            // arrival presents staged detections; it never starts a run.
             redactionState.activeSearch = state
         }
+    }
+
+    /// Notice for the review-arrival re-target when the drop would
+    /// otherwise be silent: the arriving review replaces a session that
+    /// still held unapplied matches. Returns nil when nothing unapplied
+    /// is lost so the common arrival stays toast-free. Deliberately
+    /// carries no restore action — restoring the cleared session over a
+    /// pending review would bury the review behind its parked entry
+    /// points. Pinned by `InterfaceSwitchClearTests`.
+    static func reviewArrivalClearedMessage(unappliedCount: Int) -> String? {
+        guard unappliedCount > 0 else { return nil }
+        let suffix = unappliedCount == 1 ? "" : "es"
+        return "Detection review opened — \(unappliedCount) unapplied match\(suffix) cleared."
     }
 
     /// UXF-06 — rebuild the banner when a detection run records its

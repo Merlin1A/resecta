@@ -4,6 +4,9 @@ import Foundation
 @testable import RedactionEngine
 
 // Phase 3 §A7 — priors + surface forms + ambiguity flag + clearAll.
+// Reshaped to the unified apply path: the staged-review apply is the
+// stagedDetections origin of `applyFindings` (same bookkeeping
+// contract; entry renamed, call is async).
 
 @Suite("RedactionState priors + surface forms (Phase 3)")
 @MainActor
@@ -18,40 +21,40 @@ struct RedactionStatePriorsTests {
         #expect(state.ambiguousSurnameDetectionIDs.isEmpty)
     }
 
-    @Test("applyTriagedResults on accept updates SSN prior upward")
-    func applyAcceptUpdatesPrior() {
+    @Test("Staged-review apply on accept updates SSN prior upward")
+    func applyAcceptUpdatesPrior() async {
         let state = RedactionState()
         let detection = makeDetection(kind: .pii(.ssn), text: "123-45-6789")
         state.pendingTriage = [0: [detection]]
         state.triageSelections = [detection.id: true]
 
-        state.applyTriagedResults(undoManager: nil)
+        await state.applyFindings(.stagedDetections, undoManager: nil)
         #expect(state.priors.mean(.ssn) > 0.5)
         #expect(state.surfaceForms.lookup("123-45-6789") == .accepted)
         #expect(state.pendingTriage == nil)
     }
 
-    @Test("applyTriagedResults on reject updates SSN prior downward")
-    func applyRejectUpdatesPrior() {
+    @Test("Staged-review apply on reject updates SSN prior downward")
+    func applyRejectUpdatesPrior() async {
         let state = RedactionState()
         let detection = makeDetection(kind: .pii(.ssn), text: "987-65-4321")
         state.pendingTriage = [0: [detection]]
         state.triageSelections = [detection.id: false]
 
-        state.applyTriagedResults(undoManager: nil)
+        await state.applyFindings(.stagedDetections, undoManager: nil)
         #expect(state.priors.mean(.ssn) < 0.5)
         #expect(state.surfaceForms.lookup("987-65-4321") == .rejected)
     }
 
     @Test("Undo reverses the prior + surface form update")
-    func undoReversesPriorUpdate() {
+    func undoReversesPriorUpdate() async {
         let undoManager = UndoManager()
         let state = RedactionState()
         let detection = makeDetection(kind: .pii(.ssn), text: "111-22-3333")
         state.pendingTriage = [0: [detection]]
         state.triageSelections = [detection.id: true]
 
-        state.applyTriagedResults(undoManager: undoManager)
+        await state.applyFindings(.stagedDetections, undoManager: undoManager)
         #expect(state.priors.mean(.ssn) > 0.5)
         #expect(state.surfaceForms.lookup("111-22-3333") == .accepted)
 
@@ -61,7 +64,7 @@ struct RedactionStatePriorsTests {
     }
 
     @Test("clearAll persists+rehydrates priors; wipes surface forms, diagnostics, ambiguity flags")
-    func clearAllResetsPhase3State() {
+    func clearAllResetsPhase3State() async {
         // S7 / design 03 §3.6 behavior change: priors now SURVIVE clearAll
         // (saved before the wipe, rehydrated after) so triage history
         // accumulates across documents. Everything else still wipes.
@@ -82,7 +85,7 @@ struct RedactionStatePriorsTests {
         )
         state.ambiguousSurnameDetectionIDs = [detection.id]
 
-        state.applyTriagedResults(undoManager: nil)
+        await state.applyFindings(.stagedDetections, undoManager: nil)
         state.clearAll()
 
         #expect(state.priors.mean(.name) > 0.5,
@@ -212,14 +215,14 @@ struct RedactionStatePriorsTests {
     }
 
     @Test("Accepted detection whose ID is flagged ambiguous carries isAmbiguousSurname forward")
-    func ambiguityFlagFlowsToMetadata() {
+    func ambiguityFlagFlowsToMetadata() async {
         let state = RedactionState()
         let detection = makeDetection(kind: .pii(.name), text: "Smith")
         state.pendingTriage = [0: [detection]]
         state.triageSelections = [detection.id: true]
         state.ambiguousSurnameDetectionIDs = [detection.id]
 
-        state.applyTriagedResults(undoManager: nil)
+        await state.applyFindings(.stagedDetections, undoManager: nil)
 
         let region = state.regions[0]?.first
         let meta = state.regionMetadata[region?.id ?? UUID()]

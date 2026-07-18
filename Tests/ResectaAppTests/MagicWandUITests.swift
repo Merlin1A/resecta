@@ -13,7 +13,7 @@ import RedactionEngine
 //   - The action sets `RedactionState.pendingMagicWandRequest`, which
 //     the host (DocumentEditorView) consumes to open the search sheet
 //     pre-filled with the escaped term and `SearchOptions.exactMatch =
-//     true`. The apply path stays on `RedactionState.applySearchResults`
+//     true`. The apply path is the search origin of `applyFindings`
 //     (hard stop — no new apply method).
 //   - All resulting matches default-select so the user can apply with
 //     one tap; this is driven by `SearchState.preselectIncomingResults`.
@@ -128,7 +128,7 @@ struct MagicWandUITests {
         // engine suite; here we pin the application-layer contract:
         //   - The magic-wand pre-select flag flips every incoming
         //     SearchResult to `isSelected = true`.
-        //   - `applySearchResults` then creates exactly one
+        //   - the search-origin apply then creates exactly one
         //     RedactionRegion per selected result, on the right page.
         //
         // Constructing four synthetic results stands in for the
@@ -163,9 +163,9 @@ struct MagicWandUITests {
         #expect(everySelected,
                 "magic-wand pre-select flag must default-select every result")
 
-        // Apply path stays on the existing `applySearchResults` per
-        // Hard stop. One region per result, on its page.
-        let outcome = await redactionState.applySearchResults(undoManager: nil)
+        // Apply path: the search origin of the one `applyFindings`
+        // seam. One region per result, on its page.
+        let outcome = await redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
         #expect(outcome?.applied == 4)
         for page in 0..<4 {
             #expect(redactionState.regions[page]?.count == 1,

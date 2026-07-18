@@ -19,7 +19,7 @@ import XCTest
 /// `--openSearchSheet` hook, run a search that yields results, select all,
 /// tap the "Apply N" toolbar button (which applies directly), and assert the
 /// app survived AND the apply produced regions (the success toast only fires
-/// after `applySearchResults` returns a non-nil result).
+/// after the search-origin apply returns a non-nil result).
 ///
 /// Grouping coverage here: page grouping (text mode) and term grouping
 /// (multi-term mode, "By Term" toggle). The category-grouping branch needs

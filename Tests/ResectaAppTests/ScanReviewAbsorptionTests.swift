@@ -6,12 +6,11 @@ import CoreGraphics
 
 // The absorbed review surface's arrival + derivation contracts:
 //
-// - review-first producers: every staged detection arrives with an EXPLICIT
-//   `false` selection entry (`reviewArrivalSelections`), because
-//   `applyTriagedResults` still reads ABSENT ids as accepted (`?? true`,
-//   its re-guard rides the apply-path unification) — an entry-less
-//   detection would display deselected but apply selected.
-// - The normalize belt closes that gap for any producer that missed it.
+// - review-first arrival: staged detections arrive with NOTHING
+//   selected, and an ABSENT selection id reads as NOT accepted in the
+//   one apply path — display state and apply state agree with no
+//   producer entries and no normalization belt (both retired with the
+//   old absent-reads-accepted fallback).
 // - The seed route (`--seedTriage`) stages the same all-deselected
 //   shape the pipeline does.
 // - The review list/group derivation helpers (filter, order, prune
@@ -39,69 +38,51 @@ struct ScanReviewAbsorptionTests {
 
     // MARK: - review-first arrival selections
 
-    @Test("reviewArrivalSelections writes an explicit false entry per detection")
-    func arrivalSelectionsAreExplicitFalse() {
-        let a = makeDetection(page: 0)
-        let b = makeDetection(page: 0, kind: .pii(.email), matchedText: "j@x.com")
-        let c = makeDetection(page: 2, kind: .face, matchedText: nil)
-        let selections = RedactionState.reviewArrivalSelections(
-            for: [0: [a, b], 2: [c]]
-        )
-        #expect(selections.count == 3)
-        for det in [a, b, c] {
-            #expect(selections[det.id] == false,
-                    "every detection needs an EXPLICIT false — the apply fallback reads absent as accepted")
-        }
-    }
-
-    @Test("normalizeReviewSelections fills missing entries with false, preserves existing")
-    func normalizeBeltFillsGaps() {
+    @Test("An absent selection id never applies — arrival needs no entries")
+    func absentIdsAreNotAccepted() async {
         let state = RedactionState()
         let a = makeDetection(page: 0)
         let b = makeDetection(page: 0, kind: .pii(.email), matchedText: "j@x.com")
-        state.pendingTriage = [0: [a, b]]
-        // Producer "forgot" b; the user selected a.
-        state.triageSelections = [a.id: true]
+        let c = makeDetection(page: 2, kind: .face, matchedText: nil)
+        state.pendingTriage = [0: [a, b], 2: [c]]
+        // The arrival shape: an EMPTY selection map.
+        state.triageSelections = [:]
 
-        state.normalizeReviewSelections()
+        let outcome = await state.applyFindings(.stagedDetections, undoManager: nil)
 
-        #expect(state.triageSelections[a.id] == true,
-                "existing entries must be preserved")
-        #expect(state.triageSelections[b.id] == false,
-                "missing entries must become explicit false")
+        #expect(outcome?.applied == 0,
+                "no detection may become a region without an explicit true entry")
+        #expect(state.regions.values.flatMap { $0 }.isEmpty)
+        #expect(state.pendingTriage == nil, "apply still resolves the review")
     }
 
-    @Test("Seed route stages all-deselected with explicit entries and a staged record")
+    @Test("Seed route stages all-deselected (empty selection map) and a staged record")
     func seedRouteArrivalShape() {
         let state = RedactionState()
         state.seedDebugTriage()
 
         guard let pending = state.pendingTriage else {
-            Issue.record("seed must stage findings")
+            Issue.record("seed must stage detections")
             return
         }
         let ids = pending.values.flatMap { $0 }.map(\.id)
         #expect(!ids.isEmpty)
-        for id in ids {
-            #expect(state.triageSelections[id] == false,
-                    "seeded findings arrive all-deselected with explicit entries (review-first arrival)")
-        }
+        #expect(state.triageSelections.isEmpty,
+                "seeded detections arrive all-deselected — the empty map IS the arrival shape")
         #expect(state.lastDetectionRun?.outcome == .staged)
         #expect(state.lastDetectionRun?.scanSummary == nil,
                 "seeded record is pipeline-origin shaped (banner derives counts from pendingTriage)")
     }
 
-    @Test("Accepted count over explicit entries matches what applyTriagedResults will apply")
-    func acceptedCountMatchesApply() {
+    @Test("Accepted count over explicit-true entries matches what the apply promotes")
+    func acceptedCountMatchesApply() async {
         let state = RedactionState()
         let a = makeDetection(page: 0)
         let b = makeDetection(page: 0, kind: .pii(.email), matchedText: "j@x.com")
         let c = makeDetection(page: 1, kind: .pii(.phone), matchedText: "(555) 010-2934")
         state.pendingTriage = [0: [a, b], 1: [c]]
-        state.triageSelections = RedactionState.reviewArrivalSelections(
-            for: [0: [a, b], 1: [c]]
-        )
-        // User selects two.
+        // Arrival shape (empty), then the user selects two.
+        state.triageSelections = [:]
         state.triageSelections[a.id] = true
         state.triageSelections[c.id] = true
 
@@ -109,7 +90,8 @@ struct ScanReviewAbsorptionTests {
         let acceptedCount = state.triageSelections.values.count { $0 }
         #expect(acceptedCount == 2)
 
-        let created = state.applyTriagedResults(undoManager: nil)
+        let created = await state.applyFindings(
+            .stagedDetections, undoManager: nil)?.applied
         #expect(created == acceptedCount,
                 "the displayed Apply count and the applied-region count must agree")
         #expect(state.pendingTriage == nil,

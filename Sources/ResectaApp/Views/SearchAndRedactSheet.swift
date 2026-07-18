@@ -76,7 +76,7 @@ struct SearchAndRedactSheet: View {
     // the sheet on every successful apply. Both apply paths now route
     // through `toastManager.enqueue` for a non-modal success toast; the
     // alert and its backing state are removed.
-    /// In-flight gate for the async `applySearchResults` call. Set true
+    /// In-flight gate for the async search-origin apply call. Set true
     /// at the start of every apply (toolbar Apply or Return-key)
     /// and cleared in a `defer` — disables the Return shortcut Button
     /// so a held key doesn't queue an apply per repeat tick.
@@ -173,7 +173,7 @@ struct SearchAndRedactSheet: View {
 
     /// Toolbar "Apply N" count for the review origin — explicit-true
     /// entries only. Producer sites write an explicit entry per staged
-    /// detection (review-first arrival), so this count and `applyTriagedResults`'
+    /// detection with an explicit true entry, so this count and the apply's
     /// accepted set describe the same selections.
     private var reviewAcceptedCount: Int {
         redactionState.triageSelections.values.count { $0 }
@@ -320,12 +320,10 @@ struct SearchAndRedactSheet: View {
                     // semibold, no destructive role, disabled at zero;
                     // the apply runs directly on tap. The live count
                     // carries the scale, and the undoable mark plus the
-                    // "Marked N" toast carry the confirmation. The
-                    // action routes per origin: an active review
-                    // applies the staged findings through the existing
-                    // `applyTriagedResults` path; otherwise the
-                    // selected search results apply through
-                    // `applySearchResults`.
+                    // "Marked N" toast carry the confirmation. Both
+                    // routes promote through the one `applyFindings`
+                    // path — an active review as the staged-detections
+                    // origin, otherwise the selected search results.
                     Button("Apply \(isReviewActive ? reviewAcceptedCount : searchState.selectedCount)") {
                         if isReviewActive {
                             applyReviewFindings()
@@ -675,7 +673,7 @@ struct SearchAndRedactSheet: View {
             }
         }
         // Clear stale applied markers when regions change (undo/redo), but
-        // NOT for the apply that just created them: applySearchResults bumps
+        // NOT for the apply that just created them: the search-origin apply bumps
         // regionVersion in the same MainActor tick as the appliedResultIDs
         // union, so this handler cannot otherwise tell that bump apart from a
         // real undo/redo. The decision is factored into the pure, testable
@@ -1122,25 +1120,32 @@ struct SearchAndRedactSheet: View {
 
     // MARK: - Apply (review origin)
 
-    /// Toolbar Apply for the review origin: route the staged detections
-    /// through the EXISTING `applyTriagedResults` path (its internals
-    /// untouched — the one-apply-path unification is a later session).
+    /// Toolbar Apply for the review origin: the staged detections
+    /// promote through the one `applyFindings` path, which writes their
+    /// metadata + audit records, owns the undo registration, and
+    /// re-checks the mutation guard inside the action (passing
+    /// `documentState` arms the path-internal re-check — the action
+    /// guard here is the second site of the two-site discipline, and
+    /// the path is the third, race-proof one).
     private func applyReviewFindings() {
         // Refuse mutations while the pipeline owns
         // `redactionState.regions` — re-checked in the action against a
-        // pipeline that started after the last render (button-level
-        // gate; the path's own re-guard is later-session work).
+        // pipeline that started after the last render.
         guard documentState.canMutateRegions else { return }
-        let created = redactionState.applyTriagedResults(undoManager: undoManager)
-        // Conditional dismiss: the modified selections were committed; a subsequent
-        // Dismiss has nothing unsaved to confirm.
-        searchState.userModifiedSelections = false
-        // UXF-11 — commit feedback through the shared copy builder so
-        // the count stays in lockstep with every other apply surface.
-        // The sheet stays up (the review resolves in place); the
-        // sheet-local toast host renders it.
-        if let message = CommitFeedback.markedMessage(applied: created) {
-            toastManager.enqueue(message, severity: .success)
+        Task { @MainActor in
+            guard let outcome = await redactionState.applyFindings(
+                .stagedDetections,
+                undoManager: undoManager,
+                documentState: documentState
+            ) else { return }
+            // UXF-11 — commit feedback through the shared copy builder so
+            // the count stays in lockstep with every other apply surface.
+            // The sheet stays up (the review resolves in place); the
+            // sheet-local toast host renders it. The conditional-dismiss
+            // tracker reset is owned by the apply path.
+            if let message = CommitFeedback.markedMessage(applied: outcome.applied) {
+                toastManager.enqueue(message, severity: .success)
+            }
         }
     }
 
@@ -1166,22 +1171,22 @@ struct SearchAndRedactSheet: View {
 
     // MARK: - Apply (search origin, toolbar)
 
-    /// Toolbar Apply for the search origin — the pre-absorption apply
-    /// action, extracted verbatim so the one Apply button can route per
-    /// origin.
+    /// Toolbar Apply for the search origin, routed through the one
+    /// `applyFindings` path.
     private func applySelectedSearchResults() {
         guard !isApplying else { return }
         // Refuse mutations while the pipeline owns
         // `redactionState.regions` — same gate as the button's
         // `.disabled`, re-checked in the action against a pipeline that
-        // started after the last render.
+        // started after the last render (and again inside the path).
         guard documentState.canMutateRegions else { return }
         isApplying = true
         // Capture selected IDs before apply clears selection
         let selectedIDs = Set(searchState.results.filter(\.isSelected).map(\.id))
         Task { @MainActor in
             defer { isApplying = false }
-            guard let result = await redactionState.applySearchResults(
+            guard let result = await redactionState.applyFindings(
+                .selectedSearchResults,
                 undoManager: undoManager,
                 documentState: documentState
             ) else {
@@ -1191,10 +1196,10 @@ struct SearchAndRedactSheet: View {
             // QW-1 (D06-F3) — union only the results that
             // produced a region. Overlap-skipped members of
             // the selection get no audit entry, so they must
-            // not earn the "applied" badge either.
+            // not earn the "applied" badge either. The
+            // conditional-dismiss tracker reset is owned by
+            // the apply path.
             searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
-            // Conditional dismiss: committed selections reset the touched tracker.
-            searchState.userModifiedSelections = false
             // Non-modal success toast via the shared
             // UXF-11 copy builder (`CommitFeedback`) so
             // the count stays in lockstep with the
@@ -1227,18 +1232,17 @@ struct SearchAndRedactSheet: View {
         let selectedIDs = Set(searchState.results.filter(\.isSelected).map(\.id))
         Task { @MainActor in
             defer { isApplying = false }
-            guard let result = await redactionState.applySearchResults(
+            guard let result = await redactionState.applyFindings(
+                .selectedSearchResults,
                 undoManager: undoManager,
                 documentState: documentState
             ) else {
                 return
             }
             // QW-1 (D06-F3) — survivors only, mirroring the
-            // toolbar Apply path above.
+            // toolbar Apply path above. The conditional-dismiss
+            // tracker reset is owned by the apply path.
             searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
-            // Conditional dismiss: committed selections reset the touched tracker,
-            // mirroring the toolbar Apply path.
-            searchState.userModifiedSelections = false
             // Keyboard-shortcut path
             // mirrors the toolbar Apply path — non-modal toast via
             // the shared UXF-11 copy builder, which returns nil for a
@@ -1268,14 +1272,38 @@ struct SearchAndRedactSheet: View {
 
     /// Apply a saved shape and re-run the search. The list sheet dismisses
     /// first (single-modal slot); recall then restores the shape via the
-    /// testable static and triggers through the standard path. If the
+    /// testable static and triggers through the standard path — exactly
+    /// one `triggerSearch()` (single-trigger discipline). If the
     /// recalled filter state hides every result, the existing
     /// "filters hide all candidates" empty state surfaces (already
     /// implemented in SearchResultsSection; no new copy).
+    ///
+    /// A recall that replaces a results-carrying session names the drop:
+    /// the programmatic transition deliberately skips the mode-switch
+    /// undo toast (the user explicitly chose a new search — a restore
+    /// affordance would race the fresh run), but the trigger's own
+    /// clear used to destroy unapplied matches with no signal at all.
+    /// The notice closes that silence without adding any affordance.
     private func recallSavedSearch(_ saved: SavedSearch) {
         activeModal = nil
+        let dropped = Self.unappliedMatchCount(in: searchState)
         SavedSearchListSheet.apply(saved, to: searchState)
         triggerSearch()
+        if let message = Self.recallClearedMessage(unappliedCount: dropped) {
+            toastManager.enqueue(message, severity: .info)
+        }
+    }
+
+    /// Notice for a recall that drops live unapplied matches. Returns
+    /// nil when nothing unapplied is lost so the common recall stays
+    /// toast-free. Sibling of `dismissClearedMessage` (UXF-27) and the
+    /// review-arrival notice — the family that keeps every
+    /// results-dropping transition named. Pinned by
+    /// `InterfaceSwitchClearTests`.
+    static func recallClearedMessage(unappliedCount: Int) -> String? {
+        guard unappliedCount > 0 else { return nil }
+        let suffix = unappliedCount == 1 ? "" : "es"
+        return "Recall cleared \(unappliedCount) unapplied match\(suffix)."
     }
 
     private func presentReverseRationale(for result: SearchResult) {

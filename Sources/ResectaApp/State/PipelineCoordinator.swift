@@ -1959,17 +1959,12 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // explicit user selection).
                 coordinator.redactionState.pendingTriage = allResults
 
-                // Review-first arrival: detections arrive with NOTHING selected: the
-                // machine proposes, only the user selects. Entries are
-                // EXPLICIT per detection (not an empty map) because the
-                // apply path's absent-id fallback still reads accepted.
-                var selections: [UUID: Bool] = [:]
-                for (_, pageResults) in allResults {
-                    for result in pageResults {
-                        selections[result.id] = false
-                    }
-                }
-                coordinator.redactionState.triageSelections = selections
+                // Review-first arrival: detections arrive with NOTHING
+                // selected — the machine proposes, only the user
+                // selects. An empty map is the whole contract now: the
+                // one apply path reads an absent id as not accepted, so
+                // staging just clears any stale entries.
+                coordinator.redactionState.triageSelections = [:]
 
                 coordinator.documentState.transition(to: .editing)
                 coordinator.redactionState.recordDetectionRun(.staged)
@@ -2237,7 +2232,7 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// Scoped to the regions actually applied. The
     /// prior pass also harvested `redactionState.detectionResults.values` (EVERY
     /// detection, including triage-deselected / auxiliary ones —
-    /// `applyTriagedResults` filters `regions` by selection at
+    /// the staged-review apply filters `regions` by selection at
     /// `RedactionState.swift:775` but never prunes `detectionResults`), so terms
     /// for un-redacted detections were hunted across body text and surfaced as
     /// false "Sensitive text within a redacted region" Layer-2 reports.

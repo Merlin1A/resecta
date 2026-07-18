@@ -72,14 +72,21 @@ enum MatchExportService {
     private static func recordFromSnapshot(
         _ s: MatchAuditSnapshot
     ) -> MatchAuditRecord {
+        // Scan-origin snapshots leave the search-only fields nil (no
+        // query term, no per-word OCR source confidence, sometimes no
+        // text). The export row renders them as empty columns — the
+        // artifact never invents values the origin did not record.
+        // Search-origin snapshots populate all three, so the emitted v4
+        // rows for them are unchanged. (Export surfaces stay compiled
+        // off for 1.0 either way.)
         MatchAuditRecord(
             id: s.resultID,
             pageIndex: s.pageIndex,
-            matchedText: s.matchedText,
-            source: MatchAuditExporter.sourceDescription(s.source),
+            matchedText: s.matchedText ?? "",
+            source: s.source.map(MatchAuditExporter.sourceDescription) ?? "",
             piiCategory: s.piiCategory?.rawValue,
             piiConfidence: s.piiConfidence,
-            term: s.term,
+            term: s.term ?? "",
             ruleID: s.rationale?.ruleID,
             finalScore: s.rationale?.finalScore,
             appliedThreshold: s.rationale?.appliedThreshold,

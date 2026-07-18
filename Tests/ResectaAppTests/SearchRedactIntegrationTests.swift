@@ -7,7 +7,7 @@ import RedactionEngine
 @MainActor
 struct SearchRedactIntegrationTests {
 
-    @Test("applySearchResults creates regions with .searchMatch source")
+    @Test("Search-origin apply creates regions with .searchMatch source")
     func applyCreatesRegions() async {
         let redactionState = RedactionState()
         let search = SearchState()
@@ -17,7 +17,7 @@ struct SearchRedactIntegrationTests {
         ]
         redactionState.activeSearch = search
 
-        await redactionState.applySearchResults(undoManager: nil)
+        await redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
 
         // Regions created on both pages
         #expect(redactionState.regions[0]?.count == 1)
@@ -37,26 +37,26 @@ struct SearchRedactIntegrationTests {
         redactionState.activeSearch = nil
     }
 
-    @Test("applySearchResults sets regionsModifiedSinceVerification")
+    @Test("Search-origin apply sets regionsModifiedSinceVerification")
     func applySetsStaleFlag() async {
         let redactionState = RedactionState()
         let search = SearchState()
         search.results = [makeResult(pageIndex: 0, term: "test")]
         redactionState.activeSearch = search
 
-        await redactionState.applySearchResults(undoManager: nil)
+        await redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
 
         #expect(redactionState.regionsModifiedSinceVerification == true)
     }
 
-    @Test("applySearchResults populates regionMetadata")
+    @Test("Search-origin apply populates regionMetadata")
     func applyPopulatesMetadata() async {
         let redactionState = RedactionState()
         let search = SearchState()
         search.results = [makeResult(pageIndex: 0, term: "SSN")]
         redactionState.activeSearch = search
 
-        await redactionState.applySearchResults(undoManager: nil)
+        await redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
 
         guard let region = redactionState.regions[0]?.first else {
             Issue.record("No region created")
@@ -68,14 +68,14 @@ struct SearchRedactIntegrationTests {
         #expect(metadata?.matchedText == "test")
     }
 
-    @Test("applySearchResults with no selected results does nothing")
+    @Test("Search-origin apply with no selected results does nothing")
     func applyWithNoSelectionDoesNothing() async {
         let redactionState = RedactionState()
         let search = SearchState()
         search.results = [makeResult(pageIndex: 0, term: "test", isSelected: false)]
         redactionState.activeSearch = search
 
-        await redactionState.applySearchResults(undoManager: nil)
+        await redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
 
         #expect(redactionState.regions.isEmpty)
         // activeSearch should still be set since no apply happened
@@ -93,7 +93,7 @@ struct SearchRedactIntegrationTests {
         ]
         redactionState.activeSearch = search
 
-        await redactionState.applySearchResults(undoManager: undoManager)
+        await redactionState.applyFindings(.selectedSearchResults, undoManager: undoManager)
         #expect(redactionState.regions[0]?.count == 2)
 
         undoManager.undo()
@@ -108,7 +108,7 @@ struct SearchRedactIntegrationTests {
         search.results = [makeResult(pageIndex: 0, term: "test")]
         redactionState.activeSearch = search
 
-        await redactionState.applySearchResults(undoManager: undoManager)
+        await redactionState.applyFindings(.selectedSearchResults, undoManager: undoManager)
         undoManager.undo()
         #expect(redactionState.regions[0]?.isEmpty ?? true)
 
@@ -140,7 +140,7 @@ struct SearchRedactIntegrationTests {
         search.results = [resultA, resultB]
         redactionState.activeSearch = search
 
-        let outcome = await redactionState.applySearchResults(undoManager: nil)
+        let outcome = await redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
 
         #expect(outcome?.applied == 1)
         #expect(outcome?.skippedOverlaps == 1)
@@ -177,7 +177,7 @@ struct SearchRedactIntegrationTests {
         let selectedIDs = Set(search.results.filter(\.isSelected).map(\.id))
         #expect(selectedIDs == [resultA.id, resultB.id])
 
-        guard let outcome = await redactionState.applySearchResults(undoManager: nil) else {
+        guard let outcome = await redactionState.applyFindings(.selectedSearchResults, undoManager: nil) else {
             Issue.record("apply returned nil")
             return
         }
@@ -257,14 +257,14 @@ struct SearchRedactIntegrationTests {
         #expect(redactionState.regionMetadata[region.id]?.piiKind == .pii(.phone))
     }
 
-    @Test("applySearchResults threads the category stamp end to end")
+    @Test("Search-origin apply threads the category stamp end to end")
     func applyThreadsCategoryStamp() async {
         let redactionState = RedactionState()
         let search = SearchState()
         search.results = [makeResult(pageIndex: 0, term: "Name", piiCategory: .name)]
         redactionState.activeSearch = search
 
-        await redactionState.applySearchResults(undoManager: nil)
+        await redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
 
         guard let region = redactionState.regions[0]?.first else {
             Issue.record("No region created")

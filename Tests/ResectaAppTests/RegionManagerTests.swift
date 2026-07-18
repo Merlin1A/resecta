@@ -173,8 +173,10 @@ struct RegionManagerTests {
 
     // MARK: - Batch Apply Detection Results
 
-    @Test("applyDetectionResults adds regions for multiple pages")
-    func batchApply() {
+    // Reshaped to the unified apply path: the raw detection map is the
+    // detectionResults origin of `applyFindings` (async entry).
+    @Test("Detection-map apply adds regions for multiple pages")
+    func batchApply() async {
         let state = RedactionState()
         let det0 = DetectionResult(
             normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
@@ -182,23 +184,23 @@ struct RegionManagerTests {
         let det1 = DetectionResult(
             normalizedRect: CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.1),
             kind: .face, confidence: 0.88)
-        state.applyDetectionResults([0: [det0], 1: [det1]], undoManager: nil)
+        await state.applyFindings(.detectionResults([0: [det0], 1: [det1]]), undoManager: nil)
         #expect(state.regions[0]?.count == 1)
         #expect(state.regions[1]?.count == 1)
         #expect(state.regions[0]?.first?.source == .detectedPII(kind: .ssn))
         #expect(state.regions[1]?.first?.source == .detectedFace)
     }
 
-    @Test("applyDetectionResults undo removes all batch regions")
-    func batchApplyUndo() {
+    @Test("Detection-map apply undo removes all batch regions")
+    func batchApplyUndo() async {
         let state = RedactionState()
         let undoManager = makeUndoManager()
         let det = DetectionResult(
             normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
             kind: .pii(.ssn), confidence: 0.95)
-        withUndoGroup(undoManager) {
-            state.applyDetectionResults([0: [det]], undoManager: undoManager)
-        }
+        undoManager.beginUndoGrouping()
+        await state.applyFindings(.detectionResults([0: [det]]), undoManager: undoManager)
+        undoManager.endUndoGrouping()
         #expect(state.regions[0]?.count == 1)
         undoManager.undo()
         #expect(state.regions[0]?.isEmpty != false)
@@ -269,8 +271,8 @@ struct RegionManagerTests {
         #expect(state.effectiveRegionCount == 3)
     }
 
-    @Test("applyDetectionResults creates regions with correct source types")
-    func applyDetectionResultsCreatesCorrectSources() {
+    @Test("Detection-map apply creates regions with correct source types")
+    func applyDetectionResultsCreatesCorrectSources() async {
         let state = RedactionState()
         let ssn = DetectionResult(
             normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.04),
@@ -278,7 +280,7 @@ struct RegionManagerTests {
         let face = DetectionResult(
             normalizedRect: CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.2),
             kind: .face, confidence: 0.85)
-        state.applyDetectionResults([0: [ssn, face]], undoManager: nil)
+        await state.applyFindings(.detectionResults([0: [ssn, face]]), undoManager: nil)
         #expect(state.regions[0]?.count == 2)
         #expect(state.regions[0]?[0].source == .detectedPII(kind: .creditCard))
         #expect(state.regions[0]?[1].source == .detectedFace)
@@ -286,17 +288,17 @@ struct RegionManagerTests {
 
     // MARK: - Triage (GAP §2.2)
 
-    @Test("applyTriagedResults creates regions and metadata, undo/redo lifecycle")
-    func triageApplyUndoMetadata() {
+    @Test("Staged-review apply creates regions and metadata, undo/redo lifecycle")
+    func triageApplyUndoMetadata() async {
         let state = RedactionState()
         let undoManager = makeUndoManager()
         let detection = DetectionResult.mock(kind: .pii(.ssn), matchedText: "123-45-6789")
         state.pendingTriage = [0: [detection]]
         state.triageSelections = [detection.id: true]
 
-        withUndoGroup(undoManager) {
-            state.applyTriagedResults(undoManager: undoManager)
-        }
+        undoManager.beginUndoGrouping()
+        await state.applyFindings(.stagedDetections, undoManager: undoManager)
+        undoManager.endUndoGrouping()
         let regionID = state.regions[0]!.first!.id
         #expect(state.regionMetadata[regionID] != nil)
         #expect(state.regionMetadata[regionID]?.matchedText == "123-45-6789")
@@ -312,15 +314,15 @@ struct RegionManagerTests {
         #expect(state.regionMetadata[regionID] != nil)
     }
 
-    @Test("applyTriagedResults filters rejected detections")
-    func triageFiltersRejected() {
+    @Test("Staged-review apply filters rejected detections")
+    func triageFiltersRejected() async {
         let state = RedactionState()
         let accepted = DetectionResult.mock(kind: .pii(.ssn))
         let rejected = DetectionResult.mock(kind: .pii(.email))
         state.pendingTriage = [0: [accepted, rejected]]
         state.triageSelections = [accepted.id: true, rejected.id: false]
 
-        state.applyTriagedResults(undoManager: nil)
+        await state.applyFindings(.stagedDetections, undoManager: nil)
         #expect(state.regions[0]?.count == 1)
         #expect(state.regionMetadata.count == 1)
     }

@@ -3,9 +3,10 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// W5 — verify applySearchResults populates the audit dict, undo removes
-// entries in lockstep with the regions, redo restores them, and clearAll
-// wipes everything on document close.
+// W5 — verify the search origin of `applyFindings` populates the audit
+// dict, undo removes entries in lockstep with the regions, redo restores
+// them, and clearAll wipes everything on document close. (The
+// detection-origin audit contract is pinned in `ApplyFindingsSeamTests`.)
 
 @Suite("RedactionState appliedMatchAudit (W5)")
 @MainActor
@@ -51,7 +52,7 @@ struct RedactionStateAuditTests {
 
     // MARK: - Apply populates
 
-    @Test("applySearchResults populates audit keyed by region id")
+    @Test("Search-origin apply populates audit keyed by region id")
     func applyPopulatesAudit() async {
         let state = RedactionState()
         let search = SearchState()
@@ -59,7 +60,7 @@ struct RedactionStateAuditTests {
         search.results = [result]
         state.activeSearch = search
 
-        await state.applySearchResults(undoManager: nil)
+        await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
         #expect(state.appliedMatchAudit.count == 1)
         guard let region = state.regions[0]?.first else {
@@ -69,8 +70,12 @@ struct RedactionStateAuditTests {
         let snapshot = state.appliedMatchAudit[region.id]
         #expect(snapshot != nil)
         #expect(snapshot?.resultID == result.id)
+        #expect(snapshot?.origin == .search)
+        #expect(snapshot?.regionID == region.id,
+                "the created region's id is populated on every snapshot")
         #expect(snapshot?.matchedText == "Jane Doe")
         #expect(snapshot?.piiCategory == .name)
+        #expect(snapshot?.term == "PII Scan")
         #expect(snapshot?.rationale?.ruleID == "name.nltagger")
     }
 
@@ -94,7 +99,7 @@ struct RedactionStateAuditTests {
         ]
         state.activeSearch = search
 
-        await state.applySearchResults(undoManager: nil)
+        await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
         let snap = state.appliedMatchAuditSnapshots.first
         if case .ocr(let c) = snap?.source {
@@ -116,7 +121,7 @@ struct RedactionStateAuditTests {
         state.activeSearch = search
 
         undo.beginUndoGrouping()
-        await state.applySearchResults(undoManager: undo)
+        await state.applyFindings(.selectedSearchResults, undoManager: undo)
         undo.endUndoGrouping()
         #expect(state.appliedMatchAudit.count == 2)
 
@@ -134,7 +139,7 @@ struct RedactionStateAuditTests {
         state.activeSearch = search
 
         undo.beginUndoGrouping()
-        await state.applySearchResults(undoManager: undo)
+        await state.applyFindings(.selectedSearchResults, undoManager: undo)
         undo.endUndoGrouping()
         let regionID = state.regions[0]?.first?.id
         #expect(regionID != nil)
@@ -157,13 +162,13 @@ struct RedactionStateAuditTests {
         let search = SearchState()
         search.results = [makeResult(pageIndex: 0)]
         state.activeSearch = search
-        await state.applySearchResults(undoManager: nil)
+        await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
         // Simulate sheet re-open with fresh results.
         let search2 = SearchState()
         search2.results = [makeResult(pageIndex: 2, matchedText: "John Doe")]
         state.activeSearch = search2
-        await state.applySearchResults(undoManager: nil)
+        await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
         #expect(state.appliedMatchAudit.count == 2)
         let texts = state.appliedMatchAuditSnapshots.map(\.matchedText)
@@ -184,7 +189,7 @@ struct RedactionStateAuditTests {
         ]
         state.activeSearch = search
 
-        await state.applySearchResults(undoManager: nil)
+        await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
         let pages = state.appliedMatchAuditSnapshots.map(\.pageIndex)
         #expect(pages == [0, 1, 2])
@@ -198,7 +203,7 @@ struct RedactionStateAuditTests {
         let search = SearchState()
         search.results = [makeResult()]
         state.activeSearch = search
-        await state.applySearchResults(undoManager: nil)
+        await state.applyFindings(.selectedSearchResults, undoManager: nil)
         #expect(!state.appliedMatchAudit.isEmpty)
 
         state.clearAll()

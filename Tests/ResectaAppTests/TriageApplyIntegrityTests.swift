@@ -8,9 +8,8 @@ import RedactionEngine
 //
 // Pins three contracts:
 //   - UXF-11: one commit-feedback copy (`CommitFeedback.markedMessage`)
-//     across triage Apply / Apply Group / search mark (incl. PII Scan
-//     mode) / auto-apply detection, always reporting the count of
-//     regions actually created.
+//     across every origin of the one `applyFindings` path, always
+//     reporting the count of regions actually created.
 //   - UXF-06: the detection run record (`RedactionState.DetectionRunRecord`)
 //     and the pure banner-model builder covering every outcome —
 //     zero/failed runs persist instead of dying as toasts.
@@ -82,8 +81,8 @@ struct TriageApplyIntegrityTests {
         #expect(CommitFeedback.markedMessage(applied: 0) == nil)
     }
 
-    @Test("applyTriagedResults returns the created-region count the Apply toast shows")
-    func applyTriagedResultsReturnsCreatedCount() {
+    @Test("Staged-review apply returns the created-region count the Apply toast shows")
+    func applyTriagedResultsReturnsCreatedCount() async {
         let state = RedactionState()
         let ids = seedPending(state, items: [
             (page: 0, kind: .ssn, text: "123-45-6789"),
@@ -93,7 +92,8 @@ struct TriageApplyIntegrityTests {
         // Reject one — the count must track acceptance, not the total.
         state.triageSelections[ids[1]] = false
 
-        let created = state.applyTriagedResults(undoManager: nil)
+        let created = await state.applyFindings(
+            .stagedDetections, undoManager: nil)?.applied
 
         #expect(created == 2)
         #expect(state.regions.values.flatMap { $0 }.count == 2)
@@ -101,27 +101,28 @@ struct TriageApplyIntegrityTests {
         #expect(state.triagePromotionOccurred)
     }
 
-    @Test("applyTriagedResults with nothing pending returns 0 and sets no flag")
-    func applyTriagedResultsNoopReturnsZero() {
+    @Test("Staged-review apply with nothing pending returns 0 and sets no flag")
+    func applyTriagedResultsNoopReturnsZero() async {
         let state = RedactionState()
-        #expect(state.applyTriagedResults(undoManager: nil) == 0)
+        let outcome = await state.applyFindings(.stagedDetections, undoManager: nil)
+        #expect(outcome?.applied == 0)
         #expect(!state.triagePromotionOccurred)
     }
 
-    @Test("applyDetectionResults splits signature candidates out of the applied count")
-    func applyDetectionResultsCountsExcludeSignatures() {
+    @Test("Detection-map apply splits signature candidates out of the applied count")
+    func applyDetectionResultsCountsExcludeSignatures() async {
         let state = RedactionState()
         let name = makeDetection(page: 0, kind: .name, matchedText: "Jordan Avery")
         let ssn = makeDetection(page: 1, kind: .ssn, matchedText: "123-45-6789")
         let sig = makeDetection(page: 1, kind: .signatureCandidate, matchedText: "")
 
-        let outcome = state.applyDetectionResults(
-            [0: [name], 1: [ssn, sig]], undoManager: nil)
+        let outcome = await state.applyFindings(
+            .detectionResults([0: [name], 1: [ssn, sig]]), undoManager: nil)
 
         // The toast's count is regions created — the signature candidate
-        // routed to triage instead (ST-100: it is never auto-applied).
-        #expect(outcome.applied == 2)
-        #expect(outcome.signatureCandidates == 1)
+        // routed to the review instead (ST-100: never applied directly).
+        #expect(outcome?.applied == 2)
+        #expect(outcome?.signatureCandidates == 1)
         #expect(state.regions.values.flatMap { $0 }.count == 2)
         #expect(state.pendingTriage?.values.flatMap { $0 }.count == 1)
     }
@@ -145,7 +146,7 @@ struct TriageApplyIntegrityTests {
         }
         state.activeSearch = search
 
-        let outcome = await state.applySearchResults(undoManager: nil)
+        let outcome = await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
         #expect(outcome?.applied == 3)
         #expect(outcome?.skippedOverlaps == 0)
@@ -157,8 +158,8 @@ struct TriageApplyIntegrityTests {
 
     // MARK: - UXF-29 rider: group apply records accepted priors
 
-    @Test("applyEntityGroup records accepted priors for promoted members")
-    func groupApplyRecordsAcceptedPriors() {
+    @Test("Group apply records accepted priors for promoted members")
+    func groupApplyRecordsAcceptedPriors() async {
         let state = RedactionState()
         seedPending(state, items: [
             (page: 1, kind: .name, text: "John Doe"),
@@ -171,16 +172,16 @@ struct TriageApplyIntegrityTests {
         }
         #expect(state.priors.mean(.name) == 0.5)
 
-        state.applyEntityGroup(group, undoManager: nil)
+        await state.applyFindings(.entityGroup(group), undoManager: nil)
 
         // Two accepted-name updates move the Beta prior upward; the
-        // members no longer flow through applyTriagedResults' loop.
+        // members no longer flow through the staged-review loop.
         #expect(state.priors.mean(.name) > 0.5)
         #expect(state.triagePromotionOccurred)
     }
 
     @Test("Undo of a group apply restores the prior state it recorded")
-    func groupApplyUndoRestoresPriors() {
+    func groupApplyUndoRestoresPriors() async {
         let state = RedactionState()
         let undoManager = UndoManager()
         seedPending(state, items: [
@@ -193,7 +194,7 @@ struct TriageApplyIntegrityTests {
             return
         }
 
-        state.applyEntityGroup(group, undoManager: undoManager)
+        await state.applyFindings(.entityGroup(group), undoManager: undoManager)
         #expect(state.priors.mean(.name) > 0.5)
 
         undoManager.undo()

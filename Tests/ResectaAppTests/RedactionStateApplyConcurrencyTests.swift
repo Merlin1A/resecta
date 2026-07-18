@@ -3,7 +3,7 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-@Suite("RedactionState.applySearchResults concurrency", .tags(.search))
+@Suite("RedactionState search-origin apply concurrency", .tags(.search))
 @MainActor
 struct RedactionStateApplyConcurrencyTests {
 
@@ -41,7 +41,7 @@ struct RedactionStateApplyConcurrencyTests {
         search.results = results
         state.activeSearch = search
 
-        let outcome = await state.applySearchResults(undoManager: nil)
+        let outcome = await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
         #expect(outcome?.applied == 500)
         #expect(outcome?.skippedOverlaps == 0)
@@ -77,8 +77,8 @@ struct RedactionStateApplyConcurrencyTests {
         // a MainActor-isolated state observe the same contract: the
         // second call sees the first's regions and skips them as
         // overlaps.
-        let resA = await state.applySearchResults(undoManager: nil)
-        let resB = await state.applySearchResults(undoManager: nil)
+        let resA = await state.applyFindings(.selectedSearchResults, undoManager: nil)
+        let resB = await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
         let applied = (resA?.applied ?? 0) + (resB?.applied ?? 0)
         let skipped = (resA?.skippedOverlaps ?? 0) + (resB?.skippedOverlaps ?? 0)
@@ -121,8 +121,8 @@ struct RedactionStateApplyConcurrencyTests {
         state.activeSearch = search
 
         // Launch both applies concurrently against the same activeSearch.
-        async let a = state.applySearchResults(undoManager: nil)
-        async let b = state.applySearchResults(undoManager: nil)
+        async let a = state.applyFindings(.selectedSearchResults, undoManager: nil)
+        async let b = state.applyFindings(.selectedSearchResults, undoManager: nil)
         let (ra, rb) = await (a, b)
 
         let applied = (ra?.applied ?? 0) + (rb?.applied ?? 0)
@@ -144,9 +144,9 @@ struct RedactionStateApplyConcurrencyTests {
 
         // No-duplication is the load-bearing property — and it does NOT hold
         // today. Each apply snapshots existing regions on the MainActor
-        // (RedactionState.swift:851) *before* its off-main prepare, and the
-        // write-back appends the prepared set with no re-check against live
-        // regions (:862-869). With two async-let applies the second snapshots
+        // *before* its off-main prepare step, and the shared commit
+        // appends the prepared set with no re-check against live
+        // regions. With two async-let applies the second snapshots
         // before the first commits, so it re-adds every match → regionCount
         // becomes 2*total. Production never reaches this: the Search & Redact
         // sheet's `isApplying` gate serializes apply (Group 3, N-3). Per the
@@ -163,7 +163,7 @@ struct RedactionStateApplyConcurrencyTests {
     }
 }
 
-// D06-F1 — `applySearchResults` records the `regionVersion` it produces as a
+// D06-F1 — the search-origin apply records the `regionVersion` it produces as a
 // monotonic high-water-mark (`lastAppliedSearchRegionVersion`) so the Search &
 // Redact sheet can skip clearing the applied markers for the apply's own
 // region bump (vs a real undo/redo). See `SearchAndRedactSheet.shouldClearAppliedMarkers`.
@@ -183,7 +183,7 @@ struct RedactionStateAppliedVersionTests {
         )
     }
 
-    @Test("applySearchResults records the produced regionVersion as the high-water-mark")
+    @Test("Search-origin apply records the produced regionVersion as the high-water-mark")
     func applyRecordsHighWaterMark() async {
         let state = RedactionState()
         let search = SearchState()
@@ -194,7 +194,7 @@ struct RedactionStateAppliedVersionTests {
         #expect(state.regionVersion == 0)
         #expect(state.lastAppliedSearchRegionVersion == -1)
 
-        let outcome = await state.applySearchResults(undoManager: nil)
+        let outcome = await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
         // The apply created one region, advanced regionVersion by exactly 1,
         // and recorded that post-bump value as the high-water-mark.
@@ -211,7 +211,7 @@ struct RedactionStateAppliedVersionTests {
         search.results = [result]
         state.activeSearch = search
 
-        _ = await state.applySearchResults(undoManager: nil)
+        _ = await state.applyFindings(.selectedSearchResults, undoManager: nil)
         // Mirror SearchAndRedactSheet's apply path: the applied result IDs are
         // unioned into searchState in the same MainActor tick as the bump.
         search.appliedResultIDs.formUnion([result.id])

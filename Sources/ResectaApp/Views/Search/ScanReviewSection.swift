@@ -6,10 +6,10 @@ import RedactionEngine
 // `redactionState.pendingTriage` is non-nil (pipeline staging, the
 // summary banner's Review re-entry, or the DEBUG `--seedTriage` hook):
 // staged detections render through the shared `FindingRow` family,
-// arrive with nothing selected (review-first arrival), and apply through the existing
-// `applyTriagedResults` path from the sheet's toolbar. This replaces
-// the standalone "Review Detections" triage sheet — one review surface
-// for both result origins.
+// arrive with nothing selected (review-first arrival), and apply
+// through the one `applyFindings` path from the sheet's toolbar. This
+// replaces the standalone "Review Detections" triage sheet — one
+// review surface for both result origins.
 //
 // Carried from the retired sheet: the pipeline-side OCR-skip banner
 // (ST-83), the classification-diagnostic disclosure (G5), the
@@ -89,24 +89,17 @@ struct ScanReviewSection: View {
             }
         }
         .task {
-            // Belt: every staged detection must carry an EXPLICIT
-            // selection entry (arrival default false — review-first). Producer
-            // sites write them; this normalization closes the gap for
-            // any path that didn't, because `applyTriagedResults` falls
-            // back to `?? true` for absent ids (its re-guard is a later
-            // session's work) — an entry-less detection would display
-            // deselected but apply selected.
-            redactionState.normalizeReviewSelections()
             recomputeAll()
         }
         .onChange(of: viewMode) { _, _ in recomputeAll() }
         .onChange(of: filterKind) { _, _ in recomputeAll() }
         // Re-derive when the staged set changes shape — keyed on the
         // total count, not `!= nil`, so a wholesale replacement or a
-        // partial prune (group apply) refreshes the caches too. New
-        // arrivals also re-run the explicit-entry belt.
+        // partial prune (group apply) refreshes the caches too. (No
+        // arrival-entry normalization remains: the one apply path reads
+        // an absent selection id as not accepted, so display state and
+        // apply state agree without producer entries or a belt.)
         .onChange(of: redactionState.pendingTriage?.values.reduce(0) { $0 + $1.count } ?? 0) { _, _ in
-            redactionState.normalizeReviewSelections()
             recomputeAll()
         }
         .onChange(of: redactionState.crossPageEntityGroups.count) { _, _ in recomputeAll() }
@@ -439,7 +432,8 @@ struct ScanReviewSection: View {
 
     /// Cross-page entity group list. Each row collapses every member
     /// detection of one group into a single tap-target so accept applies
-    /// all members atomically through `applyEntityGroup` — one undo step.
+    /// all members atomically through the group origin of
+    /// `applyFindings` — one undo step.
     @ViewBuilder
     private var groupedFindingList: some View {
         if cachedFilteredGroups.isEmpty {
@@ -462,27 +456,34 @@ struct ScanReviewSection: View {
                     CrossPageGroupRow(
                         group: group,
                         onAccept: {
-                            let created = redactionState.applyEntityGroup(
-                                group, undoManager: undoManager
-                            )
-                            // UXF-29 — the apply pruned its members from
-                            // `pendingTriage`; refresh so this group's
-                            // row (and its flat-list rows) leave the
-                            // screen instead of inviting a second,
-                            // double-creating tap.
-                            recomputeAll()
-                            // UXF-11 — commit feedback through the shared
-                            // copy builder. The sheet-local toast host
-                            // renders it whether or not the prune emptied
-                            // the review (the sheet itself stays up).
-                            if let message = CommitFeedback.markedMessage(applied: created) {
-                                let manager = toastManager
-                                Task { @MainActor in
-                                    manager.enqueue(message, severity: .success)
+                            Task { @MainActor in
+                                guard let outcome = await redactionState.applyFindings(
+                                    .entityGroup(group),
+                                    undoManager: undoManager,
+                                    documentState: documentState
+                                ) else { return }
+                                // UXF-29 — the apply pruned its members
+                                // from `pendingTriage`; refresh so this
+                                // group's row (and its flat-list rows)
+                                // leave the screen. A second tap racing
+                                // this one resolves against the pruned
+                                // review and applies zero — benign.
+                                recomputeAll()
+                                // UXF-11 — commit feedback through the
+                                // shared copy builder. The sheet-local
+                                // toast host renders it whether or not
+                                // the prune emptied the review (the
+                                // sheet itself stays up).
+                                if let message = CommitFeedback.markedMessage(applied: outcome.applied) {
+                                    toastManager.enqueue(message, severity: .success)
                                 }
                             }
                         }
                     )
+                    // Mirror the toolbar Apply's disable while the
+                    // pipeline owns `regions`; the path re-checks
+                    // inside the action either way.
+                    .disabled(!documentState.canMutateRegions)
                 }
             }
             .listStyle(.plain)
@@ -605,7 +606,7 @@ struct ScanReviewSection: View {
 
 /// Single-row view for a `CrossPageEntityGroup`. Surfaces canonical text,
 /// member count, and pages; "Apply Group" promotes every member in one
-/// atomic undo step via `RedactionState.applyEntityGroup`.
+/// atomic undo step via the entity-group origin of `applyFindings`.
 struct CrossPageGroupRow: View {
     let group: CrossPageEntityGroup
     let onAccept: () -> Void

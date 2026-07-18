@@ -6,7 +6,7 @@ import RedactionEngine
 
 // DRAW-4 — Cross-page entity linking. Tests the locked normalize-and-
 // exact-match clustering across all PII categories and the atomic
-// "accept group" undo behavior in `RedactionState.applyEntityGroup`.
+// "accept group" undo behavior in the entity-group origin of `applyFindings`.
 //
 // Decision references:
 //   - plan.md §4 DRAW-4
@@ -67,9 +67,9 @@ struct CrossPageEntityLinkingTests {
             ids.append(detection.id)
         }
         state.pendingTriage = pending
-        // Mirror PipelineCoordinator's post-detection write: triage
-        // defaults to "accepted" so the applyEntityGroup path can be
-        // exercised without further setup.
+        // Test-local acceptance: production stages all-deselected, but
+        // these tests exercise the apply paths, so every seeded
+        // detection gets an explicit accepted entry.
         for id in ids { state.triageSelections[id] = true }
         return ids
     }
@@ -128,7 +128,7 @@ struct CrossPageEntityLinkingTests {
     // MARK: - 3. Group accept is one atomic undo step
 
     @Test("Group accept creates regions; a single undo() removes every one")
-    func testGroupAcceptCreatesAtomicUndoStep() {
+    func testGroupAcceptCreatesAtomicUndoStep() async {
         let state = RedactionState()
         let undoManager = UndoManager()
         seedPending(state, items: [
@@ -145,7 +145,7 @@ struct CrossPageEntityLinkingTests {
         // Pre-condition: no regions yet.
         #expect(state.regions.values.flatMap { $0 }.count == 0)
 
-        let applied = state.applyEntityGroup(group, undoManager: undoManager)
+        let applied = await state.applyFindings(.entityGroup(group), undoManager: undoManager)?.applied
 
         // Three regions, one per page in the group.
         #expect(applied == 3)
@@ -160,7 +160,7 @@ struct CrossPageEntityLinkingTests {
         #expect(remaining == 0)
 
         // Redo restores the same three regions (two-leg register/re-register
-        // pattern parity with applySearchResults).
+        // pattern parity across every origin of the shared commit).
         undoManager.redo()
         #expect(state.regions[1]?.count == 1)
         #expect(state.regions[3]?.count == 1)
@@ -218,7 +218,7 @@ struct CrossPageEntityLinkingTests {
     // MARK: - 6. UXF-29 — Apply Group then Apply N must not double-create
 
     @Test("Apply Group followed by Apply N creates one region per accepted detection (UXF-29)")
-    func testGroupApplyThenTriageApplyCreatesEachDetectionOnce() {
+    func testGroupApplyThenTriageApplyCreatesEachDetectionOnce() async {
         let state = RedactionState()
         seedPending(state, items: [
             (page: 1, kind: .name, text: "John Doe"),
@@ -235,7 +235,7 @@ struct CrossPageEntityLinkingTests {
         }
 
         // User taps "Apply Group" in the Grouped view…
-        let applied = state.applyEntityGroup(group, undoManager: nil)
+        let applied = await state.applyFindings(.entityGroup(group), undoManager: nil)?.applied
         #expect(applied == 2)
 
         // The promoted members are pruned: only the email stays pending,
@@ -247,7 +247,7 @@ struct CrossPageEntityLinkingTests {
         }
 
         // …then taps "Apply N" on the sheet toolbar.
-        state.applyTriagedResults(undoManager: nil)
+        await state.applyFindings(.stagedDetections, undoManager: nil)
 
         // 3 unique accepted detections → exactly 3 regions, one each.
         let total = state.regions.values.flatMap { $0 }.count
@@ -260,7 +260,7 @@ struct CrossPageEntityLinkingTests {
     // MARK: - 7. UXF-29 — repeated Apply Group taps must not re-create
 
     @Test("A second Apply Group tap creates no additional regions (UXF-29)")
-    func testRepeatedGroupApplyIsIdempotent() {
+    func testRepeatedGroupApplyIsIdempotent() async {
         let state = RedactionState()
         seedPending(state, items: [
             (page: 1, kind: .name, text: "John Doe"),
@@ -272,10 +272,10 @@ struct CrossPageEntityLinkingTests {
             return
         }
 
-        #expect(state.applyEntityGroup(group, undoManager: nil) == 2)
+        #expect(await state.applyFindings(.entityGroup(group), undoManager: nil)?.applied == 2)
         // The group row stays on screen after the first tap; a second tap
         // must be a no-op, not a duplicate promotion.
-        #expect(state.applyEntityGroup(group, undoManager: nil) == 0)
+        #expect(await state.applyFindings(.entityGroup(group), undoManager: nil)?.applied == 0)
         #expect(state.regions.values.flatMap { $0 }.count == 2)
     }
 }

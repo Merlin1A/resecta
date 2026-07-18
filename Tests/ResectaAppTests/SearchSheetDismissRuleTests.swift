@@ -120,9 +120,8 @@ struct SearchSheetDismissRuleTests {
             kind: .pii(.ssn), confidence: 0.9, matchedText: "123-45-6789"
         )
         redactionState.pendingTriage = [0: [det]]
-        redactionState.triageSelections = RedactionState.reviewArrivalSelections(
-            for: [0: [det]]
-        )
+        // Review-first arrival: an empty map (absent = not accepted).
+        redactionState.triageSelections = [:]
         redactionState.dismissTriage()
         #expect(redactionState.pendingTriage == nil)
         #expect(redactionState.triageSelections.isEmpty)

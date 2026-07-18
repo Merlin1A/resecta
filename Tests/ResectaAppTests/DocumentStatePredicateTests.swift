@@ -159,7 +159,7 @@ struct DocumentStatePredicateTests {
         #expect(doc.sourceDocument == nil)
     }
 
-    @Test("applySearchResults returns nil when documentState is in pipeline-owning phase")
+    @Test("applyFindings returns nil when documentState is in pipeline-owning phase")
     func applySearchResultsRespectsCanMutateRegions() async {
         let doc = DocumentState()
         let red = RedactionState()
@@ -183,8 +183,9 @@ struct DocumentStatePredicateTests {
         ]
         red.activeSearch = search
 
-        let result = await red.applySearchResults(undoManager: nil, documentState: doc)
-        #expect(result == nil, "applySearchResults should refuse to mutate during pipeline phases")
+        let result = await red.applyFindings(
+            .selectedSearchResults, undoManager: nil, documentState: doc)
+        #expect(result == nil, "applyFindings should refuse to mutate during pipeline phases")
         // No regions should have been created.
         #expect(red.regions.isEmpty || red.regions.values.allSatisfy { $0.isEmpty })
     }

@@ -5,7 +5,7 @@ import RedactionEngine
 @testable import ResectaApp
 
 // WU-71 / [P10] path (a) — app-side propagation tests. Verifies that
-// `RedactionState.applySearchResults` threads the SearchResult's
+// The search origin of `applyFindings` threads the SearchResult's
 // rationale into the region's `Source` so the iPad popover and iPhone
 // canvas action sheet can read it via
 // `RedactionState.rationale(forRegionID:)`.
@@ -48,7 +48,7 @@ struct RegionRationaleHandoffTests {
         search.flushPendingResults()
         state.activeSearch = search
 
-        _ = await state.applySearchResults(undoManager: nil)
+        _ = await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
         guard let region = state.regions[0]?.first else {
             Issue.record("expected one region after apply")
@@ -70,7 +70,7 @@ struct RegionRationaleHandoffTests {
         search.flushPendingResults()
         state.activeSearch = search
 
-        _ = await state.applySearchResults(undoManager: nil)
+        _ = await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
         guard let region = state.regions[0]?.first else {
             Issue.record("expected one region after apply")
@@ -99,7 +99,7 @@ struct RegionRationaleHandoffTests {
         search.flushPendingResults()
         state.activeSearch = search
 
-        _ = await state.applySearchResults(undoManager: nil)
+        _ = await state.applyFindings(.selectedSearchResults, undoManager: nil)
         guard let region = state.regions[0]?.first else {
             Issue.record("no region applied")
             return
@@ -123,7 +123,7 @@ struct RegionRationaleHandoffTests {
         search.flushPendingResults()
         state.activeSearch = search
 
-        _ = await state.applySearchResults(undoManager: nil)
+        _ = await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
         // The audit pathway (MatchAuditSnapshot) already carried rationale
         // pre-WU-71. WU-71 leaves that pathway intact and adds a parallel

@@ -258,8 +258,8 @@ func withUndoGroup(_ mgr: UndoManager, _ body: () -> Void) {
     mgr.endUndoGrouping()
 }
 
-/// Async overload for callers whose body awaits (e.g.,
-/// `applySearchResults` is async after the apply-path refactor).
+/// Async overload for callers whose body awaits (e.g., the
+/// `applyFindings` entry is async).
 @MainActor
 func withUndoGroup(_ mgr: UndoManager, _ body: () async -> Void) async {
     mgr.beginUndoGrouping()

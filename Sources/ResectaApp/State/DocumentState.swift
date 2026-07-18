@@ -270,7 +270,7 @@ class DocumentState {
     /// True when caller mutations of `redactionState.regions` /
     /// `redactionState.regionMetadata` are a safe transition. False during
     /// phases that the pipeline owns (`.detecting`, `.redacting`,
-    /// `.verifying`); the `applySearchResults` write-back transaction
+    /// `.verifying`); the `applyFindings` write-back transaction
     /// must not interleave with those. STATE-7 — Apply during pipeline.
     var canMutateRegions: Bool {
         switch phaseKind {
