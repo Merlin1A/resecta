@@ -251,6 +251,7 @@ struct TriageApplyIntegrityTests {
 
         let model = DocumentEditorView.detectionBannerModel(
             outcome: .staged,
+            scanSummary: nil,
             pendingTriage: state.pendingTriage,
             ocrSkippedPageCount: 0
         )
@@ -262,30 +263,56 @@ struct TriageApplyIntegrityTests {
         #expect(!model.isWarning)
     }
 
-    @Test("Auto-applied outcome reports created regions and pending signature candidates")
-    func bannerModelAutoApplied() {
-        let plain = DocumentEditorView.detectionBannerModel(
-            outcome: .autoApplied(regionCount: 4, signatureCandidateCount: 0),
+    @Test("Scan-origin staged outcome reports the record's own counts with no Review action")
+    func bannerModelScanStaged() {
+        // Scan-interface runs carry their counts on the record; the
+        // banner must not read `pendingTriage` for them (their results
+        // live in the sheet's list, and a dismissed sheet's results
+        // are cleared by design — Review would promise a surface that
+        // is no longer populated).
+        let model = DocumentEditorView.detectionBannerModel(
+            outcome: .staged,
+            scanSummary: .init(foundCount: 12, pageCount: 3),
             pendingTriage: nil,
             ocrSkippedPageCount: 0
         )
-        #expect(plain.message == "Added 4 detected regions")
-        #expect(!plain.showsReview)
-        #expect(plain.autoDismisses)
+        #expect(model.message == "Scan found 12 items across 3 pages")
+        #expect(!model.showsReview)
+        #expect(model.autoDismisses)
+        #expect(!model.isWarning)
 
-        let withSigs = DocumentEditorView.detectionBannerModel(
-            outcome: .autoApplied(regionCount: 1, signatureCandidateCount: 2),
+        let singular = DocumentEditorView.detectionBannerModel(
+            outcome: .staged,
+            scanSummary: .init(foundCount: 1, pageCount: 1),
             pendingTriage: nil,
             ocrSkippedPageCount: 0
         )
-        #expect(withSigs.message
-                == "Added 1 detected region \u{2014} 2 signature candidates awaiting review")
+        #expect(singular.message == "Scan found 1 item across 1 page")
+    }
+
+    @Test("Scan summary takes precedence over stale pendingTriage on staged records")
+    func bannerModelScanStagedIgnoresPendingTriage() {
+        // If seeded triage state coexists with a scan-interface record
+        // (e.g. the --seedTriage hook plus an in-sheet scan), the
+        // record's own summary wins — pipeline kind-counts would
+        // misdescribe the scan run.
+        let state = RedactionState()
+        seedPending(state, items: [(page: 0, kind: .ssn, text: "123-45-6789")])
+        let model = DocumentEditorView.detectionBannerModel(
+            outcome: .staged,
+            scanSummary: .init(foundCount: 2, pageCount: 5),
+            pendingTriage: state.pendingTriage,
+            ocrSkippedPageCount: 0
+        )
+        #expect(model.message == "Scan found 2 items across 5 pages")
+        #expect(!model.showsReview)
     }
 
     @Test("Nothing-found outcome persists, and discloses OCR-skipped pages")
     func bannerModelNothingFound() {
         let clean = DocumentEditorView.detectionBannerModel(
             outcome: .nothingFound(pageCount: 3),
+            scanSummary: nil,
             pendingTriage: nil,
             ocrSkippedPageCount: 0
         )
@@ -298,6 +325,7 @@ struct TriageApplyIntegrityTests {
         // the coverage gap must surface here.
         let skipped = DocumentEditorView.detectionBannerModel(
             outcome: .nothingFound(pageCount: 3),
+            scanSummary: nil,
             pendingTriage: nil,
             ocrSkippedPageCount: 1
         )
@@ -310,6 +338,7 @@ struct TriageApplyIntegrityTests {
     func bannerModelFailed() {
         let model = DocumentEditorView.detectionBannerModel(
             outcome: .failed,
+            scanSummary: nil,
             pendingTriage: nil,
             ocrSkippedPageCount: 0
         )

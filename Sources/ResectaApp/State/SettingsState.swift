@@ -75,14 +75,6 @@ class SettingsState {
                 UserDefaults.standard.set(pipelineMode.rawValue, forKey: "pipelineMode.v2") }
     }
 
-    /// When true, detection results are auto-applied as regions.
-    /// When false, detection results are staged for triage review.
-    /// Defaults to false so users see the triage sheet by default.
-    var autoApplyDetections: Bool = false {
-        didSet { guard !isInitializing else { return }
-                UserDefaults.standard.set(autoApplyDetections, forKey: "autoApplyDetections") }
-    }
-
     /// When true, the rectangle-draw tool snaps the in-progress
     /// rectangle's edges to nearby OCR text-block edges within
     /// `snapTolerance = 8 / zoomScale` overlay-space points. Default on;
@@ -178,7 +170,12 @@ class SettingsState {
         let storedMode = UserDefaults.standard.string(forKey: "pipelineMode.v2")
         self.pipelineMode = storedMode
             .flatMap(PipelineMode.init(rawValue:)) ?? .secureRasterization
-        self.autoApplyDetections = UserDefaults.standard.object(forKey: "autoApplyDetections") as? Bool ?? false
+        // One-time cleanup of the retired auto-apply preference.
+        // The setting is gone — every detection run stages for review —
+        // so the persisted key is removed rather than hydrated.
+        // Idempotent removeObject-on-init (nothing writes this key
+        // anymore), mirroring `SavedSearchStore.legacyDefaultsKey`.
+        UserDefaults.standard.removeObject(forKey: "autoApplyDetections")
         self.snapToTextEnabled = UserDefaults.standard.object(forKey: "snapToTextEnabled") as? Bool ?? true
         self.paranoidMode = UserDefaults.standard.object(forKey: "paranoidMode") as? Bool ?? false
         let storedAppearance = UserDefaults.standard.string(forKey: "appearancePreference.v1")
@@ -205,7 +202,6 @@ class SettingsState {
         // re-trigger the review request (Apple's OS-side rate limit bounds the
         // exposure, but the disclosure dialog does not mention re-arming).
         pipelineMode = .secureRasterization
-        autoApplyDetections = false
         snapToTextEnabled = true
         paranoidMode = false
         appearancePreference = .system

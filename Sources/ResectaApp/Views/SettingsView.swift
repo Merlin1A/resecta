@@ -142,8 +142,8 @@ struct SettingsView: View {
     // MARK: - GATE-1 — Pipeline-active banner (STATE-5 companion)
 
     /// Non-blocking banner shown while the pipeline is `.detecting`,
-    /// `.redacting`, or `.verifying`. The four pipeline-affecting
-    /// controls below (`pipelineMode`, `autoVerify`, `autoApplyDetections`,
+    /// `.redacting`, or `.verifying`. The pipeline-affecting
+    /// controls below (`pipelineMode`, `autoVerify`,
     /// `paranoidMode`, plus `fillColor` / `exportDPI`) remain functional;
     /// the banner describes the mechanism (STATE-5: settings snapshot
     /// captured at run entry) without promising an outcome.
@@ -297,20 +297,10 @@ struct SettingsView: View {
             // description.
             .accessibilityHint(Self.verifyToggleHint(paranoidMode: settingsState.paranoidMode))
 
-            // GAP §8.1: Detection review toggle. Inverted binding — toggle ON
-            // means autoApplyDetections is false (triage review enabled).
-            Toggle(isOn: Binding(
-                get: { !settingsState.autoApplyDetections },
-                set: { settingsState.autoApplyDetections = !$0 }
-            )) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Review Detections Before Applying")
-                    Text("Auto-detected items are shown for your review before being applied as redaction regions")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .accessibilityHint("When enabled, you can review and filter auto-detected items before they become redaction regions")
+            // The "Review Detections Before Applying" toggle is retired:
+            // review-before-apply is now the only behavior (detected
+            // items always stage for review; nothing is applied without
+            // an explicit selection), so there is no setting to show.
 
             // Detection preset picker. SELECTS one of
             // the calibrated threshold vectors (conservative / balanced /

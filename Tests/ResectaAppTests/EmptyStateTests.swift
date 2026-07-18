@@ -147,15 +147,17 @@ struct EmptyStateTests {
         #expect(secondary == nil)
     }
 
-    @Test("PII Scan pre-scan secondary line names the Confidence slider (UXF-23: the real control) when detectors active")
+    @Test("PII Scan pre-scan secondary line states the detector count and names no retired control (UXF-23)")
     func piiScanPreScanSecondaryWithDetectors() {
         let secondary = WU20Strings.piiScanPreScanSecondary(enabledPIICategoryCount: 5)
         #expect(secondary != nil)
         #expect(secondary?.contains("5") == true)
-        #expect(secondary?.contains("Confidence slider") == true)
-        // UXF-23: the old copy referenced a "Customize" disclosure that
-        // is not wired into the piiScan toolbar.
+        // UXF-23 discipline: never name an affordance the view doesn't
+        // have. "Customize" was retired long ago; the Confidence slider
+        // retired with the two-interface chassis (Settings' Detection
+        // Sensitivity preset is the one engine-level control).
         #expect(secondary?.contains("Customize") == false)
+        #expect(secondary?.contains("Confidence slider") == false)
     }
 
     @Test("PII Scan pre-scan secondary line is mechanism-description (no outcome promise)")

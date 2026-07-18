@@ -136,11 +136,12 @@ struct SearchResultsSection: View {
             // Live preview row (counts + saturation/invalid signal).
             livePreviewRow
 
-            // Session-scoped navigation scope. Hidden in piiScan mode
-            // (preview path is disabled there; Cmd+G still works).
-            if searchState.searchModeType != .piiScan {
-                scopePicker
-            }
+            // Session-scoped navigation scope — the shared page-scope
+            // control, shown on BOTH interfaces (it scopes J/K and
+            // Cmd+G result traversal; it was previously hidden in the
+            // scan mode only because the live-preview path is disabled
+            // there, which never affected its traversal job).
+            scopePicker
 
             // "Select where…" Menu surfaces predicate-driven
             // attribute selection.
@@ -677,7 +678,9 @@ struct SearchResultsSection: View {
 
     private var emptyState: some View {
         let context = currentEmptyStateContext()
-        let piiCount = searchState.enabledPIICategories.count
+        // Effective count: an empty chip selection means the next run
+        // scans everything, so the detector count reflects that.
+        let piiCount = searchState.effectiveScanCategories.count
         return ContentUnavailableView {
             Label(
                 WU20Strings.headline(for: context),
@@ -733,7 +736,7 @@ struct SearchResultsSection: View {
             recentMultiTermSets: searchState.recentMultiTermSets,
             currentSearchPage: searchState.currentSearchPage,
             totalCount: searchState.totalCount,
-            enabledPIICategoryCount: searchState.enabledPIICategories.count
+            enabledPIICategoryCount: searchState.effectiveScanCategories.count
         )
     }
 
@@ -978,13 +981,12 @@ enum WU20Strings {
             return "No occurrences in the document for any of the active terms."
         case .piiScanPreScan:
             // Carries the role sentence (moved here
-            // from the piiScan toolbar). Wording constraints stay pinned
-            // by `PIIScanRoleCopyTests`: names "the same PII text
-            // detectors as Auto-Detect" (Auto-Detect additionally runs
-            // image legs — faces, signature candidates — that PII Scan
-            // does not) and makes the whole-document default scope
-            // explicit.
-            return "Runs the same PII text detectors as Auto-Detect across the whole document — text only; Auto-Detect also checks images. Tap **Scan Document** above to run it."
+            // from the scan toolbar). The former copy positioned this
+            // mode against the Auto-Detect menu entry; that entry point
+            // retired with the two-interface toolbar, so the copy now
+            // states the mechanism on its own terms: text detectors,
+            // whole-document default, text content only.
+            return "Runs the PII text detectors across the whole document \u{2014} text content only. Tap **Scan Document** above to run it."
         case .piiScanPostScanZero(let detectorCount):
             let suffix = detectorCount == 1 ? "" : "s"
             return "\(detectorCount) detector\(suffix) matched 0 candidates above threshold."
@@ -995,14 +997,14 @@ enum WU20Strings {
 
     /// Secondary description line for the `piiScanPreScan` empty state.
     /// Returned only when `enabledPIICategoryCount > 0`; nil otherwise.
-    /// Describes the active detector count and the tuning affordance
-    /// that actually exists in the piiScan toolbar — the Confidence
-    /// slider (UXF-23: the previous copy named a "Customize" disclosure
-    /// that is not wired into the view). Mechanism-description, not an
-    /// outcome promise. Pinned by `EmptyStateTests`.
+    /// States the active detector count; the selection affordance is
+    /// the category chip row itself, and the retired Confidence
+    /// slider's sentence retired with it (UXF-23 discipline: never
+    /// name an affordance the view doesn't have). Mechanism-
+    /// description, not an outcome promise. Pinned by `EmptyStateTests`.
     static func piiScanPreScanSecondary(enabledPIICategoryCount: Int) -> String? {
         guard enabledPIICategoryCount > 0 else { return nil }
-        return "Detectors active: \(enabledPIICategoryCount). Tune with the Confidence slider above."
+        return "Detectors active: \(enabledPIICategoryCount)."
     }
 
     // MARK: Multi-term recall chips

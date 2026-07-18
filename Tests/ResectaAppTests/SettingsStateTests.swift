@@ -17,7 +17,6 @@ struct SettingsStateTests {
         "autoVerify",
         "successfulExportCount",
         "pipelineMode.v2",
-        "autoApplyDetections",
         "detectionPreset.v1",
         "search.recents.enabled.v1",  // design 04 §4.6
     ]
@@ -39,7 +38,6 @@ struct SettingsStateTests {
         #expect(state.fillColor == .black)
         #expect(state.autoVerify == true)
         #expect(state.pipelineMode == .secureRasterization)
-        #expect(state.autoApplyDetections == false)
     }
 
     // MARK: - DPI Clamping
@@ -266,30 +264,25 @@ struct SettingsStateTests {
         #expect(state.pipelineMode == .searchableRedaction)
     }
 
-    // MARK: - AutoApplyDetections (GAP §2.4)
+    // MARK: - Retired auto-apply preference (stale-key cleanup)
 
-    @Test("autoApplyDetections true persists and reads back")
-    func autoApplyDetectionsTrue() {
+    @Test("Init removes the retired autoApplyDetections key")
+    func initRemovesRetiredAutoApplyKey() {
         cleanDefaults()
+        // A value persisted by an earlier build. The setting is gone —
+        // every detection run stages for review — so init removes the
+        // stale key rather than hydrating it.
         UserDefaults.standard.set(true, forKey: "autoApplyDetections")
-        let state = SettingsState()
-        #expect(state.autoApplyDetections == true)
+        _ = SettingsState()
+        #expect(UserDefaults.standard.object(forKey: "autoApplyDetections") == nil)
     }
 
-    @Test("Missing autoApplyDetections key defaults to false")
-    func autoApplyDetectionsMissing() {
+    @Test("Retired-key cleanup is idempotent across inits")
+    func retiredAutoApplyCleanupIdempotent() {
         cleanDefaults()
-        let state = SettingsState()
-        #expect(state.autoApplyDetections == false)
-    }
-
-    @Test("Setting autoApplyDetections triggers immediate UserDefaults write")
-    func didSetAutoApplyDetections() {
-        cleanDefaults()
-        let state = SettingsState()
-        state.autoApplyDetections = true
-        #expect(UserDefaults.standard.bool(forKey: "autoApplyDetections") == true)
-        #expect(state.autoApplyDetections == true)
+        _ = SettingsState()
+        _ = SettingsState()
+        #expect(UserDefaults.standard.object(forKey: "autoApplyDetections") == nil)
     }
 
     // MARK: - resetToDefaults
@@ -302,13 +295,11 @@ struct SettingsStateTests {
         state.fillColor = .white
         state.autoVerify = false
         state.pipelineMode = .searchableRedaction
-        state.autoApplyDetections = true
         state.resetToDefaults()
         #expect(state.exportDPI == 300)
         #expect(state.fillColor == .black)
         #expect(state.autoVerify == true)
         #expect(state.pipelineMode == .secureRasterization)
-        #expect(state.autoApplyDetections == false)
     }
 
     @Test("resetToDefaults preserves successfulExportCount (lifetime review-gate metric, CAT-400)")

@@ -149,6 +149,15 @@ struct SearchAndRedactSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // The switcher hides at the compact detent: compactFloat
+                // is the deliberate canvas-visible state sized for the
+                // search bar + nav controls, and the extra segmented row
+                // displaced the nav counter below the clip there.
+                // Interface switching is a full-chrome activity — drag
+                // up and the switcher returns.
+                if selectedDetent != .compactFloat {
+                    interfaceSwitcher
+                }
                 searchBar
                 SearchToolbarSection(
                     searchState: searchState,
@@ -181,7 +190,10 @@ struct SearchAndRedactSheet: View {
                     )
                 }
             }
-            .navigationTitle("Search & Redact")
+            // Per-interface titles under the one chassis — the former
+            // "Search & Redact" umbrella title retired with the
+            // two-interface split.
+            .navigationTitle(searchState.searchModeType.interface.displayName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -428,6 +440,22 @@ struct SearchAndRedactSheet: View {
                !searchState.queryText.isEmpty {
                 triggerSearch()
             }
+            // One-tap contract: the toolbar Scan button armed a
+            // one-shot flag before presenting. Consume it exactly once
+            // here — this is the sole trigger for the auto-run;
+            // `triggerSearch()` does not deduplicate same-turn callers
+            // (`activeSearchTask` is assigned after a suspension
+            // point), so a second programmatic trigger site would race
+            // two scans against the shared searcher. Mutually
+            // exclusive with the magic-wand branch above by
+            // construction (magic wand seeds `.text`; the Scan button
+            // seeds the scan mode).
+            if searchState.pendingAutoRunScan {
+                searchState.pendingAutoRunScan = false
+                if searchState.searchModeType == .piiScan {
+                    triggerSearch()
+                }
+            }
             #if DEBUG
             // Sim-verification hook (read-only MCP — no taps): present
             // the saved-searches list on launch. The arg implies
@@ -442,10 +470,14 @@ struct SearchAndRedactSheet: View {
             // the results-arrival layout states are reachable on the
             // sim drive even when the AX automation server is
             // unavailable.
+            // Skipped when a magic-wand pre-fill already ran above —
+            // two same-turn `triggerSearch()` calls are not
+            // deduplicated (see the auto-run consume note).
             if let queryArg = CommandLine.arguments
                 .first(where: { $0.hasPrefix("--searchQuery=") })?
                 .split(separator: "=").last,
-               searchState.searchModeType != .piiScan {
+               searchState.searchModeType != .piiScan,
+               !searchState.preselectIncomingResults {
                 isSearchFieldFocused = false
                 searchState.queryText = String(queryArg)
                 triggerSearch()
@@ -530,6 +562,15 @@ struct SearchAndRedactSheet: View {
             let snapshot = Self.modeSwitchSnapshot(of: searchState, previousMode: oldMode)
             let unappliedCount = Self.unappliedMatchCount(in: searchState)
             if !isProgrammatic {
+                // Belt: no user-initiated mode/interface change may
+                // leave an in-flight scan running — an orphaned task
+                // would keep appending into the new mode's list and its
+                // completion tail would record a false run outcome. The
+                // pickers gate on `isSearching`, so this is
+                // defense-in-depth for any future un-gated write.
+                // (Programmatic recall skips this: its own
+                // `triggerSearch()` cancels-and-awaits the prior task.)
+                searchState.cancelSearchWithoutAwait()
                 // `clearResults()` already drops `appliedResultIDs` —
                 // no separate `removeAll()` here.
                 searchState.clearResults()
@@ -640,6 +681,48 @@ struct SearchAndRedactSheet: View {
         .shieldedSheetContent(monitor: captureMonitor)
     }
 
+    // MARK: - Interface Switcher
+
+    /// Top-level two-segment switcher between the sheet's peer
+    /// interfaces (Scan · Search). The interface is a pure derivation
+    /// over `searchModeType`, so the switcher WRITES modes: Scan maps
+    /// to the scan mode, Search restores the last Search-side mode.
+    /// The write happens in the Binding's set (a user gesture — the
+    /// binding-set discipline), which routes through the existing
+    /// mode-switch `.onChange` semantics below: results clear with the
+    /// undo toast exactly as a mode-picker tap always did. Switching
+    /// interfaces never auto-runs — only the toolbar Scan button
+    /// carries the one-tap contract.
+    private var interfaceSwitcher: some View {
+        Picker("Interface", selection: Binding(
+            get: { searchState.searchModeType.interface },
+            set: { newInterface in
+                guard newInterface != searchState.searchModeType.interface else { return }
+                switch newInterface {
+                case .scan:
+                    searchState.searchModeType = .piiScan
+                case .search:
+                    searchState.searchModeType = searchState.lastSearchSideMode
+                }
+            }
+        )) {
+            Text(SearchInterface.scan.displayName).tag(SearchInterface.scan)
+            Text(SearchInterface.search.displayName).tag(SearchInterface.search)
+        }
+        .pickerStyle(.segmented)
+        // Disabled while a scan is in flight, like every other
+        // search-affecting control in this sheet: switching interfaces
+        // mid-run would orphan the active task (the mode-switch
+        // handler clears results, and an uncancelled task's completion
+        // tail would then write a false run record). Cancel first or
+        // wait; the cancel affordance sits right in the search bar.
+        .disabled(searchState.isSearching)
+        .padding(.horizontal, ResectaTokens.Spacing.md)
+        .padding(.top, ResectaTokens.Spacing.xs)
+        .accessibilityLabel("Interface")
+        .accessibilityIdentifier("interfaceSwitcher")
+    }
+
     // MARK: - Search Bar
 
     private var searchBar: some View {
@@ -653,7 +736,9 @@ struct SearchAndRedactSheet: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
-                .disabled(searchState.isSearching || searchState.enabledPIICategories.isEmpty)
+                // An empty chip selection no longer disables the run —
+                // it means scan everything (`effectiveScanCategories`).
+                .disabled(searchState.isSearching)
                 .accessibilityLabel("Scan document for PII")
             } else if searchState.searchModeType == .multiTerm {
                 TextField("Add term…", text: $searchState.queryText)
@@ -981,7 +1066,10 @@ struct SearchAndRedactSheet: View {
         case .multiTerm:
             return .multiTerm(searchState.searchTerms, options: options)
         case .piiScan:
-            return .piiScan(categories: searchState.enabledPIICategories, options: options)
+            // Empty chip selection = scan everything (the one-tap
+            // contract needs no configuration) — the effective set
+            // maps no-selection to the full category set.
+            return .piiScan(categories: searchState.effectiveScanCategories, options: options)
         }
     }
 

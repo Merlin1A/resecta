@@ -7,7 +7,7 @@ import Foundation
 //
 // `RunSettings` captures pipeline-affecting settings once at the top of
 // `runFullPipeline` / `runDetectionPipeline`, mirroring the existing
-// `effectiveMode` snapshot pattern. Mid-run reads of `autoApplyDetections`,
+// `effectiveMode` snapshot pattern. Mid-run reads of
 // `autoVerify`, `paranoidMode`, `pipelineMode`, `fillColor`, and
 // `exportDPI` route through the snapshot — a user toggling SettingsView
 // during `.detecting / .redacting / .verifying` cannot divert kickoff-
@@ -28,7 +28,7 @@ struct PipelineCoordinatorRunSettingsTests {
     private func cleanSettingsDefaults() {
         let keys = [
             "paranoidMode", "autoVerify", "pipelineMode.v2",
-            "exportDPI", "fillColor", "autoApplyDetections"
+            "exportDPI", "fillColor"
         ]
         for key in keys {
             UserDefaults.standard.removeObject(forKey: key)
@@ -37,12 +37,11 @@ struct PipelineCoordinatorRunSettingsTests {
 
     // MARK: - Snapshot capture
 
-    @Test("Snapshot captures all six pipeline-affecting fields")
+    @Test("Snapshot captures all five pipeline-affecting fields")
     func snapshotCapturesAllFields() {
         cleanSettingsDefaults()
         let settings = SettingsState()
         settings.pipelineMode = .searchableRedaction
-        settings.autoApplyDetections = true
         settings.autoVerify = false
         settings.paranoidMode = false
         settings.fillColor = .white
@@ -51,7 +50,6 @@ struct PipelineCoordinatorRunSettingsTests {
         let snapshot = PipelineCoordinator.RunSettings.snapshot(from: settings)
 
         #expect(snapshot.pipelineMode == .searchableRedaction)
-        #expect(snapshot.autoApplyDetections == true)
         #expect(snapshot.autoVerify == false)
         #expect(snapshot.paranoidMode == false)
         #expect(snapshot.fillColor == .white)
@@ -78,19 +76,6 @@ struct PipelineCoordinatorRunSettingsTests {
                 "Snapshot must be immutable after capture (STATE-5).")
         #expect(settings.autoVerify == false,
                 "Live SettingsState reflects the user's toggle for the *next* run.")
-    }
-
-    @Test("Mid-run toggle of autoApplyDetections does not affect a captured snapshot")
-    func testAutoApplyDetectionsSnapshotIndependence() {
-        cleanSettingsDefaults()
-        let settings = SettingsState()
-        settings.autoApplyDetections = false
-
-        let snapshot = PipelineCoordinator.RunSettings.snapshot(from: settings)
-        #expect(snapshot.autoApplyDetections == false)
-
-        settings.autoApplyDetections = true
-        #expect(snapshot.autoApplyDetections == false)
     }
 
     @Test("Mid-run toggle of paranoidMode does not affect a captured snapshot")
@@ -163,7 +148,6 @@ struct PipelineCoordinatorRunSettingsTests {
 
         let snapshot = PipelineCoordinator.RunSettings(
             pipelineMode: .secureRasterization,
-            autoApplyDetections: false,
             autoVerify: true,
             paranoidMode: false,
             fillColor: .white,
@@ -212,7 +196,6 @@ struct PipelineCoordinatorRunSettingsTests {
 
         let snapshot = PipelineCoordinator.RunSettings(
             pipelineMode: .secureRasterization,
-            autoApplyDetections: false,
             autoVerify: true,
             paranoidMode: false,
             fillColor: .black,
@@ -245,7 +228,6 @@ struct PipelineCoordinatorRunSettingsTests {
         // is deterministic without running Vision/OCR on the simulator.
         let snapshot = PipelineCoordinator.RunSettings(
             pipelineMode: .secureRasterization,
-            autoApplyDetections: false,
             autoVerify: true,
             paranoidMode: false,
             fillColor: .black,

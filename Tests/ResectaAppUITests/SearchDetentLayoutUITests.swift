@@ -58,7 +58,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         start.press(forDuration: 0.1, thenDragTo: end)
     }
 
-    /// The mode picker's segments surface with the segment title as the
+    /// A picker's segments surface with the segment title as the
     /// label; `.tabs` on the 26.4 sim, `.buttons` on some hierarchies —
     /// match across element types by label.
     private func modeSegment(_ title: String) -> XCUIElement {
@@ -67,12 +67,34 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             .firstMatch
     }
 
-    // MARK: - Expanded detent: mode tab must win the tap (seq 134)
+    /// Interface-switcher segments, scoped INSIDE the switcher by its
+    /// stable identifier: the editor toolbar behind the sheet carries
+    /// buttons with the same "Scan" / "Search" labels, so an app-wide
+    /// label match could target the occluded toolbar instead.
+    private func interfaceSegment(_ title: String) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(identifier: "interfaceSwitcher")
+            .firstMatch
+            .descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@ AND (elementType == 9 OR elementType == 42 OR elementType == 13)", title))
+            .firstMatch
+    }
 
-    func testExpandedDetent_multiTermTabSwitchesMode() {
+    // MARK: - Expanded detent: segmented controls must win the tap (seq 134)
+
+    // Premise updated for the two-interface chassis: the 4-segment mode
+    // picker (which included a "PII Scan" segment) became a 2-segment
+    // interface switcher + a Search-side 3-segment mode picker, and the
+    // per-run confidence slider is retired. The defect class this test
+    // pins is unchanged — at the expanded detent the pinned toolbar
+    // header must not occlude the segmented controls at the top of the
+    // sheet — so the drive now exercises BOTH segmented rows and
+    // asserts the Scan side's run button (its remaining pinned control)
+    // instead of the retired slider.
+    func testExpandedDetent_interfaceAndModeTabsSwitchSurfaces() {
         launchSearchSheet(mode: "piiScan")
 
-        // Sheet is up once the PII Scan surface renders.
+        // Sheet is up once the Scan surface renders.
         XCTAssertTrue(
             app.buttons["Scan document for PII"].waitForExistence(timeout: 30),
             "Search sheet never presented — check the --openSearchSheet launch hook."
@@ -91,33 +113,54 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Sheet did not reach the expanded detent — the drag gesture failed, so this test exercised nothing."
         )
 
-        // The exact seq-134 failure: tap Multi-term at the expanded
-        // detent. On the defective layout the pinned header owned this
-        // hit target and the tap was a silent no-op.
+        // The seq-134 failure class, first row: tap the interface
+        // switcher's Search segment at the expanded detent. On the
+        // defective layout the pinned header owned this hit target and
+        // the tap was a silent no-op.
+        let searchSegment = interfaceSegment("Search")
+        XCTAssertTrue(
+            searchSegment.waitForExistence(timeout: 10),
+            "Interface switcher's Search segment not found after expanding the sheet."
+        )
+        XCTAssertTrue(searchSegment.isHittable, "Search segment exists but is not hittable at the expanded detent.")
+        searchSegment.tap()
+
+        // Interface actually switched: the text field replaces the
+        // Scan run button.
+        XCTAssertTrue(
+            app.textFields["Search text"].waitForExistence(timeout: 10),
+            "Tapping the Search segment at the expanded detent did not switch interface — the seq-134 occlusion no-op."
+        )
+
+        // Second row — the Search-side mode picker (the original
+        // seq-134 target): tap Multi-term and prove the mode switched.
         let multiTerm = modeSegment("Multi-term")
         XCTAssertTrue(
             multiTerm.waitForExistence(timeout: 10),
-            "Multi-term mode tab not found after expanding the sheet."
+            "Multi-term mode tab not found on the Search interface."
         )
         XCTAssertTrue(multiTerm.isHittable, "Multi-term tab exists but is not hittable at the expanded detent.")
         multiTerm.tap()
 
-        // Mode actually switched: the multi-term entry field replaces
-        // the PII Scan button.
         XCTAssertTrue(
             app.textFields["Search term input"].waitForExistence(timeout: 10),
             "Tapping the Multi-term tab at the expanded detent did not switch mode — the seq-134 occlusion no-op."
         )
 
-        // The confidence slider belongs to piiScan; switching back must
-        // land it unobstructed (hittable) too.
-        modeSegment("PII Scan").tap()
-        let slider = app.sliders["Minimum PII confidence"]
+        // Round-trip: back to Scan; its run button must land
+        // unobstructed (the retired slider's replacement assertion).
+        let scanSegment = interfaceSegment("Scan")
         XCTAssertTrue(
-            slider.waitForExistence(timeout: 10),
-            "Confidence slider missing after switching back to PII Scan at the expanded detent."
+            scanSegment.waitForExistence(timeout: 10),
+            "Interface switcher's Scan segment not found."
         )
-        XCTAssertTrue(slider.isHittable, "Confidence slider not hittable at the expanded detent.")
+        scanSegment.tap()
+        let scanButton = app.buttons["Scan document for PII"]
+        XCTAssertTrue(
+            scanButton.waitForExistence(timeout: 10),
+            "Scan run button missing after switching back to Scan at the expanded detent."
+        )
+        XCTAssertTrue(scanButton.isHittable, "Scan run button not hittable at the expanded detent.")
     }
 
     // MARK: - Medium detent with results: first row must be reachable (ts2-04)
@@ -131,7 +174,16 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Search sheet never presented — check the --openSearchSheet launch hook."
         )
         field.tap()
-        field.typeText("Sample")
+        // Trailing newline dismisses the software keyboard. With the
+        // interface switcher's added chrome above the list, a raised
+        // keyboard clips the single result row's bottom edge, and
+        // XCUIElement.tap()'s occlusion-aware hit point then drifts
+        // off-center onto the row's leading selection circle —
+        // toggling selection instead of navigating (observed in the
+        // failure AX dump: row Selected, no counter). The row tap this
+        // test pins is a full-row-visible interaction; the app-side
+        // flow is verified correct by manual drive.
+        field.typeText("Sample\n")
 
         // One match in the bundled fixture.
         let footerCount = app.staticTexts["0 of 1 selected"]

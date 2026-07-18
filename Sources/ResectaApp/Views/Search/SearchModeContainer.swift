@@ -1,22 +1,33 @@
 import SwiftUI
 
-// SEARCH-AND-REDACT §S2: Mode picker (Text / Regex / Multi-term / PII Scan).
+// SEARCH-AND-REDACT §S2: Mode picker (Text / Regex / Multi-term) —
+// the Search interface's second-level mode control. The Scan interface
+// has no mode picker (its controls are category chips + scope), so
+// this view renders only on the Search side and iterates the
+// Search-side mode list rather than `allCases`.
 // Per-mode option blocks live in `SearchToolbarSection`; this view owns
 // just the picker so future mode-set changes add segments here without
 // touching the rest of the toolbar.
 //
-// 4 × ~70pt = 280pt fits comfortably at iPhone 17 standard width
+// 3 × ~70pt = 210pt fits comfortably at iPhone 17 standard width
 // (393pt); at high Dynamic Type the segmented row would overflow, so
 // [RR-14](RISK_REGISTER.md#rr-14) routes through a `Menu` fallback at
-// `.accessibility3`+.
+// `.accessibility4`+.
 
 struct SearchModeContainer: View {
     @Bindable var searchState: SearchState
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    /// [RR-14] AX-bound threshold. At 4 segments the segmented picker
-    /// fits comfortably one level deeper into the AX range before the
-    /// menu fallback engages.
+    /// The Search interface's modes. The scan mode is not a segment —
+    /// it is reached through the sheet's interface switcher, and the
+    /// interface owns it programmatically (saved-search recall and the
+    /// `--searchMode=` hook still set it directly on `searchModeType`).
+    static let searchModes: [SearchModeType] = [.text, .regex, .multiTerm]
+
+    /// [RR-14] AX-bound threshold, re-derived for 3 segments: the
+    /// threshold was safe at 4 segments, and dropping a segment gives
+    /// each remaining one ~33% more width ("Multi-term", the longest
+    /// label, bounds the row), so `.accessibility4` carries with margin.
     static let menuFallbackThreshold: DynamicTypeSize = .accessibility4
 
     /// Pure predicate consumed by both `body` and unit tests.
@@ -28,14 +39,14 @@ struct SearchModeContainer: View {
         Group {
             if Self.shouldUseMenuStyle(for: dynamicTypeSize) {
                 Picker("Mode", selection: $searchState.searchModeType) {
-                    ForEach(SearchModeType.allCases, id: \.self) { mode in
+                    ForEach(Self.searchModes, id: \.self) { mode in
                         Text(mode.displayName).tag(mode)
                     }
                 }
                 .pickerStyle(.menu)
             } else {
                 Picker("Mode", selection: $searchState.searchModeType) {
-                    ForEach(SearchModeType.allCases, id: \.self) { mode in
+                    ForEach(Self.searchModes, id: \.self) { mode in
                         Text(mode.displayName).tag(mode)
                     }
                 }
@@ -43,6 +54,11 @@ struct SearchModeContainer: View {
             }
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
+        // Disabled while a search is in flight, mirroring the
+        // interface switcher: a mode change mid-run clears results
+        // without cancelling the active task, which would otherwise
+        // keep streaming into the new mode's list.
+        .disabled(searchState.isSearching)
         .accessibilityLabel("Search mode")
     }
 }

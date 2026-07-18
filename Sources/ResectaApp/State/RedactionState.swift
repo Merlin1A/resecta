@@ -106,7 +106,9 @@ class RedactionState {
     // --- Triage Support ---
 
     /// Detection results awaiting user review. Non-nil triggers the triage sheet.
-    /// Populated by runDetectionPipeline() when autoApplyDetections is false.
+    /// Populated by runDetectionPipeline() on every detection run —
+    /// every run is reviewed (the auto-apply path retired with its
+    /// setting).
     /// Cleared when the user accepts (applies filtered results) or dismisses (discards).
     /// Structure: pageIndex → array of DetectionResult.
     var pendingTriage: [Int: [DetectionResult]]? = nil
@@ -116,28 +118,36 @@ class RedactionState {
     /// Key: DetectionResult.id. Value: true = accepted, false = rejected.
     var triageSelections: [UUID: Bool] = [:]
 
-    /// UXF-06 — record of how the most recent Auto-Detect run ended.
-    /// Written by `PipelineCoordinator` on every run exit path (staged for
-    /// triage, auto-applied, nothing found, failed) and read by
-    /// `DocumentEditorView` to drive the detection summary banner —
-    /// zero/failed runs previously surfaced only as transient toasts.
-    /// `run` increments per record so two identical consecutive outcomes
-    /// still read as a change to `.onChange` observers. Session-scoped;
-    /// cleared on new-document import.
+    /// UXF-06 — record of how the most recent detection run ended, for
+    /// BOTH run origins: pipeline detection runs (staged for triage)
+    /// and the sheet's Scan-interface runs (results listed in-sheet).
+    /// Written on every run exit path (staged, nothing found, failed)
+    /// and read by `DocumentEditorView` to drive the detection summary
+    /// banner — zero/failed runs previously surfaced only as transient
+    /// toasts. `run` increments per record so two identical consecutive
+    /// outcomes still read as a change to `.onChange` observers.
+    /// Session-scoped; cleared on new-document import.
     struct DetectionRunRecord: Equatable {
         enum Outcome: Equatable {
-            /// Detections staged into `pendingTriage` for user review.
+            /// Findings staged for user review — triage for pipeline
+            /// runs, the in-sheet result list for Scan-interface runs.
+            /// Nothing is applied until the user selects and applies.
             case staged
-            /// Auto-apply ON: `regionCount` regions created directly;
-            /// signature candidates (never auto-applied) routed to triage.
-            case autoApplied(regionCount: Int, signatureCandidateCount: Int)
             /// The run completed and flagged nothing.
             case nothingFound(pageCount: Int)
             /// The run ended early on a render/detection error.
             case failed
         }
+        /// Present for Scan-interface (in-sheet) runs: the counts the
+        /// banner reports. Pipeline runs leave it nil and the banner
+        /// derives its counts from `pendingTriage`.
+        struct ScanRunSummary: Equatable {
+            let foundCount: Int
+            let pageCount: Int
+        }
         let run: Int
         let outcome: Outcome
+        let scanSummary: ScanRunSummary?
     }
     var lastDetectionRun: DetectionRunRecord? = nil
 
@@ -150,10 +160,16 @@ class RedactionState {
     var triagePromotionOccurred: Bool = false
 
     /// Writer for `lastDetectionRun` — bumps the run counter and resets
-    /// the per-run promotion flag.
-    func recordDetectionRun(_ outcome: DetectionRunRecord.Outcome) {
+    /// the per-run promotion flag. `scanSummary` is passed by the
+    /// Scan-interface run path only; the pipeline writer sites use the
+    /// default and the banner reads `pendingTriage` for their counts.
+    func recordDetectionRun(
+        _ outcome: DetectionRunRecord.Outcome,
+        scanSummary: DetectionRunRecord.ScanRunSummary? = nil
+    ) {
         lastDetectionRun = DetectionRunRecord(
-            run: (lastDetectionRun?.run ?? 0) + 1, outcome: outcome)
+            run: (lastDetectionRun?.run ?? 0) + 1, outcome: outcome,
+            scanSummary: scanSummary)
         triagePromotionOccurred = false
     }
 
@@ -779,10 +795,10 @@ class RedactionState {
     /// Batch apply detection results. All regions undo as one action,
     /// stable UUIDs on redo.
     ///
-    /// `.signatureCandidate` detections are never auto-applied.
-    /// Even when the caller has `autoApplyDetections == true`, the signature
-    /// heuristic is triage-only by design: confidence is heuristic and the
-    /// user must accept in the triage sheet before a region is created.
+    /// `.signatureCandidate` detections are never applied directly.
+    /// The signature heuristic is triage-only by design: confidence is
+    /// heuristic and the user must accept in the triage sheet before a
+    /// region is created.
     /// Signature candidates split out of the results map are surfaced via
     /// `pendingTriage` so the triage sheet appears for them only. Locked
     /// decision.

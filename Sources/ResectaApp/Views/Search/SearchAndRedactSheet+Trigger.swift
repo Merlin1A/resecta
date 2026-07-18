@@ -113,6 +113,14 @@ extension SearchAndRedactSheet {
                     "Could not prepare the document for search. Try again.",
                     severity: .warning
                 )
+                // Scan-interface runs leave a durable failed record —
+                // a failure notice that only ever lived in a transient
+                // toast is no record at all (the banner persists it).
+                if searchState.searchModeType == .piiScan {
+                    redactionState.recordDetectionRun(
+                        .failed,
+                        scanSummary: .init(foundCount: 0, pageCount: 0))
+                }
                 return
             }
 
@@ -151,8 +159,11 @@ extension SearchAndRedactSheet {
             // Capture PII scan configuration for the coverage report +
             // doctype explanation. Classifier runs on the first page only;
             // cheap (<5ms) and gives the footer its top-3 probabilities.
+            // The EFFECTIVE set (empty selection = everything) is what
+            // the engine query requests, so the report describes the
+            // run that actually happened.
             let isPIIScan = searchState.searchModeType == .piiScan
-            let enabledCategories = searchState.enabledPIICategories
+            let enabledCategories = searchState.effectiveScanCategories
             let scanStartedAt = Date()
 
             // Reset the overlap-suppressed tally before kickoff so the
@@ -298,6 +309,22 @@ extension SearchAndRedactSheet {
                             completedAt: Date()
                         )
                         searchState.setCoverageReport(report)
+
+                        // Run-outcome record for the Scan interface —
+                        // the summary banner is the run-outcome surface
+                        // for both origins now. Found runs auto-dismiss
+                        // (the results are on screen in the sheet);
+                        // zero-found runs persist so "ran and found
+                        // nothing" stays distinguishable from "never
+                        // ran" after the sheet closes. Cancelled runs
+                        // skip this tail and leave no record.
+                        redactionState.recordDetectionRun(
+                            searchState.results.isEmpty
+                                ? .nothingFound(pageCount: searchState.totalPages)
+                                : .staged,
+                            scanSummary: .init(
+                                foundCount: searchState.results.count,
+                                pageCount: searchState.totalPages))
                     }
 
                     await searcher.setOverlapSink(nil)

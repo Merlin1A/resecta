@@ -760,43 +760,33 @@ struct DocumentEditorView: View {
                                     : "Tap to enter freeform drawing mode")
             }
 
-            Menu {
-                Button {
-                    coordinator.runDetectionPipeline(recognitionLevel: .fast)
-                } label: {
-                    Label("Quick Scan", systemImage: "hare")
-                }
-
-                Button {
-                    coordinator.runDetectionPipeline(recognitionLevel: .accurate)
-                } label: {
-                    Label("Enhanced Scan", systemImage: "tortoise")
-                }
-
-                Divider()
-
-                Text("Enhanced Scan is more thorough but takes longer.")
-                    .font(.caption)
-
-                // Role hint mirroring the PII Scan
-                // subtitle: Auto-Detect = same text detectors plus
-                // image legs (faces, signature candidates).
-                Text("Checks document text and images. PII Scan in Search & Redact runs the same text detectors only.")
-                    .font(.caption)
-            } label: {
-                Label("Auto-Detect", systemImage: "sparkle.magnifyingglass")
-            } primaryAction: {
-                // Default tap: quick scan (preserves existing behavior)
-                coordinator.runDetectionPipeline(recognitionLevel: .fast)
+            // Two peer entry points into the one search-and-scan sheet
+            // (two interfaces over one chassis). Both open the same
+            // sheet pre-switched to the tapped interface; they replace
+            // the former Auto-Detect menu + Search & Redact button.
+            //
+            // [Scan] keeps the one-tap contract: the tap arms a
+            // one-shot auto-run flag the sheet consumes on appear, so
+            // one tap opens the sheet AND runs a full scan with no
+            // second confirm. The run is trigger-driven from there
+            // (chips / options configure the NEXT run).
+            Button("Scan", systemImage: "doc.viewfinder") {
+                let state = SearchState()
+                state.searchModeType = .piiScan
+                state.pendingAutoRunScan = true
+                redactionState.activeSearch = state
             }
-            // F-3: block while pipeline active or triage pending
-            .disabled(documentState.phaseKind.isPipelineActive
-                      || documentState.phaseKind != .editing
-                      || redactionState.pendingTriage != nil)
+            .disabled(documentState.phaseKind != .editing
+                      || redactionState.pendingTriage != nil
+                      || redactionState.activeSearch != nil)
+            // Identifier is PLUMBING and carries over from the
+            // Auto-Detect entry this button renames — UI tests anchor
+            // on it, and it is deliberately not the display string.
             .accessibilityIdentifier("autoDetect")
 
-            // SEARCH-AND-REDACT §6.1: Search & Redact button
-            Button("Search & Redact", systemImage: "magnifyingglass") {
+            // [Search] opens the literal-search interface. A fresh
+            // SearchState defaults to `.text` — the Search side.
+            Button("Search", systemImage: "magnifyingglass") {
                 redactionState.activeSearch = SearchState()
             }
             .disabled(documentState.phaseKind != .editing
@@ -1730,8 +1720,13 @@ struct DocumentEditorView: View {
         }
         let model = Self.detectionBannerModel(
             outcome: record.outcome,
+            scanSummary: record.scanSummary,
             pendingTriage: redactionState.pendingTriage,
-            ocrSkippedPageCount: redactionState.ocrPixelCapSkippedPages.count
+            // Scan-interface runs disclose OCR skips through the
+            // sheet's own per-page banner (ST-83); the pipeline-side
+            // skip count belongs to pipeline records only.
+            ocrSkippedPageCount: record.scanSummary != nil
+                ? 0 : redactionState.ocrPixelCapSkippedPages.count
         )
         withAnimation { detectionBanner = model }
         if model.autoDismisses {
@@ -1762,17 +1757,30 @@ struct DocumentEditorView: View {
     }
 
     /// Pure banner-model builder covering every `DetectionRunRecord`
-    /// outcome. The staged message preserves the pre-existing per-kind
-    /// "Found …" summary; the auto-applied message now reports the count
-    /// of regions actually created rather than `regionMetadata.count`
-    /// (which accumulates search-applied regions too, ST-100 family).
+    /// outcome, for both run origins. Pipeline-staged records derive
+    /// their per-kind "Found …" summary from `pendingTriage`;
+    /// Scan-interface records carry their counts in `scanSummary`
+    /// (their results live in the sheet's list, not in triage). The
+    /// former auto-applied case is retired with the auto-apply setting.
     static func detectionBannerModel(
         outcome: RedactionState.DetectionRunRecord.Outcome,
+        scanSummary: RedactionState.DetectionRunRecord.ScanRunSummary?,
         pendingTriage: [Int: [DetectionResult]]?,
         ocrSkippedPageCount: Int
     ) -> DetectionBannerModel {
         switch outcome {
         case .staged:
+            // Scan-interface run: counts come from the record itself.
+            // No Review action — the results are (or were) on screen in
+            // the sheet, and a dismissed sheet's results are cleared by
+            // design (re-running the scan restores them).
+            if let scanSummary {
+                let n = scanSummary.foundCount
+                let p = scanSummary.pageCount
+                return DetectionBannerModel(
+                    message: "Scan found \(n) item\(n == 1 ? "" : "s") across \(p) page\(p == 1 ? "" : "s")",
+                    showsReview: false, autoDismisses: true, isWarning: false)
+            }
             let pending = pendingTriage ?? [:]
             let flat = pending.values.flatMap { $0 }
             guard !flat.isEmpty else {
@@ -1798,15 +1806,6 @@ struct DocumentEditorView: View {
             return DetectionBannerModel(
                 message: "Found \(parts.joined(separator: ", ")) across \(pages) page\(pages == 1 ? "" : "s")",
                 showsReview: true, autoDismisses: true, isWarning: false)
-
-        case .autoApplied(let regionCount, let signatureCandidateCount):
-            var message = "Added \(regionCount) detected region\(regionCount == 1 ? "" : "s")"
-            if signatureCandidateCount > 0 {
-                message += " \u{2014} \(signatureCandidateCount) signature candidate\(signatureCandidateCount == 1 ? "" : "s") awaiting review"
-            }
-            return DetectionBannerModel(
-                message: message,
-                showsReview: false, autoDismisses: true, isWarning: false)
 
         case .nothingFound(let pageCount):
             var message = "Detection ran on \(pageCount) page\(pageCount == 1 ? "" : "s") and flagged no items."
@@ -1945,9 +1944,13 @@ private struct DetectionSummaryBanner: View {
 
     var body: some View {
         HStack(spacing: ResectaTokens.Spacing.sm) {
+            // Non-warning icon follows the Scan entry point's glyph —
+            // the banner is the run-outcome surface for detection runs
+            // from either origin; the former sparkle glyph retired with
+            // the Auto-Detect menu.
             Image(systemName: model.isWarning
                 ? "exclamationmark.triangle.fill"
-                : "sparkle.magnifyingglass")
+                : "doc.viewfinder")
                 .foregroundStyle(.orange)
                 .accessibilityHidden(true)
             Text(model.message)

@@ -204,7 +204,6 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// describes the same contract to the user.
     struct RunSettings: Sendable {
         let pipelineMode: PipelineMode
-        let autoApplyDetections: Bool
         let autoVerify: Bool
         let paranoidMode: Bool
         let fillColor: FillColor
@@ -223,7 +222,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         static func snapshot(from settingsState: SettingsState) -> RunSettings {
             RunSettings(
                 pipelineMode: settingsState.pipelineMode,
-                autoApplyDetections: settingsState.autoApplyDetections,
                 autoVerify: settingsState.autoVerify,
                 paranoidMode: settingsState.paranoidMode,
                 fillColor: settingsState.fillColor,
@@ -1510,10 +1508,11 @@ final class PipelineCoordinator: @unchecked Sendable {
         // user originally chose (fallback .accurate when nil at resume time).
         documentState.lastUsedRecognitionLevel = recognitionLevel
 
-        // Snapshot pipeline-affecting settings once at run
-        // entry; `autoApplyDetections` is the only field this path
-        // reads mid-run, but the snapshot covers all five for
-        // consistency with `runFullPipeline`. Mirrors `effectiveMode`.
+        // Snapshot pipeline-affecting settings once at run entry.
+        // With the auto-apply branch retired (every detection run now
+        // stages for triage review unconditionally), the detection
+        // path's only remaining snapshot reader is `buildOCRSkipHint`
+        // (pipelineMode). Mirrors `effectiveMode`.
         let runSettings = RunSettings.snapshot(from: settingsState)
 
         // nonisolated(unsafe): @Observable prevents Sendable; Task captures self
@@ -1678,7 +1677,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                                 totalPages: totalPages,
                                 currentStep: recognitionLevel == .fast
                                     ? "Scanning page \(i + 1)\u{2026}"
-                                    : "Enhanced scan \u{2014} page \(i + 1)\u{2026}"
+                                    : "Thorough scan \u{2014} page \(i + 1)\u{2026}"
                             )
                         ))
 
@@ -1954,43 +1953,24 @@ final class PipelineCoordinator: @unchecked Sendable {
                     return
                 }
 
-                // Route through the run-entry snapshot so a
-                // mid-run SettingsView toggle cannot divert the
-                // auto-apply / triage branch after detection has begun.
-                if runSettings.autoApplyDetections {
-                    // Legacy behavior: auto-apply all detections as regions
-                    let outcome = coordinator.redactionState.applyDetectionResults(
-                        allResults, undoManager: coordinator.undoManager)
-                    coordinator.documentState.transition(to: .editing)
-                    coordinator.redactionState.recordDetectionRun(.autoApplied(
-                        regionCount: outcome.applied,
-                        signatureCandidateCount: outcome.signatureCandidates))
-                    // UXF-11/ST-100 — toast the count of regions actually
-                    // created. The prior copy used the raw detection total,
-                    // which overcounted whenever signature candidates were
-                    // present (they route to triage, not to regions). An
-                    // all-signature run creates zero regions: no toast —
-                    // the banner + auto-opened triage sheet carry it.
-                    if let message = CommitFeedback.markedMessage(applied: outcome.applied) {
-                        coordinator.enqueueToast(message, severity: .success)
-                    }
-                } else {
-                    // NEW: Stage for triage review
-                    coordinator.redactionState.pendingTriage = allResults
+                // Stage for triage review — every detection run is
+                // reviewed; the auto-apply branch retired with its
+                // Settings toggle (no region is created without an
+                // explicit user selection).
+                coordinator.redactionState.pendingTriage = allResults
 
-                    // Initialize triage selections: all accepted by default
-                    var selections: [UUID: Bool] = [:]
-                    for (_, pageResults) in allResults {
-                        for result in pageResults {
-                            selections[result.id] = true
-                        }
+                // Initialize triage selections: all accepted by default
+                var selections: [UUID: Bool] = [:]
+                for (_, pageResults) in allResults {
+                    for result in pageResults {
+                        selections[result.id] = true
                     }
-                    coordinator.redactionState.triageSelections = selections
-
-                    coordinator.documentState.transition(to: .editing)
-                    coordinator.redactionState.recordDetectionRun(.staged)
-                    // Triage sheet appears automatically via .sheet binding on pendingTriage
                 }
+                coordinator.redactionState.triageSelections = selections
+
+                coordinator.documentState.transition(to: .editing)
+                coordinator.redactionState.recordDetectionRun(.staged)
+                // Triage sheet appears automatically via .sheet binding on pendingTriage
 
             } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
                 // Only mutate cancellation state if this

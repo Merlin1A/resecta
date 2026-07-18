@@ -336,8 +336,14 @@ struct SearchStateSelectionTests {
         #expect(state.currentResultFilteredPosition == 1)
     }
 
-    @Test("filteredCount reflects minimumPIIConfidence threshold")
-    func counterReflectsPIIConfidence() {
+    @Test("minimumPIIConfidence no longer hides results from the counter or J/K traversal")
+    func counterIgnoresRetiredPIIConfidenceThreshold() {
+        // The per-run confidence slider is retired (Settings' Detection
+        // Sensitivity preset is the one engine-level control), so its
+        // former client-side post-filter must not hide results — every
+        // above-threshold result the engine returns is listed and
+        // traversable. The property survives for saved-search schema
+        // compat only.
         let state = SearchState()
         let high = makeResult(piiCategory: .ssn, piiConfidence: 0.9)
         let low  = makeResult(piiCategory: .ssn, piiConfidence: 0.4)
@@ -345,14 +351,15 @@ struct SearchStateSelectionTests {
         state.results = [high, low, mid]
         state.minimumPIIConfidence = 0.65
 
-        // Only high and mid pass the threshold.
-        #expect(state.filteredCount == 2)
+        #expect(state.filteredCount == 3)
         #expect(state.totalCount == 3)
 
         state.navigateToNext(currentPageIndex: 0)
         #expect(state.currentResultFilteredPosition == 1)
         state.navigateToNext(currentPageIndex: 0)
         #expect(state.currentResultFilteredPosition == 2)
+        state.navigateToNext(currentPageIndex: 0)
+        #expect(state.currentResultFilteredPosition == 3)
     }
 
     @Test("filteredCount reflects piiCategoryFilter restriction")

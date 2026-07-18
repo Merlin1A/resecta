@@ -31,7 +31,7 @@ struct SettingsViewResetConfirmationTests {
     private func cleanDefaults() {
         let keys = [
             "paranoidMode", "autoVerify", "pipelineMode.v2",
-            "exportDPI", "fillColor", "autoApplyDetections",
+            "exportDPI", "fillColor",
             "snapToTextEnabled", "appearancePreference.v1",
             "successfulExportCount",
         ]

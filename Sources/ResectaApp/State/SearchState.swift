@@ -92,7 +92,29 @@ final class SearchState: Identifiable {
     var queryText: String = ""
 
     /// Active search mode selector.
-    var searchModeType: SearchModeType = .text
+    var searchModeType: SearchModeType = .text {
+        didSet {
+            // Remember the last Search-side mode so the interface
+            // switcher can restore it when the user returns from Scan.
+            if searchModeType != .piiScan {
+                lastSearchSideMode = searchModeType
+            }
+        }
+    }
+
+    /// Last non-scan mode the session used. The interface switcher's
+    /// Search segment restores this instead of hard-resetting to
+    /// `.text`, so Scan round-trips preserve the user's mode choice.
+    private(set) var lastSearchSideMode: SearchModeType = .text
+
+    /// One-shot arm for the toolbar Scan button's one-tap contract:
+    /// the button sets this before presenting the sheet, and the
+    /// sheet's `.onAppear` consumes it exactly once to fire the run.
+    /// A single consume site is load-bearing — `triggerSearch()` does
+    /// not deduplicate same-turn callers (`activeSearchTask` is
+    /// assigned only after a suspension point), so the arm/consume
+    /// pattern is what keeps the auto-run to one scan.
+    var pendingAutoRunScan: Bool = false
 
     /// Search options (toggles in UI).
     var options: SearchOptions = SearchOptions()
@@ -126,10 +148,25 @@ final class SearchState: Identifiable {
     /// Categories enabled for PII scan (all enabled by default).
     var enabledPIICategories: Set<PIICategory> = Set(PIICategory.allCases)
 
-    /// Minimum PII confidence threshold for post-scan filtering (0.0 = show all).
-    var minimumPIIConfidence: Double = 0.50 {
-        didSet { invalidateFilterCaches() }
+    /// Categories the next scan actually requests. An empty chip
+    /// selection means scan EVERYTHING: the one-tap contract needs no
+    /// configuration, so no selection maps to the full category set
+    /// rather than a no-op scan. Consumed by `buildSearchMode()`, the
+    /// coverage report, and the empty-state detector count so all
+    /// three surfaces describe the same run.
+    var effectiveScanCategories: Set<PIICategory> {
+        enabledPIICategories.isEmpty ? Set(PIICategory.allCases) : enabledPIICategories
     }
+
+    /// Former minimum-confidence value for the retired client-side
+    /// post-scan filter. The per-run Confidence slider is gone —
+    /// Settings' Detection Sensitivity preset is the one engine-level
+    /// control — and results are no longer confidence-filtered
+    /// client-side. The property remains because the saved-search
+    /// schema (v2, frozen) persists it and `SearchResultRow`'s
+    /// confidence-bar tiering reads it; it no longer participates in
+    /// result filtering.
+    var minimumPIIConfidence: Double = 0.50
 
     /// Post-scan filter: only show results matching these categories (nil = show all).
     var piiCategoryFilter: Set<PIICategory>? = nil {
@@ -540,7 +577,6 @@ final class SearchState: Identifiable {
             version: resultVersion,
             source: sourceFilter,
             minOCRConfidence: minimumOCRConfidence,
-            minPIIConfidence: minimumPIIConfidence,
             piiCategoryFilter: piiCategoryFilter,
             sortOrder: sortOrder,
             appliedResultIDs: appliedResultIDs,
@@ -552,7 +588,6 @@ final class SearchState: Identifiable {
         let version: Int
         let source: SourceFilter
         let minOCRConfidence: Float
-        let minPIIConfidence: Double
         let piiCategoryFilter: Set<PIICategory>?
         let sortOrder: ResultSortOrder
         let appliedResultIDs: Set<UUID>
@@ -577,10 +612,10 @@ final class SearchState: Identifiable {
             if let categoryFilter = piiCategoryFilter, let cat = result.piiCategory {
                 guard categoryFilter.contains(cat) else { return false }
             }
-            // PII confidence filter
-            if minimumPIIConfidence > 0, let conf = result.piiConfidence {
-                guard conf >= minimumPIIConfidence else { return false }
-            }
+            // The PII confidence post-filter is retired with the
+            // per-run Confidence slider — every above-threshold result
+            // the engine returns is listed; selection predicates
+            // (Select where… ≥75/≥90) are the confidence tools now.
             // Applied-state filter. `.all` no-ops; `.applied`
             // keeps only results whose IDs are in `appliedResultIDs`;
             // `.unapplied` keeps the complement.
@@ -1042,6 +1077,10 @@ final class SearchState: Identifiable {
         // other session-scoped state so a fresh sheet session starts at
         // the engine default selection shape.
         preselectIncomingResults = false
+        // Defensive: an armed-but-unconsumed auto-run must not leak
+        // into the next sheet session (the flag is normally consumed
+        // by the sheet's `.onAppear` before any teardown can run).
+        pendingAutoRunScan = false
         // Also reset the new exactMatch options flag so the
         // sheet's option toggles return to the default substring match.
         options.exactMatch = false
@@ -1250,7 +1289,35 @@ enum SearchModeType: String, CaseIterable, Sendable, Codable {
         case .text: "Text"
         case .regex: "Regex"
         case .multiTerm: "Multi-term"
-        case .piiScan: "PII Scan"
+        case .piiScan: "Scan"
+        }
+    }
+
+    /// Which of the sheet's two peer interfaces this mode belongs to.
+    /// The scan mode IS the Scan interface's machinery; text / regex /
+    /// multi-term are the Search interface's second-level modes. The
+    /// interface is a pure derivation — mode carries interface
+    /// identity, so persistence, launch args, and saved-search recall
+    /// need no second field.
+    var interface: SearchInterface {
+        self == .piiScan ? .scan : .search
+    }
+}
+
+/// The sheet's top-level interface pair: one chassis, two peer
+/// interfaces — Scan (detector-driven) and Search (literal matching).
+/// Display-only UI selector — never persisted (the mode's wire value
+/// carries interface identity).
+enum SearchInterface: Equatable, Sendable {
+    case scan
+    case search
+
+    /// Segment / title strings for the switcher and per-interface
+    /// navigation titles.
+    var displayName: String {
+        switch self {
+        case .scan: "Scan"
+        case .search: "Search"
         }
     }
 }

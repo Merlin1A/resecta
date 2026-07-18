@@ -45,8 +45,10 @@ struct RegionInfoPopover: View {
                       ? "tortoise" : "hare")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
+                // Recognition levels present as Fast / Thorough
+                // (hare / tortoise icons carry).
                 Text(metadata.recognitionLevel == .accurate
-                     ? "Enhanced scan" : "Quick scan")
+                     ? "Thorough scan" : "Fast scan")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }

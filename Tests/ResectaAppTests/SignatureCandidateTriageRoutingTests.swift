@@ -8,7 +8,8 @@ import CoreGraphics
 // signature heuristic candidates. The engine emits `.pii(.signatureCandidate)`
 // detections; `RedactionState.applyDetectionResults` is designed to peel
 // those out and route them into `pendingTriage` rather than creating
-// regions, regardless of the user's `autoApplyDetections` preference.
+// regions, unconditionally (the former auto-apply preference is
+// retired; the invariant this suite pins predates it and outlives it).
 //
 // DRAW-3 contract.
 

@@ -239,7 +239,7 @@ struct SavedSearchListSheet: View {
     static func generatedName(for searchState: SearchState) -> String {
         switch searchState.searchModeType {
         case .piiScan:
-            return "PII Scan – \(Date.now.formatted(date: .abbreviated, time: .shortened))"
+            return "\(SearchModeType.piiScan.displayName) – \(Date.now.formatted(date: .abbreviated, time: .shortened))"
         case .multiTerm:
             let terms = searchState.searchTerms.prefix(3).joined(separator: ", ")
             return "Terms: \(String(terms.prefix(30)))"
@@ -270,6 +270,11 @@ struct SavedSearchListSheet: View {
         if saved.minimumOCRConfidence > 0 {
             parts.append("OCR ≥\(Int(saved.minimumOCRConfidence * 100))%")
         }
+        // Legacy-only display: the per-run confidence slider is
+        // retired, so no live UI can produce a non-default value —
+        // this chip fires only for entries saved before the
+        // retirement, where it still honestly describes the saved
+        // shape. The schema keeps the field (frozen v2).
         if saved.mode == .piiScan && saved.minimumPIIConfidence != 0.50 {
             parts.append("Confidence ≥\(Int(saved.minimumPIIConfidence * 100))%")
         }

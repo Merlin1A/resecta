@@ -1,12 +1,13 @@
 import SwiftUI
 import RedactionEngine
 
-// Active-profile chip, Mode picker, per-mode
-// option blocks (text/regex/multi-term standard options vs PII Scan
-// options), post-scan PII category filter chips, multi-term chip list,
-// and live progress / count display.
-// Lifted from `SearchAndRedactSheet.swift`; Mode picker delegated
-// to `SearchModeContainer`.
+// Per-interface option blocks under the two-interface chassis:
+// Search side = mode picker (Text/Regex/Multi-term via
+// `SearchModeContainer`) + standard options; Scan side = pre-scan
+// category chips + OCR options (no mode picker). Plus post-scan
+// PII category filter chips, multi-term chip list, and live
+// progress / count display.
+// Lifted from `SearchAndRedactSheet.swift`.
 //
 // Case/whole-word/OCR toggles wrap in a
 // `DisclosureGroup("Options")` collapsed by default (Hybrid
@@ -52,14 +53,15 @@ struct SearchToolbarSection: View {
 
     var body: some View {
         VStack(spacing: ResectaTokens.Spacing.xs) {
-            // Mode picker
-            SearchModeContainer(searchState: searchState)
-
             if searchState.searchModeType == .piiScan {
-                // PII Scan: category selection chips + confidence slider
-                piiScanOptions
+                // Scan interface: no mode picker — category chips +
+                // OCR options (the mode picker is a Search-side
+                // second-level control).
+                scanOptions
             } else {
-                // Standard options for text/regex/multi-term
+                // Search interface: mode picker + standard options
+                // for text/regex/multi-term.
+                SearchModeContainer(searchState: searchState)
                 standardSearchOptions
             }
 
@@ -294,25 +296,36 @@ struct SearchToolbarSection: View {
         )
     }
 
-    // MARK: - PII Scan Options
+    // MARK: - Scan Options
 
-    private var piiScanOptions: some View {
+    private var scanOptions: some View {
         VStack(spacing: ResectaTokens.Spacing.xs) {
             // The role subtitle moved from here into
-            // the piiScan pre-scan empty state
+            // the pre-scan empty state
             // (`WU20Strings.description(for: .piiScanPreScan)`).
+            //
+            // The per-run Confidence slider that lived here is retired:
+            // Settings' Detection Sensitivity preset is the one
+            // engine-level control, and the confidence sort +
+            // Select-where ≥75/≥90 predicates are the review-side
+            // confidence tools.
 
-            // Confidence slider
-            HStack(spacing: 4) {
-                Text("Confidence ≥\(Int(searchState.minimumPIIConfidence * 100))%")
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .frame(width: 120, alignment: .trailing)
-                Slider(value: $searchState.minimumPIIConfidence, in: 0...1, step: 0.05)
-                    .accessibilityLabel("Minimum PII confidence")
+            // Category chips — pre-scan detector selection over
+            // `enabledPIICategories`. Toggling narrows the NEXT run;
+            // runs stay trigger-driven (no auto re-run on chip change).
+            scanCategoryChips
+
+            // An empty selection means the next run scans everything —
+            // say so where the chips would otherwise read as "nothing".
+            if searchState.enabledPIICategories.isEmpty {
+                HStack {
+                    Text("No categories selected \u{2014} the next scan runs all detectors.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, ResectaTokens.Spacing.md)
             }
-            .padding(.horizontal, ResectaTokens.Spacing.md)
 
             // The whole OCR block (toggle + controls row) renders
             // only when a page can actually route to OCR; on all-`.rich`
@@ -323,7 +336,7 @@ struct SearchToolbarSection: View {
                     .contains { $0 != .rich },
                 statusKnown: !documentState.textLayerStatus.isEmpty
             ) {
-                // Include OCR toggle for PII scan
+                // Include OCR toggle for the scan run
                 HStack {
                     Toggle("Include OCR Pages", isOn: $searchState.options.includeOCR)
                         .toggleStyle(.button)
@@ -334,13 +347,55 @@ struct SearchToolbarSection: View {
                 .padding(.horizontal, ResectaTokens.Spacing.md)
 
                 // Mirror the source-filter + OCR
-                // confidence slider into PII Scan mode. Reuses
+                // confidence slider into the Scan interface. Reuses
                 // the same `ocrControlsRow` component so the gating helpers
                 // (`ocrControlsShouldShow`, `ocrSliderShouldBeDisabled`,
                 // `awaitingOCRResultsCaption`) stay canonical across modes.
                 ocrControlsRow
             }
         }
+    }
+
+    // MARK: - Scan Category Chips (pre-scan selection)
+
+    /// Pre-scan detector-selection chips over the full category set.
+    /// Distinct from `piiCategoryFilterChips` (post-scan result
+    /// filtering): these choose what the NEXT run requests. Toggling
+    /// routes through the Button's action (a user gesture) — never
+    /// value observation — and deliberately does NOT re-trigger the
+    /// scan; runs stay trigger-driven.
+    private var scanCategoryChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: ResectaTokens.Spacing.xs) {
+                ForEach(PIICategory.allCases, id: \.self) { category in
+                    let isEnabled = searchState.enabledPIICategories.contains(category)
+                    Button {
+                        if isEnabled {
+                            searchState.enabledPIICategories.remove(category)
+                        } else {
+                            searchState.enabledPIICategories.insert(category)
+                        }
+                    } label: {
+                        HStack(spacing: 2) {
+                            Image(systemName: category.symbolName)
+                                .font(.caption2)
+                            Text(category.rawValue)
+                                .font(.caption2)
+                        }
+                        .padding(.horizontal, ResectaTokens.Spacing.sm)
+                        .padding(.vertical, ResectaTokens.Spacing.xxs)
+                        .background(isEnabled ? SearchResultRow.categoryColor(category).opacity(0.2) : .clear, in: Capsule())
+                        .overlay(Capsule().strokeBorder(isEnabled ? SearchResultRow.categoryColor(category) : .secondary.opacity(0.3)))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(category.rawValue) detector")
+                    .accessibilityValue(isEnabled ? "enabled" : "disabled")
+                    .accessibilityHint("Applies to the next scan")
+                }
+            }
+            .padding(.horizontal, ResectaTokens.Spacing.md)
+        }
+        .accessibilityIdentifier("scanCategoryChips")
     }
 
     // MARK: - OCR Controls (shared by standardSearchOptions + piiScanOptions)

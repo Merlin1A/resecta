@@ -140,7 +140,10 @@ struct SavedSearchStoreTests {
         #expect(SearchModeType.text.displayName == "Text")
         #expect(SearchModeType.regex.displayName == "Regex")
         #expect(SearchModeType.multiTerm.displayName == "Multi-term")
-        #expect(SearchModeType.piiScan.displayName == "PII Scan")
+        // Display renamed "PII Scan" → "Scan" with the two-interface
+        // chassis; the wire value above is untouched — that is the
+        // whole point of the decoupling.
+        #expect(SearchModeType.piiScan.displayName == "Scan")
     }
 
     @Test("Rename preserves the normalization-extension and v2 option flags")
@@ -404,7 +407,9 @@ struct SavedSearchStoreTests {
 
         let piiState = SearchState()
         piiState.searchModeType = .piiScan
-        #expect(SavedSearchListSheet.generatedName(for: piiState).hasPrefix("PII Scan"))
+        // Generated scan names follow the displayName ("Scan") — the
+        // "PII Scan" brand retired with the two-interface chassis.
+        #expect(SavedSearchListSheet.generatedName(for: piiState).hasPrefix("Scan – "))
     }
 
     @Test("Row preview prefers query text, falls back to terms, truncates at 40")

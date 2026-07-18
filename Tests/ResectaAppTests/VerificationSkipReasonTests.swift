@@ -203,7 +203,7 @@ struct VerificationSkipReasonTests {
     private func cleanSettingsDefaults() {
         let keys = [
             "paranoidMode", "autoVerify", "pipelineMode.v2",
-            "exportDPI", "fillColor", "autoApplyDetections",
+            "exportDPI", "fillColor",
         ]
         for key in keys {
             UserDefaults.standard.removeObject(forKey: key)
