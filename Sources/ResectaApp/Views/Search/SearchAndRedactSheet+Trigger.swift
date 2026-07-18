@@ -34,6 +34,12 @@ extension SearchAndRedactSheet {
     }
 
     func triggerSearch() {
+        // Belt: no run may start while staged detections await
+        // review — the review owns the Scan surface until resolved
+        // (Apply / Dismiss). Every trigger site is already parked
+        // during a review (run button hidden, recall disabled, auto-run
+        // unarmed); this guard is defense-in-depth for future callers.
+        guard redactionState.pendingTriage == nil else { return }
         // Orchestration runs inside a Task so the prior task's cleanup
         // tail completes (via `await searchState.cancelSearch()`) before
         // the new scan installs sinks and flips `isSearching`.

@@ -361,33 +361,27 @@ struct SearchToolbarSection: View {
     /// Pre-scan detector-selection chips over the full category set.
     /// Distinct from `piiCategoryFilterChips` (post-scan result
     /// filtering): these choose what the NEXT run requests. Toggling
-    /// routes through the Button's action (a user gesture) — never
+    /// routes through the chip's action (a user gesture) — never
     /// value observation — and deliberately does NOT re-trigger the
-    /// scan; runs stay trigger-driven.
+    /// scan; runs stay trigger-driven. Rendered through `FilterChip`
+    /// (the one chip component), category-tinted.
     private var scanCategoryChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: ResectaTokens.Spacing.xs) {
                 ForEach(PIICategory.allCases, id: \.self) { category in
                     let isEnabled = searchState.enabledPIICategories.contains(category)
-                    Button {
+                    FilterChip(
+                        label: category.rawValue,
+                        systemImage: category.symbolName,
+                        tint: SearchResultRow.categoryColor(category),
+                        isSelected: isEnabled
+                    ) {
                         if isEnabled {
                             searchState.enabledPIICategories.remove(category)
                         } else {
                             searchState.enabledPIICategories.insert(category)
                         }
-                    } label: {
-                        HStack(spacing: 2) {
-                            Image(systemName: category.symbolName)
-                                .font(.caption2)
-                            Text(category.rawValue)
-                                .font(.caption2)
-                        }
-                        .padding(.horizontal, ResectaTokens.Spacing.sm)
-                        .padding(.vertical, ResectaTokens.Spacing.xxs)
-                        .background(isEnabled ? SearchResultRow.categoryColor(category).opacity(0.2) : .clear, in: Capsule())
-                        .overlay(Capsule().strokeBorder(isEnabled ? SearchResultRow.categoryColor(category) : .secondary.opacity(0.3)))
                     }
-                    .buttonStyle(.plain)
                     .accessibilityLabel("\(category.rawValue) detector")
                     .accessibilityValue(isEnabled ? "enabled" : "disabled")
                     .accessibilityHint("Applies to the next scan")
@@ -590,29 +584,33 @@ struct SearchToolbarSection: View {
 
     /// Chip group consumed by `chipRowSubstrate`. Returns the chip
     /// content only (no enclosing ScrollView) so future chip groups compose
-    /// alongside it inside the substrate's single HStack.
+    /// alongside it inside the substrate's single HStack. Rendered
+    /// through `FilterChip` (the one chip component).
     @ViewBuilder
     private var piiCategoryFilterChips: some View {
         // "All" chip
-        Button {
+        FilterChip(
+            label: "All",
+            isSelected: searchState.piiCategoryFilter == nil
+        ) {
             searchState.piiCategoryFilter = nil
-        } label: {
-            let isAll = searchState.piiCategoryFilter == nil
-            Text("All")
-                .font(.caption2.bold())
-                .padding(.horizontal, ResectaTokens.Spacing.sm)
-                .padding(.vertical, ResectaTokens.Spacing.xxs)
-                .background(isAll ? ResectaTokens.BrandTeal.tint.opacity(0.2) : Color.clear, in: Capsule())
-                .overlay(Capsule().strokeBorder(isAll ? ResectaTokens.BrandTeal.tint : Color.secondary.opacity(0.3)))
         }
-        .buttonStyle(.plain)
 
         // Per-category chips with counts
         let counts = searchState.categoryCounts
         ForEach(PIICategory.allCases.filter { counts[$0] != nil }, id: \.self) { category in
             let count = counts[category] ?? 0
             let isActive = searchState.piiCategoryFilter?.contains(category) ?? true
-            Button {
+            FilterChip(
+                label: category.rawValue,
+                // Show the count only when the user has narrowed the
+                // filter; at the default "All" state the count
+                // duplicates info already visible elsewhere.
+                count: searchState.piiCategoryFilter != nil ? count : nil,
+                systemImage: category.symbolName,
+                tint: SearchResultRow.categoryColor(category),
+                isSelected: isActive
+            ) {
                 if searchState.piiCategoryFilter == nil {
                     // Switch from "All" to single category
                     searchState.piiCategoryFilter = [category]
@@ -624,27 +622,7 @@ struct SearchToolbarSection: View {
                 } else {
                     searchState.piiCategoryFilter?.insert(category)
                 }
-            } label: {
-                HStack(spacing: 2) {
-                    Image(systemName: category.symbolName)
-                        .font(.caption2)
-                    // Show the count only when the user has narrowed the
-                    // filter; at the default "All" state the count
-                    // duplicates info already visible elsewhere.
-                    if searchState.piiCategoryFilter != nil {
-                        Text("\(category.rawValue) (\(count))")
-                            .font(.caption2)
-                    } else {
-                        Text(category.rawValue)
-                            .font(.caption2)
-                    }
-                }
-                .padding(.horizontal, ResectaTokens.Spacing.sm)
-                .padding(.vertical, ResectaTokens.Spacing.xxs)
-                .background(isActive ? SearchResultRow.categoryColor(category).opacity(0.2) : .clear, in: Capsule())
-                .overlay(Capsule().strokeBorder(isActive ? SearchResultRow.categoryColor(category) : .secondary.opacity(0.3)))
             }
-            .buttonStyle(.plain)
             .accessibilityLabel("\(category.rawValue), \(count) match\(count == 1 ? "" : "es")")
         }
     }

@@ -93,10 +93,11 @@ class RedactionState {
     }
 
     /// Set when any gazetteer / context-keywords loader failed to
-    /// initialize for this session. Drives the persistent top banner in
-    /// `DetectionTriageSheet` and gates the one-time warning toast posted
-    /// by `PipelineCoordinator`. Per-session (not persisted) — a relaunch
-    /// re-evaluates loader state from scratch.
+    /// initialize for this session. Drives the persistent degrade
+    /// banner on the search sheet's Scan interface and gates
+    /// the one-time warning toast posted by `PipelineCoordinator`.
+    /// Per-session (not persisted) — a relaunch re-evaluates loader
+    /// state from scratch.
     var autoDetectionDegraded: Bool = false
 
     /// Text extraction buffer for Searchable Redaction mode.
@@ -105,18 +106,52 @@ class RedactionState {
 
     // --- Triage Support ---
 
-    /// Detection results awaiting user review. Non-nil triggers the triage sheet.
+    /// Staged detections awaiting user review. Non-nil presents the
+    /// review inside the search sheet's Scan interface (the
+    /// `DocumentEditorView` bridge opens/switches the one sheet).
     /// Populated by runDetectionPipeline() on every detection run —
     /// every run is reviewed (the auto-apply path retired with its
     /// setting).
-    /// Cleared when the user accepts (applies filtered results) or dismisses (discards).
+    /// Cleared when the user accepts (applies selected findings) or dismisses (discards).
     /// Structure: pageIndex → array of DetectionResult.
     var pendingTriage: [Int: [DetectionResult]]? = nil
 
-    /// Per-detection acceptance state during triage. Starts with all detections accepted.
-    /// The user can deselect individual detections before applying.
+    /// Per-detection acceptance state during review. Review-first arrival: staged
+    /// detections arrive with NOTHING selected — every producer writes an
+    /// EXPLICIT `false` entry per detection (`reviewArrivalSelections`), and the
+    /// user opts in per row / per predicate before Apply.
     /// Key: DetectionResult.id. Value: true = accepted, false = rejected.
     var triageSelections: [UUID: Bool] = [:]
+
+    /// Review-first arrival: arrival selections for staged detections: an EXPLICIT
+    /// `false` entry per detection. Explicit-per-id rather than an empty
+    /// map because `applyTriagedResults` still reads absent ids as
+    /// accepted (`?? true`) — its re-guard rides the apply-path
+    /// unification, so until then the producers carry the contract.
+    static func reviewArrivalSelections(
+        for pending: [Int: [DetectionResult]]
+    ) -> [UUID: Bool] {
+        var selections: [UUID: Bool] = [:]
+        for (_, pageResults) in pending {
+            for result in pageResults {
+                selections[result.id] = false
+            }
+        }
+        return selections
+    }
+
+    /// Belt for the explicit-entry contract above: fill a `false`
+    /// entry for any staged detection that lacks one, so a detection can
+    /// never display deselected while the apply-path fallback would
+    /// read it accepted. Called by the review surface on appear.
+    func normalizeReviewSelections() {
+        guard let pending = pendingTriage else { return }
+        for (_, pageResults) in pending {
+            for result in pageResults where triageSelections[result.id] == nil {
+                triageSelections[result.id] = false
+            }
+        }
+    }
 
     /// UXF-06 — record of how the most recent detection run ended, for
     /// BOTH run origins: pipeline detection runs (staged for triage)
@@ -297,7 +332,7 @@ class RedactionState {
 
     /// DetectionResult IDs whose matched name belongs to a bare-surname cluster
     /// with ≥ 15 ambiguous entries. Populated post-clustering in
-    /// PipelineCoordinator.runDetectionPipeline; consumed by DetectionTriageRow
+    /// PipelineCoordinator.runDetectionPipeline; consumed by the review rows
     /// to show the inline "Common surname — verify context" hint. Cleared by clearAll().
     var ambiguousSurnameDetectionIDs: Set<UUID> = []
 
@@ -305,7 +340,7 @@ class RedactionState {
     /// clustering step in `PipelineCoordinator.runDetectionPipeline`.
     /// Each group bundles every `DetectionResult` whose `matchedText`
     /// normalizes to the same canonical form within the same PII
-    /// category. Drives the "Grouped" view mode in `DetectionTriageSheet`;
+    /// category. Drives the "Grouped" view mode in `ScanReviewSection`;
     /// `applyEntityGroup(_:undoManager:)` consumes a member to atomically
     /// accept the entire group. Cleared by clearAll().
     var crossPageEntityGroups: [CrossPageEntityGroup] = []
@@ -1703,21 +1738,23 @@ nonisolated func prepareApply(
 
 #if DEBUG
 extension RedactionState {
-    /// DEBUG-only triage repro hook. Seeds `pendingTriage` (+ matching
-    /// `triageSelections`, all accepted) with a handful of synthetic
-    /// `DetectionResult`s on page 0 so the "Review Detections" triage sheet —
-    /// presented by `DocumentEditorView`'s `.sheet(item:)` whenever
-    /// `pendingTriage != nil` — can be reached on the Simulator WITHOUT running
-    /// on-device detection (the Vision/Core-Graphics page-0 rasterize the
-    /// Auto-Detect button drives cannot be serviced on the sim). Invoked from
-    /// the `--seedTriage` launch hook in `ResectaApp`. Mirrors the real triage
-    /// staging in `PipelineCoordinator.runDetectionPipeline` (all selections
-    /// default to `true`). Strictly `#if DEBUG` — no mock data ships in release.
+    /// DEBUG-only review repro hook. Seeds `pendingTriage` (+ matching
+    /// `triageSelections`, all-deselected per the review-first arrival rule) with a handful of
+    /// synthetic `DetectionResult`s on page 0 so the unified review —
+    /// the search sheet's Scan interface, opened by the
+    /// `DocumentEditorView` bridge whenever `pendingTriage != nil` —
+    /// can be reached on the Simulator WITHOUT running on-device
+    /// detection (the Vision/Core-Graphics page-0 rasterize cannot be
+    /// serviced on the sim). Invoked from the `--seedTriage` launch
+    /// hook in `ResectaApp` (arg name carried from the triage era —
+    /// it is test plumbing). Mirrors the real staging in
+    /// `PipelineCoordinator.runDetectionPipeline`. Strictly
+    /// `#if DEBUG` — no mock data ships in release.
     ///
     /// The synthetic strings below are fabricated test fixtures (not document
     /// content) chosen to span detection kinds and a confidence range so the
-    /// triage list, type-filter chips, confidence slider, and "Apply N" are
-    /// all exercised — including the triage → Dismiss path this unblocks.
+    /// review list, kind-filter chips, Select-Where, and "Apply N" are
+    /// all exercised — including the review → Dismiss path this unblocks.
     func seedDebugTriage() {
         let mocks: [DetectionResult] = [
             DetectionResult(
@@ -1742,7 +1779,9 @@ extension RedactionState {
                 kind: .pii(.name), confidence: 0.83, matchedText: "Jordan Avery"),
         ]
         pendingTriage = [0: mocks]
-        triageSelections = Dictionary(uniqueKeysWithValues: mocks.map { ($0.id, true) })
+        // Review-first arrival: seeded detections arrive all-DESELECTED like every
+        // arrival, with explicit per-id entries.
+        triageSelections = Self.reviewArrivalSelections(for: [0: mocks])
         // Mirror the real staging path's sibling writes so the summary
         // banner (UXF-06), its Review re-entry, and the Grouped view mode
         // are all drivable on the Simulator: `detectionResults` backs the

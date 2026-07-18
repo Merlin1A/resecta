@@ -1,45 +1,38 @@
 import XCTest
 
-/// UI test for the Detection Triage "Dismiss" flow.
+/// UI test for the unified review surface's Dismiss flow (conditional dismiss).
 ///
-/// This exercises the triage → Dismiss path on the **Simulator**, which
-/// on-device detection cannot reach there (the Auto-Detect page-0
-/// Vision/Core-Graphics rasterize is not serviceable on the sim). The app's
-/// DEBUG `--seedTriage` launch hook (`ResectaApp` → `RedactionState.seedDebugTriage()`)
-/// presents the "Review Detections" sheet with mock detections, so the Dismiss
-/// button is reachable without running detection.
+/// This exercises the review → Dismiss path on the **Simulator**, which
+/// on-device detection cannot reach there (the page-0 Vision/Core-Graphics
+/// rasterize is not serviceable on the sim). The app's DEBUG `--seedTriage`
+/// launch hook (`ResectaApp` → `RedactionState.seedDebugTriage()`) stages
+/// mock findings; the editor's presentation bridge opens the search sheet
+/// pre-switched to the Scan interface with the review list, so Dismiss is
+/// reachable without running detection.
 ///
-/// Two paths converge on `DetectionTriageSheet.performDismiss()`:
-///  - **Direct (Hypothesis B):** a fresh seed leaves `hasModifiedSelections == false`,
-///    so tapping Dismiss calls `performDismiss()` with no confirmation dialog.
-///  - **Dialog (Hypothesis A):** after toggling a row (which flips
-///    `hasModifiedSelections`), Dismiss routes through the GATE-5
-///    `confirmationDialog` before `performDismiss()`.
+/// Premise change (sanctioned): the standalone "Review Detections" triage
+/// sheet this suite originally drove was absorbed into the search sheet's
+/// Scan interface, and its confirm-if-selections-touched Dismiss rule
+/// generalized to the whole sheet. The two converging paths carry over
+/// with inverted arrival polarity (findings now arrive DESELECTED):
+///  - **Direct:** a fresh seed leaves `userModifiedSelections == false`,
+///    so tapping Dismiss closes in one tap with no dialog.
+///  - **Dialog:** after selecting a row (which flips the tracker),
+///    Dismiss routes through the confirmation dialog.
 ///
-/// Each path is run twice — once over the (non-loading) single sample and once
-/// with `--multipageDoc`, which loads a bundled 23-page document behind the
-/// sheet. The multipage variants probe whether a real paginated document
-/// changes the Dismiss behavior.
+/// Each path runs twice — once over the (non-loading) single sample and
+/// once with `--multipageDoc`, which loads a bundled 23-page document
+/// behind the sheet, probing whether a real paginated document changes
+/// the Dismiss behavior.
 ///
-/// Root cause (fixed): `performDismiss()` enqueues a toast whose `@Observable`
-/// mutation synchronously flushes a SwiftUI graph transaction *during* the
-/// button-tap update cycle. `ToastView` read its queue manager via
-/// `@Environment(ToastQueueManager.self)`; that re-entrant flush re-evaluated
-/// the toast body and the observable-object environment lookup could not
-/// resolve mid-transaction, tripping the strict-Observation "state during
-/// update" assertion (`EXC_BREAKPOINT`).
-///
-/// Shipped fix (PR #148): inject the manager into `ToastView` as a plain `let`
-/// constant from `ContentView`, sidestepping the environment read. Deferring
-/// the toast out of the synchronous update cycle was tried FIRST and explicitly
-/// REJECTED — it did not fix the crash. The structural invariant (ToastView
-/// holds the manager as a `let`, never an `@Environment` read) is pinned by
-/// `ToastManagerLetInjectionTests`; these UI tests are the crash-PATH guard.
-///
-/// Each test asserts the app is still in the foreground afterward; a crash in
-/// `performDismiss()` aborts the process and fails that assertion (the bare
-/// "sheet gone" check alone would false-pass on a crash, since a dead app also
-/// has no Dismiss button).
+/// The crash class this suite guards (PR #148: a toast enqueue's
+/// synchronous graph flush during the dismiss transaction tripping the
+/// strict-Observation assertion) is unchanged by the absorption — the
+/// dismiss path still enqueues through the let-injected ToastView
+/// contract pinned by `ToastManagerLetInjectionTests`. Each test asserts
+/// the app is still in the foreground afterward; a crash aborts the
+/// process and fails that assertion (the bare "sheet gone" check alone
+/// would false-pass on a crash).
 // nonisolated: this is an XCUITest that drives the app through `XCUIApplication`
 // (a separate process) and does NOT `@testable import` app internals, so it touches
 // no @MainActor app state and was nonisolated pre-flip (ran 4/4 green). Under the
@@ -65,40 +58,39 @@ nonisolated final class DetectionTriageDismissUITests: XCTestCase {
 
     // MARK: - Tests
 
-    /// Hypothesis B — direct dismiss, no confirmation dialog, single sample.
-    func testDismissUntouchedTriageSheet() {
-        launchSeededTriage(multipage: false)
+    /// Direct dismiss — untouched review, no confirmation dialog, single sample.
+    func testDismissUntouchedReviewSheet() {
+        launchSeededReview(multipage: false)
         performDirectDismiss()
     }
 
-    /// Hypothesis B with a real 23-page document loaded behind the sheet.
-    func testDismissUntouchedTriageSheet_multipageDocument() {
-        launchSeededTriage(multipage: true)
+    /// Direct dismiss with a real 23-page document loaded behind the sheet.
+    func testDismissUntouchedReviewSheet_multipageDocument() {
+        launchSeededReview(multipage: true)
         performDirectDismiss()
     }
 
-    /// Hypothesis A — dismiss routed through the GATE-5 confirmation dialog.
+    /// Dialog dismiss — routed through the conditional confirmation dialog.
     func testDismissAfterModifyingSelections() {
-        launchSeededTriage(multipage: false)
+        launchSeededReview(multipage: false)
         performDialogDismiss()
     }
 
-    /// Hypothesis A with a real 23-page document loaded behind the sheet.
+    /// Dialog dismiss with a real 23-page document loaded behind the sheet.
     func testDismissAfterModifyingSelections_multipageDocument() {
-        launchSeededTriage(multipage: true)
+        launchSeededReview(multipage: true)
         performDialogDismiss()
     }
 
     // MARK: - Launch
 
-    /// Launch into the seeded "Review Detections" triage sheet.
+    /// Launch into the seeded review (search sheet, Scan interface).
     ///
     /// `--seedTriage` implies the test-document load; `multipage: true` adds
     /// `--multipageDoc`, which swaps the single-page sample for the bundled
-    /// 23-page fixture so the Dismiss path runs with a real paginated document
-    /// behind the sheet. The seeded triage stays page-0 in both cases, so the
+    /// 23-page fixture. The seeded findings stay page-0 in both cases, so the
     /// only variable between variants is the document's page count.
-    private func launchSeededTriage(multipage: Bool) {
+    private func launchSeededReview(multipage: Bool) {
         var arguments = ["--uitesting", "--loadTestDocument", "--seedTriage"]
         if multipage {
             arguments.append("--multipageDoc")
@@ -107,49 +99,59 @@ nonisolated final class DetectionTriageDismissUITests: XCTestCase {
         app.launch()
     }
 
-    // MARK: - Dismiss paths
-
-    /// Tap Dismiss on an untouched sheet (direct `performDismiss()`).
-    private func performDirectDismiss() {
-        let dismissButton = app.buttons["detectionTriageDismissButton"]
+    /// Wait for the seeded review to present: the sheet's Dismiss button
+    /// plus the review list itself (the Scan interface's absorbed
+    /// findings view).
+    private func awaitSeededReview() -> XCUIElement {
+        let dismissButton = app.buttons["searchDismissButton"]
         XCTAssertTrue(
             dismissButton.waitForExistence(timeout: 30),
-            "Seeded 'Review Detections' sheet never presented — check the --seedTriage launch hook."
+            "Seeded review sheet never presented — check the --seedTriage launch hook + presentation bridge."
         )
+        XCTAssertTrue(
+            app.otherElements["scanReviewList"].waitForExistence(timeout: 10)
+                || app.collectionViews["scanReviewList"].waitForExistence(timeout: 5),
+            "Review list did not render inside the Scan interface."
+        )
+        return dismissButton
+    }
+
+    // MARK: - Dismiss paths
+
+    /// Tap Dismiss on an untouched review (direct one-tap close).
+    private func performDirectDismiss() {
+        let dismissButton = awaitSeededReview()
 
         dismissButton.tap()
 
         assertSurvivedDismiss(dismissButton)
     }
 
-    /// Modify a selection, tap Dismiss, confirm the destructive dialog.
+    /// Select a review row, tap Dismiss, confirm the destructive dialog.
     private func performDialogDismiss() {
-        let dismissButton = app.buttons["detectionTriageDismissButton"]
-        XCTAssertTrue(
-            dismissButton.waitForExistence(timeout: 30),
-            "Seeded 'Review Detections' sheet never presented — check the --seedTriage launch hook."
-        )
+        let dismissButton = awaitSeededReview()
 
-        // Flip `hasModifiedSelections` so the Dismiss tap routes through the
-        // GATE-5 confirmation dialog. Toggling the first row's acceptance
-        // checkmark sets the flag. The row uses
-        // `.accessibilityElement(children: .combine)`, so the inner toggle
-        // Button isn't a separately addressable AX element — tap its leading
-        // checkmark region by coordinate (touch hit-testing is independent of
-        // the accessibility merge). This is deterministic, unlike the
-        // batch-actions SwiftUI Menu, which is flaky to open from XCUITest.
+        // Flip the touched tracker so the Dismiss tap routes through the
+        // conditional confirmation dialog. Selecting the first review row's
+        // circle does it — the row uses
+        // `.accessibilityElement(children: .ignore)`, so the inner
+        // selection Button isn't a separately addressable AX element —
+        // tap its leading circle region by coordinate (touch hit-testing
+        // is independent of the accessibility merge). Findings arrive
+        // DESELECTED (review-first arrival), so this tap SELECTS — same tracker flip,
+        // inverted polarity vs the retired preselected triage sheet.
         let firstRow = app.cells.firstMatch
-        XCTAssertTrue(firstRow.waitForExistence(timeout: 5), "No triage rows present to modify.")
+        XCTAssertTrue(firstRow.waitForExistence(timeout: 5), "No review rows present to modify.")
         firstRow.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
 
         dismissButton.tap()
 
-        // GATE-5 confirmation dialog — confirm the destructive Dismiss.
+        // conditional confirmation dialog — confirm the destructive Dismiss.
         // SwiftUI's confirmationDialog surfaces the destructive button twice in
         // the AX tree (a legacy computed Button nested under a modern
         // PopUpButton), so the bare identifier query is ambiguous — disambiguate
         // with .firstMatch.
-        let confirm = app.buttons["detectionTriageDismissConfirm"].firstMatch
+        let confirm = app.buttons["searchDismissConfirmButton"].firstMatch
         XCTAssertTrue(
             confirm.waitForExistence(timeout: 5),
             "Confirmation dialog did not appear after Dismiss with modified selections."
@@ -162,23 +164,23 @@ nonisolated final class DetectionTriageDismissUITests: XCTestCase {
     // MARK: - Assertion
 
     /// Shared post-dismiss assertion: the sheet closed AND the app process is
-    /// still alive. A state-during-update trap inside `performDismiss()` aborts
+    /// still alive. A state-during-update trap inside the dismiss path aborts
     /// the process, which the `.runningForeground` check detects (the bare
     /// "sheet gone" check alone would false-pass on a crash, since a dead app
     /// also has no Dismiss button).
     private func assertSurvivedDismiss(_ dismissButton: XCUIElement) {
         XCTAssertTrue(
             dismissButton.waitForNonExistence(timeout: 5),
-            "Triage sheet did not dismiss."
+            "Review sheet did not dismiss."
         )
         XCTAssertEqual(
             app.state, .runningForeground,
-            "App left the foreground after Dismiss — likely a crash in performDismiss()."
+            "App left the foreground after Dismiss — likely a crash in the dismiss path."
         )
         // Editor chrome should be back and interactive.
         XCTAssertTrue(
             app.buttons["autoDetect"].waitForExistence(timeout: 5),
-            "Editor toolbar did not return after dismissing the triage sheet."
+            "Editor toolbar did not return after dismissing the review sheet."
         )
     }
 }

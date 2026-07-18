@@ -21,7 +21,7 @@ struct ShieldedSheetContent: ViewModifier {
 
     /// Pure decision seam pinned by `ScreenCaptureShieldTests` — the same
     /// "static contract, testable without rendering" pattern as
-    /// `DetectionTriageSheet.triageSelections(rewritingFor:in:)`.
+    /// `SearchAndRedactSheet.degradeBannerShouldShow(interface:degraded:)`.
     static func shouldShield(_ monitor: ScreenCaptureMonitor) -> Bool {
         monitor.isShielded
     }

@@ -1,16 +1,21 @@
 import SwiftUI
 import RedactionEngine
 
-// Individual result row in the search results list.
+// Search-origin member of the unified row family. The shared skeleton
+// (selection circle, content column, page indicator, a11y contract)
+// lives in `FindingRow`; this file mounts the search-side accessories —
+// leading confidence bar, source badge, applied indicator, term label,
+// inline rationale disclosure — and keeps the pure display contracts
+// (badges, tiers, tooltips, rationale summaries) other surfaces and
+// tests consume.
 //
-// Adds a 2pt leading-edge confidence bar (mode-
-// meaningful) and replaces the flat "OCR" capsule with a
-// percent-bearing "OCR · N%" capsule. Bar grading: PII rows graded
-// against `piiThreshold`, OCR rows graded against `ocrFloor`,
-// text/regex/Custom rows render the fixed-green literal-match band
-// (tooltip uses the "Literal match — strength matches
-// the input text." verbatim). Grading lives on a static helper so the
-// contract is testable without a SwiftUI host.
+// Bar grading: PII and detection rows grade on the shared absolute
+// bands (`absoluteConfidenceTier`); OCR rows grade against `ocrFloor`
+// (a live control); text/regex/Custom rows render the fixed-green
+// literal-match band. The former `piiThreshold:` input is gone — it
+// read the dormant `minimumPIIConfidence`, which no live UI can change
+// since the per-run Confidence slider retired, so grading against it
+// described a control that no longer exists.
 
 struct SearchResultRow: View {
     @Binding var result: SearchResult
@@ -19,13 +24,10 @@ struct SearchResultRow: View {
     var isApplied: Bool = false
     /// Show the search term label (multi-term mode, page grouping).
     var showTermLabel: Bool = false
-    /// Active PII confidence threshold from `SearchState.minimumPIIConfidence`.
-    /// Drives the confidence-bar tier on PII rows.
-    var piiThreshold: Double = 0.0
     /// Active OCR confidence floor from `SearchState.minimumOCRConfidence`.
     /// Drives the confidence-bar tier on OCR rows. `Float` mirrors the
     /// underlying `SearchState` storage; converted to `Double` inside
-    /// `confidenceTier(for:piiThreshold:ocrFloor:)`.
+    /// `confidenceTier(for:ocrFloor:)`.
     var ocrFloor: Float = 0.0
     /// Active search mode from `SearchState.searchModeType`. Gates
     /// the Regex source badge — `.regex` mode + `.regexPattern` rationale
@@ -52,22 +54,22 @@ struct SearchResultRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
-            // The outer Button was replaced with a gesture-based
-            // hit area so the inner checkbox / chevron Buttons no longer
-            // nest inside another Button (UIKit hit-test ambiguity on
-            // iOS 17+ would otherwise dispatch outer + inner intent on
-            // the same tap). The PressHighlightModifier recreates the
-            // press dim that the outer Button previously provided.
-            HStack(spacing: 0) {
-                // Leading-edge confidence bar. Color graded
-                // against the active PII threshold / OCR floor; text/regex/Custom
-                // rows render the fixed-green literal-match band.
-                confidenceBar
-
-                HStack(spacing: ResectaTokens.Spacing.sm) {
+            // The tappable hit area is gesture-based (not an outer
+            // Button) so the inner checkbox / chevron Buttons don't nest
+            // inside another Button (UIKit hit-test ambiguity on iOS 17+
+            // would otherwise dispatch outer + inner intent on the same
+            // tap). PressHighlightModifier recreates the press dim.
+            FindingRow(
+                model: FindingRowModel(result: result),
+                isSelected: Binding(
+                    get: { result.isSelected },
+                    set: { result.isSelected = $0 }
+                ),
+                leading: {
+                    confidenceBar
                     // Applied-state indicator (12pt). Reserved slot
                     // between the confidence bar and the selection
-                    // checkbox; empty when the row has not been applied.
+                    // circle; empty when the row has not been applied.
                     Group {
                         if isApplied {
                             Image(systemName: "checkmark.circle.fill")
@@ -78,38 +80,9 @@ struct SearchResultRow: View {
                         }
                     }
                     .frame(width: 12)
-
-                    // Selection toggle
-                    Button {
-                        result.isSelected.toggle()
-                    } label: {
-                        Image(systemName: result.isSelected ? "checkmark.circle.fill" : "circle")
-                            .font(.title3)
-                            .foregroundStyle(result.isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                            .contentTransition(.symbolEffect(.replace))
-                    }
-                    .buttonStyle(.plain)
-                    .frame(width: 28)
-
-                    // Source badge
-                    sourceBadge
-
-                    // Text content
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(result.matchedText)
-                            .font(.subheadline.monospaced())
-                            .lineLimit(1)
-                            .privacySensitive()  // Matched text is sensitive
-
-                        Text(result.contextSnippet)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                            .privacySensitive()  // Context is sensitive
-                    }
-
-                    Spacer()
-
+                },
+                badge: { sourceBadge },
+                trailing: {
                     // Term label for multi-term disambiguation
                     if showTermLabel {
                         Text(result.term)
@@ -120,14 +93,8 @@ struct SearchResultRow: View {
                     }
 
                     rationaleAccessory
-
-                    // Page indicator
-                    Text("p.\(result.pageIndex + 1)")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
                 }
-                .padding(.leading, ResectaTokens.Spacing.xs)
-            }
+            )
             .contentShape(Rectangle())
             .onTapGesture { onNavigate() }
             .modifier(PressHighlightModifier())
@@ -141,10 +108,6 @@ struct SearchResultRow: View {
             }
         }
         .listRowBackground(isCurrent ? ResectaTokens.BrandTeal.tint.opacity(0.12) : nil)
-        // Announce page number only, NEVER matched text
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Search match, page \(result.pageIndex + 1)")
-        .accessibilityAddTraits(result.isSelected ? .isSelected : [])
         // Immediate VoiceOver feedback on selection toggle
         .onChange(of: result.isSelected) { _, isSelected in
             if UIAccessibility.isVoiceOverRunning {
@@ -156,7 +119,7 @@ struct SearchResultRow: View {
         }
     }
 
-    /// Rationale accessory now toggles the inline
+    /// Rationale accessory toggles the inline
     /// expansion (was: info.circle opening MatchRationaleSheet directly).
     /// The full-detail sheet path remains reachable via the "View
     /// details" button inside the inline expansion. Per the long-
@@ -215,7 +178,7 @@ struct SearchResultRow: View {
     }
 
     /// Leading-edge confidence bar. Mode-meaningful
-    /// (PII against `piiThreshold`, OCR against `ocrFloor`,
+    /// (PII on the shared absolute bands, OCR against `ocrFloor`,
     /// text/regex/Custom against the literal-match constant); the bar's
     /// help text on literal-match rows ships the resolved string
     /// verbatim. Decorative for VoiceOver — confidence is exposed via
@@ -225,7 +188,6 @@ struct SearchResultRow: View {
             .fill(
                 Self.confidenceTier(
                     for: result,
-                    piiThreshold: piiThreshold,
                     ocrFloor: Double(ocrFloor)
                 ).color
             )
@@ -417,26 +379,37 @@ extension SearchResultRow {
         }
     }
 
-    /// Within-threshold band (15 percentage points) — confidence at or
-    /// above `threshold + bandwidth` is `.high`; within the band is
-    /// `.medium`; below threshold is `.low` (defensive — pre-filtered
-    /// rows shouldn't reach this branch).
+    /// Within-floor band (15 percentage points) for OCR grading —
+    /// confidence at or above `floor + bandwidth` is `.high`; within
+    /// the band is `.medium`; below the floor is `.low`.
     static let confidenceBandwidth: Double = 0.15
+
+    /// Shared absolute confidence bands for classifier findings —
+    /// the same tiers the detection review rows use, so one confidence
+    /// grammar covers both origins of the unified surface. ≥ 0.9 high,
+    /// ≥ 0.7 medium, else low.
+    static func absoluteConfidenceTier(_ confidence: Double) -> ConfidenceTier {
+        if confidence >= 0.9 { return .high }
+        if confidence >= 0.7 { return .medium }
+        return .low
+    }
 
     /// Mode-meaningful confidence-bar grading. Branch order
     /// mirrors `sourceBadge`'s precedence: Custom → PII → OCR → text.
+    /// PII rows grade on the shared absolute bands: the former
+    /// `piiThreshold` input read `minimumPIIConfidence`, which is
+    /// schema-compat state no live control can change since the per-run
+    /// Confidence slider retired — grading against it described a
+    /// control that no longer exists.
     static func confidenceTier(
         for result: SearchResult,
-        piiThreshold: Double,
         ocrFloor: Double
     ) -> ConfidenceTier {
         if Self.isCustomTermHit(result) {
             return .high
         }
         if let piiConf = result.piiConfidence, result.piiCategory != nil {
-            if piiConf >= piiThreshold + Self.confidenceBandwidth { return .high }
-            if piiConf >= piiThreshold { return .medium }
-            return .low
+            return absoluteConfidenceTier(piiConf)
         }
         if case .ocr(let confidence) = result.source {
             let conf = Double(confidence)

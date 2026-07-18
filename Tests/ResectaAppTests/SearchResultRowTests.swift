@@ -158,7 +158,7 @@ struct SearchResultRowTests {
     func textLayerLiteralIsHigh() {
         let result = makeResult(term: "alpha", piiCategory: nil, signals: nil)
         #expect(SearchResultRow.confidenceTier(
-            for: result, piiThreshold: 0.50, ocrFloor: 0.0
+            for: result, ocrFloor: 0.0
         ) == .high)
     }
 
@@ -170,11 +170,17 @@ struct SearchResultRowTests {
             signals: [.userAlwaysFlag(pattern: "patient_id")]
         )
         #expect(SearchResultRow.confidenceTier(
-            for: result, piiThreshold: 0.50, ocrFloor: 0.0
+            for: result, ocrFloor: 0.0
         ) == .high)
     }
 
-    @Test("confidenceTier — PII row above threshold + 0.15 band is high")
+    // PII rows grade on the shared ABSOLUTE bands (>= 0.9 high,
+    // >= 0.7 medium, else low) — the same tiers the detection review
+    // rows use, one confidence grammar for both origins. The former
+    // `piiThreshold` input read the dormant `minimumPIIConfidence`
+    // (no live control since the per-run Confidence slider retired).
+
+    @Test("confidenceTier — PII row at or above 0.9 is high")
     func piiAboveThresholdIsHigh() {
         let result = makeResult(
             term: "123-45-6789",
@@ -183,34 +189,42 @@ struct SearchResultRowTests {
             piiConfidence: 0.90
         )
         #expect(SearchResultRow.confidenceTier(
-            for: result, piiThreshold: 0.50, ocrFloor: 0.0
+            for: result, ocrFloor: 0.0
         ) == .high)
     }
 
-    @Test("confidenceTier — PII row inside the 0.15 band is medium")
-    func piiAtThresholdIsMedium() {
+    @Test("confidenceTier — PII row in the 0.7..<0.9 band is medium")
+    func piiMidBandIsMedium() {
         let result = makeResult(
             term: "123-45-6789",
             piiCategory: .ssn,
             signals: [.regexPattern(name: "ssn")],
-            piiConfidence: 0.55  // 0.50 + 0.05 inside the 0.15 band
+            piiConfidence: 0.75
         )
         #expect(SearchResultRow.confidenceTier(
-            for: result, piiThreshold: 0.50, ocrFloor: 0.0
+            for: result, ocrFloor: 0.0
         ) == .medium)
     }
 
-    @Test("confidenceTier — PII row below threshold is low (defensive; pre-filter removes most)")
+    @Test("confidenceTier — PII row below 0.7 is low")
     func piiBelowThresholdIsLow() {
         let result = makeResult(
             term: "ambiguous",
             piiCategory: .ssn,
             signals: [.regexPattern(name: "ssn")],
-            piiConfidence: 0.30
+            piiConfidence: 0.55
         )
         #expect(SearchResultRow.confidenceTier(
-            for: result, piiThreshold: 0.50, ocrFloor: 0.0
+            for: result, ocrFloor: 0.0
         ) == .low)
+    }
+
+    @Test("absoluteConfidenceTier — shared band boundaries for both origins")
+    func absoluteBandBoundaries() {
+        #expect(SearchResultRow.absoluteConfidenceTier(0.90) == .high)
+        #expect(SearchResultRow.absoluteConfidenceTier(0.89) == .medium)
+        #expect(SearchResultRow.absoluteConfidenceTier(0.70) == .medium)
+        #expect(SearchResultRow.absoluteConfidenceTier(0.69) == .low)
     }
 
     @Test("confidenceTier — OCR row above floor + 0.15 band is high")
@@ -222,7 +236,7 @@ struct SearchResultRowTests {
             source: .ocr(confidence: 0.95)
         )
         #expect(SearchResultRow.confidenceTier(
-            for: result, piiThreshold: 0.0, ocrFloor: 0.50
+            for: result, ocrFloor: 0.50
         ) == .high)
     }
 
@@ -235,7 +249,7 @@ struct SearchResultRowTests {
             source: .ocr(confidence: 0.55)
         )
         #expect(SearchResultRow.confidenceTier(
-            for: result, piiThreshold: 0.0, ocrFloor: 0.50
+            for: result, ocrFloor: 0.50
         ) == .medium)
     }
 
@@ -248,15 +262,17 @@ struct SearchResultRowTests {
             source: .ocr(confidence: 0.20)
         )
         #expect(SearchResultRow.confidenceTier(
-            for: result, piiThreshold: 0.0, ocrFloor: 0.50
+            for: result, ocrFloor: 0.50
         ) == .low)
     }
 
-    @Test("confidenceTier — PII over OCR source still grades against piiThreshold (precedence)")
-    func piiOverOCRGradesAgainstPIIThreshold() {
+    @Test("confidenceTier — PII over OCR source still grades on the PII bands (precedence)")
+    func piiOverOCRGradesAgainstPIIBands() {
         // PII detection on an OCR'd page surfaces with both `piiCategory`
         // and `source == .ocr`. Per the branch order in confidenceTier,
-        // PII grading wins; OCR floor is irrelevant here.
+        // PII grading wins; OCR floor is irrelevant here. 0.85 sits in
+        // the absolute medium band even though it clears the OCR floor's
+        // high band — proving the PII branch took precedence.
         let result = makeResult(
             term: "123-45-6789",
             piiCategory: .ssn,
@@ -265,8 +281,8 @@ struct SearchResultRowTests {
             piiConfidence: 0.85
         )
         #expect(SearchResultRow.confidenceTier(
-            for: result, piiThreshold: 0.50, ocrFloor: 0.50
-        ) == .high)
+            for: result, ocrFloor: 0.50
+        ) == .medium)
     }
 
     // MARK: - WU-14: Confidence-bar tooltip [D-37]

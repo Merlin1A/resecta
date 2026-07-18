@@ -1959,11 +1959,14 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // explicit user selection).
                 coordinator.redactionState.pendingTriage = allResults
 
-                // Initialize triage selections: all accepted by default
+                // Review-first arrival: detections arrive with NOTHING selected: the
+                // machine proposes, only the user selects. Entries are
+                // EXPLICIT per detection (not an empty map) because the
+                // apply path's absent-id fallback still reads accepted.
                 var selections: [UUID: Bool] = [:]
                 for (_, pageResults) in allResults {
                     for result in pageResults {
-                        selections[result.id] = true
+                        selections[result.id] = false
                     }
                 }
                 coordinator.redactionState.triageSelections = selections

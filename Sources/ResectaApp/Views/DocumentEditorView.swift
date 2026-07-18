@@ -107,18 +107,19 @@ struct DocumentEditorView: View {
     /// preserved and stay compiled and green, so revival is a one-line flip.
     private static let advancedDrawToolsEnabled = false
 
-    /// P1.3: single sheet slot for the editor. Precedence triage > search
-    /// > rationale is enforced by `activeSheetBinding`'s getter so two
+    /// P1.3: single sheet slot for the editor. Precedence search >
+    /// rationale is enforced by the binding's getter so two
     /// near-simultaneous transitions in the same runloop tick can't drop a
-    /// sheet silently.
+    /// sheet silently. The former `.triage` case is absorbed: staged
+    /// detection findings present INSIDE the search sheet's Scan
+    /// interface (`ScanReviewSection`), and the `pendingTriage`
+    /// observer below opens/switches that one sheet for every producer.
     private enum ActiveSheet: Identifiable {
-        case triage
         case search(SearchState)
         case rationale(UUID)
 
         var id: String {
             switch self {
-            case .triage: return "triage"
             case .search(let state): return "search-\(state.id)"
             case .rationale(let regionID): return "rationale-\(regionID)"
             }
@@ -436,13 +437,15 @@ struct DocumentEditorView: View {
                 .transition(.opacity)
             }
         }
-        // P1.3: single `.sheet(item:)` slot for triage / search / rationale.
-        // Precedence triage > search > rationale; the getter returns the
-        // highest-precedence active source. GAP §4.1 (triage),
-        // SEARCH-AND-REDACT §6.1 (search), WU-71 / [P10] path (a) (rationale).
+        // P1.3: single `.sheet(item:)` slot for search / rationale.
+        // Precedence search > rationale; the getter returns the
+        // highest-precedence active source. SEARCH-AND-REDACT §6.1
+        // (search), WU-71 / [P10] path (a) (rationale). Staged
+        // detections ride the search case — the `pendingTriage`
+        // observer below keeps `activeSearch` populated while
+        // detections are pending.
         .sheet(item: Binding<ActiveSheet?>(
             get: {
-                if redactionState.pendingTriage != nil { return .triage }
                 if let searchState = redactionState.activeSearch { return .search(searchState) }
                 if let regionID = redactionState.pendingCanvasRationaleRequest {
                     return .rationale(regionID)
@@ -468,15 +471,20 @@ struct DocumentEditorView: View {
                     // re-check guard prevents a double-dismiss if a concurrent
                     // path cleared the state across the one-frame window (the
                     // get: closure above may re-query during it).
-                    if redactionState.pendingTriage != nil {
-                        Task { @MainActor in
-                            guard redactionState.pendingTriage != nil else { return }
-                            redactionState.dismissTriage()
-                        }
-                    } else if redactionState.activeSearch != nil {
+                    if redactionState.activeSearch != nil {
                         Task { @MainActor in
                             guard redactionState.activeSearch != nil else { return }
                             redactionState.activeSearch = nil
+                            // A system-initiated dismissal (swipe /
+                            // programmatic) with staged findings pending
+                            // discards the review — same semantics as
+                            // the sheet's own Dismiss. Without this the
+                            // findings would strand: the sheet is gone
+                            // but the pending set keeps the Scan/Search
+                            // entry points disabled.
+                            if redactionState.pendingTriage != nil {
+                                redactionState.dismissTriage()
+                            }
                         }
                     } else if redactionState.pendingCanvasRationaleRequest != nil {
                         Task { @MainActor in
@@ -488,18 +496,15 @@ struct DocumentEditorView: View {
             }
         )) { sheet in
             switch sheet {
-            case .triage:
-                DetectionTriageSheet()
-                    .interactiveDismissDisabled(true) // Must explicitly accept or dismiss
-                    .presentationDetents([.medium, .large])
-                    // F2-9: .medium is the default (first in array). Shows summary bar +
-                    // first few rows; user drags to .large for full list.
-                    .presentationDragIndicator(.visible)
             case .search(let searchState):
                 SearchAndRedactSheet(searchState: searchState, selectedDetent: $searchSheetDetent)
-                    // U3: Block swipe-dismiss when user has selected results to prevent accidental loss.
-                    // Freely dismissible only when no results are selected.
-                    .interactiveDismissDisabled(searchState.selectedCount > 0)
+                    // Conditional dismiss: block swipe-dismiss once the USER has
+                    // modified selections this session, so the Dismiss
+                    // button's confirmation dialog can't be bypassed.
+                    // An untouched sheet swipes away freely (one-tap
+                    // dismiss rule; machine-made selections drop
+                    // silently, as the magic-wand flow always has).
+                    .interactiveDismissDisabled(searchState.userModifiedSelections)
                     // Compact float detent —
                     // `.fraction(0.15)` of available height with a 110pt
                     // floor (`CompactFloatDetent.swift`). Search bar +
@@ -524,6 +529,17 @@ struct DocumentEditorView: View {
                     )
                 }
             }
+        }
+        // Absorbed-review presentation bridge: whenever staged detections
+        // arrive (pipeline staging, banner Review, the DEBUG seed hook),
+        // surface them in the ONE sheet's Scan interface. Observation
+        // here is presentation-only — the same job the retired
+        // `.triage` sheet-getter arm did — and never triggers a run
+        // (the auto-run flag stays unarmed). `initial: true` covers a
+        // producer that wrote before this view mounted.
+        .onChange(of: redactionState.pendingTriage != nil, initial: true) { _, hasPending in
+            guard hasPending else { return }
+            presentReviewInScanInterface()
         }
         // GAP §6.2: iPad hover popover — observe hoveredRegionID on RedactionState
         // GAP-7: VoiceOver announcement on selection count change
@@ -776,6 +792,10 @@ struct DocumentEditorView: View {
                 state.pendingAutoRunScan = true
                 redactionState.activeSearch = state
             }
+            // `pendingTriage != nil` normally implies the sheet is
+            // already up (the review bridge presents it); the explicit
+            // clause is a belt so a fresh auto-run can never arm while
+            // staged detections await review.
             .disabled(documentState.phaseKind != .editing
                       || redactionState.pendingTriage != nil
                       || redactionState.activeSearch != nil)
@@ -1689,20 +1709,63 @@ struct DocumentEditorView: View {
     }
 
     /// Phase 1C: Re-populate pendingTriage from stored detectionResults to
-    /// re-open the triage sheet.
+    /// re-open the review — now the search sheet's Scan interface, not
+    /// the retired standalone triage sheet.
     private func handleBannerReview() {
         detectionBanner = nil
+        // Block while a review is already pending (mirrors the
+        // pipeline's own entry guard): re-staging would silently reset
+        // the user's in-progress selections to the all-deselected
+        // arrival default. The pending review is already on screen —
+        // dismissing the banner is all this tap should do.
+        guard redactionState.pendingTriage == nil else { return }
         guard !redactionState.triagePromotionOccurred,
               !redactionState.detectionResults.isEmpty else { return }
         redactionState.pendingTriage = redactionState.detectionResults
-        // Mirror the coordinator's staging default (all accepted) — after
-        // a Dismiss the selections were cleared, and the sheet's "Apply N"
-        // count reads explicit entries.
-        var selections: [UUID: Bool] = [:]
-        for results in redactionState.detectionResults.values {
-            for result in results { selections[result.id] = true }
+        // Review-first arrival: re-staged detections arrive all-DESELECTED, like every
+        // arrival. Entries are EXPLICIT per detection because the apply
+        // path's absent-id fallback still reads accepted (its re-guard
+        // is a later session's work).
+        redactionState.triageSelections = RedactionState.reviewArrivalSelections(
+            for: redactionState.detectionResults
+        )
+        // Deterministic presentation (the observer above also fires,
+        // but a direct call doesn't depend on change delivery).
+        presentReviewInScanInterface()
+    }
+
+    /// Open — or re-target — the one search sheet on its Scan
+    /// interface so the staged detections render for review.
+    private func presentReviewInScanInterface() {
+        // A review is a full-chrome activity: the sheet's detent
+        // selection is sticky @State across sheet sessions, and a
+        // stale compactFloat (~110 pt) would present the arrival with
+        // the review list clipped out of sight. Never LOWER an
+        // already-larger detent.
+        if searchSheetDetent == .compactFloat {
+            searchSheetDetent = .medium
         }
-        redactionState.triageSelections = selections
+        if let state = redactionState.activeSearch {
+            // Sheet already up: surface the review by switching its
+            // interface. The write takes the ordinary user-transition
+            // path in the sheet's mode-switch handler (clear + undo
+            // toast for any live results) — the review must not
+            // silently absorb another interface's session. The touched
+            // tracker resets with it: the review arriving here is a
+            // fresh all-deselected selection context, and a Dismiss
+            // confirmation about the just-cleared session's work would
+            // reference selections the user can no longer see.
+            if state.searchModeType != .piiScan {
+                state.searchModeType = .piiScan
+                state.userModifiedSelections = false
+            }
+        } else {
+            let state = SearchState()
+            state.searchModeType = .piiScan
+            // Deliberately NOT arming `pendingAutoRunScan`: a review
+            // arrival presents findings; it never starts a run.
+            redactionState.activeSearch = state
+        }
     }
 
     /// UXF-06 — rebuild the banner when a detection run records its

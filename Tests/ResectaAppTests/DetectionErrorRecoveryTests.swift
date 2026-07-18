@@ -120,7 +120,7 @@ struct DetectionErrorRecoveryTests {
     // MARK: - Deliverable 2: --seedTriage seed helper
 
     #if DEBUG
-    @Test("seedDebugTriage populates pendingTriage + all-accepted selections on page 0")
+    @Test("seedDebugTriage populates pendingTriage + all-deselected selections on page 0")
     func seedDebugTriagePopulatesPendingTriage() {
         let redactionState = RedactionState()
         #expect(redactionState.pendingTriage == nil)
@@ -135,12 +135,14 @@ struct DetectionErrorRecoveryTests {
         // 6 mocks — q14 added a second "Jordan Avery" so the Grouped view
         // mode has a real cluster and "Apply Group" is drivable on-sim.
         #expect(page0.count == 6)
-        // Selections cover every seeded detection and default to accepted,
-        // mirroring the real triage staging path.
+        // Review-first arrival: selections cover every seeded detection with an
+        // EXPLICIT deselected entry, mirroring the real staging path's
+        // all-deselected arrival (explicit-per-id because the apply
+        // path's absent-id fallback still reads accepted).
         #expect(redactionState.triageSelections.count == page0.count)
-        #expect(redactionState.triageSelections.values.allSatisfy { $0 })
+        #expect(redactionState.triageSelections.values.allSatisfy { !$0 })
         for detection in page0 {
-            #expect(redactionState.triageSelections[detection.id] == true)
+            #expect(redactionState.triageSelections[detection.id] == false)
         }
         // A mix of kinds so the triage list, filters, and "Apply N" are exercised.
         let kinds = Set(page0.map { $0.kind })

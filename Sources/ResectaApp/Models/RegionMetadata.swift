@@ -34,8 +34,9 @@ nonisolated struct RegionMetadata: Sendable {
     let badgeLabel: String
 
     /// Full description for accessibility and hover tooltip.
-    /// F2-1: Labels MUST match DetectionTriageRow.kindFullName exactly —
-    /// VoiceOver users encounter both surfaces for the same detection.
+    /// F2-1: Labels MUST match `DetectionResult.Kind.fullName`
+    /// (Extensions/DetectionKind+Display.swift) exactly — VoiceOver
+    /// users encounter both surfaces for the same detection.
     let accessibilityDescription: String
 
     init(piiKind: DetectionResult.Kind, confidence: Double,

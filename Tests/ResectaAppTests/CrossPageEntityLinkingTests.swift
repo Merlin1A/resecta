@@ -167,19 +167,22 @@ struct CrossPageEntityLinkingTests {
         #expect(state.regions[5]?.count == 1)
     }
 
-    // MARK: - 4. Triage sheet exposes four view modes
+    // MARK: - 4. Review surface exposes four view modes
 
-    @Test("Triage sheet SortOrder has exactly 4 view modes including Grouped")
+    @Test("Review view modes carry all 4 including Grouped")
     func testGroupedViewModeAvailable() {
-        let cases = DetectionTriageSheet.SortOrder.allCases
+        // The retired triage sheet's SortOrder carried into the unified
+        // review surface as ReviewViewMode — same four modes, same
+        // user-visible labels.
+        let cases = ScanReviewSection.ReviewViewMode.allCases
         #expect(cases.count == 4)
         #expect(cases.contains(.byPage))
         #expect(cases.contains(.byType))
         #expect(cases.contains(.byConfidence))
         #expect(cases.contains(.grouped))
         // Confirm the rawValue surfaces as the user-visible "Grouped" label
-        // the Picker renders in the filter bar.
-        #expect(DetectionTriageSheet.SortOrder.grouped.rawValue == "Grouped")
+        // the Picker renders in the review chip bar.
+        #expect(ScanReviewSection.ReviewViewMode.grouped.rawValue == "Grouped")
     }
 
     // MARK: - 5. Cross-category clustering preserves category

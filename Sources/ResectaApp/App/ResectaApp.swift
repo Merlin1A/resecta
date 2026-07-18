@@ -147,13 +147,15 @@ struct ResectaApp: App {
                                         named: sampleName,
                                         documentState: ws.documentState,
                                         redactionState: ws.redactionState)
-                                    // DEBUG triage repro hook: seed mock
-                                    // detections so the "Review Detections"
-                                    // sheet presents on the Simulator without
-                                    // running on-device detection (which the
-                                    // sim cannot service). The sheet appears
-                                    // because its `.sheet(item:)` getter returns
-                                    // `.triage` when `pendingTriage != nil`.
+                                    // DEBUG review repro hook: seed mock
+                                    // detections so the unified review (the
+                                    // search sheet's Scan interface) presents
+                                    // on the Simulator without running
+                                    // on-device detection (which the sim
+                                    // cannot service). The editor's
+                                    // `pendingTriage` bridge opens the sheet
+                                    // pre-switched to Scan. Arg name carried
+                                    // from the triage era — test plumbing.
                                     if launchArguments.contains("--seedTriage") {
                                         ws.redactionState.seedDebugTriage()
                                     }

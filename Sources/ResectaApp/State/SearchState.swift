@@ -1077,6 +1077,8 @@ final class SearchState: Identifiable {
         // other session-scoped state so a fresh sheet session starts at
         // the engine default selection shape.
         preselectIncomingResults = false
+        // Conditional dismiss: the touched-selections tracker is per-sheet-session.
+        userModifiedSelections = false
         // Defensive: an armed-but-unconsumed auto-run must not leak
         // into the next sheet session (the flag is normally consumed
         // by the sheet's `.onAppear` before any teardown can run).
@@ -1188,6 +1190,22 @@ final class SearchState: Identifiable {
     /// non-magic-wand search in the same session goes back to the
     /// default selection shape. Pinned by `MagicWandUITests`.
     var preselectIncomingResults: Bool = false
+
+    /// Conditional dismiss: whether the USER has modified selections this sheet
+    /// session, for either result origin. Gates the sheet's Dismiss:
+    /// untouched → one tap; touched → confirmation dialog (the triage
+    /// sheet's donor rule, generalized to the whole surface).
+    ///
+    /// Written `true` only at user-gesture sites (row circle, footer
+    /// Select All, Select-Where, keyboard space toggle, Pencil circle
+    /// select, review-row equivalents) — NEVER by programmatic
+    /// selection writes: the magic-wand arrival preselect, saved-search
+    /// recall, and the mode-switch undo restore don't count as user
+    /// selection work. Reset by a successful apply (the modified
+    /// selections were committed — a post-apply Dismiss confirming
+    /// "selections will not be saved" would be false) and by `clear()`
+    /// on session teardown.
+    var userModifiedSelections: Bool = false
 
     /// Buffer a result from the search stream. Flushed in batches
     /// to avoid per-result @Observable change notifications (P2).

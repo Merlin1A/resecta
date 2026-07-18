@@ -103,14 +103,16 @@ nonisolated final class SearchMarkForRedactionUITests: XCTestCase {
         )
         byTerm.tap()
 
-        // Both terms searched: footer reads "0 of 2 selected". (The
-        // term-grouped SECTION HEADERS are lazily materialized and sit
-        // offscreen at this detent — the results list viewport is ~18 pt
-        // tall on the 26.4 sim — so they can be absent from the AX tree
-        // even though the List content closure, where the crash lived,
-        // has already evaluated `resultsByTerm`. Assert on the footer
-        // count instead; the By Term toggle state above pins the branch.)
-        let footerCount = app.staticTexts["0 of 2 selected"]
+        // Both terms searched: the footer states the review-first arrival
+        // default explicitly — "2 found — none selected yet" replaces
+        // the former "0 of 2 selected". (The term-grouped SECTION
+        // HEADERS are lazily materialized and sit offscreen at this
+        // detent — the results list viewport is ~18 pt tall on the 26.4
+        // sim — so they can be absent from the AX tree even though the
+        // List content closure, where the crash lived, has already
+        // evaluated `resultsByTerm`. Assert on the footer count
+        // instead; the By Term toggle state above pins the branch.)
+        let footerCount = app.staticTexts["2 found — none selected yet"]
         XCTAssertTrue(
             footerCount.waitForExistence(timeout: 15),
             "Footer never showed both terms' results — a term submission failed."

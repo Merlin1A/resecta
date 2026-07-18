@@ -12,43 +12,13 @@ import SwiftUI
 @Suite("Accessibility labels and hints (Pkg J)")
 struct AccessibilityLabelTests {
 
-    // MARK: - A11Y-3 — Triage menu label
-
-    @Test("Triage Menu announces 'Triage batch actions'")
-    func testTriageMenuLabel() {
-        // Closes A11Y-3 — the ellipsis glyph alone reads as a bare "more"
-        // hint. Pin the explicit menu label so VoiceOver users hear what
-        // the menu is for before drilling in.
-        #expect(DetectionTriageSheet.menuAccessibilityLabel == "Triage batch actions")
-    }
-
-    // MARK: - A11Y-4 — Triage slider label + spoken value
-
-    @Test("Triage Slider label is 'Minimum detection confidence'")
-    func testTriageSliderLabel() {
-        // Closes A11Y-4 — paired with the spoken value below. With both
-        // modifiers in place VoiceOver announces "Minimum detection
-        // confidence, X percent, adjustable" instead of an unnamed slider.
-        #expect(DetectionTriageSheet.sliderAccessibilityLabel == "Minimum detection confidence")
-    }
-
-    @Test("Triage Slider value renders percent of the bound confidence",
-          arguments: [
-            (0.00, "0 percent"),
-            (0.05, "5 percent"),
-            (0.50, "50 percent"),
-            (0.95, "95 percent"),
-          ])
-    func testTriageSliderValue(confidence: Double, expected: String) {
-        // The slider's range is 0...0.95 in steps of 0.05 — cover the
-        // endpoints + a midpoint so a drift in either the multiplier
-        // (e.g., dropping the *100) or the unit string fails the test.
-        #expect(
-            DetectionTriageSheet.sliderAccessibilityValue(
-                forConfidence: confidence
-            ) == expected
-        )
-    }
+    // A11Y-3 (triage batch-actions menu label) and A11Y-4 (triage
+    // min-confidence slider label + spoken value) retired with their
+    // controls: the batch menu's job moved to the footer Select All +
+    // Select-Where predicates, and the review-side confidence slider
+    // followed the per-run Confidence slider out (predicates are the
+    // confidence tools). The unified review surface's spoken contracts
+    // are pinned by `FindingRowFamilyTests`.
 
     // MARK: - A11Y-5 / A11Y-6 — Settings picker hints
 

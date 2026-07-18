@@ -169,6 +169,8 @@ struct SearchResultsSection: View {
     /// applying to `searchState.results` (not `filteredResults`) the
     /// Menu remains useful when filters hide candidates the user wants
     /// to operate on.
+    /// Every branch routes through `userSelectWhere` so the conditional-dismiss
+    /// touched tracker flips exactly once per user predicate pick.
     @ViewBuilder
     private var selectWhereMenu: some View {
         if !searchState.results.isEmpty {
@@ -176,18 +178,18 @@ struct SearchResultsSection: View {
                 Menu {
                     Section("By confidence") {
                         Button("\u{2265} 75%") {
-                            searchState.selectWhere { ($0.piiConfidence ?? 0) >= 0.75 }
+                            userSelectWhere { ($0.piiConfidence ?? 0) >= 0.75 }
                         }
                         Button("\u{2265} 90%") {
-                            searchState.selectWhere { ($0.piiConfidence ?? 0) >= 0.90 }
+                            userSelectWhere { ($0.piiConfidence ?? 0) >= 0.90 }
                         }
                     }
                     Section("By source") {
                         Button("Text") {
-                            searchState.selectWhere { $0.source == .textLayer }
+                            userSelectWhere { $0.source == .textLayer }
                         }
                         Button("OCR") {
-                            searchState.selectWhere { $0.source != .textLayer }
+                            userSelectWhere { $0.source != .textLayer }
                         }
                     }
                     if searchState.searchModeType == .piiScan {
@@ -197,7 +199,7 @@ struct SearchResultsSection: View {
                             Section("By category") {
                                 ForEach(categories, id: \.self) { category in
                                     Button(category.rawValue) {
-                                        searchState.selectWhere { $0.piiCategory == category }
+                                        userSelectWhere { $0.piiCategory == category }
                                     }
                                 }
                             }
@@ -206,11 +208,11 @@ struct SearchResultsSection: View {
                     Section("By applied state") {
                         Button("Applied") {
                             let applied = searchState.appliedResultIDs
-                            searchState.selectWhere { applied.contains($0.id) }
+                            userSelectWhere { applied.contains($0.id) }
                         }
                         Button("Unapplied") {
                             let applied = searchState.appliedResultIDs
-                            searchState.selectWhere { !applied.contains($0.id) }
+                            userSelectWhere { !applied.contains($0.id) }
                         }
                     }
                 } label: {
@@ -224,6 +226,14 @@ struct SearchResultsSection: View {
             .padding(.horizontal, ResectaTokens.Spacing.md)
             .padding(.vertical, ResectaTokens.Spacing.xxs)
         }
+    }
+
+    /// Select-Where wrapper: the predicate replacement plus the conditional-dismiss
+    /// touched flip — predicate selection is user selection work, so
+    /// the sheet's Dismiss confirms from here forward.
+    private func userSelectWhere(_ predicate: (SearchResult) -> Bool) {
+        searchState.selectWhere(predicate)
+        searchState.userModifiedSelections = true
     }
 
     // MARK: - Live Preview Row
@@ -463,6 +473,8 @@ struct SearchResultsSection: View {
 
             Button {
                 searchState.toggleSelectionForCurrentMatch()
+                // Conditional dismiss: the space-key toggle is user selection work.
+                searchState.userModifiedSelections = true
             } label: { EmptyView() }
                 .accessibilityLabel("Toggle selection for current match")
                 .keyboardShortcut(" ", modifiers: [])
@@ -575,6 +587,10 @@ struct SearchResultsSection: View {
                 for id in enclosed {
                     searchState.toggleSelection(for: id)
                 }
+                // Conditional dismiss: a Pencil circle-select is user selection work.
+                if !enclosed.isEmpty {
+                    searchState.userModifiedSelections = true
+                }
             }
             // UXF-05 (ts2-04): at the medium detent the list's viewport
             // can shrink to a sliver; without clipping, row content
@@ -605,7 +621,9 @@ struct SearchResultsSection: View {
     }
 
     /// Safe binding for a search result by ID. Falls back to the snapshot
-    /// if the result has been removed between render passes.
+    /// if the result has been removed between render passes. The set
+    /// side is the row circle — a user gesture — so it also flips the
+    /// conditional-dismiss touched tracker.
     private func safeBinding(for id: UUID, fallback: SearchResult) -> Binding<SearchResult> {
         Binding(
             get: {
@@ -613,6 +631,7 @@ struct SearchResultsSection: View {
             },
             set: { _ in
                 searchState.toggleSelection(for: id)
+                searchState.userModifiedSelections = true
             }
         )
     }
@@ -624,9 +643,9 @@ struct SearchResultsSection: View {
             isCurrent: searchState.currentResult?.id == result.id,
             isApplied: searchState.appliedResultIDs.contains(result.id),
             showTermLabel: showTermLabel,
-            // Confidence-bar tier feeds off the active PII threshold
-            // / OCR floor; literal-match rows ignore both.
-            piiThreshold: searchState.minimumPIIConfidence,
+            // OCR rows grade against the live OCR floor; PII rows use
+            // the shared absolute bands (the dormant per-run threshold
+            // input retired with the row-family unification).
             ocrFloor: searchState.minimumOCRConfidence,
             // Regex source-capsule gate — mode + rationale signal.
             searchMode: searchState.searchModeType,

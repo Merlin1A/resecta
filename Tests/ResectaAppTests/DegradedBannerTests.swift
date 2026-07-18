@@ -10,8 +10,9 @@ import Foundation
 //    posts exactly one warning toast (mechanism-description copy per I6)
 //    and flips `RedactionState.autoDetectionDegraded = true`.
 // 2. Subsequent calls observing the same failure do NOT re-toast — the
-//    persistent banner in `DetectionTriageSheet` carries the state from
-//    that point on.
+//    persistent banner on the search sheet's Scan interface carries
+//    the state from that point on (one rule: Scan always; Search only when
+//    a scan-class capability degrades the current action).
 // 3. The banner is gated purely by `autoDetectionDegraded`; flipping it
 //    back to false hides the banner without any additional plumbing.
 //
@@ -95,8 +96,8 @@ struct DegradedBannerTests {
 
     @Test("Banner gating tracks the flag (true → banner present, false → absent)")
     func testBannerPersistsWhileFlagSet() {
-        // The banner view in DetectionTriageSheet is gated by a single
-        // expression: `if redactionState.autoDetectionDegraded`. Rather
+        // The banner on the search sheet is gated by the unified degrade-rule
+        // predicate over `redactionState.autoDetectionDegraded`. Rather
         // than rendering the SwiftUI hierarchy in a test, we pin the
         // contract that DRIVES the conditional — flipping the flag must
         // toggle the predicate without any other state dependency.
@@ -111,6 +112,24 @@ struct DegradedBannerTests {
         state.autoDetectionDegraded = false
         #expect(!state.autoDetectionDegraded,
                 "banner predicate must be false when flag is cleared")
+    }
+
+    @Test("Unified degrade rule: degrade banner shows on Scan always, never on Search in this tree")
+    func testDegradeBannerInterfaceRule() {
+        // Unified rule: Scan surfaces a degraded corpus whenever the
+        // flag is set (its runs consult the detection corpus). Search
+        // shows it only when a scan-class capability degrades the
+        // CURRENT action — and no Search-side action in this tree uses
+        // one (literal matching + OCR modality access), so the Search
+        // side renders none.
+        #expect(SearchAndRedactSheet.degradeBannerShouldShow(
+            interface: .scan, degraded: true))
+        #expect(!SearchAndRedactSheet.degradeBannerShouldShow(
+            interface: .scan, degraded: false))
+        #expect(!SearchAndRedactSheet.degradeBannerShouldShow(
+            interface: .search, degraded: true))
+        #expect(!SearchAndRedactSheet.degradeBannerShouldShow(
+            interface: .search, degraded: false))
     }
 
     @Test("Multiple gazetteer failures still post exactly one toast")
@@ -137,7 +156,8 @@ struct DegradedBannerTests {
         // asset is absent (the override→diagnostic production is proven in
         // PIIDetectorInitDegradedTests). It must flip `autoDetectionDegraded`
         // through the SAME coordinator path a corpus failure uses, which gates the
-        // `degradedDetectionBanner` in DetectionTriageSheet — no new banner / UI.
+        // `degradedDetectionBanner` on the search sheet's Scan
+        // interface — no new banner / UI.
         let (coordinator, _) = makeWiredCoordinator()
         #expect(!coordinator.redactionState.autoDetectionDegraded,
                 "precondition: flag starts false")

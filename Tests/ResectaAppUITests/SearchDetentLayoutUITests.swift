@@ -185,8 +185,11 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         // flow is verified correct by manual drive.
         field.typeText("Sample\n")
 
-        // One match in the bundled fixture.
-        let footerCount = app.staticTexts["0 of 1 selected"]
+        // One match in the bundled fixture. Review-first label family: results
+        // arrive deselected and the footer states the arrival default
+        // explicitly ("N found — none selected yet") in place of the
+        // former "0 of N selected".
+        let footerCount = app.staticTexts["1 found — none selected yet"]
         XCTAssertTrue(
             footerCount.waitForExistence(timeout: 15),
             "Text search returned no results for the bundled fixture."

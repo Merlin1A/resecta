@@ -121,36 +121,27 @@ struct PIIScanRoleCopyTests {
     }
 }
 
-@Suite("q11 — UXF-13 selection-default labels")
+@Suite("q11 — UXF-13 review-first selection-default labels")
 struct SelectionDefaultLabelTests {
 
-    @Test("triage summary states the all-preselected arrival default explicitly")
-    func triageAllPreselected() {
-        let label = DetectionTriageSheet.selectionSummaryLabel(accepted: 9, total: 9)
-        #expect(label == "All 9 preselected — review before Apply")
-    }
+    // The triage sheet's "All N preselected" summary retired with the
+    // all-preselected arrival default itself: the review-first arrival rule flips every
+    // producer to all-DESELECTED, and the one footer label family
+    // below covers both result origins of the unified surface.
 
-    @Test("triage summary falls back to M-of-N once the user deselects")
-    func triagePartialSelection() {
-        #expect(DetectionTriageSheet.selectionSummaryLabel(accepted: 3, total: 9)
-                == "3 of 9 selected for redaction")
-        #expect(DetectionTriageSheet.selectionSummaryLabel(accepted: 0, total: 0)
-                == "0 of 0 selected for redaction")
-    }
-
-    @Test("piiScan footer states the none-selected arrival default explicitly")
-    func piiScanNoneSelectedYet() {
-        let label = SearchFooterSection.selectionCountLabel(selected: 0, total: 27, isPIIScan: true)
+    @Test("footer states the none-selected arrival default explicitly — any origin")
+    func noneSelectedYet() {
+        let label = SearchFooterSection.selectionCountLabel(selected: 0, total: 27)
         #expect(label == "27 found — none selected yet")
     }
 
-    @Test("footer keeps M-of-N form outside the piiScan arrival default")
+    @Test("footer keeps M-of-N form outside the arrival default")
     func footerOtherForms() {
-        #expect(SearchFooterSection.selectionCountLabel(selected: 4, total: 27, isPIIScan: true)
+        #expect(SearchFooterSection.selectionCountLabel(selected: 4, total: 27)
                 == "4 of 27 selected")
-        #expect(SearchFooterSection.selectionCountLabel(selected: 0, total: 27, isPIIScan: false)
-                == "0 of 27 selected")
-        #expect(SearchFooterSection.selectionCountLabel(selected: 0, total: 0, isPIIScan: true)
+        #expect(SearchFooterSection.selectionCountLabel(selected: 27, total: 27)
+                == "27 of 27 selected")
+        #expect(SearchFooterSection.selectionCountLabel(selected: 0, total: 0)
                 == "0 of 0 selected")
     }
 }

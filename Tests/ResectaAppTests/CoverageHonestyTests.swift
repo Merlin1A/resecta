@@ -114,17 +114,17 @@ struct OCRSkipBannerTests {
 
 // MARK: - ST-83 detect-leg banner
 
-@Suite("Triage OCR skip banner (ST-83, detect leg)")
+@Suite("Review OCR skip banner (ST-83, detect leg)")
 @MainActor
 struct DetectionTriageOCRSkipBannerTests {
 
     @Test("Headline pluralizes and renders 1-based page numbers")
     func headlinePluralizationAndNumbering() {
-        let single = DetectionTriageSheet.ocrSkipBannerHeadline(pages: [0])
+        let single = ScanReviewSection.ocrSkipBannerHeadline(pages: [0])
         #expect(single.contains("Page 1 is"))
         #expect(single.contains("that page"))
 
-        let multiple = DetectionTriageSheet.ocrSkipBannerHeadline(pages: [1, 3, 7])
+        let multiple = ScanReviewSection.ocrSkipBannerHeadline(pages: [1, 3, 7])
         #expect(multiple.contains("Pages 2, 4, and 8 are"))
         #expect(multiple.contains("those pages"))
         #expect(multiple.contains("not checked"))

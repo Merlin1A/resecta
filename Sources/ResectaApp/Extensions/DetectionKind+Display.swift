@@ -2,7 +2,7 @@ import SwiftUI
 import RedactionEngine
 
 // §4.2-§4.3: Shared display properties for DetectionResult.Kind.
-// Used by DetectionTriageSheet (filter chips) and DetectionTriageRow (badges).
+// Used by ScanReviewSection (kind filter chips, review-row badges).
 
 extension DetectionResult.Kind {
 

@@ -81,13 +81,19 @@ struct SearchAndRedactSheet: View {
     /// and cleared in a `defer` — disables the Return shortcut Button
     /// so a held key doesn't queue an apply per repeat tick.
     @State private var isApplying = false
-    // Dismiss closes in ONE tap, selected or not: a live
-    // selection is deselected in-place and the sheet dismisses in the
-    // same action — silently, with no confirmation dialog or undo toast
-    // (both the prior `showDiscardConfirmation` dialog and the two-tap
-    // Done flow that replaced it are gone). See
-    // `SearchAndRedactSheet+DiscardUndo.swift` for the selection
-    // helpers and the UXF-27 dismissal message.
+    // Conditional dismiss: Dismiss is conditional on user selection work: an
+    // untouched sheet closes in one tap (a live machine-made selection,
+    // e.g. the magic-wand preselect, is deselected in-place on the way
+    // out); once the USER has modified selections this session
+    // (`searchState.userModifiedSelections`), Dismiss routes through a
+    // confirmation dialog. This generalizes the retired triage sheet's
+    // confirm-if-selections-touched rule to the whole surface and
+    // consciously supersedes the prior one-tap-always ruling: under
+    // all-deselected arrival, every live selection is deliberate opt-in
+    // work. See `SearchAndRedactSheet+DiscardUndo.swift` for the
+    // selection helpers and the UXF-27 dismissal message (untouched
+    // path only — the dialog already names the drop on the other).
+    @State private var showDismissConfirmation = false
     @State private var duplicateTermMessage: String?
     @FocusState private var isSearchFieldFocused: Bool
     // `appliedResultIDs` lives on `SearchState`. View-side reads/writes go
@@ -146,6 +152,39 @@ struct SearchAndRedactSheet: View {
     /// scaleEffect doesn't drift if the animation visual+state diverge.
     @State private var grabberPulseScale: CGFloat = 1.0
 
+    /// Review-mode kind filter, hoisted to the sheet so the footer's
+    /// Select All can target the VISIBLE (kind-filtered) findings —
+    /// mirroring the search footer's filtered-only semantics.
+    @State private var reviewFilterKind: DetectionResult.Kind? = nil
+
+    // MARK: - Absorbed review (detection findings)
+
+    /// Whether the Scan interface is presenting staged detections
+    /// for review. The staged set (`pendingTriage`) is the
+    /// store of record; the unified sheet is its one surface.
+    private var isReviewActive: Bool {
+        redactionState.pendingTriage != nil
+            && searchState.searchModeType.interface == .scan
+    }
+
+    private var reviewFindings: [(page: Int, detection: DetectionResult)] {
+        ScanReviewSection.flattenedFindings(redactionState.pendingTriage)
+    }
+
+    /// Toolbar "Apply N" count for the review origin — explicit-true
+    /// entries only. Producer sites write an explicit entry per staged
+    /// detection (review-first arrival), so this count and `applyTriagedResults`'
+    /// accepted set describe the same selections.
+    private var reviewAcceptedCount: Int {
+        redactionState.triageSelections.values.count { $0 }
+    }
+
+    private var reviewVisibleIDs: [UUID] {
+        ScanReviewSection.filteredFindings(
+            reviewFindings, filterKind: reviewFilterKind, viewMode: .byPage
+        ).map(\.detection.id)
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -158,37 +197,100 @@ struct SearchAndRedactSheet: View {
                 if selectedDetent != .compactFloat {
                     interfaceSwitcher
                 }
-                searchBar
-                SearchToolbarSection(
-                    searchState: searchState,
-                    duplicateTermMessage: $duplicateTermMessage,
-                    onTriggerSearch: triggerSearch,
-                    onRequestSaveCurrentRegex: {
-                        savedRegexSaveLabel = ""
-                        savedRegexSaveError = nil
-                        showSavedRegexSavePrompt = true
-                    }
-                )
-                Divider()
 
-                SearchResultsSection(
-                    searchState: searchState,
-                    selectedDetent: $selectedDetent,
-                    onRequestWhy: presentReverseRationale,
-                    onApplyShortcut: applyFromKeyboardShortcut,
-                    applyShortcutEnabled: applyShortcutEnabled,
-                    onRequestShowRationale: { rowID in
-                        activeModal = .rowRationale(rowID: rowID)
-                    },
-                    onTriggerSearch: triggerSearch
-                )
-
-                if searchState.filteredCount > 0 {
-                    SearchFooterSection(
-                        searchState: searchState,
-                        showAuditExport: $showAuditExport
-                    )
+                // Unified degrade rule: the gazetteer-degrade disclosure is unified
+                // across interfaces: Scan shows it whenever the session
+                // is degraded (its runs consult the detection corpus);
+                // Search shows it only when a scan-class capability
+                // degrades the current action — and no Search-side
+                // action in this tree uses one (literal matching plus
+                // OCR modality access only), so the Search side
+                // renders none. Predicate is static for testability.
+                if Self.degradeBannerShouldShow(
+                    interface: searchState.searchModeType.interface,
+                    degraded: redactionState.autoDetectionDegraded
+                ) {
+                    degradedDetectionBanner
                 }
+
+                if isReviewActive {
+                    // Absorbed review: staged detections render
+                    // inside the Scan interface. Run affordances are
+                    // parked while the review is pending — resolve it
+                    // (Apply / Dismiss) to scan again; the Search
+                    // interface stays reachable via the switcher.
+                    ScanReviewSection(
+                        searchState: searchState,
+                        filterKind: $reviewFilterKind,
+                        onRequestWhy: { request in
+                            activeModal = .rationale(request)
+                        }
+                    )
+
+                    if !reviewFindings.isEmpty {
+                        SearchFooterSection(
+                            searchState: searchState,
+                            showAuditExport: $showAuditExport,
+                            review: SearchFooterSection.ReviewFooterModel(
+                                selectedCount: reviewAcceptedCount,
+                                visibleCount: reviewVisibleIDs.count,
+                                allVisibleSelected: allReviewVisibleSelected,
+                                onToggleSelectAll: toggleReviewSelectAll
+                            )
+                        )
+                    }
+                } else {
+                    searchBar
+                    SearchToolbarSection(
+                        searchState: searchState,
+                        duplicateTermMessage: $duplicateTermMessage,
+                        onTriggerSearch: triggerSearch,
+                        onRequestSaveCurrentRegex: {
+                            savedRegexSaveLabel = ""
+                            savedRegexSaveError = nil
+                            showSavedRegexSavePrompt = true
+                        }
+                    )
+                    Divider()
+
+                    SearchResultsSection(
+                        searchState: searchState,
+                        selectedDetent: $selectedDetent,
+                        onRequestWhy: presentReverseRationale,
+                        onApplyShortcut: applyFromKeyboardShortcut,
+                        applyShortcutEnabled: applyShortcutEnabled,
+                        onRequestShowRationale: { rowID in
+                            activeModal = .rowRationale(rowID: rowID)
+                        },
+                        onTriggerSearch: triggerSearch
+                    )
+
+                    if searchState.filteredCount > 0 {
+                        SearchFooterSection(
+                            searchState: searchState,
+                            showAuditExport: $showAuditExport
+                        )
+                    }
+                }
+            }
+            // Conditional dismiss: conditional Dismiss confirmation, the retired
+            // triage sheet's donor rule generalized. Copy is
+            // mechanism-description (ARCH §1.3) — names what the action
+            // does without an outcome promise. Attached to the content
+            // VStack (not the outer modifier chain) to stay inside the
+            // type-checker budget beside the audit-export dialog.
+            .confirmationDialog(
+                Self.dismissTitle,
+                isPresented: $showDismissConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Dismiss", role: .destructive) {
+                    performDismiss(afterConfirmation: true)
+                }
+                .accessibilityIdentifier("searchDismissConfirmButton")
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text(Self.dismissMessage)
             }
             // Per-interface titles under the one chassis — the former
             // "Search & Redact" umbrella title retired with the
@@ -198,83 +300,37 @@ struct SearchAndRedactSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Dismiss") {
-                        // ONE tap closes, selected or not — triage's
-                        // Dismiss naming and single-tap behavior (the
-                        // prior Done needed a second tap when a
-                        // selection existed). A live selection is
-                        // deselected in-place and dropped silently: it
-                        // only feeds Apply, and re-running the search
-                        // restores it. No confirmation dialog, no undo
-                        // toast.
-                        if searchState.selectedCount > 0 {
-                            let snapshot = Self.currentSelectionSnapshot(in: searchState)
-                            Self.clearSelection(in: searchState, snapshot: snapshot)
+                        // Conditional dismiss: conditional confirmation: only route
+                        // through the dialog when the USER has modified
+                        // selections this session. An untouched sheet
+                        // dismisses directly so the no-op case adds no
+                        // friction; machine-made selections (magic-wand
+                        // preselect) don't count as user work and drop
+                        // silently on the way out, as before.
+                        if searchState.userModifiedSelections {
+                            showDismissConfirmation = true
                         } else {
-                            // UXF-27: a 0-selected dismissal names what
-                            // the close drops when unapplied matches
-                            // exist (the driven piiScan case — results
-                            // arrive deselected) so the loss isn't
-                            // silent. The toast manager outlives the
-                            // sheet, so the toast survives dismissal.
-                            if let message = Self.dismissClearedMessage(
-                                unappliedCount: Self.unappliedMatchCount(in: searchState)
-                            ) {
-                                toastManager.enqueue(message, severity: .info)
-                            }
+                            performDismiss(afterConfirmation: false)
                         }
-                        redactionState.activeSearch = nil
                     }
                     .accessibilityIdentifier("searchDismissButton")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    // Triage parity: "Apply \(count)" — semibold, no
-                    // destructive role, disabled at zero — and the apply
-                    // runs directly on tap; the prior "Redact N
-                    // instances?" confirmation dialog is gone. The live
-                    // count in the label carries the scale, and the
-                    // undoable mark plus the "Marked N" toast carry the
-                    // confirmation.
-                    Button("Apply \(searchState.selectedCount)") {
-                        guard !isApplying else { return }
-                        // Refuse mutations while the pipeline owns
-                        // `redactionState.regions` — same gate as the
-                        // `.disabled` below, re-checked in the action
-                        // against a pipeline that started after the last
-                        // render.
-                        guard documentState.canMutateRegions else { return }
-                        isApplying = true
-                        // Capture selected IDs before apply clears selection
-                        let selectedIDs = Set(searchState.results.filter(\.isSelected).map(\.id))
-                        Task { @MainActor in
-                            defer { isApplying = false }
-                            guard let result = await redactionState.applySearchResults(
-                                undoManager: undoManager,
-                                documentState: documentState
-                            ) else {
-                                redactionState.activeSearch = nil
-                                return
-                            }
-                            // QW-1 (D06-F3) — union only the results that
-                            // produced a region. Overlap-skipped members of
-                            // the selection get no audit entry, so they must
-                            // not earn the "applied" badge either.
-                            searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
-                            // Non-modal success toast via the shared
-                            // UXF-11 copy builder (`CommitFeedback`) so
-                            // the count stays in lockstep with the
-                            // triage-apply toasts. `toastManager.enqueue`
-                            // coalesces duplicates so repeated taps can't
-                            // queue a pile of identical toasts.
-                            if let message = CommitFeedback.markedMessage(
-                                applied: result.applied,
-                                alreadyCovered: result.skippedOverlaps
-                            ) {
-                                toastManager.enqueue(message, severity: .success)
-                            }
-                            // Navigate to first affected page
-                            if let firstPage = searchState.results.first(where: { selectedIDs.contains($0.id) })?.pageIndex {
-                                documentState.currentPageIndex = firstPage
-                            }
+                    // One "Apply \(count)" for both result origins —
+                    // semibold, no destructive role, disabled at zero;
+                    // the apply runs directly on tap. The live count
+                    // carries the scale, and the undoable mark plus the
+                    // "Marked N" toast carry the confirmation. The
+                    // action routes per origin: an active review
+                    // applies the staged findings through the existing
+                    // `applyTriagedResults` path; otherwise the
+                    // selected search results apply through
+                    // `applySearchResults`.
+                    Button("Apply \(isReviewActive ? reviewAcceptedCount : searchState.selectedCount)") {
+                        if isReviewActive {
+                            applyReviewFindings()
+                        } else {
+                            applySelectedSearchResults()
                         }
                     }
                     .fontWeight(.semibold)
@@ -283,9 +339,12 @@ struct SearchAndRedactSheet: View {
                     // owns `redactionState.regions` so the mark
                     // write-back transaction cannot interleave
                     // with `.detecting / .redacting / .verifying`.
-                    .disabled(searchState.selectedCount == 0
-                              || isApplying
-                              || !documentState.canMutateRegions)
+                    .disabled(isReviewActive
+                              ? (reviewAcceptedCount == 0
+                                 || !documentState.canMutateRegions)
+                              : (searchState.selectedCount == 0
+                                 || isApplying
+                                 || !documentState.canMutateRegions))
                 }
                 // Saved-searches actions surface FLAT in the system
                 // overflow (•••) menu — no nested submenu. The list is
@@ -300,6 +359,11 @@ struct SearchAndRedactSheet: View {
                     } label: {
                         Label("Saved Searches", systemImage: "bookmark")
                     }
+                    // Parked while staged detections await review: a
+                    // recall re-triggers a run, and a run must not race
+                    // the pending review for the Scan surface. Resolve
+                    // the review (Apply / Dismiss) first.
+                    .disabled(redactionState.pendingTriage != nil)
                     .accessibilityIdentifier("saved-searches-menu")
                 }
                 ToolbarItem(placement: .secondaryAction) {
@@ -309,9 +373,13 @@ struct SearchAndRedactSheet: View {
                     } label: {
                         Label("Save as…", systemImage: "plus.circle")
                     }
-                    .disabled(!(searchState.results.isEmpty == false
-                                || !searchState.queryText.isEmpty
-                                || !searchState.searchTerms.isEmpty))
+                    // Also parked during a pending review — the sheet's
+                    // query shape isn't the review's content, so a save
+                    // here would capture an unrelated shape.
+                    .disabled(redactionState.pendingTriage != nil
+                              || !(searchState.results.isEmpty == false
+                                   || !searchState.queryText.isEmpty
+                                   || !searchState.searchTerms.isEmpty))
                     .accessibilityIdentifier("saved-searches-save-as")
                 }
             }
@@ -716,7 +784,12 @@ struct SearchAndRedactSheet: View {
         // handler clears results, and an uncancelled task's completion
         // tail would then write a false run record). Cancel first or
         // wait; the cancel affordance sits right in the search bar.
-        .disabled(searchState.isSearching)
+        // ALSO parked while staged detections await review: the review
+        // owns the surface until resolved (Apply / Dismiss) — every
+        // trigger path refuses to run during a review, so an enabled
+        // Search segment would open an interface whose search field
+        // silently does nothing.
+        .disabled(searchState.isSearching || redactionState.pendingTriage != nil)
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .padding(.top, ResectaTokens.Spacing.xs)
         .accessibilityLabel("Interface")
@@ -962,6 +1035,185 @@ struct SearchAndRedactSheet: View {
         searchState.setLivePreviewRects(rects)
     }
 
+    // MARK: - Dismiss (conditional dismiss)
+
+    /// Dismiss-confirmation copy — the single source of truth for both
+    /// the production `.confirmationDialog` and the copy-pin banned-word
+    /// sweep (`SearchSheetDismissRuleTests`), so a copy rename can't
+    /// drift past the sweep. Generalized from the retired triage
+    /// sheet's donor copy to cover both result origins.
+    static let dismissTitle = "Dismiss results?"
+    static let dismissMessage = "Selections will not be saved."
+
+    /// Shared dismiss path for the direct (untouched) and confirmed
+    /// (touched) routes. Closes BOTH sheet arms: a live selection is
+    /// deselected in-place; a pending review is discarded (the retired
+    /// triage sheet's Dismiss semantics — the summary banner's Review
+    /// re-stages the findings, and re-running detection rebuilds them).
+    /// `afterConfirmation` suppresses the loss-naming toasts — the
+    /// dialog already named the drop, and dialog + toast on one dismiss
+    /// would double-message.
+    private func performDismiss(afterConfirmation: Bool) {
+        if searchState.selectedCount > 0 {
+            let snapshot = Self.currentSelectionSnapshot(in: searchState)
+            Self.clearSelection(in: searchState, snapshot: snapshot)
+        } else if redactionState.pendingTriage == nil,
+                  !afterConfirmation,
+                  let message = Self.dismissClearedMessage(
+                      unappliedCount: Self.unappliedMatchCount(in: searchState)
+                  ) {
+            // UXF-27: a 0-selected dismissal names what the close drops
+            // when unapplied matches exist so the loss isn't silent.
+            // The toast manager outlives the sheet.
+            toastManager.enqueue(message, severity: .info)
+        }
+        if redactionState.pendingTriage != nil {
+            if !afterConfirmation {
+                // Carried from the retired review surface — the info
+                // trace that staged findings were dropped.
+                toastManager.enqueue("Detection results dismissed", severity: .info)
+            }
+            redactionState.dismissTriage()
+        }
+        redactionState.activeSearch = nil
+    }
+
+    // MARK: - the unified degrade rule Degrade banner
+
+    /// Unified degrade-banner rule: Scan always surfaces a degraded
+    /// detection corpus (its runs consult it); Search only when a
+    /// scan-class capability degrades the CURRENT action — and no
+    /// Search-side action in this tree uses one (literal matching plus
+    /// OCR modality access), so the Search side renders none until a
+    /// recall-aid lands there. Pure predicate, pinned by
+    /// `DegradedBannerTests`.
+    static func degradeBannerShouldShow(
+        interface: SearchInterface,
+        degraded: Bool
+    ) -> Bool {
+        degraded && interface == .scan
+    }
+
+    /// Persistent top banner while `redactionState.autoDetectionDegraded`
+    /// is true (one or more gazetteer / context-keywords resources failed
+    /// to load this session). Mechanism-description copy per ARCH §1.3 /
+    /// I6 — describes what happened and what remains available, no
+    /// outcome promises. Copy carried verbatim from the retired triage
+    /// sheet (its sole surface until this unification).
+    @ViewBuilder
+    private var degradedDetectionBanner: some View {
+        HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            Text("Auto-detection was disabled for this session because the detection corpus failed to load. Manual redaction tools remain available.")
+                .font(.subheadline)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, ResectaTokens.Spacing.md)
+        .padding(.vertical, ResectaTokens.Spacing.sm)
+        .background(ResectaTokens.SemanticColor.warningTint.opacity(0.12))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("degradedDetectionBanner")
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    // MARK: - Apply (review origin)
+
+    /// Toolbar Apply for the review origin: route the staged detections
+    /// through the EXISTING `applyTriagedResults` path (its internals
+    /// untouched — the one-apply-path unification is a later session).
+    private func applyReviewFindings() {
+        // Refuse mutations while the pipeline owns
+        // `redactionState.regions` — re-checked in the action against a
+        // pipeline that started after the last render (button-level
+        // gate; the path's own re-guard is later-session work).
+        guard documentState.canMutateRegions else { return }
+        let created = redactionState.applyTriagedResults(undoManager: undoManager)
+        // Conditional dismiss: the modified selections were committed; a subsequent
+        // Dismiss has nothing unsaved to confirm.
+        searchState.userModifiedSelections = false
+        // UXF-11 — commit feedback through the shared copy builder so
+        // the count stays in lockstep with every other apply surface.
+        // The sheet stays up (the review resolves in place); the
+        // sheet-local toast host renders it.
+        if let message = CommitFeedback.markedMessage(applied: created) {
+            toastManager.enqueue(message, severity: .success)
+        }
+    }
+
+    /// Footer Select All over the VISIBLE (kind-filtered) review
+    /// detections; hidden detections retain their selection state,
+    /// mirroring the search footer's filtered-only semantics.
+    private var allReviewVisibleSelected: Bool {
+        let visible = reviewVisibleIDs
+        guard !visible.isEmpty else { return false }
+        return visible.allSatisfy { redactionState.triageSelections[$0] ?? false }
+    }
+
+    private func toggleReviewSelectAll() {
+        let visible = reviewVisibleIDs
+        guard !visible.isEmpty else { return }
+        let target = !allReviewVisibleSelected
+        for id in visible {
+            redactionState.triageSelections[id] = target
+        }
+        // Conditional dismiss: bulk select/deselect is user selection work.
+        searchState.userModifiedSelections = true
+    }
+
+    // MARK: - Apply (search origin, toolbar)
+
+    /// Toolbar Apply for the search origin — the pre-absorption apply
+    /// action, extracted verbatim so the one Apply button can route per
+    /// origin.
+    private func applySelectedSearchResults() {
+        guard !isApplying else { return }
+        // Refuse mutations while the pipeline owns
+        // `redactionState.regions` — same gate as the button's
+        // `.disabled`, re-checked in the action against a pipeline that
+        // started after the last render.
+        guard documentState.canMutateRegions else { return }
+        isApplying = true
+        // Capture selected IDs before apply clears selection
+        let selectedIDs = Set(searchState.results.filter(\.isSelected).map(\.id))
+        Task { @MainActor in
+            defer { isApplying = false }
+            guard let result = await redactionState.applySearchResults(
+                undoManager: undoManager,
+                documentState: documentState
+            ) else {
+                redactionState.activeSearch = nil
+                return
+            }
+            // QW-1 (D06-F3) — union only the results that
+            // produced a region. Overlap-skipped members of
+            // the selection get no audit entry, so they must
+            // not earn the "applied" badge either.
+            searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
+            // Conditional dismiss: committed selections reset the touched tracker.
+            searchState.userModifiedSelections = false
+            // Non-modal success toast via the shared
+            // UXF-11 copy builder (`CommitFeedback`) so
+            // the count stays in lockstep with the
+            // review-apply toasts. `toastManager.enqueue`
+            // coalesces duplicates so repeated taps can't
+            // queue a pile of identical toasts.
+            if let message = CommitFeedback.markedMessage(
+                applied: result.applied,
+                alreadyCovered: result.skippedOverlaps
+            ) {
+                toastManager.enqueue(message, severity: .success)
+            }
+            // Navigate to first affected page
+            if let firstPage = searchState.results.first(where: { selectedIDs.contains($0.id) })?.pageIndex {
+                documentState.currentPageIndex = firstPage
+            }
+        }
+    }
+
     // MARK: - Apply (keyboard shortcut)
 
     fileprivate func applyFromKeyboardShortcut() {
@@ -984,6 +1236,9 @@ struct SearchAndRedactSheet: View {
             // QW-1 (D06-F3) — survivors only, mirroring the
             // toolbar Apply path above.
             searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
+            // Conditional dismiss: committed selections reset the touched tracker,
+            // mirroring the toolbar Apply path.
+            searchState.userModifiedSelections = false
             // Keyboard-shortcut path
             // mirrors the toolbar Apply path — non-modal toast via
             // the shared UXF-11 copy builder, which returns nil for a
