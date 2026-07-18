@@ -90,19 +90,24 @@ struct PIIScanRoleCopyTests {
     // (`SearchToolbarSection.piiScanRoleSubtitle`, deleted) into the
     // pre-scan empty state; the QRC-16a wording constraints follow it.
 
-    @Test("Scan role copy states the text-detector mechanism, whole-document scope, and text-only limit")
+    @Test("Scan role copy states the text-detector mechanism, locality, scope, text-only limit, and rationale visibility")
     func subtitleWordingConstraints() {
         // The copy formerly positioned this mode against the
         // Auto-Detect menu entry; that entry point retired with the
-        // two-interface toolbar, so the constraint set is now
+        // two-interface toolbar, so the constraint set is
         // self-contained: the mechanism (PII text detectors), the
-        // default scope (whole document), and the honest capability
-        // limit (text content only) — with no reference to a surface
-        // that no longer exists.
+        // locality (on-device), the default scope (whole document),
+        // the honest capability limit (text content only), and — the
+        // interface's role sentence, folded in with the copy pass —
+        // rationale visibility (results show the reasoning behind
+        // each item). No reference to a surface that no longer
+        // exists.
         let copy = WU20Strings.description(for: .piiScanPreScan)
+        #expect(copy.contains("on-device"))
         #expect(copy.contains("PII text detectors"))
         #expect(copy.contains("whole document"))
         #expect(copy.contains("text content only"))
+        #expect(copy.contains("show why"))
         #expect(!copy.contains("Auto-Detect"))
     }
 

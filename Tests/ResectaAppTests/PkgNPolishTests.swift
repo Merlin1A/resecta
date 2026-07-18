@@ -227,20 +227,18 @@ struct ApplyTriggersToastTests {
 
     @Test("Singular-form copy renders for 1-instance apply")
     func testSingularFormCopy() {
-        // UX-singular-plural-grammar (Pkg N): "Redact 1 instance?"
-        // vs "Redact 2 instances?". The pattern is repeated in
-        // DetectionTriageSheet. This test exercises the
-        // SearchAndRedactSheet variant via the same string template
-        // surface the view uses.
-        let one = "Redact \(1) instance\(1 == 1 ? "" : "s")?"
-        let two = "Redact \(2) instance\(2 == 1 ? "" : "s")?"
-        #expect(one == "Redact 1 instance?")
-        #expect(two == "Redact 2 instances?")
-        // DetectionTriageSheet variant.
-        let oneItem = "\(1) item\(1 == 1 ? "" : "s") detected"
-        let twoItem = "\(2) item\(2 == 1 ? "" : "s") detected"
-        #expect(oneItem == "1 item detected")
-        #expect(twoItem == "2 items detected")
+        // UX-singular-plural-grammar (Pkg N): the count-suffix ternary
+        // idiom for user-facing counts. The templates this test
+        // originally quoted ("Redact N instance(s)?", the triage
+        // sheet's "N item(s) detected") retired with their surfaces;
+        // the idiom's live sites are the clear-notice family
+        // ("… N unapplied match(es) …", pinned end-to-end by
+        // InterfaceSwitchClearTests). Pin the grammar against a real
+        // producer so the rule stays anchored to production copy.
+        #expect(SearchAndRedactSheet.recallClearedMessage(unappliedCount: 1)
+                == "Recall cleared 1 unapplied match.")
+        #expect(SearchAndRedactSheet.recallClearedMessage(unappliedCount: 2)
+                == "Recall cleared 2 unapplied matches.")
     }
 }
 

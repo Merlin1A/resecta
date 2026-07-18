@@ -402,7 +402,7 @@ struct SettingsView: View {
             NavigationLink("Custom Terms") {
                 CustomTermsView()
             }
-            .accessibilityHint("Add always-flag or never-flag terms applied during PII scans.")
+            .accessibilityHint("Add always-flag or never-flag terms applied during scans.")
 
             // App-wide saved-regex library, surfaced in the regex search
             // toolbar's saved-pattern menu.
@@ -414,7 +414,10 @@ struct SettingsView: View {
             Label("Workflow", systemImage: "arrow.triangle.2.circlepath")
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
-                Text("When detection review is enabled, auto-detected items are shown for your review before being applied as redaction regions.")
+                // The review-toggle era's conditional phrasing retired
+                // with the toggle: review-before-apply is the only
+                // behavior, so the footer states it unconditionally.
+                Text("Detected items are staged for your review; nothing is applied without an explicit selection.")
                 // Verbatim mechanism-description copy.
                 Text("Recent searches are stored on this device to help you repeat common queries. Disable to stop recording.")
             }

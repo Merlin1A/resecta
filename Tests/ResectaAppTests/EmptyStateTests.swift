@@ -141,6 +141,54 @@ struct EmptyStateTests {
         #expect(!copy.contains("Browse Templates"))
     }
 
+    @Test("Search role line mounts on pre-search contexts only")
+    func searchRoleSubtitleContexts() {
+        // The Search interface's one-line role sentence renders above
+        // the per-mode caption on the pre-search empty states. It does
+        // not render on no-match branches (result feedback owns those)
+        // or on the Scan side (whose role copy lives in the
+        // piiScanPreScan description).
+        let mounted: [WU20Strings.EmptyContext] = [
+            .textPreSearch, .regexPreSearch,
+            .multiTermPreSearchNoRecents, .multiTermPreSearchWithRecents,
+        ]
+        let bare: [WU20Strings.EmptyContext] = [
+            .textNoMatch, .regexNoMatch, .multiTermNoMatch,
+            .piiScanPreScan, .piiScanPostScanZero(detectorCount: 5),
+        ]
+        for context in mounted {
+            #expect(WU20Strings.showsSearchRoleSubtitle(for: context),
+                    "role line missing on \(context)")
+        }
+        for context in bare {
+            #expect(!WU20Strings.showsSearchRoleSubtitle(for: context),
+                    "role line unexpectedly mounted on \(context)")
+        }
+    }
+
+    @Test("Search role line states the literal-match contract, mechanism-description only")
+    func searchRoleSubtitleWording() {
+        let copy = WU20Strings.searchRoleSubtitle
+        // The literal-match contract: results follow the query, and
+        // nothing is inferred beyond it.
+        #expect(copy.contains("Matches exactly what you ask for"))
+        #expect(copy.contains("nothing inferred"))
+        // Mechanism-description discipline — forbidden vocabulary
+        // assembled via concat so this source does not itself trip
+        // the pre-commit sweep.
+        let lowered = copy.lowercased()
+        let forbidden: [String] = [
+            "guarant" + "ee",
+            "ensur" + "e",
+            "fin" + "d",
+            "cat" + "ch",
+            "100" + "%",
+        ]
+        for phrase in forbidden {
+            #expect(!lowered.contains(phrase), "forbidden phrase: \(phrase)")
+        }
+    }
+
     @Test("PII Scan pre-scan secondary line is nil when no detectors active")
     func piiScanPreScanSecondaryNilWhenNoDetectors() {
         let secondary = WU20Strings.piiScanPreScanSecondary(enabledPIICategoryCount: 0)

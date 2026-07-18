@@ -1928,8 +1928,8 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // linking across **all** PII categories using
                 // normalize-and-exact-match. Peer to the name-only
                 // clusterer above (which uses Jaro-Winkler over surname
-                // blocks). Drives the "Grouped" view mode in
-                // `DetectionTriageSheet`.
+                // blocks). Drives the "Grouped" view mode in the scan
+                // review surface (`ScanReviewSection`).
                 let crossPageGroups =
                     CrossPageEntityGroup.clusters(from: accumulatedResults)
 
@@ -2144,8 +2144,8 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// failure of the session, post a warning toast (mechanism-description
     /// copy) and flip `RedactionState.autoDetectionDegraded = true`.
     /// Subsequent runs that re-discover the same failure are silent — the
-    /// persistent banner in `DetectionTriageSheet` already communicates the
-    /// state.
+    /// persistent banner on the search sheet's Scan interface already
+    /// communicates the state.
     func surfaceGazetteerLoadDiagnostics(_ diagnostics: GazetteerLoadDiagnostics) {
         guard diagnostics.didDegrade else { return }
         // Only toast once per session — `autoDetectionDegraded` doubles as
@@ -2153,7 +2153,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         guard !redactionState.autoDetectionDegraded else { return }
         redactionState.autoDetectionDegraded = true
         enqueueToast(
-            "Auto-detection unavailable \u{2014} detection corpus failed to load. Manual redaction tools remain available.",
+            "Detection degraded \u{2014} detection corpus failed to load. Manual redaction tools remain available.",
             severity: .warning
         )
     }

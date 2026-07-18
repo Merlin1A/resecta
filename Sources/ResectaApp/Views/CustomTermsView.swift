@@ -69,7 +69,7 @@ struct CustomTermsView: View {
 
     private var aboutSection: some View {
         Section {
-            Text("Always-flag terms are added as matches during every PII scan. Never-flag terms drop matches whose text equals the term. Only affects PII scans \u{2014} direct searches pass through unchanged.")
+            Text("Always-flag terms are added as matches during every scan. Never-flag terms drop matches whose text equals the term. Only affects scans \u{2014} Search matches pass through unchanged.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .listRowSeparator(.hidden)

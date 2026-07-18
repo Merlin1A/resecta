@@ -865,7 +865,7 @@ struct DocumentEditorView: View {
             .keyboardShortcut("r", modifiers: [.command, .shift])
             .accessibilityIdentifier("redactButton")
             .accessibilityHint(redactionState.hasEffectiveRegions
-                               ? "" : "Draw or auto-detect regions first") // §A8
+                               ? "" : "Draw regions or apply Scan or Search results first") // §A8
 
             settingsButton
 

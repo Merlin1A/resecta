@@ -2147,8 +2147,8 @@ class RedactionOverlayView: UIView {
     private func accessibilityValue(for region: RedactionRegion) -> String {
         let base: String = switch region.source {
         case .manual: "Manual redaction region"
-        case .detectedPII(let kind, _): "Auto-detected \(kind.accessibilityName)"
-        case .detectedFace: "Auto-detected face region"
+        case .detectedPII(let kind, _): "Detected \(kind.accessibilityName)"
+        case .detectedFace: "Detected face region"
         case .searchMatch: "Search match redaction region"
         }
 

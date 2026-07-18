@@ -1096,15 +1096,17 @@ struct SearchAndRedactSheet: View {
     /// is true (one or more gazetteer / context-keywords resources failed
     /// to load this session). Mechanism-description copy per ARCH §1.3 /
     /// I6 — describes what happened and what remains available, no
-    /// outcome promises. Copy carried verbatim from the retired triage
-    /// sheet (its sole surface until this unification).
+    /// outcome promises. The copy pass reworded the inherited banner
+    /// line: the state is a degrade (runs proceed with the resources
+    /// that loaded), and the retired flow name is gone — the wording
+    /// now matches the toast that announces the same state.
     @ViewBuilder
     private var degradedDetectionBanner: some View {
         HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
                 .accessibilityHidden(true)
-            Text("Auto-detection was disabled for this session because the detection corpus failed to load. Manual redaction tools remain available.")
+            Text("Detection is degraded for this session because the detection corpus failed to load. Manual redaction tools remain available.")
                 .font(.subheadline)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)

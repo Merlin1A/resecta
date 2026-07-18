@@ -188,7 +188,7 @@ struct ResectaApp: App {
                                         if launchArguments.contains("--openSavedSearches"),
                                            savedSearchStore.savedSearches.isEmpty {
                                             savedSearchStore.add(SavedSearch(
-                                                name: "Sample: PII scan",
+                                                name: "Sample: Scan",
                                                 mode: .piiScan,
                                                 enabledPIICategories: [.ssn, .ein, .routingNumber]
                                             ))

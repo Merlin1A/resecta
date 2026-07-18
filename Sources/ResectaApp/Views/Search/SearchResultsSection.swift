@@ -707,6 +707,12 @@ struct SearchResultsSection: View {
             )
         } description: {
             VStack(alignment: .center, spacing: ResectaTokens.Spacing.sm) {
+                // Interface-level role line for the Search side,
+                // above the per-mode caption. The Scan side's role
+                // sentence lives inside its description string.
+                if WU20Strings.showsSearchRoleSubtitle(for: context) {
+                    Text(WU20Strings.searchRoleSubtitle)
+                }
                 // Markdown-bold markers only parse through the
                 // LocalizedStringKey overload of `Text(_:)`; a plain
                 // String variable hits the verbatim overload and renders
@@ -999,16 +1005,44 @@ enum WU20Strings {
         case .multiTermNoMatch:
             return "No occurrences in the document for any of the active terms."
         case .piiScanPreScan:
-            // Carries the role sentence (moved here
-            // from the scan toolbar). The former copy positioned this
-            // mode against the Auto-Detect menu entry; that entry point
-            // retired with the two-interface toolbar, so the copy now
-            // states the mechanism on its own terms: text detectors,
-            // whole-document default, text content only.
-            return "Runs the PII text detectors across the whole document \u{2014} text content only. Tap **Scan Document** above to run it."
+            // Carries the Scan interface's role sentence (moved here
+            // from the scan toolbar; the Search interface's counterpart
+            // is `searchRoleSubtitle` below). The copy states the
+            // mechanism on its own terms: text detectors, on-device,
+            // whole-document default, text content only — plus the
+            // rationale-visibility half of the role: every result can
+            // show the reasoning behind it.
+            return "Runs the on-device PII text detectors across the whole document \u{2014} text content only. Results show why each item was flagged. Tap **Scan Document** above to run it."
         case .piiScanPostScanZero(let detectorCount):
             let suffix = detectorCount == 1 ? "" : "s"
             return "\(detectorCount) detector\(suffix) matched 0 candidates above threshold."
+        }
+    }
+
+    // MARK: Search-interface role line
+
+    /// One-line role sentence for the Search interface, rendered above
+    /// the per-mode caption on the pre-search empty states (the Scan
+    /// interface's counterpart is folded into the `piiScanPreScan`
+    /// description above). States the literal-match contract: matches
+    /// follow the query and its options; nothing is inferred beyond
+    /// them. Pinned by `EmptyStateTests`.
+    static let searchRoleSubtitle =
+        "Matches exactly what you ask for \u{2014} nothing more, nothing inferred."
+
+    /// True for the Search-side pre-search contexts that mount the
+    /// role line. Pure predicate consumed by the empty state and
+    /// pinned by `EmptyStateTests`. No-match branches stay
+    /// role-line-free (they carry result feedback), and the Scan-side
+    /// branches have their own role copy.
+    static func showsSearchRoleSubtitle(for context: EmptyContext) -> Bool {
+        switch context {
+        case .textPreSearch, .regexPreSearch,
+             .multiTermPreSearchNoRecents, .multiTermPreSearchWithRecents:
+            return true
+        case .textNoMatch, .regexNoMatch, .multiTermNoMatch,
+             .piiScanPreScan, .piiScanPostScanZero:
+            return false
         }
     }
 

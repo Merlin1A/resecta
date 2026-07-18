@@ -20,7 +20,7 @@ The core workflow is:
 
 1. **Import** a PDF or image from Files, Photos, or drag-and-drop.
 2. **View** pages and navigate the document.
-3. **Mark** regions for redaction by drawing rectangles, tapping detected PII, or tapping detected faces.
+3. **Mark** regions for redaction by drawing rectangles, or by selecting and applying results from Scan (on-device text detection) or Search (text, pattern, and multi-term matching).
 4. **Apply** redaction. Each affected page is rasterized — vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer in marked regions. Source document metadata (author, editing history, etc.) is stripped; the rebuilt file carries a generic producer tag and fresh creation/modification timestamps added by the system PDF writer, so the export is not metadata-free — see [`PRIVACY.md`](./PRIVACY.md).
 5. **Verify.** A multi-layer verification engine scans the output for residual content using text extraction, OCR, binary string search across multiple encodings, structural analysis, and metadata checks.
 6. **Export** via the system share sheet.
@@ -39,7 +39,7 @@ The end-to-end pipeline. The chosen export mode selects the verification pass:
 ```mermaid
 flowchart LR
   A[Import PDF or image] --> B[View]
-  B --> C[Mark: auto-detect or draw regions]
+  B --> C[Mark: scan, search, or draw regions]
   C --> D[Apply: rasterize / flatten / strip metadata]
   D --> E{Export mode}
   E -->|Secure Rasterization| F[Verify - 5-layer pass]
@@ -55,9 +55,10 @@ _All stages run on-device; the redaction pipeline makes no network calls. Verifi
 V1.0 ships the core workflow described above. The following items
 were deliberately deferred to a future release:
 
-- **No "Compose" search sub-mode.** Search ships four modes (Text,
-  Regex, Multi-term, PII Scan). A Compose mode for stacked filter
-  combinations is V1.1+ scope.
+- **No "Compose" search sub-mode.** The app ships two marking
+  interfaces: Scan, which runs the on-device PII text detectors, and
+  Search, with three modes (Text, Regex, Multi-term). A Compose mode
+  for stacked filter combinations is V1.1+ scope.
 - **No per-region exemption tagging.** User-defined detection terms
   live in a flat `UserTermsStore` (always-flag / never-flag lists)
   and `SavedRegexStore` (saved-regex library). Per-region FOIA
@@ -80,7 +81,7 @@ See [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md) for the open-bug tracker.
 
 - No network: the codebase contains no `URLSession` or `NWConnection` usage. This is verifiable at the source level via grep.
 - No accounts, no analytics, no telemetry, no server-side components.
-- On-device PII detection uses regex patterns and `NLTagger` named-entity recognition. On-device face detection uses the Vision framework; no biometric data is created, stored, or transmitted.
+- On-device PII detection uses regex patterns and `NLTagger` named-entity recognition; OCR for scanned pages uses the Vision framework. Nothing in the app creates, stores, or transmits biometric data.
 - Sample documents, if any, are bundled into the app binary — not downloaded.
 
 Users are responsible for verifying that redaction output meets their specific requirements before sharing documents.
@@ -164,7 +165,7 @@ A stranger can clone, build, and start contributing in under an hour with these 
 
 ## Testing
 
-The workflow the suites protect — import, auto-detect, apply, verify:
+The workflow the suites protect — import, scan, apply, verify (recorded before the current interface naming):
 
 ![Import, scan, apply, verify](docs/images/redact-verify-demo.gif)
 
@@ -172,7 +173,7 @@ The test tree is larger than the source tree: roughly 54,000 lines of Swift sour
 
 - **Engine package** (`Packages/RedactionEngine/Tests`) — 1,630 Swift Testing `@Test` functions across 213 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
 - **App target** (`Tests/ResectaAppTests`) — 1,205 `@Test` functions across 177 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
-- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 11 XCUITest methods that drive the built app on a simulator: the first-launch legal gate, detection triage, and search-to-redaction flows.
+- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 11 XCUITest methods that drive the built app on a simulator: the first-launch legal gate, detection review, and search-to-redaction flows.
 
 Together the suites carry about 6,100 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
 
@@ -197,8 +198,8 @@ Licensed under the Apache License, Version 2.0. See [`LICENSE`](./LICENSE) for t
 
 ## Screenshots
 
-All captures show the app's bundled synthetic sample document — every visible value (names, accounts, addresses) is fictitious.
+All captures show the app's bundled synthetic sample document — every visible value (names, accounts, addresses) is fictitious. The frames predate the current interface naming (the detection surface is now called Scan); refreshed captures are planned for a future release.
 
-| Home | PII scan results | Verification |
+| Home | Scan results | Verification |
 | --- | --- | --- |
-| ![Home screen](./docs/images/home.png) | ![PII scan results with detected matches](./docs/images/pii-scan-results.png) | ![Verification summary — Checks Passed](./docs/images/verification-passed.png) |
+| ![Home screen](./docs/images/home.png) | ![Scan results with detected matches](./docs/images/pii-scan-results.png) | ![Verification summary — Checks Passed](./docs/images/verification-passed.png) |

@@ -107,7 +107,7 @@ extension PipelineError {
             // what the engine did (signature check failed → corpus not
             // loaded → manual tools remain).
             case .detectionCorpusInvalid:
-                "The detection corpus did not pass signature verification, so auto-detection is unavailable for this session. Manual redaction tools remain available."
+                "The detection corpus did not pass signature verification, so detection is unavailable for this session. Manual redaction tools remain available."
             }
 
         case .redactionError(let f):
