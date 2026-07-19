@@ -558,11 +558,22 @@ public actor DocumentSearcher {
         let searcher = self
         let sendableDoc = document
 
-        Task {
+        // The producer must be cancellable from the consumer side:
+        // cancelling/dropping the stream is the caller's only cancel
+        // mechanism, and an unstoppable producer keeps scanning every
+        // remaining page (OCR included) and fires whichever sinks are
+        // installed when it finally reaches them — a later search's,
+        // corrupting that scan's suppression counts and banners. The
+        // per-page `Task.isCancelled` checks read THIS task's flag, so
+        // termination must propagate to it.
+        let producer = Task {
             await searcher.performSearch(
                 sendableDoc, mode: mode,
                 progress: progress, continuation: continuation
             )
+        }
+        continuation.onTermination = { @Sendable _ in
+            producer.cancel()
         }
 
         return stream
@@ -1136,7 +1147,7 @@ public actor DocumentSearcher {
                 if options.includeOCR {
                     let ocrResults = await searchPageViaOCRFallback_regex(
                         page: page, pageIndex: pageIndex,
-                        pattern: pattern, options: options
+                        regex: regex, options: options
                     )
                     for result in ocrResults {
                         if totalYielded >= Self.maxResults { break }
@@ -2165,10 +2176,13 @@ public actor DocumentSearcher {
     ///      pattern was authored by the user for literal match; applying NFKC
     ///      to the body only (not the pattern) would silently break ASCII
     ///      patterns. This is consistent with the text-layer path in searchRegex.
+    /// Takes the caller's already-compiled (and safety-validated)
+    /// `NSRegularExpression` — re-validating/re-compiling the pattern
+    /// string here repeated the full precheck once per scanned page.
     private func searchPageViaOCRFallback_regex(
         page: PDFPage,
         pageIndex: Int,
-        pattern: String,
+        regex: NSRegularExpression,
         options: SearchOptions
     ) async -> [SearchResult] {
         let lines = await ocrPage(page, pageIndex: pageIndex)
@@ -2187,8 +2201,6 @@ public actor DocumentSearcher {
         if options.normalizeSmartPunctuation {
             searchText = TextNormalizer.normalizeSmartPunctuation(searchText)
         }
-
-        guard let regex = Self.validateRegexPattern(pattern) else { return [] }
 
         let nsString = searchText as NSString
         let fullRange = NSRange(location: 0, length: nsString.length)
@@ -2261,7 +2273,7 @@ public actor DocumentSearcher {
                 matchedText: matchedText,
                 contextSnippet: snippet,
                 source: .ocr(confidence: avgConfidence),
-                term: pattern
+                term: regex.pattern
             ))
         }
 

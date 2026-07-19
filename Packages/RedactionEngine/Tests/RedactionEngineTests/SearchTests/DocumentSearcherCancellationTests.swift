@@ -130,6 +130,72 @@ struct DocumentSearcherCancellationTests {
         #expect(count >= 20)
     }
 
+    @Test("Terminating the stream stops the producer's page walk")
+    func streamTerminationStopsProducerPageWalk() async throws {
+        let pageCount = 120
+        let data = multiPageTextPDF(
+            pageCount: pageCount,
+            text: "Quick fox content on every page."
+        )
+        guard let doc = PDFDocument(data: data) else {
+            Issue.record("Failed to create PDFDocument")
+            return
+        }
+        let sendable = SendablePDFDocument(doc)
+        let searcher = DocumentSearcher()
+
+        // Track the highest page the producer reports. The producer is
+        // an unstructured Task whose only cancellation channel is the
+        // stream's `onTermination` — before that wiring existed,
+        // dropping the stream left it walking every remaining page and
+        // firing whichever sinks were installed by the NEXT scan.
+        final class PageBox: @unchecked Sendable {
+            private let lock = NSLock()
+            private var _maxPage = 0
+            var maxPage: Int {
+                lock.lock(); defer { lock.unlock() }
+                return _maxPage
+            }
+            func record(_ page: Int) {
+                lock.lock(); defer { lock.unlock() }
+                _maxPage = max(_maxPage, page)
+            }
+        }
+        let box = PageBox()
+
+        let consumer = Task {
+            let stream = searcher.search(
+                sendable,
+                mode: .text("fox", options: SearchOptions()),
+                progress: { current, _ in box.record(current) }
+            )
+            for await _ in stream {
+                break  // Drop the stream after the first result.
+            }
+        }
+        _ = await consumer.value
+
+        // Poll until the page counter goes quiet (load-tolerant: a slow
+        // host slows both the walk and the poll), then assert the walk
+        // stopped short of the document's end. A zombie producer walks
+        // to `pageCount` regardless of how long that takes.
+        var current = box.maxPage
+        var quietRounds = 0
+        for _ in 0..<40 {
+            try await Task.sleep(for: .milliseconds(100))
+            let next = box.maxPage
+            if next == current {
+                quietRounds += 1
+                if quietRounds >= 3 { break }
+            } else {
+                quietRounds = 0
+                current = next
+            }
+        }
+        #expect(box.maxPage < pageCount,
+                "the producer must stop near the termination point, not walk the whole document")
+    }
+
     // MARK: - Helpers
 
     private func multiPageTextPDF(pageCount: Int, text: String) -> Data {
