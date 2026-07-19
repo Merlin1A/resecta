@@ -254,6 +254,10 @@ struct SearchToolbarSection: View {
                         onTriggerSearch()
                     }
                     .controlSize(.small)
+                    // Same in-flight gate as every other trigger control
+                    // in this sheet; rapid re-taps must not race a
+                    // second setup past the not-yet-assigned task.
+                    .disabled(searchState.isSearching)
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.md)
             }
@@ -442,7 +446,10 @@ struct SearchToolbarSection: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, ResectaTokens.Spacing.md)
-                    .accessibilityLabel("OCR controls disabled: \(caption.lowercased())")
+                    // The caption is a full sentence that may open with
+                    // an acronym ("OCR not needed …") — lowercasing it
+                    // produced "ocr not needed" in the spoken label.
+                    .accessibilityLabel("OCR controls disabled: \(caption)")
             }
         }
     }

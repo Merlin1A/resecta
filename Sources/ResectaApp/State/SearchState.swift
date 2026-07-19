@@ -110,11 +110,63 @@ final class SearchState: Identifiable {
     /// One-shot arm for the toolbar Scan button's one-tap contract:
     /// the button sets this before presenting the sheet, and the
     /// sheet's `.onAppear` consumes it exactly once to fire the run.
-    /// A single consume site is load-bearing — `triggerSearch()` does
-    /// not deduplicate same-turn callers (`activeSearchTask` is
-    /// assigned only after a suspension point), so the arm/consume
-    /// pattern is what keeps the auto-run to one scan.
+    /// A single consume site keeps the auto-run to one scan; overlapping
+    /// `triggerSearch()` calls additionally coalesce through the
+    /// single-flight gate below.
     var pendingAutoRunScan: Bool = false
+
+    // MARK: - Trigger single-flight
+
+    /// True while `triggerSearch()` is between its synchronous entry
+    /// and the `activeSearchTask` assignment. The setup window spans
+    /// real suspension points (the prior task's cancel-await, the
+    /// detached document copy), so without a gate two overlapping
+    /// callers both observe a nil task handle and the loser's scan runs
+    /// orphaned — appending into shared results and double-writing the
+    /// run record. Not observed by any view.
+    @ObservationIgnored private(set) var triggerSetupInFlight = false
+
+    /// Set when a trigger arrived while another held the setup window.
+    /// Consumed by `endTriggerSetup()`: the window owner re-triggers
+    /// once, so the final run reflects the latest query shape.
+    @ObservationIgnored private(set) var pendingRetrigger = false
+
+    /// Single-flight gate for `triggerSearch()`. Returns true when the
+    /// caller owns the setup window; false coalesces this call into one
+    /// deferred re-trigger. Pinned by `SearchStateTests`.
+    func beginTriggerSetup() -> Bool {
+        guard !triggerSetupInFlight else {
+            pendingRetrigger = true
+            return false
+        }
+        triggerSetupInFlight = true
+        return true
+    }
+
+    /// Close the setup window. Returns true when a coalesced caller
+    /// requested a re-trigger while the window was held.
+    func endTriggerSetup() -> Bool {
+        triggerSetupInFlight = false
+        let retrigger = pendingRetrigger
+        pendingRetrigger = false
+        return retrigger
+    }
+
+    // MARK: - Run-state discriminators
+
+    /// True once a non-cancelled run has completed since the last
+    /// `clearResults()`. The empty-state discriminator uses it to
+    /// distinguish "ran and found nothing" from "this query was never
+    /// run in this mode" — a mode switch carries the query text but
+    /// deliberately does not re-run (UXF-16), and that carried state
+    /// must not render as a definitive no-match verdict.
+    var hasCompletedRunSinceClear = false
+
+    /// True when the last Scan attempt exited before kickoff (document
+    /// not ready). Distinguishes "never scanned" from "the scan failed
+    /// to start" after the failure toast expires. Reset by
+    /// `clearResults()` — every trigger clears before its guards run.
+    var scanStartFailed = false
 
     /// Search options (toggles in UI).
     var options: SearchOptions = SearchOptions()
@@ -648,6 +700,16 @@ final class SearchState: Identifiable {
         results.count { $0.isSelected }
     }
 
+    /// True when the selection is non-empty and every selected result
+    /// already carries an applied marker. The toolbar Apply disables on
+    /// it — re-applying an all-applied selection can only no-op through
+    /// the overlap guard ("Marked 0 … already covered").
+    var selectionFullyApplied: Bool {
+        let selected = results.filter(\.isSelected)
+        guard !selected.isEmpty else { return false }
+        return selected.allSatisfy { appliedResultIDs.contains($0.id) }
+    }
+
     /// D06-F2 Part 2 — count of results the user left un-checked in triage
     /// (the complement of `selectedCount`). Folded into
     /// `CoverageReport.deselectedCount` at the panel + audit-export boundary
@@ -1073,6 +1135,8 @@ final class SearchState: Identifiable {
         regexTimeoutPages = []
         ocrSkippedPages = []
         capUnscannedPageCount = 0
+        hasCompletedRunSinceClear = false
+        scanStartFailed = false
         // Drop the magic-wand pre-select flag along with all
         // other session-scoped state so a fresh sheet session starts at
         // the engine default selection shape.
@@ -1269,6 +1333,11 @@ final class SearchState: Identifiable {
         regexTimeoutPages = []
         ocrSkippedPages = []
         capUnscannedPageCount = 0
+        // Run-state discriminators reset with results: the next empty
+        // state must read as "not run yet" until a run completes, and a
+        // prior failed-start must not outlive the state it described.
+        hasCompletedRunSinceClear = false
+        scanStartFailed = false
         // UXF-02 — scan-progress counters reset with results. Leaving
         // `currentSearchPage` non-zero across a mode switch made the
         // piiScan empty state read as post-scan ("Scan complete … 0

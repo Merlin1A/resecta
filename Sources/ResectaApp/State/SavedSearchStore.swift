@@ -183,10 +183,21 @@ nonisolated struct SavedSearch: Codable, Identifiable, Sendable, Equatable {
 nonisolated struct SavedSearchEnvelope: Codable, Sendable, Equatable {
     let schemaVersion: Int
     let savedSearches: [SavedSearch]
+    /// Rows the lenient decode could not understand, retained verbatim
+    /// (as raw JSON trees) so `encode` re-emits them. Without this, the
+    /// first save after a row-level decode failure would erase the
+    /// failed row from disk permanently — a future-version row must
+    /// survive an older build's unrelated saves.
+    let unrecognized: [RetainedJSONValue]
 
-    init(schemaVersion: Int, savedSearches: [SavedSearch]) {
+    init(
+        schemaVersion: Int,
+        savedSearches: [SavedSearch],
+        unrecognized: [RetainedJSONValue] = []
+    ) {
         self.schemaVersion = schemaVersion
         self.savedSearches = savedSearches
+        self.unrecognized = unrecognized
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -194,11 +205,12 @@ nonisolated struct SavedSearchEnvelope: Codable, Sendable, Equatable {
     }
 
     /// Lenient per-element decode: an element that fails to decode is
-    /// DROPPED and the rest survive, so one bad row can never zero the
-    /// whole list. The per-row posture is unchanged — each element still
+    /// parked in `unrecognized` and the rest survive, so one bad row can
+    /// never zero the whole list — and the parked raw row survives
+    /// re-saves. The per-row posture is unchanged — each element still
     /// fails closed on unknown keys via the `SavedSearch` whitelist
     /// decoder; what this bounds is the blast radius of a row-level
-    /// failure. Logs the dropped COUNT only (never content, never names),
+    /// failure. Logs the parked COUNT only (never content, never names),
     /// DEBUG builds only.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -206,22 +218,43 @@ nonisolated struct SavedSearchEnvelope: Codable, Sendable, Equatable {
         let wrapped = try container.decode([FailableSavedSearch].self, forKey: .savedSearches)
         let survivors = wrapped.compactMap(\.value)
         #if DEBUG
-        let dropped = wrapped.count - survivors.count
-        if dropped > 0 {
-            envelopeLogger.debug("SavedSearchEnvelope: dropped \(dropped) undecodable row(s)")
+        let parked = wrapped.count - survivors.count
+        if parked > 0 {
+            envelopeLogger.debug("SavedSearchEnvelope: parked \(parked) undecodable row(s)")
         }
         #endif
         self.savedSearches = survivors
+        self.unrecognized = wrapped.compactMap(\.raw)
+    }
+
+    /// Re-splice: decoded rows and retained raw rows encode back into
+    /// the ONE `savedSearches` array — the wire shape is unchanged, so
+    /// this is not a schema change. Retained rows append after the
+    /// decoded list (list order is append-order already).
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        var rows = container.nestedUnkeyedContainer(forKey: .savedSearches)
+        for search in savedSearches { try rows.encode(search) }
+        for row in unrecognized { try rows.encode(row) }
     }
 }
 
 /// Never-throwing element wrapper for the lenient envelope decode. The
 /// wrapper's `init` always succeeds, so the unkeyed container advances
-/// past a failing element instead of aborting the whole array.
+/// past a failing element instead of aborting the whole array; the
+/// failed element is captured as a raw JSON tree for re-emission.
 nonisolated private struct FailableSavedSearch: Decodable {
     let value: SavedSearch?
+    let raw: RetainedJSONValue?
     init(from decoder: Decoder) {
-        self.value = try? SavedSearch(from: decoder)
+        if let decoded = try? SavedSearch(from: decoder) {
+            self.value = decoded
+            self.raw = nil
+        } else {
+            self.value = nil
+            self.raw = try? RetainedJSONValue(from: decoder)
+        }
     }
 }
 
@@ -260,20 +293,21 @@ final class SavedSearchStore {
 
     private(set) var savedSearches: [SavedSearch]
 
+    /// Raw rows the lenient hydrate parked (see
+    /// `SavedSearchEnvelope.unrecognized`); threaded back into every
+    /// `persist()` so a re-save cannot erase them.
+    private var unrecognizedRows: [RetainedJSONValue]
+
     private let blob: FileJSONBlob<SavedSearchEnvelope>
 
     /// Default production init — reads the Application Support file.
     convenience init() {
-        self.init(fileURL: Self.defaultFileURL, asyncHydrate: true)
+        self.init(fileURL: Self.defaultFileURL)
     }
 
-    // P2.1: `asyncHydrate` moves the file read off the cold-start
-    // critical path. Default is false so tests calling `init(fileURL:)`
-    // keep their synchronous round-trip contract.
     init(
         fileURL: URL,
-        legacyDefaults: UserDefaults = .standard,
-        asyncHydrate: Bool = false
+        legacyDefaults: UserDefaults = .standard
     ) {
         self.blob = FileJSONBlob(
             fileURL: fileURL,
@@ -283,14 +317,14 @@ final class SavedSearchStore {
         // One-time cleanup of the pre-v2 UserDefaults blob (idempotent —
         // nothing writes that key anymore).
         legacyDefaults.removeObject(forKey: Self.legacyDefaultsKey)
-        if asyncHydrate {
-            self.savedSearches = []
-            Task { @MainActor in
-                self.savedSearches = Self.hydrate(from: self.blob)
-            }
-        } else {
-            self.savedSearches = Self.hydrate(from: blob)
-        }
+        // Hydration is deliberately synchronous. The former async
+        // option left `savedSearches = []` until a later MainActor
+        // tick, so a mutation landing first would `persist()` just
+        // itself over the real library — silent data loss. The file is
+        // one small JSON blob; the read is not worth that window.
+        let hydrated = Self.hydrate(from: blob)
+        self.savedSearches = hydrated.searches
+        self.unrecognizedRows = hydrated.unrecognized
     }
 
     /// Hydration gate for the INNER envelope version. The outer
@@ -298,10 +332,12 @@ final class SavedSearchStore {
     /// the two declared versions honest against each other — a future
     /// edit that bumps one without the other reads as the empty fallback
     /// instead of silently succeeding on stale-shaped data.
-    private static func hydrate(from blob: FileJSONBlob<SavedSearchEnvelope>) -> [SavedSearch] {
+    private static func hydrate(
+        from blob: FileJSONBlob<SavedSearchEnvelope>
+    ) -> (searches: [SavedSearch], unrecognized: [RetainedJSONValue]) {
         let envelope = blob.load()
-        guard envelope.schemaVersion == Int(Self.schemaVersion) else { return [] }
-        return envelope.savedSearches
+        guard envelope.schemaVersion == Int(Self.schemaVersion) else { return ([], []) }
+        return (envelope.savedSearches, envelope.unrecognized)
     }
 
     // MARK: - Read
@@ -349,6 +385,10 @@ final class SavedSearchStore {
     }
 
     private func persist() {
-        blob.save(SavedSearchEnvelope(schemaVersion: Int(Self.schemaVersion), savedSearches: savedSearches))
+        blob.save(SavedSearchEnvelope(
+            schemaVersion: Int(Self.schemaVersion),
+            savedSearches: savedSearches,
+            unrecognized: unrecognizedRows
+        ))
     }
 }

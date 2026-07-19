@@ -40,10 +40,26 @@ extension SearchAndRedactSheet {
         // during a review (run button hidden, recall disabled, auto-run
         // unarmed); this guard is defense-in-depth for future callers.
         guard redactionState.pendingTriage == nil else { return }
+        // Single-flight: setup below spans real suspension points
+        // (cancel-await, detached document copy) before
+        // `activeSearchTask` is assigned. Overlapping callers — rapid
+        // multi-term Returns, double-tapped run affordances — coalesce
+        // into one deferred re-trigger instead of racing a second
+        // orchestration past the nil task handle, which orphaned the
+        // loser's scan and double-wrote the run record.
+        guard searchState.beginTriggerSetup() else { return }
         // Orchestration runs inside a Task so the prior task's cleanup
         // tail completes (via `await searchState.cancelSearch()`) before
         // the new scan installs sinks and flips `isSearching`.
         Task { @MainActor in
+            defer {
+                // Window closes on every exit path; a coalesced caller
+                // re-runs once so the final scan reflects the latest
+                // query shape.
+                if searchState.endTriggerSetup() {
+                    triggerSearch()
+                }
+            }
             await searchState.cancelSearch()
             // Snapshot the just-completed scan's
             // results (if any) into `priorScanFingerprints` BEFORE
@@ -100,6 +116,19 @@ extension SearchAndRedactSheet {
 
             guard let liveDoc = documentState.sourceDocument else {
                 searchState.isSearching = false
+                // Same feedback contract as the copy-failure guard
+                // below — a silent exit reads as "never ran" once the
+                // sheet re-renders.
+                toastManager.enqueue(
+                    "Could not prepare the document for search. Try again.",
+                    severity: .warning
+                )
+                if searchState.searchModeType == .piiScan {
+                    searchState.scanStartFailed = true
+                    redactionState.recordDetectionRun(
+                        .failed,
+                        scanSummary: .init(foundCount: 0, pageCount: 0))
+                }
                 return
             }
 
@@ -123,6 +152,7 @@ extension SearchAndRedactSheet {
                 // a failure notice that only ever lived in a transient
                 // toast is no record at all (the banner persists it).
                 if searchState.searchModeType == .piiScan {
+                    searchState.scanStartFailed = true
                     redactionState.recordDetectionRun(
                         .failed,
                         scanSummary: .init(foundCount: 0, pageCount: 0))
@@ -297,6 +327,10 @@ extension SearchAndRedactSheet {
                 // may have already installed sinks and set `isSearching`.
                 if !Task.isCancelled {
                     searchState.flushPendingResults()
+                    // A completed (non-cancelled) run flips the
+                    // empty-state discriminator from "not run yet" to a
+                    // genuine result verdict.
+                    searchState.hasCompletedRunSinceClear = true
                     // Magic-wand pre-select flag is single-use:
                     // applies to the matches this scan emits, then resets
                     // so a follow-up search from the same sheet session
@@ -486,5 +520,146 @@ extension SearchAndRedactSheet {
             startedAt: startedAt,
             completedAt: completedAt
         )
+    }
+
+    // MARK: - Apply (search origin, toolbar)
+
+    /// Toolbar Apply for the search origin, routed through the one
+    /// `applyFindings` path. (Lives here with `triggerSearch()` per the
+    /// M-6 hub-cap decomposition — the run-orchestration family stays
+    /// together; internal, not private, because the hub view's toolbar
+    /// is the caller.)
+    func applySelectedSearchResults() {
+        guard !isApplying else { return }
+        // Refuse mutations while the pipeline owns
+        // `redactionState.regions` — same gate as the button's
+        // `.disabled`, re-checked in the action against a pipeline that
+        // started after the last render (and again inside the path).
+        guard documentState.canMutateRegions else { return }
+        isApplying = true
+        // Capture selected IDs before apply clears selection
+        let selectedIDs = Set(searchState.results.filter(\.isSelected).map(\.id))
+        Task { @MainActor in
+            defer { isApplying = false }
+            guard let result = await redactionState.applyFindings(
+                .selectedSearchResults,
+                undoManager: undoManager,
+                documentState: documentState
+            ) else {
+                // A refused apply (the path's post-await mutation
+                // re-check lost to a pipeline start) preserves the
+                // session for retry — same contract as the review and
+                // keyboard-shortcut apply handlers. Dismissing here
+                // destroyed the user's results and selections over a
+                // transient refusal.
+                return
+            }
+            // QW-1 (D06-F3) — union only the results that
+            // produced a region. Overlap-skipped members of
+            // the selection get no audit entry, so they must
+            // not earn the "applied" badge either. The
+            // conditional-dismiss tracker reset is owned by
+            // the apply path.
+            searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
+            // Non-modal success toast via the shared
+            // UXF-11 copy builder (`CommitFeedback`) so
+            // the count stays in lockstep with the
+            // review-apply toasts. `toastManager.enqueue`
+            // coalesces duplicates so repeated taps can't
+            // queue a pile of identical toasts.
+            if let message = CommitFeedback.markedMessage(
+                applied: result.applied,
+                alreadyCovered: result.skippedOverlaps
+            ) {
+                toastManager.enqueue(message, severity: .success)
+            }
+            // Navigate to first affected page
+            if let firstPage = searchState.results.first(where: { selectedIDs.contains($0.id) })?.pageIndex {
+                documentState.currentPageIndex = firstPage
+            }
+        }
+    }
+
+    // MARK: - Apply (keyboard shortcut)
+
+    func applyFromKeyboardShortcut() {
+        guard !isApplying else { return }
+        // Keyboard-shortcut Apply path mirrors the
+        // toolbar Apply gate — refuse mutations while the
+        // pipeline owns `redactionState.regions`.
+        guard documentState.canMutateRegions else { return }
+        guard searchState.selectCurrentMatchIfNoneSelected() else { return }
+        isApplying = true
+        let selectedIDs = Set(searchState.results.filter(\.isSelected).map(\.id))
+        Task { @MainActor in
+            defer { isApplying = false }
+            guard let result = await redactionState.applyFindings(
+                .selectedSearchResults,
+                undoManager: undoManager,
+                documentState: documentState
+            ) else {
+                return
+            }
+            // QW-1 (D06-F3) — survivors only, mirroring the
+            // toolbar Apply path above. The conditional-dismiss
+            // tracker reset is owned by the apply path.
+            searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
+            // Keyboard-shortcut path
+            // mirrors the toolbar Apply path — non-modal toast via
+            // the shared UXF-11 copy builder, which returns nil for a
+            // no-op apply so a held shortcut against an all-overlap
+            // selection still emits no "Marked 0" message.
+            if let message = CommitFeedback.markedMessage(
+                applied: result.applied,
+                alreadyCovered: result.skippedOverlaps
+            ) {
+                toastManager.enqueue(message, severity: .success)
+            }
+            if let firstPage = searchState.results.first(where: { selectedIDs.contains($0.id) })?.pageIndex {
+                documentState.currentPageIndex = firstPage
+            }
+        }
+    }
+
+    /// Forwarded to `SearchResultsSection` so the invisible Return-shortcut
+    /// Button can disable itself during an in-flight apply.
+    var applyShortcutEnabled: Bool { !isApplying }
+
+    // MARK: - Saved-Search Recall
+
+    /// Apply a saved shape and re-run the search. The list sheet dismisses
+    /// first (single-modal slot); recall then restores the shape via the
+    /// testable static and triggers through the standard path — exactly
+    /// one `triggerSearch()` (single-trigger discipline). If the
+    /// recalled filter state hides every result, the existing
+    /// "filters hide all candidates" empty state surfaces (already
+    /// implemented in SearchResultsSection; no new copy).
+    ///
+    /// A recall that replaces a results-carrying session names the drop:
+    /// the programmatic transition deliberately skips the mode-switch
+    /// undo toast (the user explicitly chose a new search — a restore
+    /// affordance would race the fresh run), but the trigger's own
+    /// clear used to destroy unapplied matches with no signal at all.
+    /// The notice closes that silence without adding any affordance.
+    func recallSavedSearch(_ saved: SavedSearch) {
+        activeModal = nil
+        let dropped = Self.unappliedMatchCount(in: searchState)
+        SavedSearchListSheet.apply(saved, to: searchState)
+        triggerSearch()
+        if let message = Self.recallClearedMessage(unappliedCount: dropped) {
+            toastManager.enqueue(message, severity: .info)
+        }
+    }
+
+    /// Notice for a recall that drops live unapplied matches. Returns
+    /// nil when nothing unapplied is lost so the common recall stays
+    /// toast-free. Sibling of `dismissClearedMessage` (UXF-27) and the
+    /// review-arrival notice — the family that keeps every
+    /// results-dropping transition named. Pinned by
+    /// `InterfaceSwitchClearTests`.
+    static func recallClearedMessage(unappliedCount: Int) -> String? {
+        guard unappliedCount > 0 else { return nil }
+        let suffix = unappliedCount == 1 ? "" : "es"
+        return "Recall cleared \(unappliedCount) unapplied match\(suffix)."
     }
 }

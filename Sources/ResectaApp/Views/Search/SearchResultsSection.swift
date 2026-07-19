@@ -43,6 +43,12 @@ struct SearchResultsSection: View {
     /// next 300 ms debounce would eventually run, but the banner's tap
     /// would feel broken in the interim.
     let onTriggerSearch: () -> Void
+    /// Recall a recent query from an empty-state chip. The parent owns
+    /// the debounce plumbing, so it performs both the `queryText` write
+    /// and the trigger — a section-side write would arm the field's
+    /// `.onChange` debounce on top of the direct trigger and run the
+    /// recalled query twice.
+    let onRecallQuery: (String) -> Void
 
     /// Per-sheet-session dismiss state for the doctype banner.
     /// `SearchResultsSection` is re-instantiated when the sheet
@@ -759,9 +765,12 @@ struct SearchResultsSection: View {
             queryText: searchState.queryText,
             multiTermTerms: searchState.searchTerms,
             recentMultiTermSets: searchState.recentMultiTermSets,
+            multiTermConjunction: searchState.options.multiTermConjunction,
             currentSearchPage: searchState.currentSearchPage,
             totalCount: searchState.totalCount,
-            enabledPIICategoryCount: searchState.effectiveScanCategories.count
+            enabledPIICategoryCount: searchState.effectiveScanCategories.count,
+            hasCompletedRun: searchState.hasCompletedRunSinceClear,
+            scanStartFailed: searchState.scanStartFailed
         )
     }
 
@@ -810,8 +819,7 @@ struct SearchResultsSection: View {
             HStack(spacing: ResectaTokens.Spacing.xs) {
                 ForEach(Array(queries.enumerated()), id: \.offset) { _, query in
                     Button {
-                        searchState.queryText = query
-                        onTriggerSearch()
+                        onRecallQuery(query)
                     } label: {
                         Text(query)
                             .font(.caption2)
@@ -902,13 +910,18 @@ enum WU20Strings {
     /// instantiating the SwiftUI view.
     enum EmptyContext: Equatable {
         case textPreSearch
+        case textNotRun
         case textNoMatch
         case regexPreSearch
+        case regexNotRun
         case regexNoMatch
         case multiTermPreSearchNoRecents
         case multiTermPreSearchWithRecents
+        case multiTermNotRun
         case multiTermNoMatch
+        case multiTermNoMatchConjunction
         case piiScanPreScan
+        case piiScanStartFailed
         case piiScanPostScanZero(detectorCount: Int)
     }
 
@@ -919,23 +932,42 @@ enum WU20Strings {
         queryText: String,
         multiTermTerms: [String],
         recentMultiTermSets: [[String]],
+        multiTermConjunction: Bool,
         currentSearchPage: Int,
         totalCount: Int,
-        enabledPIICategoryCount: Int
+        enabledPIICategoryCount: Int,
+        hasCompletedRun: Bool,
+        scanStartFailed: Bool
     ) -> EmptyContext {
         switch mode {
         case .text:
-            return queryText.isEmpty ? .textPreSearch : .textNoMatch
+            if queryText.isEmpty { return .textPreSearch }
+            // A carried query the mode switch deliberately did not
+            // re-run (UXF-16) must not read as a no-match verdict.
+            return hasCompletedRun ? .textNoMatch : .textNotRun
         case .regex:
-            return queryText.isEmpty ? .regexPreSearch : .regexNoMatch
+            if queryText.isEmpty { return .regexPreSearch }
+            return hasCompletedRun ? .regexNoMatch : .regexNotRun
         case .multiTerm:
             if multiTermTerms.isEmpty {
                 return recentMultiTermSets.isEmpty
                     ? .multiTermPreSearchNoRecents
                     : .multiTermPreSearchWithRecents
             }
-            return .multiTermNoMatch
+            if !hasCompletedRun { return .multiTermNotRun }
+            // Under conjunction, per-term occurrences may exist even
+            // when no page satisfies every term — the copy must not
+            // claim "no occurrences … for any of the terms".
+            return multiTermConjunction
+                ? .multiTermNoMatchConjunction
+                : .multiTermNoMatch
         case .piiScan:
+            // A failed start outranks the pre-scan default: the toast
+            // that announced it expires, and "Not scanned yet" would
+            // erase the failure from the surface.
+            if scanStartFailed && totalCount == 0 {
+                return .piiScanStartFailed
+            }
             // Post-scan zero-result requires `currentSearchPage > 0`
             // (the scan ran) and `totalCount == 0` (no matches).
             if currentSearchPage > 0 && totalCount == 0 {
@@ -950,6 +982,8 @@ enum WU20Strings {
         switch context {
         case .textPreSearch:
             return "Text search"
+        case .textNotRun, .regexNotRun, .multiTermNotRun:
+            return "Not run yet"
         case .textNoMatch:
             return "No matches"
         case .regexPreSearch:
@@ -960,8 +994,10 @@ enum WU20Strings {
             return "Multi-term search"
         case .multiTermPreSearchWithRecents:
             return "Multi-term search"
-        case .multiTermNoMatch:
+        case .multiTermNoMatch, .multiTermNoMatchConjunction:
             return "No matches"
+        case .piiScanStartFailed:
+            return "Scan didn't start"
         case .piiScanPreScan:
             // UXF-02 — pre-scan headline must not read as a verdict.
             // "Not scanned yet" states the actual condition; the
@@ -975,12 +1011,16 @@ enum WU20Strings {
     static func headlineSymbol(for context: EmptyContext) -> String {
         switch context {
         case .textPreSearch, .multiTermPreSearchNoRecents,
-             .multiTermPreSearchWithRecents, .regexPreSearch:
+             .multiTermPreSearchWithRecents, .regexPreSearch,
+             .textNotRun, .regexNotRun, .multiTermNotRun:
             return "magnifyingglass"
-        case .textNoMatch, .regexNoMatch, .multiTermNoMatch:
+        case .textNoMatch, .regexNoMatch, .multiTermNoMatch,
+             .multiTermNoMatchConjunction:
             return "doc.text.magnifyingglass"
         case .piiScanPreScan:
             return "shield.lefthalf.filled"
+        case .piiScanStartFailed:
+            return "exclamationmark.shield"
         case .piiScanPostScanZero:
             return "checkmark.shield"
         }
@@ -992,18 +1032,28 @@ enum WU20Strings {
         switch context {
         case .textPreSearch:
             return "Type a word, phrase, or pattern to match against the document text."
+        case .textNotRun:
+            return "This query hasn't been run in this mode yet. Press Return to run it, or edit it to search as you type."
         case .textNoMatch:
             return "No occurrences in the document for the active query. Try a broader term or change the search options."
         case .regexPreSearch:
             return "Enter a regular expression to match against the document text. Example: \\d{3}-\\d{2}-\\d{4} for SSN-style sequences."
+        case .regexNotRun:
+            return "This pattern hasn't been run in this mode yet. Press Return to run it, or edit it to search as you type."
         case .regexNoMatch:
             return "The active pattern produced no matches. Adjust the pattern or the search options."
         case .multiTermPreSearchNoRecents:
             return "Type a term above and press Return to add it. Each term searches the document independently."
         case .multiTermPreSearchWithRecents:
             return "Type a term above and press Return to add it, or recall a recent term set below."
+        case .multiTermNotRun:
+            return "These terms haven't been run in this mode yet. Press Return in the term field to run them."
         case .multiTermNoMatch:
             return "No occurrences in the document for any of the active terms."
+        case .multiTermNoMatchConjunction:
+            return "No page contains all of the active terms together. Individual terms may still occur on their own — turn off \"All terms must match\" to see per-term occurrences."
+        case .piiScanStartFailed:
+            return "The last scan couldn't start because the document wasn't ready. Tap Scan Document to try again."
         case .piiScanPreScan:
             // Carries the Scan interface's role sentence (moved here
             // from the scan toolbar; the Search interface's counterpart
@@ -1041,7 +1091,9 @@ enum WU20Strings {
              .multiTermPreSearchNoRecents, .multiTermPreSearchWithRecents:
             return true
         case .textNoMatch, .regexNoMatch, .multiTermNoMatch,
-             .piiScanPreScan, .piiScanPostScanZero:
+             .multiTermNoMatchConjunction,
+             .textNotRun, .regexNotRun, .multiTermNotRun,
+             .piiScanPreScan, .piiScanStartFailed, .piiScanPostScanZero:
             return false
         }
     }

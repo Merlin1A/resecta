@@ -101,6 +101,9 @@ struct SavedSearchListSheet: View {
                     }
                     renameTarget = nil
                 }
+                // Blank names can't commit — without the gate the alert
+                // auto-dismisses on Rename and the no-op reads as done.
+                .disabled(renameText.trimmingCharacters(in: .whitespaces).isEmpty)
                 Button("Cancel", role: .cancel) { renameTarget = nil }
             } message: { _ in
                 Text("The new name is capped at \(SavedSearch.nameLengthCap) characters.")
@@ -112,6 +115,10 @@ struct SavedSearchListSheet: View {
                     guard !trimmed.isEmpty else { return }
                     savedSearchStore.add(Self.capture(from: searchState, name: trimmed))
                 }
+                // Blank names can't commit (parity with the toolbar
+                // "Save as…" alert) — a Save that auto-dismisses while
+                // saving nothing reads as success.
+                .disabled(savePromptName.trimmingCharacters(in: .whitespaces).isEmpty)
                 Button("Cancel", role: .cancel) { }
             } message: {
                 Text("Saves the current query shape — mode, query text, and filter settings. Never document content or results.")
@@ -239,7 +246,22 @@ struct SavedSearchListSheet: View {
         searchState.isProgrammaticModeChange = searchState.searchModeType != saved.mode
         searchState.searchModeType = saved.mode
         searchState.queryText = saved.queryText ?? ""
-        searchState.searchTerms = saved.searchTerms ?? []
+        // Blank/whitespace terms never match anything and, under
+        // conjunction, one such term zeroes the whole AND search (no
+        // page can carry a hit for it). The typing UI can't produce
+        // them; the decode boundary can (version-skewed or edited
+        // blobs), so filter here.
+        searchState.searchTerms = (saved.searchTerms ?? []).filter {
+            !$0.trimmingCharacters(in: .whitespaces).isEmpty
+        }
+        // Post-scan display filters are session state, not query shape:
+        // a recall into the SAME mode never passes through the
+        // mode-switch `.onChange` (which resets them for cross-mode
+        // transitions), and a stale category filter from the previous
+        // session would silently hide the recalled run's results —
+        // every Scan→Scan recall is same-mode.
+        searchState.piiCategoryFilter = nil
+        searchState.sortOrder = .discoveryOrder
         if let categories = saved.enabledPIICategories {
             searchState.enabledPIICategories = categories
         }

@@ -35,9 +35,12 @@ struct PIIScanIdleHonestyTests {
             queryText: "",
             multiTermTerms: [],
             recentMultiTermSets: [],
+            multiTermConjunction: false,
             currentSearchPage: state.currentSearchPage,
             totalCount: state.totalCount,
-            enabledPIICategoryCount: 17
+            enabledPIICategoryCount: 17,
+            hasCompletedRun: state.hasCompletedRunSinceClear,
+            scanStartFailed: state.scanStartFailed
         )
         #expect(ctx == .piiScanPreScan)
     }

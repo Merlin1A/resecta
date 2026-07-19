@@ -82,7 +82,8 @@ struct SearchSheetDismissRuleTests {
             results: [makeResult(selected: true)],
             appliedResultIDs: [],
             piiCategoryFilter: nil,
-            sortOrder: .discoveryOrder
+            sortOrder: .discoveryOrder,
+            appliedFilter: .all
         )
         SearchAndRedactSheet.restoreModeSwitchSnapshot(snapshot, in: state)
         #expect(state.results.count == 1)

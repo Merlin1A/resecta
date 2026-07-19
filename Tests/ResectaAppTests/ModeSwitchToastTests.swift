@@ -113,6 +113,26 @@ struct ModeSwitchToastTests {
                 == "Mode switch cleared 2 matches (all already applied).")
     }
 
+    @Test("Scan↔Search transitions name the interface switch, not a mode switch")
+    func interfaceSwitchVerb() {
+        let manager = ToastQueueManager()
+        let state = SearchState()
+        state.results = [makeResult(page: 0)]
+        // Previous mode = piiScan (Scan interface); the state now sits
+        // in .text (Search interface) — the interface changed, so the
+        // toast must not attribute the clear to a mode-picker tap.
+        let snapshot = SearchAndRedactSheet.modeSwitchSnapshot(of: state, previousMode: .piiScan)
+        state.clearResults()
+        SearchAndRedactSheet.enqueueModeSwitchUndoToast(
+            on: manager,
+            searchState: state,
+            snapshot: snapshot,
+            isProgrammatic: false,
+            unappliedCount: 1
+        )
+        #expect(manager.activeToasts.first?.message == "Interface switch cleared 1 unapplied match.")
+    }
+
     @Test("Programmatic switch does NOT enqueue toast even with unapplied results")
     func programmaticSwitchSkipsToast() {
         let manager = ToastQueueManager()
@@ -146,6 +166,7 @@ struct ModeSwitchToastTests {
         state.appliedResultIDs = [r1.id]
         state.piiCategoryFilter = [.name]
         state.sortOrder = .pageAscending
+        state.appliedFilter = .unapplied
 
         // Simulate the .onChange body: snapshot (with the OLD mode from
         // the onChange parameter), clear, enqueue.
@@ -180,6 +201,8 @@ struct ModeSwitchToastTests {
         #expect(state.appliedResultIDs == [r1.id])
         #expect(state.piiCategoryFilter == [.name])
         #expect(state.sortOrder == .pageAscending)
+        #expect(state.appliedFilter == .unapplied,
+                "clearResults() resets the applied-state chip to .all; the restore puts it back")
     }
 
     @Test("Undo no-ops gracefully after the SearchState is gone")

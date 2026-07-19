@@ -282,6 +282,40 @@ struct SearchStateTests {
     }
 }
 
+// MARK: - Trigger single-flight gate
+
+@Suite("SearchState trigger single-flight", .tags(.search))
+@MainActor
+struct SearchStateTriggerSingleFlightTests {
+
+    @Test("Overlapping begin coalesces into exactly one deferred retrigger")
+    func triggerSetupSingleFlight() {
+        let state = SearchState()
+        #expect(state.beginTriggerSetup() == true, "first caller owns the window")
+        #expect(state.beginTriggerSetup() == false, "overlapping caller coalesces")
+        #expect(state.beginTriggerSetup() == false, "N overlapping callers still coalesce to one")
+        #expect(state.endTriggerSetup() == true, "the coalesced request surfaces once at close")
+        #expect(state.endTriggerSetup() == false, "consumed — no retrigger loop")
+        #expect(state.beginTriggerSetup() == true, "the window reopens after close")
+        #expect(state.endTriggerSetup() == false, "no retrigger when none was requested")
+    }
+
+    @Test("Run-state discriminators reset with clearResults")
+    func runStateDiscriminatorsReset() {
+        let state = SearchState()
+        state.hasCompletedRunSinceClear = true
+        state.scanStartFailed = true
+        state.clearResults()
+        #expect(state.hasCompletedRunSinceClear == false)
+        #expect(state.scanStartFailed == false)
+        state.hasCompletedRunSinceClear = true
+        state.scanStartFailed = true
+        state.clear()
+        #expect(state.hasCompletedRunSinceClear == false)
+        #expect(state.scanStartFailed == false)
+    }
+}
+
 extension Tag {
     @Tag static var search: Self
 }

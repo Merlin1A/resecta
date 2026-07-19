@@ -23,25 +23,106 @@ struct EmptyStateTests {
             queryText: "",
             multiTermTerms: [],
             recentMultiTermSets: [],
+            multiTermConjunction: false,
             currentSearchPage: 0,
             totalCount: 0,
-            enabledPIICategoryCount: 0
+            enabledPIICategoryCount: 0,
+            hasCompletedRun: false,
+            scanStartFailed: false
         )
         #expect(ctx == .textPreSearch)
     }
 
-    @Test("Text mode no-match context when query is non-empty and totalCount = 0")
+    @Test("Text mode no-match context when query is non-empty and a run completed")
     func textNoMatchContext() {
         let ctx = WU20Strings.context(
             mode: .text,
             queryText: "alpha",
             multiTermTerms: [],
             recentMultiTermSets: [],
+            multiTermConjunction: false,
             currentSearchPage: 0,
             totalCount: 0,
-            enabledPIICategoryCount: 0
+            enabledPIICategoryCount: 0,
+            hasCompletedRun: true,
+            scanStartFailed: false
         )
         #expect(ctx == .textNoMatch)
+    }
+
+    @Test("Carried query without a completed run reads as not-run, never as a no-match verdict")
+    func notRunContexts() {
+        // The mode switch carries the query text but deliberately does
+        // not re-run (UXF-16); until a run completes, the empty state
+        // must not claim the query produced no matches.
+        let text = WU20Strings.context(
+            mode: .text, queryText: "alpha",
+            multiTermTerms: [], recentMultiTermSets: [],
+            multiTermConjunction: false,
+            currentSearchPage: 0, totalCount: 0,
+            enabledPIICategoryCount: 0,
+            hasCompletedRun: false, scanStartFailed: false
+        )
+        #expect(text == .textNotRun)
+
+        let regex = WU20Strings.context(
+            mode: .regex, queryText: "Page \\d+",
+            multiTermTerms: [], recentMultiTermSets: [],
+            multiTermConjunction: false,
+            currentSearchPage: 0, totalCount: 0,
+            enabledPIICategoryCount: 0,
+            hasCompletedRun: false, scanStartFailed: false
+        )
+        #expect(regex == .regexNotRun)
+
+        let terms = WU20Strings.context(
+            mode: .multiTerm, queryText: "",
+            multiTermTerms: ["alpha"], recentMultiTermSets: [],
+            multiTermConjunction: false,
+            currentSearchPage: 0, totalCount: 0,
+            enabledPIICategoryCount: 0,
+            hasCompletedRun: false, scanStartFailed: false
+        )
+        #expect(terms == .multiTermNotRun)
+    }
+
+    @Test("Not-run copy names a run affordance")
+    func notRunCopyNamesRunAffordance() {
+        #expect(WU20Strings.description(for: .textNotRun).contains("Return"))
+        #expect(WU20Strings.description(for: .regexNotRun).contains("Return"))
+        #expect(WU20Strings.description(for: .multiTermNotRun).contains("Return"))
+        #expect(WU20Strings.description(for: .piiScanStartFailed).contains("Scan Document"))
+    }
+
+    @Test("Conjunction zero-hit names the all-terms gate, not per-term absence")
+    func conjunctionNoMatchContext() {
+        let ctx = WU20Strings.context(
+            mode: .multiTerm, queryText: "",
+            multiTermTerms: ["alpha", "zzz"], recentMultiTermSets: [],
+            multiTermConjunction: true,
+            currentSearchPage: 0, totalCount: 0,
+            enabledPIICategoryCount: 0,
+            hasCompletedRun: true, scanStartFailed: false
+        )
+        #expect(ctx == .multiTermNoMatchConjunction)
+        let copy = WU20Strings.description(for: .multiTermNoMatchConjunction)
+        // Under conjunction, individual terms may still occur — the
+        // copy must not claim absence "for any of the active terms".
+        #expect(!copy.contains("for any of the active terms"))
+        #expect(copy.contains("all of the active terms"))
+    }
+
+    @Test("Failed scan start outranks the pre-scan default")
+    func scanStartFailedContext() {
+        let ctx = WU20Strings.context(
+            mode: .piiScan, queryText: "",
+            multiTermTerms: [], recentMultiTermSets: [],
+            multiTermConjunction: false,
+            currentSearchPage: 0, totalCount: 0,
+            enabledPIICategoryCount: 12,
+            hasCompletedRun: false, scanStartFailed: true
+        )
+        #expect(ctx == .piiScanStartFailed)
     }
 
     @Test("Multi-term pre-search context flips on recents presence")
@@ -51,9 +132,12 @@ struct EmptyStateTests {
             queryText: "",
             multiTermTerms: [],
             recentMultiTermSets: [],
+            multiTermConjunction: false,
             currentSearchPage: 0,
             totalCount: 0,
-            enabledPIICategoryCount: 0
+            enabledPIICategoryCount: 0,
+            hasCompletedRun: false,
+            scanStartFailed: false
         )
         #expect(noRecents == .multiTermPreSearchNoRecents)
 
@@ -62,23 +146,29 @@ struct EmptyStateTests {
             queryText: "",
             multiTermTerms: [],
             recentMultiTermSets: [["alpha", "beta"]],
+            multiTermConjunction: false,
             currentSearchPage: 0,
             totalCount: 0,
-            enabledPIICategoryCount: 0
+            enabledPIICategoryCount: 0,
+            hasCompletedRun: false,
+            scanStartFailed: false
         )
         #expect(withRecents == .multiTermPreSearchWithRecents)
     }
 
-    @Test("Multi-term no-match context when terms present and totalCount = 0")
+    @Test("Multi-term no-match context when terms present and a run completed")
     func multiTermNoMatchContext() {
         let ctx = WU20Strings.context(
             mode: .multiTerm,
             queryText: "",
             multiTermTerms: ["alpha", "beta"],
             recentMultiTermSets: [],
+            multiTermConjunction: false,
             currentSearchPage: 0,
             totalCount: 0,
-            enabledPIICategoryCount: 0
+            enabledPIICategoryCount: 0,
+            hasCompletedRun: true,
+            scanStartFailed: false
         )
         #expect(ctx == .multiTermNoMatch)
     }
@@ -90,9 +180,12 @@ struct EmptyStateTests {
             queryText: "",
             multiTermTerms: [],
             recentMultiTermSets: [],
+            multiTermConjunction: false,
             currentSearchPage: 0,
             totalCount: 0,
-            enabledPIICategoryCount: 12
+            enabledPIICategoryCount: 12,
+            hasCompletedRun: false,
+            scanStartFailed: false
         )
         #expect(ctx == .piiScanPreScan)
     }
@@ -104,9 +197,12 @@ struct EmptyStateTests {
             queryText: "",
             multiTermTerms: [],
             recentMultiTermSets: [],
+            multiTermConjunction: false,
             currentSearchPage: 8,
             totalCount: 0,
-            enabledPIICategoryCount: 7
+            enabledPIICategoryCount: 7,
+            hasCompletedRun: true,
+            scanStartFailed: false
         )
         #expect(ctx == .piiScanPostScanZero(detectorCount: 7))
     }
@@ -154,7 +250,10 @@ struct EmptyStateTests {
         ]
         let bare: [WU20Strings.EmptyContext] = [
             .textNoMatch, .regexNoMatch, .multiTermNoMatch,
-            .piiScanPreScan, .piiScanPostScanZero(detectorCount: 5),
+            .multiTermNoMatchConjunction,
+            .textNotRun, .regexNotRun, .multiTermNotRun,
+            .piiScanPreScan, .piiScanStartFailed,
+            .piiScanPostScanZero(detectorCount: 5),
         ]
         for context in mounted {
             #expect(WU20Strings.showsSearchRoleSubtitle(for: context),
@@ -252,11 +351,11 @@ struct EmptyStateTests {
     @Test("All branches contain no §19 forbidden phrases")
     func allBranchesNoForbiddenPhrases() {
         let allContexts: [WU20Strings.EmptyContext] = [
-            .textPreSearch, .textNoMatch,
-            .regexPreSearch, .regexNoMatch,
+            .textPreSearch, .textNotRun, .textNoMatch,
+            .regexPreSearch, .regexNotRun, .regexNoMatch,
             .multiTermPreSearchNoRecents, .multiTermPreSearchWithRecents,
-            .multiTermNoMatch,
-            .piiScanPreScan,
+            .multiTermNotRun, .multiTermNoMatch, .multiTermNoMatchConjunction,
+            .piiScanPreScan, .piiScanStartFailed,
             .piiScanPostScanZero(detectorCount: 5),
         ]
         // Forbidden phrase set per the M-1 check (CONTRIBUTING, audit checklist) — assembled

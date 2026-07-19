@@ -375,6 +375,7 @@ struct ApplySeamUndoTests {
         #expect(state.priors.mean(.ssn) > 0.5)
         #expect(state.surfaceForms.lookup("123-45-6789") == .accepted)
 
+        let versionAfterApply = state.regionVersion
         undo.undo()
         #expect(state.regions[0]?.isEmpty ?? true)
         #expect(state.regionMetadata[regionID] == nil)
@@ -383,13 +384,18 @@ struct ApplySeamUndoTests {
         #expect(state.priors.mean(.ssn) == 0.5, "recorded decisions restore on undo")
         #expect(state.surfaceForms.lookup("123-45-6789") == nil)
         #expect(state.pendingTriage == nil, "undo does not reopen the review")
+        #expect(state.regionVersion > versionAfterApply,
+                "the undo leg bumps regionVersion — the canvas overlay refresh gate and the sheet's applied-marker clear both key on it")
 
+        let versionAfterUndo = state.regionVersion
         undo.redo()
         #expect(state.regions[0]?.count == 1)
         #expect(state.regionMetadata[regionID] != nil)
         #expect(state.appliedMatchAudit[regionID] != nil)
         #expect(state.priors.mean(.ssn) == 0.5,
                 "redo re-inserts the artifacts without re-recording decisions — carried semantics")
+        #expect(state.regionVersion > versionAfterUndo,
+                "the redo leg is a region mutation too")
     }
 
     @Test("Group-apply undo restores decisions and drops all three artifact sets")
@@ -435,12 +441,45 @@ struct ApplySeamUndoTests {
         undo.beginUndoGrouping()
         _ = await state.applyFindings(.selectedSearchResults, undoManager: undo)
         undo.endUndoGrouping()
+        let versionAfterApply = state.regionVersion
         undo.undo()
 
         #expect(state.priors.mean(.ssn) == priorMean,
                 "the search origin records no decisions, so undo restores none")
         #expect(state.regions.values.flatMap { $0 }.isEmpty)
         #expect(state.appliedMatchAudit.isEmpty)
+        #expect(state.regionVersion > versionAfterApply,
+                "search-origin undo bumps past the recorded apply version so `shouldClearAppliedMarkers` can distinguish it from the apply's own bump")
+        #expect(state.regionVersion != state.lastAppliedSearchRegionVersion,
+                "the marker handler reads this inequality as a real undo")
+    }
+
+    @Test("Batch delete undo bumps regionVersion on the restore leg")
+    func removeRegionsUndoBumpsVersion() {
+        let state = RedactionState()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        let region = makeDetection().toRegion()
+        state.addRegion(region, page: 0, undoManager: nil)
+
+        let versionBefore = state.regionVersion
+        undo.beginUndoGrouping()
+        state.removeRegions([region.id], page: 0, undoManager: undo)
+        undo.endUndoGrouping()
+        #expect(state.regions[0]?.isEmpty ?? true)
+        #expect(state.regionVersion > versionBefore)
+
+        let versionAfterDelete = state.regionVersion
+        undo.undo()
+        #expect(state.regions[0]?.count == 1, "undo re-inserts the deleted region")
+        #expect(state.regionVersion > versionAfterDelete,
+                "the undo leg is a region mutation — the overlay refresh gate keys on the bump")
+
+        let versionAfterUndo = state.regionVersion
+        undo.redo()
+        #expect(state.regions[0]?.isEmpty ?? true, "redo re-deletes")
+        #expect(state.regionVersion > versionAfterUndo,
+                "the redo leg recurses into removeRegions, which bumps at entry")
     }
 }
 

@@ -13,11 +13,68 @@ import RedactionEngine
 /// Persistence envelope. `schemaVersion = 1` in V1.x. Stored at
 /// `UserDefaults` key `savedRegexes.v1`.
 // nonisolated: persisted via `UserDefaultsJSONBlob<T: Codable & Sendable>` and
-// read off-MainActor; keep its synthesized Codable conformance nonisolated under
+// read off-MainActor; keep its Codable conformance nonisolated under
 // the s04 SE-0466 MainActor-default flip (mirrors UserTermsBlob).
 nonisolated struct SavedRegexEnvelope: Codable, Sendable, Equatable {
     let schemaVersion: Int
     let userSavedRegexes: [SavedRegex]
+    /// Rows the lenient decode could not understand, retained as raw
+    /// JSON so `encode` re-emits them (same contract as
+    /// `SavedSearchEnvelope.unrecognized`).
+    let unrecognized: [RetainedJSONValue]
+
+    init(
+        schemaVersion: Int,
+        userSavedRegexes: [SavedRegex],
+        unrecognized: [RetainedJSONValue] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.userSavedRegexes = userSavedRegexes
+        self.unrecognized = unrecognized
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, userSavedRegexes
+    }
+
+    /// Lenient per-element decode, ported from `SavedSearchEnvelope`:
+    /// the previous synthesized decoder failed the WHOLE array on one
+    /// malformed element, so a single bad row emptied the user's entire
+    /// regex library (and the next persist made the wipe permanent).
+    /// One bad row now parks in `unrecognized`; the rest survive.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        let wrapped = try container.decode([FailableSavedRegex].self, forKey: .userSavedRegexes)
+        self.userSavedRegexes = wrapped.compactMap(\.value)
+        self.unrecognized = wrapped.compactMap(\.raw)
+    }
+
+    /// Re-splice decoded + retained rows into the one wire array —
+    /// shape unchanged, not a schema change.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        var rows = container.nestedUnkeyedContainer(forKey: .userSavedRegexes)
+        for regex in userSavedRegexes { try rows.encode(regex) }
+        for row in unrecognized { try rows.encode(row) }
+    }
+}
+
+/// Never-throwing element wrapper for the lenient envelope decode
+/// (mirrors `FailableSavedSearch`).
+nonisolated private struct FailableSavedRegex: Decodable {
+    let value: SavedRegex?
+    let raw: RetainedJSONValue?
+    init(from decoder: Decoder) {
+        if let decoded = try? SavedRegex(from: decoder) {
+            self.value = decoded
+            self.raw = nil
+        } else {
+            self.value = nil
+            self.raw = try? RetainedJSONValue(from: decoder)
+        }
+    }
 }
 
 @Observable
@@ -45,70 +102,33 @@ final class SavedRegexStore {
     /// User-owned entries, persisted to UserDefaults.
     private(set) var userSavedRegexes: [SavedRegex]
 
+    /// Raw rows the lenient hydrate parked (see
+    /// `SavedRegexEnvelope.unrecognized`); threaded back into every
+    /// `persist()` so a re-save cannot erase them.
+    private var unrecognizedRows: [RetainedJSONValue]
+
     private let blob: UserDefaultsJSONBlob<SavedRegexEnvelope>
-
-    // Hydration-race barrier (mirrors UserTermsStore). Any mutation
-    // (via `persist()`) sets it; the async-hydrate write-back skips once set so
-    // a regex saved before hydration completes is not clobbered.
-    private var isHydrated = false
-
-    // Async-hydrate task handle for deterministic test awaiting. nil
-    // on the synchronous path.
-    private(set) var hydrationTask: Task<Void, Never>?
 
     /// Default production init — reads from `UserDefaults.standard`.
     convenience init() {
-        self.init(defaults: .standard, asyncHydrate: true)
+        self.init(defaults: .standard)
     }
 
-    // P2.1: `asyncHydrate` moves the UserDefaults read off the cold-start
-    // critical path. Default is false so tests calling `init(defaults:)`
-    // keep their synchronous round-trip contract.
-    //
-    // CONC-1 (Pkg N): the async path runs the UserDefaults read on a
-    // detached Task so the decode work happens off-MainActor. The
-    // previous `Task { @MainActor in ... }` formulation only deferred
-    // the work to a later MainActor tick — it never left the main
-    // thread. The detached awaiter hops back to MainActor here to
-    // publish the result.
-    init(defaults: UserDefaults, asyncHydrate: Bool = false) {
+    // Hydration is deliberately synchronous (the former async path
+    // published `[]` until a later tick, and the `isHydrated` barrier
+    // only stopped the LATE write-back — a mutation landing first still
+    // persisted a one-entry envelope over the real library on disk).
+    // One small UserDefaults read is not worth that window.
+    init(defaults: UserDefaults) {
         self.blob = UserDefaultsJSONBlob(
             key: Self.storageKey,
             schemaVersion: Self.schemaVersion,
             defaults: defaults,
             fallback: SavedRegexEnvelope(schemaVersion: 1, userSavedRegexes: [])
         )
-        if asyncHydrate {
-            self.userSavedRegexes = []
-            let captured = self.blob
-            self.hydrationTask = Task { @MainActor in
-                let hydrated = await Task.detached {
-                    SavedRegexStore.loadUserSavedRegexes(from: captured)
-                }.value
-                self.applyHydration(hydrated)
-            }
-        } else {
-            self.userSavedRegexes = blob.load().userSavedRegexes
-            self.isHydrated = true
-        }
-    }
-
-    /// Publish the async-hydrate snapshot unless a mutation already
-    /// superseded it (see `isHydrated`). Internal — not private — so the race
-    /// guard is testable without depending on detached-task read timing.
-    func applyHydration(_ hydrated: [SavedRegex]) {
-        guard !isHydrated else { return }
-        userSavedRegexes = hydrated
-        isHydrated = true
-    }
-
-    /// CONC-1 (Pkg N): nonisolated helper invoked from `Task.detached` so
-    /// the UserDefaults decode runs off-MainActor. Pure function of the
-    /// blob handle; no MainActor state read.
-    nonisolated private static func loadUserSavedRegexes(
-        from blob: UserDefaultsJSONBlob<SavedRegexEnvelope>
-    ) -> [SavedRegex] {
-        blob.load().userSavedRegexes
+        let envelope = blob.load()
+        self.userSavedRegexes = envelope.userSavedRegexes
+        self.unrecognizedRows = envelope.unrecognized
     }
 
     // MARK: - Mutate
@@ -152,12 +172,10 @@ final class SavedRegexStore {
     }
 
     private func persist() {
-        // A real mutation supersedes any in-flight async-hydrate
-        // snapshot; mark hydrated so a late write-back is dropped.
-        isHydrated = true
         blob.save(SavedRegexEnvelope(
             schemaVersion: 1,
-            userSavedRegexes: userSavedRegexes
+            userSavedRegexes: userSavedRegexes,
+            unrecognized: unrecognizedRows
         ))
     }
 }

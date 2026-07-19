@@ -152,21 +152,58 @@ struct StoreHydrateOffMainActorTests {
         #expect(store.blob.alwaysFlag.contains(where: { $0.pattern == "alpha" }))
     }
 
-    @Test("SavedRegexStore async hydrate eventually publishes loaded list")
-    func testSavedRegexStoreAsyncHydratePublishes() async {
+    @Test("SavedRegexStore hydrates synchronously — the persisted list is visible from init")
+    func testSavedRegexStoreSyncHydratePublishes() async {
         let suiteName = "pkg-n-conc-1-regex-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let seed = SavedRegexStore(defaults: defaults)
         _ = seed.add(label: "PkgN-test", pattern: "\\d{4}")
-        let store = SavedRegexStore(defaults: defaults, asyncHydrate: true)
-        #expect(store.userSavedRegexes.isEmpty, "Initial userSavedRegexes is empty before detached hydrate completes")
-        for _ in 0..<200 {
-            await Task.yield()
-            if !store.userSavedRegexes.isEmpty { break }
-            try? await Task.sleep(for: .milliseconds(5))
-        }
+        // Hydration is synchronous by design: the former async path
+        // published `[]` first, and a mutation landing in that window
+        // persisted a one-entry envelope over the real library.
+        let store = SavedRegexStore(defaults: defaults)
         #expect(store.userSavedRegexes.contains(where: { $0.label == "PkgN-test" }))
+    }
+
+    @Test("SavedRegexStore: one bad row parks and survives a re-save instead of zeroing the library")
+    func testSavedRegexLenientDecodeAndRetention() throws {
+        let suiteName = "pkg-n-regex-lenient-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let seed = SavedRegexStore(defaults: defaults)
+        #expect(seed.add(label: "Keep", pattern: "\\d{3}"))
+
+        // Corrupt one row in the stored blob (outer UserDefaultsJSONBlob
+        // envelope → payload → userSavedRegexes). The previous
+        // synthesized decoder failed the WHOLE array on this row,
+        // emptying the library; leniency parks it instead.
+        let data = try #require(defaults.data(forKey: SavedRegexStore.storageKey))
+        var outer = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var payload = try #require(outer["payload"] as? [String: Any])
+        var rows = try #require(payload["userSavedRegexes"] as? [[String: Any]])
+        rows.append(["bogusRow": true])
+        payload["userSavedRegexes"] = rows
+        outer["payload"] = payload
+        defaults.set(try JSONSerialization.data(withJSONObject: outer),
+                     forKey: SavedRegexStore.storageKey)
+
+        let store = SavedRegexStore(defaults: defaults)
+        #expect(store.userSavedRegexes.map(\.label) == ["Keep"],
+                "survivors load; the bad row parks instead of zeroing the list")
+
+        // The re-save that used to make the loss permanent.
+        #expect(store.add(label: "Second", pattern: "[a-z]{2}"))
+        let rawAfter = String(
+            data: try #require(defaults.data(forKey: SavedRegexStore.storageKey)),
+            encoding: .utf8)!
+        #expect(rawAfter.contains("bogusRow"),
+                "the parked row survives the unrelated save")
+
+        let reloaded = SavedRegexStore(defaults: defaults)
+        #expect(Set(reloaded.userSavedRegexes.map(\.label)) == ["Keep", "Second"])
     }
 }
 

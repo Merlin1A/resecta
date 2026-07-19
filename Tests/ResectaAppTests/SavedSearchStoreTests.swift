@@ -555,6 +555,45 @@ struct SavedSearchStoreTests {
         #expect(envelope.savedSearches.map(\.name) == ["survivor"])
     }
 
+    @Test("A parked undecodable row survives an unrelated save")
+    func parkedRowSurvivesResave() throws {
+        let fileURL = Self.makeScratchFileURL()
+        let (defaults, suiteName) = Self.makeScratchDefaults()
+        defer {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        // A future-version row: unknown key → the [D-25] fail-closed row
+        // decoder throws, so the row parks in `unrecognized`.
+        let good = Self.validRowJSON(id: "00000000-0000-0000-0000-000000000011", name: "good row")
+        let future = #"{"id": "00000000-0000-0000-0000-000000000012", "name": "future", "mode": "text", "queryText": "q", "caseSensitive": false, "wholeWord": false, "sourceFilter": "All", "minimumOCRConfidence": 0.0, "minimumPIIConfidence": 0.5, "futureKey": true}"#
+        let fileJSON = #"{"schemaVersion": 2, "payload": {"schemaVersion": 2, "savedSearches": [\#(good), \#(future)]}}"#
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fileJSON.data(using: .utf8)!.write(to: fileURL)
+
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
+        #expect(store.savedSearches.map(\.name) == ["good row"],
+                "the parked row is invisible to the UI")
+
+        // The mutation that used to make the drop permanent.
+        let added = try JSONDecoder().decode(
+            SavedSearch.self,
+            from: Self.validRowJSON(
+                id: "00000000-0000-0000-0000-000000000013", name: "added"
+            ).data(using: .utf8)!)
+        store.add(added)
+
+        let raw = try String(contentsOf: fileURL, encoding: .utf8)
+        #expect(raw.contains("futureKey"),
+                "the undecodable row must survive the re-save on disk")
+
+        let reloaded = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
+        #expect(Set(reloaded.savedSearches.map(\.name)) == ["good row", "added"],
+                "survivors and the new entry reload; the parked row keeps parking")
+    }
+
     @Test("Store hydrating a file with one bad row keeps the good rows")
     func storeHydratesPastBadRow() throws {
         let fileURL = Self.makeScratchFileURL()

@@ -736,6 +736,10 @@ class RedactionState {
             target.invalidateRegionCaches()
             target.regionsModifiedSinceVerification = true
             target.outputURL = nil
+            // Undo re-inserts the deleted regions — bump so the overlay
+            // refresh gate observes it (the redo leg recurses into
+            // `removeRegions`, which bumps at entry).
+            target.regionVersion += 1
             target.registerUndo(undoManager, "Delete Redactions") { target2 in
                 target2.removeRegions(ids, page: page, undoManager: undoManager)
             }
@@ -1296,6 +1300,13 @@ class RedactionState {
             target.invalidateRegionCaches()
             target.regionsModifiedSinceVerification = true
             target.outputURL = nil
+            // The undo leg is a region mutation like any other: bump
+            // `regionVersion` so the overlay refresh gate and the search
+            // sheet's applied-marker `.onChange` observe the removal.
+            // `lastAppliedSearchRegionVersion` stays at the forward
+            // apply's value, so the marker handler reads this bump as a
+            // real undo rather than the apply's own.
+            target.regionVersion += 1
             target.registerUndo(undoManager, actionName) { target2 in
                 for (page, newRegions) in snapshot {
                     target2.regions[page, default: []].append(contentsOf: newRegions)
@@ -1306,6 +1317,12 @@ class RedactionState {
                 target2.invalidateRegionCaches()
                 target2.regionsModifiedSinceVerification = true
                 target2.outputURL = nil
+                // Redo re-inserts regions — a region mutation; the bump
+                // keeps the canvas overlays refreshing. The sheet's
+                // applied markers stay cleared (conservative: the
+                // re-inserted regions read as coverage, so a re-apply
+                // over them no-ops as "already covered").
+                target2.regionVersion += 1
             }
         }
     }

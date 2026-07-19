@@ -2262,7 +2262,12 @@ extension RedactionOverlayView: UIContextMenuInteractionDelegate {
             // rationale data exists. Action routes through
             // `pendingCanvasRationaleRequest` for sheet presentation on
             // `DocumentEditorView`, same pattern as Tag Exemption above.
-            if RedactionOverlayView.rationaleMenuShouldShow(region: region) {
+            // Also parked while the search sheet is presented: the
+            // single `ActiveSheet` slot gives `activeSearch` precedence,
+            // so a request set now would sit swallowed until the search
+            // sheet closes and then pop up as an orphaned modal.
+            if RedactionOverlayView.rationaleMenuShouldShow(region: region),
+               self.coordinator?.redactionState?.activeSearch == nil {
                 let rationaleAction = UIAction(
                     title: "View Rationale",
                     image: UIImage(systemName: "doc.text.magnifyingglass")

@@ -71,6 +71,12 @@ struct SearchAndRedactSheet: View {
     /// hint, not a state-change cue. See `CompactFloatDetent.shouldPulseGrabber`.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State var searchDebounceTask: Task<Void, Never>?
+    /// One-shot debounce suppression for programmatic `queryText`
+    /// writes that carry their own trigger (recall chips): the field's
+    /// `.onChange` consumes it instead of arming the 300 ms debounce,
+    /// so a recalled query runs exactly once instead of once now and
+    /// once again at debounce expiry.
+    @State var suppressNextQueryDebounce = false
     // The prior `applyResultMessage`
     // state field drove an `.alert("Redaction Applied", ...)` that blocked
     // the sheet on every successful apply. Both apply paths now route
@@ -80,7 +86,9 @@ struct SearchAndRedactSheet: View {
     /// at the start of every apply (toolbar Apply or Return-key)
     /// and cleared in a `defer` — disables the Return shortcut Button
     /// so a held key doesn't queue an apply per repeat tick.
-    @State private var isApplying = false
+    /// Internal (not private): the apply handlers live in the
+    /// `+Trigger` extension file.
+    @State var isApplying = false
     // Conditional dismiss: Dismiss is conditional on user selection work: an
     // untouched sheet closes in one tap (a live machine-made selection,
     // e.g. the magic-wand preselect, is deselected in-place on the way
@@ -262,7 +270,15 @@ struct SearchAndRedactSheet: View {
                         onRequestShowRationale: { rowID in
                             activeModal = .rowRationale(rowID: rowID)
                         },
-                        onTriggerSearch: triggerSearch
+                        onTriggerSearch: triggerSearch,
+                        onRecallQuery: { query in
+                            // One run per recall: suppress the
+                            // `.onChange` debounce the write below arms,
+                            // then trigger directly.
+                            suppressNextQueryDebounce = true
+                            searchState.queryText = query
+                            triggerSearch()
+                        }
                     )
 
                     if searchState.filteredCount > 0 {
@@ -342,7 +358,12 @@ struct SearchAndRedactSheet: View {
                                  || !documentState.canMutateRegions)
                               : (searchState.selectedCount == 0
                                  || isApplying
-                                 || !documentState.canMutateRegions))
+                                 || !documentState.canMutateRegions
+                                 // An all-applied selection can only
+                                 // no-op through the overlap guard —
+                                 // gray the button instead of offering
+                                 // a "Marked 0" round-trip.
+                                 || searchState.selectionFullyApplied))
                 }
                 // Saved-searches actions surface FLAT in the system
                 // overflow (•••) menu — no nested submenu. The list is
@@ -373,11 +394,15 @@ struct SearchAndRedactSheet: View {
                     }
                     // Also parked during a pending review — the sheet's
                     // query shape isn't the review's content, so a save
-                    // here would capture an unrelated shape.
+                    // here would capture an unrelated shape. Scan mode
+                    // always has a saveable shape (categories + options
+                    // — the point of a saved scan is reuse on OTHER
+                    // documents), so its gate doesn't hinge on results.
                     .disabled(redactionState.pendingTriage != nil
-                              || !(searchState.results.isEmpty == false
-                                   || !searchState.queryText.isEmpty
-                                   || !searchState.searchTerms.isEmpty))
+                              || (searchState.searchModeType != .piiScan
+                                  && searchState.results.isEmpty
+                                  && searchState.queryText.isEmpty
+                                  && searchState.searchTerms.isEmpty))
                     .accessibilityIdentifier("saved-searches-save-as")
                 }
             }
@@ -464,6 +489,10 @@ struct SearchAndRedactSheet: View {
                 guard !trimmed.isEmpty else { return }
                 savedSearchStore.add(SavedSearchListSheet.capture(from: searchState, name: trimmed))
             }
+            // Blank names can't commit — without the gate the alert
+            // still auto-dismisses on Save and the no-op reads as a
+            // successful save (parity with the regex-save alert below).
+            .disabled(savedSearchSaveName.trimmingCharacters(in: .whitespaces).isEmpty)
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Saves the current query shape — mode, query text, and filter settings. Never document content or results.")
@@ -508,14 +537,14 @@ struct SearchAndRedactSheet: View {
             }
             // One-tap contract: the toolbar Scan button armed a
             // one-shot flag before presenting. Consume it exactly once
-            // here — this is the sole trigger for the auto-run;
-            // `triggerSearch()` does not deduplicate same-turn callers
-            // (`activeSearchTask` is assigned after a suspension
-            // point), so a second programmatic trigger site would race
-            // two scans against the shared searcher. Mutually
-            // exclusive with the magic-wand branch above by
-            // construction (magic wand seeds `.text`; the Scan button
-            // seeds the scan mode).
+            // here — this is the sole trigger for the auto-run.
+            // Overlapping `triggerSearch()` callers additionally
+            // coalesce through the single-flight gate
+            // (`beginTriggerSetup`), so a second same-turn trigger site
+            // re-runs once instead of racing; the single consume stays
+            // the first line of defense. Mutually exclusive with the
+            // magic-wand branch above by construction (magic wand seeds
+            // `.text`; the Scan button seeds the scan mode).
             if searchState.pendingAutoRunScan {
                 searchState.pendingAutoRunScan = false
                 if searchState.searchModeType == .piiScan {
@@ -537,8 +566,9 @@ struct SearchAndRedactSheet: View {
             // sim drive even when the AX automation server is
             // unavailable.
             // Skipped when a magic-wand pre-fill already ran above —
-            // two same-turn `triggerSearch()` calls are not
-            // deduplicated (see the auto-run consume note).
+            // overlapping calls would coalesce through the
+            // single-flight gate, but one deliberate trigger per
+            // launch stays the cleaner contract.
             if let queryArg = CommandLine.arguments
                 .first(where: { $0.hasPrefix("--searchQuery=") })?
                 .split(separator: "=").last,
@@ -817,6 +847,11 @@ struct SearchAndRedactSheet: View {
                     // The typed term may itself be PII
                     // (a user searching their own SSN).
                     .privacySensitive()
+                    // Search input is verbatim: autocapitalization would
+                    // rewrite case-sensitive terms and autocorrect can
+                    // silently replace the typed term before it runs.
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                     .focused($isSearchFieldFocused)
                     .onSubmit {
                         // Route every multi-term submission
@@ -829,6 +864,12 @@ struct SearchAndRedactSheet: View {
                         )
                         switch outcome {
                         case .rejectedEmpty:
+                            // Return on an empty field with terms staged
+                            // re-runs the current set — the affordance
+                            // the not-run empty state names.
+                            if !searchState.searchTerms.isEmpty {
+                                triggerSearch()
+                            }
                             return
                         case .rejectedTooLong(let message):
                             searchState.queryText = ""
@@ -852,10 +893,30 @@ struct SearchAndRedactSheet: View {
                     .textFieldStyle(.roundedBorder)
                     // The typed query may itself be PII.
                     .privacySensitive()
+                    // Verbatim input: autocapitalization breaks
+                    // case-sensitive queries and mangles regex patterns;
+                    // autocorrect can silently rewrite the query.
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                     .focused($isSearchFieldFocused)
                     .accessibilityLabel("Search text")
+                    // Return runs the current query — the explicit-run
+                    // affordance for carried queries the mode switch
+                    // deliberately does not auto-run (UXF-16) and for
+                    // short queries below the debounce floor.
+                    .onSubmit {
+                        if !searchState.queryText.isEmpty {
+                            triggerSearch()
+                        }
+                    }
                     .onChange(of: searchState.queryText) { _, newValue in
-                        debounceSearch(query: newValue)
+                        if suppressNextQueryDebounce {
+                            // Recall chips trigger their own run; the
+                            // flag is one-shot.
+                            suppressNextQueryDebounce = false
+                        } else {
+                            debounceSearch(query: newValue)
+                        }
                         scheduleLivePreviewIfApplicable()
                     }
             }
@@ -1171,142 +1232,11 @@ struct SearchAndRedactSheet: View {
         searchState.userModifiedSelections = true
     }
 
-    // MARK: - Apply (search origin, toolbar)
-
-    /// Toolbar Apply for the search origin, routed through the one
-    /// `applyFindings` path.
-    private func applySelectedSearchResults() {
-        guard !isApplying else { return }
-        // Refuse mutations while the pipeline owns
-        // `redactionState.regions` — same gate as the button's
-        // `.disabled`, re-checked in the action against a pipeline that
-        // started after the last render (and again inside the path).
-        guard documentState.canMutateRegions else { return }
-        isApplying = true
-        // Capture selected IDs before apply clears selection
-        let selectedIDs = Set(searchState.results.filter(\.isSelected).map(\.id))
-        Task { @MainActor in
-            defer { isApplying = false }
-            guard let result = await redactionState.applyFindings(
-                .selectedSearchResults,
-                undoManager: undoManager,
-                documentState: documentState
-            ) else {
-                redactionState.activeSearch = nil
-                return
-            }
-            // QW-1 (D06-F3) — union only the results that
-            // produced a region. Overlap-skipped members of
-            // the selection get no audit entry, so they must
-            // not earn the "applied" badge either. The
-            // conditional-dismiss tracker reset is owned by
-            // the apply path.
-            searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
-            // Non-modal success toast via the shared
-            // UXF-11 copy builder (`CommitFeedback`) so
-            // the count stays in lockstep with the
-            // review-apply toasts. `toastManager.enqueue`
-            // coalesces duplicates so repeated taps can't
-            // queue a pile of identical toasts.
-            if let message = CommitFeedback.markedMessage(
-                applied: result.applied,
-                alreadyCovered: result.skippedOverlaps
-            ) {
-                toastManager.enqueue(message, severity: .success)
-            }
-            // Navigate to first affected page
-            if let firstPage = searchState.results.first(where: { selectedIDs.contains($0.id) })?.pageIndex {
-                documentState.currentPageIndex = firstPage
-            }
-        }
-    }
-
-    // MARK: - Apply (keyboard shortcut)
-
-    fileprivate func applyFromKeyboardShortcut() {
-        guard !isApplying else { return }
-        // Keyboard-shortcut Apply path mirrors the
-        // toolbar Apply gate — refuse mutations while the
-        // pipeline owns `redactionState.regions`.
-        guard documentState.canMutateRegions else { return }
-        guard searchState.selectCurrentMatchIfNoneSelected() else { return }
-        isApplying = true
-        let selectedIDs = Set(searchState.results.filter(\.isSelected).map(\.id))
-        Task { @MainActor in
-            defer { isApplying = false }
-            guard let result = await redactionState.applyFindings(
-                .selectedSearchResults,
-                undoManager: undoManager,
-                documentState: documentState
-            ) else {
-                return
-            }
-            // QW-1 (D06-F3) — survivors only, mirroring the
-            // toolbar Apply path above. The conditional-dismiss
-            // tracker reset is owned by the apply path.
-            searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
-            // Keyboard-shortcut path
-            // mirrors the toolbar Apply path — non-modal toast via
-            // the shared UXF-11 copy builder, which returns nil for a
-            // no-op apply so a held shortcut against an all-overlap
-            // selection still emits no "Marked 0" message.
-            if let message = CommitFeedback.markedMessage(
-                applied: result.applied,
-                alreadyCovered: result.skippedOverlaps
-            ) {
-                toastManager.enqueue(message, severity: .success)
-            }
-            if let firstPage = searchState.results.first(where: { selectedIDs.contains($0.id) })?.pageIndex {
-                documentState.currentPageIndex = firstPage
-            }
-        }
-    }
-
-    /// Forwarded to `SearchResultsSection` so the invisible Return-shortcut
-    /// Button can disable itself during an in-flight apply.
-    fileprivate var applyShortcutEnabled: Bool { !isApplying }
-
-    // `debounceSearch(query:)`, `triggerSearch()`, and the static
-    // helpers (`firstPageText(of:)`, `makeCoverageReport(...)`) live in
-    // `Search/SearchAndRedactSheet+Trigger.swift`.
-
-    // MARK: - Saved-Search Recall
-
-    /// Apply a saved shape and re-run the search. The list sheet dismisses
-    /// first (single-modal slot); recall then restores the shape via the
-    /// testable static and triggers through the standard path — exactly
-    /// one `triggerSearch()` (single-trigger discipline). If the
-    /// recalled filter state hides every result, the existing
-    /// "filters hide all candidates" empty state surfaces (already
-    /// implemented in SearchResultsSection; no new copy).
-    ///
-    /// A recall that replaces a results-carrying session names the drop:
-    /// the programmatic transition deliberately skips the mode-switch
-    /// undo toast (the user explicitly chose a new search — a restore
-    /// affordance would race the fresh run), but the trigger's own
-    /// clear used to destroy unapplied matches with no signal at all.
-    /// The notice closes that silence without adding any affordance.
-    private func recallSavedSearch(_ saved: SavedSearch) {
-        activeModal = nil
-        let dropped = Self.unappliedMatchCount(in: searchState)
-        SavedSearchListSheet.apply(saved, to: searchState)
-        triggerSearch()
-        if let message = Self.recallClearedMessage(unappliedCount: dropped) {
-            toastManager.enqueue(message, severity: .info)
-        }
-    }
-
-    /// Notice for a recall that drops live unapplied matches. Returns
-    /// nil when nothing unapplied is lost so the common recall stays
-    /// toast-free. Sibling of `dismissClearedMessage` (UXF-27) and the
-    /// review-arrival notice — the family that keeps every
-    /// results-dropping transition named. Pinned by
-    /// `InterfaceSwitchClearTests`.
-    static func recallClearedMessage(unappliedCount: Int) -> String? {
-        guard unappliedCount > 0 else { return nil }
-        let suffix = unappliedCount == 1 ? "" : "es"
-        return "Recall cleared \(unappliedCount) unapplied match\(suffix)."
-    }
+    // `debounceSearch(query:)`, `triggerSearch()`, the two apply
+    // handlers (toolbar + keyboard shortcut), `applyShortcutEnabled`,
+    // and the saved-search recall live in
+    // `Search/SearchAndRedactSheet+Trigger.swift` (M-6 hub-cap
+    // decomposition; run-orchestration family stays together).
 
     private func presentReverseRationale(for result: SearchResult) {
         let doctype = searchState.lastDoctypeExplanation?.primary

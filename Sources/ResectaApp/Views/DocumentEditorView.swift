@@ -1241,7 +1241,21 @@ struct DocumentEditorView: View {
     /// path that drives the `.sheet(isPresented:)` binding.
     fileprivate func applyMagicWandRequest(_ request: MagicWandSearchRequest) {
         let state = redactionState.activeSearch ?? SearchState()
+        // Programmatic transition, same contract as saved-search recall:
+        // armed only when the mode actually changes so the hub's
+        // `.onChange` neither re-clears the session it is about to
+        // repopulate nor mis-attributes the clear to a mode-picker tap
+        // the user never made. (A fresh `SearchState` starts in `.text`,
+        // so the flag stays false on the new-session path.)
+        state.isProgrammaticModeChange = state.searchModeType != .text
         state.searchModeType = .text
+        // Clear synchronously: the programmatic transition above makes
+        // the mode-switch `.onChange` preserve results (the recall
+        // contract), but the magic wand REPLACES the session — without
+        // this, the old session's verdict renders against the new query
+        // until the debounce fires. Post-clear the interim empty state
+        // reads "Not run yet", which is honest.
+        state.clearResults()
         state.options.exactMatch = true
         // DRAW-5 — auto-select every match so the user can apply with one
         // tap. Flag is consumed by `SearchState.appendResult` for every

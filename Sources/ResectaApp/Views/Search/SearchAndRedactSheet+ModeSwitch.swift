@@ -43,6 +43,7 @@ extension SearchAndRedactSheet {
         let appliedResultIDs: Set<UUID>
         let piiCategoryFilter: Set<PIICategory>?
         let sortOrder: ResultSortOrder
+        let appliedFilter: AppliedFilter
     }
 
     /// Capture the pre-clear session slice. Must run BEFORE
@@ -60,7 +61,8 @@ extension SearchAndRedactSheet {
             results: searchState.results,
             appliedResultIDs: searchState.appliedResultIDs,
             piiCategoryFilter: searchState.piiCategoryFilter,
-            sortOrder: searchState.sortOrder
+            sortOrder: searchState.sortOrder,
+            appliedFilter: searchState.appliedFilter
         )
     }
 
@@ -91,14 +93,20 @@ extension SearchAndRedactSheet {
         unappliedCount: Int
     ) {
         guard !isProgrammatic, !snapshot.results.isEmpty else { return }
+        // Scan↔Search transitions route through the same handler (the
+        // interface derives from `searchModeType`); the toast names
+        // which switch the user actually made.
+        let verb = snapshot.mode.interface != searchState.searchModeType.interface
+            ? "Interface switch"
+            : "Mode switch"
         let message: String
         if unappliedCount > 0 {
             let suffix = unappliedCount == 1 ? "" : "es"
-            message = "Mode switch cleared \(unappliedCount) unapplied match\(suffix)."
+            message = "\(verb) cleared \(unappliedCount) unapplied match\(suffix)."
         } else {
             let count = snapshot.results.count
             let suffix = count == 1 ? "" : "es"
-            message = "Mode switch cleared \(count) match\(suffix) (all already applied)."
+            message = "\(verb) cleared \(count) match\(suffix) (all already applied)."
         }
         toastManager.enqueue(
             message,
@@ -134,5 +142,8 @@ extension SearchAndRedactSheet {
         searchState.appliedResultIDs = snapshot.appliedResultIDs
         searchState.piiCategoryFilter = snapshot.piiCategoryFilter
         searchState.sortOrder = snapshot.sortOrder
+        // `clearResults()` reset this to `.all`; the restore puts the
+        // user's applied-state chip back too.
+        searchState.appliedFilter = snapshot.appliedFilter
     }
 }

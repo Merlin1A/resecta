@@ -54,23 +54,22 @@ struct UserTermsStoreHydrationTests {
         await store.hydrationTask?.value   // drain the live task (also skips)
     }
 
-    @Test("SavedRegexStore: a stale hydrate write-back does not clobber an early save")
+    @Test("SavedRegexStore: hydration is synchronous — an early save persists and reloads intact")
     func testHydrateDoesNotClobberEarlySavedRegex() async {
         let name = "SavedRegexStoreTests.clobber"
         let defaults = makeEmptyDefaults(name)
         defer { defaults.removePersistentDomain(forName: name) }
 
-        let store = SavedRegexStore(defaults: defaults, asyncHydrate: true)
+        // The async-hydrate window (and its clobber class) is gone:
+        // `SavedRegexStore` hydrates synchronously at init, so there is
+        // no tick in which a mutation can persist over an unloaded
+        // library. The reload asserts the persisted bytes carry the
+        // early save.
+        let store = SavedRegexStore(defaults: defaults)
         #expect(store.add(label: "Early", pattern: "[0-9]{3}"))
 
-        let stale = [SavedRegex(label: "Prior", pattern: "[a-z]+")]
-        store.applyHydration(stale)
-
-        #expect(store.userSavedRegexes.contains(where: { $0.label == "Early" }),
-                "the early save must survive a stale hydrate write-back")
-        #expect(!store.userSavedRegexes.contains(where: { $0.label == "Prior" }),
-                "the stale snapshot is dropped, not merged")
-
-        await store.hydrationTask?.value
+        let reloaded = SavedRegexStore(defaults: defaults)
+        #expect(reloaded.userSavedRegexes.contains(where: { $0.label == "Early" }),
+                "the early save must be on disk and visible from init")
     }
 }
