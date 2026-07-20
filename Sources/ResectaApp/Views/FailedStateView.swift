@@ -37,7 +37,10 @@ struct FailedStateView: View {
     // copy-pin banned-word sweep (FailedStateViewStartOverTests) reference
     // these, so a copy rename can no longer drift silently past the sweep.
     static let startOverTitle = "Start over?"
-    static let startOverMessage = "Drawn regions and document will be cleared."
+    // Parallel phrasing with the editor's Close confirm ("Drawn
+    // regions and verification results will be cleared.") — the two
+    // destructive-clear confirms speak one phrasing family.
+    static let startOverMessage = "The document and drawn regions will be cleared."
 
     /// True when the session carries at least one drawn region.
     /// Mirrors the predicate in `VerificationActionBar`.

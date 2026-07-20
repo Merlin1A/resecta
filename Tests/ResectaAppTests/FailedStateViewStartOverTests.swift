@@ -166,8 +166,9 @@ struct FailedStateViewStartOverTests {
                     "message must not contain banned outcome-promise word: \(word)")
         }
         // Message names what's cleared. The shape of the copy carries
-        // the mechanism.
-        #expect(message.contains("Drawn regions"))
+        // the mechanism. ("drawn regions" sits mid-sentence in the
+        // aligned destructive-clear phrasing family.)
+        #expect(message.contains("drawn regions"))
         #expect(message.contains("document"))
     }
 

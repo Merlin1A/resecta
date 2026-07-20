@@ -1369,7 +1369,7 @@ struct DocumentEditorView: View {
     /// former hard-coded sentence named the Layer-2 in-region cause even for
     /// page-count / metadata / structure FAILs.
     static let shareAnywayConfirmFallbackMessage =
-        "A verification check reported readable text within a redacted region. You can review the findings on this screen, or share the redacted document as it is."
+        "A verification check reported readable text within a redacted region. You can review the findings on this screen, or share the document as it is."
 
     /// Confirm copy for the §3.4 FAIL override / "Option B" one-time "Share
     /// Anyway" path. Mechanism-description (ARCH §1.3): quotes the diagnostic
@@ -1380,11 +1380,11 @@ struct DocumentEditorView: View {
     static func shareAnywayConfirmMessage(report: VerificationReport) -> String {
         if case .fail(let message) = report.overallStatus, !message.isEmpty {
             return "A verification check reported: \(message). "
-                + "You can review the findings on this screen, or share the redacted document as it is."
+                + "You can review the findings on this screen, or share the document as it is."
         }
         if case .attention(let message) = report.overallStatus, !message.isEmpty {
             return "A verification check reported: \(message). "
-                + "You can review the items on this screen, or share the redacted document as it is."
+                + "You can review the items on this screen, or share the document as it is."
         }
         return shareAnywayConfirmFallbackMessage
     }

@@ -145,7 +145,7 @@ struct FailExportGateTests {
         let msg = DocumentEditorView.shareAnywayConfirmMessage(
             report: report(.attention("Text matching your redactions is still readable on page 2 (1 instance)")))
         #expect(msg.contains("still readable on page 2"))
-        #expect(msg.contains("share the redacted document as it is"))
+        #expect(msg.contains("share the document as it is"))
     }
 
     // VE-8-1 (F07) emits a synthetic single-layer "Page Count Check" FAIL when
@@ -222,7 +222,7 @@ struct FailExportGateTests {
         let message = DocumentEditorView.shareAnywayConfirmMessage(
             report: report(.fail("Readable text detected within a redacted region on 1 page(s): 1")))
         #expect(message.contains("Readable text detected within a redacted region on 1 page(s): 1"))
-        #expect(message.contains("share the redacted document as it is"))
+        #expect(message.contains("share the document as it is"))
     }
 
     @Test("Confirm message quotes a page-count diagnostic, not the in-region sentence")

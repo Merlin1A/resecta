@@ -89,9 +89,13 @@ struct CoverageReportLocalizationTests {
 @Suite("q11 — QRC-16a role copy")
 struct PIIScanRoleCopyTests {
 
-    // UP-6: the role copy moved from the piiScan toolbar
+    // The role copy's history: it moved from the piiScan toolbar
     // (`SearchToolbarSection.piiScanRoleSubtitle`, deleted) into the
-    // pre-scan empty state; the QRC-16a wording constraints follow it.
+    // pre-scan empty state, and now lives on
+    // `WU20Strings.piiScanRoleSentence` — primary home: the scan
+    // in-flight state's description; residue home: the vestigial
+    // pre-scan state. The QRC-16a wording constraints follow the
+    // sentence wherever it renders.
 
     @Test("Scan role copy states the text-detector mechanism, locality, scope, text-only limit, and rationale visibility")
     func subtitleWordingConstraints() {
@@ -112,6 +116,15 @@ struct PIIScanRoleCopyTests {
         #expect(copy.contains("text content only"))
         #expect(copy.contains("show why"))
         #expect(!copy.contains("Auto-Detect"))
+    }
+
+    @Test("the role sentence's two homes stay in lockstep (in-flight primary, pre-scan residue)")
+    func roleSentenceHomesStayInLockstep() {
+        // The in-flight state renders `piiScanRoleSentence` directly;
+        // the pre-scan description must keep returning the same
+        // constant so the sentence cannot drift between its homes.
+        #expect(WU20Strings.description(for: .piiScanPreScan)
+                == WU20Strings.piiScanRoleSentence)
     }
 
     @Test("piiScan role copy is mechanism-description (no outcome promise)")

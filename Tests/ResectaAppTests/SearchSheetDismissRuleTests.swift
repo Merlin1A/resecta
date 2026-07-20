@@ -145,9 +145,9 @@ struct SearchSheetDismissRuleTests {
             #expect(!message.lowercased().contains(word),
                     "message must not contain banned outcome-promise word: \(word)")
         }
-        // Message names the affected state (selections) so the user
-        // knows what's discarded.
-        #expect(message.contains("Selections"))
+        // Message names the affected state (the selected matches) so
+        // the user knows what's discarded.
+        #expect(message.contains("Selected matches"))
     }
 
     // CAT-395 (C-J1, the "F10 deferral pattern"): the `.sheet(item:)` set:

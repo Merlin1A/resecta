@@ -144,7 +144,9 @@ struct RedactWorkspaceView: View {
                     pendingImportData = nil
                 }
             } message: {
-                Text("Importing a new file will replace the current document. Your unsaved changes will be lost.")
+                // Names what actually clears — there is no save
+                // concept here for "unsaved changes" to point at.
+                Text("Importing a new file will replace the current document. Drawn regions and detection results will be cleared.")
             }
             // Environment injection — satisfies @Environment reads in
             // DocumentEditorView and all downstream views.
@@ -339,7 +341,7 @@ struct RedactWorkspaceView: View {
         if workspace.documentState.hasAnyTextLayer,
            workspace.documentState.phaseKind == .editing {
             toastManager.enqueue(
-                ToastItem(message: "Text layer detected \u{2014} searchable redaction available for this document",
+                ToastItem(message: "Text layer detected \u{2014} Scan and Search can match text in this document.",
                           severity: .info)
             )
         }

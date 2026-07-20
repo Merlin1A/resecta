@@ -315,9 +315,10 @@ struct SearchToolbarSection: View {
             // confidence tools.
 
             // Category chips — pre-scan detector selection over
-            // `enabledPIICategories`. Toggling narrows the NEXT run;
-            // runs stay trigger-driven (no auto re-run on chip change).
-            scanCategoryChips
+            // `enabledPIICategories` — plus the trailing re-run
+            // affordance. Toggling narrows the NEXT run; runs stay
+            // trigger-driven (no auto re-run on chip change).
+            scanChipsRow
 
             // An empty selection means the next run scans everything —
             // say so where the chips would otherwise read as "nothing".
@@ -361,6 +362,37 @@ struct SearchToolbarSection: View {
     }
 
     // MARK: - Scan Category Chips (pre-scan selection)
+
+    /// Chips row: the scrolling category chips plus the compact re-run
+    /// button pinned at the trailing edge (chips scroll beside it).
+    /// The re-run affordance replaces the retired persistent
+    /// "Scan Document" capsule — entry auto-run is how scans start;
+    /// this button covers re-running after narrowing categories.
+    private var scanChipsRow: some View {
+        HStack(spacing: 0) {
+            scanCategoryChips
+            rescanButton
+                .padding(.trailing, ResectaTokens.Spacing.md)
+        }
+    }
+
+    /// Compact re-run control for the Scan interface. Inherits the
+    /// retired run button's accessibility label — the stable-label
+    /// policy: existing UI-test queries and VoiceOver habits keep
+    /// resolving to the surface's one run control.
+    private var rescanButton: some View {
+        Button {
+            onTriggerSearch()
+        } label: {
+            Image(systemName: "arrow.clockwise")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        // An empty chip selection does not disable the run — it means
+        // scan everything (`effectiveScanCategories`).
+        .disabled(searchState.isSearching)
+        .accessibilityLabel("Scan document for PII")
+    }
 
     /// Pre-scan detector-selection chips over the full category set.
     /// Distinct from `piiCategoryFilterChips` (post-scan result

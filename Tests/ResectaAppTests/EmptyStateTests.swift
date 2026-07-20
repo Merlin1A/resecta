@@ -91,7 +91,10 @@ struct EmptyStateTests {
         #expect(WU20Strings.description(for: .textNotRun).contains("Return"))
         #expect(WU20Strings.description(for: .regexNotRun).contains("Return"))
         #expect(WU20Strings.description(for: .multiTermNotRun).contains("Return"))
-        #expect(WU20Strings.description(for: .piiScanStartFailed).contains("Scan Document"))
+        // The failed-start state's run affordance is its inline
+        // "Scan Again" action, not the copy — the description must
+        // not name the retired run button.
+        #expect(!WU20Strings.description(for: .piiScanStartFailed).contains("Scan Document"))
     }
 
     @Test("Conjunction zero-hit names the all-terms gate, not per-term absence")
@@ -219,13 +222,15 @@ struct EmptyStateTests {
         #expect(copy.contains("match"))
     }
 
-    @Test("PII Scan pre-scan description points at Scan Document button, mechanism-description only")
-    func piiScanPreScanCopyPointsAtScanDocument() {
-        // UP-6 folded the QRC-16a role sentence into this description
-        // (wording constraints pinned by `PIIScanRoleCopyTests`); the
-        // Scan CTA must survive the merge.
+    @Test("PII Scan pre-scan description names no retired control")
+    func piiScanPreScanCopyNamesNoRetiredControl() {
+        // The persistent run button retired with the auto-run-first
+        // Scan interface. The vestigial pre-scan description keeps the
+        // role sentence as residue (wording constraints pinned by
+        // `PIIScanRoleCopyTests`) and must not point at the retired
+        // button.
         let copy = WU20Strings.description(for: .piiScanPreScan)
-        #expect(copy.contains("**Scan Document**"))
+        #expect(!copy.contains("Scan Document"))
     }
 
     @Test("Browse Templates copy is removed from piiScanPreScan description (WU-20 §4.2)")
@@ -286,34 +291,6 @@ struct EmptyStateTests {
         for phrase in forbidden {
             #expect(!lowered.contains(phrase), "forbidden phrase: \(phrase)")
         }
-    }
-
-    @Test("PII Scan pre-scan secondary line is nil when no detectors active")
-    func piiScanPreScanSecondaryNilWhenNoDetectors() {
-        let secondary = WU20Strings.piiScanPreScanSecondary(enabledPIICategoryCount: 0)
-        #expect(secondary == nil)
-    }
-
-    @Test("PII Scan pre-scan secondary line states the detector count and names no retired control (UXF-23)")
-    func piiScanPreScanSecondaryWithDetectors() {
-        let secondary = WU20Strings.piiScanPreScanSecondary(enabledPIICategoryCount: 5)
-        #expect(secondary != nil)
-        #expect(secondary?.contains("5") == true)
-        // UXF-23 discipline: never name an affordance the view doesn't
-        // have. "Customize" was retired long ago; the Confidence slider
-        // retired with the two-interface chassis (Settings' Detection
-        // Sensitivity preset is the one engine-level control).
-        #expect(secondary?.contains("Customize") == false)
-        #expect(secondary?.contains("Confidence slider") == false)
-    }
-
-    @Test("PII Scan pre-scan secondary line is mechanism-description (no outcome promise)")
-    func piiScanPreScanSecondaryIsMechanism() {
-        let secondary = WU20Strings.piiScanPreScanSecondary(enabledPIICategoryCount: 3) ?? ""
-        let forbidden = "guarant" + "ee"
-        #expect(!secondary.lowercased().contains(forbidden))
-        let ensureWord = "ensur" + "e"
-        #expect(!secondary.lowercased().contains(ensureWord))
     }
 
     @Test("PII Scan post-scan zero-result is mechanism-description (no outcome promise)")

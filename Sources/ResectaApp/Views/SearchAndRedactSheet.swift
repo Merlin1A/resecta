@@ -286,7 +286,7 @@ struct SearchAndRedactSheet: View {
                 isPresented: $showDismissConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("Dismiss", role: .destructive) {
+                Button("Discard", role: .destructive) {
                     performDismiss(afterConfirmation: true)
                 }
                 .accessibilityIdentifier("searchDismissConfirmButton")
@@ -718,18 +718,13 @@ struct SearchAndRedactSheet: View {
     private var searchBar: some View {
         HStack(spacing: ResectaTokens.Spacing.sm) {
             if searchState.searchModeType == .piiScan {
-                // PII Scan mode: scan button instead of text field
-                Button {
-                    triggerSearch()
-                } label: {
-                    Label("Scan Document", systemImage: "shield.lefthalf.filled")
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                // An empty chip selection no longer disables the run —
-                // it means scan everything (`effectiveScanCategories`).
-                .disabled(searchState.isSearching)
-                .accessibilityLabel("Scan document for PII")
+                // Scan interface: no persistent run control here. Entry
+                // auto-run starts scans (the one-tap contract), and the
+                // compact re-run affordance on the category-chips row in
+                // `SearchToolbarSection` covers re-running after
+                // narrowing categories. This row keeps its
+                // cancel-while-searching and result-navigation jobs
+                // below.
             } else if searchState.searchModeType == .multiTerm {
                 TextField("Add term…", text: $searchState.queryText)
                     .textFieldStyle(.roundedBorder)
@@ -1013,10 +1008,11 @@ struct SearchAndRedactSheet: View {
     /// Dismiss-confirmation copy — the single source of truth for both
     /// the production `.confirmationDialog` and the copy-pin banned-word
     /// sweep (`SearchSheetDismissRuleTests`), so a copy rename can't
-    /// drift past the sweep. Generalized from the retired triage
-    /// sheet's donor copy to cover both result origins.
-    static let dismissTitle = "Dismiss results?"
-    static let dismissMessage = "Selections will not be saved."
+    /// drift past the sweep. Covers both result origins; the message
+    /// names the concrete loss — selected matches that will not be
+    /// applied — rather than a generic "not saved".
+    static let dismissTitle = "Discard selections?"
+    static let dismissMessage = "Selected matches will not be applied to the document."
 
     /// Shared dismiss path for the direct (untouched) and confirmed
     /// (touched) routes. Closes BOTH sheet arms: a live selection is

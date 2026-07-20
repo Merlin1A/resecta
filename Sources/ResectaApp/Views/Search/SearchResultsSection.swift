@@ -158,7 +158,17 @@ struct SearchResultsSection: View {
             // attribute selection.
             selectWhereMenu
 
-            if searchState.results.isEmpty && !searchState.isSearching {
+            if searchState.searchModeType == .piiScan
+                && searchState.results.isEmpty
+                && searchState.isSearching {
+                // Scan in flight, nothing yet to list: an auto-run
+                // starts before the user has seen any result, so the
+                // surface names what is happening instead of rendering
+                // a blank list. The toolbar's progress row above
+                // carries the page/count numbers — this state
+                // deliberately repeats none of them.
+                scanInFlightState
+            } else if searchState.results.isEmpty && !searchState.isSearching {
                 emptyState
             } else if searchState.filteredCount == 0 && !searchState.results.isEmpty && !searchState.isSearching {
                 filteredOutState
@@ -739,9 +749,6 @@ struct SearchResultsSection: View {
 
     private var emptyState: some View {
         let context = currentEmptyStateContext()
-        // Effective count: an empty chip selection means the next run
-        // scans everything, so the detector count reflects that.
-        let piiCount = searchState.effectiveScanCategories.count
         return ContentUnavailableView {
             Label(
                 WU20Strings.headline(for: context),
@@ -761,14 +768,6 @@ struct SearchResultsSection: View {
                 // the asterisks literally (screenshot evidence) — the
                 // explicit `.init` routes back to the markdown-aware path.
                 Text(.init(WU20Strings.description(for: context)))
-                if context == .piiScanPreScan,
-                   let secondary = WU20Strings.piiScanPreScanSecondary(
-                       enabledPIICategoryCount: piiCount
-                   ) {
-                    Text(.init(secondary))
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
                 if context == .multiTermPreSearchWithRecents {
                     multiTermRecallChips
                 }
@@ -788,6 +787,43 @@ struct SearchResultsSection: View {
                         accessibilityPrefix: WU20Strings.queryRecallAccessibilityPrefix
                     )
                 }
+            }
+        } actions: {
+            // Failed-start recovery: the retry lives here as an inline
+            // action, since the copy no longer names any other control.
+            if context == .piiScanStartFailed {
+                scanAgainButton
+            }
+        }
+    }
+
+    /// Inline retry for the failed-start state. Routes through the
+    /// same trigger as the chips-row re-run control. The in-flight
+    /// belt mirrors that control's gate; structurally this state only
+    /// renders while no run is in flight.
+    private var scanAgainButton: some View {
+        Button {
+            onTriggerSearch()
+        } label: {
+            Label("Scan Again", systemImage: "arrow.clockwise")
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(searchState.isSearching)
+    }
+
+    /// Scan-run in-flight surface — rendered in place of the results
+    /// list while a Scan-interface run has produced nothing to list
+    /// yet. Carries the interface's role sentence (its primary home:
+    /// read exactly while the user waits); the vestigial pre-scan
+    /// state keeps the same sentence as residue. Page/count numbers
+    /// stay on the toolbar's progress row alone.
+    private var scanInFlightState: some View {
+        ContentUnavailableView {
+            Label(WU20Strings.scanInFlightHeadline, systemImage: "doc.viewfinder")
+        } description: {
+            VStack(alignment: .center, spacing: ResectaTokens.Spacing.sm) {
+                Text(WU20Strings.piiScanRoleSentence)
+                ProgressView()
             }
         }
     }
@@ -1037,7 +1073,7 @@ enum WU20Strings {
         case .piiScanPreScan:
             // UXF-02 — pre-scan headline must not read as a verdict.
             // "Not scanned yet" states the actual condition; the
-            // description below carries the Scan CTA.
+            // description below carries the role sentence.
             return "Not scanned yet"
         case .piiScanPostScanZero:
             return "Scan complete"
@@ -1053,12 +1089,16 @@ enum WU20Strings {
         case .textNoMatch, .regexNoMatch, .multiTermNoMatch,
              .multiTermNoMatchConjunction:
             return "doc.text.magnifyingglass"
+        // The Scan side dropped the shield family: `doc.viewfinder`
+        // matches the toolbar Scan entry's own glyph, and the outcome
+        // states use the plain severity symbols. (The verification
+        // surfaces keep their shields — different vocabulary.)
         case .piiScanPreScan:
-            return "shield.lefthalf.filled"
+            return "doc.viewfinder"
         case .piiScanStartFailed:
-            return "exclamationmark.shield"
+            return "exclamationmark.triangle"
         case .piiScanPostScanZero:
-            return "checkmark.shield"
+            return "checkmark.circle"
         }
     }
 
@@ -1089,16 +1129,16 @@ enum WU20Strings {
         case .multiTermNoMatchConjunction:
             return "No page contains all of the active terms together. Individual terms may still occur on their own — turn off \"All terms must match\" to see per-term occurrences."
         case .piiScanStartFailed:
-            return "The last scan couldn't start because the document wasn't ready. Tap Scan Document to try again."
+            // Names no control: the retry is the state's own inline
+            // "Scan Again" action, rendered beside this copy.
+            return "The last scan couldn't start because the document wasn't ready."
         case .piiScanPreScan:
-            // Carries the Scan interface's role sentence (moved here
-            // from the scan toolbar; the Search interface's counterpart
-            // is `searchRoleSubtitle` below). The copy states the
-            // mechanism on its own terms: text detectors, on-device,
-            // whole-document default, text content only — plus the
-            // rationale-visibility half of the role: every result can
-            // show the reasoning behind it.
-            return "Runs the on-device PII text detectors across the whole document \u{2014} text content only. Results show why each item was flagged. Tap **Scan Document** above to run it."
+            // The vestigial pre-scan state (entry auto-run makes it
+            // unreachable in practice; the case stays for
+            // discriminator completeness) keeps the role sentence as
+            // residue — if a failure edge ever surfaces it, the copy
+            // stays true and names no retired control.
+            return piiScanRoleSentence
         case .piiScanPostScanZero(let detectorCount):
             let suffix = detectorCount == 1 ? "" : "s"
             return "\(detectorCount) detector\(suffix) matched 0 candidates above threshold."
@@ -1134,19 +1174,24 @@ enum WU20Strings {
         }
     }
 
-    // MARK: PII Scan secondary description
+    // MARK: Scan role sentence + in-flight state
 
-    /// Secondary description line for the `piiScanPreScan` empty state.
-    /// Returned only when `enabledPIICategoryCount > 0`; nil otherwise.
-    /// States the active detector count; the selection affordance is
-    /// the category chip row itself, and the retired Confidence
-    /// slider's sentence retired with it (UXF-23 discipline: never
-    /// name an affordance the view doesn't have). Mechanism-
-    /// description, not an outcome promise. Pinned by `EmptyStateTests`.
-    static func piiScanPreScanSecondary(enabledPIICategoryCount: Int) -> String? {
-        guard enabledPIICategoryCount > 0 else { return nil }
-        return "Detectors active: \(enabledPIICategoryCount)."
-    }
+    /// The Scan interface's role sentence. Primary home: the
+    /// in-flight state's description, read exactly while the user
+    /// waits on an auto-run; the vestigial `piiScanPreScan`
+    /// description returns the same constant as residue. States the
+    /// mechanism on its own terms: text detectors, on-device,
+    /// whole-document default, text content only — plus the
+    /// rationale-visibility half of the role. Wording constraints
+    /// pinned by `PIIScanRoleCopyTests`.
+    /// (The former "Detectors active: N." secondary line retired with
+    /// the run button: the selected chips already show the active set,
+    /// and the zero-result copy carries the count.)
+    static let piiScanRoleSentence =
+        "Runs the on-device PII text detectors across the whole document \u{2014} text content only. Results show why each item was flagged."
+
+    /// Headline for the Scan-run in-flight surface.
+    static let scanInFlightHeadline = "Scanning…"
 
     // MARK: Multi-term recall chips
 
