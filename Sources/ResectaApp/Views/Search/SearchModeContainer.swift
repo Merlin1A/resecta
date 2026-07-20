@@ -19,9 +19,9 @@ struct SearchModeContainer: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// The Search interface's modes. The scan mode is not a segment —
-    /// it is reached through the sheet's interface switcher, and the
-    /// interface owns it programmatically (saved-search recall and the
-    /// `--searchMode=` hook still set it directly on `searchModeType`).
+    /// it belongs to the Scan entry, and programmatic paths
+    /// (saved-search recall and the `--searchMode=` hook) still set it
+    /// directly on `searchModeType`.
     static let searchModes: [SearchModeType] = [.text, .regex, .multiTerm]
 
     /// [RR-14] AX-bound threshold, re-derived for 3 segments: the
@@ -54,10 +54,9 @@ struct SearchModeContainer: View {
             }
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
-        // Disabled while a search is in flight, mirroring the
-        // interface switcher: a mode change mid-run clears results
-        // without cancelling the active task, which would otherwise
-        // keep streaming into the new mode's list.
+        // Disabled while a search is in flight: a mode change mid-run
+        // clears results without cancelling the active task, which
+        // would otherwise keep streaming into the new mode's list.
         .disabled(searchState.isSearching)
         .accessibilityLabel("Search mode")
     }

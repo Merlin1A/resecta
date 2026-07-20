@@ -93,12 +93,11 @@ extension SearchAndRedactSheet {
         unappliedCount: Int
     ) {
         guard !isProgrammatic, !snapshot.results.isEmpty else { return }
-        // Scan↔Search transitions route through the same handler (the
-        // interface derives from `searchModeType`); the toast names
-        // which switch the user actually made.
-        let verb = snapshot.mode.interface != searchState.searchModeType.interface
-            ? "Interface switch"
-            : "Mode switch"
+        // Every interface-crossing transition is programmatic (magic
+        // wand, review arrival, saved-search recall), and the guard
+        // above skips programmatic transitions — a toast that reaches
+        // this point names a Search-side mode change.
+        let verb = "Mode switch"
         let message: String
         if unappliedCount > 0 {
             let suffix = unappliedCount == 1 ? "" : "es"

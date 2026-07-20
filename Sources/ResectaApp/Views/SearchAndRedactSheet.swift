@@ -138,16 +138,10 @@ struct SearchAndRedactSheet: View {
     /// `CompactFloatDetent.shouldPulseGrabber(...)` for testability.
     @State private var hasPulsedGrabberThisSession: Bool = false
 
-    /// Toolbar "Save as…" prompt state. The in-list save
-    /// affordance lives inside `SavedSearchListSheet`; this pair backs the
-    /// toolbar menu entry point (visible once a search shape exists).
-    @State private var showSavedSearchSavePrompt = false
-    @State var savedSearchSaveName: String = ""
-
     /// UXF-04: "Save current..." (saved-regex menu) naming prompt state.
-    /// The alert lives at this sheet's root, the same attachment the
-    /// working "Save as…" alert above uses; the menu-side half of the
-    /// fix (item ordering) is documented on
+    /// The alert lives at this sheet's root — the attachment that stays
+    /// presentable after the triggering Menu dismisses; the menu-side
+    /// half of the fix (item ordering) is documented on
     /// `SearchToolbarSection.onRequestSaveCurrentRegex`.
     @State private var showSavedRegexSavePrompt = false
     @State private var savedRegexSaveLabel: String = ""
@@ -196,16 +190,6 @@ struct SearchAndRedactSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // The switcher hides at the compact detent: compactFloat
-                // is the deliberate canvas-visible state sized for the
-                // search bar + nav controls, and the extra segmented row
-                // displaced the nav counter below the clip there.
-                // Interface switching is a full-chrome activity — drag
-                // up and the switcher returns.
-                if selectedDetent != .compactFloat {
-                    interfaceSwitcher
-                }
-
                 // Unified degrade rule: the gazetteer-degrade disclosure is unified
                 // across interfaces: Scan shows it whenever the session
                 // is degraded (its runs consult the detection corpus);
@@ -225,8 +209,7 @@ struct SearchAndRedactSheet: View {
                     // Absorbed review: staged detections render
                     // inside the Scan interface. Run affordances are
                     // parked while the review is pending — resolve it
-                    // (Apply / Dismiss) to scan again; the Search
-                    // interface stays reachable via the switcher.
+                    // (Apply / Dismiss) to scan again.
                     ScanReviewSection(
                         searchState: searchState,
                         filterKind: $reviewFilterKind,
@@ -278,6 +261,9 @@ struct SearchAndRedactSheet: View {
                             suppressNextQueryDebounce = true
                             searchState.queryText = query
                             triggerSearch()
+                        },
+                        onShowSavedSearches: {
+                            activeModal = .savedSearches
                         }
                     )
 
@@ -365,46 +351,15 @@ struct SearchAndRedactSheet: View {
                                  // a "Marked 0" round-trip.
                                  || searchState.selectionFullyApplied))
                 }
-                // Saved-searches actions surface FLAT in the system
-                // overflow (•••) menu — no nested submenu. The list is
-                // available in EVERY mode (incl. PII Scan per the design's
-                // entry-point note), so both mount in the navigation
-                // toolbar's .secondaryAction zone rather than inside the
-                // mode-gated SearchToolbarSection rows. "Save as…" is
-                // enabled once a search shape exists.
-                ToolbarItem(placement: .secondaryAction) {
-                    Button {
-                        activeModal = .savedSearches
-                    } label: {
-                        Label("Saved Searches", systemImage: "bookmark")
-                    }
-                    // Parked while staged detections await review: a
-                    // recall re-triggers a run, and a run must not race
-                    // the pending review for the Scan surface. Resolve
-                    // the review (Apply / Dismiss) first.
-                    .disabled(redactionState.pendingTriage != nil)
-                    .accessibilityIdentifier("saved-searches-menu")
-                }
-                ToolbarItem(placement: .secondaryAction) {
-                    Button {
-                        savedSearchSaveName = SavedSearchListSheet.generatedName(for: searchState)
-                        showSavedSearchSavePrompt = true
-                    } label: {
-                        Label("Save as…", systemImage: "plus.circle")
-                    }
-                    // Also parked during a pending review — the sheet's
-                    // query shape isn't the review's content, so a save
-                    // here would capture an unrelated shape. Scan mode
-                    // always has a saveable shape (categories + options
-                    // — the point of a saved scan is reuse on OTHER
-                    // documents), so its gate doesn't hinge on results.
-                    .disabled(redactionState.pendingTriage != nil
-                              || (searchState.searchModeType != .piiScan
-                                  && searchState.results.isEmpty
-                                  && searchState.queryText.isEmpty
-                                  && searchState.searchTerms.isEmpty))
-                    .accessibilityIdentifier("saved-searches-save-as")
-                }
+                // The navigation toolbar carries ONLY Dismiss and
+                // Apply — no .secondaryAction items, so SwiftUI renders
+                // no system overflow (•••) and the inline title sits
+                // centered. Saved-searches access lives in the content
+                // area instead: one bookmark button per interface
+                // (`savedSearchesBookmark` here by the Search field;
+                // its Scan-side sibling by the scope row in
+                // `SearchResultsSection`), and saving goes through the
+                // saved list's own save row.
             }
         }
         // Custom grabber capsule lives in the top safe-area
@@ -479,27 +434,8 @@ struct SearchAndRedactSheet: View {
                 .presentationDragIndicator(.visible)
             }
         }
-        // Toolbar "Save as…" prompt (the in-list affordance is
-        // the second entry point; both commit through the same capture
-        // static).
-        .alert("Save Current Search", isPresented: $showSavedSearchSavePrompt) {
-            TextField("Name", text: $savedSearchSaveName)
-            Button("Save") {
-                let trimmed = savedSearchSaveName.trimmingCharacters(in: .whitespaces)
-                guard !trimmed.isEmpty else { return }
-                savedSearchStore.add(SavedSearchListSheet.capture(from: searchState, name: trimmed))
-            }
-            // Blank names can't commit — without the gate the alert
-            // still auto-dismisses on Save and the no-op reads as a
-            // successful save (parity with the regex-save alert below).
-            .disabled(savedSearchSaveName.trimmingCharacters(in: .whitespaces).isEmpty)
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Saves the current query shape — mode, query text, and filter settings. Never document content or results.")
-        }
         // UXF-04: "Save current..." (saved-regex menu) naming prompt.
-        // Root-attached for the same reason as the "Save as…" alert
-        // above — see `showSavedRegexSavePrompt`. Sentinel-validates via
+        // Root-attached — see `showSavedRegexSavePrompt`. Sentinel-validates via
         // `RegexSentinelCheck.validate(_:)`, then commits through
         // `savedRegexStore.add(label:pattern:)`; on success a toast
         // names where the saved pattern is managed (UXF-20).
@@ -777,53 +713,6 @@ struct SearchAndRedactSheet: View {
         .shieldedSheetContent(monitor: captureMonitor)
     }
 
-    // MARK: - Interface Switcher
-
-    /// Top-level two-segment switcher between the sheet's peer
-    /// interfaces (Scan · Search). The interface is a pure derivation
-    /// over `searchModeType`, so the switcher WRITES modes: Scan maps
-    /// to the scan mode, Search restores the last Search-side mode.
-    /// The write happens in the Binding's set (a user gesture — the
-    /// binding-set discipline), which routes through the existing
-    /// mode-switch `.onChange` semantics below: results clear with the
-    /// undo toast exactly as a mode-picker tap always did. Switching
-    /// interfaces never auto-runs — only the toolbar Scan button
-    /// carries the one-tap contract.
-    private var interfaceSwitcher: some View {
-        Picker("Interface", selection: Binding(
-            get: { searchState.searchModeType.interface },
-            set: { newInterface in
-                guard newInterface != searchState.searchModeType.interface else { return }
-                switch newInterface {
-                case .scan:
-                    searchState.searchModeType = .piiScan
-                case .search:
-                    searchState.searchModeType = searchState.lastSearchSideMode
-                }
-            }
-        )) {
-            Text(SearchInterface.scan.displayName).tag(SearchInterface.scan)
-            Text(SearchInterface.search.displayName).tag(SearchInterface.search)
-        }
-        .pickerStyle(.segmented)
-        // Disabled while a scan is in flight, like every other
-        // search-affecting control in this sheet: switching interfaces
-        // mid-run would orphan the active task (the mode-switch
-        // handler clears results, and an uncancelled task's completion
-        // tail would then write a false run record). Cancel first or
-        // wait; the cancel affordance sits right in the search bar.
-        // ALSO parked while staged detections await review: the review
-        // owns the surface until resolved (Apply / Dismiss) — every
-        // trigger path refuses to run during a review, so an enabled
-        // Search segment would open an interface whose search field
-        // silently does nothing.
-        .disabled(searchState.isSearching || redactionState.pendingTriage != nil)
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.top, ResectaTokens.Spacing.xs)
-        .accessibilityLabel("Interface")
-        .accessibilityIdentifier("interfaceSwitcher")
-    }
-
     // MARK: - Search Bar
 
     private var searchBar: some View {
@@ -921,6 +810,14 @@ struct SearchAndRedactSheet: View {
                     }
             }
 
+            // Saved-searches entry point for the Search interface —
+            // by the field so it stays reachable at the compact detent.
+            // The Scan interface's sibling rides the scope row in
+            // `SearchResultsSection` (Scan has no field row).
+            if searchState.searchModeType != .piiScan {
+                savedSearchesBookmark
+            }
+
             if searchState.isSearching {
                 Button {
                     Task { await searchState.cancelSearch() }
@@ -938,6 +835,23 @@ struct SearchAndRedactSheet: View {
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .padding(.vertical, ResectaTokens.Spacing.sm)
+    }
+
+    /// Bookmark button presenting the saved-searches list through the
+    /// single modal slot. Parked while staged detections await review:
+    /// a recall re-triggers a run, and a run must not race the pending
+    /// review for the Scan surface. Resolve the review (Apply /
+    /// Dismiss) first.
+    private var savedSearchesBookmark: some View {
+        Button {
+            activeModal = .savedSearches
+        } label: {
+            Image(systemName: "bookmark")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .disabled(redactionState.pendingTriage != nil)
+        .accessibilityLabel("Saved Searches")
     }
 
     // MARK: - Grabber Pulse

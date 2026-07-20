@@ -3,13 +3,16 @@ import XCTest
 /// UI tests for the Search & Redact sheet's detent-dependent layout
 /// (q18 / UXF-05, +UXF-17 cross-ref).
 ///
-/// Two demonstrated defects, both driven end-to-end here:
+/// Two demonstrated defect classes, both driven end-to-end here:
 /// - ts5-02 / seq 134: at the expanded detent the pinned Dismiss /
-///   Apply toolbar header overlapped the mode tabs; a tap on the
-///   Multi-term tab did NOTHING. The test drags the sheet to expanded
-///   with a real drag gesture (the occlusion appeared after drag
-///   transitions, not programmatic detent seeding) and asserts the
-///   Multi-term tap actually switches mode.
+///   Apply toolbar header overlapped the segmented rows at the top of
+///   the sheet; taps there were silent no-ops. The tests drag the
+///   sheet to expanded with a real drag gesture (the occlusion
+///   appeared after drag transitions, not programmatic detent
+///   seeding) and assert the top controls stay hittable and their
+///   taps take effect — once per interface entry, since interface
+///   choice lives on the editor toolbar's two entry buttons rather
+///   than in-sheet chrome.
 /// - ts2-04: at the medium detent with results, the first result row
 ///   rendered below the fold, half-clipped at the footer, and row taps
 ///   landed on the footer. The test searches at the default medium
@@ -60,38 +63,45 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
 
     /// A picker's segments surface with the segment title as the
     /// label; `.tabs` on the 26.4 sim, `.buttons` on some hierarchies —
-    /// match across element types by label.
-    private func modeSegment(_ title: String) -> XCUIElement {
+    /// match across element types by label. Query ONLY titles unique
+    /// in the presented hierarchy (incl. the editor toolbar behind the
+    /// sheet). "Text" is NOT one: the OCR source filter renders an
+    /// identically-typed "Text" segment on the Search surface, so a
+    /// label match there is ambiguous — round-trip via "Regex" instead.
+    private func segment(_ title: String) -> XCUIElement {
         app.descendants(matching: .any)
             .matching(NSPredicate(format: "label == %@ AND (elementType == 9 OR elementType == 42 OR elementType == 13)", title))
             .firstMatch
     }
 
-    /// Interface-switcher segments, scoped INSIDE the switcher by its
-    /// stable identifier: the editor toolbar behind the sheet carries
-    /// buttons with the same "Scan" / "Search" labels, so an app-wide
-    /// label match could target the occluded toolbar instead.
-    private func interfaceSegment(_ title: String) -> XCUIElement {
-        app.descendants(matching: .any)
-            .matching(identifier: "interfaceSwitcher")
-            .firstMatch
-            .descendants(matching: .any)
-            .matching(NSPredicate(format: "label == %@ AND (elementType == 9 OR elementType == 42 OR elementType == 13)", title))
-            .firstMatch
+    /// Drag-proof shared by the expanded-detent tests: at the expanded
+    /// detent the pinned Dismiss button sits in the top fifth of the
+    /// window (~91 pt on the 26.4 iPhone 17 sim; ~413 pt at medium).
+    /// Without this, a failed drag leaves the sheet at medium and the
+    /// occlusion assertions below exercise nothing.
+    private func assertSheetExpanded() {
+        let dismiss = app.buttons["searchDismissButton"].firstMatch
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 5), "Dismiss button not found after drag.")
+        let window = app.windows.firstMatch
+        XCTAssertLessThan(
+            dismiss.frame.minY, window.frame.height * 0.2,
+            "Sheet did not reach the expanded detent — the drag gesture failed, so this test exercised nothing."
+        )
     }
 
-    // MARK: - Expanded detent: segmented controls must win the tap (seq 134)
+    // MARK: - Expanded detent: top controls must win the tap (seq 134)
 
-    // Premise updated for the two-interface chassis: the 4-segment mode
-    // picker (which included a "PII Scan" segment) became a 2-segment
-    // interface switcher + a Search-side 3-segment mode picker, and the
-    // per-run confidence slider is retired. The defect class this test
-    // pins is unchanged — at the expanded detent the pinned toolbar
-    // header must not occlude the segmented controls at the top of the
-    // sheet — so the drive now exercises BOTH segmented rows and
-    // asserts the Scan side's run button (its remaining pinned control)
-    // instead of the retired slider.
-    func testExpandedDetent_interfaceAndModeTabsSwitchSurfaces() {
+    // Premise updated for the two-entry model: interface choice lives
+    // on the editor toolbar's two entry buttons (the in-sheet
+    // switcher is gone), so each interface pins the seq-134 occlusion
+    // class from its own entry. The defect class is unchanged — at
+    // the expanded detent the pinned toolbar header must not occlude
+    // the controls at the top of the sheet.
+
+    // Scan entry. --searchMode seeds the same interface the toolbar
+    // Scan button opens, without the entry's auto-run (a run in
+    // flight would disable the controls this test asserts against).
+    func testExpandedDetent_scanEntryTopControlsTakeTaps() {
         launchSearchSheet(mode: "piiScan")
 
         // Sheet is up once the Scan surface renders.
@@ -101,40 +111,61 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
 
         dragSheetToExpanded()
+        assertSheetExpanded()
 
-        // Prove the drag actually expanded the sheet: at the expanded
-        // detent the pinned Dismiss button sits in the top fifth of the
-        // window (~91 pt on the 26.4 iPhone 17 sim; ~413 pt at medium).
-        let dismiss = app.buttons["searchDismissButton"].firstMatch
-        XCTAssertTrue(dismiss.waitForExistence(timeout: 5), "Dismiss button not found after drag.")
-        let window = app.windows.firstMatch
-        XCTAssertLessThan(
-            dismiss.frame.minY, window.frame.height * 0.2,
-            "Sheet did not reach the expanded detent — the drag gesture failed, so this test exercised nothing."
-        )
+        // The seq-134 failure class: on the defective layout the
+        // pinned header owned the top controls' hit targets and taps
+        // were silent no-ops. The run button is the surface's top
+        // pinned control...
+        let scanButton = app.buttons["Scan document for PII"]
+        XCTAssertTrue(scanButton.isHittable, "Scan run button not hittable at the expanded detent.")
 
-        // The seq-134 failure class, first row: tap the interface
-        // switcher's Search segment at the expanded detent. On the
-        // defective layout the pinned header owned this hit target and
-        // the tap was a silent no-op.
-        let searchSegment = interfaceSegment("Search")
+        // ...and the scope segments prove a tap actually lands:
+        // flipping the scope AWAY from its whole-document default is
+        // observable via segment selection without starting a run.
+        let thisPage = segment("This page")
         XCTAssertTrue(
-            searchSegment.waitForExistence(timeout: 10),
-            "Interface switcher's Search segment not found after expanding the sheet."
+            thisPage.waitForExistence(timeout: 10),
+            "Scope picker's This page segment not found on the Scan surface."
         )
-        XCTAssertTrue(searchSegment.isHittable, "Search segment exists but is not hittable at the expanded detent.")
-        searchSegment.tap()
-
-        // Interface actually switched: the text field replaces the
-        // Scan run button.
         XCTAssertTrue(
-            app.textFields["Search text"].waitForExistence(timeout: 10),
-            "Tapping the Search segment at the expanded detent did not switch interface — the seq-134 occlusion no-op."
+            thisPage.isHittable,
+            "This page segment exists but is not hittable at the expanded detent."
+        )
+        XCTAssertFalse(
+            thisPage.isSelected,
+            "This page is already selected at launch — the whole-document default moved and this flip assert lost its meaning."
+        )
+        thisPage.tap()
+        // tap() returns after the app idles, so the selection write and
+        // its render pass have settled by the time this re-queries.
+        XCTAssertTrue(
+            thisPage.isSelected,
+            "Tapping the This page segment did not flip the scope — the seq-134 occlusion no-op."
+        )
+    }
+
+    // Search entry, plus the surviving Search-side mode tabs (the
+    // original seq-134 target): Text / Regex / Multi-term must win
+    // their taps at the expanded detent.
+    func testExpandedDetent_searchEntryModeTabsSwitchSurfaces() {
+        launchSearchSheet(mode: nil)
+
+        let field = app.textFields["Search text"]
+        XCTAssertTrue(
+            field.waitForExistence(timeout: 30),
+            "Search sheet never presented — check the --openSearchSheet launch hook."
         )
 
-        // Second row — the Search-side mode picker (the original
-        // seq-134 target): tap Multi-term and prove the mode switched.
-        let multiTerm = modeSegment("Multi-term")
+        dragSheetToExpanded()
+        assertSheetExpanded()
+
+        // Top pinned control of the Search surface.
+        XCTAssertTrue(field.isHittable, "Search field not hittable at the expanded detent.")
+
+        // seq-134: tap Multi-term and prove the mode switched — its
+        // dedicated term field replaces the shared text field.
+        let multiTerm = segment("Multi-term")
         XCTAssertTrue(
             multiTerm.waitForExistence(timeout: 10),
             "Multi-term mode tab not found on the Search interface."
@@ -147,20 +178,25 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Tapping the Multi-term tab at the expanded detent did not switch mode — the seq-134 occlusion no-op."
         )
 
-        // Round-trip: back to Scan; its run button must land
-        // unobstructed (the retired slider's replacement assertion).
-        let scanSegment = interfaceSegment("Scan")
+        // Round-trip: over to Regex, which shares the text-search
+        // field — the field's return proves the tap landed. (Regex is
+        // queried instead of Text because the Text label is ambiguous
+        // here; see `segment(_:)`.)
+        let regexTab = segment("Regex")
         XCTAssertTrue(
-            scanSegment.waitForExistence(timeout: 10),
-            "Interface switcher's Scan segment not found."
+            regexTab.waitForExistence(timeout: 10),
+            "Regex mode tab not found on the Search interface."
         )
-        scanSegment.tap()
-        let scanButton = app.buttons["Scan document for PII"]
+        XCTAssertTrue(regexTab.isHittable, "Regex tab exists but is not hittable at the expanded detent.")
+        regexTab.tap()
         XCTAssertTrue(
-            scanButton.waitForExistence(timeout: 10),
-            "Scan run button missing after switching back to Scan at the expanded detent."
+            app.textFields["Search text"].waitForExistence(timeout: 10),
+            "Tapping the Regex tab did not restore the shared text field — the seq-134 occlusion no-op."
         )
-        XCTAssertTrue(scanButton.isHittable, "Scan run button not hittable at the expanded detent.")
+        XCTAssertTrue(
+            app.textFields["Search text"].isHittable,
+            "Search field not hittable after the mode round-trip."
+        )
     }
 
     // MARK: - Medium detent with results: first row must be reachable (ts2-04)

@@ -5,18 +5,16 @@ import CoreGraphics
 @testable import RedactionEngine
 
 // Two-interface chassis — the pure state contracts under the sheet's
-// Scan · Search switcher:
+// Scan · Search split:
 //
 // 1. Interface identity is a DERIVATION over `searchModeType` (the
 //    scan mode IS the Scan interface's machinery), so persistence,
 //    launch args, and saved-search recall need no second field.
-// 2. The switcher's Search segment restores the LAST Search-side mode,
-//    not a hard `.text` reset.
-// 3. The toolbar Scan button's one-tap contract rides a one-shot
+// 2. The toolbar Scan button's one-tap contract rides a one-shot
 //    `pendingAutoRunScan` flag with a single consume site.
-// 4. An empty category-chip selection means scan EVERYTHING
+// 3. An empty category-chip selection means scan EVERYTHING
 //    (`effectiveScanCategories`).
-// 5. The retired per-run confidence slider no longer filters results —
+// 4. The retired per-run confidence slider no longer filters results —
 //    `minimumPIIConfidence` is schema-compat state, not a filter input.
 
 @Suite("Search interface chassis")
@@ -43,25 +41,6 @@ struct SearchInterfaceChassisTests {
     func searchModeListExcludesScan() {
         #expect(SearchModeContainer.searchModes == [.text, .regex, .multiTerm])
         #expect(!SearchModeContainer.searchModes.contains(.piiScan))
-    }
-
-    // MARK: - Last Search-side mode (switcher round-trip)
-
-    @Test("lastSearchSideMode defaults to text and tracks Search-side sets only")
-    func lastSearchSideModeTracking() {
-        let state = SearchState(defaults: UserDefaults(suiteName: "chassis-\(UUID().uuidString)")!)
-        #expect(state.lastSearchSideMode == .text)
-
-        state.searchModeType = .regex
-        #expect(state.lastSearchSideMode == .regex)
-
-        // Entering the Scan interface must not clobber the memory —
-        // this is what makes the switcher's round-trip restore work.
-        state.searchModeType = .piiScan
-        #expect(state.lastSearchSideMode == .regex)
-
-        state.searchModeType = .multiTerm
-        #expect(state.lastSearchSideMode == .multiTerm)
     }
 
     // MARK: - One-tap auto-run flag

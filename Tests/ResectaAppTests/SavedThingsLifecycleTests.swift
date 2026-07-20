@@ -12,8 +12,7 @@ import UIKit
 // of the screen where it draws clipped outside the menu container and
 // taps never land — the item's action simply never ran. The fix orders
 // the item first (nearest the menu anchor, always visible) and hoists
-// the naming alert to the `SearchAndRedactSheet` root — the same
-// attachment the working "Save as…" alert uses — requested via
+// the naming alert to the `SearchAndRedactSheet` root — requested via
 // `onRequestSaveCurrentRegex`. This suite pins:
 //
 //   1. The commit seam (`commitSaveCurrentRegex`) round-trips through a

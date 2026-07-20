@@ -92,20 +92,7 @@ final class SearchState: Identifiable {
     var queryText: String = ""
 
     /// Active search mode selector.
-    var searchModeType: SearchModeType = .text {
-        didSet {
-            // Remember the last Search-side mode so the interface
-            // switcher can restore it when the user returns from Scan.
-            if searchModeType != .piiScan {
-                lastSearchSideMode = searchModeType
-            }
-        }
-    }
-
-    /// Last non-scan mode the session used. The interface switcher's
-    /// Search segment restores this instead of hard-resetting to
-    /// `.text`, so Scan round-trips preserve the user's mode choice.
-    private(set) var lastSearchSideMode: SearchModeType = .text
+    var searchModeType: SearchModeType = .text
 
     /// One-shot arm for the toolbar Scan button's one-tap contract:
     /// the button sets this before presenting the sheet, and the
@@ -1399,8 +1386,7 @@ enum SearchInterface: Equatable, Sendable {
     case scan
     case search
 
-    /// Segment / title strings for the switcher and per-interface
-    /// navigation titles.
+    /// Per-interface navigation titles.
     var displayName: String {
         switch self {
         case .scan: "Scan"

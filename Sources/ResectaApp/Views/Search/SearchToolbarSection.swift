@@ -41,8 +41,8 @@ struct SearchToolbarSection: View {
     /// item was ordered after the 10 built-ins, which pushes it past
     /// the top of the screen where it draws clipped and taps never
     /// land (fixed by ordering it first, nearest the menu anchor); and
-    /// the naming alert now lives at the sheet root alongside the
-    /// working "Save as…" alert instead of on this section's VStack.
+    /// the naming alert now lives at the sheet root instead of on this
+    /// section's VStack.
     let onRequestSaveCurrentRegex: () -> Void
 
     // Initialized to `optionsCollapsedByDefault` (false). The

@@ -59,6 +59,16 @@ struct SavedListPartitionTests {
         #expect(SavedSearchListSheet.saveCurrentLabel(for: .scan) == "Save current scan…")
     }
 
+    @Test("Save-prompt chrome follows the interface whose shape it captures")
+    func savePromptChromePerInterface() {
+        #expect(SavedSearchListSheet.savePromptTitle(for: .search) == "Save Current Search")
+        #expect(SavedSearchListSheet.savePromptTitle(for: .scan) == "Save Current Scan")
+        #expect(SavedSearchListSheet.savePromptMessage(for: .search)
+                == "Saves the current query shape — mode, query text, and filter settings. Never document content or results.")
+        #expect(SavedSearchListSheet.savePromptMessage(for: .scan)
+                == "Saves the current scan shape — selected categories and options. Never document content or results.")
+    }
+
     @Test("Recall round-trip stays interface-correct for both entry kinds")
     func recallRoundTripPerInterface() {
         // A scan entry recalls into the Scan interface's machinery.

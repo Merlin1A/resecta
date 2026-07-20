@@ -136,7 +136,8 @@ struct SearchResultsListObservationCrashTests {
             applyShortcutEnabled: true,
             onRequestShowRationale: { _ in },
             onTriggerSearch: {},
-            onRecallQuery: { _ in }
+            onRecallQuery: { _ in },
+            onShowSavedSearches: {}
         )
         .environment(DocumentState())
         .environment(RedactionState())

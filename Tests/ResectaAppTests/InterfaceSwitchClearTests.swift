@@ -2,12 +2,12 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// Interface-switch clear semantics: switching interfaces clears the
+// Interface-crossing clear semantics: crossing interfaces clears the
 // other side's unapplied results through the mode-switch undo-toast
-// contract (pinned in ModeSwitchToastTests — the interface switcher
-// writes modes, so the same handler serves both). What this file pins
-// is the closure of the two transitions that still dropped results
-// SILENTLY:
+// contract (pinned in ModeSwitchToastTests — interface identity
+// derives from the mode, so the same handler serves both). What this
+// file pins is the closure of the two transitions that still dropped
+// results SILENTLY:
 //
 //   1. Saved-search recall over a live results set — the programmatic
 //      transition deliberately skips the mode-switch toast, and the

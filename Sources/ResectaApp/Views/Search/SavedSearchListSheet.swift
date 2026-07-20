@@ -37,8 +37,8 @@ struct SavedSearchListSheet: View {
     @State private var deleteTarget: SavedSearch?
 
     /// The interface whose entries this list shows — the active one.
-    /// Stable for the sheet's lifetime (the switcher is unreachable
-    /// behind this modal).
+    /// Stable for the sheet's lifetime (no user path changes the
+    /// interface while this modal is up).
     private var activeInterface: SearchInterface {
         searchState.searchModeType.interface
     }
@@ -108,20 +108,19 @@ struct SavedSearchListSheet: View {
             } message: { _ in
                 Text("The new name is capped at \(SavedSearch.nameLengthCap) characters.")
             }
-            .alert("Save Current Search", isPresented: $showSavePrompt) {
+            .alert(Self.savePromptTitle(for: activeInterface), isPresented: $showSavePrompt) {
                 TextField("Name", text: $savePromptName)
                 Button("Save") {
                     let trimmed = savePromptName.trimmingCharacters(in: .whitespaces)
                     guard !trimmed.isEmpty else { return }
                     savedSearchStore.add(Self.capture(from: searchState, name: trimmed))
                 }
-                // Blank names can't commit (parity with the toolbar
-                // "Save as…" alert) — a Save that auto-dismisses while
-                // saving nothing reads as success.
+                // Blank names can't commit — a Save that auto-dismisses
+                // while saving nothing reads as success.
                 .disabled(savePromptName.trimmingCharacters(in: .whitespaces).isEmpty)
                 Button("Cancel", role: .cancel) { }
             } message: {
-                Text("Saves the current query shape — mode, query text, and filter settings. Never document content or results.")
+                Text(Self.savePromptMessage(for: activeInterface))
             }
             // UXF-33: destructive confirm for swipe-Delete, mirroring
             // the app-wide confirmation-dialog pattern (Settings
@@ -233,6 +232,20 @@ struct SavedSearchListSheet: View {
 
     static func saveCurrentLabel(for interface: SearchInterface) -> String {
         interface == .scan ? "Save current scan…" : "Save current search…"
+    }
+
+    /// Save-prompt chrome follows the interface whose shape the save
+    /// captures: the Scan side names categories and options, the
+    /// Search side names query text and filters — the prompt never
+    /// describes the other interface's shape.
+    static func savePromptTitle(for interface: SearchInterface) -> String {
+        interface == .scan ? "Save Current Scan" : "Save Current Search"
+    }
+
+    static func savePromptMessage(for interface: SearchInterface) -> String {
+        interface == .scan
+            ? "Saves the current scan shape — selected categories and options. Never document content or results."
+            : "Saves the current query shape — mode, query text, and filter settings. Never document content or results."
     }
 
     /// Apply a saved shape to the live `SearchState` (recall). The

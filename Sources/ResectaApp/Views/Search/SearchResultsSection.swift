@@ -49,6 +49,9 @@ struct SearchResultsSection: View {
     /// `.onChange` debounce on top of the direct trigger and run the
     /// recalled query twice.
     let onRecallQuery: (String) -> Void
+    /// Present the saved-searches list — the parent owns the single
+    /// modal slot. Wired to the Scan-side bookmark on the scope row.
+    let onShowSavedSearches: () -> Void
 
     /// Per-sheet-session dismiss state for the doctype banner.
     /// `SearchResultsSection` is re-instantiated when the sheet
@@ -146,8 +149,10 @@ struct SearchResultsSection: View {
             // control, shown on BOTH interfaces (it scopes J/K and
             // Cmd+G result traversal; it was previously hidden in the
             // scan mode only because the live-preview path is disabled
-            // there, which never affected its traversal job).
-            scopePicker
+            // there, which never affected its traversal job). On the
+            // Scan interface the row also carries the saved-searches
+            // bookmark — Scan has no field row to host it.
+            scopeRow
 
             // "Select where…" Menu surfaces predicate-driven
             // attribute selection.
@@ -443,7 +448,22 @@ struct SearchResultsSection: View {
         }
     }
 
-    // MARK: - Scope Picker
+    // MARK: - Scope Row
+
+    /// The scope picker plus, on the Scan interface only, the
+    /// saved-searches bookmark. The Search side renders the picker
+    /// alone with the same paddings (its bookmark sits by the search
+    /// field in the hub's search bar).
+    private var scopeRow: some View {
+        HStack(spacing: ResectaTokens.Spacing.sm) {
+            scopePicker
+            if searchState.searchModeType == .piiScan {
+                savedSearchesBookmark
+            }
+        }
+        .padding(.horizontal, ResectaTokens.Spacing.md)
+        .padding(.vertical, ResectaTokens.Spacing.xxs)
+    }
 
     private var scopePicker: some View {
         Picker("Scope", selection: $searchState.navigationScope) {
@@ -451,9 +471,25 @@ struct SearchResultsSection: View {
             Text("Whole document").tag(SearchNavigationScope.wholeDocument)
         }
         .pickerStyle(.segmented)
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.xxs)
         .accessibilityLabel("Navigation scope")
+    }
+
+    /// Bookmark button presenting the saved-searches list. Parked
+    /// while staged detections await review: a recall re-triggers a
+    /// run, and a run must not race the pending review for the Scan
+    /// surface. (While a review is active this section isn't rendered
+    /// at all — the review section replaces it — so the gate is a belt
+    /// on top of that structural rule.)
+    private var savedSearchesBookmark: some View {
+        Button {
+            onShowSavedSearches()
+        } label: {
+            Image(systemName: "bookmark")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .disabled(redactionState.pendingTriage != nil)
+        .accessibilityLabel("Saved Searches")
     }
 
     // MARK: - Keyboard Shortcuts (J / K / Space / Return)

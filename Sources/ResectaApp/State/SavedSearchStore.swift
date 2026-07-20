@@ -33,8 +33,9 @@ private struct AnyCodingKey: CodingKey {
 // per [RR-43](RISK_REGISTER.md#rr-43).
 //
 // The consuming UI shipped in V1.0: `SavedSearchListSheet`
-// lists / recalls / renames / deletes entries, plus the
-// toolbar "Save as…" entry point in `SearchAndRedactSheet`.
+// lists / recalls / renames / deletes entries and carries the save
+// entry point (reached via the per-interface bookmark buttons in
+// `SearchAndRedactSheet` / `SearchResultsSection`).
 
 // MARK: - SavedSearch shape
 
