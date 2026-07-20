@@ -90,6 +90,132 @@ struct SandwichVerificationTests {
                 "TJ-kerning tampering on a region-less page must FAIL the SVT-1 lattice; got \(badResult)")
     }
 
+    // MARK: - SVT-1 pitch-flip acceptance (J-14, BH-A-02 ≡ BH-B-05)
+
+    /// Draw invisible Courier lines writer-style (mode-3 CTLineDraw, one
+    /// size per line) at the given sizes/origins and return the PDF bytes.
+    private func writerStyleTwoLinePDF(
+        first: (text: String, size: CGFloat, origin: CGPoint),
+        second: (text: String, size: CGFloat, origin: CGPoint)
+    ) throws -> Data {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("svt1_flip_\(UUID().uuidString).pdf")
+        var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let ctx = try #require(CGContext(url as CFURL, mediaBox: &mediaBox, nil))
+        ctx.beginPDFPage(nil)
+        ctx.setTextDrawingMode(.invisible)
+        for line in [first, second] {
+            ctx.saveGState()
+            ctx.textMatrix = .identity
+            let font = CTFontCreateWithName("Courier" as CFString, line.size, nil)
+            let attr = NSAttributedString(
+                string: line.text,
+                attributes: [.font: font])
+            ctx.textPosition = line.origin
+            CTLineDraw(CTLineCreateWithAttributedString(attr), ctx)
+            ctx.restoreGState()
+        }
+        ctx.endPDFPage()
+        ctx.closePDF()
+        defer { try? FileManager.default.removeItem(at: url) }
+        return try Data(contentsOf: url)
+    }
+
+    /// Read back the page and require the SVT-1 walk to see BOTH point
+    /// sizes inside ONE y-band — the writer-band junction the pitch-flip
+    /// rule adjudicates. Guards the acceptance tests against vacuity (two
+    /// read-back bands would never reach the flip site).
+    private func requireSameBandSizeJunction(
+        _ page: PDFPage, sizes: Set<CGFloat>
+    ) throws {
+        let text = try #require(page.string) as NSString
+        var units: [(y: CGFloat, size: CGFloat)] = []
+        var off = 0
+        while off < page.numberOfCharacters {
+            let r = text.rangeOfComposedCharacterSequence(at: off)
+            defer { off += max(r.length, 1) }
+            guard let sel = page.selection(for: r) else { continue }
+            let b = sel.bounds(for: page)
+            guard b.width > 0, b.height > 0,
+                  !FilterResult.isLineageWhitespace(text.substring(with: r))
+            else { continue }
+            var size: CGFloat = 0
+            #if canImport(UIKit)
+            if let a = sel.attributedString, a.length > 0,
+               let f = a.attribute(.font, at: 0, effectiveRange: nil) as? UIFont {
+                size = f.pointSize
+            }
+            #else
+            if let a = sel.attributedString, a.length > 0,
+               let f = a.attribute(.font, at: 0, effectiveRange: nil) as? NSFont {
+                size = f.pointSize
+            }
+            #endif
+            units.append((b.minY, size))
+        }
+        let bands = SandwichVerification.yBands(units.map(\.y))
+        var sizesPerBand: [Int: [CGFloat]] = [:]
+        for (k, u) in units.enumerated() {
+            sizesPerBand[bands[k], default: []].append(u.size)
+        }
+        // Read-back sizes carry float slop — match at 0.05pt tolerance.
+        try #require(
+            sizesPerBand.values.contains { bandSizes in
+                sizes.allSatisfy { want in
+                    bandSizes.contains { abs($0 - want) < 0.05 }
+                }
+            },
+            "read-back must pool both sizes \(sizes) into one band — adjust test geometry")
+    }
+
+    @Test("SVT-1 accepts a writer-grammar pitch flip inside a pooled band (J-14)",
+          .tags(.critical))
+    func svt1PitchFlipAtWriterQuantizedSizesPasses() async throws {
+        // The C1/BH shape: two writer bands at quantized pitches (5.0pt,
+        // 5.5pt) whose read-back line boxes pool into one verifier band.
+        // Pre-J-14 this FAILed as "Non-uniform glyph advance" on every
+        // ordinary searchable export of such a page.
+        let data = try writerStyleTwoLinePDF(
+            first: ("MEMBER FDIC.", 5.0, CGPoint(x: 60, y: 100)),
+            second: ("RESERVE NOTICE", 5.5, CGPoint(x: 120, y: 100)))
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+        try requireSameBandSizeJunction(page, sizes: [5.0, 5.5])
+        let result = try await verifier.verifySpatialExclusion(
+            outputPage: page, regionShapes: [], pageIndex: 0)
+        #expect(!result.isFail,
+                "quantized-pitch writer-band junction must not FAIL; got \(result)")
+    }
+
+    @Test("SVT-1 still fails a pitch flip to an off-lattice foreign size",
+          .tags(.critical))
+    func svt1PitchFlipAtForeignSizeFails() async throws {
+        // A foreign text object at 5.3pt — not a §5C.2-emittable size —
+        // must still read as output this writer did not produce.
+        let data = try writerStyleTwoLinePDF(
+            first: ("MEMBER FDIC.", 5.0, CGPoint(x: 60, y: 100)),
+            second: ("INJECTED RUN", 5.3, CGPoint(x: 120, y: 100)))
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+        try requireSameBandSizeJunction(page, sizes: [5.0, 5.3])
+        let result = try await verifier.verifySpatialExclusion(
+            outputPage: page, regionShapes: [], pageIndex: 0)
+        #expect(result.isFail,
+                "off-lattice pitch flip must FAIL the SVT-1 check; got \(result)")
+    }
+
+    @Test("isWriterQuantizedPitch matches the §5C.2 emittable set")
+    func writerQuantizedPitchPredicate() {
+        #expect(SandwichVerification.isWriterQuantizedPitch(5.0))
+        #expect(SandwichVerification.isWriterQuantizedPitch(5.5))
+        #expect(SandwichVerification.isWriterQuantizedPitch(12.0))
+        #expect(SandwichVerification.isWriterQuantizedPitch(1.0))
+        #expect(!SandwichVerification.isWriterQuantizedPitch(5.3))
+        #expect(!SandwichVerification.isWriterQuantizedPitch(5.26))
+        #expect(!SandwichVerification.isWriterQuantizedPitch(0.5),
+                "below minimumFontSize is not writer-emittable")
+    }
+
     // MARK: - Layer 7: Character Count Cross-Check (ENGINE §6.6)
 
     @Test("Character count matches digest when counts agree")

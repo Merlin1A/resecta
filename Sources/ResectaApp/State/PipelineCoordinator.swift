@@ -2152,8 +2152,10 @@ final class PipelineCoordinator: @unchecked Sendable {
         // the "first-failure already announced" gate.
         guard !redactionState.autoDetectionDegraded else { return }
         redactionState.autoDetectionDegraded = true
+        redactionState.autoDetectionDegradeFailures = diagnostics.failedGazetteers
         enqueueToast(
-            "Detection degraded \u{2014} detection corpus failed to load. Manual redaction tools remain available.",
+            DetectionDegradeCopy.toast(
+                failedGazetteers: diagnostics.failedGazetteers),
             severity: .warning
         )
     }

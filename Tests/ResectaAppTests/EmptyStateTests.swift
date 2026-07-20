@@ -25,6 +25,7 @@ struct EmptyStateTests {
             recentMultiTermSets: [],
             multiTermConjunction: false,
             currentSearchPage: 0,
+            totalPages: 0,
             totalCount: 0,
             enabledPIICategoryCount: 0,
             hasCompletedRun: false,
@@ -42,6 +43,7 @@ struct EmptyStateTests {
             recentMultiTermSets: [],
             multiTermConjunction: false,
             currentSearchPage: 0,
+            totalPages: 0,
             totalCount: 0,
             enabledPIICategoryCount: 0,
             hasCompletedRun: true,
@@ -59,7 +61,7 @@ struct EmptyStateTests {
             mode: .text, queryText: "alpha",
             multiTermTerms: [], recentMultiTermSets: [],
             multiTermConjunction: false,
-            currentSearchPage: 0, totalCount: 0,
+            currentSearchPage: 0, totalPages: 0, totalCount: 0,
             enabledPIICategoryCount: 0,
             hasCompletedRun: false, scanStartFailed: false
         )
@@ -69,7 +71,7 @@ struct EmptyStateTests {
             mode: .regex, queryText: "Page \\d+",
             multiTermTerms: [], recentMultiTermSets: [],
             multiTermConjunction: false,
-            currentSearchPage: 0, totalCount: 0,
+            currentSearchPage: 0, totalPages: 0, totalCount: 0,
             enabledPIICategoryCount: 0,
             hasCompletedRun: false, scanStartFailed: false
         )
@@ -79,7 +81,7 @@ struct EmptyStateTests {
             mode: .multiTerm, queryText: "",
             multiTermTerms: ["alpha"], recentMultiTermSets: [],
             multiTermConjunction: false,
-            currentSearchPage: 0, totalCount: 0,
+            currentSearchPage: 0, totalPages: 0, totalCount: 0,
             enabledPIICategoryCount: 0,
             hasCompletedRun: false, scanStartFailed: false
         )
@@ -103,7 +105,7 @@ struct EmptyStateTests {
             mode: .multiTerm, queryText: "",
             multiTermTerms: ["alpha", "zzz"], recentMultiTermSets: [],
             multiTermConjunction: true,
-            currentSearchPage: 0, totalCount: 0,
+            currentSearchPage: 0, totalPages: 0, totalCount: 0,
             enabledPIICategoryCount: 0,
             hasCompletedRun: true, scanStartFailed: false
         )
@@ -121,7 +123,7 @@ struct EmptyStateTests {
             mode: .piiScan, queryText: "",
             multiTermTerms: [], recentMultiTermSets: [],
             multiTermConjunction: false,
-            currentSearchPage: 0, totalCount: 0,
+            currentSearchPage: 0, totalPages: 0, totalCount: 0,
             enabledPIICategoryCount: 12,
             hasCompletedRun: false, scanStartFailed: true
         )
@@ -137,6 +139,7 @@ struct EmptyStateTests {
             recentMultiTermSets: [],
             multiTermConjunction: false,
             currentSearchPage: 0,
+            totalPages: 0,
             totalCount: 0,
             enabledPIICategoryCount: 0,
             hasCompletedRun: false,
@@ -151,6 +154,7 @@ struct EmptyStateTests {
             recentMultiTermSets: [["alpha", "beta"]],
             multiTermConjunction: false,
             currentSearchPage: 0,
+            totalPages: 0,
             totalCount: 0,
             enabledPIICategoryCount: 0,
             hasCompletedRun: false,
@@ -168,6 +172,7 @@ struct EmptyStateTests {
             recentMultiTermSets: [],
             multiTermConjunction: false,
             currentSearchPage: 0,
+            totalPages: 0,
             totalCount: 0,
             enabledPIICategoryCount: 0,
             hasCompletedRun: true,
@@ -185,6 +190,7 @@ struct EmptyStateTests {
             recentMultiTermSets: [],
             multiTermConjunction: false,
             currentSearchPage: 0,
+            totalPages: 0,
             totalCount: 0,
             enabledPIICategoryCount: 12,
             hasCompletedRun: false,
@@ -202,12 +208,48 @@ struct EmptyStateTests {
             recentMultiTermSets: [],
             multiTermConjunction: false,
             currentSearchPage: 8,
+            totalPages: 0,
             totalCount: 0,
             enabledPIICategoryCount: 7,
             hasCompletedRun: true,
             scanStartFailed: false
         )
         #expect(ctx == .piiScanPostScanZero(detectorCount: 7))
+    }
+
+    @Test("Cancelled scan never renders the post-scan clean bill (BH-A-05)")
+    func piiScanCancelledContext() {
+        // A cancelled run leaves currentSearchPage at the cancelled
+        // position with hasCompletedRun still false — exactly the state
+        // that used to render "Scan complete · N detectors matched 0
+        // candidates" on a partially-scanned document.
+        let ctx = WU20Strings.context(
+            mode: .piiScan,
+            queryText: "",
+            multiTermTerms: [],
+            recentMultiTermSets: [],
+            multiTermConjunction: false,
+            currentSearchPage: 8,
+            totalPages: 120,
+            totalCount: 0,
+            enabledPIICategoryCount: 17,
+            hasCompletedRun: false,
+            scanStartFailed: false
+        )
+        #expect(ctx == .piiScanCancelled(pagesScanned: 8, pageCount: 120))
+    }
+
+    @Test("Cancelled-scan copy names the partial coverage, no completion claim")
+    func piiScanCancelledCopy() {
+        let context = WU20Strings.EmptyContext
+            .piiScanCancelled(pagesScanned: 8, pageCount: 120)
+        #expect(WU20Strings.headline(for: context) == "Scan cancelled")
+        // The completed-run checkmark is reserved for full runs.
+        #expect(WU20Strings.headlineSymbol(for: context) == "stop.circle")
+        let copy = WU20Strings.description(for: context)
+        #expect(copy == "Detection stopped after 8 of 120 pages — the remaining pages weren't scanned.")
+        #expect(!copy.contains("complete"))
+        #expect(!copy.contains("detector"))
     }
 
     // MARK: - Description copy
@@ -259,6 +301,7 @@ struct EmptyStateTests {
             .textNotRun, .regexNotRun, .multiTermNotRun,
             .piiScanPreScan, .piiScanStartFailed,
             .piiScanPostScanZero(detectorCount: 5),
+            .piiScanCancelled(pagesScanned: 3, pageCount: 12),
         ]
         for context in mounted {
             #expect(WU20Strings.showsSearchRoleSubtitle(for: context),
@@ -334,6 +377,7 @@ struct EmptyStateTests {
             .multiTermNotRun, .multiTermNoMatch, .multiTermNoMatchConjunction,
             .piiScanPreScan, .piiScanStartFailed,
             .piiScanPostScanZero(detectorCount: 5),
+            .piiScanCancelled(pagesScanned: 3, pageCount: 12),
         ]
         // Forbidden phrase set per the M-1 check (CONTRIBUTING, audit checklist) — assembled
         // via string concat so the test source itself does not trip
@@ -438,5 +482,14 @@ struct SearchStateRecentMultiTermSetsTests {
         state.recordMultiTermSearch(terms: ["alpha", "beta"])
         state.clearResults()
         #expect(state.recentMultiTermSets == [["alpha", "beta"]])
+    }
+
+    @Test("clearResults() resets the frozen detector-count snapshot (BH-A-06)")
+    func clearResultsResetsLastRunDetectorCount() {
+        let state = SearchState()
+        state.lastRunDetectorCount = 17
+        state.clearResults()
+        #expect(state.lastRunDetectorCount == nil,
+                "the next run's copy must not inherit a prior run's snapshot")
     }
 }

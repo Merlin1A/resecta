@@ -1077,7 +1077,8 @@ struct SearchAndRedactSheet: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
                 .accessibilityHidden(true)
-            Text("Detection is degraded for this session because the detection corpus failed to load. Manual redaction tools remain available.")
+            Text(DetectionDegradeCopy.banner(
+                failedGazetteers: redactionState.autoDetectionDegradeFailures))
                 .font(.subheadline)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)

@@ -88,6 +88,19 @@ public struct SandwichVerification: Sendable {
         return advances.reduce(0) { $0 + $1.width }
     }
 
+    /// True when a read-back point size is one the reconstructor's §5C.2
+    /// pitch derivation can emit: a whole multiple of
+    /// `pitchQuantizationStep` at or above `minimumFontSize` (J-14). The
+    /// SVT-1 pitch-flip acceptance gates on this so a foreign text object
+    /// at an arbitrary size never reads as a writer-band junction.
+    static func isWriterQuantizedPitch(_ size: CGFloat) -> Bool {
+        guard size >= TextLayerReconstructor.minimumFontSize - 0.01 else {
+            return false
+        }
+        let steps = size / TextLayerReconstructor.pitchQuantizationStep
+        return abs(steps - steps.rounded()) * TextLayerReconstructor.pitchQuantizationStep <= 0.01
+    }
+
     /// Descent fraction of a read-back font's line box —
     /// `descent / (ascent + descent)` — used to shrink read-back selection
     /// boxes to their glyph-core row. The name mapping matches
@@ -400,6 +413,27 @@ public struct SandwichVerification: Sendable {
                       prev.pointSize > 0
                 else { continue }
                 if abs(prev.pointSize - curr.pointSize) > 0.01 {
+                    // J-14 (2026-07-20): the writer pools ONE pitch per
+                    // SOURCE-Y band, but PDFKit read-back pools adjacent
+                    // writer lines into one selection line box, so a
+                    // verifier band can legitimately straddle a writer-band
+                    // junction and carry two pitches. The junction is
+                    // accepted only when BOTH sizes sit on the writer's own
+                    // pitch lattice (§5C.2 quantization step, minimum size)
+                    // — the grammar no foreign text object follows for free
+                    // — and it resets the delta chain: each writer band
+                    // re-anchors on its own cell grid, so no cross-pitch
+                    // origin relation exists to verify. Positions within
+                    // each pitch run stay lattice-pinned; the run-start
+                    // origin gains only the freedom every band start
+                    // already has. The size class itself is the §5C.4
+                    // accepted bounded-bits channel. Any off-lattice size
+                    // flip still reports output this writer did not
+                    // produce.
+                    if Self.isWriterQuantizedPitch(prev.pointSize),
+                       Self.isWriterQuantizedPitch(curr.pointSize) {
+                        continue
+                    }
                     return .fail(
                         "Non-uniform glyph advance on page \(pageIndex + 1) at offset \(curr.utf16Offset)"
                     )

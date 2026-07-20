@@ -425,6 +425,12 @@ struct SearchToolbarSection: View {
             }
             .padding(.horizontal, ResectaTokens.Spacing.md)
         }
+        // BH-A-06 — chips freeze while a run is in flight, matching the
+        // sibling ↻ control: kickoff snapshots the category set, so a
+        // mid-run toggle neither re-scopes the running scan nor warns —
+        // it only desynced the completion copy from the run that
+        // actually executed.
+        .disabled(searchState.isSearching)
         .accessibilityIdentifier("scanCategoryChips")
     }
 

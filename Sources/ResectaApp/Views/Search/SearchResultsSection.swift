@@ -839,8 +839,12 @@ struct SearchResultsSection: View {
             recentMultiTermSets: searchState.recentMultiTermSets,
             multiTermConjunction: searchState.options.multiTermConjunction,
             currentSearchPage: searchState.currentSearchPage,
+            totalPages: searchState.totalPages,
             totalCount: searchState.totalCount,
-            enabledPIICategoryCount: searchState.effectiveScanCategories.count,
+            // BH-A-06 — the completion copy describes the run that
+            // executed (kickoff snapshot), not the live chip state.
+            enabledPIICategoryCount: searchState.lastRunDetectorCount
+                ?? searchState.effectiveScanCategories.count,
             hasCompletedRun: searchState.hasCompletedRunSinceClear,
             scanStartFailed: searchState.scanStartFailed
         )
@@ -995,6 +999,7 @@ enum WU20Strings {
         case piiScanPreScan
         case piiScanStartFailed
         case piiScanPostScanZero(detectorCount: Int)
+        case piiScanCancelled(pagesScanned: Int, pageCount: Int)
     }
 
     /// Pure-function context discriminator. Tested directly by
@@ -1006,6 +1011,7 @@ enum WU20Strings {
         recentMultiTermSets: [[String]],
         multiTermConjunction: Bool,
         currentSearchPage: Int,
+        totalPages: Int,
         totalCount: Int,
         enabledPIICategoryCount: Int,
         hasCompletedRun: Bool,
@@ -1041,9 +1047,17 @@ enum WU20Strings {
                 return .piiScanStartFailed
             }
             // Post-scan zero-result requires `currentSearchPage > 0`
-            // (the scan ran) and `totalCount == 0` (no matches).
+            // (the scan ran), `totalCount == 0` (no matches), AND
+            // `hasCompletedRun` (the run finished). A cancelled run
+            // leaves `currentSearchPage` at the cancelled position with
+            // `hasCompletedRun` false — that state must never render
+            // the "Scan complete" clean bill on a partially-scanned
+            // document (BH-A-05): it gets its own cancelled render.
             if currentSearchPage > 0 && totalCount == 0 {
-                return .piiScanPostScanZero(detectorCount: enabledPIICategoryCount)
+                return hasCompletedRun
+                    ? .piiScanPostScanZero(detectorCount: enabledPIICategoryCount)
+                    : .piiScanCancelled(
+                        pagesScanned: currentSearchPage, pageCount: totalPages)
             }
             return .piiScanPreScan
         }
@@ -1077,6 +1091,8 @@ enum WU20Strings {
             return "Not scanned yet"
         case .piiScanPostScanZero:
             return "Scan complete"
+        case .piiScanCancelled:
+            return "Scan cancelled"
         }
     }
 
@@ -1099,6 +1115,8 @@ enum WU20Strings {
             return "exclamationmark.triangle"
         case .piiScanPostScanZero:
             return "checkmark.circle"
+        case .piiScanCancelled:
+            return "stop.circle"
         }
     }
 
@@ -1142,6 +1160,12 @@ enum WU20Strings {
         case .piiScanPostScanZero(let detectorCount):
             let suffix = detectorCount == 1 ? "" : "s"
             return "\(detectorCount) detector\(suffix) matched 0 candidates above threshold."
+        case .piiScanCancelled(let pagesScanned, let pageCount):
+            // Mechanism description, no verdict: a partial run must
+            // never read as a clean bill. Names the unscanned remainder
+            // explicitly; the chips-row ↻ is the re-run affordance.
+            let suffix = pageCount == 1 ? "" : "s"
+            return "Detection stopped after \(pagesScanned) of \(pageCount) page\(suffix) — the remaining pages weren't scanned."
         }
     }
 
@@ -1169,7 +1193,8 @@ enum WU20Strings {
         case .textNoMatch, .regexNoMatch, .multiTermNoMatch,
              .multiTermNoMatchConjunction,
              .textNotRun, .regexNotRun, .multiTermNotRun,
-             .piiScanPreScan, .piiScanStartFailed, .piiScanPostScanZero:
+             .piiScanPreScan, .piiScanStartFailed, .piiScanPostScanZero,
+             .piiScanCancelled:
             return false
         }
     }

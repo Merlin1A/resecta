@@ -202,6 +202,38 @@ extension SearchAndRedactSheet {
             let enabledCategories = searchState.effectiveScanCategories
             let scanStartedAt = Date()
 
+            // BH-A-06 — freeze the executed detector count for the
+            // zero-state completion copy, beside the engine query's own
+            // category snapshot above.
+            if isPIIScan {
+                searchState.lastRunDetectorCount = enabledCategories.count
+            }
+
+            // H-201 — SEC-7 degrade surface for the LIVE scan path. The
+            // legacy detection pipeline surfaced its loader diagnostics via
+            // `PipelineCoordinator.surfaceGazetteerLoadDiagnostics`, but the
+            // Scan interface runs through `DocumentSearcher`, whose shared
+            // detector degraded silently (an NER-absent OS build dropped
+            // every name match with zero signal). Surface the shared
+            // detector's load diagnostics at scan kickoff: first qualifying
+            // failure posts the one-time toast and raises the persistent
+            // Scan-interface banner (same flag, same gate semantics as the
+            // legacy path).
+            if isPIIScan {
+                let diagnostics = DocumentSearcher.sharedLoadDiagnostics
+                if diagnostics.didDegrade,
+                   !redactionState.autoDetectionDegraded {
+                    redactionState.autoDetectionDegraded = true
+                    redactionState.autoDetectionDegradeFailures =
+                        diagnostics.failedGazetteers
+                    toastManager.enqueue(
+                        DetectionDegradeCopy.toast(
+                            failedGazetteers: diagnostics.failedGazetteers),
+                        severity: .warning
+                    )
+                }
+            }
+
             // Reset the overlap-suppressed tally before kickoff so the
             // CoverageReport only reflects this scan's counts.
             searchState.resetOverlapSuppression()
@@ -561,6 +593,9 @@ extension SearchAndRedactSheet {
             // conditional-dismiss tracker reset is owned by
             // the apply path.
             searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
+            // BH-A-03 — dedup-covered IDs feed the Apply-graying
+            // gate (no badge, per QW-1 above).
+            searchState.coveredResultIDs.formUnion(result.coveredResultIDs)
             // Non-modal success toast via the shared
             // UXF-11 copy builder (`CommitFeedback`) so
             // the count stays in lockstep with the
@@ -604,6 +639,8 @@ extension SearchAndRedactSheet {
             // toolbar Apply path above. The conditional-dismiss
             // tracker reset is owned by the apply path.
             searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
+            // BH-A-03 — mirror of the toolbar path's covered union.
+            searchState.coveredResultIDs.formUnion(result.coveredResultIDs)
             // Keyboard-shortcut path
             // mirrors the toolbar Apply path — non-modal toast via
             // the shared UXF-11 copy builder, which returns nil for a

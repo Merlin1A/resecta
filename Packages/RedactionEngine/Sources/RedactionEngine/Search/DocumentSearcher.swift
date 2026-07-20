@@ -65,11 +65,24 @@ public actor DocumentSearcher {
     // run. The static loads once per process and every searcher shares it:
     // PIIDetector is a stateless `Sendable` value, and its Bloom `Data` is
     // copy-on-write, so the buffer is shared rather than re-copied. Mirrors
-    // `AddressSpatialAssembler.sharedAddressComponents`. The
-    // `PIIDetector.loadWithDiagnostics()` path builds its own detector
-    // explicitly and is unaffected by this cache.
-    private static let sharedPIIDetector = PIIDetector()
-    private let piiDetector = DocumentSearcher.sharedPIIDetector
+    // `AddressSpatialAssembler.sharedAddressComponents`.
+    //
+    // H-201 (SEC-7 re-wire): the shared detector is built through
+    // `loadWithDiagnostics()` — NOT the bare `PIIDetector()` — so the live
+    // scan path carries the same degrade diagnostics the legacy detection
+    // pipeline surfaced. On a healthy install the constructed detector is
+    // identical to the bare init's; on a corpus/signature failure or an
+    // NER-asset-absent OS build, `sharedLoadDiagnostics` records it and the
+    // scan kickoff surfaces the SEC-7 banner instead of degrading silently.
+    private static let sharedPIIDetectorLoad = PIIDetector.loadWithDiagnostics()
+    private let piiDetector = DocumentSearcher.sharedPIIDetectorLoad.detector
+
+    /// SEC-7 diagnostics for the process-shared search detector (H-201).
+    /// Cached with the detector — the probe reflects load-time state, which
+    /// is the state every search in this process actually runs under.
+    public static var sharedLoadDiagnostics: GazetteerLoadDiagnostics {
+        sharedPIIDetectorLoad.diagnostics
+    }
 
     // B06 — Site-B / Search parity. The five scored families
     // {account, phone, mrn, ein, itin} now gate at Search on the SAME composed

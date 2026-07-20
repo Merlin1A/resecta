@@ -173,4 +173,63 @@ struct DegradedBannerTests {
         #expect(coordinator.redactionState.autoDetectionDegraded,
                 "NER-absent diagnostic must flip the SEC-7 degraded banner flag")
     }
+
+    // MARK: - H-201: copy branch + failure recording
+
+    @Test("H-201: NER-only degrade gets the OS-model copy, not the corpus copy")
+    func testNEROnlyCopyBranch() {
+        let nerOnly = [GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue]
+        #expect(DetectionDegradeCopy.isNEROnly(nerOnly))
+        let toast = DetectionDegradeCopy.toast(failedGazetteers: nerOnly)
+        let banner = DetectionDegradeCopy.banner(failedGazetteers: nerOnly)
+        // The corpus-blaming line would be FALSE on a pre-26.4 device
+        // whose bundled corpus loaded fine.
+        #expect(!toast.contains("corpus"))
+        #expect(!banner.contains("corpus"))
+        #expect(toast.contains("name model"))
+        #expect(banner.contains("name model"))
+    }
+
+    @Test("H-201: any corpus failure — including mixed with NER — keeps the corpus copy")
+    func testCorpusAndMixedCopyBranch() {
+        let corpusOnly = ["NameGazetteer"]
+        let mixed = [
+            "NameGazetteer",
+            GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue,
+        ]
+        for failures in [corpusOnly, mixed] {
+            #expect(!DetectionDegradeCopy.isNEROnly(failures))
+            #expect(DetectionDegradeCopy.toast(failedGazetteers: failures)
+                .contains("detection corpus failed to load"))
+            #expect(DetectionDegradeCopy.banner(failedGazetteers: failures)
+                .contains("detection corpus failed to load"))
+        }
+    }
+
+    @Test("H-201: coordinator surface records the failure list and posts branch copy")
+    func testCoordinatorRecordsFailuresAndBranchesToast() {
+        let (coordinator, toast) = makeWiredCoordinator()
+        let nerOnly = GazetteerLoadDiagnostics(
+            failedGazetteers: [GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue],
+            failureReasons: [:]
+        )
+        coordinator.surfaceGazetteerLoadDiagnostics(nerOnly)
+        #expect(coordinator.redactionState.autoDetectionDegradeFailures
+                == nerOnly.failedGazetteers,
+                "failure list must be recorded for the banner copy branch")
+        #expect(toast.activeTopToasts.first?.message.contains("name model") == true,
+                "NER-only degrade must post the OS-model toast")
+    }
+
+    @Test("H-201: clearForNewDocument resets the recorded failure list")
+    func testFailureListResetsWithFlag() {
+        let (coordinator, _) = makeWiredCoordinator()
+        coordinator.surfaceGazetteerLoadDiagnostics(GazetteerLoadDiagnostics(
+            failedGazetteers: ["NameGazetteer"], failureReasons: [:]))
+        #expect(!coordinator.redactionState.autoDetectionDegradeFailures.isEmpty)
+        coordinator.redactionState.clearForNewDocument()
+        #expect(!coordinator.redactionState.autoDetectionDegraded)
+        #expect(coordinator.redactionState.autoDetectionDegradeFailures.isEmpty,
+                "failure list shares the flag's lifetime")
+    }
 }

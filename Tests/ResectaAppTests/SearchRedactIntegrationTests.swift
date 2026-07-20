@@ -187,6 +187,47 @@ struct SearchRedactIntegrationTests {
         #expect(!search.appliedResultIDs.contains(resultA.id))
     }
 
+    @Test("Fully covered selection grays Apply after one round-trip (BH-A-03)")
+    func coveredSelectionGraysApply() async {
+        // A selection whose members are ALL dedup-covered by existing
+        // regions used to keep Apply enabled forever: skipped IDs never
+        // entered `appliedResultIDs`, so `selectionFullyApplied` could
+        // not engage and every press re-ran a "Marked 0 … already
+        // covered" no-op.
+        let redactionState = RedactionState()
+        let rectA = CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.04)
+        redactionState.regions[0] = [RedactionRegion(
+            id: UUID(), normalizedRect: rectA, source: .manual)]
+
+        let resultA = makeResult(term: "secret", normalizedRect: rectA)
+        let search = SearchState()
+        search.results = [resultA]
+        redactionState.activeSearch = search
+        #expect(!search.selectionFullyApplied,
+                "precondition: gate disengaged before the apply")
+
+        guard let outcome = await redactionState.applyFindings(
+            .selectedSearchResults, undoManager: nil) else {
+            Issue.record("apply returned nil")
+            return
+        }
+        #expect(outcome.applied == 0)
+        #expect(outcome.skippedOverlaps == 1)
+        #expect(outcome.coveredResultIDs == [resultA.id])
+        // Sheet flow: union both ledgers.
+        search.appliedResultIDs.formUnion(outcome.appliedResultIDs)
+        search.coveredResultIDs.formUnion(outcome.coveredResultIDs)
+
+        // QW-1 intact: no badge for the covered row …
+        #expect(!search.appliedResultIDs.contains(resultA.id))
+        // … but the graying gate engages, killing the dead round-trip.
+        #expect(search.selectionFullyApplied,
+                "fully covered selection must gray Apply")
+        // clearResults drops the ledger with its sibling.
+        search.clearResults()
+        #expect(search.coveredResultIDs.isEmpty)
+    }
+
     // MARK: - Helpers
 
     private func makeResult(

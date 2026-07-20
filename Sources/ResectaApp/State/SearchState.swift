@@ -155,6 +155,15 @@ final class SearchState: Identifiable {
     /// `clearResults()` — every trigger clears before its guards run.
     var scanStartFailed = false
 
+    /// BH-A-06 — detector count of the category set the last Scan run
+    /// actually executed with (snapshotted at kickoff, mirroring the
+    /// engine query's own `enabledCategories` snapshot). The zero-state
+    /// completion copy renders from this, never from the live chip
+    /// state, so a post-hoc chip toggle cannot rewrite the description
+    /// of a run that already happened. nil until a run kicks off; reset
+    /// by `clearResults()`.
+    var lastRunDetectorCount: Int?
+
     /// Search options (toggles in UI).
     var options: SearchOptions = SearchOptions()
 
@@ -493,6 +502,16 @@ final class SearchState: Identifiable {
         didSet { invalidateFilterCaches() }
     }
 
+    /// BH-A-03 — result IDs the apply path dedup-SKIPPED because an
+    /// existing region already covers them (>80% overlap). Distinct
+    /// from `appliedResultIDs` on purpose: QW-1 grants skipped results
+    /// no applied badge and no audit entry, but a selection that is
+    /// fully covered (applied ∪ covered) must still gray Apply — the
+    /// button otherwise stays live forever and every press re-runs a
+    /// "Marked 0 … already covered" no-op. Same lifetime as
+    /// `appliedResultIDs`.
+    var coveredResultIDs: Set<UUID> = []
+
     /// Reserved for programmatic mode transitions (saved-search
     /// recall). When `true`, the `searchModeType` `.onChange` handler
     /// in `SearchAndRedactSheet` preserves applied markers + filter
@@ -694,7 +713,12 @@ final class SearchState: Identifiable {
     var selectionFullyApplied: Bool {
         let selected = results.filter(\.isSelected)
         guard !selected.isEmpty else { return false }
-        return selected.allSatisfy { appliedResultIDs.contains($0.id) }
+        // BH-A-03 — dedup-covered counts as applied for the graying
+        // gate: a fully covered selection has nothing left to apply.
+        return selected.allSatisfy {
+            appliedResultIDs.contains($0.id)
+                || coveredResultIDs.contains($0.id)
+        }
     }
 
     /// D06-F2 Part 2 — count of results the user left un-checked in triage
@@ -1101,6 +1125,7 @@ final class SearchState: Identifiable {
         pendingResults.removeAll()
         results = []
         appliedResultIDs.removeAll()
+        coveredResultIDs.removeAll()
         appliedFilter = .all
         resultsAtCap = false
         currentResultIndex = nil
@@ -1124,6 +1149,7 @@ final class SearchState: Identifiable {
         capUnscannedPageCount = 0
         hasCompletedRunSinceClear = false
         scanStartFailed = false
+        lastRunDetectorCount = nil
         // Drop the magic-wand pre-select flag along with all
         // other session-scoped state so a fresh sheet session starts at
         // the engine default selection shape.
@@ -1310,6 +1336,7 @@ final class SearchState: Identifiable {
         pendingResults.removeAll()
         results = []
         appliedResultIDs.removeAll()
+        coveredResultIDs.removeAll()
         appliedFilter = .all
         resultsAtCap = false
         currentResultIndex = nil
@@ -1325,6 +1352,7 @@ final class SearchState: Identifiable {
         // prior failed-start must not outlive the state it described.
         hasCompletedRunSinceClear = false
         scanStartFailed = false
+        lastRunDetectorCount = nil
         // UXF-02 — scan-progress counters reset with results. Leaving
         // `currentSearchPage` non-zero across a mode switch made the
         // piiScan empty state read as post-scan ("Scan complete … 0

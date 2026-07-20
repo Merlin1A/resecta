@@ -100,6 +100,13 @@ class RedactionState {
     /// state from scratch.
     var autoDetectionDegraded: Bool = false
 
+    /// H-201 — engine-facing names of the loaders behind the current
+    /// degrade (`GazetteerLoadDiagnostics.failedGazetteers`). Drives the
+    /// banner/toast copy branch: an NER-only degrade (OS model absent) is
+    /// described as such instead of blaming the bundled corpus. Same
+    /// lifetime as `autoDetectionDegraded`.
+    var autoDetectionDegradeFailures: [String] = []
+
     /// Text extraction buffer for Searchable Redaction mode.
     /// Populated during the extraction phase; nil for Secure Rasterization.
     var textExtractionBuffer: [Int: [CharacterInfo]]? = nil
@@ -534,6 +541,7 @@ class RedactionState {
         // "auto-detect degraded" banner (`signalDegradedDetection` treats the
         // flag as an already-toasted gate and never resets it).
         autoDetectionDegraded = false
+        autoDetectionDegradeFailures = []
         // Drop any pending canvas-rationale request so a stale region
         // UUID does not present a blank rationale sheet over the new document.
         pendingCanvasRationaleRequest = nil
@@ -839,6 +847,10 @@ class RedactionState {
         /// Search origin only: the `SearchResult.id`s that produced a
         /// region this pass.
         let appliedResultIDs: Set<UUID>
+        /// Search origin only (BH-A-03): the `SearchResult.id`s
+        /// dedup-skipped as already covered. No badge, no audit entry
+        /// (QW-1) — consumed only by the Apply-graying gate.
+        var coveredResultIDs: Set<UUID> = []
         /// Detection-map origin only: detections routed to the review
         /// instead of applied.
         let signatureCandidates: Int
@@ -956,6 +968,7 @@ class RedactionState {
             applied: prepared.appliedCount,
             skippedOverlaps: prepared.skippedOverlaps,
             appliedResultIDs: prepared.appliedResultIDs,
+            coveredResultIDs: prepared.coveredResultIDs,
             signatureCandidates: 0
         )
     }
@@ -1667,6 +1680,12 @@ struct PreparedApply: Sendable {
     /// sheet's `appliedResultIDs` union (the green "applied" badge state)
     /// matches the audit-backed set instead of the full selection.
     let appliedResultIDs: Set<UUID>
+    /// BH-A-03 — the `SearchResult.id`s dedup-SKIPPED for >80% overlap
+    /// with an existing region. QW-1 keeps them out of
+    /// `appliedResultIDs` (no badge, no audit entry); the sheet unions
+    /// them into `SearchState.coveredResultIDs` so `selectionFullyApplied`
+    /// can gray Apply on a fully covered selection.
+    let coveredResultIDs: Set<UUID>
 }
 
 /// Pure-function detached prepare step for the search origin of
@@ -1695,6 +1714,7 @@ nonisolated func prepareApply(
     var createdAudit: [UUID: MatchAuditSnapshot] = [:]
     var skippedOverlaps = 0
     var appliedResultIDs: Set<UUID> = []
+    var coveredResultIDs: Set<UUID> = []
 
     for result in selected {
         // Skip results that overlap > 80% with existing regions.
@@ -1708,6 +1728,7 @@ nonisolated func prepareApply(
         }
         if overlaps {
             skippedOverlaps += 1
+            coveredResultIDs.insert(result.id)
             continue
         }
 
@@ -1762,7 +1783,8 @@ nonisolated func prepareApply(
         createdAudit: createdAudit,
         appliedCount: appliedCount,
         skippedOverlaps: skippedOverlaps,
-        appliedResultIDs: appliedResultIDs
+        appliedResultIDs: appliedResultIDs,
+        coveredResultIDs: coveredResultIDs
     )
 }
 
@@ -1824,3 +1846,30 @@ extension RedactionState {
     }
 }
 #endif
+
+// MARK: - SEC-7 degrade copy (H-201)
+
+/// Copy table for the SEC-7 detection-degrade surfaces (one-time toast +
+/// persistent Scan-interface banner). An NER-only degrade — the OS-
+/// provisioned `.nameType` MobileAsset absent, bundled corpus healthy —
+/// is described as such: the corpus-blaming line would be false on a
+/// pre-26.4 device. Mechanism-description discipline throughout.
+enum DetectionDegradeCopy {
+    /// True when the failure list is exactly the NER name model.
+    static func isNEROnly(_ failedGazetteers: [String]) -> Bool {
+        failedGazetteers ==
+            [GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue]
+    }
+
+    static func toast(failedGazetteers: [String]) -> String {
+        isNEROnly(failedGazetteers)
+            ? "Name detection degraded \u{2014} this OS version doesn't provide the on-device name model. Other detectors still run."
+            : "Detection degraded \u{2014} detection corpus failed to load. Manual redaction tools remain available."
+    }
+
+    static func banner(failedGazetteers: [String]) -> String {
+        isNEROnly(failedGazetteers)
+            ? "Name detection is degraded for this session because the on-device name model isn't available on this OS version. Other detectors and manual redaction tools remain available."
+            : "Detection is degraded for this session because the detection corpus failed to load. Manual redaction tools remain available."
+    }
+}

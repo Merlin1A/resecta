@@ -37,6 +37,7 @@ struct PIIScanIdleHonestyTests {
             recentMultiTermSets: [],
             multiTermConjunction: false,
             currentSearchPage: state.currentSearchPage,
+            totalPages: state.totalPages,
             totalCount: state.totalCount,
             enabledPIICategoryCount: 17,
             hasCompletedRun: state.hasCompletedRunSinceClear,
