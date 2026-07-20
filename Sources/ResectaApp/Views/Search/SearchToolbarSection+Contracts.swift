@@ -173,6 +173,22 @@ extension SearchToolbarSection {
         "Sort order, currently \(active.rawValue)"
     }
 
+    // MARK: - BH-B-04 Pure-Function Contracts
+
+    /// BH-B-04 — an option change re-runs only when the session has
+    /// something the change makes stale: a committed run (a no-match
+    /// verdict included — toggling case-sensitivity off may produce
+    /// matches) or live results. Fresh, carried (UXF-16), and
+    /// short-term-guarded queries stay explicit-trigger, so the option
+    /// row cannot become a backdoor around the debounce floor.
+    /// Pinned by `SearchToolbarSectionTests`.
+    static func optionChangeShouldRetrigger(
+        hasCompletedRun: Bool,
+        hasResults: Bool
+    ) -> Bool {
+        hasCompletedRun || hasResults
+    }
+
     // MARK: - WU-31 Pure-Function Contracts
 
     /// Per WU-31 / ACTION-WU-31: minimum vertical extent the regex

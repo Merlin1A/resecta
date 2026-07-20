@@ -772,4 +772,36 @@ struct SavedSearchStoreTests {
         let decoded = try JSONDecoder().decode(SavedSearch.self, from: data)
         #expect(decoded.name == "Tiny")
     }
+
+    // MARK: - H-74 duplicate-name collision guards
+
+    @Test("H-74: add rejects an exact-name duplicate and appends nothing")
+    func testAddRejectsDuplicateName() {
+        let store = SavedSearchStore(
+            fileURL: FileManager.default.temporaryDirectory
+                .appendingPathComponent("h74-add-\(UUID().uuidString).json"))
+        #expect(store.add(SavedSearch(name: "Payroll sweep", mode: .text, queryText: "acct")))
+        #expect(store.add(SavedSearch(name: "Payroll sweep", mode: .regex, queryText: "\\d+")) == false)
+        #expect(store.savedSearches.count == 1)
+        // A distinct name still lands.
+        #expect(store.add(SavedSearch(name: "Payroll sweep 2", mode: .text, queryText: "acct")))
+        #expect(store.savedSearches.count == 2)
+    }
+
+    @Test("H-74: rename rejects another entry's name; own name stays a success")
+    func testRenameCollisionGuard() {
+        let store = SavedSearchStore(
+            fileURL: FileManager.default.temporaryDirectory
+                .appendingPathComponent("h74-rename-\(UUID().uuidString).json"))
+        let a = SavedSearch(name: "Alpha", mode: .text, queryText: "a")
+        let b = SavedSearch(name: "Beta", mode: .text, queryText: "b")
+        store.add(a)
+        store.add(b)
+        #expect(store.rename(id: b.id, to: "Alpha") == false)
+        #expect(store.lookup(id: b.id)?.name == "Beta")
+        #expect(store.rename(id: b.id, to: "Beta"),
+                "renaming an entry to its own current name is a no-op success")
+        #expect(store.rename(id: b.id, to: "Gamma"))
+        #expect(store.lookup(id: b.id)?.name == "Gamma")
+    }
 }

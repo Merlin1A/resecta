@@ -277,7 +277,10 @@ struct SearchResultsSection: View {
                     } else {
                         Image(systemName: "eye")
                             .foregroundStyle(.secondary)
-                        Text("Matches this page: \(preview.currentPageMatches.count) \u{00B7} Total: \(preview.totalCount)")
+                        Text(Self.previewCountLine(
+                            pageMatches: preview.currentPageMatches.count,
+                            committedTotal: searchState.hasCompletedRunSinceClear
+                                ? searchState.totalCount : nil))
                             .font(.caption)
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
@@ -289,6 +292,21 @@ struct SearchResultsSection: View {
                 .accessibilityElement(children: .combine)
             }
         }
+    }
+
+    /// BH-B-02 — the live preview is page-scoped (D10-F3), so its
+    /// `totalCount` ≡ the current-page count and the former
+    /// "Total: \(preview.totalCount)" contradicted the footer on any
+    /// multi-page-match query ("Matches this page: 1 · Total: 1" beside
+    /// "3 found"). The document-wide total belongs to the committed
+    /// full search: render it only when a committed run exists; the
+    /// honest page count stands alone otherwise.
+    static func previewCountLine(pageMatches: Int, committedTotal: Int?) -> String {
+        var line = "Matches this page: \(pageMatches)"
+        if let committedTotal {
+            line += " \u{00B7} Total: \(committedTotal)"
+        }
+        return line
     }
 
     // MARK: - Saturation Banner

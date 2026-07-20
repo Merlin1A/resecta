@@ -72,15 +72,27 @@ struct DiscardUndoToastTests {
 
     @Test("dismissClearedMessage names the unapplied loss at the dismiss decision point")
     func dismissMessageNamesUnappliedLoss() {
-        #expect(SearchAndRedactSheet.dismissClearedMessage(unappliedCount: 27)
+        #expect(SearchAndRedactSheet.dismissClearedMessage(unappliedCount: 27, interface: .search)
                 == "Search closed — 27 unapplied matches cleared.")
-        #expect(SearchAndRedactSheet.dismissClearedMessage(unappliedCount: 1)
+        #expect(SearchAndRedactSheet.dismissClearedMessage(unappliedCount: 1, interface: .search)
                 == "Search closed — 1 unapplied match cleared.")
+    }
+
+    // BH-B-03 — the leading noun follows the interface (UP-era
+    // adaptive-copy posture): a Scan-interface dismissal must not say
+    // "Search closed".
+    @Test("dismissClearedMessage uses the Scan noun on the Scan interface")
+    func dismissMessageScanNoun() {
+        #expect(SearchAndRedactSheet.dismissClearedMessage(unappliedCount: 126, interface: .scan)
+                == "Scan closed — 126 unapplied matches cleared.")
+        #expect(SearchAndRedactSheet.dismissClearedMessage(unappliedCount: 1, interface: .scan)
+                == "Scan closed — 1 unapplied match cleared.")
     }
 
     @Test("dismissClearedMessage is nil when nothing unapplied is lost")
     func dismissMessageNilWhenNothingLost() {
-        #expect(SearchAndRedactSheet.dismissClearedMessage(unappliedCount: 0) == nil)
+        #expect(SearchAndRedactSheet.dismissClearedMessage(unappliedCount: 0, interface: .search) == nil)
+        #expect(SearchAndRedactSheet.dismissClearedMessage(unappliedCount: 0, interface: .scan) == nil)
     }
 
     // MARK: - Fixtures

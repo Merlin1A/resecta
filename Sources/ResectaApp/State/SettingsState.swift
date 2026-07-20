@@ -206,9 +206,11 @@ class SettingsState {
         paranoidMode = false
         appearancePreference = .system
         detectionPreset = .balanced
-        // Factory default is OFF (private by default). Reset restores
-        // the preference only; explicit history clearing stays with the
-        // dedicated Clear Search History affordance.
+        // Factory default is OFF (private by default). H-70 — the view's
+        // reset action clears the stored recents alongside this flip
+        // (mirroring the toggle's own off-path): leaving the data while
+        // switching the flag off let old PII-bearing queries resurface
+        // through SearchState's unconditional hydrate.
         saveRecentSearches = false
     }
 }

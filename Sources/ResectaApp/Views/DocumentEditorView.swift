@@ -519,6 +519,16 @@ struct DocumentEditorView: View {
                     // sole visual cue. Drag still works via the system
                     // gesture on the sheet's top area.
                     .presentationDragIndicator(.hidden)
+                    // BH-A-04 — the compact float exists so the user
+                    // can interact with the document beneath it, but
+                    // without a background-interaction grant UIKit
+                    // routed EVERY outside tap (canvas or toolbar) to
+                    // sheet dismissal — silently destroying live scan
+                    // results, with the sticky detent re-arming the
+                    // trap on the next Scan. Interaction is enabled
+                    // only up through the compact detent; medium/large
+                    // keep the standard dimmed scrim.
+                    .presentationBackgroundInteraction(.enabled(upThrough: .compactFloat))
             case .rationale(let regionID):
                 if let rationale = redactionState.rationale(forRegionID: regionID) {
                     RegionRationaleSheet(

@@ -102,17 +102,17 @@ struct SearchToolbarSection: View {
             // `Anim.resolved(_:reduceMotion:)`.
             DisclosureGroup("Options", isExpanded: $optionsExpanded) {
                 HStack(spacing: ResectaTokens.Spacing.md) {
-                    Toggle("Case Sensitive", isOn: $searchState.options.caseSensitive)
+                    Toggle("Case Sensitive", isOn: optionBinding(\.caseSensitive))
                         .toggleStyle(.button)
                         .controlSize(.small)
                         .accessibilityLabel("Case sensitive search")
 
-                    Toggle("Whole Word", isOn: $searchState.options.wholeWord)
+                    Toggle("Whole Word", isOn: optionBinding(\.wholeWord))
                         .toggleStyle(.button)
                         .controlSize(.small)
                         .accessibilityLabel("Whole word matching")
 
-                    Toggle("Include OCR", isOn: $searchState.options.includeOCR)
+                    Toggle("Include OCR", isOn: optionBinding(\.includeOCR))
                         .toggleStyle(.button)
                         .controlSize(.small)
                         .accessibilityLabel("Include scanned page text")
@@ -128,21 +128,21 @@ struct SearchToolbarSection: View {
                 // visible-but-inert toggle would misstate the mechanism.
                 HStack(spacing: ResectaTokens.Spacing.md) {
                     if searchState.searchModeType != .regex {
-                        Toggle("Ignore digit separators", isOn: $searchState.options.stripDigitSeparators)
+                        Toggle("Ignore digit separators", isOn: optionBinding(\.stripDigitSeparators))
                             .toggleStyle(.button)
                             .controlSize(.small)
                             .accessibilityLabel("Ignore digit separators")
                             .accessibilityHint("Matches 123456789 when the document has 123-45-6789")
                     }
 
-                    Toggle("Normalize quotes and dashes", isOn: $searchState.options.normalizeSmartPunctuation)
+                    Toggle("Normalize quotes and dashes", isOn: optionBinding(\.normalizeSmartPunctuation))
                         .toggleStyle(.button)
                         .controlSize(.small)
                         .accessibilityLabel("Normalize quotes and dashes")
                         .accessibilityHint("Treats curly quotes and em-dashes as their plain equivalents")
 
                     if searchState.searchModeType != .regex {
-                        Toggle("Match regardless of accents", isOn: $searchState.options.foldDiacritics)
+                        Toggle("Match regardless of accents", isOn: optionBinding(\.foldDiacritics))
                             .toggleStyle(.button)
                             .controlSize(.small)
                             .accessibilityLabel("Match regardless of accents")
@@ -262,6 +262,35 @@ struct SearchToolbarSection: View {
                 .padding(.horizontal, ResectaTokens.Spacing.md)
             }
         }
+    }
+
+    // MARK: - Option Bindings (BH-B-04)
+
+    /// BH-B-04 — Search-side option toggles re-run the live query,
+    /// matching their two re-running siblings (the conjunction toggle
+    /// and the saturation-banner shortcuts). The re-run fires from the
+    /// toggle's own `set` — a user gesture — NEVER value observation,
+    /// per the conjunction binding's documented rationale: an
+    /// observation-based re-trigger would fire a duplicate scan
+    /// alongside a saved-search recall's own trigger whenever the
+    /// recalled value differs. The gate
+    /// (`optionChangeShouldRetrigger`) keeps un-run sessions un-run:
+    /// carried queries (UXF-16) and short-term-guarded queries stay
+    /// explicit-trigger. (The Scan interface's own option controls
+    /// deliberately keep next-run semantics, like its category chips.)
+    private func optionBinding(_ keyPath: WritableKeyPath<SearchOptions, Bool>) -> Binding<Bool> {
+        Binding(
+            get: { searchState.options[keyPath: keyPath] },
+            set: { newValue in
+                searchState.options[keyPath: keyPath] = newValue
+                if Self.optionChangeShouldRetrigger(
+                    hasCompletedRun: searchState.hasCompletedRunSinceClear,
+                    hasResults: !searchState.results.isEmpty
+                ) {
+                    onTriggerSearch()
+                }
+            }
+        )
     }
 
     // MARK: - Regex Error Callout

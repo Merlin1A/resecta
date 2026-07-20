@@ -23,8 +23,11 @@ extension SearchAndRedactSheet {
             }
             return
         }
-        // Short terms require explicit trigger
-        guard query.count >= 3 else { return }
+        // Short terms require explicit trigger. BH-B-06 — the floor
+        // counts TRIMMED characters (mirroring multi-term's validator
+        // trim), so whitespace-only input never auto-runs a real
+        // engine pass under a visually-empty field.
+        guard Self.queryQualifiesForAutoRun(query) else { return }
 
         searchDebounceTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
@@ -415,6 +418,14 @@ extension SearchAndRedactSheet {
                 }
             }
         }
+    }
+
+    /// BH-B-06 — debounce auto-run floor on the trimmed length. The
+    /// query still runs VERBATIM (trailing spaces are meaningful to a
+    /// literal search); trimming here only gates whether typing alone
+    /// starts a run.
+    static func queryQualifiesForAutoRun(_ query: String) -> Bool {
+        query.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3
     }
 
     // MARK: - Regex error hints (UXF-18)

@@ -60,8 +60,15 @@ struct SearchFooterSection: View {
                 // that arrival default explicitly instead of a bare
                 // "0 of N selected" — one label family for the whole
                 // surface.
+                // BH-A-01 — M and N must come from the SAME domain.
+                // The global `selectedCount` beside the filtered total
+                // produced M>N reads under a kind filter
+                // ("12 of 6 selected"); `selectedFilteredCount` keys
+                // both numbers to the visible set, mirroring the nav
+                // counter's filtered remap (and the Select All gate
+                // below, which already compared filtered-to-filtered).
                 Text(Self.selectionCountLabel(
-                    selected: review?.selectedCount ?? searchState.selectedCount,
+                    selected: review?.selectedCount ?? searchState.selectedFilteredCount,
                     total: review?.visibleCount ?? searchState.filteredCount
                 ))
                     .font(.subheadline)

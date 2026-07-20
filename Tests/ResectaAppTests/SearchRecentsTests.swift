@@ -321,4 +321,32 @@ struct LastFilterPersistenceTests {
         let second = SearchState(defaults: defaults)
         #expect(second.appliedFilter == .all)
     }
+
+    // MARK: - BH-B-06 whitespace hygiene
+
+    @Test("BH-B-06: whitespace-only queries are never recorded (no blank recents chip)")
+    func whitespaceOnlyQueryNotRecorded() {
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let state = SearchState(defaults: defaults)
+        state.recordRecentQuery("   ", mode: .text)
+        state.recordRecentQuery("\n\t ", mode: .regex)
+        #expect(state.recentTextQueries.isEmpty)
+        #expect(state.recentRegexQueries.isEmpty)
+        // A whitespace-PADDED query is a real (verbatim) query and
+        // stays recallable.
+        state.recordRecentQuery(" acct ", mode: .text)
+        #expect(state.recentTextQueries == [" acct "])
+    }
+
+    @Test("BH-B-06: the debounce auto-run floor counts trimmed characters")
+    func debounceFloorCountsTrimmedCharacters() {
+        #expect(SearchAndRedactSheet.queryQualifiesForAutoRun("   ") == false)
+        #expect(SearchAndRedactSheet.queryQualifiesForAutoRun("  a b  ") == true)
+        #expect(SearchAndRedactSheet.queryQualifiesForAutoRun(" ab ") == false,
+                "2 trimmed chars stays under the ≥3 floor — explicit Return only")
+        #expect(SearchAndRedactSheet.queryQualifiesForAutoRun("abc") == true)
+        #expect(SearchAndRedactSheet.queryQualifiesForAutoRun("") == false)
+    }
 }

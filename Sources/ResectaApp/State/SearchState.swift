@@ -791,7 +791,13 @@ final class SearchState: Identifiable {
     ///   or document content.
     /// - Deduplicates with move-to-front; caps at `recentQueriesCap`.
     func recordRecentQuery(_ query: String, mode: SearchModeType) {
-        guard !query.isEmpty else { return }
+        // BH-B-06 — whitespace-only strings are not queries: recording
+        // one produced an invisible blank recents chip that re-ran the
+        // whitespace on tap. Defensive belt beside the trigger-side
+        // trimmed gate (explicit Return paths can still run verbatim
+        // whitespace-padded queries; those are worth recalling, a
+        // blank chip never is).
+        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         guard mode == .text || mode == .regex else { return }
         // Absent key treated as false (default-off). Keep in lockstep
         // with `SettingsState.saveRecentSearches` hydration.

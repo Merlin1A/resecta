@@ -349,9 +349,18 @@ final class SavedSearchStore {
 
     // MARK: - Mutate
 
-    func add(_ search: SavedSearch) {
+    /// H-74 — duplicate-save collision check per the in-repo
+    /// `SavedRegexStore.add` pattern: an exact-name duplicate is
+    /// rejected (`false`; the UI re-presents the prompt), so a repeated
+    /// Save can no longer append indistinguishable byte-identical rows.
+    /// Name-scoped like the regex store's label check — two entries may
+    /// share a shape, never a name.
+    @discardableResult
+    func add(_ search: SavedSearch) -> Bool {
+        guard !savedSearches.contains(where: { $0.name == search.name }) else { return false }
         savedSearches.append(search)
         persist()
+        return true
     }
 
     func remove(id: UUID) {
@@ -361,8 +370,16 @@ final class SavedSearchStore {
 
     /// Rename only — other fields are immutable in V1.x. The UI for
     /// in-place edit lives in [WU-26](WORK_UNITS.md#wu-26).
-    func rename(id: UUID, to newName: String) {
-        guard let idx = savedSearches.firstIndex(where: { $0.id == id }) else { return }
+    /// H-74 sibling guard: renaming onto ANOTHER entry's name would
+    /// recreate the indistinguishable-rows state the add guard closes;
+    /// renaming an entry to its own current name stays a success.
+    @discardableResult
+    func rename(id: UUID, to newName: String) -> Bool {
+        let cappedName = String(newName.prefix(SavedSearch.nameLengthCap))
+        guard !savedSearches.contains(where: { $0.id != id && $0.name == cappedName }) else {
+            return false
+        }
+        guard let idx = savedSearches.firstIndex(where: { $0.id == id }) else { return false }
         let existing = savedSearches[idx]
         savedSearches[idx] = SavedSearch(
             id: existing.id,
@@ -383,6 +400,7 @@ final class SavedSearchStore {
             multiTermConjunction: existing.multiTermConjunction
         )
         persist()
+        return true
     }
 
     private func persist() {

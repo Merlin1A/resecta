@@ -20,6 +20,7 @@ struct ModeSwitchToastTests {
     @Test("User-initiated switch with unapplied results enqueues undo toast")
     func userSwitchEnqueuesToast() {
         let manager = ToastQueueManager()
+        let rs = RedactionState()
         let state = SearchState()
         state.results = [
             makeResult(page: 0),
@@ -35,7 +36,7 @@ struct ModeSwitchToastTests {
         state.clearResults()
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
-            searchState: state,
+            redactionState: rs,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: unapplied
@@ -51,6 +52,7 @@ struct ModeSwitchToastTests {
     @Test("Singular suffix when exactly one unapplied result")
     func singularSuffix() {
         let manager = ToastQueueManager()
+        let rs = RedactionState()
         let state = SearchState()
         state.results = [makeResult(page: 0)]
         // 0 applied → 1 unapplied.
@@ -60,7 +62,7 @@ struct ModeSwitchToastTests {
         state.clearResults()
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
-            searchState: state,
+            redactionState: rs,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: unapplied
@@ -72,13 +74,14 @@ struct ModeSwitchToastTests {
     @Test("User-initiated switch with no results does NOT enqueue toast")
     func emptyStateNoToast() {
         let manager = ToastQueueManager()
+        let rs = RedactionState()
         let state = SearchState()
         // Empty results array → nothing cleared → no toast.
 
         let snapshot = SearchAndRedactSheet.modeSwitchSnapshot(of: state, previousMode: .text)
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
-            searchState: state,
+            redactionState: rs,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: 0
@@ -90,6 +93,7 @@ struct ModeSwitchToastTests {
     @Test("All-applied clear now toasts too (pack 01 carve-out B closed)")
     func allAppliedClearToasts() {
         let manager = ToastQueueManager()
+        let rs = RedactionState()
         let state = SearchState()
         let r1 = makeResult(page: 0)
         let r2 = makeResult(page: 1)
@@ -102,7 +106,7 @@ struct ModeSwitchToastTests {
         state.clearResults()
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
-            searchState: state,
+            redactionState: rs,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: unapplied
@@ -116,6 +120,7 @@ struct ModeSwitchToastTests {
     @Test("Programmatic switch does NOT enqueue toast even with unapplied results")
     func programmaticSwitchSkipsToast() {
         let manager = ToastQueueManager()
+        let rs = RedactionState()
         let state = SearchState()
         state.results = [makeResult(page: 0), makeResult(page: 0), makeResult(page: 1)]
         // 3 unapplied, but the transition is programmatic (ST-95 recall).
@@ -124,7 +129,7 @@ struct ModeSwitchToastTests {
         let snapshot = SearchAndRedactSheet.modeSwitchSnapshot(of: state, previousMode: .text)
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
-            searchState: state,
+            redactionState: rs,
             snapshot: snapshot,
             isProgrammatic: state.isProgrammaticModeChange,
             unappliedCount: SearchAndRedactSheet.unappliedMatchCount(in: state)
@@ -138,6 +143,7 @@ struct ModeSwitchToastTests {
     @Test("Undo restores mode, results, applied markers, filter, and sort order")
     func undoRestoresSession() async {
         let manager = ToastQueueManager()
+        let rs = RedactionState()
         let state = SearchState()
         let r1 = makeResult(page: 0)
         let r2 = makeResult(page: 1)
@@ -158,7 +164,7 @@ struct ModeSwitchToastTests {
         state.sortOrder = .discoveryOrder
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
-            searchState: state,
+            redactionState: rs,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: unapplied
@@ -170,6 +176,8 @@ struct ModeSwitchToastTests {
 
         // Tap Undo via the toast's action handler. The restore is
         // deferred one runloop turn (CAT-396 F10 deferral pattern).
+        // BH-B-07 — the target resolves through the LIVE activeSearch.
+        rs.activeSearch = state
         let toast = try! #require(manager.activeToasts.first)
         toast.actionHandler?()
         await Task.yield()
@@ -185,28 +193,138 @@ struct ModeSwitchToastTests {
                 "clearResults() resets the applied-state chip to .all; the restore puts it back")
     }
 
-    @Test("Undo no-ops gracefully after the SearchState is gone")
-    func undoNoOpsAfterStateDeallocated() async {
-        let manager = ToastQueueManager()
-        var state: SearchState? = SearchState()
-        state!.results = [makeResult(page: 0)]
+    // MARK: - BH-B-07 restore-target resolution
 
-        let snapshot = SearchAndRedactSheet.modeSwitchSnapshot(of: state!, previousMode: .text)
+    @Test("BH-B-07: Undo after sheet reopen restores into the NEW live SearchState")
+    func undoRestoresIntoReopenedSession() async {
+        let manager = ToastQueueManager()
+        let rs = RedactionState()
+        let original = SearchState()
+        let r1 = makeResult(page: 0)
+        original.results = [r1]
+
+        let snapshot = SearchAndRedactSheet.modeSwitchSnapshot(of: original, previousMode: .regex)
+        original.clearResults()
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
-            searchState: state!,
+            redactionState: rs,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: 1
         )
-        state = nil
 
-        // The closure holds [weak searchState]; the structural assertion
-        // is that the (deferred) restore no-ops without crashing.
+        // Simulate dismiss + reopen: the original session dies, a fresh
+        // SearchState becomes the live session — the pre-fix
+        // [weak searchState] capture no-oped exactly here.
+        let reopened = SearchState()
+        rs.activeSearch = reopened
+
+        let toast = try! #require(manager.activeToasts.first)
+        toast.actionHandler?()
+        await Task.yield()
+
+        #expect(reopened.searchModeType == .regex)
+        #expect(reopened.results.map(\.id) == [r1.id])
+    }
+
+    @Test("BH-B-07: Undo with no live sheet mints a session and presents it")
+    func undoMintsAndPresentsWhenNoSheetIsUp() async {
+        let manager = ToastQueueManager()
+        let rs = RedactionState()
+        let original = SearchState()
+        let r1 = makeResult(page: 1)
+        original.results = [r1]
+
+        let snapshot = SearchAndRedactSheet.modeSwitchSnapshot(of: original, previousMode: .text)
+        SearchAndRedactSheet.enqueueModeSwitchUndoToast(
+            on: manager,
+            redactionState: rs,
+            snapshot: snapshot,
+            isProgrammatic: false,
+            unappliedCount: 1
+        )
+        // Sheet fully closed: no live session at tap time.
+        #expect(rs.activeSearch == nil)
+
+        let toast = try! #require(manager.activeToasts.first)
+        toast.actionHandler?()
+        await Task.yield()
+
+        // Assigning activeSearch IS the presentation trigger.
+        let presented = try! #require(rs.activeSearch)
+        #expect(presented.searchModeType == .text)
+        #expect(presented.results.map(\.id) == [r1.id])
+    }
+
+    @Test("BH-B-07: Undo no-ops while a detection review is pending")
+    func undoNoOpsDuringPendingReview() async {
+        let manager = ToastQueueManager()
+        let rs = RedactionState()
+        let original = SearchState()
+        original.results = [makeResult(page: 0)]
+
+        let snapshot = SearchAndRedactSheet.modeSwitchSnapshot(of: original, previousMode: .text)
+        SearchAndRedactSheet.enqueueModeSwitchUndoToast(
+            on: manager,
+            redactionState: rs,
+            snapshot: snapshot,
+            isProgrammatic: false,
+            unappliedCount: 1
+        )
+        // A pending review owns the surface.
+        rs.pendingTriage = [:]
+
+        let toast = try! #require(manager.activeToasts.first)
+        toast.actionHandler?()
+        await Task.yield()
+
+        #expect(rs.activeSearch == nil,
+                "the restore must not mint/present a session under a pending review")
+    }
+
+    @Test("Undo no-ops gracefully after the RedactionState is gone")
+    func undoNoOpsAfterRedactionStateDeallocated() async {
+        let manager = ToastQueueManager()
+        var rs: RedactionState? = RedactionState()
+        let state = SearchState()
+        state.results = [makeResult(page: 0)]
+
+        let snapshot = SearchAndRedactSheet.modeSwitchSnapshot(of: state, previousMode: .text)
+        SearchAndRedactSheet.enqueueModeSwitchUndoToast(
+            on: manager,
+            redactionState: rs!,
+            snapshot: snapshot,
+            isProgrammatic: false,
+            unappliedCount: 1
+        )
+        rs = nil
+
+        // The closure holds [weak redactionState]; the structural
+        // assertion is that the (deferred) restore no-ops without
+        // crashing.
         let toast = try! #require(manager.activeToasts.first)
         toast.actionHandler?()
         await Task.yield()
         #expect(manager.activeToasts.count == 1)
+    }
+
+    @Test("BH-B-07: restore arms the programmatic flag only when the mode actually changes")
+    func restoreFlagOnlyOnRealModeChange() {
+        let state = SearchState()
+        let sameMode = state.searchModeType
+        let snapshot = SearchAndRedactSheet.ModeSwitchSnapshot(
+            mode: sameMode,
+            results: [makeResult(page: 0)],
+            appliedResultIDs: [],
+            piiCategoryFilter: nil,
+            sortOrder: .discoveryOrder,
+            appliedFilter: .all
+        )
+        SearchAndRedactSheet.restoreModeSwitchSnapshot(snapshot, in: state)
+        // No .onChange consumer ever fires for a same-mode restore — a
+        // stale true would mis-classify the next USER transition.
+        #expect(state.isProgrammaticModeChange == false)
+        #expect(state.results.count == 1)
     }
 
     @Test("unappliedMatchCount clamps to zero when applied IDs outpace results")

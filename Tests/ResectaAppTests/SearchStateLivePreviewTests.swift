@@ -202,6 +202,23 @@ struct SearchStateLivePreviewTests {
         let seen = await recorder.indices
         #expect(Set(seen) == [2], "read-index set was \(Set(seen)); expected only the current page {2}")
     }
+
+    // MARK: - BH-B-02 preview count line
+
+    @Test("BH-B-02: the preview line prints the committed document total, never the page-scoped preview total")
+    func previewCountLineUsesCommittedTotal() {
+        // Committed run exists: the document-wide total renders beside
+        // the page count.
+        #expect(SearchResultsSection.previewCountLine(pageMatches: 1, committedTotal: 3)
+                == "Matches this page: 1 · Total: 3")
+        // No committed run: the honest page count stands alone — the
+        // page-scoped preview's totalCount (≡ page count since D10-F3)
+        // must never masquerade as a document total.
+        #expect(SearchResultsSection.previewCountLine(pageMatches: 1, committedTotal: nil)
+                == "Matches this page: 1")
+        #expect(SearchResultsSection.previewCountLine(pageMatches: 0, committedTotal: 0)
+                == "Matches this page: 0 · Total: 0")
+    }
 }
 
 /// Records the page indices a `pageTextProvider` is asked for, so a test can

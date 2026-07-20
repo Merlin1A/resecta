@@ -187,7 +187,11 @@ struct SearchAndRedactSheet: View {
         ).map(\.detection.id)
     }
 
-    var body: some View {
+    /// Full-chrome composition (medium / large detents). The
+    /// presentation-level modifier chain (single modal slot, onChange
+    /// handlers, sheet-local toast host, shield) lives on `body`'s
+    /// shared container so BOTH compositions keep it.
+    private var fullSheetContent: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Unified degrade rule: the gazetteer-degrade disclosure is unified
@@ -362,6 +366,25 @@ struct SearchAndRedactSheet: View {
                 // saved list's own save row.
             }
         }
+    }
+
+    var body: some View {
+        // BH-B-01 — compactFloat composition branch: compressed into
+        // ~110–131pt the full NavigationStack chrome z-overlapped into
+        // unusable rows and NONE of the detent's promised controls
+        // (search bar, nav chevrons, first result row —
+        // `CompactFloatDetent.swift` contract) were visible. Render the
+        // documented strip at the compact detent instead; the full
+        // chrome returns at medium/large. The review origin gets a
+        // one-line selection summary (arrivals raise the detent — the
+        // strip is the drag-down residue state).
+        Group {
+            if selectedDetent == .compactFloat {
+                compactFloatStrip
+            } else {
+                fullSheetContent
+            }
+        }
         // Custom grabber capsule lives in the top safe-area
         // inset so it sits above the navigation bar — the natural
         // grabber position. The system `.presentationDragIndicator` is
@@ -458,7 +481,10 @@ struct SearchAndRedactSheet: View {
             }
         }
         .onAppear {
-            isSearchFieldFocused = true
+            // BH-B-01 rider — no auto-focus at the compact detent
+            // (sticky-detent reopen): the raised keyboard would cover
+            // the very document the float exists to expose.
+            isSearchFieldFocused = selectedDetent != .compactFloat
             // When the sheet appears already carrying a
             // magic-wand pre-fill (the host wrote `queryText` +
             // `preselectIncomingResults = true` before flipping
@@ -614,7 +640,7 @@ struct SearchAndRedactSheet: View {
                 // silently (pack 01 carve-out B).
                 Self.enqueueModeSwitchUndoToast(
                     on: toastManager,
-                    searchState: searchState,
+                    redactionState: redactionState,
                     snapshot: snapshot,
                     isProgrammatic: isProgrammatic,
                     unappliedCount: unappliedCount
@@ -679,6 +705,11 @@ struct SearchAndRedactSheet: View {
         // predicate seam so the call site stays declarative.
         .onChange(of: selectedDetent, initial: false) { (_: PresentationDetent, newDetent: PresentationDetent) in
             handleDetentChangeForPulse(newDetent: newDetent)
+            // BH-B-01 rider — dropping to compact releases field focus
+            // so the keyboard never sits over the exposed document.
+            if newDetent == .compactFloat {
+                isSearchFieldFocused = false
+            }
         }
         // Observed on-sim: the app's single toast host
         // lives on ContentView, which renders BEHIND this presented
@@ -711,6 +742,98 @@ struct SearchAndRedactSheet: View {
         // editor's shield swap, so it needs its own. Outermost modifier so
         // the entire sheet (toolbar, results, footer) swaps for the shield.
         .shieldedSheetContent(monitor: captureMonitor)
+    }
+
+    // MARK: - compactFloat Strip (BH-B-01)
+
+    /// The compact detent's documented composition: the search bar row
+    /// (field + cancel + result-nav chevrons) over ONE line naming the
+    /// current result — nothing else. While a run is in flight the
+    /// result line yields to the toolbar's progress line (same strings)
+    /// so the H-202 compact progress state survives the recomposition.
+    @ViewBuilder
+    private var compactFloatStrip: some View {
+        VStack(spacing: 0) {
+            if isReviewActive {
+                compactReviewSummaryLine
+            } else {
+                searchBar
+                if searchState.isSearching {
+                    compactScanProgressLine
+                } else {
+                    compactCurrentResultLine
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityIdentifier("compactFloatStrip")
+    }
+
+    /// Review origin at the compact detent: a one-line selection
+    /// summary through the footer's pinned label builder (no new
+    /// strings). Review arrivals raise the detent
+    /// (`presentReviewInScanInterface`), so this renders only after a
+    /// deliberate drag-down.
+    private var compactReviewSummaryLine: some View {
+        HStack {
+            Text(SearchFooterSection.selectionCountLabel(
+                selected: reviewAcceptedCount,
+                total: reviewVisibleIDs.count
+            ))
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, ResectaTokens.Spacing.md)
+        .padding(.vertical, ResectaTokens.Spacing.sm)
+    }
+
+    /// Byte-identical to the toolbar section's progress row so the
+    /// compact in-flight state introduces no new strings.
+    private var compactScanProgressLine: some View {
+        HStack {
+            ProgressView()
+                .controlSize(.small)
+            Text("Scanning page \(searchState.currentSearchPage) of \(searchState.totalPages)…")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text("\(searchState.totalCount) found")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+        .padding(.horizontal, ResectaTokens.Spacing.md)
+    }
+
+    /// One-line readout of the row the chevrons navigate (falls back
+    /// to the first result — the contract's "first result row").
+    /// Blank when no results exist: the field alone invites a query.
+    @ViewBuilder
+    private var compactCurrentResultLine: some View {
+        if let current = searchState.currentResult ?? searchState.results.first {
+            HStack(spacing: ResectaTokens.Spacing.xs) {
+                if searchState.appliedResultIDs.contains(current.id) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                        .accessibilityLabel("Applied")
+                }
+                Text(current.matchedText)
+                    .font(.callout)
+                    .lineLimit(1)
+                    // The matched text is document content.
+                    .privacySensitive()
+                Spacer()
+                Text("Page \(current.pageIndex + 1)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            .padding(.horizontal, ResectaTokens.Spacing.md)
+            .padding(.vertical, ResectaTokens.Spacing.xxs)
+            .accessibilityElement(children: .combine)
+        }
     }
 
     // MARK: - Search Bar
@@ -789,7 +912,11 @@ struct SearchAndRedactSheet: View {
                     // deliberately does not auto-run (UXF-16) and for
                     // short queries below the debounce floor.
                     .onSubmit {
-                        if !searchState.queryText.isEmpty {
+                        // BH-B-06 — trimmed gate (mirrors multi-term's
+                        // validator): a whitespace-only Return must not
+                        // run an invisible query.
+                        if !searchState.queryText
+                            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             triggerSearch()
                         }
                     }
@@ -1029,7 +1156,8 @@ struct SearchAndRedactSheet: View {
         } else if redactionState.pendingTriage == nil,
                   !afterConfirmation,
                   let message = Self.dismissClearedMessage(
-                      unappliedCount: Self.unappliedMatchCount(in: searchState)
+                      unappliedCount: Self.unappliedMatchCount(in: searchState),
+                      interface: searchState.searchModeType.interface
                   ) {
             // UXF-27: a 0-selected dismissal names what the close drops
             // when unapplied matches exist so the loss isn't silent.

@@ -42,10 +42,17 @@ extension SearchAndRedactSheet {
     /// still holds unapplied matches (piiScan results arrive
     /// deselected), the close drops them with no other signal. Returns
     /// nil when nothing unapplied is lost so the common dismiss stays
-    /// toast-free. Pinned by `DiscardUndoToastTests`.
-    static func dismissClearedMessage(unappliedCount: Int) -> String? {
+    /// toast-free. BH-B-03 — the leading noun follows the interface
+    /// (the UP-era adaptive-copy posture: save alert, displayName
+    /// split): a Scan-interface dismissal says "Scan closed", not
+    /// "Search closed". Pinned by `DiscardUndoToastTests`.
+    static func dismissClearedMessage(
+        unappliedCount: Int,
+        interface: SearchInterface
+    ) -> String? {
         guard unappliedCount > 0 else { return nil }
+        let noun = interface == .scan ? "Scan" : "Search"
         let suffix = unappliedCount == 1 ? "" : "es"
-        return "Search closed — \(unappliedCount) unapplied match\(suffix) cleared."
+        return "\(noun) closed — \(unappliedCount) unapplied match\(suffix) cleared."
     }
 }

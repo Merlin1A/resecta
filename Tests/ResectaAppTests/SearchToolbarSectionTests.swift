@@ -104,4 +104,21 @@ struct SearchToolbarSectionTests {
         #expect(SearchToolbarSection.piiScanOCRBlockShouldShow(
             anyPageAwaitsOCR: true, statusKnown: true) == true)
     }
+
+    @Test("BH-B-04 — option changes re-run only sessions with something to make stale")
+    func bhB04OptionChangeRetriggerGate() {
+        // Committed run (even a no-match verdict): re-run — toggling
+        // case-sensitivity off may produce matches.
+        #expect(SearchToolbarSection.optionChangeShouldRetrigger(
+            hasCompletedRun: true, hasResults: false) == true)
+        // Live results mid-session: re-run.
+        #expect(SearchToolbarSection.optionChangeShouldRetrigger(
+            hasCompletedRun: false, hasResults: true) == true)
+        #expect(SearchToolbarSection.optionChangeShouldRetrigger(
+            hasCompletedRun: true, hasResults: true) == true)
+        // Fresh / carried (UXF-16) / short-term-guarded sessions stay
+        // explicit-trigger — the option row is no debounce backdoor.
+        #expect(SearchToolbarSection.optionChangeShouldRetrigger(
+            hasCompletedRun: false, hasResults: false) == false)
+    }
 }

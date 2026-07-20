@@ -31,6 +31,12 @@ struct SavedSearchListSheet: View {
     @State private var renameText: String = ""
     @State private var showSavePrompt = false
     @State private var savePromptName: String = ""
+    /// H-74 — collision feedback for the save / rename prompts. When
+    /// the store rejects a duplicate name the alert re-presents with
+    /// this message in place of its standard body (the UXF-04
+    /// saved-regex prompt's proven re-present pattern).
+    @State private var savePromptError: String?
+    @State private var renameError: String?
     /// UXF-33 / ST-94: swipe-Delete asks for confirmation before the
     /// store removal (app-standard destructive-confirm idiom — same
     /// shape as Settings' Reset dialogs).
@@ -75,6 +81,7 @@ struct SavedSearchListSheet: View {
                 Section {
                     Button {
                         savePromptName = Self.generatedName(for: searchState)
+                        savePromptError = nil
                         showSavePrompt = true
                     } label: {
                         Label(Self.saveCurrentLabel(for: activeInterface), systemImage: "plus.circle")
@@ -96,31 +103,49 @@ struct SavedSearchListSheet: View {
                 TextField("Name", text: $renameText)
                 Button("Rename") {
                     let trimmed = renameText.trimmingCharacters(in: .whitespaces)
-                    if !trimmed.isEmpty {
-                        savedSearchStore.rename(id: search.id, to: trimmed)
+                    if !trimmed.isEmpty,
+                       !savedSearchStore.rename(id: search.id, to: trimmed) {
+                        // H-74 — duplicate name: re-present with the
+                        // collision message instead of dismissing.
+                        renameError = Self.duplicateNameMessage
+                        renameTarget = search
+                    } else {
+                        renameError = nil
+                        renameTarget = nil
                     }
-                    renameTarget = nil
                 }
                 // Blank names can't commit — without the gate the alert
                 // auto-dismisses on Rename and the no-op reads as done.
                 .disabled(renameText.trimmingCharacters(in: .whitespaces).isEmpty)
-                Button("Cancel", role: .cancel) { renameTarget = nil }
+                Button("Cancel", role: .cancel) {
+                    renameError = nil
+                    renameTarget = nil
+                }
             } message: { _ in
-                Text("The new name is capped at \(SavedSearch.nameLengthCap) characters.")
+                Text(renameError
+                     ?? "The new name is capped at \(SavedSearch.nameLengthCap) characters.")
             }
             .alert(Self.savePromptTitle(for: activeInterface), isPresented: $showSavePrompt) {
                 TextField("Name", text: $savePromptName)
                 Button("Save") {
                     let trimmed = savePromptName.trimmingCharacters(in: .whitespaces)
                     guard !trimmed.isEmpty else { return }
-                    savedSearchStore.add(Self.capture(from: searchState, name: trimmed))
+                    if savedSearchStore.add(Self.capture(from: searchState, name: trimmed)) {
+                        savePromptError = nil
+                    } else {
+                        // H-74 — duplicate name: re-present with the
+                        // collision message (UXF-04 re-present pattern)
+                        // instead of silently appending a twin row.
+                        savePromptError = Self.duplicateNameMessage
+                        showSavePrompt = true
+                    }
                 }
                 // Blank names can't commit — a Save that auto-dismisses
                 // while saving nothing reads as success.
                 .disabled(savePromptName.trimmingCharacters(in: .whitespaces).isEmpty)
-                Button("Cancel", role: .cancel) { }
+                Button("Cancel", role: .cancel) { savePromptError = nil }
             } message: {
-                Text(Self.savePromptMessage(for: activeInterface))
+                Text(savePromptError ?? Self.savePromptMessage(for: activeInterface))
             }
             // UXF-33: destructive confirm for swipe-Delete, mirroring
             // the app-wide confirmation-dialog pattern (Settings
@@ -233,6 +258,11 @@ struct SavedSearchListSheet: View {
     static func saveCurrentLabel(for interface: SearchInterface) -> String {
         interface == .scan ? "Save current scan…" : "Save current search…"
     }
+
+    /// H-74 — collision message for a rejected duplicate name (save and
+    /// rename prompts). Mechanism description, no outcome promise.
+    static let duplicateNameMessage =
+        "That name is already in use — choose a different name."
 
     /// Save-prompt chrome follows the interface whose shape the save
     /// captures: the Scan side names categories and options, the

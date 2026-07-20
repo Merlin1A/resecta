@@ -80,14 +80,17 @@ extension SearchAndRedactSheet {
     /// transition programmatic so the `.onChange` handler in the hub
     /// view preserves rather than re-clears — then re-applies the
     /// snapshotted results, applied markers, filter, and sort order.
-    /// `[weak searchState]`: if the
-    /// SearchState is gone by the time Undo is tapped, the closure
-    /// no-ops. Coverage report / doctype explanation are NOT restored —
-    /// they belong to a completed scan, not to the visible list.
+    /// BH-B-07 — the restore TARGET resolves at tap time, not enqueue
+    /// time: the toast deliberately outlives the sheet, and every sheet
+    /// open mints a fresh `SearchState`, so the former
+    /// `[weak searchState]` capture died with its session and the
+    /// surviving Undo button silently no-oped over a fresh sheet.
+    /// Coverage report / doctype explanation are NOT restored — they
+    /// belong to a completed scan, not to the visible list.
     @MainActor
     static func enqueueModeSwitchUndoToast(
         on toastManager: ToastQueueManager,
-        searchState: SearchState,
+        redactionState: RedactionState,
         snapshot: ModeSwitchSnapshot,
         isProgrammatic: Bool,
         unappliedCount: Int
@@ -111,18 +114,38 @@ extension SearchAndRedactSheet {
             message,
             severity: .info,
             actionLabel: discardUndoActionLabel,
-            actionHandler: { [weak searchState] in
+            actionHandler: { [weak redactionState] in
                 // Deferral pattern: the restore flips
                 // searchModeType and repopulates results — a larger
                 // @Observable mutation than the sibling selection
                 // restore — so defer it one runloop turn past the
                 // toast's own synchronous dismiss transaction.
-                Task { @MainActor [weak searchState] in
-                    guard let searchState else { return }
-                    Self.restoreModeSwitchSnapshot(snapshot, in: searchState)
+                Task { @MainActor [weak redactionState] in
+                    guard let redactionState,
+                          let target = Self.modeSwitchRestoreTarget(in: redactionState)
+                    else { return }
+                    Self.restoreModeSwitchSnapshot(snapshot, in: target)
                 }
             }
         )
+    }
+
+    /// BH-B-07 — restore-target resolution at Undo-tap time. A pending
+    /// detection review owns the surface (restoring a search session
+    /// under it would bury the review behind parked entry points), so
+    /// the tap no-ops there. Otherwise the LIVE session — whichever
+    /// sheet is up when the user taps — is the target; with no sheet up
+    /// the restore mints one and presents it (assigning
+    /// `activeSearch` is the presentation trigger), because an Undo
+    /// designed to outlive the sheet must be able to bring the session
+    /// back. Pinned by `ModeSwitchToastTests`.
+    @MainActor
+    static func modeSwitchRestoreTarget(in redactionState: RedactionState) -> SearchState? {
+        guard redactionState.pendingTriage == nil else { return nil }
+        if let live = redactionState.activeSearch { return live }
+        let fresh = SearchState()
+        redactionState.activeSearch = fresh
+        return fresh
     }
 
     /// Undo action body: put the session back the way the mode switch
@@ -135,7 +158,12 @@ extension SearchAndRedactSheet {
         // Route the mode change through the existing programmatic hook
         // (ST-95's reserved flag) so the hub's `.onChange` handler treats
         // the restore like a saved-search recall — no re-clear, no toast.
-        searchState.isProgrammaticModeChange = true
+        // Armed ONLY when the mode actually changes (mirrors
+        // `SavedSearchListSheet.apply`): the `.onChange` consumer never
+        // fires otherwise, and a stale `true` would mis-classify the
+        // next USER transition as programmatic — reachable since
+        // BH-B-07's minted-target path can start at the snapshot mode.
+        searchState.isProgrammaticModeChange = searchState.searchModeType != snapshot.mode
         searchState.searchModeType = snapshot.mode
         searchState.results = snapshot.results
         searchState.appliedResultIDs = snapshot.appliedResultIDs

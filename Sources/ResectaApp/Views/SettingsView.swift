@@ -130,6 +130,18 @@ struct SettingsView: View {
             ) {
                 Button("Reset", role: .destructive) {
                     settingsState.resetToDefaults()
+                    // H-70 — reset turns the recents preference OFF, and
+                    // every other transition to off (the toggle's own
+                    // off-path above, Clear Search History) clears the
+                    // stored queries with it. Reset previously left the
+                    // data on disk while `SearchState.init` hydrates the
+                    // arrays unconditionally — so a user's PII-bearing
+                    // query history silently resurfaced on the next
+                    // sheet under a toggle that read off. Same
+                    // three-line clear as the toggle's off-path.
+                    redactionState?.activeSearch?.clearRecentSearchHistory()
+                    UserDefaults.standard.removeObject(forKey: "search.recents.text.v1")
+                    UserDefaults.standard.removeObject(forKey: "search.recents.regex.v1")
                 }
                 .accessibilityIdentifier("settingsResetConfirm")
                 Button("Cancel", role: .cancel) { }
