@@ -12,9 +12,14 @@ import RedactionEngine
 // MARK: - WU-08 Pure-Function Contracts
 
 extension SearchToolbarSection {
-    /// The "Options" disclosure starts collapsed.
-    /// Pinned by `SearchToolbarSectionTests.optionsDisclosureCollapsedByDefault`.
-    static let optionsCollapsedByDefault: Bool = false
+    /// The "Options" disclosure starts collapsed: expanded-by-default
+    /// is false. SO-04 — renamed from `optionsCollapsedByDefault`,
+    /// whose name inverted the stored value (it read
+    /// "collapsed-by-default = false" while documenting "starts
+    /// collapsed"). The view initializes `optionsExpanded` from this
+    /// constant.
+    /// Pinned by `SearchToolbarSectionTests.optionsDisclosureStartsCollapsed`.
+    static let optionsExpandedByDefault: Bool = false
 
     /// Per WU-08 / [R-07]: caption shown beneath the disabled OCR
     /// controls when Include OCR is on but no OCR results have arrived
@@ -187,6 +192,23 @@ extension SearchToolbarSection {
         hasResults: Bool
     ) -> Bool {
         hasCompletedRun || hasResults
+    }
+
+    // MARK: - SO-02 Pure-Function Contracts
+
+    /// SO-02 — visibility gate for the short-term warning + "Search
+    /// Anyway" pair. Renders only for a 1–2 character query outside
+    /// multi-term mode AND while no regex error stands: with a
+    /// non-compiling pattern on screen, tapping "Search Anyway" ran a
+    /// no-op loop (the attempt clears the list, the error persists,
+    /// the button re-renders). The error wins. Pinned by
+    /// `SearchToolbarSectionTests`.
+    static func shortTermWarningShouldShow(
+        queryCount: Int,
+        isMultiTerm: Bool,
+        hasRegexError: Bool
+    ) -> Bool {
+        queryCount > 0 && queryCount < 3 && !isMultiTerm && !hasRegexError
     }
 
     // MARK: - WU-31 Pure-Function Contracts

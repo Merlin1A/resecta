@@ -69,7 +69,11 @@ public struct TextNormalizer: Sendable {
     /// Separator characters removed by digit-format-insensitive matching
     /// ("123456789" matches "123-45-6789"). NFKC has already mapped
     /// NBSP → space upstream, so a plain space entry covers it.
-    static let separatorCharacters: Set<Character> = ["-", " ", ".", "/"]
+    /// SO-01: "," is a member — the canonical thousands separator was
+    /// the one grouping character missing from the set ("1234567"
+    /// missed "1,234,567" with the toggle on). Decimal-comma risk is
+    /// asymmetric by precedent: "." was always stripped.
+    static let separatorCharacters: Set<Character> = ["-", " ", ".", "/", ","]
 
     /// Strip separator characters, returning the stripped string plus an
     /// explicit offset map: `offsetMap[i]` is the Character index in

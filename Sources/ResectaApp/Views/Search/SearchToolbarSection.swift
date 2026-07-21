@@ -45,9 +45,11 @@ struct SearchToolbarSection: View {
     /// section's VStack.
     let onRequestSaveCurrentRegex: () -> Void
 
-    // Initialized to `optionsCollapsedByDefault` (false). The
+    // SO-04 — initialized FROM the contract constant (previously a
+    // hardcoded `false` whose comment claimed this initialization,
+    // under the inverted name `optionsCollapsedByDefault`). The
     // contract is pinned by `SearchToolbarSectionTests`.
-    @State private var optionsExpanded: Bool = false
+    @State private var optionsExpanded: Bool = SearchToolbarSection.optionsExpandedByDefault
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -101,56 +103,56 @@ struct SearchToolbarSection: View {
             // Disclosure animation respects Reduce Motion via
             // `Anim.resolved(_:reduceMotion:)`.
             DisclosureGroup("Options", isExpanded: $optionsExpanded) {
-                HStack(spacing: ResectaTokens.Spacing.md) {
-                    Toggle("Case Sensitive", isOn: optionBinding(\.caseSensitive))
-                        .toggleStyle(.button)
-                        .controlSize(.small)
-                        .accessibilityLabel("Case sensitive search")
-
-                    Toggle("Whole Word", isOn: optionBinding(\.wholeWord))
-                        .toggleStyle(.button)
-                        .controlSize(.small)
-                        .accessibilityLabel("Whole word matching")
-
-                    Toggle("Include OCR", isOn: optionBinding(\.includeOCR))
-                        .toggleStyle(.button)
-                        .controlSize(.small)
-                        .accessibilityLabel("Include scanned page text")
-
-                    Spacer()
-                }
-                .padding(.top, ResectaTokens.Spacing.xs)
-
-                // Normalization extensions row.
-                // The two length-changing options are hidden in regex
-                // mode: the engine excludes them there (a transformed
-                // pattern changes meaning; see SearchOptions), so a
-                // visible-but-inert toggle would misstate the mechanism.
-                HStack(spacing: ResectaTokens.Spacing.md) {
-                    if searchState.searchModeType != .regex {
-                        Toggle("Ignore digit separators", isOn: optionBinding(\.stripDigitSeparators))
-                            .toggleStyle(.button)
-                            .controlSize(.small)
-                            .accessibilityLabel("Ignore digit separators")
-                            .accessibilityHint("Matches 123456789 when the document has 123-45-6789")
+                // V1 flow chips (SO study §5 R-1). FlowLayout +
+                // FilterChip — both existing house components — replace
+                // the fixed two-HStack toggle rows: uniform
+                // always-stroked capsules whose silhouette holds in
+                // both states, wrapping one-per-line at accessibility
+                // sizes instead of collapsing into hyphenated letter
+                // columns. Visible labels are the V1 short set; the
+                // caption carries the normalization-row semantics the
+                // short labels drop. Accessibility labels stay the
+                // shipped six VERBATIM (stable-label policy) and the
+                // three example hints carry over.
+                VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
+                    // Row 1 — matching options
+                    FlowLayout(spacing: ResectaTokens.Spacing.xs) {
+                        optionChip("Case-sensitive", \.caseSensitive,
+                                   a11yLabel: "Case sensitive search")
+                        optionChip("Whole word", \.wholeWord,
+                                   a11yLabel: "Whole word matching")
+                        optionChip("Include OCR", \.includeOCR,
+                                   a11yLabel: "Include scanned page text")
                     }
 
-                    Toggle("Normalize quotes and dashes", isOn: optionBinding(\.normalizeSmartPunctuation))
-                        .toggleStyle(.button)
-                        .controlSize(.small)
-                        .accessibilityLabel("Normalize quotes and dashes")
-                        .accessibilityHint("Treats curly quotes and em-dashes as their plain equivalents")
+                    Text("Match despite differences in:")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, ResectaTokens.Spacing.xxs)
 
-                    if searchState.searchModeType != .regex {
-                        Toggle("Match regardless of accents", isOn: optionBinding(\.foldDiacritics))
-                            .toggleStyle(.button)
-                            .controlSize(.small)
-                            .accessibilityLabel("Match regardless of accents")
-                            .accessibilityHint("Matches Munoz when the document has Muñoz")
+                    // Row 2 — normalization options. The two
+                    // length-changing options stay hidden in regex
+                    // mode: the engine excludes them there (a
+                    // transformed pattern changes meaning; see
+                    // SearchOptions), so a visible-but-inert chip
+                    // would misstate the mechanism.
+                    FlowLayout(spacing: ResectaTokens.Spacing.xs) {
+                        if searchState.searchModeType != .regex {
+                            optionChip("Digit separators", \.stripDigitSeparators,
+                                       a11yLabel: "Ignore digit separators",
+                                       a11yHint: "Matches 123456789 when the document has 123-45-6789")
+                        }
+                        optionChip("Quotes & dashes", \.normalizeSmartPunctuation,
+                                   a11yLabel: "Normalize quotes and dashes",
+                                   a11yHint: "Treats curly quotes and em-dashes as their plain equivalents")
+                        if searchState.searchModeType != .regex {
+                            optionChip("Accents", \.foldDiacritics,
+                                       a11yLabel: "Match regardless of accents",
+                                       a11yHint: "Matches Munoz when the document has Muñoz")
+                        }
                     }
-
-                    Spacer()
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, ResectaTokens.Spacing.xs)
             }
             .padding(.horizontal, ResectaTokens.Spacing.md)
@@ -241,9 +243,15 @@ struct SearchToolbarSection: View {
                 regexErrorCallout
             }
 
-            // Short term warning
-            if searchState.queryText.count > 0 && searchState.queryText.count < 3
-                && searchState.searchModeType != .multiTerm {
+            // Short term warning. SO-02 — suppressed while a regex
+            // error stands: rendering "Search Anyway" beside a
+            // non-compiling pattern invited a no-op loop (the attempt
+            // clears the list, the error stays, the button remains).
+            if Self.shortTermWarningShouldShow(
+                queryCount: searchState.queryText.count,
+                isMultiTerm: searchState.searchModeType == .multiTerm,
+                hasRegexError: searchState.regexError != nil
+            ) {
                 HStack {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
@@ -291,6 +299,30 @@ struct SearchToolbarSection: View {
                 }
             }
         )
+    }
+
+    // MARK: - Option Chips (V1 layout, SO study §5 R-1)
+
+    /// One option chip: `FilterChip` driven through `optionBinding(_:)`
+    /// so every chip keeps the BH-B-04 re-run gate. The visible label
+    /// is the V1 short string; `a11yLabel` is the shipped VoiceOver
+    /// label, VERBATIM (stable-label policy — existing queries and
+    /// VoiceOver habits keep resolving). The value mirrors the retired
+    /// Toggle's announced on/off state; `a11yHint` carries the original
+    /// example copy where one shipped.
+    private func optionChip(
+        _ label: String,
+        _ keyPath: WritableKeyPath<SearchOptions, Bool>,
+        a11yLabel: String,
+        a11yHint: String? = nil
+    ) -> some View {
+        let binding = optionBinding(keyPath)
+        return FilterChip(label: label, isSelected: binding.wrappedValue) {
+            binding.wrappedValue.toggle()
+        }
+        .accessibilityLabel(a11yLabel)
+        .accessibilityValue(binding.wrappedValue ? "on" : "off")
+        .accessibilityHint(a11yHint ?? "")
     }
 
     // MARK: - Regex Error Callout

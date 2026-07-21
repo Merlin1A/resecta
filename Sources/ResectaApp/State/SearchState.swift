@@ -212,7 +212,20 @@ final class SearchState: Identifiable {
     var options: SearchOptions = SearchOptions()
 
     /// B2: Regex validation error message, shown inline in options bar.
-    var regexError: String?
+    /// SO-03 — an arriving error clears any stale result list via
+    /// `clearResultState()` (the same reset a run attempt performs):
+    /// a standing list beneath a non-compiling pattern read as "the
+    /// invalid pattern found N". Only the nil → message transition
+    /// acts, and the shared clear deliberately skips this field so the
+    /// error survives its own observer.
+    var regexError: String? {
+        didSet {
+            if regexError != nil, oldValue == nil,
+               !results.isEmpty || !pendingResults.isEmpty {
+                clearResultState()
+            }
+        }
+    }
 
     // MARK: - Filters (U1, U2)
 
@@ -1381,6 +1394,14 @@ final class SearchState: Identifiable {
     /// Clear results and increment version for overlay refresh.
     func clearResults() {
         regexError = nil
+        clearResultState()
+    }
+
+    /// Result-state clear shared by `clearResults()` and the SO-03
+    /// `regexError` observer: everything a run attempt resets EXCEPT
+    /// `regexError` itself, so the observer can wipe a stale list
+    /// without nilling the error it is reacting to.
+    private func clearResultState() {
         flushTask?.cancel()
         flushTask = nil
         pendingResults.removeAll()

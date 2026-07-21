@@ -6,7 +6,8 @@ import Foundation
 // `SearchToolbarSection` carry the gate logic so the WU-08 visibility
 // rules are testable without a SwiftUI host:
 //
-//  - `optionsCollapsedByDefault` pins the disclosure default per [D-01].
+//  - `optionsExpandedByDefault` pins the disclosure default per [D-01]
+//    (SO-04 renamed it from `optionsCollapsedByDefault`).
 //  - `ocrControlsShouldShow(includeOCR:)` is the new gate (was
 //    `hasOCRResults`) — controls surface as soon as Include OCR is on.
 //  - `ocrSliderShouldBeDisabled(hasOCRResults:)` flips the controls to
@@ -17,8 +18,10 @@ import Foundation
 struct SearchToolbarSectionTests {
 
     @Test("Options disclosure starts collapsed by default")
-    func optionsDisclosureCollapsedByDefault() {
-        #expect(SearchToolbarSection.optionsCollapsedByDefault == false)
+    func optionsDisclosureStartsCollapsed() {
+        // SO-04 — the constant is named for what it stores: expanded-
+        // by-default is false, i.e. the disclosure starts collapsed.
+        #expect(SearchToolbarSection.optionsExpandedByDefault == false)
     }
 
     @Test("OCR controls surface whenever Include OCR is on, regardless of results")
@@ -120,5 +123,26 @@ struct SearchToolbarSectionTests {
         // explicit-trigger — the option row is no debounce backdoor.
         #expect(SearchToolbarSection.optionChangeShouldRetrigger(
             hasCompletedRun: false, hasResults: false) == false)
+    }
+
+    @Test("SO-02 — short-term warning suppressed while a regex error stands")
+    func so02ShortTermWarningGate() {
+        // 1–2 character query, no standing error: the pair renders.
+        #expect(SearchToolbarSection.shortTermWarningShouldShow(
+            queryCount: 1, isMultiTerm: false, hasRegexError: false) == true)
+        #expect(SearchToolbarSection.shortTermWarningShouldShow(
+            queryCount: 2, isMultiTerm: false, hasRegexError: false) == true)
+        // A standing regex error suppresses the pair — "Search Anyway"
+        // beside a non-compiling pattern was a no-op loop.
+        #expect(SearchToolbarSection.shortTermWarningShouldShow(
+            queryCount: 2, isMultiTerm: false, hasRegexError: true) == false)
+        // Empty and ≥3-character queries never warn.
+        #expect(SearchToolbarSection.shortTermWarningShouldShow(
+            queryCount: 0, isMultiTerm: false, hasRegexError: false) == false)
+        #expect(SearchToolbarSection.shortTermWarningShouldShow(
+            queryCount: 3, isMultiTerm: false, hasRegexError: false) == false)
+        // Multi-term keeps its own add-term flow; never warns here.
+        #expect(SearchToolbarSection.shortTermWarningShouldShow(
+            queryCount: 2, isMultiTerm: true, hasRegexError: false) == false)
     }
 }

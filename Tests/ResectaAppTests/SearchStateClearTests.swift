@@ -98,4 +98,31 @@ struct SearchStateClearTests {
         let state = SearchState()
         #expect(state.isProgrammaticModeChange == false)
     }
+
+    @Test("SO-03 — a landing regex error clears stale results and survives the clear")
+    func regexErrorArrivalClearsStaleResults() {
+        let state = SearchState()
+        state.results = [SearchResult(
+            pageIndex: 0,
+            normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.05),
+            matchedText: "2020-2021",
+            contextSnippet: "range 2020-2021 shown",
+            source: .textLayer,
+            term: "2020-2021"
+        )]
+        state.hasCompletedRunSinceClear = true
+
+        state.regexError = "A ( group is never closed — add the matching )"
+
+        // The stale list cannot sit beneath the error — error arrival
+        // performs the same result-state reset a run attempt does…
+        #expect(state.results.isEmpty)
+        #expect(state.hasCompletedRunSinceClear == false)
+        // …and the arriving error survives its own observer.
+        #expect(state.regexError != nil)
+
+        // The run-attempt path (clearResults) still nils the error.
+        state.clearResults()
+        #expect(state.regexError == nil)
+    }
 }

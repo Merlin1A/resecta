@@ -139,6 +139,36 @@ struct TextNormalizerTests {
         #expect(map.isEmpty)
     }
 
+    @Test("SO-01 — comma strips as a digit separator with an exact offset map")
+    func separatorStripComma() {
+        let (normalized, map) = TextNormalizer.stripSeparators("1,234,567")
+        #expect(normalized == "1234567")
+        #expect(map == [0, 2, 3, 4, 6, 7, 8])
+    }
+
+    @Test("SO-01 — comma-grouped number matches through the pipeline; rects map to the original span")
+    func commaGroupedNumberMatchesWithOffsetsIntact() {
+        let ext = TextNormalizer.applySearchExtensions(
+            pageText: "total 1,234,567 due",
+            query: "1234567",
+            options: SearchOptions(stripDigitSeparators: true)
+        )
+        // The space entry strips too, so the whole page collapses.
+        #expect(ext.pageText == "total1234567due")
+        #expect(ext.query == "1234567")
+        let range = ext.pageText.range(of: ext.query)
+        #expect(range != nil)
+        guard let range, let map = ext.offsetMap else { return }
+        let start = ext.pageText.distance(from: ext.pageText.startIndex, to: range.lowerBound)
+        let length = ext.pageText.distance(from: range.lowerBound, to: range.upperBound)
+        let baseChars = Array(ext.baseText)
+        let baseStart = map[start]
+        let baseEndExclusive = map[start + length - 1] + 1
+        // The mapped span recovers the document's comma-grouped
+        // original — the rect lands on "1,234,567", not a shifted slice.
+        #expect(String(baseChars[baseStart..<baseEndExclusive]) == "1,234,567")
+    }
+
     // MARK: - S7 / design 04 §4.4 — Diacritic Fold + Offset Map
 
     @Test("Diacritic folding maps Muñoz to Munoz")
