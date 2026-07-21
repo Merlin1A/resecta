@@ -146,13 +146,19 @@ struct SearchResultsSection: View {
             livePreviewRow
 
             // Session-scoped navigation scope — the shared page-scope
-            // control, shown on BOTH interfaces (it scopes J/K and
-            // Cmd+G result traversal; it was previously hidden in the
-            // scan mode only because the live-preview path is disabled
-            // there, which never affected its traversal job). On the
-            // Scan interface the row also carries the saved-searches
-            // bookmark — Scan has no field row to host it.
-            scopeRow
+            // control (it scopes J/K and Cmd+G result traversal, never
+            // the rendered list or counts). D-63/UT-02: retired for
+            // 1.0 in BOTH interfaces behind
+            // `navigationScopeControlsEnabled` — its sole effect is
+            // imperceptible outside a chevron walk, so it read as
+            // broken. `navigationScope` then keeps its
+            // `.wholeDocument` default by absence of writers. The
+            // saved-searches bookmark that rode this row on the Scan
+            // interface relocated to the sheet's search-bar row
+            // (UT-04). Machinery and tests stay compiled; DC-210.
+            if SearchState.navigationScopeControlsEnabled {
+                scopeRow
+            }
 
             // "Select where…" Menu surfaces predicate-driven
             // attribute selection.
@@ -359,16 +365,24 @@ struct SearchResultsSection: View {
                 .disabled(searchState.isSearching)
                 .accessibilityLabel(WU23Strings.toggleCaseSensitive)
 
-                Button {
-                    scopeSaturatedSearchToCurrentPage()
-                } label: {
-                    Text(WU23Strings.scopeToCurrentPage)
-                        .font(.caption2)
+                // D-63/UT-03: dark with the scope picker — with the
+                // picker retired this shortcut was a one-way door into
+                // page-scoped traversal with no readout and no way
+                // back. The banner and its two option legs stay; the
+                // model chain (`scopeToCurrentPage()`) stays compiled
+                // and unit-pinned. DC-211.
+                if SearchState.navigationScopeControlsEnabled {
+                    Button {
+                        scopeSaturatedSearchToCurrentPage()
+                    } label: {
+                        Text(WU23Strings.scopeToCurrentPage)
+                            .font(.caption2)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(searchState.navigationScope == .currentPage || searchState.isSearching)
+                    .accessibilityLabel(WU23Strings.scopeToCurrentPage)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(searchState.navigationScope == .currentPage || searchState.isSearching)
-                .accessibilityLabel(WU23Strings.scopeToCurrentPage)
             }
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
@@ -478,16 +492,16 @@ struct SearchResultsSection: View {
 
     // MARK: - Scope Row
 
-    /// The scope picker plus, on the Scan interface only, the
-    /// saved-searches bookmark. The Search side renders the picker
-    /// alone with the same paddings (its bookmark sits by the search
-    /// field in the hub's search bar).
+    /// The scope picker row (dark for 1.0 behind
+    /// `navigationScopeControlsEnabled`; renders under the DEBUG
+    /// reveal). D-63/UT-04: the saved-searches bookmark that rode
+    /// this row on the Scan interface moved permanently to the
+    /// sheet's search-bar row — reachable at every detent, which
+    /// this home never was at compact — so the reveal renders the
+    /// picker alone in both interfaces.
     private var scopeRow: some View {
         HStack(spacing: ResectaTokens.Spacing.sm) {
             scopePicker
-            if searchState.searchModeType == .piiScan {
-                savedSearchesBookmark
-            }
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .padding(.vertical, ResectaTokens.Spacing.xxs)
@@ -508,6 +522,10 @@ struct SearchResultsSection: View {
     /// surface. (While a review is active this section isn't rendered
     /// at all — the review section replaces it — so the gate is a belt
     /// on top of that structural rule.)
+    /// D-63/UT-04: DORMANT — no render site since the bookmark moved
+    /// to the sheet's search-bar row (`SearchAndRedactSheet`'s
+    /// `savedSearchesBookmark` is the live instance, both
+    /// interfaces). Kept compiled per the hide-never-delete posture.
     private var savedSearchesBookmark: some View {
         Button {
             onShowSavedSearches()

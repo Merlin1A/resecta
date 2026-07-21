@@ -841,13 +841,23 @@ struct SearchAndRedactSheet: View {
     private var searchBar: some View {
         HStack(spacing: ResectaTokens.Spacing.sm) {
             if searchState.searchModeType == .piiScan {
-                // Scan interface: no persistent run control here. Entry
-                // auto-run starts scans (the one-tap contract), and the
-                // compact re-run affordance on the category-chips row in
-                // `SearchToolbarSection` covers re-running after
-                // narrowing categories. This row keeps its
-                // cancel-while-searching and result-navigation jobs
-                // below.
+                // Scan interface leading controls (D-63/UT-04): the ↻
+                // re-run — relocated here from the retired
+                // category-chips row, and hidden again whenever the
+                // DEBUG reveal restores that row so the surface never
+                // renders two run controls — and the saved-searches
+                // bookmark, relocated from the retired scope row
+                // (this home is reachable at every detent; the scope
+                // row never was at compact). Entry auto-run still
+                // starts scans (the one-tap contract); the row keeps
+                // its cancel-while-searching and result-navigation
+                // jobs at the trailing edge, giving Scan the same
+                // leading-controls … trailing-nav read as Search.
+                if !SearchState.scanCategoryStripEnabled {
+                    scanRescanButton
+                }
+                savedSearchesBookmark
+                Spacer(minLength: 0)
             } else if searchState.searchModeType == .multiTerm {
                 TextField("Add term…", text: $searchState.queryText)
                     .textFieldStyle(.roundedBorder)
@@ -933,9 +943,11 @@ struct SearchAndRedactSheet: View {
             }
 
             // Saved-searches entry point for the Search interface —
-            // by the field so it stays reachable at the compact detent.
-            // The Scan interface's sibling rides the scope row in
-            // `SearchResultsSection` (Scan has no field row).
+            // by the field so it stays reachable at the compact
+            // detent. The Scan interface renders the SAME
+            // `savedSearchesBookmark` from its leading branch above
+            // (D-63/UT-04) — one shared component, two per-mode
+            // render sites, so exactly one bookmark shows per mode.
             if searchState.searchModeType != .piiScan {
                 savedSearchesBookmark
             }
@@ -963,7 +975,9 @@ struct SearchAndRedactSheet: View {
     /// single modal slot. Parked while staged detections await review:
     /// a recall re-triggers a run, and a run must not race the pending
     /// review for the Scan surface. Resolve the review (Apply /
-    /// Dismiss) first.
+    /// Dismiss) first. Since D-63/UT-04 this is the one live bookmark
+    /// for BOTH interfaces (Scan renders it from the search bar's
+    /// leading branch; the scope-row sibling is dormant).
     private var savedSearchesBookmark: some View {
         Button {
             activeModal = .savedSearches
@@ -974,6 +988,28 @@ struct SearchAndRedactSheet: View {
         .controlSize(.small)
         .disabled(redactionState.pendingTriage != nil)
         .accessibilityLabel("Saved Searches")
+    }
+
+    /// Compact re-run control for the Scan interface bar — the
+    /// relocated home of the retired chips-row ↻ (D-63/UT-04).
+    /// Inherits the run control's stable accessibility label
+    /// ("Scan document for PII") so existing UI-test queries and
+    /// VoiceOver habits keep resolving to the surface's one run
+    /// control; the render site above gates on
+    /// `!scanCategoryStripEnabled` so the DEBUG reveal — which
+    /// restores the chips row and its in-row ↻ — never co-renders a
+    /// second one. An empty chip selection never disables the run
+    /// (it means scan everything via `effectiveScanCategories`).
+    private var scanRescanButton: some View {
+        Button {
+            triggerSearch()
+        } label: {
+            Image(systemName: "arrow.clockwise")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .disabled(searchState.isSearching)
+        .accessibilityLabel("Scan document for PII")
     }
 
     // MARK: - Grabber Pulse

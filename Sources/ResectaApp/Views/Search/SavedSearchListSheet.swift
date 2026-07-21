@@ -305,7 +305,15 @@ struct SavedSearchListSheet: View {
         // every Scan→Scan recall is same-mode.
         searchState.piiCategoryFilter = nil
         searchState.sortOrder = .discoveryOrder
-        if let categories = saved.enabledPIICategories {
+        // D-63/UT-05: category restore only while the chips strip is
+        // live — with the strip dark there is no UI that shows or
+        // undoes a narrowed detector set, so recall must not silently
+        // narrow what the next scan runs. The persisted
+        // `enabledPIICategories` field is untouched (schema and codec
+        // unchanged; capture still writes it) and restore revives with
+        // the flag. Pinned by `SavedListPartitionTests`. DC-212.
+        if SearchState.scanCategoryStripEnabled,
+           let categories = saved.enabledPIICategories {
             searchState.enabledPIICategories = categories
         }
         searchState.options.caseSensitive = saved.caseSensitive

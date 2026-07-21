@@ -356,7 +356,14 @@ struct SavedSearchStoreTests {
         #expect(restored.queryText == original.queryText)
         #expect(restored.searchTerms == original.searchTerms)
         if mode == .piiScan {
-            #expect(restored.enabledPIICategories == [.ssn, .phone])
+            // D-63/UT-05: the categories PERSIST (the wire field is
+            // pinned intact by the `decoded == captured` leg above)
+            // but restore does not apply them while the chips strip
+            // is dark — recall must not silently narrow detectors
+            // with no UI readout. The dedicated pin lives in
+            // `SavedListPartitionTests.recallDoesNotNarrowWhileStripDark`.
+            #expect(decoded.enabledPIICategories == [.ssn, .phone])
+            #expect(restored.enabledPIICategories == Set(PIICategory.allCases))
         }
         #expect(restored.options.caseSensitive == original.options.caseSensitive)
         #expect(restored.options.wholeWord == original.options.wholeWord)

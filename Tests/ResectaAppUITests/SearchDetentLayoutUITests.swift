@@ -101,10 +101,17 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
     // Scan entry. --searchMode seeds the same interface the toolbar
     // Scan button opens, without the entry's auto-run (a run in
     // flight would disable the controls this test asserts against).
+    // Reshaped for D-63/UT: the retired chips strip + scope picker
+    // are pinned ABSENT flag-dark, the occlusion class pins against
+    // the NEW shipping chrome (the relocated ↻ + bookmark in the
+    // search bar — the bookmark tap presenting the saved list is the
+    // taps-take-effect proof), and a relaunch under the DEBUG reveal
+    // arg smokes the revival path.
     func testExpandedDetent_scanEntryTopControlsTakeTaps() {
         launchSearchSheet(mode: "piiScan")
 
-        // Sheet is up once the Scan surface renders.
+        // Sheet is up once the Scan surface renders — the run
+        // control's stable label resolves to the relocated bar ↻.
         XCTAssertTrue(
             app.buttons["Scan document for PII"].waitForExistence(timeout: 30),
             "Search sheet never presented — check the --openSearchSheet launch hook."
@@ -113,35 +120,84 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         dragSheetToExpanded()
         assertSheetExpanded()
 
+        // D-63 flag-off absence: the retired controls must not render
+        // (asserted at the expanded detent, where they WOULD be
+        // visible if present).
+        XCTAssertFalse(
+            segment("This page").exists,
+            "The retired scope picker rendered on the Scan surface with the flag dark."
+        )
+        XCTAssertFalse(
+            segment("Whole document").exists,
+            "The retired scope picker rendered on the Scan surface with the flag dark."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)
+                .matching(identifier: "scanCategoryChips").firstMatch.exists,
+            "The retired category-chips strip rendered with the flag dark."
+        )
+        // Exactly one run control — the no-double-↻ contract.
+        XCTAssertEqual(
+            app.buttons.matching(
+                NSPredicate(format: "label == %@", "Scan document for PII")).count, 1,
+            "Expected exactly one Scan run control on the flag-dark surface."
+        )
+
         // The seq-134 failure class: on the defective layout the
         // pinned header owned the top controls' hit targets and taps
-        // were silent no-ops. The run button is the surface's top
+        // were silent no-ops. The relocated ↻ is the surface's top
         // pinned control...
         let scanButton = app.buttons["Scan document for PII"]
         XCTAssertTrue(scanButton.isHittable, "Scan run button not hittable at the expanded detent.")
 
-        // ...and the scope segments prove a tap actually lands:
-        // flipping the scope AWAY from its whole-document default is
-        // observable via segment selection without starting a run.
-        let thisPage = segment("This page")
+        // ...its bar-mate bookmark must be hittable too...
+        let bookmark = app.buttons["Saved Searches"]
         XCTAssertTrue(
-            thisPage.waitForExistence(timeout: 10),
-            "Scope picker's This page segment not found on the Scan surface."
+            bookmark.waitForExistence(timeout: 10),
+            "Saved-searches bookmark not found in the Scan bar — the UT-04 relocation lost Scan's only saved-list entry point."
         )
         XCTAssertTrue(
-            thisPage.isHittable,
-            "This page segment exists but is not hittable at the expanded detent."
+            bookmark.isHittable,
+            "Bookmark exists but is not hittable at the expanded detent."
         )
-        XCTAssertFalse(
-            thisPage.isSelected,
-            "This page is already selected at launch — the whole-document default moved and this flip assert lost its meaning."
-        )
-        thisPage.tap()
-        // tap() returns after the app idles, so the selection write and
-        // its render pass have settled by the time this re-queries.
+
+        // ...and its tap must actually land: the saved list presents.
+        bookmark.tap()
         XCTAssertTrue(
-            thisPage.isSelected,
-            "Tapping the This page segment did not flip the scope — the seq-134 occlusion no-op."
+            app.navigationBars["Saved Searches"].waitForExistence(timeout: 10),
+            "Tapping the bookmark did not present the saved list — the seq-134 occlusion no-op."
+        )
+
+        // Reveal smoke (the D-63 revival path): relaunch with the
+        // DEBUG reveal arg — the retired rows render again and the
+        // run control collapses back to the chips-row ↻, still
+        // exactly one.
+        app.terminate()
+        app.launchArguments = [
+            "--uitesting", "--loadTestDocument", "--openSearchSheet",
+            "--searchMode=piiScan", "--showRetiredSheetControls",
+        ]
+        app.launch()
+        XCTAssertTrue(
+            app.buttons["Scan document for PII"].waitForExistence(timeout: 30),
+            "Reveal relaunch never presented the sheet."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .matching(identifier: "scanCategoryChips").firstMatch
+                .waitForExistence(timeout: 10),
+            "--showRetiredSheetControls did not restore the category-chips strip."
+        )
+        dragSheetToExpanded()
+        assertSheetExpanded()
+        XCTAssertTrue(
+            segment("This page").waitForExistence(timeout: 10),
+            "--showRetiredSheetControls did not restore the scope picker."
+        )
+        XCTAssertEqual(
+            app.buttons.matching(
+                NSPredicate(format: "label == %@", "Scan document for PII")).count, 1,
+            "The reveal co-rendered two Scan run controls — the bar ↻ must hide whenever the chips strip (and its in-row ↻) returns."
         )
     }
 
@@ -162,6 +218,23 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
 
         // Top pinned control of the Search surface.
         XCTAssertTrue(field.isHittable, "Search field not hittable at the expanded detent.")
+
+        // D-63 flag-off absence on the Search surface too — the
+        // scope picker was ONE shared row across both interfaces.
+        XCTAssertFalse(
+            segment("This page").exists,
+            "The retired scope picker rendered on the Search surface with the flag dark."
+        )
+        XCTAssertFalse(
+            segment("Whole document").exists,
+            "The retired scope picker rendered on the Search surface with the flag dark."
+        )
+        // The Search side's field-side bookmark is untouched by the
+        // UT-04 relocation.
+        XCTAssertTrue(
+            app.buttons["Saved Searches"].exists,
+            "The Search side's field-side bookmark went missing."
+        )
 
         // seq-134: tap Multi-term and prove the mode switched — its
         // dedicated term field replaces the shared text field.
@@ -259,6 +332,24 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         XCTAssertFalse(
             app.staticTexts["1 of 1 selected"].exists,
             "Row tap flipped the footer selection count — the tap landed on the footer's Select All."
+        )
+
+        // D-63/UT chevron pin: the shared bar's trailing result-nav
+        // chevrons stay present and hittable with results on board
+        // (they had zero coverage pre-UT, and the UT-04 relocation
+        // reshaped their row's leading content).
+        let nextResult = app.buttons["Next result"]
+        XCTAssertTrue(
+            nextResult.waitForExistence(timeout: 10),
+            "Next result chevron not found with results present."
+        )
+        XCTAssertTrue(
+            nextResult.isHittable,
+            "Next result chevron exists but is not hittable at the medium detent."
+        )
+        XCTAssertTrue(
+            app.buttons["Previous result"].isHittable,
+            "Previous result chevron exists but is not hittable at the medium detent."
         )
     }
 }

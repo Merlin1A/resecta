@@ -1,5 +1,7 @@
 import Testing
 import Foundation
+// PIICategory (the full default detector set) lives in the engine.
+import RedactionEngine
 @testable import ResectaApp
 
 // Typed saved lists: the bookmark entry point lists entries for the
@@ -80,7 +82,12 @@ struct SavedListPartitionTests {
         SavedSearchListSheet.apply(scanEntry, to: state)
         #expect(state.searchModeType == .piiScan)
         #expect(state.searchModeType.interface == .scan)
-        #expect(state.enabledPIICategories == [.ssn, .email])
+        // D-63/UT-05: with the category strip dark (the shipped 1.0
+        // state, and this test process — no reveal arg), recall keeps
+        // the full default set; the narrowed field persists but is
+        // not applied. The dedicated no-narrow pin below carries the
+        // full contract.
+        #expect(state.enabledPIICategories == Set(PIICategory.allCases))
         #expect(state.isProgrammaticModeChange == false,
                 "same-mode recall must not arm the programmatic flag — the hub's mode-switch handler is its only consumer and would never reset a stale true")
 
@@ -92,6 +99,36 @@ struct SavedListPartitionTests {
         #expect(state.searchModeType.interface == .search)
         #expect(state.queryText == "needle")
         #expect(state.isProgrammaticModeChange == true)
+    }
+
+    @Test("Recall does not narrow detectors while the category strip is dark (D-63/UT-05)")
+    func recallDoesNotNarrowWhileStripDark() {
+        // Premise guard: this process launches without the DEBUG
+        // reveal arg, so the strip is dark — the shipped 1.0 state.
+        #expect(!SearchState.scanCategoryStripEnabled,
+                "test process unexpectedly running with --showRetiredSheetControls — this pin exercises the shipped flag-dark path")
+
+        let narrowed = SavedSearch(
+            name: "ssn-only", mode: .piiScan,
+            enabledPIICategories: [.ssn],
+            caseSensitive: true,
+            includeOCR: false)
+        let state = SearchState()
+        state.searchModeType = .piiScan
+
+        SavedSearchListSheet.apply(narrowed, to: state)
+
+        // The hazard (E6): a narrowed set silently restricting the
+        // next scan with zero UI readout. While dark, recall keeps
+        // the full default set…
+        #expect(state.enabledPIICategories == Set(PIICategory.allCases),
+                "recall narrowed the detector set while the chips strip is dark — the next scan would silently skip detectors with no UI readout")
+        // …and the persisted field itself is untouched (schema and
+        // codec unchanged — restore revives with the flag).
+        #expect(narrowed.enabledPIICategories == [.ssn])
+        // The rest of the shape still restores exactly as before.
+        #expect(state.options.caseSensitive == true)
+        #expect(state.options.includeOCR == false)
     }
 
     @Test("Capture is interface-correct by construction — the active mode is the entry's list key")

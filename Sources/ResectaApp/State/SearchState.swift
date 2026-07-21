@@ -47,6 +47,50 @@ final class SearchState: Identifiable {
     // nonisolated: Sendable constant read from nonisolated test contexts.
     nonisolated static let searchDiagnosticSurfacesEnabled = false
 
+    /// V1.0 ships without the Scan category-chips strip (per-run
+    /// detector narrowing over `enabledPIICategories`, its in-row ↻,
+    /// and the "no categories selected" notice) per D-63: with the
+    /// strip dark the surface always scans the full detector set —
+    /// already the untouched default — and the ↻ re-run affordance
+    /// relocates to the sheet's search-bar row. All machinery (the
+    /// chips views, `enabledPIICategories`, `effectiveScanCategories`,
+    /// the BH-A-06 kickoff snapshot) stays compiled and unit-tested;
+    /// revival = flip to `true`, or in DEBUG launch with
+    /// `--showRetiredSheetControls` (which also re-hides the relocated
+    /// ↻ so the surface never renders two run controls). The
+    /// saved-search recall writer is gated on this flag too — recall
+    /// must not silently narrow detectors the user can't see.
+    /// Cataloged DC-209/DC-212; post-launch revisit.
+    // nonisolated: Sendable constant read from nonisolated test contexts.
+    nonisolated static let scanCategoryStripEnabled: Bool = {
+        #if DEBUG
+        CommandLine.arguments.contains("--showRetiredSheetControls")
+        #else
+        false
+        #endif
+    }()
+
+    /// V1.0 ships without the "This page | Whole document" navigation
+    /// -scope picker (both interfaces) and the saturation banner's
+    /// "Scope to current page" shortcut per D-63: the control is
+    /// navigation-only by design (it scopes chevron/J/K/Cmd+G
+    /// traversal, never the rendered list or counts), so its sole
+    /// effect is imperceptible and the control reads as broken. With
+    /// no live writers besides `clear()`'s reset, `navigationScope`
+    /// stays `.wholeDocument` (the shipped default); `scopedResults`
+    /// and `navigateToNext/Previous` stay live and unit-tested,
+    /// degenerating to whole-document traversal. Revival = flip to
+    /// `true`, or in DEBUG launch with `--showRetiredSheetControls`.
+    /// Cataloged DC-210/DC-211; post-launch revisit.
+    // nonisolated: Sendable constant read from nonisolated test contexts.
+    nonisolated static let navigationScopeControlsEnabled: Bool = {
+        #if DEBUG
+        CommandLine.arguments.contains("--showRetiredSheetControls")
+        #else
+        false
+        #endif
+    }()
+
     // MARK: - Recents persistence constants
 
     static let recentQueriesCap = 10

@@ -347,7 +347,15 @@ struct SearchToolbarSection: View {
             // `enabledPIICategories` — plus the trailing re-run
             // affordance. Toggling narrows the NEXT run; runs stay
             // trigger-driven (no auto re-run on chip change).
-            scanChipsRow
+            // D-63/UT-01: the strip is retired for 1.0 — dark behind
+            // `scanCategoryStripEnabled` (the ↻ re-run relocated to
+            // the sheet's search-bar row; the "no categories" notice
+            // below goes unreachable with it, since the strip is the
+            // only UI that can empty the selection). Machinery and
+            // tests stay compiled; DC-209.
+            if SearchState.scanCategoryStripEnabled {
+                scanChipsRow
+            }
 
             // An empty selection means the next run scans everything —
             // say so where the chips would otherwise read as "nothing".
