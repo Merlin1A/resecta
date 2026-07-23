@@ -529,6 +529,17 @@ struct DocumentEditorView: View {
                     // only up through the compact detent; medium/large
                     // keep the standard dimmed scrim.
                     .presentationBackgroundInteraction(.enabled(upThrough: .compactFloat))
+                    // D-68 — with the custom compact float mixed into
+                    // the detent set, `.automatic` content interaction
+                    // resolves AGAINST list scrolling below the top
+                    // detent: slow drags on list content die outright
+                    // and flicks spend on detent jumps, leaving
+                    // overflowing results unreachable by touch. The
+                    // explicit pin is load-bearing — sheet lists
+                    // scroll under drag at every detent; detent
+                    // changes ride the grabber/top strip, and a
+                    // down-drag with content at top still collapses.
+                    .presentationContentInteraction(.scrolls)
             case .rationale(let regionID):
                 if let rationale = redactionState.rationale(forRegionID: regionID) {
                     RegionRationaleSheet(
