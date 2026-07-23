@@ -123,46 +123,8 @@ struct FindingRow<Leading: View, Badge: View, Trailing: View>: View {
 
                 badge()
 
-                VStack(alignment: .leading, spacing: 2) {
-                    if model.titleIsContent {
-                        // §4.5: .privacySensitive() redacts in captures.
-                        Text(model.title)
-                            .font(.subheadline.monospaced())
-                            .lineLimit(1)
-                            .privacySensitive()
-                    } else {
-                        Text(model.title)
-                            .font(.subheadline)
-                    }
-
-                    if let secondary = model.secondaryText {
-                        if model.secondaryIsContent {
-                            Text(secondary)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                                .privacySensitive()
-                        } else {
-                            Text(secondary)
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-
-                    // Phase 3 §A5: bare-surname cluster hint.
-                    if model.showsAmbiguousSurnameHint {
-                        Label {
-                            Text("Common surname — verify context")
-                                .foregroundStyle(ResectaTokens.SemanticColor.confidenceMediumText)
-                        } icon: {
-                            Image(systemName: "exclamationmark.triangle")
-                                .foregroundStyle(Color(uiColor: .systemYellow))
-                        }
-                        .font(.caption2)
-                        .accessibilityLabel("Common surname, verify context before applying")
-                    }
-                }
+                FindingRowContentColumn(model: model)
+                    .equatable()
 
                 Spacer()
 
@@ -184,6 +146,60 @@ struct FindingRow<Leading: View, Badge: View, Trailing: View>: View {
         // `.combine` surfaced the toggle implicitly).
         .accessibilityAction(named: "Toggle selection") {
             isSelected.toggle()
+        }
+    }
+}
+
+/// SA-1 (D-71): the row's Equatable-value content column, extracted
+/// so a `.equatable()` fast path keyed on the (Equatable)
+/// `FindingRowModel` can skip re-running the text stack on
+/// section-wide invalidations that leave the row's model unchanged.
+/// Shared by BOTH row families through `FindingRow`. Interactive
+/// elements (selection circle, accessory slots) stay outside the
+/// equality — closures never enter the comparison (B-3).
+struct FindingRowContentColumn: View, Equatable {
+    let model: FindingRowModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if model.titleIsContent {
+                // §4.5: .privacySensitive() redacts in captures.
+                Text(model.title)
+                    .font(.subheadline.monospaced())
+                    .lineLimit(1)
+                    .privacySensitive()
+            } else {
+                Text(model.title)
+                    .font(.subheadline)
+            }
+
+            if let secondary = model.secondaryText {
+                if model.secondaryIsContent {
+                    Text(secondary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .privacySensitive()
+                } else {
+                    Text(secondary)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            // Phase 3 §A5: bare-surname cluster hint.
+            if model.showsAmbiguousSurnameHint {
+                Label {
+                    Text("Common surname — verify context")
+                        .foregroundStyle(ResectaTokens.SemanticColor.confidenceMediumText)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(Color(uiColor: .systemYellow))
+                }
+                .font(.caption2)
+                .accessibilityLabel("Common surname, verify context before applying")
+            }
         }
     }
 }

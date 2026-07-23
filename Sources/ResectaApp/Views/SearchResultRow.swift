@@ -53,6 +53,21 @@ struct SearchResultRow: View {
     @State private var isRationaleExpanded: Bool = false
 
     var body: some View {
+        // SA-1 (D-71) micro-fix: signal-derived display inputs are
+        // computed once per row build — `badgeView` / `confidenceTier`
+        // / `confidenceBarTooltip` each re-scanned `rationale.signals`
+        // for the same predicates on every body evaluation.
+        let isCustomHit = Self.isCustomTermHit(result)
+        let isRegexHit = Self.isRegexHit(result, searchMode: searchMode)
+        let tier = Self.confidenceTier(
+            for: result,
+            ocrFloor: Double(ocrFloor),
+            isCustomHit: isCustomHit
+        )
+        let barTooltip = Self.confidenceBarTooltip(
+            for: result,
+            isCustomHit: isCustomHit
+        )
         VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
             // The tappable hit area is gesture-based (not an outer
             // Button) so the inner checkbox / chevron Buttons don't nest
@@ -66,7 +81,8 @@ struct SearchResultRow: View {
                     set: { result.isSelected = $0 }
                 ),
                 leading: {
-                    confidenceBar
+                    SearchRowConfidenceBar(tier: tier, tooltip: barTooltip)
+                        .equatable()
                     // Applied-state indicator (12pt). Reserved slot
                     // between the confidence bar and the selection
                     // circle; empty when the row has not been applied.
@@ -81,7 +97,14 @@ struct SearchResultRow: View {
                     }
                     .frame(width: 12)
                 },
-                badge: { sourceBadge },
+                badge: {
+                    SearchRowSourceBadge(
+                        result: result,
+                        isCustomHit: isCustomHit,
+                        isRegexHit: isRegexHit
+                    )
+                    .equatable()
+                },
                 trailing: {
                     // Term label for multi-term disambiguation
                     if showTermLabel {
@@ -177,34 +200,31 @@ struct SearchResultRow: View {
         .padding(.bottom, ResectaTokens.Spacing.xxs)
     }
 
-    /// Leading-edge confidence bar. Mode-meaningful
-    /// (PII on the shared absolute bands, OCR against `ocrFloor`,
-    /// text/regex/Custom against the literal-match constant); the bar's
-    /// help text on literal-match rows ships the resolved string
-    /// verbatim. Decorative for VoiceOver — confidence is exposed via
-    /// the source badge's accessibility label and the rationale sheet.
-    private var confidenceBar: some View {
-        Rectangle()
-            .fill(
-                Self.confidenceTier(
-                    for: result,
-                    ocrFloor: Double(ocrFloor)
-                ).color
-            )
-            .frame(width: 2)
-            .help(Self.confidenceBarTooltip(for: result))
-            .accessibilityHidden(true)
-    }
-
-    private var sourceBadge: some View {
-        Self.badgeView(for: result, searchMode: searchMode)
-    }
-
     /// Single-capsule renderer for the source badge. Branch order
-    /// Custom → Regex → category/source.
+    /// Custom → Regex → category/source. This two-parameter signature
+    /// stays the public/test contract; it computes the signal flags and
+    /// delegates to the flag-taking canonical implementation below
+    /// (SA-1 — the row build precomputes the flags once and calls the
+    /// canonical form directly).
     @ViewBuilder
     static func badgeView(for result: SearchResult, searchMode: SearchModeType) -> some View {
-        if Self.isCustomTermHit(result) {
+        badgeView(
+            for: result,
+            isCustomHit: Self.isCustomTermHit(result),
+            isRegexHit: Self.isRegexHit(result, searchMode: searchMode)
+        )
+    }
+
+    /// Canonical badge renderer over precomputed signal flags. The
+    /// flags fully determine the branch together with `result` itself
+    /// (`searchMode` participates only through `isRegexHit`).
+    @ViewBuilder
+    static func badgeView(
+        for result: SearchResult,
+        isCustomHit: Bool,
+        isRegexHit: Bool
+    ) -> some View {
+        if isCustomHit {
             // User-defined always-flag term hit.
             Text("Custom")
                 .font(.caption2.bold())
@@ -213,7 +233,7 @@ struct SearchResultRow: View {
                 .padding(.vertical, 2)
                 .background(ResectaTokens.SemanticColor.customTermBadge, in: Capsule())
                 .accessibilityLabel("Custom term match")
-        } else if Self.isRegexHit(result, searchMode: searchMode) {
+        } else if isRegexHit {
             // Regex-mode hit with a `.regexPattern` rationale
             // signal. Mode-gated indigo capsule.
             Text(Self.regexCapsuleText(for: result))
@@ -395,17 +415,34 @@ extension SearchResultRow {
     }
 
     /// Mode-meaningful confidence-bar grading. Branch order
-    /// mirrors `sourceBadge`'s precedence: Custom → PII → OCR → text.
+    /// mirrors the source badge's precedence: Custom → PII → OCR → text.
     /// PII rows grade on the shared absolute bands: the former
     /// `piiThreshold` input read `minimumPIIConfidence`, which is
     /// schema-compat state no live control can change since the per-run
     /// Confidence slider retired — grading against it described a
-    /// control that no longer exists.
+    /// control that no longer exists. This two-parameter signature
+    /// stays the public/test contract and delegates to the flag-taking
+    /// canonical form (SA-1).
     static func confidenceTier(
         for result: SearchResult,
         ocrFloor: Double
     ) -> ConfidenceTier {
-        if Self.isCustomTermHit(result) {
+        confidenceTier(
+            for: result,
+            ocrFloor: ocrFloor,
+            isCustomHit: Self.isCustomTermHit(result)
+        )
+    }
+
+    /// Canonical grading over the precomputed custom-hit flag, so the
+    /// row build scans `rationale.signals` once for all three
+    /// signal-derived display inputs.
+    static func confidenceTier(
+        for result: SearchResult,
+        ocrFloor: Double,
+        isCustomHit: Bool
+    ) -> ConfidenceTier {
+        if isCustomHit {
             return .high
         }
         if let piiConf = result.piiConfidence, result.piiCategory != nil {
@@ -424,9 +461,18 @@ extension SearchResultRow {
     /// Text/regex/Custom rows surface the
     /// literal-match tooltip on the bar; PII/OCR rows return empty
     /// (their confidence is rendered inline on the source badge).
-    /// SAFE — mechanism description, no outcome promise.
+    /// SAFE — mechanism description, no outcome promise. Public/test
+    /// contract signature; delegates to the flag-taking form (SA-1).
     static func confidenceBarTooltip(for result: SearchResult) -> String {
-        if Self.isCustomTermHit(result) {
+        confidenceBarTooltip(for: result, isCustomHit: Self.isCustomTermHit(result))
+    }
+
+    /// Canonical tooltip over the precomputed custom-hit flag.
+    static func confidenceBarTooltip(
+        for result: SearchResult,
+        isCustomHit: Bool
+    ) -> String {
+        if isCustomHit {
             return "Literal match — strength matches the input text."
         }
         if result.piiCategory == nil, result.source == .textLayer {
@@ -516,9 +562,17 @@ extension SearchResultRow {
 }
 
 /// Recreates the press dim that the outer Button previously
-/// provided on `SearchResultRow`. A `DragGesture(minimumDistance: 0)`
-/// tracks the touch-down/touch-up edges so SwiftUI fires the scale and
-/// opacity changes synchronously with the tap-gesture recognizer.
+/// provided on `SearchResultRow`. SA-1 (D-71): press tracking rides a
+/// never-completing long press (`minimumDuration: .infinity`) instead
+/// of the former `DragGesture(minimumDistance: 0)` — the zero-distance
+/// drag entered gesture arbitration against the List's pan on every
+/// touch-down, a scroll-start tax paid by every row; a long-press
+/// recognizer in the `.possible` state claims nothing, so the List pan
+/// starts clean. `onPressingChanged` still fires true at touch-down
+/// and false at lift / drag-away, so the dim visual is unchanged; the
+/// row's tap gesture and the no-nested-Button contract are untouched.
+/// (The infinite duration means `perform` never fires — the gesture
+/// exists solely for its pressing edges.)
 struct PressHighlightModifier: ViewModifier {
     @State private var isPressed: Bool = false
 
@@ -527,12 +581,54 @@ struct PressHighlightModifier: ViewModifier {
             .scaleEffect(isPressed ? 0.985 : 1.0)
             .opacity(isPressed ? 0.85 : 1.0)
             .animation(.easeOut(duration: 0.12), value: isPressed)
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                        if !isPressed { isPressed = true }
-                    }
-                    .onEnded { _ in isPressed = false }
-            )
+            .onLongPressGesture(minimumDuration: .infinity) {
+            } onPressingChanged: { pressing in
+                isPressed = pressing
+            }
+    }
+}
+
+// MARK: - SA-1 Equatable accessory wrappers
+//
+// The Equatable-value halves of the row extracted so `.equatable()`
+// can skip their bodies on section-wide invalidations that leave the
+// row's data unchanged (B-3: value content inside the equality,
+// closures/bindings outside).
+
+/// Leading-edge confidence bar. Mode-meaningful
+/// (PII on the shared absolute bands, OCR against the live OCR floor,
+/// text/regex/Custom against the literal-match constant); the bar's
+/// help text on literal-match rows ships the resolved string
+/// verbatim. Decorative for VoiceOver — confidence is exposed via
+/// the source badge's accessibility label and the rationale sheet.
+/// Tier + tooltip are precomputed by the row build.
+struct SearchRowConfidenceBar: View, Equatable {
+    let tier: SearchResultRow.ConfidenceTier
+    let tooltip: String
+
+    var body: some View {
+        Rectangle()
+            .fill(tier.color)
+            .frame(width: 2)
+            .help(tooltip)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Source badge as an Equatable value view over the precomputed
+/// signal flags; renders through the canonical
+/// `SearchResultRow.badgeView(for:isCustomHit:isRegexHit:)` so the
+/// badge branch logic stays in one place.
+struct SearchRowSourceBadge: View, Equatable {
+    let result: SearchResult
+    let isCustomHit: Bool
+    let isRegexHit: Bool
+
+    var body: some View {
+        SearchResultRow.badgeView(
+            for: result,
+            isCustomHit: isCustomHit,
+            isRegexHit: isRegexHit
+        )
     }
 }

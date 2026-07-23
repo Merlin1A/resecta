@@ -687,6 +687,41 @@ final class SearchState: Identifiable {
     @ObservationIgnored private var _resultsByCategoryCache: [PIICategory: [SearchResult]]?
     @ObservationIgnored private var _resultsByCategoryCacheKey: _FilterCacheKey?
 
+    // SA-1 (D-71): O(1) id→index map backing `result(for:)` — the
+    // results list's per-row binding get previously linear-scanned
+    // `results` ~7-8× per row body, on every mounted row, on every
+    // scroll-time section invalidation. Same memoization shape as the
+    // filter caches above (@ObservationIgnored — the getter writes
+    // mid-body-evaluation); keyed on `resultVersion` alone: every
+    // in-app `results` mutation bumps it (`clear` /
+    // `flushPendingResults` / `clearResultState`), and in-place
+    // `isSelected` writes never move indices.
+    @ObservationIgnored private var _resultIndexByID: [UUID: Int]?
+    @ObservationIgnored private var _resultIndexByIDVersion: Int?
+
+    /// Live result lookup by ID — O(1) through the version-keyed index
+    /// map. The id re-check plus the linear rescue keep the lookup
+    /// exactly equivalent to the scan it replaces even against a direct
+    /// `results` assignment that skipped the version bump (test seams
+    /// do this); a genuinely absent id still returns nil. Reads the
+    /// same observed inputs as the former scan (`results`,
+    /// `resultVersion`).
+    func result(for id: UUID) -> SearchResult? {
+        if _resultIndexByIDVersion != resultVersion || _resultIndexByID == nil {
+            var map = [UUID: Int](minimumCapacity: results.count)
+            for (index, result) in results.enumerated() {
+                map[result.id] = index
+            }
+            _resultIndexByID = map
+            _resultIndexByIDVersion = resultVersion
+        }
+        if let index = _resultIndexByID?[id], index < results.count,
+           results[index].id == id {
+            return results[index]
+        }
+        return results.first(where: { $0.id == id })
+    }
+
     private var _currentCacheKey: _FilterCacheKey {
         _FilterCacheKey(
             version: resultVersion,

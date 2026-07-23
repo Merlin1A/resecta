@@ -111,6 +111,28 @@ extension SearchResultsSection {
         touchType == .pencil
     }
 
+    /// SA-1 (D-71) stroke-lifecycle gate transition for the row-frame
+    /// tracking gate: `.began` activates tracking, terminal states
+    /// (`.ended`/`.cancelled`/`.failed`) deactivate it, and
+    /// mid-stroke / idle states leave it unchanged (nil). Keeping the
+    /// mapping a pure function splits gate policy from the UIKit
+    /// wiring, matching the predicates above. Pinned by
+    /// `PencilCircleSelectTests.strokeGate*`.
+    static func pencilStrokeGateTransition(
+        for state: UIGestureRecognizer.State
+    ) -> Bool? {
+        switch state {
+        case .began:
+            return true
+        case .ended, .cancelled, .failed:
+            return false
+        case .possible, .changed:
+            return nil
+        @unknown default:
+            return nil
+        }
+    }
+
     /// Selection-effect computation: given the closed loop and a map
     /// of row frames keyed by result UUID, return the set of row IDs
     /// to toggle. Splits selection-policy from gesture-mechanics so
@@ -202,9 +224,16 @@ final class PencilCircleSelectGestureRecognizer: UIPanGestureRecognizer {
 /// behavior — currently a no-op since the deployment target is iOS 26.
 struct PencilCircleSelectOverlay: UIViewRepresentable {
     var onLoopClose: ([CGPoint]) -> Void
+    /// SA-1: stroke-lifecycle callback driving the host's row-frame
+    /// tracking gate — true on `.began`, false on terminal states, per
+    /// `SearchResultsSection.pencilStrokeGateTransition(for:)`.
+    var onStrokeActiveChanged: (Bool) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onLoopClose: onLoopClose)
+        Coordinator(
+            onLoopClose: onLoopClose,
+            onStrokeActiveChanged: onStrokeActiveChanged
+        )
     }
 
     func makeUIView(context: Context) -> UIView {
@@ -230,14 +259,16 @@ struct PencilCircleSelectOverlay: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {
-        // Closure capture refresh — the host may pass an updated
-        // `onLoopClose` between renders.
+        // Closure capture refresh — the host may pass updated
+        // closures between renders.
         context.coordinator.onLoopClose = onLoopClose
+        context.coordinator.onStrokeActiveChanged = onStrokeActiveChanged
     }
 
     @MainActor
     final class Coordinator: NSObject {
         var onLoopClose: ([CGPoint]) -> Void
+        var onStrokeActiveChanged: (Bool) -> Void
         weak var recognizer: PencilCircleSelectGestureRecognizer?
         /// The overlay view, used to convert the recognizer's
         /// window-space path into overlay-local coordinates — the
@@ -245,28 +276,44 @@ struct PencilCircleSelectOverlay: UIViewRepresentable {
         /// coordinate space the row frames are tracked in.
         weak var overlayView: UIView?
 
-        init(onLoopClose: @escaping ([CGPoint]) -> Void) {
+        init(
+            onLoopClose: @escaping ([CGPoint]) -> Void,
+            onStrokeActiveChanged: @escaping (Bool) -> Void
+        ) {
             self.onLoopClose = onLoopClose
+            self.onStrokeActiveChanged = onStrokeActiveChanged
         }
 
         @objc func handlePan(_ recognizer: UIPanGestureRecognizer) {
-            guard recognizer.state == .ended,
-                  let pencilRecognizer = recognizer as? PencilCircleSelectGestureRecognizer
-            else { return }
-            // The recognizer lives on the UIWindow (see
-            // `PencilTouchPassthroughView`), so its path is in window
-            // coordinates; convert to overlay-local before handing to
-            // the SwiftUI host, whose row frames resolve in the named
-            // coordinate space anchored at the List boundary.
-            let path: [CGPoint]
-            if let overlayView, let window = overlayView.window {
-                path = pencilRecognizer.pathPoints.map {
-                    overlayView.convert($0, from: window)
+            if recognizer.state == .ended,
+               let pencilRecognizer = recognizer as? PencilCircleSelectGestureRecognizer {
+                // The recognizer lives on the UIWindow (see
+                // `PencilTouchPassthroughView`), so its path is in window
+                // coordinates; convert to overlay-local before handing to
+                // the SwiftUI host, whose row frames resolve in the named
+                // coordinate space anchored at the List boundary.
+                let path: [CGPoint]
+                if let overlayView, let window = overlayView.window {
+                    path = pencilRecognizer.pathPoints.map {
+                        overlayView.convert($0, from: window)
+                    }
+                } else {
+                    path = pencilRecognizer.pathPoints
                 }
-            } else {
-                path = pencilRecognizer.pathPoints
+                onLoopClose(path)
             }
-            onLoopClose(path)
+            // SA-1: dispatch the stroke gate AFTER any loop-close so the
+            // logical order reads "finish the stroke, then drop
+            // tracking". Both callbacks are synchronous state writes;
+            // the render that unmounts the GeometryReaders happens
+            // afterward, so the modifier's render-time `rowFrames`
+            // capture is still populated when `onLoopClose` computes
+            // enclosure.
+            if let active = SearchResultsSection.pencilStrokeGateTransition(
+                for: recognizer.state
+            ) {
+                onStrokeActiveChanged(active)
+            }
         }
     }
 }
@@ -315,21 +362,25 @@ final class PencilTouchPassthroughView: UIView {
 /// selection mutator.
 struct PencilCircleSelectModifier: ViewModifier {
     var rowFrames: [UUID: CGRect]
+    var onStrokeActiveChanged: (Bool) -> Void
     var onSelectionLoop: (Set<UUID>) -> Void
 
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
             content.overlay(
-                PencilCircleSelectOverlay(onLoopClose: { path in
-                    guard SearchResultsSection.isClosedLoop(path: path) else { return }
-                    let enclosed = SearchResultsSection.enclosedRowIDs(
-                        loop: path,
-                        rowFrames: rowFrames
-                    )
-                    if !enclosed.isEmpty {
-                        onSelectionLoop(enclosed)
-                    }
-                })
+                PencilCircleSelectOverlay(
+                    onLoopClose: { path in
+                        guard SearchResultsSection.isClosedLoop(path: path) else { return }
+                        let enclosed = SearchResultsSection.enclosedRowIDs(
+                            loop: path,
+                            rowFrames: rowFrames
+                        )
+                        if !enclosed.isEmpty {
+                            onSelectionLoop(enclosed)
+                        }
+                    },
+                    onStrokeActiveChanged: onStrokeActiveChanged
+                )
             )
         } else {
             content
@@ -340,16 +391,20 @@ struct PencilCircleSelectModifier: ViewModifier {
 extension View {
     /// Attach the Pencil circle-to-select overlay to a view.
     /// `rowFrames` is the host-maintained dictionary of row id →
-    /// frame in the modifier's coordinate space. `onSelectionLoop`
+    /// frame in the modifier's coordinate space. `onStrokeActiveChanged`
+    /// reports the recognizer's stroke lifecycle (SA-1 — the host
+    /// gates its row-frame tracking on it). `onSelectionLoop`
     /// is invoked with the set of enclosed row IDs after a valid
     /// closed loop completes (start/end within 40pt, area ≥ 400
     /// sq-pt).
     func pencilCircleSelect(
         rowFrames: [UUID: CGRect],
+        onStrokeActiveChanged: @escaping (Bool) -> Void,
         onSelectionLoop: @escaping (Set<UUID>) -> Void
     ) -> some View {
         modifier(PencilCircleSelectModifier(
             rowFrames: rowFrames,
+            onStrokeActiveChanged: onStrokeActiveChanged,
             onSelectionLoop: onSelectionLoop
         ))
     }
@@ -361,13 +416,26 @@ extension View {
     /// `SearchResultsSection.resultsList` observes the preference and
     /// updates `rowFrames` for the gesture overlay to consume.
     /// Background `Color.clear` keeps the row layout unaffected.
-    func trackRowFrameForPencilSelect(id: UUID) -> some View {
-        background(GeometryReader { proxy in
-            Color.clear.preference(
-                key: RowFramesPreferenceKey.self,
-                value: [id: proxy.frame(in: .named(PencilCircleSelectCoordinateSpace.name))]
-            )
-        })
+    /// SA-1 (D-71): the GeometryReader mounts only while `isActive` —
+    /// the host's stroke gate — so the per-pixel preference
+    /// re-aggregation that taxed every finger scroll exists only
+    /// during a live Pencil stroke. Frames resolve on the render pass
+    /// after the gate flips (stroke start), well before any physical
+    /// loop can close.
+    @ViewBuilder
+    func trackRowFrameForPencilSelect(id: UUID, isActive: Bool) -> some View {
+        background(
+            Group {
+                if isActive {
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: RowFramesPreferenceKey.self,
+                            value: [id: proxy.frame(in: .named(PencilCircleSelectCoordinateSpace.name))]
+                        )
+                    }
+                }
+            }
+        )
     }
 }
 

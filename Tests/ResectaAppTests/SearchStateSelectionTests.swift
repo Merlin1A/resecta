@@ -407,6 +407,46 @@ struct SearchStateSelectionTests {
         #expect(state.currentResult?.id == textP1.id)
     }
 
+    // MARK: - result(for:) O(1) lookup (SA-1, D-71)
+
+    @Test("result(for:) returns the live value by id and nil for absent ids")
+    func resultForIDLookup() {
+        let state = SearchState()
+        let a = makeResult(isSelected: false)
+        let b = makeResult(piiConfidence: 0.9, isSelected: true)
+        let c = makeResult()
+        state.results = [a, b, c]
+
+        #expect(state.result(for: b.id)?.id == b.id)
+        #expect(state.result(for: b.id)?.isSelected == true)
+        #expect(state.result(for: c.id)?.id == c.id)
+        #expect(state.result(for: UUID()) == nil)
+
+        // In-place mutation through the public set-side contract stays
+        // visible through the lookup (the map holds indices, not
+        // snapshots; `toggleSelection` bumps `resultVersion`).
+        state.toggleSelection(for: a.id)
+        #expect(state.result(for: a.id)?.isSelected == true)
+    }
+
+    @Test("result(for:) stays exact under direct results replacement (rescue path)")
+    func resultForIDRescueOnDirectReplacement() {
+        let state = SearchState()
+        let old = makeResult()
+        state.results = [old]
+        // Warm the map at the current version.
+        #expect(state.result(for: old.id)?.id == old.id)
+
+        // Replace the array WITHOUT a version bump (the direct-assignment
+        // seam the linear rescue exists for): lookups must reflect the
+        // new array exactly — new ids found (map-miss rescue), removed
+        // ids nil (stale-index id-mismatch rescue).
+        let fresh = makeResult(piiCategory: .ssn, piiConfidence: 0.95)
+        state.results = [fresh]
+        #expect(state.result(for: fresh.id)?.id == fresh.id)
+        #expect(state.result(for: old.id) == nil)
+    }
+
     // MARK: - Helpers
 
     private func makeResult(

@@ -326,6 +326,26 @@ struct PencilCircleSelectTests {
         )
         #expect(enclosed == [a, b, c])
     }
+
+    // MARK: - Stroke-lifecycle gate (SA-1, D-71)
+    //
+    // Row-frame tracking mounts only while a Pencil stroke is live;
+    // this pure transition function is the gate policy the overlay's
+    // Coordinator dispatches on every recognizer state change.
+
+    @Test("Stroke gate activates on .began and deactivates on terminal states")
+    func strokeGateTerminalTransitions() {
+        #expect(SearchResultsSection.pencilStrokeGateTransition(for: .began) == true)
+        #expect(SearchResultsSection.pencilStrokeGateTransition(for: .ended) == false)
+        #expect(SearchResultsSection.pencilStrokeGateTransition(for: .cancelled) == false)
+        #expect(SearchResultsSection.pencilStrokeGateTransition(for: .failed) == false)
+    }
+
+    @Test("Stroke gate leaves idle and mid-stroke states unchanged")
+    func strokeGateNoChangeTransitions() {
+        #expect(SearchResultsSection.pencilStrokeGateTransition(for: .possible) == nil)
+        #expect(SearchResultsSection.pencilStrokeGateTransition(for: .changed) == nil)
+    }
 }
 
 // q18 hit-test regression pins: the overlay view must NEVER claim a

@@ -77,6 +77,19 @@ struct SearchResultsSection: View {
     /// fall through to the List's native scroll path.
     @State private var rowFrames: [UUID: CGRect] = [:]
 
+    /// SA-1 (D-71): row-frame tracking is gated on a live Pencil
+    /// stroke. Ungated, every row's GeometryReader re-fired the
+    /// preference aggregation + a section-dirtying `rowFrames` write on
+    /// every scrolled pixel — a Pencil-only feature taxing every finger
+    /// scroll. The overlay's recognizer flips this on `.began` and
+    /// clears it on `.ended`/`.cancelled`/`.failed`; rows mount their
+    /// GeometryReaders only while it is true, so frames are captured at
+    /// stroke start (a render pass resolves well inside the hundreds of
+    /// milliseconds a physical loop takes) and stay current through the
+    /// stroke. While false — all scroll time — the preference loop does
+    /// not exist.
+    @State private var isPencilSelectStrokeActive: Bool = false
+
     /// Reduce Motion gate for any animation introduced
     /// by the saturation banner (currently a no-op — the banner appears
     /// inside the existing show/hide branching of `livePreviewRow`).
@@ -662,7 +675,10 @@ struct SearchResultsSection: View {
         // gesture-end via `enclosedRowIDs(loop:rowFrames:)`. The
         // gesture is Pencil-only (filtered by
         // `allowedTouchTypes` on the recognizer); finger drags pass
-        // through to the List's native scroll. The
+        // through to the List's native scroll. SA-1: tracking runs
+        // only while `isPencilSelectStrokeActive` — the recognizer's
+        // stroke lifecycle drives the gate via
+        // `onStrokeActiveChanged`. The
         // `#available(iOS 26, *)` gate inside
         // `PencilCircleSelectModifier` insulates future iOS-version
         // gesture-API swaps.
@@ -671,7 +687,10 @@ struct SearchResultsSection: View {
             .onPreferenceChange(RowFramesPreferenceKey.self) { newFrames in
                 rowFrames = newFrames
             }
-            .pencilCircleSelect(rowFrames: rowFrames) { enclosed in
+            .pencilCircleSelect(
+                rowFrames: rowFrames,
+                onStrokeActiveChanged: { isPencilSelectStrokeActive = $0 }
+            ) { enclosed in
                 for id in enclosed {
                     searchState.toggleSelection(for: id)
                 }
@@ -711,11 +730,15 @@ struct SearchResultsSection: View {
     /// Safe binding for a search result by ID. Falls back to the snapshot
     /// if the result has been removed between render passes. The set
     /// side is the row circle — a user gesture — so it also flips the
-    /// conditional-dismiss touched tracker.
+    /// conditional-dismiss touched tracker. SA-1: the get routes
+    /// through `SearchState.result(for:)` — O(1) via the version-keyed
+    /// index map instead of the former per-call linear scan (re-hit
+    /// several times per row body); removed-id and fallback semantics
+    /// are unchanged.
     private func safeBinding(for id: UUID, fallback: SearchResult) -> Binding<SearchResult> {
         Binding(
             get: {
-                searchState.results.first(where: { $0.id == id }) ?? fallback
+                searchState.result(for: id) ?? fallback
             },
             set: { _ in
                 searchState.toggleSelection(for: id)
@@ -770,7 +793,10 @@ struct SearchResultsSection: View {
         }
 
         row
-            .trackRowFrameForPencilSelect(id: result.id)
+            .trackRowFrameForPencilSelect(
+                id: result.id,
+                isActive: isPencilSelectStrokeActive
+            )
     }
 
     // MARK: - Empty State
