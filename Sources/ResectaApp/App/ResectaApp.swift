@@ -75,7 +75,15 @@ struct ResectaApp: App {
 
     #if DEBUG
     /// Handle launch arguments for UI testing.
-    /// --uitesting: Auto-accept EULA to bypass the gate.
+    /// --uitesting: Auto-accept EULA to bypass the gate, and clear the
+    ///   persisted last-filter shape so every test launch opens the
+    ///   search sheet at the default Source=All (D-69). The cross-session
+    ///   filter persistence is a shipped feature; a non-default source
+    ///   filter left in the app container by a manual drive filter-hides
+    ///   text-layer results and deterministically reds the XCUI
+    ///   text-search suites. Per-launch and test-only: release launches
+    ///   never pass the flag, and in-session persistence still works
+    ///   after the launch-time clear.
     /// --resetEULA: Clear the acceptance flag so the gate PRESENTS — the
     ///   gate-links UI tests drive the un-accepted gate itself, the
     ///   inverse of --uitesting. DEBUG-only, and it only ever forces the
@@ -85,6 +93,7 @@ struct ResectaApp: App {
             UserDefaults.standard.set(false, forKey: "disclaimerAccepted_v1")
         } else if CommandLine.arguments.contains("--uitesting") {
             UserDefaults.standard.set(true, forKey: "disclaimerAccepted_v1")
+            UserDefaults.standard.removeObject(forKey: "search.lastFilter.v1")
         }
     }
 
