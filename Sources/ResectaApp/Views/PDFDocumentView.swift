@@ -35,6 +35,16 @@ struct PDFDocumentView: UIViewRepresentable {
     /// (`SettingsState.snapToTextEnabled`).
     var snapToTextEnabled: Bool = true
 
+    /// SA-3 rider (D-70): rect-level scroll fires only when the view
+    /// is zoomed meaningfully past fit — at (or under) fit scale the
+    /// whole page is on screen and the page write alone suffices. The
+    /// 1% epsilon absorbs autoScales float noise.
+    nonisolated static func shouldRectScroll(
+        scaleFactor: CGFloat, fitScaleFactor: CGFloat
+    ) -> Bool {
+        scaleFactor > fitScaleFactor * 1.01
+    }
+
     func makeCoordinator() -> PDFViewCoordinator {
         let coordinator = PDFViewCoordinator()
         coordinator.documentState = documentState
@@ -84,6 +94,33 @@ struct PDFDocumentView: UIViewRepresentable {
            let targetPage = doc.page(at: documentState.currentPageIndex),
            pdfView.currentPage != targetPage {
             pdfView.go(to: targetPage)
+        }
+
+        // SA-3 rider (D-70): rect-level scroll-to-match. Consume the
+        // pending target exactly once (token guard on the
+        // coordinator — no state write during the update pass), and
+        // only when the view is zoomed past fit: at fit scale the
+        // whole page is visible, page-granular navigation suffices,
+        // and an unconditional `go(to:on:)` would zoom unexpectedly.
+        // The rect converts through the engine's canonical
+        // `normalizedToPDFPageCoordinates` (ENGINE §5B.1a) — the same
+        // mapping the burn path uses, so the scroll target and the
+        // drawn redaction agree by construction.
+        if let target = documentState.pendingCanvasScrollTarget,
+           coordinator.lastHandledCanvasScrollToken != target.token {
+            coordinator.lastHandledCanvasScrollToken = target.token
+            if let doc = pdfView.document,
+               let page = doc.page(at: target.pageIndex),
+               Self.shouldRectScroll(
+                   scaleFactor: pdfView.scaleFactor,
+                   fitScaleFactor: pdfView.scaleFactorForSizeToFit
+               ) {
+                let pageRect = normalizedToPDFPageCoordinates(
+                    target.normalizedRect,
+                    pageRect: page.bounds(for: pdfView.displayBox)
+                )
+                pdfView.go(to: pageRect, on: page)
+            }
         }
 
         // UI_UX §9.1: VoiceOver label for the document editor

@@ -529,17 +529,25 @@ struct DocumentEditorView: View {
                     // only up through the compact detent; medium/large
                     // keep the standard dimmed scrim.
                     .presentationBackgroundInteraction(.enabled(upThrough: .compactFloat))
-                    // D-68 — with the custom compact float mixed into
-                    // the detent set, `.automatic` content interaction
-                    // resolves AGAINST list scrolling below the top
-                    // detent: slow drags on list content die outright
-                    // and flicks spend on detent jumps, leaving
-                    // overflowing results unreachable by touch. The
-                    // explicit pin is load-bearing — sheet lists
-                    // scroll under drag at every detent; detent
-                    // changes ride the grabber/top strip, and a
-                    // down-drag with content at top still collapses.
-                    .presentationContentInteraction(.scrolls)
+                    // D-70 supersession (SA-2): the D-68
+                    // `.presentationContentInteraction(.scrolls)` pin
+                    // is RETIRED. D-67 attributed the dead in-list
+                    // drags to the custom compact float mixed into the
+                    // detent set; the D-70 probe matrix
+                    // (18-SCROLL-ARCH §3) corrected the mechanism —
+                    // `.automatic` cooperation fails only while the
+                    // sheet content carries either of two composition
+                    // poisons: a NavigationStack wrapper, or a
+                    // horizontal chip ScrollView sibling above the
+                    // List. SA-2 removed both, so the system default
+                    // (.automatic) now arbitrates cooperatively: one
+                    // continuous swipe scrolls the list AND grows or
+                    // shrinks the sheet at content edges; the grabber
+                    // path still resizes; compactFloat, the BH-A-04
+                    // grant, and the hidden indicator are all proven
+                    // compatible (probe runs R6/R7). No explicit
+                    // contentInteraction modifier — .automatic IS the
+                    // arbitration of record.
             case .rationale(let regionID):
                 if let rationale = redactionState.rationale(forRegionID: regionID) {
                     RegionRationaleSheet(

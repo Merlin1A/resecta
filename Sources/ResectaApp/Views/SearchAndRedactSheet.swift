@@ -101,7 +101,11 @@ struct SearchAndRedactSheet: View {
     // work. See `SearchAndRedactSheet+DiscardUndo.swift` for the
     // selection helpers and the UXF-27 dismissal message (untouched
     // path only — the dialog already names the drop on the other).
-    @State private var showDismissConfirmation = false
+    // Visibility: read/written by the sheetHeaderChrome builder in
+    // `SearchSheetHeaderSection.swift` (cross-file extension — the
+    // established +Trigger pattern; internal is the smallest
+    // visibility that compiles).
+    @State var showDismissConfirmation = false
     @State private var duplicateTermMessage: String?
     @FocusState private var isSearchFieldFocused: Bool
     // `appliedResultIDs` lives on `SearchState`. View-side reads/writes go
@@ -164,7 +168,7 @@ struct SearchAndRedactSheet: View {
     /// Whether the Scan interface is presenting staged detections
     /// for review. The staged set (`pendingTriage`) is the
     /// store of record; the unified sheet is its one surface.
-    private var isReviewActive: Bool {
+    var isReviewActive: Bool {
         redactionState.pendingTriage != nil
             && searchState.searchModeType.interface == .scan
     }
@@ -177,7 +181,7 @@ struct SearchAndRedactSheet: View {
     /// entries only. Producer sites write an explicit entry per staged
     /// detection with an explicit true entry, so this count and the apply's
     /// accepted set describe the same selections.
-    private var reviewAcceptedCount: Int {
+    var reviewAcceptedCount: Int {
         redactionState.triageSelections.values.count { $0 }
     }
 
@@ -192,24 +196,24 @@ struct SearchAndRedactSheet: View {
     /// handlers, sheet-local toast host, shield) lives on `body`'s
     /// shared container so BOTH compositions keep it.
     private var fullSheetContent: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Unified degrade rule: the gazetteer-degrade disclosure is unified
-                // across interfaces: Scan shows it whenever the session
-                // is degraded (its runs consult the detection corpus);
-                // Search shows it only when a scan-class capability
-                // degrades the current action — and no Search-side
-                // action in this tree uses one (literal matching plus
-                // OCR modality access only), so the Search side
-                // renders none. Predicate is static for testability.
-                if Self.degradeBannerShouldShow(
-                    interface: searchState.searchModeType.interface,
-                    degraded: redactionState.autoDetectionDegraded
-                ) {
-                    degradedDetectionBanner
-                }
-
-                if isReviewActive {
+        // SA-2 (D-70): the NavigationStack wrapper is RETIRED and the
+        // sheet's fixed chrome rides the active List's top safe-area
+        // insets instead of stacking above it as VStack siblings. The
+        // SA-2 bisect corrected the D-70 poison model (18- §10):
+        // UISheetPresentationController's `.automatic` cooperation
+        // binds only to a scroll view whose top edge sits at/near the
+        // sheet's content top (~40 pt tolerance on this device
+        // class) — the chrome's SPECIES never mattered, its HEIGHT
+        // did. Chrome stacked as siblings pushed the List past that
+        // threshold, so every sibling composition was dead. With the
+        // chrome in `.safeAreaInset(edge: .top)` layers the List's
+        // UIKit frame binds at the sheet top and one-swipe
+        // scroll↔detent cooperation is native (probe SPIKE-1a/b:
+        // listY 415→62 cooperative expand with the full chrome load
+        // in the inset).
+        Group {
+            if isReviewActive {
+                VStack(spacing: 0) {
                     // Absorbed review: staged detections render
                     // inside the Scan interface. Run affordances are
                     // parked while the review is pending — resolve it
@@ -219,8 +223,22 @@ struct SearchAndRedactSheet: View {
                         filterKind: $reviewFilterKind,
                         onRequestWhy: { request in
                             activeModal = .rationale(request)
+                        },
+                        // SA-3 rider (B-3): review rows navigate the
+                        // canvas with the search rows' shipped idiom —
+                        // page write + compact drop (page-granular by
+                        // ruling; ST-105 keeps the canvas interactive
+                        // behind the compact float).
+                        onNavigateToPage: { page in
+                            documentState.currentPageIndex = page
+                            if selectedDetent != .compactFloat {
+                                selectedDetent = .compactFloat
+                            }
                         }
                     )
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        sheetHeaderChrome
+                    }
 
                     if !reviewFindings.isEmpty {
                         SearchFooterSection(
@@ -234,20 +252,9 @@ struct SearchAndRedactSheet: View {
                             )
                         )
                     }
-                } else {
-                    searchBar
-                    SearchToolbarSection(
-                        searchState: searchState,
-                        duplicateTermMessage: $duplicateTermMessage,
-                        onTriggerSearch: triggerSearch,
-                        onRequestSaveCurrentRegex: {
-                            savedRegexSaveLabel = ""
-                            savedRegexSaveError = nil
-                            showSavedRegexSavePrompt = true
-                        }
-                    )
-                    Divider()
-
+                }
+            } else {
+                VStack(spacing: 0) {
                     SearchResultsSection(
                         searchState: searchState,
                         selectedDetent: $selectedDetent,
@@ -268,8 +275,32 @@ struct SearchAndRedactSheet: View {
                         },
                         onShowSavedSearches: {
                             activeModal = .savedSearches
-                        }
+                        },
+                        onNavigateToCurrentResult: navigateToCurrentResult
                     )
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        // The Search interface's whole fixed chrome
+                        // joins the header in ONE inset stack — the
+                        // search bar, toolbar, and separator must not
+                        // re-offset the results list's frame (the
+                        // same threshold, 18- §10).
+                        VStack(spacing: 0) {
+                            sheetHeaderChrome
+                            searchBar
+                            SearchToolbarSection(
+                                searchState: searchState,
+                                duplicateTermMessage: $duplicateTermMessage,
+                                onTriggerSearch: triggerSearch,
+                                onRequestSaveCurrentRegex: {
+                                    savedRegexSaveLabel = ""
+                                    savedRegexSaveError = nil
+                                    showSavedRegexSavePrompt = true
+                                }
+                            )
+                            Divider()
+                        }
+                        .background(.background)
+                    }
 
                     if searchState.filteredCount > 0 {
                         SearchFooterSection(
@@ -279,92 +310,25 @@ struct SearchAndRedactSheet: View {
                     }
                 }
             }
-            // Conditional dismiss: conditional Dismiss confirmation, the retired
-            // triage sheet's donor rule generalized. Copy is
-            // mechanism-description (ARCH §1.3) — names what the action
-            // does without an outcome promise. Attached to the content
-            // VStack (not the outer modifier chain) to stay inside the
-            // type-checker budget beside the audit-export dialog.
-            .confirmationDialog(
-                Self.dismissTitle,
-                isPresented: $showDismissConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Discard", role: .destructive) {
-                    performDismiss(afterConfirmation: true)
-                }
-                .accessibilityIdentifier("searchDismissConfirmButton")
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                Text(Self.dismissMessage)
+        }
+        // Conditional dismiss: conditional Dismiss confirmation, the retired
+        // triage sheet's donor rule generalized. Copy is
+        // mechanism-description (ARCH §1.3) — names what the action
+        // does without an outcome promise. Attached to the content
+        // Group (not the outer modifier chain) to stay inside the
+        // type-checker budget beside the audit-export dialog.
+        .confirmationDialog(
+            Self.dismissTitle,
+            isPresented: $showDismissConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Discard", role: .destructive) {
+                performDismiss(afterConfirmation: true)
             }
-            // Per-interface titles under the one chassis — the former
-            // "Search & Redact" umbrella title retired with the
-            // two-interface split.
-            .navigationTitle(searchState.searchModeType.interface.displayName)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Dismiss") {
-                        // Conditional dismiss: conditional confirmation: only route
-                        // through the dialog when the USER has modified
-                        // selections this session. An untouched sheet
-                        // dismisses directly so the no-op case adds no
-                        // friction; machine-made selections (magic-wand
-                        // preselect) don't count as user work and drop
-                        // silently on the way out, as before.
-                        if searchState.userModifiedSelections {
-                            showDismissConfirmation = true
-                        } else {
-                            performDismiss(afterConfirmation: false)
-                        }
-                    }
-                    .accessibilityIdentifier("searchDismissButton")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    // One "Apply \(count)" for both result origins —
-                    // semibold, no destructive role, disabled at zero;
-                    // the apply runs directly on tap. The live count
-                    // carries the scale, and the undoable mark plus the
-                    // "Marked N" toast carry the confirmation. Both
-                    // routes promote through the one `applyFindings`
-                    // path — an active review as the staged-detections
-                    // origin, otherwise the selected search results.
-                    Button("Apply \(isReviewActive ? reviewAcceptedCount : searchState.selectedCount)") {
-                        if isReviewActive {
-                            applyReviewFindings()
-                        } else {
-                            applySelectedSearchResults()
-                        }
-                    }
-                    .fontWeight(.semibold)
-                    .accessibilityIdentifier("searchApplyButton")
-                    // Also disabled while the pipeline
-                    // owns `redactionState.regions` so the mark
-                    // write-back transaction cannot interleave
-                    // with `.detecting / .redacting / .verifying`.
-                    .disabled(isReviewActive
-                              ? (reviewAcceptedCount == 0
-                                 || !documentState.canMutateRegions)
-                              : (searchState.selectedCount == 0
-                                 || isApplying
-                                 || !documentState.canMutateRegions
-                                 // An all-applied selection can only
-                                 // no-op through the overlap guard —
-                                 // gray the button instead of offering
-                                 // a "Marked 0" round-trip.
-                                 || searchState.selectionFullyApplied))
-                }
-                // The navigation toolbar carries ONLY Dismiss and
-                // Apply — no .secondaryAction items, so SwiftUI renders
-                // no system overflow (•••) and the inline title sits
-                // centered. Saved-searches access lives in the content
-                // area instead: one bookmark button per interface
-                // (`savedSearchesBookmark` here by the Search field;
-                // its Scan-side sibling by the scope row in
-                // `SearchResultsSection`), and saving goes through the
-                // saved list's own save row.
-            }
+            .accessibilityIdentifier("searchDismissConfirmButton")
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text(Self.dismissMessage)
         }
     }
 
@@ -1110,9 +1074,20 @@ struct SearchAndRedactSheet: View {
         }
     }
 
+    /// The ONE result-navigation seam (SA-3 rider d — the former
+    /// section-side duplicate is deleted; its J/K keyboard buttons
+    /// call back through `onNavigateToCurrentResult`).
     private func navigateToCurrentResult() {
         guard let result = searchState.currentResult else { return }
         documentState.currentPageIndex = result.pageIndex
+        // SA-3 rider (D-70): rect-level half — when the canvas is
+        // zoomed past fit, the page write alone can leave the match
+        // off-screen; the canvas consumes this with the engine's
+        // canonical rect conversion.
+        documentState.requestCanvasScroll(
+            toPageIndex: result.pageIndex,
+            normalizedRect: result.normalizedRect
+        )
         // Only minimize from .large; preserve .medium so results list stays visible
         if selectedDetent == .large {
             selectedDetent = .medium
@@ -1185,7 +1160,7 @@ struct SearchAndRedactSheet: View {
     /// `afterConfirmation` suppresses the loss-naming toasts — the
     /// dialog already named the drop, and dialog + toast on one dismiss
     /// would double-message.
-    private func performDismiss(afterConfirmation: Bool) {
+    func performDismiss(afterConfirmation: Bool) {
         if searchState.selectedCount > 0 {
             let snapshot = Self.currentSelectionSnapshot(in: searchState)
             Self.clearSelection(in: searchState, snapshot: snapshot)
@@ -1236,7 +1211,7 @@ struct SearchAndRedactSheet: View {
     /// that loaded), and the retired flow name is gone — the wording
     /// now matches the toast that announces the same state.
     @ViewBuilder
-    private var degradedDetectionBanner: some View {
+    var degradedDetectionBanner: some View {
         HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
@@ -1265,7 +1240,7 @@ struct SearchAndRedactSheet: View {
     /// `documentState` arms the path-internal re-check — the action
     /// guard here is the second site of the two-site discipline, and
     /// the path is the third, race-proof one).
-    private func applyReviewFindings() {
+    func applyReviewFindings() {
         // Refuse mutations while the pipeline owns
         // `redactionState.regions` — re-checked in the action against a
         // pipeline that started after the last render.

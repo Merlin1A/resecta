@@ -52,6 +52,11 @@ struct SearchResultsSection: View {
     /// Present the saved-searches list — the parent owns the single
     /// modal slot. Wired to the Scan-side bookmark on the scope row.
     let onShowSavedSearches: () -> Void
+    /// SA-3 rider (d): result navigation is ONE seam on the hub —
+    /// the J/K keyboard buttons call back through this instead of a
+    /// section-side duplicate (the hub's copy also carries the
+    /// rect-level scroll-to-match half).
+    let onNavigateToCurrentResult: () -> Void
 
     /// Per-sheet-session dismiss state for the doctype banner.
     /// `SearchResultsSection` is re-instantiated when the sheet
@@ -97,6 +102,54 @@ struct SearchResultsSection: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        // SA-2 (D-70): when results render, the List is the section's
+        // root and the section's own fixed chrome rides its top
+        // safe-area inset (under the hub's sheet-chrome inset), so
+        // the List's UIKit frame binds at the sheet top for
+        // cooperative scroll↔detent arbitration (18- §10 — chrome
+        // HEIGHT above the list unbinds it, not chrome species). The
+        // empty / in-flight / filtered-out states keep plain stacked
+        // chrome — nothing scrolls there.
+        Group {
+            if searchState.searchModeType == .piiScan
+                && searchState.results.isEmpty
+                && searchState.isSearching {
+                // Scan in flight, nothing yet to list: an auto-run
+                // starts before the user has seen any result, so the
+                // surface names what is happening instead of rendering
+                // a blank list. The toolbar's progress row above
+                // carries the page/count numbers — this state
+                // deliberately repeats none of them.
+                VStack(spacing: 0) {
+                    sectionTopChrome
+                    scanInFlightState
+                }
+            } else if searchState.results.isEmpty && !searchState.isSearching {
+                VStack(spacing: 0) {
+                    sectionTopChrome
+                    emptyState
+                }
+            } else if searchState.filteredCount == 0 && !searchState.results.isEmpty && !searchState.isSearching {
+                VStack(spacing: 0) {
+                    sectionTopChrome
+                    filteredOutState
+                }
+            } else {
+                resultsList
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        sectionTopChrome
+                    }
+            }
+        }
+        .background { keyboardShortcutButtons }
+    }
+
+    /// Everything that used to sit above the results list as fixed
+    /// VStack chrome — banners, live preview, Select-Where — riding
+    /// the list's top safe-area inset under the hub's sheet chrome
+    /// (SA-2/D-70, 18- §10). Opaque background — rows scroll UNDER
+    /// the inset region.
+    private var sectionTopChrome: some View {
         VStack(spacing: 0) {
             // D06-F2 Part 2 — fold the live applied / deselected view-state
             // counts into the stored scan report so the panel AND the shared
@@ -122,8 +175,6 @@ struct SearchResultsSection: View {
 
             // Doctype banner — always-visible primary doctype +
             // detector count above the results list for simplicity.
-            // Placed inside the same scroll container as the list
-            // (acceptable to scroll off at compact detent).
             // Hidden for 1.0 behind `searchDiagnosticSurfacesEnabled`.
             if SearchState.searchDiagnosticSurfacesEnabled,
                searchState.searchModeType == .piiScan,
@@ -176,26 +227,8 @@ struct SearchResultsSection: View {
             // "Select where…" Menu surfaces predicate-driven
             // attribute selection.
             selectWhereMenu
-
-            if searchState.searchModeType == .piiScan
-                && searchState.results.isEmpty
-                && searchState.isSearching {
-                // Scan in flight, nothing yet to list: an auto-run
-                // starts before the user has seen any result, so the
-                // surface names what is happening instead of rendering
-                // a blank list. The toolbar's progress row above
-                // carries the page/count numbers — this state
-                // deliberately repeats none of them.
-                scanInFlightState
-            } else if searchState.results.isEmpty && !searchState.isSearching {
-                emptyState
-            } else if searchState.filteredCount == 0 && !searchState.results.isEmpty && !searchState.isSearching {
-                filteredOutState
-            } else {
-                resultsList
-            }
         }
-        .background { keyboardShortcutButtons }
+        .background(.background)
     }
 
     // MARK: - Select Where… Menu
@@ -560,14 +593,14 @@ struct SearchResultsSection: View {
         Group {
             Button {
                 searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
-                navigateToCurrentResult()
+                onNavigateToCurrentResult()
             } label: { EmptyView() }
                 .accessibilityLabel("Previous match")
                 .keyboardShortcut("j", modifiers: [])
 
             Button {
                 searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
-                navigateToCurrentResult()
+                onNavigateToCurrentResult()
             } label: { EmptyView() }
                 .accessibilityLabel("Next match")
                 .keyboardShortcut("k", modifiers: [])
@@ -590,14 +623,6 @@ struct SearchResultsSection: View {
         .frame(width: 0, height: 0)
         .opacity(0)
         .accessibilityHidden(false)
-    }
-
-    private func navigateToCurrentResult() {
-        guard let result = searchState.currentResult else { return }
-        documentState.currentPageIndex = result.pageIndex
-        if selectedDetent == .large {
-            selectedDetent = .medium
-        }
     }
 
     // MARK: - Results List
@@ -662,6 +687,10 @@ struct SearchResultsSection: View {
                 }
             }
         .listStyle(.plain)
+        // SA-2: stable handle for the cooperative-arbitration XCUI
+        // pins' in-list drags — the results-list sibling of
+        // `scanReviewList`.
+        .accessibilityIdentifier("searchResultsList")
         .onChange(of: pendingAnchorID, initial: false) { (_: UUID?, newID: UUID?) in
             anchorTappedRow(newID: newID, proxy: proxy)
         }
@@ -763,6 +792,13 @@ struct SearchResultsSection: View {
             onNavigate: {
                 searchState.currentResultIndex = searchState.index(of: result.id)
                 documentState.currentPageIndex = result.pageIndex
+                // SA-3 rider: rect-level half — the tapped match
+                // scrolls into view when the canvas is zoomed past
+                // fit (engine-canonical conversion at the consumer).
+                documentState.requestCanvasScroll(
+                    toPageIndex: result.pageIndex,
+                    normalizedRect: result.normalizedRect
+                )
                 // Tap-on-row drops to compact so the
                 // PDF gets max area; the chevron / J/K nav path stays
                 // at large → medium per the prior contract. Set

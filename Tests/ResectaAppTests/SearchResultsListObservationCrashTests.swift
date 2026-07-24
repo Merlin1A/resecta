@@ -137,7 +137,8 @@ struct SearchResultsListObservationCrashTests {
             onRequestShowRationale: { _ in },
             onTriggerSearch: {},
             onRecallQuery: { _ in },
-            onShowSavedSearches: {}
+            onShowSavedSearches: {},
+            onNavigateToCurrentResult: {}
         )
         .environment(DocumentState())
         .environment(RedactionState())

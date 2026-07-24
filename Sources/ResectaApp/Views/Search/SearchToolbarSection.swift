@@ -471,29 +471,33 @@ struct SearchToolbarSection: View {
     /// scan; runs stay trigger-driven. Rendered through `FilterChip`
     /// (the one chip component), category-tinted.
     private var scanCategoryChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: ResectaTokens.Spacing.xs) {
-                ForEach(PIICategory.allCases, id: \.self) { category in
-                    let isEnabled = searchState.enabledPIICategories.contains(category)
-                    FilterChip(
-                        label: category.rawValue,
-                        systemImage: category.symbolName,
-                        tint: SearchResultRow.categoryColor(category),
-                        isSelected: isEnabled
-                    ) {
-                        if isEnabled {
-                            searchState.enabledPIICategories.remove(category)
-                        } else {
-                            searchState.enabledPIICategories.insert(category)
-                        }
+        // SA-2 (D-70): FlowLayout wrap replaces the horizontal
+        // ScrollView (cooperation poison — 18-SCROLL-ARCH §3). This
+        // surface is flag-dark in 1.0 (`--showRetiredSheetControls`),
+        // but it converts with its component family so the DEBUG
+        // reveal can never re-poison the sheet; the 17-category worst
+        // case wraps tall, which the reveal surface accepts.
+        FlowLayout(spacing: ResectaTokens.Spacing.xs) {
+            ForEach(PIICategory.allCases, id: \.self) { category in
+                let isEnabled = searchState.enabledPIICategories.contains(category)
+                FilterChip(
+                    label: category.rawValue,
+                    systemImage: category.symbolName,
+                    tint: SearchResultRow.categoryColor(category),
+                    isSelected: isEnabled
+                ) {
+                    if isEnabled {
+                        searchState.enabledPIICategories.remove(category)
+                    } else {
+                        searchState.enabledPIICategories.insert(category)
                     }
-                    .accessibilityLabel("\(category.rawValue) detector")
-                    .accessibilityValue(isEnabled ? "enabled" : "disabled")
-                    .accessibilityHint("Applies to the next scan")
                 }
+                .accessibilityLabel("\(category.rawValue) detector")
+                .accessibilityValue(isEnabled ? "enabled" : "disabled")
+                .accessibilityHint("Applies to the next scan")
             }
-            .padding(.horizontal, ResectaTokens.Spacing.md)
         }
+        .padding(.horizontal, ResectaTokens.Spacing.md)
         // BH-A-06 — chips freeze while a run is in flight, matching the
         // sibling ↻ control: kickoff snapshots the category set, so a
         // mid-run toggle neither re-scopes the running scan nor warns —
@@ -573,10 +577,11 @@ struct SearchToolbarSection: View {
             || !searchState.results.isEmpty
     }
 
-    /// Single horizontally-scrolling row hosting all post-scan filter
-    /// chips. Established as the integration substrate;
-    /// downstream additions append chip groups inside the inner
-    /// HStack without altering the substrate's shape.
+    /// One wrapping chip block hosting all post-scan filter chips
+    /// (SA-2/D-70: FlowLayout replaced the horizontal ScrollView —
+    /// cooperation poison, 18-SCROLL-ARCH §3). Established as the
+    /// integration substrate; downstream additions append chip groups
+    /// inside the layout without altering the substrate's shape.
     ///
     /// Visual order:
     /// - PII category filter chips (post-scan, PII Scan mode)
@@ -586,30 +591,28 @@ struct SearchToolbarSection: View {
     /// - Saturation-scope chip (pending)
     /// - Selective PII chips stay in `piiScanOptions` (pre-scan disclosure)
     private var chipRowSubstrate: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: ResectaTokens.Spacing.xs) {
-                if searchState.hasPIIResults {
-                    piiCategoryFilterChips
-                }
-                if !searchState.results.isEmpty {
-                    // The applied-state chip renders only once it
-                    // can do something: after the first apply, or while a
-                    // non-default filter is active (so an active filter
-                    // can never strand invisibly). Kills the
-                    // double-"All" chip row pre-apply. Sort chip's
-                    // visibility is unchanged.
-                    if Self.appliedFilterChipShouldShow(
-                        hasAppliedResults: !searchState.appliedResultIDs.isEmpty,
-                        activeFilter: searchState.appliedFilter
-                    ) {
-                        appliedFilterChip
-                    }
-                    sortChip
-                }
-                // Downstream chip groups inserted here.
+        FlowLayout(spacing: ResectaTokens.Spacing.xs) {
+            if searchState.hasPIIResults {
+                piiCategoryFilterChips
             }
-            .padding(.horizontal, ResectaTokens.Spacing.md)
+            if !searchState.results.isEmpty {
+                // The applied-state chip renders only once it
+                // can do something: after the first apply, or while a
+                // non-default filter is active (so an active filter
+                // can never strand invisibly). Kills the
+                // double-"All" chip row pre-apply. Sort chip's
+                // visibility is unchanged.
+                if Self.appliedFilterChipShouldShow(
+                    hasAppliedResults: !searchState.appliedResultIDs.isEmpty,
+                    activeFilter: searchState.appliedFilter
+                ) {
+                    appliedFilterChip
+                }
+                sortChip
+            }
+            // Downstream chip groups inserted here.
         }
+        .padding(.horizontal, ResectaTokens.Spacing.md)
     }
 
     // MARK: - Applied Filter Chip
@@ -744,34 +747,36 @@ struct SearchToolbarSection: View {
     // MARK: - Multi-Term Chips
 
     private var multiTermChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: ResectaTokens.Spacing.xs) {
-                ForEach(searchState.searchTerms, id: \.self) { term in
-                    let count = searchState.resultsByTerm[term]?.count ?? 0
-                    HStack(spacing: 4) {
-                        Text("\(term) (\(count))")
-                            .font(.caption)
-                            .monospacedDigit()
-                            .privacySensitive()
-                        Button {
-                            searchState.searchTerms.removeAll { $0 == term }
-                            onTriggerSearch()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.caption2)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(searchState.isSearching)
+        // SA-2 (D-70): FlowLayout wrap replaces the horizontal
+        // ScrollView (cooperation poison — 18-SCROLL-ARCH §3). Every
+        // staged term stays visible; a long term set wraps to more
+        // rows instead of panning off-screen.
+        FlowLayout(spacing: ResectaTokens.Spacing.xs) {
+            ForEach(searchState.searchTerms, id: \.self) { term in
+                let count = searchState.resultsByTerm[term]?.count ?? 0
+                HStack(spacing: 4) {
+                    Text("\(term) (\(count))")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .privacySensitive()
+                    Button {
+                        searchState.searchTerms.removeAll { $0 == term }
+                        onTriggerSearch()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption2)
                     }
-                    .padding(.horizontal, ResectaTokens.Spacing.sm)
-                    .padding(.vertical, ResectaTokens.Spacing.xxs)
-                    .background(.quaternary, in: Capsule())
-                    .opacity(count == 0 ? 0.6 : 1.0)
-                    .accessibilityLabel("\(term), \(count) match\(count == 1 ? "" : "es")")
+                    .buttonStyle(.plain)
+                    .disabled(searchState.isSearching)
                 }
+                .padding(.horizontal, ResectaTokens.Spacing.sm)
+                .padding(.vertical, ResectaTokens.Spacing.xxs)
+                .background(.quaternary, in: Capsule())
+                .opacity(count == 0 ? 0.6 : 1.0)
+                .accessibilityLabel("\(term), \(count) match\(count == 1 ? "" : "es")")
             }
-            .padding(.horizontal, ResectaTokens.Spacing.md)
         }
+        .padding(.horizontal, ResectaTokens.Spacing.md)
     }
 
     // MARK: - Saved Regex Menu (Regex mode)

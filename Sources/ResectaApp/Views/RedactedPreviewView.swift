@@ -129,6 +129,13 @@ private struct RedactedPDFView: UIViewRepresentable {
     func makeUIView(context: Context) -> PDFView {
         let pdfView = PDFView()
         pdfView.autoScales = true
+        // SA-3 rider (c), deliberately NOT aligned to the editor's
+        // `.singlePage`: the preview is a read-only whole-document
+        // verification surface with no page-navigation chrome —
+        // continuous is the only mode that keeps every page reachable
+        // without new controls. The editor's `.singlePage` exists for
+        // overlay-geometry alignment, a constraint the preview does
+        // not carry.
         pdfView.displayMode = .singlePageContinuous
         pdfView.backgroundColor = .systemGroupedBackground
         pdfView.document = document

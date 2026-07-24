@@ -57,6 +57,12 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, UIScribbleIntera
     /// the enclosing `RedactWorkspace`.
     var documentState: DocumentState?
 
+    // SA-3 rider (D-70): the last consumed rect-level scroll-to-match
+    // token. `PDFDocumentView.updateUIView` compares against the
+    // pending target's token so each request fires `go(to:on:)`
+    // exactly once without a state write during the update pass.
+    var lastHandledCanvasScrollToken: UUID?
+
     // nonisolated(unsafe): tokens written once in setupObservers (main),
     // read once in deinit (nonisolated). No concurrent access.
     private nonisolated(unsafe) var pageChangeObserver: Any?

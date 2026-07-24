@@ -129,6 +129,35 @@ class DocumentState {
     var currentPageIndex: Int = 0
     var pageCount: Int { sourceDocument?.pageCount ?? 0 }
 
+    // SA-3 rider (D-70): rect-level scroll-to-match. Page-granular
+    // navigation leaves a match off-screen when the canvas is zoomed
+    // past fit; result-navigation writers hand the canvas the match
+    // rect alongside the page write. The token makes every request
+    // consumable exactly once (re-navigating to the same rect is a
+    // fresh request), so `PDFDocumentView.updateUIView` can consume
+    // without writing view state during an update pass.
+    struct CanvasScrollTarget: Equatable {
+        let pageIndex: Int
+        /// 0–1, bottom-left origin — `RedactionRegion.normalizedRect`
+        /// convention; converted at the consumer via the engine's
+        /// canonical `normalizedToPDFPageCoordinates`.
+        let normalizedRect: CGRect
+        let token: UUID
+    }
+
+    var pendingCanvasScrollTarget: CanvasScrollTarget?
+
+    /// Request the canvas scroll a match rect into view. Callers keep
+    /// writing `currentPageIndex` themselves — this adds the
+    /// rect-level half only.
+    func requestCanvasScroll(toPageIndex pageIndex: Int, normalizedRect: CGRect) {
+        pendingCanvasScrollTarget = CanvasScrollTarget(
+            pageIndex: pageIndex,
+            normalizedRect: normalizedRect,
+            token: UUID()
+        )
+    }
+
     // SEARCH D10-F1 — per-consumer PDFDocument copy. PDFDocument/PDFPage are
     // not thread-safe for concurrent read while the main-thread PDFView renders
     // the live instance, so the background search and the off-main live-preview

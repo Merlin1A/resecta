@@ -18,14 +18,19 @@ import XCTest
 ///   landed on the footer. The test searches at the default medium
 ///   detent and asserts the first row's selection toggle is hittable
 ///   and actually toggles the footer count.
-/// - D-67: below the top detent, detent arbitration swallowed every
-///   pan starting on list content — slow drags dead, flicks consumed
-///   as detent jumps — leaving review rows past the fold unreachable
-///   by touch. The sheet pins
-///   `.presentationContentInteraction(.scrolls)`; the seeded-review
-///   test drives a real in-list drag at medium and asserts content
-///   scrolls while the sheet holds its detent, then that the grabber
-///   path still expands the sheet.
+/// - D-67 → D-70/SA-2: below the top detent, detent arbitration
+///   swallowed every pan starting on list content (D-67). The D-68
+///   `.scrolls` pin bought list scrolling by retiring scroll↔detent
+///   cooperation; SA-2 removed the two composition poisons
+///   (NavigationStack wrapper, chip H-ScrollViews — 18-SCROLL-ARCH
+///   §3) and retired that pin, so `.automatic` cooperates natively.
+///   The cooperative pins drive real in-list drags and assert the
+///   Maps-idiom contract: an in-list drag at medium EXPANDS the
+///   sheet (the D-68-era headerY-HELD assertion is deliberately
+///   INVERTED), content scrolls under drag at the top detent, a
+///   content-at-top down-drag steps the sheet back down — through
+///   medium to the compact strip — and the grabber path still
+///   resizes both directions.
 ///
 /// nonisolated for the same reason as `SearchMarkForRedactionUITests`:
 /// an XCUITest drives a separate process and touches no @MainActor app
@@ -105,9 +110,41 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
     /// normalized against the list frame; start on the row area,
     /// clear of the pinned footer.
     private func dragInReviewList(from: CGFloat, to: CGFloat) {
-        let start = reviewList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
-        let end = reviewList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to))
+        dragInList(reviewList, from: from, to: to)
+    }
+
+    private var searchResultsList: XCUIElement {
+        app.descendants(matching: .any).matching(identifier: "searchResultsList").firstMatch
+    }
+
+    /// Finger drag inside an arbitrary list body — shared by the
+    /// review-list and results-list cooperative legs.
+    private func dragInList(_ list: XCUIElement, from: CGFloat, to: CGFloat) {
+        let start = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
+        let end = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to))
         start.press(forDuration: 0.1, thenDragTo: end)
+    }
+
+    /// Normalize the seeded review to the medium detent (seeded
+    /// arrival is medium by design, but a cold first launch can
+    /// arrive expanded — the O-1 presentation-settle class) via the
+    /// grabber path, and return the settled header Y.
+    private func normalizeSeededReviewToMedium(
+        window: XCUIElement, dismiss: XCUIElement
+    ) -> CGFloat {
+        if dismiss.frame.minY < window.frame.height * 0.35 {
+            let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.10))
+            let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.50))
+            start.press(forDuration: 0.1, thenDragTo: end)
+            sleep(1)
+        }
+        let headerY = dismiss.frame.minY
+        XCTAssertTrue(
+            headerY > window.frame.height * 0.35
+                && headerY < window.frame.height * 0.65,
+            "Sheet not at the medium detent (header at \(headerY)) — the cooperative legs would exercise nothing."
+        )
+        return headerY
     }
 
     private func attachScreenshot(named name: String) {
@@ -381,20 +418,18 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
     }
 
-    // MARK: - Medium detent: list content must scroll under drag (D-67)
+    // MARK: - Cooperative arbitration (D-70/SA-2)
 
-    // D-67: with the custom compact float mixed into the detent set,
-    // `.automatic` content interaction resolved AGAINST list
-    // scrolling below the top detent — a pan starting on list content
-    // never scrolled (slow drags dead, flicks consumed as detent
-    // jumps), so rows past the fold were reachable only through the
-    // result-nav buttons. The sheet pins
-    // `.presentationContentInteraction(.scrolls)`; this test drives
-    // both halves of that contract on the seeded review, whose six
-    // rows overflow the medium detent: an in-list drag scrolls the
-    // content while the sheet holds its detent, and detent changes
-    // still ride the grabber/top strip.
-    func testMediumDetent_seededReviewDragScrollsListGrabberStillExpands() {
+    // Reshaped from the D-68-era
+    // `testMediumDetent_seededReviewDragScrollsListGrabberStillExpands`:
+    // under `.scrolls` an in-list drag at medium scrolled content
+    // while the header HELD. With the poisons removed and the pin
+    // retired, `.automatic` cooperation makes the same stroke EXPAND
+    // the sheet (probe R6: headerY 447→95 on this sim class) — the
+    // held-header assertion is deliberately INVERTED. The grabber
+    // path must keep resizing in BOTH directions (it did in every
+    // COOP probe run).
+    func testMediumDetent_seededReviewInListDragCooperativelyExpands() {
         app.launchArguments = ["--uitesting", "--loadTestDocument", "--seedTriage"]
         app.launch()
 
@@ -413,73 +448,316 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             dismiss.waitForExistence(timeout: 5),
             "Dismiss button not found on the seeded review."
         )
+        let headerYAtMedium = normalizeSeededReviewToMedium(window: window, dismiss: dismiss)
+        attachScreenshot(named: "sa2-arrival-medium")
 
-        // Seeded arrival is medium by design (the arrival raise only
-        // lifts a stale compact float), but a cold first launch can
-        // arrive expanded. The scroll legs below need the overflowing
-        // medium layout, so normalize via the grabber path — a
-        // top-strip drag down to the medium resting position.
-        if dismiss.frame.minY < window.frame.height * 0.35 {
-            let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.10))
-            let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.50))
-            start.press(forDuration: 0.1, thenDragTo: end)
-            sleep(1)
-        }
-        let headerYAtMedium = dismiss.frame.minY
-        XCTAssertTrue(
-            headerYAtMedium > window.frame.height * 0.35
-                && headerYAtMedium < window.frame.height * 0.65,
-            "Sheet not at the medium detent (header at \(headerYAtMedium)) — the scroll legs would exercise nothing."
-        )
-        attachScreenshot(named: "dsimpl-arrival-medium")
-
-        // Top-anchored arrival: the SSN row is on screen; the card and
-        // second name rows sit past the fold.
-        let ssnRow = app.staticTexts["123-45-6789"].firstMatch
-        XCTAssertTrue(ssnRow.waitForExistence(timeout: 10), "Top-anchored SSN row not found.")
-        let ssnYBefore = ssnRow.frame.minY
-
-        // The D-67 stroke: a slow drag up inside the list body. On the
-        // defective arbitration this exact stroke was a dead no-op —
-        // no scroll, no resize.
+        // The D-67 stroke — a slow drag up inside the list body. Dead
+        // under the defect, scroll-in-place under `.scrolls`,
+        // cooperative EXPAND now. R7 transient guard: the FIRST pan
+        // after presentation can be swallowed while custom-detent
+        // resolution settles (probe R7 expanded on drag-2; O-1
+        // class) — retry once ONLY if the header genuinely did not
+        // move. A true dead regime fails the assertion on the retry;
+        // a `.scrolls`-class regime scrolls content with the header
+        // held on BOTH strokes, so the negative control stays red.
         dragInReviewList(from: 0.6, to: 0.15)
         sleep(2)
+        if abs(dismiss.frame.minY - headerYAtMedium) < 10 {
+            dragInReviewList(from: 0.6, to: 0.15)
+            sleep(2)
+        }
 
-        // The list scrolled: the top row displaced upward or left the
-        // tree entirely...
-        XCTAssertTrue(
-            !ssnRow.exists || ssnRow.frame.minY < ssnYBefore - 40,
-            "In-list drag did not scroll the list — the D-67 dead-drag arbitration."
+        XCTAssertLessThan(
+            dismiss.frame.minY, window.frame.height * 0.2,
+            "In-list drag did not expand the sheet — cooperation lost (dead or scroll-in-place arbitration regime)."
         )
-        // ...and the below-the-fold tail rows became reachable.
-        let cardRow = app.staticTexts["4111 1111 1111 1111"].firstMatch
-        XCTAssertTrue(
-            cardRow.waitForExistence(timeout: 10),
-            "Card row never scrolled on screen — the list did not actually displace."
-        )
-        let secondNameRow = app.staticTexts.matching(
-            NSPredicate(format: "label == %@", "Jordan Avery")).element(boundBy: 1)
-        XCTAssertTrue(
-            secondNameRow.waitForExistence(timeout: 10),
-            "Second name row never scrolled on screen — the list did not actually displace."
-        )
-        XCTAssertTrue(
-            secondNameRow.isHittable,
-            "Second name row scrolled on screen but is not hittable."
-        )
-        // The drag spent on content, not on a detent change: the sheet
-        // header held its position.
-        XCTAssertEqual(
-            dismiss.frame.minY, headerYAtMedium, accuracy: 10,
-            "In-list drag moved the sheet header — the drag resized the sheet instead of scrolling the list."
-        )
-        attachScreenshot(named: "dsimpl-scrolled-at-medium")
+        attachScreenshot(named: "sa2-inlist-drag-expanded")
 
-        // The other half of the contract: detent changes still ride
-        // the grabber — the house expand drag must land the sheet at
-        // the top detent.
+        // Grabber path down: a top-strip drag returns the sheet to
+        // medium (resize-down still rides the grabber).
+        let downStart = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.10))
+        let downEnd = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.50))
+        downStart.press(forDuration: 0.1, thenDragTo: downEnd)
+        sleep(1)
+        let headerYAfterGrabberDown = dismiss.frame.minY
+        XCTAssertTrue(
+            headerYAfterGrabberDown > window.frame.height * 0.35
+                && headerYAfterGrabberDown < window.frame.height * 0.65,
+            "Grabber down-drag did not return the sheet to medium (header at \(headerYAfterGrabberDown))."
+        )
+
+        // Grabber path up: the house expand drag still lands the top
+        // detent.
         dragSheetToExpanded()
         assertSheetExpanded()
-        attachScreenshot(named: "dsimpl-grabber-expanded")
+        attachScreenshot(named: "sa2-grabber-expanded")
+    }
+
+    // Cooperative collapse: at the top detent with content at its
+    // top edge (the six seeded rows fit entirely at large — nothing
+    // to scroll), an in-list down-drag steps the sheet DOWN instead
+    // of dying (probe R6 "content-drag down at large collapses").
+    func testTopDetent_seededReviewContentAtTopDownDragCooperativelyCollapses() {
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--seedTriage"]
+        app.launch()
+
+        XCTAssertTrue(
+            app.staticTexts["6 found — none selected yet"].waitForExistence(timeout: 30),
+            "Seeded review never presented — check the --seedTriage launch hook."
+        )
+        XCTAssertTrue(
+            reviewList.waitForExistence(timeout: 10),
+            "scanReviewList not found on the seeded review."
+        )
+        let window = app.windows.firstMatch
+        let dismiss = app.buttons["searchDismissButton"].firstMatch
+        XCTAssertTrue(
+            dismiss.waitForExistence(timeout: 5),
+            "Dismiss button not found on the seeded review."
+        )
+        let headerYAtMedium = normalizeSeededReviewToMedium(window: window, dismiss: dismiss)
+
+        // Reach the top detent through the cooperative in-list path
+        // (R7 first-pan transient guard — see the expand pin).
+        dragInReviewList(from: 0.6, to: 0.15)
+        sleep(2)
+        if abs(dismiss.frame.minY - headerYAtMedium) < 10 {
+            dragInReviewList(from: 0.6, to: 0.15)
+            sleep(2)
+        }
+        XCTAssertLessThan(
+            dismiss.frame.minY, window.frame.height * 0.2,
+            "Precondition failed: in-list drag did not expand the sheet."
+        )
+
+        // Content sits at its top edge; a down-drag inside the list
+        // must collapse the sheet a detent step (large → medium).
+        dragInReviewList(from: 0.2, to: 0.7)
+        sleep(2)
+        XCTAssertTrue(
+            dismiss.exists,
+            "Sheet vanished on the cooperative collapse — the down-drag dismissed instead of stepping detents."
+        )
+        let headerYAfterCollapse = dismiss.frame.minY
+        XCTAssertTrue(
+            headerYAfterCollapse > window.frame.height * 0.35,
+            "Content-at-top down-drag did not collapse the sheet (header still at \(headerYAfterCollapse))."
+        )
+        attachScreenshot(named: "sa2-cooperative-collapsed")
+    }
+
+    // The down-chain's last step: from medium with content at top, a
+    // further in-list down-drag reaches the compact float, where the
+    // BH-B-01 strip composition replaces the full chrome (probe R7:
+    // full chain large → medium → compact strip).
+    func testMediumDetent_seededReviewDownDragChainReachesCompactStrip() {
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--seedTriage"]
+        app.launch()
+
+        XCTAssertTrue(
+            app.staticTexts["6 found — none selected yet"].waitForExistence(timeout: 30),
+            "Seeded review never presented — check the --seedTriage launch hook."
+        )
+        XCTAssertTrue(
+            reviewList.waitForExistence(timeout: 10),
+            "scanReviewList not found on the seeded review."
+        )
+        let window = app.windows.firstMatch
+        let dismiss = app.buttons["searchDismissButton"].firstMatch
+        XCTAssertTrue(
+            dismiss.waitForExistence(timeout: 5),
+            "Dismiss button not found on the seeded review."
+        )
+        _ = normalizeSeededReviewToMedium(window: window, dismiss: dismiss)
+
+        // Content is at its top edge on arrival — the in-list
+        // down-drag steps medium → compact. R7 first-pan transient
+        // guard: retry once if the first stroke was swallowed (the
+        // review list is still on screen exactly when the step has
+        // not happened yet).
+        dragInReviewList(from: 0.2, to: 0.7)
+        sleep(2)
+        let strip = app.descendants(matching: .any)
+            .matching(identifier: "compactFloatStrip").firstMatch
+        if !strip.exists, reviewList.exists {
+            dragInReviewList(from: 0.2, to: 0.7)
+            sleep(2)
+        }
+        XCTAssertTrue(
+            strip.waitForExistence(timeout: 10),
+            "Compact strip never appeared — the down-chain stalled above the compact float."
+        )
+        // The full chrome yields to the strip at compact (BH-B-01
+        // composition branch), and the review origin's one-line
+        // summary reuses the footer's exact label.
+        XCTAssertFalse(
+            reviewList.exists,
+            "Review list still present at the compact float — the strip did not replace the full chrome."
+        )
+        XCTAssertTrue(
+            app.staticTexts["6 found — none selected yet"].waitForExistence(timeout: 5),
+            "Compact review summary line missing at the compact float."
+        )
+        attachScreenshot(named: "sa2-compact-chain-strip")
+    }
+
+    // SA-3 rider (B-3): review-row canvas-navigation parity — a
+    // row-BODY tap drops the sheet to the compact float (the shipped
+    // search-row idiom; ST-105 keeps the canvas interactive behind
+    // it). The strip's summary line doubles as the no-selection
+    // proof: a body tap must NAVIGATE, never toggle — the selection
+    // circle keeps its own hit region.
+    func testMediumDetent_seededReviewRowBodyTapDropsToCompact() {
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--seedTriage"]
+        app.launch()
+
+        XCTAssertTrue(
+            app.staticTexts["6 found — none selected yet"].waitForExistence(timeout: 30),
+            "Seeded review never presented — check the --seedTriage launch hook."
+        )
+        XCTAssertTrue(
+            reviewList.waitForExistence(timeout: 10),
+            "scanReviewList not found on the seeded review."
+        )
+        let window = app.windows.firstMatch
+        let dismiss = app.buttons["searchDismissButton"].firstMatch
+        XCTAssertTrue(
+            dismiss.waitForExistence(timeout: 5),
+            "Dismiss button not found on the seeded review."
+        )
+        _ = normalizeSeededReviewToMedium(window: window, dismiss: dismiss)
+
+        // Tap the SSN row's matched-text area — row BODY, clear of
+        // the leading selection circle and the trailing W9 button.
+        let ssnRow = app.staticTexts["123-45-6789"].firstMatch
+        XCTAssertTrue(ssnRow.waitForExistence(timeout: 10), "SSN row not found.")
+        ssnRow.tap()
+
+        let strip = app.descendants(matching: .any)
+            .matching(identifier: "compactFloatStrip").firstMatch
+        XCTAssertTrue(
+            strip.waitForExistence(timeout: 10),
+            "Row-body tap did not drop the sheet to the compact float — B-3 navigation parity missing."
+        )
+        XCTAssertFalse(
+            reviewList.exists,
+            "Review list still present after the row-tap compact drop."
+        )
+        XCTAssertTrue(
+            app.staticTexts["6 found — none selected yet"].waitForExistence(timeout: 5),
+            "Row-body tap changed the selection count — the tap must navigate, not toggle selection."
+        )
+        attachScreenshot(named: "sa2-review-rowtap-compact")
+    }
+
+    // The Search-results leg — cooperation re-proven on the list
+    // that carries the SA-1-cleaned gesture stack (the D-70 probe
+    // proved the REVIEW list only; the caveat on record requires
+    // this list's own proof). The 23-page fixture's "account" query
+    // lands one match per page — 23 rows across 23 page sections
+    // overflow the large detent, and the DISTINCT pinned section
+    // headers ("Page N") anchor the displacement checks (row labels
+    // are all identical, and a pinned header never moves — the
+    // anchors must be LATER sections becoming hittable).
+    func testTopDetent_searchResultsContentScrollsThenCooperativelyCollapses() {
+        app.launchArguments = [
+            "--uitesting", "--loadTestDocument", "--multipageDoc",
+            "--openSearchSheet",
+        ]
+        app.launch()
+
+        let field = app.textFields["Search text"]
+        XCTAssertTrue(
+            field.waitForExistence(timeout: 30),
+            "Search sheet never presented — check the --openSearchSheet launch hook."
+        )
+        field.tap()
+        field.typeText("account\n")
+
+        XCTAssertTrue(
+            app.staticTexts["23 found — none selected yet"].waitForExistence(timeout: 20),
+            "The multipage fixture's 'account' query did not land its 23 per-page matches."
+        )
+
+        let window = app.windows.firstMatch
+        let dismiss = app.buttons["searchDismissButton"].firstMatch
+        XCTAssertTrue(
+            dismiss.waitForExistence(timeout: 5),
+            "Dismiss button not found with results on board."
+        )
+        // Results arrival raises medium → large (the blessed nudge);
+        // top up via the grabber if the raise was pre-empted.
+        if dismiss.frame.minY > window.frame.height * 0.2 {
+            dragSheetToExpanded()
+        }
+        assertSheetExpanded()
+        let headerYAtTop = dismiss.frame.minY
+
+        XCTAssertTrue(
+            searchResultsList.waitForExistence(timeout: 10),
+            "searchResultsList not found with results on board."
+        )
+        // Top-anchored arrival: the early sections are on screen, the
+        // deep ones are past the fold. (`isHittable`, not `exists` —
+        // the virtualized List pre-mounts offscreen rows.)
+        let deepHeader = app.staticTexts["Page 9"].firstMatch
+        XCTAssertFalse(
+            deepHeader.exists && deepHeader.isHittable,
+            "Section 'Page 9' visible at arrival — the fixture no longer overflows the large detent."
+        )
+
+        // Content scrolls under in-list drags at the top detent —
+        // deep sections arrive from below the fold while the sheet
+        // header holds. Up to three strokes (R7 first-pan guard +
+        // per-stroke travel).
+        var deepArrived = false
+        for _ in 0..<3 {
+            dragInList(searchResultsList, from: 0.6, to: 0.15)
+            sleep(2)
+            if deepHeader.exists && deepHeader.isHittable {
+                deepArrived = true
+                break
+            }
+        }
+        XCTAssertTrue(
+            deepArrived,
+            "In-list drags at the top detent never scrolled 'Page 9' on screen — the results list did not scroll."
+        )
+        XCTAssertEqual(
+            dismiss.frame.minY, headerYAtTop, accuracy: 10,
+            "Content drags at the top detent moved the sheet header — the drags resized instead of scrolling."
+        )
+        attachScreenshot(named: "sa2-results-scrolled-at-top")
+
+        // Down-drags with content off-top: cooperation gives the
+        // gesture to content until its edge — the return strokes must
+        // HOLD the top detent (asserted per stroke), and only at the
+        // content edge does a stroke step the sheet down.
+        var collapsed = false
+        for _ in 0..<8 {
+            dragInList(searchResultsList, from: 0.2, to: 0.7)
+            sleep(2)
+            if dismiss.exists, dismiss.frame.minY > window.frame.height * 0.35 {
+                collapsed = true
+                break
+            }
+            // Not collapsed yet ⇒ this stroke was the content-return
+            // phase — the sheet must not have moved.
+            XCTAssertEqual(
+                dismiss.frame.minY, headerYAtTop, accuracy: 10,
+                "A down-drag neither collapsed the sheet nor held the top detent — cooperation lost mid-chain."
+            )
+        }
+        XCTAssertTrue(
+            collapsed,
+            "Content-at-top down-drags never collapsed the sheet from the top detent."
+        )
+        // One detent step: full chrome still up at medium — the
+        // collapse must not sail through to the compact strip.
+        XCTAssertTrue(
+            searchResultsList.exists,
+            "The collapse sailed past medium — the results list should still be presented after one detent step."
+        )
+        attachScreenshot(named: "sa2-results-cooperative-collapsed")
     }
 }

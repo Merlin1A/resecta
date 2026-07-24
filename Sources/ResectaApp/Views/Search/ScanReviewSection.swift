@@ -33,6 +33,10 @@ struct ScanReviewSection: View {
     /// single `activeModal` slot (the same `ReverseRationalePopover`
     /// search rows open from their context menu).
     let onRequestWhy: (ReverseRationaleRequest) -> Void
+    /// SA-3 rider (B-3): row-body tap navigates the canvas to the
+    /// finding's page — the search rows' shipped idiom (page write +
+    /// compact drop live on the hub, which owns the detent).
+    let onNavigateToPage: (Int) -> Void
 
     @State private var viewMode: ReviewViewMode = .byPage
     // WP5b pattern carried: cached kind counts + filtered list so the
@@ -57,6 +61,57 @@ struct ScanReviewSection: View {
     }
 
     var body: some View {
+        // SA-2 (D-70): the List is the section's root and the fixed
+        // chrome rides its top safe-area inset, so the List's UIKit
+        // frame binds at the sheet top for cooperative scroll↔detent
+        // arbitration (18- §10 — chrome HEIGHT above the list, not
+        // chrome species, is what unbinds it). Both view modes get
+        // the same treatment (the grouped branch roots a List
+        // whenever groups exist; its empty placeholder has nothing to
+        // scroll).
+        Group {
+            if viewMode == .grouped {
+                groupedFindingList
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        reviewTopChrome
+                    }
+            } else {
+                List {
+                    ForEach(cachedFilteredFindings, id: \.detection.id) { item in
+                        reviewRow(page: item.page, detection: item.detection)
+                    }
+                }
+                .listStyle(.plain)
+                .accessibilityIdentifier("scanReviewList")
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    reviewTopChrome
+                }
+            }
+        }
+        .task {
+            recomputeAll()
+        }
+        .onChange(of: viewMode) { _, _ in recomputeAll() }
+        .onChange(of: filterKind) { _, _ in recomputeAll() }
+        // Re-derive when the staged set changes shape — keyed on the
+        // total count, not `!= nil`, so a wholesale replacement or a
+        // partial prune (group apply) refreshes the caches too. (No
+        // arrival-entry normalization remains: the one apply path reads
+        // an absent selection id as not accepted, so display state and
+        // apply state agree without producer entries or a belt.)
+        .onChange(of: redactionState.pendingTriage?.values.reduce(0) { $0 + $1.count } ?? 0) { _, _ in
+            recomputeAll()
+        }
+        .onChange(of: redactionState.crossPageEntityGroups.count) { _, _ in recomputeAll() }
+    }
+
+    /// The review surface's fixed chrome — OCR-skip banner,
+    /// classification diagnostics, the view-mode/kind chip bar, and
+    /// the Select-Where row — riding the review List's top safe-area
+    /// inset (SA-2/D-70: chrome must not offset the List's frame from
+    /// the sheet top or cooperative arbitration unbinds; 18- §10).
+    /// Opaque background — rows scroll UNDER the inset region.
+    private var reviewTopChrome: some View {
         VStack(spacing: 0) {
             // ST-83 — pipeline-side OCR-skip disclosure: pages whose
             // raster exceeded the OCR pixel caps during the detection
@@ -75,34 +130,8 @@ struct ScanReviewSection: View {
             // Select-Where predicates over the staged findings —
             // the review-side selection-throughput tools.
             selectWhereRow
-
-            if viewMode == .grouped {
-                groupedFindingList
-            } else {
-                List {
-                    ForEach(cachedFilteredFindings, id: \.detection.id) { item in
-                        reviewRow(page: item.page, detection: item.detection)
-                    }
-                }
-                .listStyle(.plain)
-                .accessibilityIdentifier("scanReviewList")
-            }
         }
-        .task {
-            recomputeAll()
-        }
-        .onChange(of: viewMode) { _, _ in recomputeAll() }
-        .onChange(of: filterKind) { _, _ in recomputeAll() }
-        // Re-derive when the staged set changes shape — keyed on the
-        // total count, not `!= nil`, so a wholesale replacement or a
-        // partial prune (group apply) refreshes the caches too. (No
-        // arrival-entry normalization remains: the one apply path reads
-        // an absent selection id as not accepted, so display state and
-        // apply state agree without producer entries or a belt.)
-        .onChange(of: redactionState.pendingTriage?.values.reduce(0) { $0 + $1.count } ?? 0) { _, _ in
-            recomputeAll()
-        }
-        .onChange(of: redactionState.crossPageEntityGroups.count) { _, _ in recomputeAll() }
+        .background(.background)
     }
 
     // MARK: - Rows
@@ -161,6 +190,13 @@ struct ScanReviewSection: View {
             }
         )
         .padding(.vertical, ResectaTokens.Spacing.xxs)
+        // SA-3 rider (B-3): row-body tap navigates the canvas —
+        // parity with `SearchResultRow`'s contentShape+onTapGesture
+        // idiom. The inner selection circle and W9 button are
+        // Buttons, so they keep winning their own hit regions; the
+        // rest of the row navigates.
+        .contentShape(Rectangle())
+        .onTapGesture { onNavigateToPage(page) }
         // The family row's `.ignore` merge hides the trailing W9 button
         // from VoiceOver (the retired triage row's `.combine` surfaced
         // it implicitly) — expose it as a named action so the detector-
@@ -180,44 +216,64 @@ struct ScanReviewSection: View {
 
     @ViewBuilder
     private var reviewChipBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: ResectaTokens.Spacing.sm) {
+        // SA-2 (D-70): FlowLayout wrap replaces the horizontal
+        // ScrollView (B-1 — every control stays visible; at
+        // accessibility sizes rows wrap instead of panning
+        // off-screen), and the bar's two ARBITRATION POISONS are
+        // gone: the SA-2 bisect (18- §10 correction) isolated the
+        // menu-style Picker and the Divider as the elements that
+        // killed the sheet's cooperative scroll↔detent arbitration —
+        // the ScrollView container itself proved innocent. The
+        // view-mode control rides a Menu (the class proven innocent
+        // in every COOP probe run) wrapping the same inline Picker
+        // rows; the Divider is dropped — a wrapped flow needs no
+        // vertical separator.
+        FlowLayout(spacing: ResectaTokens.Spacing.sm) {
+            Menu {
                 Picker("View", selection: $viewMode) {
                     ForEach(ReviewViewMode.allCases, id: \.self) { mode in
                         Text(mode.rawValue)
                     }
                 }
-                .pickerStyle(.menu)
-
-                Divider().frame(height: 20)
-                    .accessibilityHidden(true)
-
-                // Kind filter chips — narrow the visible list only
-                // (GATE-4 decouple carried: a filter change never
-                // rewrites selections, so manual selection work
-                // survives it; selection throughput lives in the
-                // footer Select All + Select-Where).
-                FilterChip(
-                    label: "All",
-                    count: allFindings.count,
-                    isSelected: filterKind == nil
-                ) {
-                    filterKind = nil
+            } label: {
+                HStack(spacing: ResectaTokens.Spacing.xxs) {
+                    Text(viewMode.rawValue)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2)
+                        .accessibilityHidden(true)
                 }
-                ForEach(cachedKindsWithCounts, id: \.kind) { item in
-                    FilterChip(
-                        label: item.kind.badge,
-                        count: item.count,
-                        tint: item.kind.badgeColor,
-                        isSelected: filterKind == item.kind
-                    ) {
-                        filterKind = item.kind
-                    }
+                .font(.caption)
+            }
+            // AX exposure parity with the retired menu-style Picker:
+            // "View, <mode>".
+            .accessibilityLabel("View")
+            .accessibilityValue(viewMode.rawValue)
+
+            // Kind filter chips — narrow the visible list only
+            // (GATE-4 decouple carried: a filter change never
+            // rewrites selections, so manual selection work
+            // survives it; selection throughput lives in the
+            // footer Select All + Select-Where).
+            FilterChip(
+                label: "All",
+                count: allFindings.count,
+                isSelected: filterKind == nil
+            ) {
+                filterKind = nil
+            }
+            ForEach(cachedKindsWithCounts, id: \.kind) { item in
+                FilterChip(
+                    label: item.kind.badge,
+                    count: item.count,
+                    tint: item.kind.badgeColor,
+                    isSelected: filterKind == item.kind
+                ) {
+                    filterKind = item.kind
                 }
             }
-            .padding(.horizontal, ResectaTokens.Spacing.md)
-            .padding(.vertical, ResectaTokens.Spacing.xs)
         }
+        .padding(.horizontal, ResectaTokens.Spacing.md)
+        .padding(.vertical, ResectaTokens.Spacing.xs)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Detection filters")
     }
