@@ -2,16 +2,17 @@ import SwiftUI
 
 // Compact float detent for the Search & Redact sheet.
 //
-// Replaces the prior fixed `.height(120)` floor with a fraction-based
-// detent that scales with screen height (15%) but never drops below
-// 110pt — keeping the search bar + nav controls + first result row
-// visible on small screens. On a typical iPhone 17 (844pt), the
-// detent resolves to ~127pt; on a smaller iPhone SE 1 (568pt) the
-// 110pt floor kicks in.
+// WA/D-75: the compact detent hugs the title-only handle — the
+// grabber capsule plus the centered interface title
+// (`compactFloatStrip`) — so the document stays the primary surface
+// while the sheet is parked. Height is a fixed hug clamped to the
+// available height. The prior max(110pt, 15%-of-screen) contract
+// sized a control strip (search bar + nav controls + first result
+// row) that no longer renders at compact.
 //
 // The pure-function `compactHeight(maxDetentValue:)` helper isolates
-// the math from the SwiftUI runtime so tests can verify the floor +
-// fraction contract without constructing a `Context` value (the type
+// the math from the SwiftUI runtime so tests can verify the hug +
+// clamp contract without constructing a `Context` value (the type
 // has no public initializer).
 
 struct CompactFloatDetent: CustomPresentationDetent {
@@ -19,13 +20,15 @@ struct CompactFloatDetent: CustomPresentationDetent {
         compactHeight(maxDetentValue: context.maxDetentValue)
     }
 
-    /// 110pt floor; fraction(0.15) of the available height when larger.
+    /// Fixed title hug, never exceeding the available height.
     static func compactHeight(maxDetentValue: CGFloat) -> CGFloat {
-        max(minimumHeight, maxDetentValue * fraction)
+        min(hugHeight, maxDetentValue)
     }
 
-    static let minimumHeight: CGFloat = 110
-    static let fraction: CGFloat = 0.15
+    /// Grabber inset (~15pt) + one headline line + breathing room —
+    /// tuned live on the iPhone 17 sim (WA-IMPL-2, B-1): grabber and
+    /// title fully visible, no clip, canvas exposed behind.
+    static let hugHeight: CGFloat = 60
 }
 
 extension PresentationDetent {

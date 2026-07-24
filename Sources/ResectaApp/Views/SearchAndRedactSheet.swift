@@ -319,15 +319,11 @@ struct SearchAndRedactSheet: View {
     }
 
     var body: some View {
-        // BH-B-01 — compactFloat composition branch: compressed into
-        // ~110–131pt the full NavigationStack chrome z-overlapped into
-        // unusable rows and NONE of the detent's promised controls
-        // (search bar, nav chevrons, first result row —
-        // `CompactFloatDetent.swift` contract) were visible. Render the
-        // documented strip at the compact detent instead; the full
-        // chrome returns at medium/large. The review origin gets a
-        // one-line selection summary (arrivals raise the detent — the
-        // strip is the drag-down residue state).
+        // Compact composition branch (BH-B-01 origin; WA/D-75 shape):
+        // at the compact detent the sheet renders ONLY the title-only
+        // handle (`compactFloatStrip`) — every control lives at
+        // medium/large, and the canvas owns interaction below the
+        // sheet (BH-A-04 grant). The full chrome returns at medium+.
         Group {
             if selectedDetent == .compactFloat {
                 compactFloatStrip
@@ -694,96 +690,23 @@ struct SearchAndRedactSheet: View {
         .shieldedSheetContent(monitor: captureMonitor)
     }
 
-    // MARK: - compactFloat Strip (BH-B-01)
+    // MARK: - compactFloat Strip (WA/D-75)
 
-    /// The compact detent's documented composition: the search bar row
-    /// (field + cancel + result-nav chevrons) over ONE line naming the
-    /// current result — nothing else. While a run is in flight the
-    /// result line yields to the toolbar's progress line (same strings)
-    /// so the H-202 compact progress state survives the recomposition.
-    @ViewBuilder
+    /// The compact detent's WHOLE composition: the centered interface
+    /// title and nothing else. CONSTRAINT (WA/D-75, superseding the
+    /// BH-B-01 control strip): compact is a glanceable title-only
+    /// handle — every control lives at medium+, and the canvas owns
+    /// interaction below the sheet (BH-A-04 grant). Identifier kept:
+    /// the detent-layout pins assert strip presence by id.
     private var compactFloatStrip: some View {
         VStack(spacing: 0) {
-            if isReviewActive {
-                compactReviewSummaryLine
-            } else {
-                searchBar
-                if searchState.isSearching {
-                    compactScanProgressLine
-                } else {
-                    compactCurrentResultLine
-                }
-            }
+            Text(searchState.searchModeType.interface.displayName)
+                .font(.headline)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
             Spacer(minLength: 0)
         }
         .accessibilityIdentifier("compactFloatStrip")
-    }
-
-    /// Review origin at the compact detent: a one-line selection
-    /// summary through the footer's pinned label builder (no new
-    /// strings). Review arrivals raise the detent
-    /// (`presentReviewInScanInterface`), so this renders only after a
-    /// deliberate drag-down.
-    private var compactReviewSummaryLine: some View {
-        HStack {
-            Text(SearchFooterSection.selectionCountLabel(
-                selected: reviewAcceptedCount,
-                total: reviewVisibleIDs.count
-            ))
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.sm)
-    }
-
-    /// Byte-identical to the toolbar section's progress row so the
-    /// compact in-flight state introduces no new strings.
-    private var compactScanProgressLine: some View {
-        HStack {
-            ProgressView()
-                .controlSize(.small)
-            Text("Scanning page \(searchState.currentSearchPage) of \(searchState.totalPages)…")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text("\(searchState.totalCount) found")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-        }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-    }
-
-    /// One-line readout of the row the chevrons navigate (falls back
-    /// to the first result — the contract's "first result row").
-    /// Blank when no results exist: the field alone invites a query.
-    @ViewBuilder
-    private var compactCurrentResultLine: some View {
-        if let current = searchState.currentResult ?? searchState.results.first {
-            HStack(spacing: ResectaTokens.Spacing.xs) {
-                if searchState.appliedResultIDs.contains(current.id) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                        .accessibilityLabel("Applied")
-                }
-                Text(current.matchedText)
-                    .font(.callout)
-                    .lineLimit(1)
-                    // The matched text is document content.
-                    .privacySensitive()
-                Spacer()
-                Text("Page \(current.pageIndex + 1)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
-            .padding(.horizontal, ResectaTokens.Spacing.md)
-            .padding(.vertical, ResectaTokens.Spacing.xxs)
-            .accessibilityElement(children: .combine)
-        }
     }
 
     // MARK: - Search Bar

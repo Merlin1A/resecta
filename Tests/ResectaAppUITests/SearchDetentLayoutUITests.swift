@@ -32,6 +32,11 @@ import XCTest
 ///   medium to the compact strip — and the grabber path still
 ///   resizes both directions.
 ///
+/// WA/D-75 also parks the editor page-bar pin here (the bar's
+/// first-ever coverage): chevron-only buttons + the "N of M" counter,
+/// driven on the same `--multipageDoc` fixture the results-list leg
+/// uses.
+///
 /// nonisolated for the same reason as `SearchMarkForRedactionUITests`:
 /// an XCUITest drives a separate process and touches no @MainActor app
 /// state.
@@ -72,6 +77,38 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.50))
         let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.03))
         start.press(forDuration: 0.1, thenDragTo: end)
+    }
+
+    /// Raise the sheet from the compact float back to medium via the
+    /// grabber path. The title-only handle (WA/D-75) hugs the bottom
+    /// of the screen, so the stroke starts just inside the sheet's
+    /// top strip and releases at mid-screen, where medium is the
+    /// nearest detent. One retry if the strip is still up after the
+    /// first stroke (a stroke can land mid detent-transition
+    /// animation — the O-1 settle class); a genuinely broken expand
+    /// path still fails the medium-band assertion below.
+    private func expandCompactStripToMedium() {
+        let window = app.windows.firstMatch
+        let strip = app.descendants(matching: .any)
+            .matching(identifier: "compactFloatStrip").firstMatch
+        for _ in 0..<2 {
+            let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95))
+            let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+            start.press(forDuration: 0.1, thenDragTo: end)
+            sleep(2)
+            if !strip.exists { break }
+        }
+        let dismiss = app.buttons["searchDismissButton"].firstMatch
+        XCTAssertTrue(
+            dismiss.waitForExistence(timeout: 5),
+            "Full chrome never returned — the compact → medium grabber expand failed."
+        )
+        let headerY = dismiss.frame.minY
+        XCTAssertTrue(
+            headerY > window.frame.height * 0.35
+                && headerY < window.frame.height * 0.65,
+            "Compact → medium expand missed the medium detent (header at \(headerY))."
+        )
     }
 
     /// A picker's segments surface with the segment title as the
@@ -385,14 +422,44 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
         row.tap()
 
-        // A row tap navigates to the match: the position counter appears
-        // in the search bar. If the tap had landed on the footer instead
-        // (the ts2-04 hit-trap), the counter would never populate — and a
-        // footer "Select All" hit would flip the selection count.
+        // WA/D-75: a row tap drops the sheet to the title-only compact
+        // handle — no counter, no chevrons render there. The strip +
+        // title prove the drop landed; the navigation evidence (the
+        // counter) and the no-selection-toggle proof are asserted at
+        // medium after a grabber re-expand, one detent later.
+        let strip = app.descendants(matching: .any)
+            .matching(identifier: "compactFloatStrip").firstMatch
+        XCTAssertTrue(
+            strip.waitForExistence(timeout: 10),
+            "Row tap did not drop the sheet to the compact float."
+        )
+        XCTAssertTrue(
+            app.staticTexts["Search"].waitForExistence(timeout: 5),
+            "Compact handle is missing its interface title."
+        )
+        XCTAssertFalse(
+            app.buttons["Next result"].exists,
+            "The Next-result chevron rendered on the title-only compact handle."
+        )
+        XCTAssertFalse(
+            app.buttons["Previous result"].exists,
+            "The Previous-result chevron rendered on the title-only compact handle."
+        )
+        XCTAssertFalse(
+            app.staticTexts["Result 1 of 1"].exists || app.staticTexts["1/1"].exists,
+            "The result counter rendered on the title-only compact handle."
+        )
+
+        // One detent later: the grabber expand restores the full
+        // chrome at medium — the pre-WA post-tap assertions, relocated.
+        // If the tap had landed on the footer instead (the ts2-04
+        // hit-trap), the counter would never populate — and a footer
+        // "Select All" hit would flip the selection count.
+        expandCompactStripToMedium()
         XCTAssertTrue(
             app.staticTexts["Result 1 of 1"].waitForExistence(timeout: 10)
                 || app.staticTexts["1/1"].waitForExistence(timeout: 2),
-            "Row tap did not navigate to the match — the tap landed elsewhere (footer hit-trap)."
+            "Row-tap navigation state lost across the compact → medium expand — the counter never populated (footer hit-trap)."
         )
         XCTAssertFalse(
             app.staticTexts["1 of 1 selected"].exists,
@@ -402,7 +469,9 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         // D-63/UT chevron pin: the shared bar's trailing result-nav
         // chevrons stay present and hittable with results on board
         // (they had zero coverage pre-UT, and the UT-04 relocation
-        // reshaped their row's leading content).
+        // reshaped their row's leading content). Since WA/D-75 the
+        // chevrons render at medium+ only, so the pin rides the
+        // re-expanded sheet.
         let nextResult = app.buttons["Next result"]
         XCTAssertTrue(
             nextResult.waitForExistence(timeout: 10),
@@ -587,16 +656,21 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             strip.waitForExistence(timeout: 10),
             "Compact strip never appeared — the down-chain stalled above the compact float."
         )
-        // The full chrome yields to the strip at compact (BH-B-01
-        // composition branch), and the review origin's one-line
-        // summary reuses the footer's exact label.
+        // The full chrome yields to the strip at compact (the BH-B-01
+        // branch, title-only since WA/D-75): the interface title is
+        // the strip's whole composition — the old summary line must
+        // be gone.
         XCTAssertFalse(
             reviewList.exists,
             "Review list still present at the compact float — the strip did not replace the full chrome."
         )
         XCTAssertTrue(
-            app.staticTexts["6 found — none selected yet"].waitForExistence(timeout: 5),
-            "Compact review summary line missing at the compact float."
+            app.staticTexts["Scan"].waitForExistence(timeout: 5),
+            "Compact handle is missing its interface title on the review origin."
+        )
+        XCTAssertFalse(
+            app.staticTexts["6 found — none selected yet"].exists,
+            "The retired compact summary line rendered — compact is title-only (WA/D-75)."
         )
         attachScreenshot(named: "sa2-compact-chain-strip")
     }
@@ -604,9 +678,11 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
     // SA-3 rider (B-3): review-row canvas-navigation parity — a
     // row-BODY tap drops the sheet to the compact float (the shipped
     // search-row idiom; ST-105 keeps the canvas interactive behind
-    // it). The strip's summary line doubles as the no-selection
-    // proof: a body tap must NAVIGATE, never toggle — the selection
-    // circle keeps its own hit region.
+    // it). WA/D-75 made compact title-only, so the no-selection
+    // proof moved one detent later: re-expand to medium and the
+    // footer must still read none-selected — a body tap must
+    // NAVIGATE, never toggle; the selection circle keeps its own
+    // hit region.
     func testMediumDetent_seededReviewRowBodyTapDropsToCompact() {
         app.launchArguments = ["--uitesting", "--loadTestDocument", "--seedTriage"]
         app.launch()
@@ -644,10 +720,28 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Review list still present after the row-tap compact drop."
         )
         XCTAssertTrue(
-            app.staticTexts["6 found — none selected yet"].waitForExistence(timeout: 5),
-            "Row-body tap changed the selection count — the tap must navigate, not toggle selection."
+            app.staticTexts["Scan"].waitForExistence(timeout: 5),
+            "Compact handle is missing its interface title after the row-body drop."
+        )
+        XCTAssertFalse(
+            app.staticTexts["6 found — none selected yet"].exists,
+            "The retired compact summary line rendered — compact is title-only (WA/D-75)."
         )
         attachScreenshot(named: "sa2-review-rowtap-compact")
+
+        // No-selection-toggle proof, one detent later (WA/D-75 B-2):
+        // the summary line no longer renders at compact, so re-expand
+        // to medium and assert the footer count is untouched — a
+        // toggling body tap would read "1 of 6 selected".
+        expandCompactStripToMedium()
+        XCTAssertTrue(
+            reviewList.waitForExistence(timeout: 10),
+            "Review list did not return at medium after the grabber expand."
+        )
+        XCTAssertTrue(
+            app.staticTexts["6 found — none selected yet"].waitForExistence(timeout: 10),
+            "Row-body tap changed the selection count — the tap must navigate, not toggle selection."
+        )
     }
 
     // The Search-results leg — cooperation re-proven on the list
@@ -759,5 +853,59 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "The collapse sailed past medium — the results list should still be presented after one detent step."
         )
         attachScreenshot(named: "sa2-results-cooperative-collapsed")
+    }
+
+    // MARK: - Editor page bar (WA/D-75 R-2)
+
+    // First-ever coverage of the iPhone page-navigation bar, added
+    // with the chevron-only reshape: the icon buttons carry the full
+    // words as accessibility labels, the center counter drops the
+    // word "Page", and both chevrons actually page. No sheet is
+    // opened — the bar is editor bottom chrome, gated on the editing
+    // phase + pageCount > 1 + compact width.
+    func testEditingPhase_pageBarChevronsPageAndCounterDropsPageWord() {
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
+        app.launch()
+
+        let bar = app.descendants(matching: .any)
+            .matching(identifier: "pageNav").firstMatch
+        XCTAssertTrue(
+            bar.waitForExistence(timeout: 30),
+            "Page navigation bar never appeared on the multipage document."
+        )
+        let previous = app.buttons["pageNavPrevious"]
+        let next = app.buttons["pageNavNext"]
+        XCTAssertTrue(
+            previous.waitForExistence(timeout: 5),
+            "Previous chevron missing from the page bar (identifier must survive the disabled first-page state)."
+        )
+        XCTAssertTrue(next.exists, "Next chevron missing from the page bar.")
+        XCTAssertTrue(next.isHittable, "Next chevron exists but is not hittable.")
+
+        // WA/D-75 R-2 copy: "N of M" without the word "Page" — the
+        // worded form is the regression assert.
+        XCTAssertTrue(
+            app.staticTexts["1 of 23"].waitForExistence(timeout: 5),
+            "Compact page counter '1 of 23' missing from the page bar."
+        )
+        XCTAssertFalse(
+            app.staticTexts["Page 1 of 23"].exists,
+            "The counter still carries the word 'Page' — the R-2 copy reshape regressed."
+        )
+
+        // Both chevrons page: forward to 2, back to 1. Previous is
+        // disabled on page 1 and must re-enable after the forward tap.
+        next.tap()
+        XCTAssertTrue(
+            app.staticTexts["2 of 23"].waitForExistence(timeout: 5),
+            "Next chevron did not page forward."
+        )
+        XCTAssertTrue(previous.isHittable, "Previous chevron not hittable on page 2.")
+        previous.tap()
+        XCTAssertTrue(
+            app.staticTexts["1 of 23"].waitForExistence(timeout: 5),
+            "Previous chevron did not page back."
+        )
+        attachScreenshot(named: "wa2-page-bar-chevrons")
     }
 }

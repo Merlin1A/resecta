@@ -2,48 +2,32 @@ import Testing
 import SwiftUI
 @testable import ResectaApp
 
-// WU-28: pin the compact float detent's pure-function
-// math (110pt floor + 0.15 fraction) and the detent-identity contract
-// the anchored-row mechanism relies on. The ScrollViewReader anchor
-// itself is driven from a SwiftUI `.onChange` and cannot run in a
-// unit test without a UI host — these tests cover the parts that
-// can be isolated as values.
+// WU-28 → WA/D-75: pin the compact float detent's pure-function
+// height (fixed title-only hug, clamped to the available height) and
+// the detent-identity contract the anchored-row mechanism relies on.
+// The ScrollViewReader anchor itself is driven from a SwiftUI
+// `.onChange` and cannot run in a unit test without a UI host — these
+// tests cover the parts that can be isolated as values.
 
 @Suite("Compact float detent (WU-28)")
 struct CompactDetentAnchoredRowTests {
-    @Test("Floor enforced when 0.15 × maxDetentValue is below 110pt")
-    func floorEnforcedOnSmallScreens() {
-        // iPhone SE (568pt): 0.15 × 568 = 85.2pt → floor wins.
-        #expect(CompactFloatDetent.compactHeight(maxDetentValue: 568) == 110)
+    @Test("Hug height is constant across screen heights")
+    func hugHeightConstantAcrossScreens() {
+        // iPhone SE (568pt) / iPhone 17 (~844pt) / iPad-class (1024pt):
+        // the title-only hug does not scale with the screen.
+        #expect(CompactFloatDetent.compactHeight(maxDetentValue: 568) == CompactFloatDetent.hugHeight)
+        #expect(CompactFloatDetent.compactHeight(maxDetentValue: 844) == CompactFloatDetent.hugHeight)
+        #expect(CompactFloatDetent.compactHeight(maxDetentValue: 1024) == CompactFloatDetent.hugHeight)
     }
 
-    @Test("Fraction(0.15) used when above the 110pt floor")
-    func fractionUsedOnLargeScreens() {
-        // iPhone 17 (~844pt): 0.15 × 844 = 126.6pt → above floor.
-        let result = CompactFloatDetent.compactHeight(maxDetentValue: 844)
-        #expect(abs(result - 126.6) < 0.001)
+    @Test("Hug constant matches the WA/D-75 title-only contract")
+    func hugConstantMatchesContract() {
+        #expect(CompactFloatDetent.hugHeight == 60)
     }
 
-    @Test("iPad-class height scales proportionally")
-    func iPadFractionScales() {
-        // iPad-class 1024pt: 0.15 × 1024 = 153.6pt.
-        let result = CompactFloatDetent.compactHeight(maxDetentValue: 1024)
-        #expect(abs(result - 153.6) < 0.001)
-    }
-
-    @Test("Boundary at floor crossover (~733pt)")
-    func boundaryValue() {
-        // 0.15 × X = 110 → X ≈ 733.33; just below returns floor.
-        #expect(CompactFloatDetent.compactHeight(maxDetentValue: 733) == 110)
-        // Just above returns the fraction.
-        let above = CompactFloatDetent.compactHeight(maxDetentValue: 734)
-        #expect(above > 110)
-    }
-
-    @Test("Floor + fraction constants match D-03 contract")
-    func constantsMatchSpec() {
-        #expect(CompactFloatDetent.minimumHeight == 110)
-        #expect(CompactFloatDetent.fraction == 0.15)
+    @Test("Clamped to the available height when it is below the hug")
+    func clampsToAvailableHeight() {
+        #expect(CompactFloatDetent.compactHeight(maxDetentValue: 40) == 40)
     }
 
     @Test("compactFloat detent is distinct from .medium and .large")

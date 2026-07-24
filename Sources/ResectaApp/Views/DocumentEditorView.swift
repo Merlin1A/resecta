@@ -505,11 +505,10 @@ struct DocumentEditorView: View {
                     // dismiss rule; machine-made selections drop
                     // silently, as the magic-wand flow always has).
                     .interactiveDismissDisabled(searchState.userModifiedSelections)
-                    // Compact float detent —
-                    // `.fraction(0.15)` of available height with a 110pt
-                    // floor (`CompactFloatDetent.swift`). Search bar +
-                    // nav controls stay visible; PDF surfaces behind.
-                    // Tap-on-row drops to compact; the
+                    // Compact float detent — a fixed title-only hug
+                    // (`CompactFloatDetent.swift`, WA/D-75). The PDF
+                    // surfaces behind; every control lives at
+                    // medium/large. Tap-on-row drops to compact; the
                     // chevron/keyboard navigation path keeps the prior
                     // large → medium semantics so result-list visibility
                     // is preserved while the user scans.
@@ -1598,8 +1597,8 @@ struct DocumentEditorView: View {
     }
 
     /// Detent the Review route raises the search sheet to. `.compactFloat`
-    /// keeps only the search bar on screen — the coverage panel mounts
-    /// topmost in `SearchResultsSection`, which `.medium` reveals.
+    /// shows only the title-only handle (WA/D-75) — the coverage panel
+    /// mounts topmost in `SearchResultsSection`, which `.medium` reveals.
     static let deselectionReviewDetent: PresentationDetent = .medium
 
     /// State preamble for the deselection-review route: the row lives on
