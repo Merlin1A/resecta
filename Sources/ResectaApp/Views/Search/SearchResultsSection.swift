@@ -43,12 +43,6 @@ struct SearchResultsSection: View {
     /// next 300 ms debounce would eventually run, but the banner's tap
     /// would feel broken in the interim.
     let onTriggerSearch: () -> Void
-    /// Recall a recent query from an empty-state chip. The parent owns
-    /// the debounce plumbing, so it performs both the `queryText` write
-    /// and the trigger — a section-side write would arm the field's
-    /// `.onChange` debounce on top of the direct trigger and run the
-    /// recalled query twice.
-    let onRecallQuery: (String) -> Void
     /// Present the saved-searches list — the parent owns the single
     /// modal slot. Wired to the Scan-side bookmark on the scope row.
     let onShowSavedSearches: () -> Void
@@ -869,22 +863,6 @@ struct SearchResultsSection: View {
                 if context == .multiTermPreSearchWithRecents {
                     multiTermRecallChips
                 }
-                // Text/regex pre-search recents chips,
-                // parallel to the multiTerm recall pattern above.
-                if context == .textPreSearch,
-                   !searchState.recentTextQueries.isEmpty {
-                    queryRecallChips(
-                        queries: searchState.recentTextQueries,
-                        accessibilityPrefix: WU20Strings.queryRecallAccessibilityPrefix
-                    )
-                }
-                if context == .regexPreSearch,
-                   !searchState.recentRegexQueries.isEmpty {
-                    queryRecallChips(
-                        queries: searchState.recentRegexQueries,
-                        accessibilityPrefix: WU20Strings.queryRecallAccessibilityPrefix
-                    )
-                }
             }
         } actions: {
             // Failed-start recovery: the retry lives here as an inline
@@ -972,37 +950,6 @@ struct SearchResultsSection: View {
                     .accessibilityLabel(
                         WU20Strings.recallChipAccessibilityLabel(terms: recall)
                     )
-                }
-            }
-        }
-    }
-
-    // MARK: - Text/Regex Recent Query Chips
-
-    /// Tappable recall chips for text and regex pre-search empty states.
-    /// Mirrors the multiTermRecallChips pattern. Tapping a chip sets
-    /// `searchState.queryText` to the tapped value and re-triggers search
-    /// via `onTriggerSearch()`. Chip labels carry `.privacySensitive()`
-    /// (a recent query may contain PII).
-    @ViewBuilder
-    private func queryRecallChips(queries: [String], accessibilityPrefix: String) -> some View {
-        VStack(alignment: .center, spacing: ResectaTokens.Spacing.xs) {
-            Text(WU20Strings.recentSearchesHeader)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            HStack(spacing: ResectaTokens.Spacing.xs) {
-                ForEach(Array(queries.enumerated()), id: \.offset) { _, query in
-                    Button {
-                        onRecallQuery(query)
-                    } label: {
-                        Text(query)
-                            .font(.caption2)
-                            .lineLimit(1)
-                            .privacySensitive()
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .accessibilityLabel("\(accessibilityPrefix): \(query)")
                 }
             }
         }
@@ -1333,12 +1280,6 @@ enum WU20Strings {
         let joined = terms.joined(separator: " and ")
         return "Recall recent search: \(joined)"
     }
-
-    /// Accessibility prefix used for text/regex recent-query recall chips
-    /// The chip label itself is `.privacySensitive()`
-    /// but the prefix is combined into the accessibility label so
-    /// VoiceOver names the action.
-    static let queryRecallAccessibilityPrefix = "Recall recent search"
 
     // MARK: Filtered-out state
 

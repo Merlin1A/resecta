@@ -136,7 +136,6 @@ struct SearchResultsListObservationCrashTests {
             applyShortcutEnabled: true,
             onRequestShowRationale: { _ in },
             onTriggerSearch: {},
-            onRecallQuery: { _ in },
             onShowSavedSearches: {},
             onNavigateToCurrentResult: {}
         )

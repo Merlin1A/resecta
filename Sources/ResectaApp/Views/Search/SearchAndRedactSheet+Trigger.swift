@@ -106,15 +106,6 @@ extension SearchAndRedactSheet {
                 searchState.recordMultiTermSearch(terms: searchState.searchTerms)
             }
 
-            // Persist text/regex queries to the recents
-            // ring. No-op for empty queries, piiScan, multiTerm, and when
-            // the user has disabled recents via the Settings toggle.
-            // Stores the QUERY string only — never matched text.
-            searchState.recordRecentQuery(
-                searchState.queryText,
-                mode: searchState.searchModeType
-            )
-
             searchState.isSearching = true
 
             guard let liveDoc = documentState.sourceDocument else {

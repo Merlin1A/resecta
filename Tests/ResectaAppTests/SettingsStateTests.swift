@@ -18,7 +18,6 @@ struct SettingsStateTests {
         "successfulExportCount",
         "pipelineMode.v2",
         "detectionPreset.v1",
-        "search.recents.enabled.v1",  // design 04 §4.6
     ]
 
     /// Remove all SettingsState keys before each test to ensure isolation.
@@ -184,48 +183,6 @@ struct SettingsStateTests {
         state.detectionPreset = .aggressive
         state.resetToDefaults()
         #expect(state.detectionPreset == .balanced)
-        cleanDefaults()
-    }
-
-    // MARK: - design 04 §4.6 — saveRecentSearches round-trip
-
-    @Test("saveRecentSearches defaults to false with no stored value (private by default)")
-    func saveRecentSearchesDefault() {
-        cleanDefaults()
-        let state = SettingsState()
-        #expect(state.saveRecentSearches == false)
-    }
-
-    @Test("saveRecentSearches false persists and reads back")
-    func saveRecentSearchesRoundTrip() {
-        cleanDefaults()
-        let state = SettingsState()
-        state.saveRecentSearches = false
-        #expect(UserDefaults.standard.object(forKey: "search.recents.enabled.v1") as? Bool == false)
-        let rehydrated = SettingsState()
-        #expect(rehydrated.saveRecentSearches == false)
-        cleanDefaults()
-    }
-
-    @Test("saveRecentSearches true persists and reads back")
-    func saveRecentSearchesTrueRoundTrip() {
-        cleanDefaults()
-        let state = SettingsState()
-        state.saveRecentSearches = false  // set to false first
-        state.saveRecentSearches = true   // then back to true
-        #expect(UserDefaults.standard.object(forKey: "search.recents.enabled.v1") as? Bool == true)
-        let rehydrated = SettingsState()
-        #expect(rehydrated.saveRecentSearches == true)
-        cleanDefaults()
-    }
-
-    @Test("resetToDefaults restores saveRecentSearches to false (the factory default)")
-    func resetRestoresSaveRecentSearches() {
-        cleanDefaults()
-        let state = SettingsState()
-        state.saveRecentSearches = true
-        state.resetToDefaults()
-        #expect(state.saveRecentSearches == false)
         cleanDefaults()
     }
 

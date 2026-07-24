@@ -130,18 +130,6 @@ struct SettingsView: View {
             ) {
                 Button("Reset", role: .destructive) {
                     settingsState.resetToDefaults()
-                    // H-70 — reset turns the recents preference OFF, and
-                    // every other transition to off (the toggle's own
-                    // off-path above, Clear Search History) clears the
-                    // stored queries with it. Reset previously left the
-                    // data on disk while `SearchState.init` hydrates the
-                    // arrays unconditionally — so a user's PII-bearing
-                    // query history silently resurfaced on the next
-                    // sheet under a toggle that read off. Same
-                    // three-line clear as the toggle's off-path.
-                    redactionState?.activeSearch?.clearRecentSearchHistory()
-                    UserDefaults.standard.removeObject(forKey: "search.recents.text.v1")
-                    UserDefaults.standard.removeObject(forKey: "search.recents.regex.v1")
                 }
                 .accessibilityIdentifier("settingsResetConfirm")
                 Button("Cancel", role: .cancel) { }
@@ -361,38 +349,6 @@ struct SettingsView: View {
                 Text("The on-device record of accepted and rejected detections is cleared. Future scans start from the uniform default weighting.")
             }
 
-            // Save Recent Searches toggle. When turned off,
-            // existing recents are cleared immediately so no residual history
-            // remains from before the preference was set.
-            Toggle(isOn: Binding(
-                get: { settingsState.saveRecentSearches },
-                set: { newValue in
-                    settingsState.saveRecentSearches = newValue
-                    if !newValue {
-                        // Clear in-memory state via the active search sheet,
-                        // and remove the two recents keys from UserDefaults
-                        // directly (covers the no-active-sheet case).
-                        redactionState?.activeSearch?.clearRecentSearchHistory()
-                        UserDefaults.standard.removeObject(forKey: "search.recents.text.v1")
-                        UserDefaults.standard.removeObject(forKey: "search.recents.regex.v1")
-                    }
-                }
-            )) {
-                Text("Save Recent Searches")
-            }
-            .accessibilityHint("When enabled, text and regex queries are stored on this device after each search")
-            .accessibilityIdentifier("saveRecentSearchesToggle")
-
-            // Clear Search History affordance — clears both
-            // UserDefaults keys and the active sheet's in-memory state.
-            Button("Clear Search History", role: .destructive) {
-                redactionState?.activeSearch?.clearRecentSearchHistory()
-                UserDefaults.standard.removeObject(forKey: "search.recents.text.v1")
-                UserDefaults.standard.removeObject(forKey: "search.recents.regex.v1")
-            }
-            .accessibilityHint("Removes all stored text and regex search queries from this device")
-            .accessibilityIdentifier("clearSearchHistoryButton")
-
             // DRAW-7: Snap-to-text-box assist. While drawing a rectangle,
             // edges within 8 points of a recognized text-block edge are
             // nudged onto it. Mechanism-description language (I6) —
@@ -425,14 +381,10 @@ struct SettingsView: View {
         } header: {
             Label("Workflow", systemImage: "arrow.triangle.2.circlepath")
         } footer: {
-            VStack(alignment: .leading, spacing: 4) {
-                // The review-toggle era's conditional phrasing retired
-                // with the toggle: review-before-apply is the only
-                // behavior, so the footer states it unconditionally.
-                Text("Detected items are staged for your review; nothing is applied without an explicit selection.")
-                // Verbatim mechanism-description copy.
-                Text("Recent searches are stored on this device to help you repeat common queries. Disable to stop recording.")
-            }
+            // The review-toggle era's conditional phrasing retired
+            // with the toggle: review-before-apply is the only
+            // behavior, so the footer states it unconditionally.
+            Text("Detected items are staged for your review; nothing is applied without an explicit selection.")
         }
     }
 

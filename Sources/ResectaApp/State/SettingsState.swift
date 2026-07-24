@@ -109,20 +109,6 @@ class SettingsState {
                 UserDefaults.standard.set(appearancePreference.rawValue, forKey: "appearancePreference.v1") }
     }
 
-    // MARK: - Search recents preference
-
-    /// When true, text and regex query strings are recorded to
-    /// UserDefaults after each search. Default OFF (private by default):
-    /// recents then stay in-memory for the session only. Turning this
-    /// off stops on-device recording; existing history is cleared by the
-    /// Settings UI write path.
-    /// didSet persistence pattern (the property-wrapper alternative
-    /// is banned inside @Observable).
-    var saveRecentSearches: Bool = false {
-        didSet { guard !isInitializing else { return }
-                UserDefaults.standard.set(saveRecentSearches, forKey: "search.recents.enabled.v1") }
-    }
-
     // MARK: - Detection preset + threshold vector
 
     /// User-selected detection preset. Drives `activeThresholdVector` at
@@ -184,9 +170,6 @@ class SettingsState {
         let storedPreset = UserDefaults.standard.string(forKey: "detectionPreset.v1")
         self.detectionPreset = storedPreset
             .flatMap(SettingsPreset.init(rawValue:)) ?? .balanced
-        // Absent key → false (default-off, private by default). Keep in
-        // lockstep with `SearchState.recordRecentQuery`'s gate.
-        self.saveRecentSearches = UserDefaults.standard.object(forKey: "search.recents.enabled.v1") as? Bool ?? false
         isInitializing = false
     }
 
@@ -206,12 +189,6 @@ class SettingsState {
         paranoidMode = false
         appearancePreference = .system
         detectionPreset = .balanced
-        // Factory default is OFF (private by default). H-70 — the view's
-        // reset action clears the stored recents alongside this flip
-        // (mirroring the toggle's own off-path): leaving the data while
-        // switching the flag off let old PII-bearing queries resurface
-        // through SearchState's unconditional hydrate.
-        saveRecentSearches = false
     }
 }
 

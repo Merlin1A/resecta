@@ -4,13 +4,12 @@ import RedactionEngine
 // Ephemeral search session state.
 // Results and document-derived fields are in-memory only; cleared on dismiss.
 // Last-used filter shape is cross-session and persisted to UserDefaults.
-// Recents (query strings) are in-memory by default and persist only when
-// the user opts in via Settings. Never log.
+// The multi-term recall ring is in-memory for the session only. Never log.
 
 /// Ephemeral search session state.
 /// Document-derived state is in-memory only; cleared on dismiss.
-/// Last-used filter shape persists via UserDefaults; query recents
-/// persist only when the user opts in (in-memory otherwise).
+/// Last-used filter shape persists via UserDefaults; the multi-term
+/// recall ring is session-only and never persisted.
 @Observable
 @MainActor
 final class SearchState: Identifiable {
@@ -90,28 +89,6 @@ final class SearchState: Identifiable {
         false
         #endif
     }()
-
-    // MARK: - Recents persistence constants
-
-    static let recentQueriesCap = 10
-    private static let recentsTextKey    = "search.recents.text.v1"
-    private static let recentsRegexKey   = "search.recents.regex.v1"
-    private static let recentsEnabledKey = "search.recents.enabled.v1"
-    /// One-shot flag for `deletePersistedRecentsOnce(defaults:)`.
-    private static let recentsDeletionDoneKey = "search.recents.oneTimeDeletion.v1"
-
-    // MARK: - Persistent recents
-
-    /// Text-mode query history, most-recent-first. Never contains
-    /// matched text or document content — query strings only.
-    /// In-memory by default; written through to UserDefaults only when
-    /// the user opts in (`search.recents.enabled.v1`).
-    /// NOT wiped by clear() or clearResults().
-    private(set) var recentTextQueries: [String] = []
-
-    /// Regex-mode query history, most-recent-first. Same
-    /// carve-out class as recentTextQueries — survives both clear paths.
-    private(set) var recentRegexQueries: [String] = []
 
     // MARK: - Last-used filter shape
 
@@ -869,81 +846,23 @@ final class SearchState: Identifiable {
         }
     }
 
-    // MARK: - Recents recording
+    // MARK: - Retired recents purge (WA-01)
 
-    /// Record a query string into the appropriate recents list.
-    ///
-    /// - No-op for empty query strings.
-    /// - No-op for modes other than `.text` / `.regex`.
-    /// - Always records into the in-memory list; writes through to
-    ///   UserDefaults only when `search.recents.enabled.v1` reads `true`
-    ///   (absent key treated as `false` — private by default; recents
-    ///   stay in-memory for the session unless the user opts in).
-    /// - Stores the QUERY string only — NEVER persists matched text
-    ///   or document content.
-    /// - Deduplicates with move-to-front; caps at `recentQueriesCap`.
-    func recordRecentQuery(_ query: String, mode: SearchModeType) {
-        // BH-B-06 — whitespace-only strings are not queries: recording
-        // one produced an invisible blank recents chip that re-ran the
-        // whitespace on tap. Defensive belt beside the trigger-side
-        // trimmed gate (explicit Return paths can still run verbatim
-        // whitespace-padded queries; those are worth recalling, a
-        // blank chip never is).
-        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        guard mode == .text || mode == .regex else { return }
-        // Absent key treated as false (default-off). Keep in lockstep
-        // with `SettingsState.saveRecentSearches` hydration.
-        let persistenceEnabled = defaults.bool(forKey: Self.recentsEnabledKey)
-
-        switch mode {
-        case .text:
-            recentTextQueries = dedupedAndCapped(
-                inserting: query,
-                into: recentTextQueries
-            )
-            if persistenceEnabled {
-                defaults.set(recentTextQueries, forKey: Self.recentsTextKey)
-            }
-        case .regex:
-            recentRegexQueries = dedupedAndCapped(
-                inserting: query,
-                into: recentRegexQueries
-            )
-            if persistenceEnabled {
-                defaults.set(recentRegexQueries, forKey: Self.recentsRegexKey)
-            }
-        default:
-            break
+    /// The persisted text/regex recents feature is excised; only the
+    /// in-memory multi-term ring above remains. This sweep removes the
+    /// feature's four retired storage keys from existing installs at
+    /// every launch — unconditional and idempotent, with no marker key
+    /// (a marker would itself be residue). The key strings live here as
+    /// literals because this function is deliberately their last home.
+    static func purgeRetiredRecentsStorage(defaults: UserDefaults = .standard) {
+        for key in [
+            "search.recents.enabled.v1",
+            "search.recents.text.v1",
+            "search.recents.regex.v1",
+            "search.recents.oneTimeDeletion.v1",
+        ] {
+            defaults.removeObject(forKey: key)
         }
-    }
-
-    /// Clear all persisted and in-memory recent search history (both
-    /// text and regex query lists, plus the in-memory multi-term ring).
-    /// Called by "Clear Search History" and by the Settings toggle
-    /// path when "Save Recent Searches" is turned off.
-    ///
-    /// Cross-session carve-out: this is the ONLY path that wipes
-    /// recents; clear() and clearResults() intentionally do NOT
-    /// (recents survive both clear paths by design).
-    func clearRecentSearchHistory() {
-        recentTextQueries = []
-        recentRegexQueries = []
-        recentMultiTermSets = []
-        defaults.removeObject(forKey: Self.recentsTextKey)
-        defaults.removeObject(forKey: Self.recentsRegexKey)
-    }
-
-    /// One-time deletion of the two persisted recents lists, run at app
-    /// launch. Recents are private-by-default from this build on; lists
-    /// persisted by earlier builds are removed unconditionally —
-    /// regardless of the enabled preference — exactly once. The flag
-    /// guard is load-bearing: recents recorded AFTER the user opts back
-    /// in must survive subsequent launches.
-    static func deletePersistedRecentsOnce(defaults: UserDefaults = .standard) {
-        guard !defaults.bool(forKey: recentsDeletionDoneKey) else { return }
-        defaults.removeObject(forKey: recentsTextKey)
-        defaults.removeObject(forKey: recentsRegexKey)
-        defaults.set(true, forKey: recentsDeletionDoneKey)
     }
 
     // MARK: - Filter flush (debounced 500 ms)
@@ -972,33 +891,13 @@ final class SearchState: Identifiable {
         }
     }
 
-    // MARK: - Recents helpers
-
-    /// Move-to-front dedup + cap helper. Pure function; used by
-    /// `recordRecentQuery` for both text and regex lists.
-    private func dedupedAndCapped(inserting query: String, into list: [String]) -> [String] {
-        var updated = list
-        if let existing = updated.firstIndex(of: query) {
-            updated.remove(at: existing)
-        }
-        updated.insert(query, at: 0)
-        if updated.count > Self.recentQueriesCap {
-            updated = Array(updated.prefix(Self.recentQueriesCap))
-        }
-        return updated
-    }
-
     // MARK: - Init (UserDefaults seam)
 
-    /// Designated init. Hydrates persisted recents and last-used filter
-    /// shape from `defaults` (fail-closed: missing / malformed → in-type
+    /// Designated init. Hydrates the last-used filter shape from
+    /// `defaults` (fail-closed: missing / malformed → in-type
     /// defaults). Pass a scratch `UserDefaults` suite in tests.
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-
-        // Recents — fail-closed decode: nil / wrong type → []
-        self.recentTextQueries  = (defaults.array(forKey: Self.recentsTextKey)  as? [String]) ?? []
-        self.recentRegexQueries = (defaults.array(forKey: Self.recentsRegexKey) as? [String]) ?? []
 
         // Last-used filter — fail-closed JSON decode → property defaults
         if let data = defaults.data(forKey: Self.lastFilterKey),
@@ -1232,10 +1131,6 @@ final class SearchState: Identifiable {
         totalPages = 0
         searchTerms = []
         recentMultiTermSets = []
-        // recentTextQueries / recentRegexQueries are
-        // intentionally NOT cleared here. Recents are cross-session
-        // persistent history; they survive both clear() and clearResults()
-        // by design. Use clearRecentSearchHistory() to wipe them.
         activeSearchTask?.cancel()
         activeSearchTask = nil
         lastDoctypeExplanation = nil

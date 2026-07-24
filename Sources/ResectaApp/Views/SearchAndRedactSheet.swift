@@ -71,12 +71,6 @@ struct SearchAndRedactSheet: View {
     /// hint, not a state-change cue. See `CompactFloatDetent.shouldPulseGrabber`.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State var searchDebounceTask: Task<Void, Never>?
-    /// One-shot debounce suppression for programmatic `queryText`
-    /// writes that carry their own trigger (recall chips): the field's
-    /// `.onChange` consumes it instead of arming the 300 ms debounce,
-    /// so a recalled query runs exactly once instead of once now and
-    /// once again at debounce expiry.
-    @State var suppressNextQueryDebounce = false
     // The prior `applyResultMessage`
     // state field drove an `.alert("Redaction Applied", ...)` that blocked
     // the sheet on every successful apply. Both apply paths now route
@@ -265,14 +259,6 @@ struct SearchAndRedactSheet: View {
                             activeModal = .rowRationale(rowID: rowID)
                         },
                         onTriggerSearch: triggerSearch,
-                        onRecallQuery: { query in
-                            // One run per recall: suppress the
-                            // `.onChange` debounce the write below arms,
-                            // then trigger directly.
-                            suppressNextQueryDebounce = true
-                            searchState.queryText = query
-                            triggerSearch()
-                        },
                         onShowSavedSearches: {
                             activeModal = .savedSearches
                         },
@@ -895,13 +881,7 @@ struct SearchAndRedactSheet: View {
                         }
                     }
                     .onChange(of: searchState.queryText) { _, newValue in
-                        if suppressNextQueryDebounce {
-                            // Recall chips trigger their own run; the
-                            // flag is one-shot.
-                            suppressNextQueryDebounce = false
-                        } else {
-                            debounceSearch(query: newValue)
-                        }
+                        debounceSearch(query: newValue)
                         scheduleLivePreviewIfApplicable()
                     }
             }

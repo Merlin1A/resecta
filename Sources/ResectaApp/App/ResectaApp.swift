@@ -43,10 +43,10 @@ struct ResectaApp: App {
         // `_meta.git_head` (engineer-facing diagnostic; not consumed at runtime).
         ColdStartTimer.shared.captureProcessStart()
 
-        // Recents privacy: one-shot removal of the recents lists
-        // persisted by earlier builds (recents are private-by-default
-        // now; see the flag guard on the callee).
-        SearchState.deletePersistedRecentsOnce()
+        // WA-01: the persisted-recents feature is excised. Sweep its
+        // four retired storage keys out of existing installs at every
+        // launch — unconditional and idempotent (no marker key).
+        SearchState.purgeRetiredRecentsStorage()
 
         // App-wide stores for the power-user library: saved regexes and
         // always/never-flag custom terms. Both persist via UserDefaults
