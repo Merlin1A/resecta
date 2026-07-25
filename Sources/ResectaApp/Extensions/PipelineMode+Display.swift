@@ -13,13 +13,20 @@ extension PipelineMode {
         }
     }
 
-    /// SF Symbol matching the pipeline mode picker in DocumentEditorView.
-    var symbolName: String {
+    /// Custom mode glyph asset (VI, D-76). Replaces the stock symbols
+    /// (`photo`/`doc.text`) at every mode-glyph site: editor picker menu,
+    /// results legend, per-page badges. Monochrome template symbol sets in
+    /// Resources/Assets.xcassets, tinted at the call site.
+    var symbolAssetName: String {
         switch self {
-        case .secureRasterization: "photo"
-        case .searchableRedaction: "doc.text"
+        case .secureRasterization: "resecta.verify.mode.rasterized"
+        case .searchableRedaction: "resecta.verify.mode.searchable"
         }
     }
+
+    /// Mode glyph for `Label { } icon:` composition — custom symbols
+    /// cannot ride `Label(_:systemImage:)` / `Image(systemName:)`.
+    var glyph: Image { Image(symbolAssetName) }
 
     /// Badge tint color. Blue for Searchable (active capability),
     /// secondary for Secure (default fallback).

@@ -1237,15 +1237,14 @@ struct DocumentEditorView: View {
                 get: { effectivePipelineMode },
                 set: { documentOverride = $0 }
             )) {
-                Label("Secure Rasterization", systemImage: "photo")
+                Label { Text("Secure Rasterization") } icon: { PipelineMode.secureRasterization.glyph }
                     .tag(PipelineMode.secureRasterization)
-                Label("Searchable Redaction", systemImage: "doc.text")
+                Label { Text("Searchable Redaction") } icon: { PipelineMode.searchableRedaction.glyph }
                     .tag(PipelineMode.searchableRedaction)
             }
         } label: {
             // UXF-22: verb-object menu label (was the bare noun "Mode").
-            Label("Switch Mode", systemImage: effectivePipelineMode == .secureRasterization
-                  ? "photo" : "doc.text")
+            Label { Text("Switch Mode") } icon: { effectivePipelineMode.glyph }
         }
         .disabled(documentState.phaseKind != .editing)
         .accessibilityIdentifier("pipelineMode")

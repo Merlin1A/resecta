@@ -26,7 +26,7 @@ struct LayerResultRow: View {
             // Header — always visible
             Button(action: onTap) {
                 HStack(spacing: ResectaTokens.Spacing.sm) {
-                    Image(systemName: layer.symbolName)
+                    VerificationSymbol.icon(for: layer)
                         .foregroundStyle(useIntermediateColors
                                          ? layer.status.intermediateColor
                                          : layer.status.color)

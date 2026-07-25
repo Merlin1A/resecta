@@ -929,13 +929,17 @@ struct VerificationResultsView: View {
                             Text("Searchable")
                                 .foregroundStyle(ResectaTokens.SemanticColor.infoText)
                         } icon: {
-                            Image(systemName: PipelineMode.searchableRedaction.symbolName)
+                            PipelineMode.searchableRedaction.glyph
                                 .foregroundStyle(ResectaTokens.SemanticColor.searchableMode)
                         }
                         .font(.caption2)
-                        Label("Rasterized", systemImage: PipelineMode.secureRasterization.symbolName)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        Label {
+                            Text("Rasterized")
+                        } icon: {
+                            PipelineMode.secureRasterization.glyph
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                     }
 
                     // PD-5: why each rasterized page fell back, for

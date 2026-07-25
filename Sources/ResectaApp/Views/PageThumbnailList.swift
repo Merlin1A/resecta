@@ -135,10 +135,13 @@ struct PageThumbnailList: View {
                                     if let modes = perPageModes, index < modes.count {
                                         let reason = perPageFallbackReasons
                                             .flatMap { index < $0.count ? $0[index] : nil }
-                                        Label(Self.badgeText(mode: modes[index], reason: reason),
-                                              systemImage: modes[index].symbolName)
-                                            .font(.caption2)
-                                            .foregroundStyle(modes[index].badgeColor)
+                                        Label {
+                                            Text(Self.badgeText(mode: modes[index], reason: reason))
+                                        } icon: {
+                                            modes[index].glyph
+                                        }
+                                        .font(.caption2)
+                                        .foregroundStyle(modes[index].badgeColor)
                                     }
 
                                     if regionCount > 0 {
