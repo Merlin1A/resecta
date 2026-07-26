@@ -102,6 +102,12 @@ enum ImportService {
         /// built off the raw bytes (PDFDocument(data:) does not retain a
         /// documentURL). Drives `TextLayerExtractor.pageReferencesHiddenOCG`.
         let hasHiddenOCG: Bool
+        /// Non-Widget source annotations, one entry per subtype, from the
+        /// engine's `AnnotationAnalyzer`. Drives the import notice banner:
+        /// annotations are drawn by the on-screen PDFKit view but are not
+        /// part of the page content stream the export raster is built
+        /// from, so their presence is surfaced to the user at import.
+        let annotationFindings: [PDFFinding]
     }
 
     // MARK: - Import from Security-Scoped URL (Files app, drag-and-drop)
@@ -315,7 +321,7 @@ enum ImportService {
             // detached task, which observes it through the
             // `Task.checkCancellation()` calls in `validatePDFOffMainActor`.
             let detached = Task.detached {
-                try validatePDFOffMainActor(data: data)
+                try await validatePDFOffMainActor(data: data)
             }
             let result = try await withTaskCancellationHandler {
                 try await detached.value
@@ -334,6 +340,8 @@ enum ImportService {
             documentState.currentPageIndex = 0
             documentState.textLayerStatus = result.textLayerStatus
             documentState.sourceHasHiddenOCG = result.hasHiddenOCG
+            documentState.sourceAnnotationFindings = result.annotationFindings
+            documentState.annotationNoticeDismissed = false
             documentState.lastUsedPipelineMode = nil
             documentState.wasPausedByBackground = false
             documentState.pausedFromPhase = nil  // clear alongside wasPausedByBackground
@@ -362,6 +370,9 @@ enum ImportService {
             documentState.currentPageIndex = 0
             documentState.textLayerStatus = [:]
             documentState.sourceHasHiddenOCG = false
+            // A page rendered from image pixels carries no annotations.
+            documentState.sourceAnnotationFindings = []
+            documentState.annotationNoticeDismissed = false
             documentState.lastUsedPipelineMode = nil
             documentState.wasPausedByBackground = false
             documentState.pausedFromPhase = nil  // clear alongside wasPausedByBackground
@@ -374,7 +385,9 @@ enum ImportService {
 
     /// Perform all CPU-intensive PDF validation off MainActor.
     /// nonisolated: explicitly opted out of SE-0466 MainActor default to avoid blocking UI.
-    private nonisolated static func validatePDFOffMainActor(data: Data) throws -> PDFValidationResult {
+    /// async: the annotation walk below rides the engine's `@concurrent`
+    /// `AnnotationAnalyzer.analyze`; every other stage is synchronous.
+    private nonisolated static func validatePDFOffMainActor(data: Data) async throws -> PDFValidationResult {
         guard let doc = PDFDocument(data: data) else {
             throw PipelineError.importError(.corrupt)
         }
@@ -395,19 +408,25 @@ enum ImportService {
         // 500-page document surrenders cooperatively when the outer
         // `activeImportTask` is cancelled by the Cancel button or the
         // scene-phase observer's `cancelActivePipeline` call.
+        // Each iteration body runs inside `autoreleasepool`: PDFKit page
+        // accessors queue autoreleased intermediates, and without a
+        // per-page drain the cost of every page accumulates across the
+        // whole loop instead of being released between pages.
         for i in 0..<doc.pageCount {
             try Task.checkCancellation()
-            guard let page = doc.page(at: i) else {
-                // Inaccessible pages in a valid PDF indicate corruption or
-                // malicious crafting — fail rather than silently skip.
-                throw PipelineError.importError(.corrupt)
-            }
-            let box = page.bounds(for: .cropBox)
-            // N3: CGRect auto-standardizes negative dimensions to positive.
-            // PDFKit bounds(for:) always returns non-negative. Documented for awareness.
-            guard box.width > 0, box.height > 0,
-                  box.width <= 5000, box.height <= 5000 else {
-                throw PipelineError.importError(.invalidPageDimensions(pageIndex: i))
+            try autoreleasepool {
+                guard let page = doc.page(at: i) else {
+                    // Inaccessible pages in a valid PDF indicate corruption or
+                    // malicious crafting — fail rather than silently skip.
+                    throw PipelineError.importError(.corrupt)
+                }
+                let box = page.bounds(for: .cropBox)
+                // N3: CGRect auto-standardizes negative dimensions to positive.
+                // PDFKit bounds(for:) always returns non-negative. Documented for awareness.
+                guard box.width > 0, box.height > 0,
+                      box.width <= 5000, box.height <= 5000 else {
+                    throw PipelineError.importError(.invalidPageDimensions(pageIndex: i))
+                }
             }
         }
 
@@ -439,17 +458,32 @@ enum ImportService {
         // CANCEL-006: per-iteration `Task.checkCancellation()` mirrors the
         // dimension-validation loop above; both contribute to the worst-case
         // surrender latency on a multi-hundred-page document.
+        // `autoreleasepool` per iteration for the same reason as the
+        // dimension loop — `detectTextLayer` reads `page.string`, whose
+        // autoreleased text machinery would otherwise accumulate across
+        // every page of the document before draining.
         var textLayerStatus: [Int: TextLayerStatus] = [:]
         for i in 0..<doc.pageCount {
             try Task.checkCancellation()
-            guard let page = doc.page(at: i) else { continue }
-            textLayerStatus[i] = TextLayerDetector.detectTextLayer(page)
+            autoreleasepool {
+                guard let page = doc.page(at: i) else { return }
+                textLayerStatus[i] = TextLayerDetector.detectTextLayer(page)
+            }
         }
+
+        // Walk source annotations through the engine's analyzer (skips
+        // Widget/form annotations by design). The on-screen PDFKit view
+        // draws annotations; the export raster is built from the page
+        // content stream, which does not include them — the result feeds
+        // the import notice banner so the user hears that mechanism
+        // before exporting.
+        let annotationResult = await AnnotationAnalyzer().analyze(document: doc)
 
         return PDFValidationResult(
             document: SendablePDFDocument(doc),
             textLayerStatus: textLayerStatus,
-            hasHiddenOCG: hasHiddenOCG
+            hasHiddenOCG: hasHiddenOCG,
+            annotationFindings: annotationResult.findings
         )
     }
 

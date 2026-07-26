@@ -226,8 +226,11 @@ concurrent entry points. The working rules, checkable by grep:
   cooperative cancellation check between bands, so cancelling a large job
   surrenders quickly; a dedicated latency suite measures that budget. Page
   rendering goes through a synchronous C call with no cancellation points, so
-  it races a timeout instead — the one place cancellation cannot reach is
-  documented and bounded rather than assumed away.
+  a timeout task races it and reports an over-long render — reports, not
+  bounds: the draw cannot be interrupted, the error surfaces only once the
+  render completes, and the app's Cancel affordance is likewise ineffective
+  for the duration of one page's draw (`KNOWN_ISSUES.md` KI-9). The one place
+  cancellation cannot reach is documented rather than assumed away.
 - Cancel/restart races have their own regression suites
   (`PipelineCoordinatorRestartRaceTests`, `DocumentStateVerifyingCancelTests`,
   `ImportServiceCancelTests`): re-running the pipeline mid-flight must not

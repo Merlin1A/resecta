@@ -6,13 +6,14 @@ import RedactionEngine
 //
 // Built-ins from `SavedRegex.allBuiltIns` merge in-memory at hydrate so
 // future built-in additions don't require a migration. Only user-saved
-// entries persist to UserDefaults; built-in IDs are stable across
-// launches, so any saved-search that referenced a built-in by id keeps
-// resolving correctly.
+// entries persist — one protected JSON file under Application Support;
+// built-in IDs are stable across launches, so any saved-search that
+// referenced a built-in by id keeps resolving correctly.
 
 /// Persistence envelope. `schemaVersion = 1` in V1.x. Stored at
-/// `UserDefaults` key `savedRegexes.v1`.
-// nonisolated: persisted via `UserDefaultsJSONBlob<T: Codable & Sendable>` and
+/// `Application Support/SavedRegexes/saved-regexes.v1.json` (pre-file
+/// installs migrate off the `savedRegexes.v1` `UserDefaults` key once).
+// nonisolated: persisted via `FileJSONBlob<T: Codable & Sendable>` and
 // read off-MainActor; keep its Codable conformance nonisolated under
 // the s04 SE-0466 MainActor-default flip (mirrors UserTermsBlob).
 nonisolated struct SavedRegexEnvelope: Codable, Sendable, Equatable {
@@ -83,10 +84,22 @@ final class SavedRegexStore {
 
     // CONC-1 (Pkg N): `nonisolated` constants for the detached-task
     // hydrate path. Compile-time constants, never mutated.
+    // `storageKey` is the pre-file `UserDefaults` location, retained as
+    // the one-shot migration source (see `migrateLegacyDefaultsIfNeeded`).
     nonisolated static let storageKey = "savedRegexes.v1"
     nonisolated static let schemaVersion: UInt8 = 1
     nonisolated static let userSavedCap = 100
     nonisolated static let patternLengthCap = SavedRegex.patternLengthCap
+
+    /// Production file location: one JSON file under Application
+    /// Support, written with `.completeFileProtection` and excluded
+    /// from backups by `FileJSONBlob` on every save — the same posture
+    /// `SavedSearchStore` established for persisted user data.
+    static var defaultFileURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("SavedRegexes", isDirectory: true)
+            .appendingPathComponent("saved-regexes.v1.json")
+    }
 
     /// Built-in patterns shipped with the app, surfaced in the menu and
     /// library alongside user-saved entries.
@@ -107,28 +120,54 @@ final class SavedRegexStore {
     /// `persist()` so a re-save cannot erase them.
     private var unrecognizedRows: [RetainedJSONValue]
 
-    private let blob: UserDefaultsJSONBlob<SavedRegexEnvelope>
+    private let blob: FileJSONBlob<SavedRegexEnvelope>
 
-    /// Default production init — reads from `UserDefaults.standard`.
+    /// Default production init — reads the Application Support file.
     convenience init() {
-        self.init(defaults: .standard)
+        self.init(fileURL: Self.defaultFileURL)
     }
 
     // Hydration is deliberately synchronous (the former async path
     // published `[]` until a later tick, and the `isHydrated` barrier
     // only stopped the LATE write-back — a mutation landing first still
     // persisted a one-entry envelope over the real library on disk).
-    // One small UserDefaults read is not worth that window.
-    init(defaults: UserDefaults) {
-        self.blob = UserDefaultsJSONBlob(
-            key: Self.storageKey,
+    // One small file read is not worth that window. The one-shot legacy
+    // migration runs first for the same reason — it must complete
+    // before the hydrate read, and it is a no-op on every launch after
+    // the first (the legacy key is removed once migrated).
+    init(fileURL: URL, legacyDefaults: UserDefaults = .standard) {
+        self.blob = FileJSONBlob(
+            fileURL: fileURL,
             schemaVersion: Self.schemaVersion,
-            defaults: defaults,
             fallback: SavedRegexEnvelope(schemaVersion: 1, userSavedRegexes: [])
         )
+        Self.migrateLegacyDefaultsIfNeeded(from: legacyDefaults, into: blob)
         let envelope = blob.load()
         self.userSavedRegexes = envelope.userSavedRegexes
         self.unrecognizedRows = envelope.unrecognized
+    }
+
+    /// One-shot move of the pre-file `UserDefaults` envelope into the
+    /// protected Application Support file (mirrors
+    /// `UserTermsStore.migrateLegacyDefaultsIfNeeded`). The key is
+    /// removed only after the file is confirmed on disk, so a failed
+    /// write retries next launch. Envelope shape and schema version are
+    /// unchanged on both sides.
+    nonisolated private static func migrateLegacyDefaultsIfNeeded(
+        from defaults: UserDefaults,
+        into storage: FileJSONBlob<SavedRegexEnvelope>
+    ) {
+        guard defaults.data(forKey: storageKey) != nil else { return }
+        let legacy = UserDefaultsJSONBlob<SavedRegexEnvelope>(
+            key: storageKey,
+            schemaVersion: schemaVersion,
+            defaults: defaults,
+            fallback: SavedRegexEnvelope(schemaVersion: 1, userSavedRegexes: [])
+        )
+        storage.save(legacy.load())
+        if FileManager.default.fileExists(atPath: storage.fileURL.path) {
+            defaults.removeObject(forKey: storageKey)
+        }
     }
 
     // MARK: - Mutate
@@ -168,6 +207,19 @@ final class SavedRegexStore {
     /// Used by `List.onDelete` inside `SavedRegexLibraryView`.
     func deleteUserSaved(at offsets: IndexSet) {
         userSavedRegexes.remove(atOffsets: offsets)
+        persist()
+    }
+
+    /// Remove every user-saved entry and persist the empty library.
+    /// Built-ins are compile-time constants and unaffected. The parked
+    /// `unrecognized` rows are dropped too: their retention contract
+    /// protects them from UNRELATED saves, and an explicit
+    /// delete-everything request is the one save that should not
+    /// re-emit them. Backs the destructive "Delete All Your Patterns"
+    /// row in `SavedRegexLibraryView`.
+    func clearAllUserSaved() {
+        userSavedRegexes = []
+        unrecognizedRows = []
         persist()
     }
 

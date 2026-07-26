@@ -49,8 +49,8 @@ and close this issue.
 mmap/copy-on-write backing. Cannot be used for proactive eviction thresholds.
 
 **Workaround:** Evict on `didReceiveMemoryWarning` notification, not memory readings.
-**Additional mitigation (2026-04-02):** `DocumentSearcher` enforces a `maxOCRPixelDimension` cap of 10,000 pixels. Pages exceeding this threshold in either axis at 300 DPI are silently skipped for OCR search rather than allocated. This prevents oversized bitmap crashes in the search path.
-**Additional mitigation (2026-05-12):** A `maxOCRPixelCount` ceiling of 36,000,000 pixels (≈ 144 MB RGBA8) supplements the per-axis cap. The per-axis check alone admits a 10000 × 10000 thumbnail (~ 400 MB RGBA8) on near-axis-cap pages; the pixel-count cap skips OCR for those pages too.
+**Additional mitigation (2026-04-02):** `DocumentSearcher` enforces a `maxOCRPixelDimension` cap of 10,000 pixels. Pages exceeding this threshold in either axis at 300 DPI are skipped for OCR search rather than allocated, and the app raises a warning naming the affected pages ("N page(s) were too large to scan for text — review them manually"). This prevents oversized bitmap crashes in the search path.
+**Additional mitigation (2026-05-12):** A `maxOCRPixelCount` ceiling of 36,000,000 pixels (≈ 144 MB RGBA8) supplements the per-axis cap. The per-axis check alone admits a 10000 × 10000 thumbnail (~ 400 MB RGBA8) on near-axis-cap pages; the pixel-count cap skips OCR for those pages too, surfaced through the same too-large-to-scan warning.
 
 ---
 
@@ -73,6 +73,22 @@ Security-harmless (more redaction, not less) but creates visual clutter. Dedupli
 deferred to post-v1.
 
 **Workaround:** Manually delete duplicate regions before applying redaction.
+
+### KI-9: Per-Page Render Timeout Reports, Not Bounds (Low–Medium)
+**Affects:** Redaction pipeline (page rasterization)
+
+Page rendering goes through a synchronous C call with no cancellation points, so the
+per-page timeout cannot interrupt a draw in progress — it reports `renderTimeout` for
+the affected page only once the draw completes, however long that takes. A page whose
+content stream expands through deeply nested Form XObjects (many drawing operators
+from a small file) can hold the render well past the timeout, and the in-app Cancel
+affordance is likewise ineffective for the duration of that one page's draw. The
+documented input caps (payload size, page count, page dimensions) bound input size,
+not per-page drawing work.
+
+**Workaround:** None in-app once a page's draw is underway — force-quit if a run
+holds far past its progress. The run still fails with `renderTimeout` naming the
+page when the draw completes; no output is produced from a failed run.
 
 ---
 

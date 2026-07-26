@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Effective date:** 2026-07-10
+**Effective date:** 2026-07-26
 
 Resecta is an on-device document-redaction app for iOS. This Privacy Policy
 describes how Resecta handles information. It is written to satisfy Apple's
@@ -44,19 +44,25 @@ mail provider you reach apply, not this policy.
 
 ## On-device storage
 
-Some preferences and data you create are stored locally on your device using
-the system `UserDefaults` store. This includes your Custom Terms, your
-saved-search and saved-regex libraries, your detection preferences, recent
-search queries you have entered, per-category detection priors the app
-maintains and uses when ranking its suggestions, an export counter, and your acceptance of
-the in-app agreement. Recent-search storage keeps the query text you typed, not
-the contents of your documents.
+Some preferences and data you create are stored locally on your device. Your
+Custom Terms and your saved-search and saved-regex libraries — the stores that
+hold text you typed — are kept as files in the app's private container with
+the iOS "complete" file-protection class applied and a system flag that
+excludes them from device backups, so they are not copied into iCloud or
+computer backups.
+Your remaining preferences — detection preferences, per-category detection
+priors the app maintains and uses when ranking its suggestions, an export
+counter, and your acceptance of the in-app agreement — are stored in the
+system `UserDefaults` store, which participates in your device backups the
+way ordinary app preference data does.
 
-This data stays on your device, is not transmitted anywhere, and is removed when
-you delete the app. Storing it locally on your device is not the same as
-collecting it: it never leaves the device, the developer never receives it, and
-it is not associated with any identity. For that reason the app's App Store
-privacy disclosure reports "Data Not Collected" for every category.
+This data is not transmitted anywhere by the app and is removed when you
+delete the app; Custom Terms and the saved libraries also have their own
+delete-all controls, and each entry can be removed individually. Storing it
+locally on your device is not the same as collecting it: the app sends
+nothing off the device, the developer never receives it, and it is not
+associated with any identity. For that reason the app's App Store privacy
+disclosure reports "Data Not Collected" for every category.
 
 Documents you import are held only for the duration of your editing session and
 are not retained by the app after you finish with them.
@@ -66,10 +72,11 @@ are not retained by the app after you finish with them.
 When you export a redacted PDF, Resecta builds a fresh file. The exported PDF
 omits the document's author, title, subject, keywords, and creator fields. For
 accuracy rather than overstatement: the system PDF writer automatically adds a
-generic producer tag and creation and modification timestamps when it builds the
-file. The export therefore carries much less metadata than a typical PDF, but it
-is not metadata-free; if a timestamp matters for your situation, account for it
-before you share.
+producer tag identifying the operating system version and build that wrote the
+file, and creation and modification timestamps, when it builds the file. The
+export therefore carries much less metadata than a typical PDF, but it is not
+metadata-free; if a timestamp or the producing OS version matters for your
+situation, account for them before you share.
 
 A separate note applies to photos. An image you import can carry its own
 embedded metadata, such as EXIF or GPS location data. Resecta redraws imported

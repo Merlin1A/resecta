@@ -15,6 +15,14 @@ import Foundation
 @Suite("Saved regex inline menu")
 struct SavedRegexMenuTests {
 
+    /// Scratch Application Support stand-in for the store's file
+    /// backend (mirrors `SavedSearchStoreTests.makeScratchFileURL`).
+    private static func makeScratchRegexFileURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("SavedRegexMenuTests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("saved-regexes.v1.json")
+    }
+
     private static func makeSuite(_ function: String = #function) -> UserDefaults {
         let name = "app.resecta.tests.SavedRegexMenu.\(function).\(UUID().uuidString)"
         let suite = UserDefaults(suiteName: name)!
@@ -127,7 +135,8 @@ struct SavedRegexMenuTests {
     @MainActor
     func saveAppendsToStore() {
         let suite = Self.makeSuite()
-        let store = SavedRegexStore(defaults: suite)
+        let store = SavedRegexStore(
+            fileURL: Self.makeScratchRegexFileURL(), legacyDefaults: suite)
         let initialUserCount = store.userSavedRegexes.count
 
         let added = store.add(label: "ZIP", pattern: #"\b\d{5}\b"#)
@@ -142,7 +151,8 @@ struct SavedRegexMenuTests {
     @MainActor
     func saveRespectsCap() {
         let suite = Self.makeSuite()
-        let store = SavedRegexStore(defaults: suite)
+        let store = SavedRegexStore(
+            fileURL: Self.makeScratchRegexFileURL(), legacyDefaults: suite)
         // Pre-fill the user list to the cap via successive add() calls
         // (each pattern must be unique label-wise to clear the dedupe
         // check inside `add`).

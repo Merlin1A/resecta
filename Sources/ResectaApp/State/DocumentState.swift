@@ -228,6 +228,19 @@ class DocumentState {
     /// `PDFPageData` via `PipelineCoordinator.buildPDFPageData`.
     var sourceHasHiddenOCG: Bool = false
 
+    /// Non-Widget annotations present in the imported source, one entry
+    /// per annotation subtype, computed at import time by the engine's
+    /// `AnnotationAnalyzer`. Annotations are drawn by the on-screen
+    /// PDFKit view but are not part of the page content stream the
+    /// export raster is built from, so their presence drives the import
+    /// notice banner in `DocumentEditorView`. Empty for image imports —
+    /// a page rendered from image pixels carries no annotations.
+    var sourceAnnotationFindings: [PDFFinding] = []
+
+    /// True once the user dismisses the import annotation notice for
+    /// the current document. Reset to false on every import.
+    var annotationNoticeDismissed: Bool = false
+
     /// Pipeline mode used for the most recent redaction run.
     var lastUsedPipelineMode: PipelineMode?
 
@@ -495,6 +508,8 @@ class DocumentState {
         redactionState.clearAll()
         sourceDocument = nil
         textLayerStatus = [:]
+        sourceAnnotationFindings = []
+        annotationNoticeDismissed = false
         currentPageIndex = 0
         lastUsedPipelineMode = nil
         wasPausedByBackground = false

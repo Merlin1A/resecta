@@ -30,7 +30,7 @@ struct AccessibilityLabelTests {
         // promise.
         #expect(
             SettingsView.defaultModeAccessibilityHint
-            == "Choose how redacted output is produced. Secure Rasterization produces image-only output; Searchable Redaction preserves non-redacted text."
+            == "Choose how redacted output is produced. Secure Rasterization produces image-only output with all text removed; Searchable Redaction preserves non-redacted text, including text that is not visible on the page."
         )
     }
 

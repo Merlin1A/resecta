@@ -10,7 +10,7 @@ import RedactionEngine
 /// existing `UserTermsIndex.compile(alwaysFlag:neverFlag:)` engine seam
 /// at scan kickoff.
 // nonisolated: a Sendable value blob persisted via the generic
-// `UserDefaultsJSONBlob<T: Codable & Sendable>` and read off-MainActor on the
+// `FileJSONBlob<T: Codable & Sendable>` and read off-MainActor on the
 // detached hydrate path. Under SE-0466 MainActor-default (fix-series s04 flip)
 // the synthesized Decodable conformance would become main-actor-isolated and
 // fail the Sendable generic bound — keep the whole type nonisolated.
@@ -28,16 +28,28 @@ final class UserTermsStore {
     // can read these constants off-MainActor. They are compile-time
     // constants and never mutated, so opting out of @MainActor isolation
     // here is sound.
+    // `storageKey` is the pre-file `UserDefaults` location, retained as
+    // the one-shot migration source (see `migrateLegacyDefaultsIfNeeded`).
     nonisolated static let storageKey = "userTerms.v1"
     nonisolated static let schemaVersion: UInt8 = 1
     nonisolated static let perListCap = 100
     nonisolated static let patternLengthCap = 200
 
+    /// Production file location: one JSON file under Application
+    /// Support, written with `.completeFileProtection` and excluded
+    /// from backups by `FileJSONBlob` on every save — the same posture
+    /// `SavedSearchStore` established for persisted user data.
+    static var defaultFileURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("UserTerms", isDirectory: true)
+            .appendingPathComponent("user-terms.v1.json")
+    }
+
     /// Composed envelope read by the engine via
     /// `DocumentSearcher.setUserTerms(_:)`.
     private(set) var blob: UserTermsBlob
 
-    private let storage: UserDefaultsJSONBlob<UserTermsBlob>
+    private let storage: FileJSONBlob<UserTermsBlob>
 
     // Hydration-race barrier. The async-hydrate write-back must not
     // clobber a term the user adds in the window between the detached snapshot
@@ -50,28 +62,35 @@ final class UserTermsStore {
     // await the write-back attempt. nil on the synchronous path.
     private(set) var hydrationTask: Task<Void, Never>?
 
-    /// Default production init — reads from `UserDefaults.standard`.
+    /// Default production init — reads the Application Support file.
     convenience init() {
-        self.init(defaults: .standard, asyncHydrate: true)
+        self.init(fileURL: Self.defaultFileURL, asyncHydrate: true)
     }
 
-    // P2.1: `asyncHydrate` moves the UserDefaults read + sanitize off the
+    // P2.1: `asyncHydrate` moves the file read + sanitize off the
     // cold-start critical path. Default is false so tests calling
-    // `init(defaults:)` keep their synchronous contract.
+    // `init(fileURL:legacyDefaults:)` keep their synchronous contract.
     //
-    // CONC-1 (Pkg N): the async path runs the UserDefaults read and
+    // CONC-1 (Pkg N): the async path runs the file read and
     // `sanitize` on a detached Task so the work happens off-MainActor.
     // The previous `Task { @MainActor in ... }` formulation only
     // deferred the work to a later MainActor tick — it never left the
     // main thread. The detached awaiter hops back to MainActor here
     // to publish the result.
-    init(defaults: UserDefaults, asyncHydrate: Bool = false) {
-        self.storage = UserDefaultsJSONBlob(
-            key: Self.storageKey,
+    //
+    // The one-shot legacy migration runs synchronously BEFORE the
+    // hydrate is spawned: it must complete before any read of the file,
+    // and running it inline keeps it out of the async-hydrate race
+    // window (a detached write racing an early user mutation could
+    // otherwise clobber the mutation). It is a no-op on every launch
+    // after the first — the legacy key is removed once migrated.
+    init(fileURL: URL, legacyDefaults: UserDefaults = .standard, asyncHydrate: Bool = false) {
+        self.storage = FileJSONBlob(
+            fileURL: fileURL,
             schemaVersion: Self.schemaVersion,
-            defaults: defaults,
             fallback: .empty
         )
+        Self.migrateLegacyDefaultsIfNeeded(from: legacyDefaults, into: storage)
         if asyncHydrate {
             self.blob = .empty
             let captured = self.storage
@@ -88,6 +107,30 @@ final class UserTermsStore {
         }
     }
 
+    /// One-shot move of the pre-file `UserDefaults` blob into the
+    /// protected Application Support file (same clean-break shape as
+    /// `SearchState.purgeRetiredRecentsStorage`, but carrying the data
+    /// forward). If the legacy key holds a decodable blob it is written
+    /// through the file store; the key is removed only after the file
+    /// is confirmed on disk, so a failed write retries next launch.
+    /// Envelope shape and schema version are unchanged on both sides.
+    nonisolated private static func migrateLegacyDefaultsIfNeeded(
+        from defaults: UserDefaults,
+        into storage: FileJSONBlob<UserTermsBlob>
+    ) {
+        guard defaults.data(forKey: storageKey) != nil else { return }
+        let legacy = UserDefaultsJSONBlob<UserTermsBlob>(
+            key: storageKey,
+            schemaVersion: schemaVersion,
+            defaults: defaults,
+            fallback: .empty
+        )
+        storage.save(legacy.load())
+        if FileManager.default.fileExists(atPath: storage.fileURL.path) {
+            defaults.removeObject(forKey: storageKey)
+        }
+    }
+
     /// Publish the async-hydrate snapshot unless a mutation already
     /// superseded it (see `isHydrated`). Internal — not private — so the race
     /// guard is testable without depending on detached-task read timing.
@@ -98,10 +141,10 @@ final class UserTermsStore {
     }
 
     /// CONC-1 (Pkg N): nonisolated helper invoked from `Task.detached` so
-    /// the UserDefaults read and the `sanitize` pass run off-MainActor.
+    /// the file read and the `sanitize` pass run off-MainActor.
     /// Pure function of the storage handle; no MainActor state read.
     nonisolated private static func loadAndSanitize(
-        from storage: UserDefaultsJSONBlob<UserTermsBlob>
+        from storage: FileJSONBlob<UserTermsBlob>
     ) -> UserTermsBlob {
         sanitize(storage.load())
     }
@@ -135,6 +178,15 @@ final class UserTermsStore {
 
     func removeNeverFlag(at indices: IndexSet) {
         blob.neverFlag.remove(atOffsets: indices)
+        persist()
+    }
+
+    /// Remove every term from both lists and persist the empty pair.
+    /// Backs the destructive "Delete All Custom Terms" row in
+    /// `CustomTermsView`; the row's confirmation copy names exactly this
+    /// scope (both lists, this store only).
+    func clearAllTerms() {
+        blob = .empty
         persist()
     }
 

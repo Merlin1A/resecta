@@ -10,7 +10,7 @@ struct SettingsView: View {
     // constants so the contract can be pinned by unit tests without
     // rendering the form. Mirrors the `InlineWarningBanner.lineLimit(for:)`
     // pattern used for the AX5 line-cap predicate.
-    static let defaultModeAccessibilityHint = "Choose how redacted output is produced. Secure Rasterization produces image-only output; Searchable Redaction preserves non-redacted text."
+    static let defaultModeAccessibilityHint = "Choose how redacted output is produced. Secure Rasterization produces image-only output with all text removed; Searchable Redaction preserves non-redacted text, including text that is not visible on the page."
     static let fillColorAccessibilityHint = "Color used to fill redacted regions in the output."
     static let verifyToggleDefaultHint = "When enabled, the app runs verification checks before you can export"
     static let verifyToggleParanoidLockedHint = "Locked on because Paranoid Mode is enabled."
@@ -193,12 +193,12 @@ struct SettingsView: View {
             // ARCH §7: Description for current selection
             switch settingsState.pipelineMode {
             case .secureRasterization:
-                Text("Produces image-only output. The simplest approach \u{2014} recommended when redaction confidence is the top priority.")
+                Text("Produces image-only output with all text removed. The simplest approach \u{2014} recommended when redaction confidence is the top priority.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .listRowSeparator(.hidden)
             case .searchableRedaction:
-                Text("Preserves non-redacted text for search and selection. Available for documents with an existing text layer.")
+                Text("Preserves non-redacted text for search and selection \u{2014} including text the page does not visibly show, such as text beneath boxes or stamps. Available for documents with an existing text layer.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .listRowSeparator(.hidden)

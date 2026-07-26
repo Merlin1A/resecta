@@ -344,15 +344,15 @@ struct SearchAndRedactSheet: View {
         // Apply) enqueue a success toast via `toastManager` so the
         // search sheet stays interactive after every apply — no
         // blocking alert, no confirmation dialog.
-        // Match audit export. Two share options: abbreviated content
-        // (default, safer) and raw content (destructive role). Cancel
-        // dismisses without writing anything.
-        // The confirmation
-        // dialog carries two v4 share `Button`s (redacted + raw) plus
-        // a Cancel role, routing through
-        // `exportAudit(includeSensitive:schema:)` with `.v4`. The
+        // Match audit export. One share option — abbreviated content —
+        // plus Cancel; Cancel dismisses without writing anything.
+        // The dialog routes through
+        // `exportAudit(includeSensitive:schema:)` with `.v4` and
+        // abbreviated content only: a raw-content share is not a dialog
+        // row (DC-214 — revival is a deliberate re-add, reviewed with
+        // PB-124's payload-policy pass, not a flag flip). The
         // dialog-shape choice (vs. a custom sheet) keeps the
-        // three-row `.confirmationDialog` fitting inside the iOS sheet at
+        // `.confirmationDialog` fitting inside the iOS sheet at
         // AX5 since each label is single-line. V1.1+ scope
         // re-introduces a v3 surface only if the per-region exemption
         // tagging deferral lands (a late-cutover deferral).
@@ -368,12 +368,9 @@ struct SearchAndRedactSheet: View {
             Button("Share v4 (redacted content)") {
                 Task { await exportAudit(includeSensitive: false, schema: .v4) }
             }
-            Button("Share v4 with raw content", role: .destructive) {
-                Task { await exportAudit(includeSensitive: true, schema: .v4) }
-            }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Creates a CSV and JSON record of each detected match and the rule that triggered it. Designed for legal review of detection reasoning. Matched text is abbreviated unless you choose raw content.")
+            Text("Creates a CSV and JSON record of each detected match and the rule that triggered it. Designed for legal review of detection reasoning. Matched text is abbreviated.")
         }
         // One `.sheet(item:)` replaces the prior pair of
         // `.sheet`s and the per-row rationale sheet on

@@ -24,6 +24,11 @@ struct CustomTermsView: View {
 
     @State private var showingTemplatePicker = false
 
+    // GATE-2 destructive-action confirmation symmetry (mirrors the
+    // Settings Reset-to-Defaults dialog): the delete-all row confirms
+    // before dropping both lists.
+    @State private var showClearAllConfirmation = false
+
     /// CL-QP1-02 (approved at QCP-P 2026-07-03) — V1.0 ships without the
     /// template-picker entry point; the browse button is gated off behind
     /// this flag. Flip it to `true` to re-enable the UI — the picker view,
@@ -41,12 +46,50 @@ struct CustomTermsView: View {
             }
             alwaysFlagSection
             neverFlagSection
+            clearAllSection
         }
         .navigationTitle("Custom Terms")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingTemplatePicker) {
             CustomTermsTemplatePicker(isPresented: $showingTemplatePicker)
                 .environment(userTermsStore)
+        }
+        // GATE-2: destructive confirm mirroring the Settings
+        // Reset-to-Defaults dialog. Copy names exactly what is cleared:
+        // both lists in this store, nothing else.
+        .confirmationDialog(
+            "Delete all custom terms?",
+            isPresented: $showClearAllConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete All", role: .destructive) {
+                userTermsStore.clearAllTerms()
+            }
+            .accessibilityIdentifier("customTermsClearAllConfirm")
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Every always-flag and never-flag term is deleted from this device. Saved Regexes and other settings are not affected.")
+        }
+    }
+
+    // MARK: - Delete All
+
+    /// Destructive bulk clear for both lists. Swipe-to-delete covers
+    /// single rows; this row is the one control that removes every
+    /// stored term at once. Hidden while both lists are empty — there
+    /// is nothing to delete and the row would read as broken.
+    @ViewBuilder
+    private var clearAllSection: some View {
+        if !userTermsStore.blob.alwaysFlag.isEmpty
+            || !userTermsStore.blob.neverFlag.isEmpty {
+            Section {
+                Button("Delete All Custom Terms", role: .destructive) {
+                    showClearAllConfirmation = true
+                }
+                .accessibilityIdentifier("customTermsClearAllButton")
+            } footer: {
+                Text("Removes every term from both lists on this device.")
+            }
         }
     }
 

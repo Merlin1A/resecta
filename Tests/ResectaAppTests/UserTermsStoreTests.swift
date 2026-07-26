@@ -27,13 +27,26 @@ struct UserTermsStoreHydrationTests {
         return defaults
     }
 
+    /// Scratch Application Support stand-in — one throwaway file per
+    /// test so stores never touch the production location (mirrors
+    /// `SavedSearchStoreTests.makeScratchFileURL`).
+    private func makeScratchFileURL(_ name: String) -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("UserTermsStoreTests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent(name)
+    }
+
     @Test("UserTermsStore: a stale hydrate write-back does not clobber an early add")
     func testHydrateDoesNotClobberEarlyAdd() async {
         let name = "UserTermsStoreTests.clobber.always"
         let defaults = makeEmptyDefaults(name)
-        defer { defaults.removePersistentDomain(forName: name) }
+        let fileURL = makeScratchFileURL("user-terms.v1.json")
+        defer {
+            defaults.removePersistentDomain(forName: name)
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+        }
 
-        let store = UserTermsStore(defaults: defaults, asyncHydrate: true)
+        let store = UserTermsStore(fileURL: fileURL, legacyDefaults: defaults, asyncHydrate: true)
         // Real race window: blob == .empty, the detached snapshot is in flight.
         let early = UserTerm(pattern: "early-term", isRegex: false)
         #expect(store.addAlwaysFlag(early))
@@ -58,17 +71,21 @@ struct UserTermsStoreHydrationTests {
     func testHydrateDoesNotClobberEarlySavedRegex() async {
         let name = "SavedRegexStoreTests.clobber"
         let defaults = makeEmptyDefaults(name)
-        defer { defaults.removePersistentDomain(forName: name) }
+        let fileURL = makeScratchFileURL("saved-regexes.v1.json")
+        defer {
+            defaults.removePersistentDomain(forName: name)
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+        }
 
         // The async-hydrate window (and its clobber class) is gone:
         // `SavedRegexStore` hydrates synchronously at init, so there is
         // no tick in which a mutation can persist over an unloaded
         // library. The reload asserts the persisted bytes carry the
         // early save.
-        let store = SavedRegexStore(defaults: defaults)
+        let store = SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults)
         #expect(store.add(label: "Early", pattern: "[0-9]{3}"))
 
-        let reloaded = SavedRegexStore(defaults: defaults)
+        let reloaded = SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults)
         #expect(reloaded.userSavedRegexes.contains(where: { $0.label == "Early" }),
                 "the early save must be on disk and visible from init")
     }

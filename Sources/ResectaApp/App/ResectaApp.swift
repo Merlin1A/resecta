@@ -49,9 +49,11 @@ struct ResectaApp: App {
         SearchState.purgeRetiredRecentsStorage()
 
         // App-wide stores for the power-user library: saved regexes and
-        // always/never-flag custom terms. Both persist via UserDefaults
-        // JSON blobs and are read by the search trigger path at scan
-        // kickoff.
+        // always/never-flag custom terms. Both persist as protected,
+        // backup-excluded JSON files under Application Support (the
+        // `SavedSearchStore` posture; pre-file installs migrate off
+        // their UserDefaults keys once at init) and are read by the
+        // search trigger path at scan kickoff.
         let regexStore = SavedRegexStore()
         let termsStore = UserTermsStore()
         let searchStore = SavedSearchStore()

@@ -37,10 +37,20 @@ struct SaveCurrentRegexCommitTests {
         return suite
     }
 
-    @Test("Successful save persists through the store to UserDefaults and back")
+    /// Scratch Application Support stand-in — one throwaway file per
+    /// store so tests never touch the production location (mirrors
+    /// `SavedSearchStoreTests.makeScratchFileURL`).
+    private static func makeScratchRegexFileURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("SavedThingsTests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("saved-regexes.v1.json")
+    }
+
+    @Test("Successful save persists through the store to its file and back")
     func saveRoundTripsThroughStore() async {
-        let defaults = Self.makeSuite()
-        let store = SavedRegexStore(defaults: defaults)
+        let fileURL = Self.makeScratchRegexFileURL()
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+        let store = SavedRegexStore(fileURL: fileURL, legacyDefaults: Self.makeSuite())
         let before = store.userSavedRegexes.count
 
         let error = await SearchAndRedactSheet.commitSaveCurrentRegex(
@@ -54,15 +64,16 @@ struct SaveCurrentRegexCommitTests {
         #expect(store.userSavedRegexes.last?.label == "ZIP code")
         #expect(store.userSavedRegexes.last?.pattern == #"\b\d{5}\b"#)
 
-        // Reload from the same suite — the entry survived persist().
-        let reloaded = SavedRegexStore(defaults: defaults)
+        // Reload from the same file — the entry survived persist().
+        let reloaded = SavedRegexStore(fileURL: fileURL, legacyDefaults: Self.makeSuite())
         #expect(reloaded.userSavedRegexes.count == before + 1)
         #expect(reloaded.userSavedRegexes.last?.label == "ZIP code")
     }
 
     @Test("Label and pattern are trimmed before commit")
     func saveTrimsWhitespace() async {
-        let store = SavedRegexStore(defaults: Self.makeSuite())
+        let store = SavedRegexStore(
+            fileURL: Self.makeScratchRegexFileURL(), legacyDefaults: Self.makeSuite())
 
         let error = await SearchAndRedactSheet.commitSaveCurrentRegex(
             label: "  Case number  ",
@@ -77,7 +88,8 @@ struct SaveCurrentRegexCommitTests {
 
     @Test("Empty label or pattern returns an error and persists nothing")
     func saveRejectsEmptyInput() async {
-        let store = SavedRegexStore(defaults: Self.makeSuite())
+        let store = SavedRegexStore(
+            fileURL: Self.makeScratchRegexFileURL(), legacyDefaults: Self.makeSuite())
 
         let emptyLabel = await SearchAndRedactSheet.commitSaveCurrentRegex(
             label: "   ", pattern: #"\d+"#, store: store
@@ -93,7 +105,8 @@ struct SaveCurrentRegexCommitTests {
 
     @Test("Store rejection (duplicate label) surfaces an error message")
     func saveSurfacesStoreRejection() async {
-        let store = SavedRegexStore(defaults: Self.makeSuite())
+        let store = SavedRegexStore(
+            fileURL: Self.makeScratchRegexFileURL(), legacyDefaults: Self.makeSuite())
         _ = store.add(label: "Dup", pattern: #"\d{2}"#)
 
         let error = await SearchAndRedactSheet.commitSaveCurrentRegex(
@@ -170,10 +183,14 @@ struct SaveCurrentRegexPresentationTests {
         let driver = PromptDriver()
 
         let root = Harness(searchState: searchState, driver: driver)
-            .environment(SavedRegexStore(defaults: {
-                let name = "app.resecta.tests.SavedThings.presentation.\(UUID().uuidString)"
-                return UserDefaults(suiteName: name)!
-            }()))
+            .environment(SavedRegexStore(
+                fileURL: FileManager.default.temporaryDirectory
+                    .appendingPathComponent("SavedThingsTests-presentation-\(UUID().uuidString)", isDirectory: true)
+                    .appendingPathComponent("saved-regexes.v1.json"),
+                legacyDefaults: {
+                    let name = "app.resecta.tests.SavedThings.presentation.\(UUID().uuidString)"
+                    return UserDefaults(suiteName: name)!
+                }()))
             // UXF-14 (q13): the section now reads DocumentState for the
             // conditional disabled-OCR caption; the hosted hierarchy must
             // provide it like the production sheet does.

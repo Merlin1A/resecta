@@ -18,15 +18,56 @@ struct SavedRegexLibraryView: View {
     @State private var addError: String?
     @State private var addInFlight: Bool = false
 
+    // GATE-2 destructive-action confirmation symmetry (mirrors the
+    // Settings Reset-to-Defaults dialog): the delete-all row confirms
+    // before dropping the user-saved library.
+    @State private var showClearAllConfirmation = false
+
     var body: some View {
         Form {
             aboutSection
             builtInSection
             userSavedSection
+            clearAllSection
             addRow
         }
         .navigationTitle("Saved regexes")
         .navigationBarTitleDisplayMode(.inline)
+        // GATE-2: destructive confirm. Copy names exactly what is
+        // cleared: user-saved patterns only — built-ins ship with the
+        // app and are unaffected.
+        .confirmationDialog(
+            "Delete all your patterns?",
+            isPresented: $showClearAllConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete All", role: .destructive) {
+                savedRegexStore.clearAllUserSaved()
+            }
+            .accessibilityIdentifier("savedRegexClearAllConfirm")
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Every user-saved pattern is deleted from this device. Built-in patterns and other settings are not affected.")
+        }
+    }
+
+    // MARK: - Delete All
+
+    /// Destructive bulk clear for the user-saved library. Swipe-to-delete
+    /// covers single rows; this row removes every user-saved pattern at
+    /// once. Hidden while the user list is empty.
+    @ViewBuilder
+    private var clearAllSection: some View {
+        if !savedRegexStore.userSavedRegexes.isEmpty {
+            Section {
+                Button("Delete All Your Patterns", role: .destructive) {
+                    showClearAllConfirmation = true
+                }
+                .accessibilityIdentifier("savedRegexClearAllButton")
+            } footer: {
+                Text("Removes every user-saved pattern on this device. Built-in patterns stay.")
+            }
+        }
     }
 
     // MARK: - About

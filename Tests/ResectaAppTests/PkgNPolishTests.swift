@@ -128,18 +128,24 @@ struct StoreHydrateOffMainActorTests {
 
     @Test("UserTermsStore async hydrate eventually publishes loaded blob")
     func testUserTermsStoreAsyncHydratePublishes() async {
-        // Seed UserDefaults with a non-empty blob so the async hydrate
+        // Seed the store file with a non-empty blob so the async hydrate
         // has visible work to do.
         let suiteName = "pkg-n-conc-1-userterms-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pkg-n-userterms-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("user-terms.v1.json")
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+        }
         // Round-trip a seeded value through the sync path so we know
         // the storage format matches what async hydrate would load.
-        let seed = UserTermsStore(defaults: defaults)
+        let seed = UserTermsStore(fileURL: fileURL, legacyDefaults: defaults)
         _ = seed.addAlwaysFlag(UserTerm(pattern: "alpha", isRegex: false))
         // Spin up the async-hydrate store. Initial blob is `.empty`,
         // then the detached-task hop publishes the loaded value.
-        let store = UserTermsStore(defaults: defaults, asyncHydrate: true)
+        let store = UserTermsStore(fileURL: fileURL, legacyDefaults: defaults, asyncHydrate: true)
         #expect(store.blob.alwaysFlag.isEmpty, "Initial blob is empty before detached hydrate completes")
         // Yield repeatedly to let the detached task run and the
         // MainActor awaiter publish. A bounded retry loop covers
@@ -156,13 +162,19 @@ struct StoreHydrateOffMainActorTests {
     func testSavedRegexStoreSyncHydratePublishes() async {
         let suiteName = "pkg-n-conc-1-regex-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let seed = SavedRegexStore(defaults: defaults)
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pkg-n-regex-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("saved-regexes.v1.json")
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+        }
+        let seed = SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults)
         _ = seed.add(label: "PkgN-test", pattern: "\\d{4}")
         // Hydration is synchronous by design: the former async path
         // published `[]` first, and a mutation landing in that window
         // persisted a one-entry envelope over the real library.
-        let store = SavedRegexStore(defaults: defaults)
+        let store = SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults)
         #expect(store.userSavedRegexes.contains(where: { $0.label == "PkgN-test" }))
     }
 
@@ -170,16 +182,23 @@ struct StoreHydrateOffMainActorTests {
     func testSavedRegexLenientDecodeAndRetention() throws {
         let suiteName = "pkg-n-regex-lenient-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pkg-n-regex-lenient-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("saved-regexes.v1.json")
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+        }
 
-        let seed = SavedRegexStore(defaults: defaults)
+        let seed = SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults)
         #expect(seed.add(label: "Keep", pattern: "\\d{3}"))
 
-        // Corrupt one row in the stored blob (outer UserDefaultsJSONBlob
-        // envelope → payload → userSavedRegexes). The previous
-        // synthesized decoder failed the WHOLE array on this row,
-        // emptying the library; leniency parks it instead.
-        let data = try #require(defaults.data(forKey: SavedRegexStore.storageKey))
+        // Corrupt one row in the stored file (outer FileJSONBlob
+        // envelope → payload → userSavedRegexes; the envelope JSON is
+        // shape-identical to the pre-file UserDefaults blob). The
+        // previous synthesized decoder failed the WHOLE array on this
+        // row, emptying the library; leniency parks it instead.
+        let data = try Data(contentsOf: fileURL)
         var outer = try #require(
             try JSONSerialization.jsonObject(with: data) as? [String: Any])
         var payload = try #require(outer["payload"] as? [String: Any])
@@ -187,22 +206,21 @@ struct StoreHydrateOffMainActorTests {
         rows.append(["bogusRow": true])
         payload["userSavedRegexes"] = rows
         outer["payload"] = payload
-        defaults.set(try JSONSerialization.data(withJSONObject: outer),
-                     forKey: SavedRegexStore.storageKey)
+        try JSONSerialization.data(withJSONObject: outer).write(to: fileURL)
 
-        let store = SavedRegexStore(defaults: defaults)
+        let store = SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults)
         #expect(store.userSavedRegexes.map(\.label) == ["Keep"],
                 "survivors load; the bad row parks instead of zeroing the list")
 
         // The re-save that used to make the loss permanent.
         #expect(store.add(label: "Second", pattern: "[a-z]{2}"))
         let rawAfter = String(
-            data: try #require(defaults.data(forKey: SavedRegexStore.storageKey)),
+            data: try Data(contentsOf: fileURL),
             encoding: .utf8)!
         #expect(rawAfter.contains("bogusRow"),
                 "the parked row survives the unrelated save")
 
-        let reloaded = SavedRegexStore(defaults: defaults)
+        let reloaded = SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults)
         #expect(Set(reloaded.userSavedRegexes.map(\.label)) == ["Keep", "Second"])
     }
 }

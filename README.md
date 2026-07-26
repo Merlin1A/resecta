@@ -21,14 +21,14 @@ The core workflow is:
 1. **Import** a PDF or image from Files, Photos, or drag-and-drop.
 2. **View** pages and navigate the document.
 3. **Mark** regions for redaction by drawing rectangles, or by selecting and applying results from Scan (on-device text detection) or Search (text, pattern, and multi-term matching).
-4. **Apply** redaction. Each affected page is rasterized — vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer in marked regions. Source document metadata (author, editing history, etc.) is stripped; the rebuilt file carries a generic producer tag and fresh creation/modification timestamps added by the system PDF writer, so the export is not metadata-free — see [`PRIVACY.md`](./PRIVACY.md).
+4. **Apply** redaction. Each affected page is rasterized — vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer in marked regions. Source document metadata (author, editing history, etc.) is stripped; the rebuilt file carries a producer tag identifying the operating system version and build that wrote it, plus fresh creation/modification timestamps added by the system PDF writer, so the export is not metadata-free — see [`PRIVACY.md`](./PRIVACY.md).
 5. **Verify.** A multi-layer verification engine scans the output for residual content using text extraction, OCR, binary string search across multiple encodings, structural analysis, and metadata checks.
 6. **Export** via the system share sheet.
 
 ## Two modes
 
 - **Secure Rasterization** — produces image-only output and is the simplest approach for high-sensitivity documents. Verification runs as a 5-layer check.
-- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to remove glyph-positioning side channels identified in academic research. Verification runs as a 10-layer check (the five additional checks cover the preserved-text layer).
+- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to remove glyph-positioning side channels identified in academic research. Non-redacted text includes text the page does not visibly show (for example, text beneath boxes or stamps in the source). Verification runs as a 10-layer check (the five additional checks cover the preserved-text layer).
 
 Both modes share the same pixel-destruction core. Mode choice is per-document.
 
@@ -93,7 +93,7 @@ Resecta is designed to address specific risks that arise when sharing redacted d
 **In scope:**
 
 - **Residual text after redaction.** Both modes are designed to rasterize affected pages and remove the original text layer from marked regions. The multi-layer verification pass scans the output for any text or character data that remains.
-- **Document metadata leakage.** Author, editing history, tagged structure, and other source metadata fields are stripped from exported documents. The rebuilt file does carry a generic producer tag and fresh creation/modification timestamps from the system PDF writer — it is not metadata-free; see [`PRIVACY.md`](./PRIVACY.md).
+- **Document metadata leakage.** Author, editing history, tagged structure, and other source metadata fields are stripped from exported documents. The rebuilt file does carry a producer tag identifying the operating system version and build that wrote it, and fresh creation/modification timestamps from the system PDF writer — it is not metadata-free; see [`PRIVACY.md`](./PRIVACY.md).
 - **Font-positioning side channels (Searchable Redaction).** The preserved text layer uses a fresh monospace font with uniform spacing, designed to remove the glyph-positioning side channels identified in academic research on sandwich PDFs.
 
 **Out of scope:**

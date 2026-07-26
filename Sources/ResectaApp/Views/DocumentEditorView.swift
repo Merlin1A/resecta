@@ -286,6 +286,30 @@ struct DocumentEditorView: View {
                             }
                         }
                     }
+                    // Import annotation notice: the imported source
+                    // carries annotations, which the on-screen view draws
+                    // but the export raster (built from the page content
+                    // stream) does not include. Persistent until the user
+                    // dismisses it; yields to the two banners above via
+                    // the visibility predicate rather than stacking.
+                    .overlay(alignment: .top) {
+                        if ImportAnnotationNoticeBanner.isVisible(
+                            phaseKind: documentState.phaseKind,
+                            annotationTypeCount: ImportAnnotationNoticeBanner.noticeWorthyCount(
+                                documentState.sourceAnnotationFindings),
+                            dismissed: documentState.annotationNoticeDismissed,
+                            pausedBannerActive: documentState.wasPausedByBackground,
+                            detectionBannerActive: detectionBanner != nil
+                        ) {
+                            ImportAnnotationNoticeBanner {
+                                withAnimation(ResectaTokens.Anim.overlayDismiss) {
+                                    documentState.annotationNoticeDismissed = true
+                                }
+                            }
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .padding(.top, ResectaTokens.Spacing.toolbarClearance)
+                        }
+                    }
                     // (CANCEL-009 note: the mid-verify background-resume
                     // banner that used to chain here was structurally
                     // unreachable — it gated on `.verified(report: .skipped)`,
@@ -1320,6 +1344,8 @@ struct DocumentEditorView: View {
         redactionState.clearAll()
         documentState.sourceDocument = nil
         documentState.textLayerStatus = [:]
+        documentState.sourceAnnotationFindings = []
+        documentState.annotationNoticeDismissed = false
         documentState.currentPageIndex = 0
         documentState.lastUsedPipelineMode = nil
         documentState.wasPausedByBackground = false
