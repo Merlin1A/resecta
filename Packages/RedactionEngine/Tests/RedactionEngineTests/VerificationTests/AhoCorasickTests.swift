@@ -73,9 +73,10 @@ struct AhoCorasickTests {
     func encodeForSearchCaseVariantsDeduplicated() {
         let patterns = AhoCorasick.encodeForSearch("Hello")
         // 3 distinct case variants (Hello / hello / HELLO; Title Case
-        // duplicates the original here) × 3 distinct encodings (UTF-8 ≡
-        // ASCII ≡ Latin-1 for ASCII text, plus UTF-16BE and UTF-16LE).
-        #expect(patterns.count == 9)
+        // duplicates the original here) × 5 distinct encodings (UTF-8 ≡
+        // ASCII ≡ Latin-1 for ASCII text, plus UTF-16BE, UTF-16LE,
+        // UTF-32BE, and UTF-32LE).
+        #expect(patterns.count == 15)
         #expect(patterns.allSatisfy { !$0.isEmpty })
         // Byte-identical duplicates are removed — one physical occurrence
         // must register exactly one pattern per matching byte shape.
@@ -83,6 +84,21 @@ struct AhoCorasickTests {
         #expect(patterns.contains(Array("Hello".utf8)))
         #expect(patterns.contains(Array("hello".utf8)))
         #expect(patterns.contains(Array("HELLO".utf8)))
+    }
+
+    @Test("encodeForSearch emits UTF-32 byte shapes in both endiannesses")
+    func encodeForSearchUTF32Shapes() {
+        let patterns = AhoCorasick.encodeForSearch("acme")
+        // UTF-32BE: each ASCII scalar as 00 00 00 xx; LE mirrored. No BOM —
+        // the explicit-endian encodings emit raw code units.
+        let utf32BE: [UInt8] = "acme".unicodeScalars.flatMap {
+            [0x00, 0x00, 0x00, UInt8($0.value)]
+        }
+        let utf32LE: [UInt8] = "acme".unicodeScalars.flatMap {
+            [UInt8($0.value), 0x00, 0x00, 0x00]
+        }
+        #expect(patterns.contains(utf32BE))
+        #expect(patterns.contains(utf32LE))
     }
 
     @Test("encodeForSearch covers Title Case for a lowercase term")
@@ -98,9 +114,10 @@ struct AhoCorasickTests {
     @Test("encodeForSearch collapses variants of a caseless term")
     func encodeForSearchCaselessTerm() {
         // Digits have no case — all four variants are byte-identical, so
-        // only the 3 distinct encodings remain (UTF-8/ASCII/Latin-1 merge).
+        // only the 5 distinct encodings remain (UTF-8/ASCII/Latin-1 merge;
+        // UTF-16 and UTF-32 each contribute both endiannesses).
         let patterns = AhoCorasick.encodeForSearch("12345")
-        #expect(patterns.count == 3)
+        #expect(patterns.count == 5)
     }
 
     @Test("encodeForSearch NFC-normalizes: decomposed term matches composed bytes")
@@ -148,11 +165,12 @@ struct AhoCorasickTests {
         // Case variants roughly triple the pattern bytes for a cased ASCII
         // term; the 1 MB bound must count the actual emitted bytes. One
         // 100_000-character term → 3 variants × (100k UTF-8 + 200k UTF-16BE
-        // + 200k UTF-16LE) = 1.5 MB > bound → degraded no-op automaton.
+        // + 200k UTF-16LE + 400k UTF-32BE + 400k UTF-32LE) = 3.9 MB > bound
+        // → degraded no-op automaton.
         let bigTerm = String(repeating: "a", count: 100_000)
         let patterns = AhoCorasick.encodeForSearch(bigTerm)
         let totalBytes = patterns.reduce(0) { $0 + $1.count }
-        #expect(totalBytes == 1_500_000)
+        #expect(totalBytes == 3_900_000)
         let ac = AhoCorasick(patterns: patterns)
         #expect(ac.isDegraded)
     }

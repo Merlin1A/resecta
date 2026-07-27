@@ -154,16 +154,16 @@ public struct PIIDetector: Sendable {
         // detection. See plan.md §3 SEC-6 (locked: degrade-with-banner).
         if !GazetteerLoader.isManifestSignatureValid(bundle: bundle) {
             let reason = "gazetteer-manifest signature verification failed (PipelineError.detectionError(.detectionCorpusInvalid))"
-            // The doctype classifier's doctype-keywords.json is not
-            // covered by the gazetteer-manifest signature, so a signature
-            // failure must not auto-report it. Its load status is folded in on
-            // the valid-signature path below.
-            // GAP-DEPTARGET-NER (D04-F3 == D11-F3) — `.nerNameModel` is also excluded:
-            // the `.nameType` NER model is an OS MobileAsset, not signature-covered,
-            // so a manifest-signature failure must not falsely attribute it. Its
-            // availability is folded in on the valid-signature path below.
+            // Loaders NOT covered by the gazetteer-manifest signature must not
+            // be auto-attributed here (their load status is folded in on the
+            // valid-signature path below): the doctype classifier's
+            // doctype-keywords.json, the OS-provisioned NER MobileAsset
+            // (GAP-DEPTARGET-NER, D04-F3 == D11-F3), and the three Classifier/
+            // quality assets (context-scorer / doctype-temperature /
+            // preset-thresholds). Membership lives on the enum so the loop and
+            // the valid-path probes cannot drift apart.
             for gazetteer in GazetteerLoadDiagnostics.Gazetteer.allCases
-            where gazetteer != .documentTypeClassifier && gazetteer != .nerNameModel {
+            where !GazetteerLoadDiagnostics.outsideManifestSignature.contains(gazetteer) {
                 diagnostics = diagnostics.appending(gazetteer, reason: reason)
             }
             // Signature-fail path: all gazetteers nil (fail-safe; no suppression).
@@ -303,6 +303,33 @@ public struct PIIDetector: Sendable {
                 .nerNameModel,
                 reason: "NLTagger .nameType MobileAsset unavailable on this OS build (NER name detection disabled)"
             )
+        }
+
+        // 11. Context-scorer weights (visibility only — DetectionOrchestrator
+        //     and DocumentSearcher own the live instances via
+        //     `loadFromEngineBundle()`, which shares this loader). Any fallback
+        //     to the identity scorer (missing / unreadable / hash-mismatched /
+        //     invalid wire) previously reached OSLog only; folding it here
+        //     drives the same SEC-7 banner the corpus loaders use. The load is
+        //     startup-cheap and idempotent; the instance is discarded.
+        let (_, scorerReason) = ContextScorerWeights.loadWithDiagnostics(from: bundle)
+        if let reason = scorerReason {
+            diagnostics = diagnostics.appending(.contextScorerWeights, reason: reason)
+        }
+
+        // 12. Doctype softmax temperature (visibility only — CalibratedScorer
+        //     owns the live value). Fallback to identity T=1.0 reports here.
+        let (_, temperatureReason) = CalibratedScorer.loadTemperatureWithDiagnostics(from: bundle)
+        if let reason = temperatureReason {
+            diagnostics = diagnostics.appending(.doctypeTemperature, reason: reason)
+        }
+
+        // 13. Preset threshold vectors (visibility only — consumers load via
+        //     `PresetThresholdBundle.loadFromEngineBundle()`). Fallback to
+        //     `.builtInDefaults` reports here.
+        let (_, presetsReason) = PresetThresholdBundle.loadWithDiagnostics(from: bundle)
+        if let reason = presetsReason {
+            diagnostics = diagnostics.appending(.presetThresholds, reason: reason)
         }
 
         let detector = PIIDetector(

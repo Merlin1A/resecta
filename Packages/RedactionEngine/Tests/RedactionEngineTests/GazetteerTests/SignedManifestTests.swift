@@ -250,14 +250,15 @@ struct SignedManifestTests {
 
         #expect(diagnostics.didDegrade)
         // The signature-fail short-circuit appends every SIGNATURE-COVERED loader.
-        // The two OS/JSON-provisioned trackers — documentTypeClassifier (CAT-065,
-        // s17) and nerNameModel (GAP-DEPTARGET-NER, this session) — are NOT covered
-        // by the gazetteer-manifest signature and are deliberately excluded from
-        // that loop, so they never appear on the signature-failure list. (Updating
-        // this from a bare `allCases.count` also corrects a count that has been off
-        // by one since documentTypeClassifier joined the enum in s17.)
+        // Trackers NOT covered by the gazetteer-manifest signature —
+        // documentTypeClassifier (CAT-065, s17), nerNameModel
+        // (GAP-DEPTARGET-NER), and the three Classifier/ quality-asset
+        // trackers — are deliberately excluded from that loop, so they never
+        // appear on the signature-failure list. Membership is the enum's own
+        // `outsideManifestSignature` set, so this pin and the production loop
+        // cannot drift apart.
         let signatureCovered = GazetteerLoadDiagnostics.Gazetteer.allCases.filter {
-            $0 != .documentTypeClassifier && $0 != .nerNameModel
+            !GazetteerLoadDiagnostics.outsideManifestSignature.contains($0)
         }
         #expect(diagnostics.failedGazetteers.count == signatureCovered.count)
         for gazetteer in signatureCovered {

@@ -109,7 +109,8 @@ struct ExportImageMetadataPinTests {
 
         // 5. /Info stays within the Apple auto-injected set (same asserts as
         // ReconstructionTests.metadataStripped; /Producer is auto-injected by
-        // CGPDFContext — known limitation, ENGINE §5.4).
+        // CGPDFContext and then rewritten to the fixed value by finalize() —
+        // ENGINE §5.4, pinned in ReconstructionTests).
         let pdfString = String(data: outputData, encoding: .ascii) ?? ""
         #expect(!pdfString.contains("/Author"))
         #expect(!pdfString.contains("/Title"))

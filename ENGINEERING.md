@@ -71,7 +71,7 @@ Details a reviewer should know exist:
 
 - The byte-level sweep (Layer 3) is a from-scratch, byte-oriented Aho–Corasick
   multi-pattern matcher (`Verification/AhoCorasick.swift`): breadth-first
-  failure links, each term expanded across case variants × five encodings
+  failure links, each term expanded across case variants × seven encodings
   (UTF-8, UTF-16BE, UTF-16LE, ASCII, Latin-1), and a hard memory bound. If a
   pathological term set exceeds the bound, the automaton degrades to a no-op
   **and reports itself degraded** so the layer surfaces incomplete coverage —
@@ -267,9 +267,13 @@ assets. The contract between the two repos is enforced, not eyeballed:
   Extending the manifest to carry per-asset content hashes is on the post-1.0
   list. On any verification failure, detection degrades with a visible banner
   — never silently.
-- One asset already carries a load-time content check: the context-scorer
+- One asset additionally carries a load-time content check: the context-scorer
   weights file is SHA-256-hashed at load against a compiled-in constant, with
-  an identity-scorer fallback on mismatch.
+  an identity-scorer fallback on mismatch. That fallback — and the equivalent
+  fallbacks for the doctype-temperature and preset-thresholds assets (identity
+  temperature, built-in defaults) — reports through the same visible-degrade
+  diagnostics as the corpus loaders, so a quality asset that fails to load
+  surfaces in the banner rather than only in the log.
 - On the test side, cross-repo fixtures and ground truth are pinned by
   SHA-256 constants that move as single, reviewed changes — drift between
   what the pipeline builds and what the app's tests expect shows up as a red

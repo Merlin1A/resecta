@@ -47,7 +47,25 @@ public struct GazetteerLoadDiagnostics: Sendable, Equatable {
         // Excluded from the signature-fail loop for the same reason as
         // documentTypeClassifier (it is not signature-covered).
         case nerNameModel = "NERNameModel"
+        // The three detection-quality assets under `Classifier/` that fall back
+        // (identity scorer / T=1.0 / built-in thresholds) when missing or
+        // invalid. Tracked so those fallbacks surface through the same SEC-7
+        // banner the corpus loaders use — reporting only; the fallback values
+        // themselves are unchanged. Not covered by the gazetteer-manifest
+        // signature, so all three are excluded from the signature-fail loop.
+        case contextScorerWeights = "ContextScorerWeights"
+        case doctypeTemperature = "DoctypeTemperature"
+        case presetThresholds = "PresetThresholds"
     }
+
+    /// Loaders NOT covered by the gazetteer-manifest signature. A manifest-
+    /// signature failure must not auto-attribute these; their load status is
+    /// folded in on the valid-signature path of
+    /// `PIIDetector.loadWithDiagnostics(bundle:)`.
+    static let outsideManifestSignature: Set<Gazetteer> = [
+        .documentTypeClassifier, .nerNameModel,
+        .contextScorerWeights, .doctypeTemperature, .presetThresholds,
+    ]
 
     /// Engine-facing names of every loader that failed to initialize.
     /// Ordering matches the four init calls inside `PIIDetector.loadWithDiagnostics(bundle:)`

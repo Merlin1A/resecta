@@ -105,12 +105,22 @@ public func normalizedToFillPixels(
     bitmapHeight: Int
 ) -> CGRect {
     let clamped = normalized.clampedToNormalized()
-    return CGRect(
+    let aligned = CGRect(
         x: clamped.minX * CGFloat(bitmapWidth),
         y: clamped.minY * CGFloat(bitmapHeight),
         width: clamped.width * CGFloat(bitmapWidth),
         height: clamped.height * CGFloat(bitmapHeight)
     ).pixelAligned()
+    // §3.2a — expand 1 px outward beyond pixel alignment. The rendered
+    // content spans points × dpi/72 while the bitmap is ceil() of that, so a
+    // rect scaled by the bitmap dimension can sit up to 1 px off the content
+    // basis; the extra pixel covers the boundary row/column in the shifted
+    // direction. Strictly over-redacting (the safe direction, §3.2). Page
+    // edges need no special case — fills clip at the bitmap and verifyFill
+    // clamps (PD-4-1). Empty aligned rects stay empty so degenerate regions
+    // remain no-ops. Do NOT shrink the bitmap instead: floor() would crop a
+    // column of real page content out of the output.
+    return aligned.isEmpty ? aligned : aligned.insetBy(dx: -1, dy: -1)
 }
 
 // MARK: - Pixel Alignment (ENGINE §3.2)
@@ -159,6 +169,10 @@ public func applyRedactionFills(
     context.setBlendMode(.copy)           // R = S, regardless of destination
     context.setShouldAntialias(false)     // No edge blending
     context.setFillColor(fillColor.cgColor)
+    // §3.2a — the polygon path dilates by stroking its own boundary in the
+    // fill color (see fillPolygonRegion); the stroke color rides the same
+    // context state as the fill color so both routes paint identically.
+    context.setStrokeColor(fillColor.cgColor)
 
     for region in regions {
         // DRAW-1: polygon path. Build a CGPath and fill with even-odd
@@ -333,6 +347,18 @@ internal func fillPolygonRegion(
     context.saveGState()
     context.addPath(path)
     context.fillPath(using: .evenOdd)
+    // §3.2a — the vertex mapping shares normalizedToFillPixels' bitmap-
+    // dimension basis, so the polygon boundary can sit up to 1 px inside the
+    // rendered content at non-integral raster dimensions. Stroking the same
+    // path 2 px wide (1 px outward, round joins bounding the reach at
+    // corners) dilates the fill the way the rect route's insetBy(-1) does;
+    // the stroke color is set beside the fill color in applyRedactionFills.
+    // verifyPolygonFill masks only polygon-interior pixels, so the halo is
+    // additional coverage, never a verified surface.
+    context.addPath(path)
+    context.setLineWidth(2)
+    context.setLineJoin(.round)
+    context.strokePath()
     context.restoreGState()
 }
 
@@ -717,7 +743,7 @@ public func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
     // Measured 2026-06-13: `os_proc_available_memory()` is unusable
     // on the simulator — it reports well under 67 MB regardless of real
     // headroom, so a standard page's 300-DPI raster (~33.7 MB) fails the
-    // half-available test and the validatePage wire-up would then refuse every page.
+    // fraction-of-available test and the validatePage wire-up would then refuse every page.
     // When the reading is at or below the §2.5 headroom (150 MB) — the same
     // floor at which `selectDPI` yields zero budget — treat it as unusable and
     // defer the memory decision to the runtime DPI cap + `selectDPI` (KI-5),
@@ -727,7 +753,7 @@ public func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
     #if canImport(UIKit)
     let available = os_proc_available_memory()
     guard available > 150_000_000 else { return true }
-    return bytes < available / 2
+    return pageMemoryEstimateFits(oneBitmapBytes: bytes, available: Int(available))
     #else
     // macOS tooling destination: os_proc_available_memory() is iOS-only.
     // Treat the reading as unusable — the same outcome as the simulator
@@ -735,4 +761,15 @@ public func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
     _ = bytes
     return true
     #endif
+}
+
+/// The per-page memory admission predicate (ENGINE §2.6): a page is admitted
+/// when THREE bitmaps' worth of its raster fit in available memory — the same
+/// per-page estimate the app layer budgets (render context + pooled fill
+/// context + encode buffer, `PipelineCoordinator`'s
+/// `pixelW * pixelH * 4 * 3`). Extracted so the constant is host-testable;
+/// `validatePage`'s deferral branches above are unchanged.
+@inlinable
+internal func pageMemoryEstimateFits(oneBitmapBytes: Int, available: Int) -> Bool {
+    oneBitmapBytes < available / 3
 }

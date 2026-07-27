@@ -21,7 +21,7 @@ The core workflow is:
 1. **Import** a PDF or image from Files, Photos, or drag-and-drop.
 2. **View** pages and navigate the document.
 3. **Mark** regions for redaction by drawing rectangles, or by selecting and applying results from Scan (on-device text detection) or Search (text, pattern, and multi-term matching).
-4. **Apply** redaction. Each affected page is rasterized — vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer in marked regions. Source document metadata (author, editing history, etc.) is stripped; the rebuilt file carries a producer tag identifying the operating system version and build that wrote it, plus fresh creation/modification timestamps added by the system PDF writer, so the export is not metadata-free — see [`PRIVACY.md`](./PRIVACY.md).
+4. **Apply** redaction. Each affected page is rasterized — vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer in marked regions. Source document metadata (author, editing history, etc.) is stripped; the rebuilt file carries a producer tag that Resecta replaces with a fixed value ("Resecta", identifying neither the operating system version nor the build), plus fresh creation/modification timestamps added by the system PDF writer, so the export is not metadata-free — see [`PRIVACY.md`](./PRIVACY.md).
 5. **Verify.** A multi-layer verification engine scans the output for residual content using text extraction, OCR, binary string search across multiple encodings, structural analysis, and metadata checks.
 6. **Export** via the system share sheet.
 
@@ -93,7 +93,7 @@ Resecta is designed to address specific risks that arise when sharing redacted d
 **In scope:**
 
 - **Residual text after redaction.** Both modes are designed to rasterize affected pages and remove the original text layer from marked regions. The multi-layer verification pass scans the output for any text or character data that remains.
-- **Document metadata leakage.** Author, editing history, tagged structure, and other source metadata fields are stripped from exported documents. The rebuilt file does carry a producer tag identifying the operating system version and build that wrote it, and fresh creation/modification timestamps from the system PDF writer — it is not metadata-free; see [`PRIVACY.md`](./PRIVACY.md).
+- **Document metadata leakage.** Author, editing history, tagged structure, and other source metadata fields are stripped from exported documents. The rebuilt file does carry a producer tag — replaced with a fixed value ("Resecta") that identifies neither the operating system version nor the build — and fresh creation/modification timestamps from the system PDF writer; it is not metadata-free. See [`PRIVACY.md`](./PRIVACY.md).
 - **Font-positioning side channels (Searchable Redaction).** The preserved text layer uses a fresh monospace font with uniform spacing, designed to remove the glyph-positioning side channels identified in academic research on sandwich PDFs.
 
 **Out of scope:**
@@ -110,7 +110,7 @@ Each load-bearing claim in this README is paired with a mechanical check in this
 | Claim | Check |
 | --- | --- |
 | Marked regions are destroyed, not covered | Per-region pixel readback after every fill — one wrong pixel fails the export (`Pipeline/PageRasterizer.swift`); the classic annotation-over-text attacks are constructed and destroyed in `SecurityTests/FakeRedactionTests.swift` |
-| The exported file is re-checked independently | The 5/10-layer verification pass re-opens the output and scans text, OCR, raw bytes across five encodings, structure, and metadata (`Verification/VerificationEngine.swift`) |
+| The exported file is re-checked independently | The 5/10-layer verification pass re-opens the output and scans text, OCR, raw bytes across seven encodings, structure, and metadata (`Verification/VerificationEngine.swift`) |
 | Placement survives rotated pages | A rotation × crop-box-origin test matrix positions its regions with a transform written independently of the production code (`SecurityTests/RotatedPageCoordinateTests.swift`) |
 | No network requests of its own | A source grep for networking symbols returns no code references (the sole hit is a comment); the pre-commit hook rejects those symbols in any staged diff (`Scripts/audit-lint.sh`) |
 | The app's own copy doesn't overclaim | A banned-vocabulary lint walks every localized string and the shipping docs (`Tests/ResectaAppTests/LegalPhraseLintTests.swift`, `Scripts/claims-lint.sh`) |
@@ -169,13 +169,13 @@ The workflow the suites protect — import, scan, apply, verify (recorded before
 
 ![Import, scan, apply, verify](docs/images/redact-verify-demo.gif)
 
-The test tree is larger than the source tree: roughly 54,000 lines of Swift source to roughly 73,000 lines of test code, about 1.4×. Counted from the current tree:
+The test tree is larger than the source tree: roughly 57,000 lines of Swift source to roughly 77,000 lines of test code, about 1.4×. Counted from the current tree:
 
-- **Engine package** (`Packages/RedactionEngine/Tests`) — 1,630 Swift Testing `@Test` functions across 213 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
-- **App target** (`Tests/ResectaAppTests`) — 1,205 `@Test` functions across 177 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
-- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 11 XCUITest methods that drive the built app on a simulator: the first-launch legal gate, detection review, and search-to-redaction flows.
+- **Engine package** (`Packages/RedactionEngine/Tests`) — 1,650 Swift Testing `@Test` functions across 216 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
+- **App target** (`Tests/ResectaAppTests`) — 1,306 `@Test` functions across 190 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
+- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 18 XCUITest methods that drive the built app on a simulator: the first-launch legal gate, detection review, and search-to-redaction flows.
 
-Together the suites carry about 6,100 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
+Together the suites carry about 6,500 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
 
 Run both suites:
 

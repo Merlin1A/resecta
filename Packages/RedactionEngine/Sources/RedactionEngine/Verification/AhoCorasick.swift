@@ -30,8 +30,12 @@ public struct AhoCorasick: Sendable {
     public let isDegraded: Bool
 
     /// Maximum total pattern bytes before the automaton degrades to a no-op.
-    /// 1 MB supports ~250K terms in UTF-8 — far beyond any realistic PII set.
-    /// Guards against pathological input causing unbounded memory allocation.
+    /// Deliberately kept at 1 MB after the UTF-32 additions: an ASCII term now
+    /// emits ~13n bytes per case variant (was ~5n), so the bound supports
+    /// roughly 77K characters of raw term content — still orders of magnitude
+    /// beyond any realistic term set, while capping automaton construction
+    /// memory against pathological input. The degrade is surfaced by both
+    /// consuming layers.
     private static let maxTotalPatternBytes = 1_000_000
 
     /// Build the automaton from a set of byte patterns.
@@ -158,13 +162,13 @@ public struct AhoCorasick: Sendable {
     /// the term the user typed need not match the document's casing (a
     /// lowercase query redacts a Title Case occurrence). Arbitrary mixed case
     /// (e.g. "aCmE") is out of scope for byte search; Layer 2's OCR gate is
-    /// fully case-insensitive. Each variant is emitted in all 5 encodings
-    /// (UTF-8, UTF-16BE, UTF-16LE, ASCII, Latin-1), skipping encodings where
-    /// it cannot be represented, and the whole set is deduplicated by byte
-    /// equality (UTF-8 ≡ ASCII ≡ Latin-1 for ASCII text; case variants of a
-    /// caseless term collapse) so one physical occurrence registers one
-    /// pattern, keeping user-facing match counts honest. Order-stable.
-    /// See ENGINE §6.3.
+    /// fully case-insensitive. Each variant is emitted in all 7 encodings
+    /// (UTF-8, UTF-16BE, UTF-16LE, UTF-32BE, UTF-32LE, ASCII, Latin-1),
+    /// skipping encodings where it cannot be represented, and the whole set is
+    /// deduplicated by byte equality (UTF-8 ≡ ASCII ≡ Latin-1 for ASCII text;
+    /// case variants of a caseless term collapse) so one physical occurrence
+    /// registers one pattern, keeping user-facing match counts honest.
+    /// Order-stable. See ENGINE §6.3.
     public static func encodeForSearch(_ term: String) -> [[UInt8]] {
         let nfc = term.precomposedStringWithCanonicalMapping
         // lowercased()/uppercased() are the locale-independent String methods
@@ -177,7 +181,8 @@ public struct AhoCorasick: Sendable {
             nfc.capitalized(with: posix).precomposedStringWithCanonicalMapping
         ]
         let encodings: [String.Encoding] = [
-            .utf8, .utf16BigEndian, .utf16LittleEndian, .ascii, .isoLatin1
+            .utf8, .utf16BigEndian, .utf16LittleEndian,
+            .utf32BigEndian, .utf32LittleEndian, .ascii, .isoLatin1
         ]
         var seen = Set<[UInt8]>()
         var patterns: [[UInt8]] = []

@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import ImageIO
+import OSLog
 
 // ENGINE §5.1–§5.4 — Streaming page-at-a-time PDF reconstruction.
 
@@ -76,7 +77,8 @@ public actor PDFStreamReconstructor {
     /// pages specify their own size per-page.
     /// Empty auxiliary dictionary omits /Author, /Title, /Subject,
     /// /Keywords, /Creator. /Producer, /CreationDate, /ModDate are
-    /// auto-injected by CGPDFContext (§5.4).
+    /// auto-injected by CGPDFContext (§5.4); `finalize()` then rewrites the
+    /// producer value to `fixedProducerValue`.
     public func begin(firstPageSize: CGSize) throws {
         guard !finalized else {
             throw PipelineError.redactionError(.reconstructionFailed)
@@ -205,6 +207,16 @@ public actor PDFStreamReconstructor {
         ctx.closePDF()
         context = nil
 
+        // §5.4 — the system writer auto-injects a `/Producer` literal naming
+        // the OS version and build that wrote the file. CGPDFContext exposes
+        // no producer key in its auxiliary dictionary, so the value is
+        // rewritten here, after the context closes: a byte-length-preserving
+        // in-place patch that replaces the string's contents with a fixed
+        // value (the freed bytes become whitespace between dictionary
+        // entries), so every xref offset stays valid. Any anomaly leaves the
+        // file untouched — the export never fails on this step.
+        Self.overwriteProducerLiteral(at: tempURL)
+
         // SEC-1: apply `.complete` file protection to the finalized temp
         // file. PipelineCoordinator.downgradeTempProtectionOnSessionClose()
         // downgrades the whole session subtree to
@@ -214,6 +226,104 @@ public actor PDFStreamReconstructor {
         // file on failure, and an unprotected file is no worse than the
         // prior contract. We deliberately do NOT throw.
         try? TempFileHardening.applyProtection(tempURL, level: .complete)
+    }
+
+    // MARK: - Producer rewrite (ENGINE §5.4)
+
+    /// The fixed `/Producer` value written into finalized files. A constant —
+    /// identical across devices, OS versions, and app versions — so the field
+    /// carries no information about the producing system.
+    static let fixedProducerValue = "Resecta"
+
+    private static let producerLogger = Logger(
+        subsystem: "app.resecta.engine", category: "pdf-reconstructor")
+
+    /// Replace the contents of the single `/Producer (…)` literal near the end
+    /// of the finished file with `fixedProducerValue`, preserving the total
+    /// byte length: the replacement writes `value + ")"` and pads the
+    /// remainder with spaces *after* the closing paren, inside the `/Info`
+    /// dictionary, where whitespace between entries is insignificant. The file
+    /// is patched in place through a `FileHandle` — nothing else moves, so
+    /// every xref offset stays valid and image streams are never re-encoded.
+    ///
+    /// Guards (each leaves the file untouched and never fails the export):
+    /// no marker in the tail window, more than one marker, an unterminated
+    /// literal, or an existing value shorter than the fixed one.
+    static func overwriteProducerLiteral(at url: URL) {
+        let marker = Data("/Producer (".utf8)
+        let replacement = Data(fixedProducerValue.utf8)
+        do {
+            let handle = try FileHandle(forUpdating: url)
+            defer { try? handle.close() }
+
+            // The writer emits the `/Info` dictionary in the file's tail, but
+            // font objects (Searchable mode's subset font program) can land
+            // between it and the xref — measured 12.6 KB from EOF on the
+            // macOS tooling destination, 4.3 KB on iOS. 256 KB covers both
+            // layouts with wide margin while keeping page image streams out
+            // of the search space.
+            let fileSize = try handle.seekToEnd()
+            let windowLength = min(fileSize, 262_144)
+            let windowStart = fileSize - windowLength
+            try handle.seek(toOffset: windowStart)
+            guard let window = try handle.read(upToCount: Int(windowLength)),
+                  !window.isEmpty else { return }
+
+            guard let markerRange = window.range(of: marker) else {
+                producerLogger.info("producer literal not present in tail; file left unchanged")
+                return
+            }
+            guard window.range(of: marker, in: markerRange.upperBound..<window.endIndex) == nil else {
+                producerLogger.warning("multiple producer literals in tail; file left unchanged")
+                return
+            }
+
+            // Escape-aware scan for the literal's closing paren: a backslash
+            // escapes the next byte, and unescaped balanced paren pairs are
+            // legal inside a PDF literal string.
+            var index = markerRange.upperBound
+            var depth = 1
+            var closeIndex: Data.Index?
+            while index < window.endIndex {
+                let byte = window[index]
+                if byte == 0x5C {  // backslash
+                    index = window.index(index, offsetBy: 2, limitedBy: window.endIndex)
+                        ?? window.endIndex
+                    continue
+                }
+                if byte == 0x28 { depth += 1 }  // "("
+                if byte == 0x29 {               // ")"
+                    depth -= 1
+                    if depth == 0 { closeIndex = index; break }
+                }
+                index = window.index(after: index)
+            }
+            guard let close = closeIndex else {
+                producerLogger.warning("unterminated producer literal in tail; file left unchanged")
+                return
+            }
+
+            let valueLength = window.distance(from: markerRange.upperBound, to: close)
+            guard valueLength >= replacement.count else {
+                producerLogger.warning("producer literal shorter than the fixed value; file left unchanged")
+                return
+            }
+
+            // value bytes + ")" + space padding == the replaced range exactly.
+            var patch = replacement
+            patch.append(0x29)  // ")"
+            patch.append(Data(repeating: 0x20, count: valueLength - replacement.count))
+
+            let valueStartOffset = windowStart
+                + UInt64(window.distance(from: window.startIndex, to: markerRange.upperBound))
+            try handle.seek(toOffset: valueStartOffset)
+            try handle.write(contentsOf: patch)
+        } catch {
+            // Mechanism-only logging (ARCH §12.2); the export proceeds with
+            // the writer's own value rather than failing.
+            producerLogger.warning(
+                "producer rewrite skipped (metadata: \(error.localizedDescription, privacy: .public))")
+        }
     }
 
     // MARK: - JPEG Encoding (ENGINE §5.3, EXP-007)

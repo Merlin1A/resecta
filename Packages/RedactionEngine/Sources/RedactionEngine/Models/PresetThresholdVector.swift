@@ -95,22 +95,33 @@ public struct PresetThresholdBundle: Sendable, Equatable {
 
     /// Testable loader — inject a custom bundle for fixture tests.
     public static func load(from bundle: Bundle) -> PresetThresholdBundle {
+        loadWithDiagnostics(from: bundle).bundle
+    }
+
+    /// SEC-7 diagnostics variant: the bundle plus, on any fallback to
+    /// `.builtInDefaults`, a mechanism-only reason string.
+    /// `PIIDetector.loadWithDiagnostics(bundle:)` folds the reason into
+    /// `GazetteerLoadDiagnostics` so the fallback surfaces through the existing
+    /// degrade banner; the fallback value itself is unchanged.
+    static func loadWithDiagnostics(from bundle: Bundle)
+        -> (bundle: PresetThresholdBundle, failureReason: String?)
+    {
         guard let url = bundle.url(
             forResource: "preset-thresholds",
             withExtension: "json",
             subdirectory: "Classifier"
         ) else {
             logger.info("preset-thresholds.json not bundled; using built-in defaults")
-            return .builtInDefaults
+            return (.builtInDefaults, "preset-thresholds.json not bundled")
         }
 
         do {
             let data = try Data(contentsOf: url)
             let decoded = try JSONDecoder().decode(WireFormat.self, from: data)
-            return try decoded.toBundle()
+            return (try decoded.toBundle(), nil)
         } catch {
             logger.warning("preset-thresholds.json load failed; using defaults: \(String(describing: error), privacy: .public)")
-            return .builtInDefaults
+            return (.builtInDefaults, "preset-thresholds.json load failed: \(String(describing: error))")
         }
     }
 

@@ -94,24 +94,26 @@ struct FillVerificationEdgeTests {
         // Region extends past page edge: x=0.95, width=0.1 → maxX=1.05
         let overflowing = CGRect(x: 0.95, y: 0.95, width: 0.1, height: 0.1)
         let result = normalizedToFillPixels(overflowing, bitmapWidth: bw, bitmapHeight: bh)
-        // Result must be entirely within bitmap bounds
-        #expect(result.maxX <= CGFloat(bw), "Clamped rect should not exceed bitmap width")
-        #expect(result.maxY <= CGFloat(bh), "Clamped rect should not exceed bitmap height")
-        #expect(result.minX >= 0, "Clamped rect should not have negative X")
-        #expect(result.minY >= 0, "Clamped rect should not have negative Y")
+        // The normalized input is clamped to [0,1] BEFORE scaling; the §3.2a
+        // 1-px outward expansion then overhangs the bitmap by exactly one
+        // pixel (fills clip at the bitmap, verifyFill clamps — PD-4-1).
+        #expect(result.maxX == CGFloat(bw) + 1, "Clamp then 1-px expansion")
+        #expect(result.maxY == CGFloat(bh) + 1, "Clamp then 1-px expansion")
+        #expect(result.minX >= 0, "Interior origin stays inside the bitmap")
+        #expect(result.minY >= 0, "Interior origin stays inside the bitmap")
     }
 
-    @Test("normalizedToFillPixels is identity for valid inputs")
+    @Test("normalizedToFillPixels is aligned scaling plus the 1-px outward expansion")
     func normalizedPassthroughForValidInputs() {
         let bw = 100, bh = 100
         let valid = CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4)
         let result = normalizedToFillPixels(valid, bitmapWidth: bw, bitmapHeight: bh)
-        // Should produce the same result as direct scaling (within pixel alignment)
+        // Direct scaling, pixel-aligned, then the §3.2a expansion.
         let expected = CGRect(
             x: 0.1 * CGFloat(bw), y: 0.2 * CGFloat(bh),
             width: 0.3 * CGFloat(bw), height: 0.4 * CGFloat(bh)
-        ).pixelAligned()
-        #expect(result == expected, "Valid inputs should pass through unchanged")
+        ).pixelAligned().insetBy(dx: -1, dy: -1)
+        #expect(result == expected)
     }
 
     @Test("clampedToNormalized clamps oversized rect to [0,1]")

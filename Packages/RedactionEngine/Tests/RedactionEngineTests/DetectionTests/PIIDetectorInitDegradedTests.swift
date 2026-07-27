@@ -15,10 +15,13 @@ import Foundation
 //
 // S3 §2.10: the SIGNATURE-COVERED loaders are the original 4 plus
 // negativeContextGazetteer, institutionGazetteer, addressComponentsGazetteer,
-// zipStateTableLoader = 8. Two later trackers are NOT covered by the
-// gazetteer-manifest signature and are excluded from the signature-fail loop:
-// documentTypeClassifier (CAT-065, s17) and nerNameModel (GAP-DEPTARGET-NER /
-// D04-F3 == D11-F3, this session). So the empty-bundle signature-fail failure
+// zipStateTableLoader = 8. Later trackers are NOT covered by the
+// gazetteer-manifest signature and are excluded from the signature-fail loop
+// (membership = `GazetteerLoadDiagnostics.outsideManifestSignature`):
+// documentTypeClassifier (CAT-065, s17), nerNameModel (GAP-DEPTARGET-NER /
+// D04-F3 == D11-F3), and the three Classifier/ quality-asset trackers
+// (contextScorerWeights / doctypeTemperature / presetThresholds — see
+// AssetLoadDiagnosticsTests). So the empty-bundle signature-fail failure
 // count stays 8 even though `Gazetteer.allCases.count` is larger.
 
 @Suite("PIIDetector init degraded — SEC-7")

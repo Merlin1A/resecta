@@ -55,6 +55,13 @@ let package = Package(
                 // the source target's `.module`. Path is relative to the
                 // test target's source dir (`Tests/RedactionEngineTests`).
                 .copy("../../Sources/RedactionEngine/Resources/Gazetteers"),
+                // SEC-7 asset-diagnostics tests need the canonical Classifier/
+                // assets (context-scorer / doctype-temperature /
+                // preset-thresholds / doctype-keywords) reachable from the test
+                // target's `Bundle.module` to build scratch bundles with
+                // altered copies — same wiring rationale as the Gazetteers
+                // entry above.
+                .copy("../../Sources/RedactionEngine/Resources/Classifier"),
             ],
             swiftSettings: [
                 .enableUpcomingFeature("NonisolatedNonsendingByDefault"),

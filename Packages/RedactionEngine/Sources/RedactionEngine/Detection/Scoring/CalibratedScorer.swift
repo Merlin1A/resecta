@@ -70,25 +70,36 @@ public struct CalibratedScorer: Sendable {
     // MARK: - Loader
 
     private static func loadTemperature(from bundle: Bundle) -> Double {
+        loadTemperatureWithDiagnostics(from: bundle).temperature
+    }
+
+    /// SEC-7 diagnostics variant: the temperature plus, on any fallback to the
+    /// identity T=1.0, a mechanism-only reason string.
+    /// `PIIDetector.loadWithDiagnostics(bundle:)` folds the reason into
+    /// `GazetteerLoadDiagnostics` so the fallback surfaces through the existing
+    /// degrade banner; the fallback value itself is unchanged.
+    static func loadTemperatureWithDiagnostics(from bundle: Bundle)
+        -> (temperature: Double, failureReason: String?)
+    {
         guard let url = bundle.url(
             forResource: "doctype-temperature",
             withExtension: "json",
             subdirectory: "Classifier"
         ) else {
             Self.logger.info("doctype-temperature.json not bundled; using identity T=1.0")
-            return 1.0
+            return (1.0, "doctype-temperature.json not bundled")
         }
         do {
             let data = try Data(contentsOf: url)
             let decoded = try JSONDecoder().decode(TemperaturePayload.self, from: data)
             guard decoded.temperature.isFinite, decoded.temperature > 0 else {
                 Self.logger.warning("doctype-temperature.json has non-positive/NaN T; using identity")
-                return 1.0
+                return (1.0, "doctype-temperature.json has non-positive/NaN T")
             }
-            return decoded.temperature
+            return (decoded.temperature, nil)
         } catch {
             Self.logger.warning("doctype-temperature.json unreadable; using identity (metadata: \(error.localizedDescription, privacy: .public))")
-            return 1.0
+            return (1.0, "doctype-temperature.json unreadable: \(error.localizedDescription)")
         }
     }
 

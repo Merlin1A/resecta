@@ -41,8 +41,9 @@ struct ValidatePageTests {
         let scale: CGFloat = 150.0 / 72.0
         let bytes = Int(ceil(bounds.width * scale)) * Int(ceil(bounds.height * scale)) * 4
         let available = os_proc_available_memory()
-        // Only assert pass if we know memory is sufficient
-        if bytes < Int(available) / 2 {
+        // Only assert pass if we know memory is sufficient (the §2.6
+        // three-bitmap estimate the gate itself applies).
+        if pageMemoryEstimateFits(oneBitmapBytes: bytes, available: Int(available)) {
             #expect(validatePage(page, effectiveDPI: 150) == true)
         }
         // Always verify the dimension check passes (bounds are within 5000)
@@ -92,6 +93,25 @@ struct ValidatePageTests {
                 "Page smaller than 10pt should be rejected")
     }
 
+    @Test("Memory admission predicate matches the app layer's three-bitmap estimate (§2.6)")
+    func memoryEstimatePredicateArithmetic() {
+        // The predicate admits a page only when three bitmaps' worth of its
+        // raster fit in available memory — the same per-page estimate the
+        // app layer budgets (render + pooled fill + encode buffer).
+        let available = 3_000_000_000
+        #expect(pageMemoryEstimateFits(oneBitmapBytes: available / 3 - 1,
+                                       available: available))
+        #expect(!pageMemoryEstimateFits(oneBitmapBytes: available / 3,
+                                        available: available))
+        // A page sized between a third and half of available memory — the
+        // window the older half-available comparison admitted — is refused.
+        #expect(!pageMemoryEstimateFits(oneBitmapBytes: available * 2 / 5,
+                                        available: available))
+        // Comfortably small pages are admitted.
+        #expect(pageMemoryEstimateFits(oneBitmapBytes: 34_000_000,
+                                       available: available))
+    }
+
     @Test("Accepts page at exactly 10pt dimensions")
     func acceptsMinimumPage() throws {
         let page = try makePDFPage(width: 10, height: 10)
@@ -100,7 +120,8 @@ struct ValidatePageTests {
         if bounds.width >= 10 && bounds.height >= 10 {
             let scale: CGFloat = 150.0 / 72.0
             let bytes = Int(ceil(bounds.width * scale)) * Int(ceil(bounds.height * scale)) * 4
-            if bytes < Int(os_proc_available_memory()) / 2 {
+            if pageMemoryEstimateFits(oneBitmapBytes: bytes,
+                                      available: Int(os_proc_available_memory())) {
                 #expect(validatePage(page, effectiveDPI: 150) == true,
                         "10pt page should pass validation")
             }

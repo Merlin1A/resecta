@@ -35,14 +35,15 @@ struct CoordinateConversionTests {
         #expect(abs(result.minY - 50) < 0.01)
     }
 
-    @Test("normalizedToFillPixels at 300 DPI US Letter fills entire bitmap")
+    @Test("normalizedToFillPixels at 300 DPI US Letter covers the entire bitmap")
     func fillPixelConversionFullPage() {
         let normalized = CGRect(x: 0.0, y: 0.0, width: 1.0, height: 1.0)
         let result = normalizedToFillPixels(
             normalized, bitmapWidth: 2550, bitmapHeight: 3300
         )
-        #expect(Int(result.width) == 2550)
-        #expect(Int(result.height) == 3300)
+        // §3.2a expands 1 px outward on every side past pixel alignment; the
+        // overhang clips at the bitmap when filling.
+        #expect(result == CGRect(x: -1, y: -1, width: 2552, height: 3302))
     }
 
     @Test("normalizedToFillPixels partial region at 150 DPI")
@@ -51,10 +52,11 @@ struct CoordinateConversionTests {
         let result = normalizedToFillPixels(
             normalized, bitmapWidth: 1275, bitmapHeight: 1650
         )
-        // 0.25 * 1275 = 318.75, pixelAligned → floor(318.75) = 318
-        // 0.25 * 1650 = 412.5, pixelAligned → floor(412.5) = 412
-        #expect(abs(result.minX - 318) < 1)
-        #expect(abs(result.minY - 412) < 1)
+        // 0.25 * 1275 = 318.75, pixelAligned → floor(318.75) = 318, then
+        // the §3.2a 1-px outward expansion → 317
+        // 0.25 * 1650 = 412.5, pixelAligned → floor(412.5) = 412 → 411
+        #expect(result.minX == 317)
+        #expect(result.minY == 411)
         // Width/height should cover at least the requested 50%
         #expect(result.width >= CGFloat(1275) * 0.5)
         #expect(result.height >= CGFloat(1650) * 0.5)

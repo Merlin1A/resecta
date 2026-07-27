@@ -95,8 +95,91 @@ struct ReconstructionTests {
         #expect(!pdfString.contains("/Keywords"))
         // /Creator may or may not appear (Apple behavior)
 
-        // /Producer is auto-injected by CGPDFContext — known limitation (§5.4)
-        // Layer 5 verification will flag this as WARN
+        // /Producer is auto-injected by CGPDFContext, then rewritten to the
+        // fixed value by finalize() (§5.4) — pinned by the tests below.
+    }
+
+    // MARK: - Producer rewrite (ENGINE §5.4)
+
+    @Test("Finalized output carries the fixed /Producer value and the expected /Info keys")
+    func outputProducerCarriesFixedValue() async throws {
+        let tempURL = makeTempURL()
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let image = try makeTestImage(width: 120, height: 160)
+        let recon = PDFStreamReconstructor(tempURL: tempURL)
+        let size = CGSize(width: 120, height: 160)
+
+        try await recon.begin(firstPageSize: size)
+        try await recon.appendPage(PageOutput(image: image, size: size, textLayerEntries: nil))
+        await recon.finalize()
+
+        // The document must stay fully parseable after the in-place patch —
+        // CGPDFDocument resolves pages through the xref table, so a moved
+        // offset would surface here.
+        let data = try Data(contentsOf: tempURL)
+        let provider = try #require(CGDataProvider(data: data as CFData))
+        let doc = try #require(CGPDFDocument(provider))
+        #expect(doc.numberOfPages == 1)
+        #expect(PDFDocument(url: tempURL)?.pageCount == 1,
+                "PDFKit must also open the patched file")
+
+        let info = try #require(doc.info)
+        for key in ["Producer", "CreationDate", "ModDate"] {
+            var str: CGPDFStringRef?
+            #expect(CGPDFDictionaryGetString(info, key, &str),
+                    "/\(key) must be present in /Info")
+        }
+        var producerRef: CGPDFStringRef?
+        #expect(CGPDFDictionaryGetString(info, "Producer", &producerRef))
+        let ref = try #require(producerRef)
+        let producer = try #require(CGPDFStringCopyTextString(ref)) as String
+        #expect(producer == PDFStreamReconstructor.fixedProducerValue,
+                "producer must be the fixed value, not the writer's own string")
+    }
+
+    @Test("Producer rewrite preserves total byte length and every surrounding byte")
+    func producerRewritePreservesByteLayout() throws {
+        // Synthetic tail with an escaped-paren value — the scan must find the
+        // literal's real closing paren, and the patch must change ONLY the
+        // value-through-paren range, leaving the file size and every byte
+        // outside that range identical (xref offsets depend on it).
+        let originalValue = "iOS Version 99.9 \\(Build XX999\\) Quartz PDFContext"
+        let before = "HEADER…binary…\n1 0 obj\n<< /Producer (\(originalValue)) /CreationDate (D:20260101000000Z00'00') >>\nendobj\nstartxref\n123\n%%EOF\n"
+        let url = makeTempURL(prefix: "producer_patch_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data(before.utf8).write(to: url)
+
+        PDFStreamReconstructor.overwriteProducerLiteral(at: url)
+
+        let after = try Data(contentsOf: url)
+        #expect(after.count == before.utf8.count, "total byte length must be preserved")
+        let fixed = PDFStreamReconstructor.fixedProducerValue
+        let padding = String(repeating: " ", count: originalValue.utf8.count - fixed.utf8.count)
+        let expected = before.replacingOccurrences(
+            of: "(\(originalValue))",
+            with: "(\(fixed))\(padding)")
+        #expect(after == Data(expected.utf8),
+                "value replaced, closing paren moved in, remainder space-padded inside the dictionary")
+    }
+
+    @Test("Producer rewrite guards: absent pattern and too-short value leave the file untouched")
+    func producerRewriteGuardsLeaveFileUntouched() throws {
+        // No marker anywhere.
+        let noMarker = "no info dictionary here at all\nstartxref\n0\n%%EOF\n"
+        let noMarkerURL = makeTempURL(prefix: "producer_guard_absent_")
+        defer { try? FileManager.default.removeItem(at: noMarkerURL) }
+        try Data(noMarker.utf8).write(to: noMarkerURL)
+        PDFStreamReconstructor.overwriteProducerLiteral(at: noMarkerURL)
+        #expect(try Data(contentsOf: noMarkerURL) == Data(noMarker.utf8))
+
+        // Marker present but the existing value is shorter than the fixed one.
+        let short = "<< /Producer (abc) >>\nstartxref\n0\n%%EOF\n"
+        let shortURL = makeTempURL(prefix: "producer_guard_short_")
+        defer { try? FileManager.default.removeItem(at: shortURL) }
+        try Data(short.utf8).write(to: shortURL)
+        PDFStreamReconstructor.overwriteProducerLiteral(at: shortURL)
+        #expect(try Data(contentsOf: shortURL) == Data(short.utf8))
     }
 
     // MARK: - Atomic Write

@@ -75,22 +75,33 @@ struct ContextScorerWeights: Sendable {
     }
 
     static func load(from bundle: Bundle) -> ContextScorerWeights {
+        loadWithDiagnostics(from: bundle).scorer
+    }
+
+    /// SEC-7 diagnostics variant: the scorer plus, on any fallback-to-identity,
+    /// a mechanism-only reason string (no document content, no file paths).
+    /// `PIIDetector.loadWithDiagnostics(bundle:)` folds the reason into
+    /// `GazetteerLoadDiagnostics` so the identity fallback surfaces through the
+    /// existing degrade banner; the fallback value itself is unchanged.
+    static func loadWithDiagnostics(from bundle: Bundle)
+        -> (scorer: ContextScorerWeights, failureReason: String?)
+    {
         guard let url = bundle.url(
             forResource: "context-scorer",
             withExtension: "json",
             subdirectory: "Classifier"
         ) else {
             logger.info("context-scorer.json not bundled; using identity scorer")
-            return .identity
+            return (.identity, "context-scorer.json not bundled")
         }
         do {  // LegalPhrases:safe — Swift error-handling keyword, not a claim.
             let data = try Data(contentsOf: url)
-            return make(from: data, verifyingHash: expectedSHA256)
+            return makeWithDiagnostics(from: data, verifyingHash: expectedSHA256)
         } catch {  // LegalPhrases:safe — Swift error-handling keyword, not a claim.
             logger.warning(
                 "context-scorer.json unreadable; using identity scorer (metadata: \(error.localizedDescription, privacy: .public))"
             )
-            return .identity
+            return (.identity, "context-scorer.json unreadable: \(error.localizedDescription)")
         }
     }
 
@@ -98,13 +109,21 @@ struct ContextScorerWeights: Sendable {
     /// problem. `verifyingHash` is the compiled-in SHA-256 self-check (pass nil
     /// to skip it — tests exercise the decode/version/arity paths that way).
     static func make(from data: Data, verifyingHash expected: String?) -> ContextScorerWeights {
+        makeWithDiagnostics(from: data, verifyingHash: expected).scorer
+    }
+
+    /// Diagnostics variant of `make(from:verifyingHash:)` — same validation
+    /// chain and identical fallback, plus the mechanism-only reason.
+    static func makeWithDiagnostics(from data: Data, verifyingHash expected: String?)
+        -> (scorer: ContextScorerWeights, failureReason: String?)
+    {
         if let expected {
             var hasher = SHA256()
             hasher.update(data: data)
             let hex = hasher.finalize().map { String(format: "%02x", $0) }.joined()
             guard hex == expected else {
                 logger.warning("context-scorer.json hash mismatch; using identity scorer")
-                return .identity
+                return (.identity, "context-scorer.json hash mismatch")
             }
         }
         do {  // LegalPhrases:safe — Swift error-handling keyword, not a claim.
@@ -118,7 +137,7 @@ struct ContextScorerWeights: Sendable {
             )
             guard decoded.featureOrder == ContextFeatureContract.featureOrder else {
                 logger.warning("context-scorer.json feature_order drift; using identity scorer")
-                return .identity
+                return (.identity, "context-scorer.json feature_order drift")
             }
             let width = decoded.featureOrder.count
             for (name, family) in decoded.families {
@@ -128,21 +147,21 @@ struct ContextScorerWeights: Sendable {
                     logger.warning(
                         "context-scorer.json family \(name, privacy: .public) arity mismatch; using identity scorer"
                     )
-                    return .identity
+                    return (.identity, "context-scorer.json family \(name) arity mismatch")
                 }
                 guard family.featureScales.allSatisfy({ $0 > 0 }) else {
                     logger.warning(
                         "context-scorer.json family \(name, privacy: .public) non-positive scale; using identity scorer"
                     )
-                    return .identity
+                    return (.identity, "context-scorer.json family \(name) non-positive scale")
                 }
             }
-            return ContextScorerWeights(families: decoded.families)
+            return (ContextScorerWeights(families: decoded.families), nil)
         } catch {  // LegalPhrases:safe — Swift error-handling keyword, not a claim.
             logger.warning(
                 "context-scorer.json decode problem; using identity scorer (metadata: \(error.localizedDescription, privacy: .public))"
             )
-            return .identity
+            return (.identity, "context-scorer.json decode problem: \(error.localizedDescription)")
         }
     }
 

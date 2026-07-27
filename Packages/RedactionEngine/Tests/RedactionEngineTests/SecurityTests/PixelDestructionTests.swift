@@ -231,19 +231,21 @@ struct PixelDestructionTests {
 
     // MARK: - Coordinate Conversion
 
-    @Test("normalizedToFillPixels maps 0-1 to full bitmap dimensions")
+    @Test("normalizedToFillPixels maps 0-1 to full bitmap dimensions plus the outward pixel")
     func normalizedToPixels() {
         let fullPage = CGRect(x: 0, y: 0, width: 1, height: 1)
         let pixels = normalizedToFillPixels(fullPage, bitmapWidth: 2550, bitmapHeight: 3300)
-        #expect(pixels == CGRect(x: 0, y: 0, width: 2550, height: 3300))
+        // §3.2a expands 1 px outward on every side; overhang clips at fill.
+        #expect(pixels == CGRect(x: -1, y: -1, width: 2552, height: 3302))
     }
 
     @Test("normalizedToFillPixels half-page region maps correctly")
     func normalizedHalfPage() {
         let halfPage = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
         let pixels = normalizedToFillPixels(halfPage, bitmapWidth: 200, bitmapHeight: 200)
-        // 0.25 * 200 = 50, 0.5 * 200 = 100 → pixelAligned → same
-        #expect(pixels == CGRect(x: 50, y: 50, width: 100, height: 100))
+        // 0.25 * 200 = 50, 0.5 * 200 = 100 → pixelAligned → same, then the
+        // §3.2a 1-px outward expansion.
+        #expect(pixels == CGRect(x: 49, y: 49, width: 102, height: 102))
     }
 
     // MARK: - effectiveBounds
