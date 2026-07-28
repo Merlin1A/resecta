@@ -525,11 +525,13 @@ public struct VerificationEngine: Sendable {
     /// FAIL/WARN to an informational note, and never silences a hit: it
     /// outranks `textOutsideRegionsOnly` in both orders, so a page carrying it
     /// can never fold to a clean PASS. `sensitiveTermOutsideRegions` marks a page where a sensitive term
-    /// is readable OUTSIDE every region — on a rasterized page OCR is the only
-    /// reader that can notice a term the user redacted surviving elsewhere
-    /// (e.g. a displaced fill); the mode-aware bucketing in
-    /// `classifyPageImages` keeps Searchable pages on the generic
-    /// outside-regions path (Layers 3/10 own the text layer there).
+    /// is readable OUTSIDE every region. `pageBucket(for:effectiveMode:)`
+    /// folds it to the generic outside-regions bucket on BOTH page modes
+    /// (D-86 / RW-F-002(b) de-escalation: out-of-region content is the page's
+    /// own un-redacted text — an occurrence the user left unredacted or
+    /// detection missed — so the raster arm reads informational; Searchable
+    /// pages' text layer is owned by Layers 3/10 either way). The distinct
+    /// finding is kept so the classifier-level signal stays unit-pinned.
     enum PageOCRFinding: Sendable, Equatable {
         case sensitiveTermInRegion
         case textInRegion
@@ -651,8 +653,9 @@ public struct VerificationEngine: Sendable {
             // A hit with readable strokes outside every region whose text matches
             // a sensitive term (same confidence gate and term filter as the
             // in-region FAIL above): the term the user redacted is still readable
-            // somewhere on the page. Signal only — the fold decides the tier, and
-            // only rasterized pages surface it (see PageOCRFinding doc).
+            // somewhere on the page. Signal only — `pageBucket(for:effectiveMode:)`
+            // folds it to the generic outside bucket on both page modes
+            // (D-86 / RW-F-002(b); see PageOCRFinding doc).
             if hitHasOutOfRegionBox,
                hit.confidence >= sensitiveTermFailConfidenceThreshold,
                let text = hit.text,
@@ -1117,7 +1120,6 @@ public struct VerificationEngine: Sendable {
         case textInRegionSecureRaster
         case textInRegionSearchable
         case fillArtifactInRegion
-        case sensitiveTermOutsideRegion
         case textOutsideRegionsOnly
         case unmappable
         case unchecked
@@ -1216,6 +1218,48 @@ public struct VerificationEngine: Sendable {
         }
     }
 
+    /// Maps one page's classifier finding to its fold bucket. Static seam so
+    /// the mapping matrix is unit-testable without Vision
+    /// (`Layer2FoldOrderTests`); `classifyPageImages` is its only caller.
+    static func pageBucket(
+        for finding: PageOCRFinding, effectiveMode: PipelineMode
+    ) -> PageOCRBucket {
+        switch finding {
+        case .sensitiveTermInRegion:
+            return .sensitiveTermInRegion   // fail outranks every other case
+        case .textInRegion:
+            // Bucketed by the PAGE's mode: a rasterized page's region holds
+            // no readable text by construction, so an in-region hit there is
+            // a leak (folds to FAIL) even when the document mode is
+            // Searchable and only this page fell back.
+            return effectiveMode == .secureRasterization
+                ? .textInRegionSecureRaster : .textInRegionSearchable
+        case .fillArtifactInRegion:
+            // Vision hallucinated tokens out of the solid fill itself — no
+            // readable ink (full-RGB fill-consistent on the in-region portion).
+            // The classification applies on BOTH page modes: a painted fill
+            // bar is the same pixels either way, so a proven fill artifact
+            // folds to the informational note regardless of the page's mode.
+            // A non-proven in-region hit on a Searchable page keeps the
+            // textInRegion WARN path above.
+            return .fillArtifactInRegion
+        case .sensitiveTermOutsideRegions:
+            // D-86 / RW-F-002(b): a term readable outside every region is the
+            // page's own un-redacted content — an occurrence the user left
+            // unredacted or detection missed — and the output is exactly as
+            // redacted. Both page modes fold it to the generic outside
+            // bucket, whose secure-raster arm reads informational ("expected
+            // for this mode") — the certified record posture (08B A18).
+            // In-region survivors still FAIL above; Searchable pages' text
+            // layer is owned by Layers 3/10 either way.
+            return .textOutsideRegionsOnly
+        case .textOutsideRegionsOnly:
+            return .textOutsideRegionsOnly
+        case .none:
+            return .clean
+        }
+    }
+
     /// OCR every (already-downsampled) image on one page and fold the
     /// result into a single Layer-2 bucket. No PDFKit — so the bounded task group
     /// runs pages concurrently. Mirrors the per-page body of the original
@@ -1250,37 +1294,9 @@ public struct VerificationEngine: Sendable {
             let enriched = work.images.first.map {
                 Self.enrichWithFillSamples(hits, image: $0, regions: work.pageRegions)
             } ?? hits
-            switch Self.classifyPageOCR(
-                hits: enriched, pageRegions: work.pageRegions, sensitiveTerms: sensitiveTerms
-            ) {
-            case .sensitiveTermInRegion: return (work.page, .sensitiveTermInRegion)
-            case .textInRegion:
-                // Bucketed by the PAGE's mode: a rasterized page's region holds
-                // no readable text by construction, so an in-region hit there is
-                // a leak (folds to FAIL) even when the document mode is
-                // Searchable and only this page fell back.
-                return (work.page, work.effectiveMode == .secureRasterization
-                    ? .textInRegionSecureRaster : .textInRegionSearchable)
-            case .fillArtifactInRegion:
-                // Vision hallucinated tokens out of the solid fill itself — no
-                // readable ink (full-RGB fill-consistent on the in-region portion).
-                // The classification applies on BOTH page modes: a painted fill
-                // bar is the same pixels either way, so a proven fill artifact
-                // folds to the informational note regardless of the page's mode.
-                // A non-proven in-region hit on a Searchable page keeps the
-                // textInRegion WARN path above.
-                return (work.page, .fillArtifactInRegion)
-            case .sensitiveTermOutsideRegions:
-                // Only rasterized pages surface the dedicated term-outside WARN:
-                // there is no text layer, so OCR is the only reader that can
-                // notice a redacted term surviving elsewhere on the page. A
-                // Searchable page's text layer is owned by Layers 3/10 — keep
-                // the generic outside-regions path there (unchanged behavior).
-                return (work.page, work.effectiveMode == .secureRasterization
-                    ? .sensitiveTermOutsideRegion : .textOutsideRegionsOnly)
-            case .textOutsideRegionsOnly: return (work.page, .textOutsideRegionsOnly)
-            case .none:                  return (work.page, .clean)
-            }
+            let finding = Self.classifyPageOCR(
+                hits: enriched, pageRegions: work.pageRegions, sensitiveTerms: sensitiveTerms)
+            return (work.page, Self.pageBucket(for: finding, effectiveMode: work.effectiveMode))
         } else if !work.pageRegions.isEmpty,
                   hits.contains(where: { !($0.text ?? "").isEmpty }) {
             // Unmappable coordinates with a redaction region present: text might
@@ -1479,22 +1495,24 @@ public struct VerificationEngine: Sendable {
         let pagesWithTextInRegionSecureRaster = pages(in: .textInRegionSecureRaster)
         let pagesWithTextInRegionSearchable = pages(in: .textInRegionSearchable)
         let pagesWithFillArtifactInRegion = pages(in: .fillArtifactInRegion)
-        let pagesWithSensitiveTermOutsideRegion = pages(in: .sensitiveTermOutsideRegion)
         let pagesWithTextOutsideRegionsOnly = pages(in: .textOutsideRegionsOnly)
         let pagesWithUnmappableImages = pages(in: .unmappable)
         let uncheckedPages = pages(in: .unchecked)
 
         // ARCH §12.2: page numbers only, never document content, in any message.
         // Priority fold: FAIL (term in region) > FAIL/WARN (text in region, by
-        // the page's own mode) > WARN (sensitive term outside regions,
-        // rasterized pages) > WARN (unmappable) > INFO (Part A fill artifact
+        // the page's own mode) > WARN (unmappable) > INFO (Part A fill artifact
         // in region) > INFO (text only outside regions) > unchecked WARN >
         // PASS. The layer reports its single most specific outcome, with the
-        // two warnable out-of-region arms ahead of the proven-artifact note —
-        // on a multi-signal document a page in a warnable bucket sets the
-        // masthead, not the note. Within the note tier the order stays
-        // specificity (fill artifact > generic outside text); the unchecked
-        // arm keeps its long-standing position below the expected-state notes.
+        // warnable unmappable arm ahead of the proven-artifact note — on a
+        // multi-signal document a page in a warnable bucket sets the masthead,
+        // not the note. Within the note tier the order stays specificity
+        // (fill artifact > generic outside text); the unchecked arm keeps its
+        // long-standing position below the expected-state notes. The dedicated
+        // sensitive-term-outside WARN arm is de-escalated into the outside-text
+        // informational (D-86 / RW-F-002(b) — `pageBucket(for:effectiveMode:)`
+        // folds that finding generic); the classifier-level signal remains in
+        // `PageOCRFinding`.
         if !pagesWithSensitiveTermInRegion.isEmpty {
             let list = pagesWithSensitiveTermInRegion.map(String.init).joined(separator: ", ")
             // An OCR hit inside a redacted region means readable text inside the
@@ -1520,17 +1538,6 @@ public struct VerificationEngine: Sendable {
             let list = pagesWithTextInRegionSearchable.map(String.init).joined(separator: ", ")
             return (.warn("OCR detected text within a redacted region on \(pagePhrase(pagesWithTextInRegionSearchable, list: list))"),
                     pagesWithTextInRegionSearchable.map { $0 - 1 })
-        }
-        // A sensitive term the user redacted is still readable OUTSIDE every
-        // region on a rasterized page (e.g. a displaced fill) — the one signature
-        // only OCR can notice there, and until now indistinguishable from the
-        // generic out-of-region arm below. A WARN rather than a FAIL: a term can
-        // legitimately remain readable when the user chose to leave an
-        // occurrence unredacted.
-        if !pagesWithSensitiveTermOutsideRegion.isEmpty {
-            let list = pagesWithSensitiveTermOutsideRegion.map(String.init).joined(separator: ", ")
-            return (.warn("A sensitive term is readable outside every redacted region on \(pagePhrase(pagesWithSensitiveTermOutsideRegion, list: list)) — review those pages before sharing."),
-                    pagesWithSensitiveTermOutsideRegion.map { $0 - 1 })
         }
         // Unmappable-coordinate pages (multi-image or padded thumbnail)
         // that carry OCR text near a region — surfaced as a WARN because the
@@ -1568,13 +1575,15 @@ public struct VerificationEngine: Sendable {
                 // content, so as a WARN this arm fired on virtually every run and
                 // pinned the masthead off green, drowning the conditional warns
                 // (unmappable, unchecked, could-not-read) that DO carry signal.
-                // The displaced-fill leak the D08-F1 WARN was aimed at is now
-                // carried by the specific arms above: a redacted term surviving
-                // out-of-region is the .sensitiveTermOutsideRegion WARN, and
-                // in-region survivors FAIL. Expected-under-this-mode observations
-                // are informational; every could-not-verify condition keeps its
-                // warning tier. Pages with NO regions have nothing to violate →
-                // the raster's own content → PASS.
+                // The displaced-fill leak the D08-F1 WARN was aimed at is
+                // carried by the in-region arms above (a displaced fill leaves
+                // the region's own text readable in-region → FAIL); a redacted
+                // term surviving out-of-region folds here as
+                // expected-under-this-mode content (D-86 / RW-F-002(b)).
+                // Expected-under-this-mode observations are informational;
+                // every could-not-verify condition keeps its warning tier.
+                // Pages with NO regions have nothing to violate → the raster's
+                // own content → PASS.
                 if documentHasRegions {
                     return (.info("Unredacted page content remains readable on \(pagePhrase(pagesWithTextOutsideRegionsOnly, list: list)) — expected for this mode."),
                             pagesWithTextOutsideRegionsOnly.map { $0 - 1 })

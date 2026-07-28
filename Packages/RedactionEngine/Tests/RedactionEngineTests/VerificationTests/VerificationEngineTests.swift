@@ -1422,13 +1422,18 @@ struct VerificationEngineTests {
         }
     }
 
-    @Test("Layer 2: SR page, region clean, term readable elsewhere → dedicated WARN")
-    func layer2ScopedOCR_termOutsideRegion_secure_warns() async throws {
+    @Test("Layer 2: SR page, region clean, term readable elsewhere → record informational (D-86 de-escalation)")
+    func layer2ScopedOCR_termOutsideRegion_secure_staysRecordInfo() async throws {
         let size = CGSize(width: 600, height: 800)
         let term = "CONFIDENTIAL"   // synthetic, non-PII
         // Term at the top of the page; the region (bottom-right) is faithfully
-        // blank — the displaced-fill signature: the redacted term survives
-        // OUTSIDE every region on a rasterized page.
+        // blank — a redacted term surviving OUTSIDE every region on a
+        // rasterized page. Pre-D-86 this surfaced a dedicated sensitive-term
+        // WARN; RW-F-002(b) de-escalated it: out-of-region content is the
+        // page's own un-redacted text, so the layer folds to the
+        // secure-raster informational — the certified record posture
+        // (08B A18) — byte-exact, term never echoed (ARCH §12.2). In-region
+        // survivors still FAIL (pins above).
         let image = try renderTextPageImage(
             [(term, CGPoint(x: 30, y: 680), 64)], size: size)
         let (doc, url) = try await makeImagePDF(image, size: size)
@@ -1441,15 +1446,13 @@ struct VerificationEngineTests {
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
-        #expect(result.status.isWarn,
-                "a term readable outside every region on an SR page must WARN; got \(result.status)")
-        if case .warn(let msg) = result.status {
-            #expect(msg.contains("A sensitive term is readable outside every redacted region"),
-                    "term-specific arm must outrank the generic outside arm; got \(msg)")
-            // ARCH §12.2: page number present, document content (the term) absent.
-            #expect(msg.contains("1"))
+        #expect(result.status.isInfo,
+                "a term readable outside every region on an SR page folds to the record informational (D-86); got \(result.status)")
+        if case .info(let msg) = result.status {
+            #expect(msg == "Unredacted page content remains readable on page 1 — expected for this mode.",
+                    "the record informational must render byte-exact; got \(msg)")
             #expect(!msg.localizedCaseInsensitiveContains(term),
-                    "WARN message must never echo the matched term")
+                    "the message must never echo the matched term")
         }
     }
 

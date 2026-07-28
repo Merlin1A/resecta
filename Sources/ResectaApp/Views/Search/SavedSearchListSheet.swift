@@ -31,12 +31,18 @@ struct SavedSearchListSheet: View {
     @State private var renameText: String = ""
     @State private var showSavePrompt = false
     @State private var savePromptName: String = ""
-    /// H-74 — collision feedback for the save / rename prompts. When
-    /// the store rejects a duplicate name the alert re-presents with
-    /// this message in place of its standard body (the UXF-04
-    /// saved-regex prompt's proven re-present pattern).
+    /// H-74 — collision feedback for the save / rename prompts. When the
+    /// store rejects a duplicate name the alert re-presents with this
+    /// message in place of its standard body, re-armed from the dismissal
+    /// write by the `.onChange` collision handlers below (RW-F-005, D-86 —
+    /// an in-action re-arm is swallowed by the tap's own dismissal).
     @State private var savePromptError: String?
     @State private var renameError: String?
+    /// RW-F-005 (D-86): the entry whose rename collided, held across the
+    /// alert's dismissal so the `.onChange` re-present can re-arm
+    /// `renameTarget` — the button action's own re-arm is swallowed by the
+    /// dismissal write (see the collision handlers below).
+    @State private var renameRetryTarget: SavedSearch?
     /// UXF-33 / ST-94: swipe-Delete asks for confirmation before the
     /// store removal (app-standard destructive-confirm idiom — same
     /// shape as Settings' Reset dialogs).
@@ -105,10 +111,14 @@ struct SavedSearchListSheet: View {
                     let trimmed = renameText.trimmingCharacters(in: .whitespaces)
                     if !trimmed.isEmpty,
                        !savedSearchStore.rename(id: search.id, to: trimmed) {
-                        // H-74 — duplicate name: re-present with the
-                        // collision message instead of dismissing.
+                        // H-74 / RW-F-005 (D-86): duplicate name. Setting
+                        // `renameTarget` back here is swallowed — the tap's
+                        // dismissal write nils it through the binding after
+                        // this action returns — so stash the entry and let
+                        // the `.onChange(of: renameTarget)` re-present
+                        // re-arm it with the collision message.
                         renameError = Self.duplicateNameMessage
-                        renameTarget = search
+                        renameRetryTarget = search
                     } else {
                         renameError = nil
                         renameTarget = nil
@@ -133,11 +143,15 @@ struct SavedSearchListSheet: View {
                     if savedSearchStore.add(Self.capture(from: searchState, name: trimmed)) {
                         savePromptError = nil
                     } else {
-                        // H-74 — duplicate name: re-present with the
-                        // collision message (UXF-04 re-present pattern)
-                        // instead of silently appending a twin row.
+                        // H-74 / RW-F-005 (D-86): duplicate name. A
+                        // `showSavePrompt = true` here is swallowed — the
+                        // tap's dismissal resets `isPresented` after this
+                        // action returns (the silent-drop defect; the UXF-04
+                        // original only survives because its action is
+                        // async). Record the error; the
+                        // `.onChange(of: showSavePrompt)` re-present
+                        // re-arms the alert carrying the message.
                         savePromptError = Self.duplicateNameMessage
-                        showSavePrompt = true
                     }
                 }
                 // Blank names can't commit — a Save that auto-dismisses
@@ -165,8 +179,28 @@ struct SavedSearchListSheet: View {
                     deleteTarget = nil
                 }
                 Button("Cancel", role: .cancel) { deleteTarget = nil }
-            } message: { _ in
-                Text("The saved search is removed from this device.")
+            } message: { search in
+                Text(Self.deleteConfirmMessage(for: search))
+            }
+            // H-74 / RW-F-005 (D-86): collision re-present, decoupled from
+            // the alert button actions — a same-transaction re-arm inside an
+            // action is swallowed by the tap's own dismissal (both collision
+            // paths shipped silently dead). Re-arm from the dismissal write
+            // instead: when either prompt closes with a collision error
+            // pending, present it again carrying the message. Cancel and
+            // success clear the error before dismissal, so no re-present
+            // loop; the typed name survives in state either way.
+            .onChange(of: showSavePrompt) { _, isPresented in
+                if !isPresented, savePromptError != nil {
+                    showSavePrompt = true
+                }
+            }
+            .onChange(of: renameTarget) { _, target in
+                if target == nil, renameError != nil,
+                   let retry = renameRetryTarget {
+                    renameRetryTarget = nil
+                    renameTarget = retry
+                }
             }
         }
         // S7 §4.1: saved query previews may themselves be PII — this sheet
@@ -359,6 +393,15 @@ struct SavedSearchListSheet: View {
     static func deleteConfirmTitle(for search: SavedSearch?) -> String {
         guard let search else { return "Delete saved search?" }
         return "Delete “\(search.name)”?"
+    }
+
+    /// UXF-33 / Q6 (D-86): delete-confirm dialog body, interface-adaptive
+    /// like the sheet's other chrome — the noun follows the deleted entry's
+    /// own interface (a saved SCAN is not a "saved search").
+    static func deleteConfirmMessage(for search: SavedSearch) -> String {
+        search.mode.interface == .scan
+            ? "The saved scan is removed from this device."
+            : "The saved search is removed from this device."
     }
 
     /// Pre-filled save-prompt name (design §4.1).

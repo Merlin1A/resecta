@@ -258,10 +258,10 @@ struct SavedSearchDeleteConfirmationTests {
             .appendingPathComponent("saved-searches.v2.json")
     }
 
-    private func makeSaved(name: String) -> SavedSearch {
+    private func makeSaved(name: String, mode: SearchModeType = .text) -> SavedSearch {
         SavedSearch(
             name: name,
-            mode: .text,
+            mode: mode,
             queryText: "q",
             searchTerms: nil,
             enabledPIICategories: nil,
@@ -281,6 +281,20 @@ struct SavedSearchDeleteConfirmationTests {
         let saved = makeSaved(name: "Tax terms")
         #expect(SavedSearchListSheet.deleteConfirmTitle(for: saved) == "Delete “Tax terms”?")
         #expect(SavedSearchListSheet.deleteConfirmTitle(for: nil) == "Delete saved search?")
+    }
+
+    @Test("Q6 (D-86): dialog body noun follows the entry's own interface")
+    func deleteConfirmMessageFollowsInterface() {
+        #expect(SavedSearchListSheet.deleteConfirmMessage(for: makeSaved(name: "Tax terms"))
+                == "The saved search is removed from this device.")
+        #expect(SavedSearchListSheet.deleteConfirmMessage(for: makeSaved(name: "Weekly scan", mode: .piiScan))
+                == "The saved scan is removed from this device.")
+    }
+
+    @Test("H-74: the collision rejection copy is the pinned string")
+    func duplicateNameMessagePinned() {
+        #expect(SavedSearchListSheet.duplicateNameMessage
+                == "That name is already in use — choose a different name.")
     }
 
     @Test("Arming the confirm (swipe Delete) does not remove the entry")
