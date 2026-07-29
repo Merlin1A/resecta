@@ -92,25 +92,27 @@ struct AccessibilityLabelTests {
 
     // MARK: - A11Y-toast-ax5 — ToastView line-limit at AX5
 
-    @Test("Toast caps at 1 line for info severity below AX5")
-    func testToastInfoBelowAX5CapsAtOneLine() {
-        // §A6.3 compact-capsule contract for non-attention severities at
-        // standard text sizes.
+    @Test("Toast caps at 2 lines for info severity below AX5")
+    func testToastInfoBelowAX5CapsAtTwoLines() {
+        // §A6.3 compact-capsule contract, amended: the original 1-line
+        // info cap truncated shipped messages mid-sentence at standard
+        // text sizes (text-layer notice, dismissal-cleared counts), so
+        // info matches the warning/error 2-line cap.
         #expect(
             ToastView.toastLineLimit(
                 severity: .info,
                 dynamicTypeSize: .large
-            ) == 1
+            ) == 2
         )
     }
 
-    @Test("Toast caps at 1 line for success severity below AX5")
-    func testToastSuccessBelowAX5CapsAtOneLine() {
+    @Test("Toast caps at 2 lines for success severity below AX5")
+    func testToastSuccessBelowAX5CapsAtTwoLines() {
         #expect(
             ToastView.toastLineLimit(
                 severity: .success,
                 dynamicTypeSize: .large
-            ) == 1
+            ) == 2
         )
     }
 
@@ -159,13 +161,13 @@ struct AccessibilityLabelTests {
 
     @Test("Toast stays at the severity baseline at AX4")
     func testToastAtAX4HoldsBaseline() {
-        // .accessibility4 is the boundary below the AX5 lift — info still
-        // caps at 1 line, warning still caps at 2.
+        // .accessibility4 is the boundary below the AX5 lift — the
+        // 2-line baseline still applies; the 3-line lift hasn't kicked in.
         #expect(
             ToastView.toastLineLimit(
                 severity: .info,
                 dynamicTypeSize: .accessibility4
-            ) == 1
+            ) == 2
         )
         #expect(
             ToastView.toastLineLimit(

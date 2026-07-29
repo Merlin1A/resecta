@@ -77,13 +77,19 @@ struct ToastView: View {
         .accessibilityAddTraits(.isStaticText)
     }
 
-    /// ACCESSIBILITY.md §9.3 — toast line cap predicate. Below AX5, error
-    /// and warning toasts cap at 2 lines and info/success cap at 1 line per
-    /// the §A6.3 compact-capsule contract. At `.accessibility5` or larger
-    /// the cap lifts to 3 lines for all severities so multi-clause messages
-    /// remain readable when the text size is at its accessibility maximum.
-    /// Exposed as a `static` so the contract can be unit-tested without
-    /// rendering the view (mirrors `InlineWarningBanner.lineLimit(for:)`).
+    /// ACCESSIBILITY.md §9.3 — toast line cap predicate. Below AX5 every
+    /// severity caps at 2 lines. The original §A6.3 compact-capsule
+    /// contract held info/success to 1 line, but real shipped messages
+    /// exceed one capsule line at standard text sizes (the text-layer
+    /// notice and the dismissal-cleared counts truncated mid-sentence),
+    /// so the info/success baseline was raised to the warning/error cap.
+    /// At `.accessibility5` or larger the cap lifts to 3 lines for all
+    /// severities so multi-clause messages remain readable when the text
+    /// size is at its accessibility maximum. `severity` stays in the
+    /// signature so the per-severity contract remains directly
+    /// assertable. Exposed as a `static` so the contract can be
+    /// unit-tested without rendering the view (mirrors
+    /// `InlineWarningBanner.lineLimit(for:)`).
     static func toastLineLimit(
         severity: ToastSeverity,
         dynamicTypeSize: DynamicTypeSize
@@ -91,6 +97,6 @@ struct ToastView: View {
         if dynamicTypeSize >= .accessibility5 {
             return 3
         }
-        return (severity == .error || severity == .warning) ? 2 : 1
+        return 2
     }
 }
