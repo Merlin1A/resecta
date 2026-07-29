@@ -116,6 +116,14 @@ targets:
         # makes the App Store Connect export-compliance answer "No"
         # non-interactive. App target only — never the test targets.
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        # Xcode 26.6 turns user-script sandboxing ON by default, which
+        # silently disarms the fixture-strip postBuildScript below: the
+        # sandboxed script cannot stat ${SRCROOT}/UITestFixtures, its -d
+        # guard skips, and both synthetic fixtures ship in Release archives
+        # (caught at the first-ever archive, D-91). The strip's whole job is
+        # deleting from the built product, so declared outputs cannot model
+        # it; pin the E4-verified environment instead.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
     dependencies:
       - package: RedactionEngine
     postBuildScripts:
