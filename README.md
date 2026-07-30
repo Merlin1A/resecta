@@ -165,10 +165,6 @@ A stranger can clone, build, and start contributing in under an hour with these 
 
 ## Testing
 
-The workflow the suites protect — import, scan, apply, verify (recorded before the current interface naming):
-
-![Import, scan, apply, verify](docs/images/redact-verify-demo.gif)
-
 The test tree is larger than the source tree: roughly 57,000 lines of Swift source to roughly 77,000 lines of test code, about 1.4×. Counted from the current tree:
 
 - **Engine package** (`Packages/RedactionEngine/Tests`) — 1,650 Swift Testing `@Test` functions across 216 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
@@ -195,11 +191,3 @@ The batched runner executes the app suites in serial batches on an iPhone 17 sim
 ## License
 
 Licensed under the Apache License, Version 2.0. See [`LICENSE`](./LICENSE) for the full text.
-
-## Screenshots
-
-All captures show the app's bundled synthetic sample document — every visible value (names, accounts, addresses) is fictitious. The frames predate the current interface naming (the detection surface is now called Scan); refreshed captures are planned for a future release.
-
-| Home | Scan results | Verification |
-| --- | --- | --- |
-| ![Home screen](./docs/images/home.png) | ![Scan results with detected matches](./docs/images/pii-scan-results.png) | ![Verification summary — Checks Passed](./docs/images/verification-passed.png) |
