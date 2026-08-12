@@ -8,7 +8,7 @@ The entries below follow the Keep-a-Changelog index format.
 
 ## [Unreleased]
 
-## [1.0.0] — 2026-07-18
+## [1.0.0] — 2026-08-12
 
 Initial public release.
 
