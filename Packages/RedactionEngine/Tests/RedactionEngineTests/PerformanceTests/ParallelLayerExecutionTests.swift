@@ -29,6 +29,14 @@ import os
 //                         Character Lineage                  → sequential
 //
 // Mechanism-description language only — no outcome promises.
+//
+// REPORT-ONLY: this suite is listed in PERF_ALONE_RedactionEngine in
+// Scripts/test-batched.sh, so it runs by itself after the batches and its
+// results do not gate the batched exit status. The overlap-floor assertion
+// measures wall-clock concurrency shape and has read red under full
+// batch load while passing alone on the same build; a red here is a
+// maintainer review signal (re-run the suite alone on a quiet machine),
+// not a batch verdict.
 
 // `.serialized` keeps the five tests from racing each other inside the
 // suite. They measure wall-clock and concurrency shape, so concurrent
