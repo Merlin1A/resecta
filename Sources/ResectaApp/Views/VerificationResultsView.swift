@@ -94,7 +94,9 @@ struct VerificationResultsView: View {
                 didAutoExpand = true
                 if Self.shouldAutoExpand(
                     status: report.overallStatus,
-                    hasMixedModes: report.perPageModes.hasMixedModes
+                    hasMixedModes: report.perPageModes.hasMixedModes,
+                    hasDeselection: Self.shouldShowDeselectionRow(
+                        snapshot: deselectionSnapshot)
                 ) {
                     detailsExpanded = true
                 }
@@ -128,11 +130,24 @@ struct VerificationResultsView: View {
     /// without a SwiftUI host (mirrors Session 1's `shouldAutoReturnHome`
     /// pattern). PASS + uniform modes → collapsed; WARN/FAIL or mixed
     /// modes → expanded.
+    ///
+    /// UXC-02: a snapshot with at least one deselected result also forces
+    /// the expansion, regardless of verdict — the exact case
+    /// `shouldShowDeselectionRow` gates the deselection row on. PASS is
+    /// precisely the verdict where "N of M results were left un-checked"
+    /// is easiest to miss if the disclosure ships collapsed, since a PASS
+    /// masthead reads as "no issues" even though it only speaks to what
+    /// was actually redacted. `hasDeselection` defaults to `false` so
+    /// call sites that never had a deselection concept (tests pinning the
+    /// original status/hasMixedModes contract) are unaffected; the one
+    /// production caller (`.onAppear` above) always passes the real
+    /// value.
     static func shouldAutoExpand(
         status: VerificationStatus,
-        hasMixedModes: Bool
+        hasMixedModes: Bool,
+        hasDeselection: Bool = false
     ) -> Bool {
-        if hasMixedModes { return true }
+        if hasMixedModes || hasDeselection { return true }
         switch status {
         case .pass, .info, .skipped:  return false
         case .warn, .attention, .fail: return true

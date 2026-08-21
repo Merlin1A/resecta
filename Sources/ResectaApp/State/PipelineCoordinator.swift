@@ -372,18 +372,22 @@ final class PipelineCoordinator: @unchecked Sendable {
                     effectiveMode: effectiveMode, runSettings: runSettings)
                 let sensitiveTerms = coordinator.collectSensitiveTerms()
 
-                // Capture the live search session's deselection
-                // facts at run entry, before any pipeline work. The value is
-                // recorded onto RedactionState only after `processDocument`
-                // returns (beside `recordLastRunInputs`), but reading it HERE
-                // pins the counts the user saw when they pressed Redact — a
+                // Capture the run's deselection facts at run entry,
+                // before any pipeline work. The value is recorded onto
+                // RedactionState only after `processDocument` returns
+                // (beside `recordLastRunInputs`), but reading it HERE pins
+                // the counts the user saw when they pressed Redact — a
                 // programmatic or user re-selection during `.redacting` /
                 // `.verifying` cannot drift what the results screen reports.
-                // Nil when no PII-scan session is live (sheet closed tears
-                // down `activeSearch`, discarding its selection state).
+                // UXC-01: `runEntryDeselectionSnapshot()` prefers the
+                // apply-commit snapshot (set at the moment the user last
+                // applied selected search results, even if the sheet has
+                // since dismissed and nil'd `activeSearch`) and falls back
+                // to the live search session's snapshot — nil only when
+                // neither source has one (no apply this document session
+                // and no live PII-scan session at run entry).
                 let deselectionSnapshot =
-                    coordinator.redactionState.activeSearch?
-                        .deselectionSnapshotForRun()
+                    coordinator.redactionState.runEntryDeselectionSnapshot()
 
                 // Sub-threshold guard — no pages with effective redactions
                 guard !pages.allSatisfy({ $0.regions.isEmpty }) else { return }
