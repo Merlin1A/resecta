@@ -1,6 +1,5 @@
 import Testing
 import Foundation
-import RedactionEngine
 @testable import ResectaApp
 
 // WU-20 — Mode-specific empty-state copy + multi-term recall chips

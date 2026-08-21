@@ -1,7 +1,6 @@
 import Testing
 import Foundation
 @testable import ResectaApp
-import RedactionEngine
 
 // q11 — piiScan truth + role legibility.
 // UXF-02: pre-scan idle state must not claim a completed scan.

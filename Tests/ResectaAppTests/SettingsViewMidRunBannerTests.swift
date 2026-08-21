@@ -1,7 +1,6 @@
 import Testing
 import Foundation
 @testable import ResectaApp
-@testable import RedactionEngine
 
 // GATE-1 — Settings-during-pipeline UX.
 //
