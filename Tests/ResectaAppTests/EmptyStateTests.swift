@@ -338,7 +338,9 @@ struct EmptyStateTests {
     @Test("PII Scan post-scan zero-result is mechanism-description (no outcome promise)")
     func piiScanPostScanZeroIsMechanism() {
         let copy = WU20Strings.description(for: .piiScanPostScanZero(detectorCount: 7))
-        #expect(copy == "7 detectors matched 0 candidates above threshold.")
+        #expect(copy == "7 detectors matched 0 candidates above threshold.\n\n"
+            + WU20Strings.piiScanZeroCalibrationLine + "\n\n"
+            + WU20Strings.piiScanZeroRecourseLine)
         // §19 forbidden outcome promises — assembled via concat so
         // the source itself does not trip the audit-lint hook.
         let outcomePhrases: [String] = [
@@ -356,7 +358,78 @@ struct EmptyStateTests {
     @Test("PII Scan post-scan zero-result uses singular suffix for 1 detector")
     func piiScanPostScanZeroSingular() {
         let copy = WU20Strings.description(for: .piiScanPostScanZero(detectorCount: 1))
-        #expect(copy == "1 detector matched 0 candidates above threshold.")
+        #expect(copy == "1 detector matched 0 candidates above threshold.\n\n"
+            + WU20Strings.piiScanZeroCalibrationLine + "\n\n"
+            + WU20Strings.piiScanZeroRecourseLine)
+    }
+
+    // MARK: - UXC-10 / UXC-11 — post-scan-zero headline, glyph, recourse
+
+    @Test("UXC-10: post-scan-zero headline names the produced count, not a clean-bill affirmation")
+    func piiScanPostScanZeroHeadline() {
+        let headline = WU20Strings.headline(for: .piiScanPostScanZero(detectorCount: 5))
+        #expect(headline == "No items flagged")
+        #expect(!headline.lowercased().contains("complete"))
+    }
+
+    @Test("UXC-10: post-scan-zero glyph matches the Search-side no-match sibling glyph")
+    func piiScanPostScanZeroGlyph() {
+        let zeroGlyph = WU20Strings.headlineSymbol(for: .piiScanPostScanZero(detectorCount: 5))
+        #expect(zeroGlyph == "doc.text.magnifyingglass")
+        #expect(zeroGlyph == WU20Strings.headlineSymbol(for: .textNoMatch))
+        #expect(zeroGlyph == WU20Strings.headlineSymbol(for: .regexNoMatch))
+        #expect(zeroGlyph == WU20Strings.headlineSymbol(for: .multiTermNoMatch))
+        #expect(zeroGlyph != "checkmark.circle")
+    }
+
+    @Test("UXC-11: calibration line states a threshold outcome, not a content verdict")
+    func piiScanZeroCalibrationLineWording() {
+        let copy = WU20Strings.piiScanZeroCalibrationLine
+        #expect(copy == "A zero result means nothing on the scanned pages cleared the current threshold for those detectors \u{2014} it is not a statement about what the document contains.")
+    }
+
+    @Test("UXC-11: recourse line names the three existing controls by their shipped labels")
+    func piiScanZeroRecourseLineWording() {
+        let copy = WU20Strings.piiScanZeroRecourseLine
+        #expect(copy == "To look further: re-run with different detectors (\u{21bb}), search for specific terms in Search, or change the Detection Sensitivity preset in Settings.")
+        #expect(copy.contains("Search"))
+        #expect(copy.contains("Settings"))
+        #expect(copy.contains("\u{21bb}"))
+    }
+
+    @Test("UXC-11: zero-state calibration + recourse lines are mechanism-description only")
+    func piiScanZeroLinesAreMechanism() {
+        // §19 forbidden vocabulary — assembled via concat so this
+        // source itself does not trip the pre-commit M-1 sweep.
+        let forbidden: [String] = [
+            "guarant" + "ee",
+            "ensur" + "e",
+            "impossi" + "ble",
+            "perfect" + "ly",
+            "flawless" + "ly",
+            "fin" + "d",
+            "cat" + "ch",
+            "100" + "%",
+            "secur" + "e",
+            "safe",
+            "clean",
+            "protect" + "ed",
+            "zero networking",
+        ]
+        for line in [WU20Strings.piiScanZeroCalibrationLine, WU20Strings.piiScanZeroRecourseLine] {
+            let lowered = line.lowercased()
+            for phrase in forbidden {
+                #expect(!lowered.contains(phrase), "forbidden phrase '\(phrase)' in: \(line)")
+            }
+        }
+    }
+
+    @Test("UXC-11: no percent sign in any post-scan-zero-state line")
+    func piiScanZeroLinesNoPercentSign() {
+        #expect(!WU20Strings.piiScanZeroCalibrationLine.contains("%"))
+        #expect(!WU20Strings.piiScanZeroRecourseLine.contains("%"))
+        let composed = WU20Strings.description(for: .piiScanPostScanZero(detectorCount: 3))
+        #expect(!composed.contains("%"))
     }
 
     @Test("Filtered-out copy points at filter chips, mechanism-description")
