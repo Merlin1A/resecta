@@ -48,7 +48,6 @@ struct PacketPRHarnessTests {
     }
     struct Occ: Codable {
         let id: String
-        let value: String
         let category: String
         let page: Int?
         let bbox: [Double]?
@@ -62,7 +61,6 @@ struct PacketPRHarnessTests {
     struct Snapshot: Codable { let pages: [Page] }
     struct Page: Codable { let pageIndex: Int; let textLeg: Leg; let ocrLeg: Leg }
     struct Leg: Codable {
-        let leg: String
         let doctype: Doctype
         let detections: [Detection]
         let overlapSuppressedByCategory: [String: Int]
@@ -72,7 +70,6 @@ struct PacketPRHarnessTests {
     struct Detection: Codable {
         let category: String
         let normalizedRect: [Double]      // [x, y, w, h]
-        let matchedText: String?
         var rect: CGRect { CGRect(x: normalizedRect[0], y: normalizedRect[1],
                                   width: normalizedRect[2], height: normalizedRect[3]) }
     }

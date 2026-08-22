@@ -21,7 +21,6 @@ struct GateG8Span: Decodable, Sendable {
     let category: String
     let start: Int
     let end: Int
-    let expected_outcome: String?
 }
 
 // MARK: - Output JSON shapes (design 02 §12)

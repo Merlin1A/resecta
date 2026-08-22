@@ -91,7 +91,7 @@ struct QuickMeasure: Sendable, CustomStringConvertible {
     let zeroBounds: Int
     let multiOut: Int
     let offGrid: Int
-    let l6Fail, l7Fail, l8Fail, l9Fail, l10Fail: Bool
+    let l6Fail, l7Fail, l8Fail, l9Fail: Bool
     /// surviving − output. > 0 ⇒ output composed < surviving (a genuine Layer-7 deficit).
     var deficit: Int { surviving - output }
     var description: String {
@@ -387,7 +387,7 @@ enum SearchableMergeProbe {
         return QuickMeasure(
             tags: tags, surviving: survTotal, output: outTotal,
             zeroBounds: zeroB, multiOut: multi, offGrid: off,
-            l6Fail: fails(5), l7Fail: fails(6), l8Fail: fails(7), l9Fail: fails(8), l10Fail: fails(9)
+            l6Fail: fails(5), l7Fail: fails(6), l8Fail: fails(7), l9Fail: fails(8)
         )
     }
 

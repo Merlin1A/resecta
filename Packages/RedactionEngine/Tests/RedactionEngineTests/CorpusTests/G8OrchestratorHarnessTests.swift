@@ -54,8 +54,7 @@ import Foundation
 @Suite("G8 orchestrator-path twin (Site-A posterior, standing emitter)", .serialized)
 struct G8OrchestratorHarnessTests {
 
-    // Reuse the baseline suite's wire format + cell schema by reference.
-    typealias Corpus = G8BaselineHarnessTests.BaselineG8Corpus
+    // Reuse the baseline suite's cell schema by reference.
     typealias Cell = G8BaselineHarnessTests.BaselineCell
 
     struct OrchCellsReport: Encodable, Sendable {

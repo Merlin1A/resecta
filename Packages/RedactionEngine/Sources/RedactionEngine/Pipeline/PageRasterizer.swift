@@ -19,7 +19,7 @@ import os
 /// front gate — it rejects out-of-range dimensions / non-default `/UserUnit`
 /// pages and, on real hardware, pages whose raster would exceed half
 /// of available memory. The 10,000-pt `pageDimensionLimit` pre-flight inside
-/// `renderPageWithTimeout` sits behind it as defense-in-depth for any
+/// `renderCGPageWithTimeout` sits behind it as defense-in-depth for any
 /// path that reaches the synchronous draw without the front gate.
 private let dpiBudgetSentinel: Int = Int.max / 4
 
@@ -122,7 +122,7 @@ public final class PageRasterizer: @unchecked Sendable {
         // raster would exceed half of available memory; the memory clause
         // defers to the runtime DPI cap + selectDPI when
         // os_proc_available_memory() is unreadable. The 10,000-pt dimension
-        // guard inside renderPageWithTimeout remains a defense-in-depth
+        // guard inside renderCGPageWithTimeout remains a defense-in-depth
         // backstop behind this. effectiveDPI mirrors the cap applied below so
         // the estimate matches what will actually be rendered.
         guard validatePage(page.page, effectiveDPI: min(page.targetDPI, dpiCap)) else {
@@ -302,8 +302,7 @@ public final class PageRasterizer: @unchecked Sendable {
         // 3. Render page with timeout (ENGINE §2.7)
         // CG-only concurrent render path — draw the pre-extracted
         // `cgPage` with the pre-extracted `cropBoxBounds`/`rotation`; the shared
-        // `PDFPage` is never touched here. (`renderPageWithTimeout(PDFPage,…)`
-        // is retained as a test seam only.)
+        // `PDFPage` is never touched here.
         guard let cgPage = page.cgPage else {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: page.pageIndex))
         }
@@ -407,47 +406,9 @@ public final class PageRasterizer: @unchecked Sendable {
 
     // MARK: - Render with Timeout (ENGINE §2.7)
 
-    /// Render a page with a 30-second timeout. drawPDFPage() is synchronous C
-    /// with no cancellation points — the timeout races against it.
-    @concurrent
-    func renderPageWithTimeout(
-        _ page: PDFPage, pageIndex: Int, dpi: CGFloat
-    ) async throws -> CGImage {
-        // L-19: Pre-flight bound-check before entering the render task group.
-        // drawPDFPage on a pathologically large page can spin for seconds
-        // inside the C call; neither the 30s timeout task nor cancelAll()
-        // can interrupt it (the outer task leaks a core + battery + thermal).
-        let preflightBounds = page.bounds(for: .cropBox)
-        guard preflightBounds.width < pageDimensionLimit,
-              preflightBounds.height < pageDimensionLimit else {
-            throw PipelineError.redactionError(.pageTooLarge(pageIndex: pageIndex))
-        }
-
-        // PDFPage is not Sendable but sequential access is guaranteed (ENGINE §1).
-        // Wrap in SendablePDFPage so the `sending`-typed addTask closure can
-        // capture it under Swift 6.2's stricter sendability checks (Xcode 26.3
-        // CI accepts only @unchecked Sendable captures here; 26.4+ also
-        // accepts nonisolated(unsafe) but the wrapper works for both).
-        let sendablePage = SendablePDFPage(page)
-        let idx = pageIndex
-        let targetDPI = dpi
-        return try await withThrowingTaskGroup(of: CGImage.self) { group in
-            group.addTask {
-                try await self.renderPage(sendablePage.page, pageIndex: idx, dpi: targetDPI)
-            }
-            group.addTask {
-                try await Task.sleep(for: .seconds(30))
-                throw PipelineError.redactionError(.renderTimeout(pageIndex: idx))
-            }
-            let result = try await group.next()!
-            group.cancelAll()
-            return result
-        }
-    }
-
     /// CG-only render-with-timeout, used by the concurrent `rasterize`.
-    /// Mirrors `renderPageWithTimeout(PDFPage,…)` but consumes the pre-extracted
-    /// `CGPDFPage` + geometry, so no shared `PDFPage` is touched concurrently.
+    /// Consumes the pre-extracted `CGPDFPage` + geometry, so no shared
+    /// `PDFPage` is touched concurrently.
     /// Concurrent-read safety of `CGPDFPage` across tasks is NOT documented by
     /// Apple — it is validated empirically by `PDFKitConcurrencyStressTests`
     /// (TSan, iOS 26 SDK, 2026-06); revalidate on SDK bumps. The other surviving

@@ -15,20 +15,9 @@ extension Tag {
     @Tag static var critical: Self
     /// Sandwich (Searchable Redaction) pipeline tests.
     @Tag static var sandwich: Self
-    /// Pipeline coordination and orchestration tests.
-    @Tag static var coordination: Self
 }
 
 // MARK: - Mock Factories (TEST §2.13)
-
-extension VerificationReport {
-    /// Create a mock report with the given overall status.
-    /// Uses empty layers array — tests needing specific layers should
-    /// construct LayerResult arrays directly.
-    static func mock(status: VerificationStatus) -> VerificationReport {
-        VerificationReport(layers: [], overallStatus: status, durationSeconds: 0)
-    }
-}
 
 extension RedactionRegion {
     /// Create a mock manual redaction region.
@@ -36,42 +25,6 @@ extension RedactionRegion {
         rect: CGRect = CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.05)
     ) -> RedactionRegion {
         RedactionRegion(id: UUID(), normalizedRect: rect, source: .manual)
-    }
-}
-
-extension DetectionResult {
-    /// Create a mock detection result of the given kind.
-    static func mock(
-        kind: DetectionResult.Kind = .pii(.ssn),
-        matchedText: String? = nil,
-        recognitionLevel: DetectionResult.RecognitionLevel = .fast
-    ) -> DetectionResult {
-        DetectionResult(
-            id: UUID(),
-            normalizedRect: CGRect(x: 0.1, y: 0.8, width: 0.3, height: 0.04),
-            kind: kind,
-            confidence: 0.95,
-            matchedText: matchedText,
-            recognitionLevel: recognitionLevel
-        )
-    }
-}
-
-extension PageFilterDigest {
-    /// Create a mock digest for testing Layer 7 character count cross-check.
-    static func mock(
-        pageIndex: Int = 0,
-        extracted: Int = 100,
-        excluded: Int = 20,
-        surviving: Int = 80
-    ) -> PageFilterDigest {
-        PageFilterDigest(
-            pageIndex: pageIndex,
-            extractedCount: extracted,
-            excludedCount: excluded,
-            survivingCount: surviving,
-            boundaryCharacters: []
-        )
     }
 }
 

@@ -23,16 +23,9 @@ struct NameGazetteerFuzzyTests {
         }
         let data = try Data(contentsOf: url)
         let filter = try BloomFilter(data: data)
-        let manifest = GazetteerManifest(
-            version: "test",
-            hashAlgorithm: "MurmurHash3_x64_128",
-            seed: 42,
-            filters: []
-        )
         return NameGazetteer(
             surnameFilter: filter,
-            givenNameFilter: filter,
-            manifest: manifest
+            givenNameFilter: filter
         )
     }
 

@@ -15,18 +15,6 @@ struct SpatialAddressGatingTests {
 
     // MARK: - Helpers
 
-    private func line(
-        _ text: String,
-        x: CGFloat = 0.1, y: CGFloat = 0.8,
-        w: CGFloat = 0.3, h: CGFloat = 0.02
-    ) -> OCREngine.TextLine {
-        OCREngine.TextLine(
-            text: text,
-            normalizedRect: CGRect(x: x, y: y, width: w, height: h),
-            confidence: 1.0
-        )
-    }
-
     /// Build a PIIDetector.PIIMatch for an address at the given confidence.
     private func addressMatch(
         text: String,

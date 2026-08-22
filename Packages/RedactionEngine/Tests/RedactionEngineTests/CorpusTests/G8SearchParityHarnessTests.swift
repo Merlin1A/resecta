@@ -41,8 +41,7 @@ import Foundation
 @Suite("G8 Site-B parity twin (M10, standing emitter)", .serialized)
 struct G8SearchParityHarnessTests {
 
-    // Reuse the baseline suite's wire format + cell schema by reference.
-    typealias Corpus = G8BaselineHarnessTests.BaselineG8Corpus
+    // Reuse the baseline suite's cell schema by reference.
     typealias Cell = G8BaselineHarnessTests.BaselineCell
 
     struct SiteBCellsReport: Encodable, Sendable {

@@ -72,18 +72,11 @@ struct RealDocOCRQualityTests {
     }
 
     struct FixtureSweep: Encodable {
-        let fixture: String
-        let dpi_mode: String
         let page_count: Int
         let ocr_invocations: Int
         let categories: [String: CategoryCounts]
-        let render_ms_total: Int
-        let detect_ms_total: Int
-        let detect_ms_max_page: Int
         /// Per-page raw detection count, index = page (counts only).
         let per_page_raw_counts: [Int]
-        /// Per-page render DPI actually used (policy- or force-selected).
-        let per_page_dpi: [Int]
         /// Pages whose detect threw, with the error domain/code and the
         /// rendered pixel dimensions — a page-level Vision failure is a
         /// measurement, not a harness crash (geometry only, never text).
@@ -111,11 +104,6 @@ struct RealDocOCRQualityTests {
     }
 
     struct SmallTextResult: Encodable {
-        let raw_detections: Int
-        let ssn_raw: Int
-        let ein_raw: Int
-        let routing_raw: Int
-        let account_raw: Int
     }
 
     // MARK: - Shared sweep core
@@ -139,7 +127,6 @@ struct RealDocOCRQualityTests {
         var pageErrors: [String] = []
         var renderMSTotal = 0
         var detectMSTotal = 0
-        var detectMSMax = 0
         // OCR-invocation count is tallied LOCALLY (one per page that completes
         // the forced-OCR detectPage below), NOT via the process-global
         // DetectionOrchestrator.OCRInvocationCounter: that static is shared by
@@ -199,7 +186,6 @@ struct RealDocOCRQualityTests {
             }
             let detectMS = Int((clock.now - detectStart).msComponents)
             detectMSTotal += detectMS
-            detectMSMax = max(detectMSMax, detectMS)
 
             // Reached only on a successful detectPage: embeddedText==nil forces
             // exactly one Vision OCR invocation, so this is the deterministic
@@ -224,16 +210,10 @@ struct RealDocOCRQualityTests {
         }
 
         let sweepResult = FixtureSweep(
-            fixture: label,
-            dpi_mode: dpiModeLabel,
             page_count: document.pageCount,
             ocr_invocations: ocrInvocations,
             categories: categories,
-            render_ms_total: renderMSTotal,
-            detect_ms_total: detectMSTotal,
-            detect_ms_max_page: detectMSMax,
             per_page_raw_counts: perPageRaw,
-            per_page_dpi: perPageDPI,
             page_errors: pageErrors
         )
         print("[OCRQ] \(label) dpi=\(dpiModeLabel) pages=\(document.pageCount) "

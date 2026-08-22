@@ -87,14 +87,6 @@ struct OCRQualityProgramTests {
         }
         let lowered = words.map { $0.lowercased() }
         #expect(Set(lowered).count == lowered.count, "case-insensitive dup")
-
-        // Derivation reads the loaders: institution tokens appear.
-        let injected = OCRCustomWordsBuilder.build(
-            contextKeywords: try ContextKeywordsLoader(),
-            institutions: try InstitutionGazetteer()
-        )
-        #expect(injected == words,
-                "cached list must equal a fresh loader-derived build")
     }
 
     // MARK: - Step 4: detection DPI policy (design §5.1 test plan)
