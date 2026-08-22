@@ -1,21 +1,9 @@
 import SwiftUI
-import CoreHaptics
 
 // §A1: Centralized design tokens for Resecta.
 // All magic numbers in the UI should reference these constants.
 
 enum ResectaTokens {
-
-    // MARK: - Typography
-
-    enum Typography {
-        static let sectionHeader: Font = .headline              // 17pt Semibold
-        static let layerName: Font = .headline                  // 17pt Semibold
-        static let bodyText: Font = .body                       // 17pt Regular
-        static let caption: Font = .caption                     // 12pt Regular
-        static let statusBadge: Font = .caption.weight(.bold)   // 12pt Bold
-        static let monoDigit: Font = .body.monospacedDigit()    // 17pt tabular figures
-    }
 
     // MARK: - Spacing
 
@@ -61,12 +49,8 @@ enum ResectaTokens {
         /// (ConfirmationSheetChrome, lands in Phase 5 of the verification/
         /// export redesign). Below the research "Large" range (20–24pt) but
         /// retained because the sheet chrome reads as embedded content, not
-        /// a floating overlay. Distinct from `.large` for semantic clarity.
+        /// a floating overlay.
         static let card: CGFloat = 16
-        /// 20pt — Large floating elements: PipelineProgressCard, popovers.
-        /// Matches the lower bound of the research "Large" range (20–24pt)
-        /// and the PipelineProgressCard floating overlay value.
-        static let large: CGFloat = 20
         /// 24pt — Sheets, modals, Liquid Glass floating overlays
         static let sheet: CGFloat = 24
         /// Capsule shape — pill buttons, single-line toasts. Use `Capsule()` shape.
@@ -94,47 +78,15 @@ enum ResectaTokens {
             }),
             radius: 6, x: 0, y: 2
         )
-        /// Floating bar, toast, FAB. Adaptive per 02-dark-mode-design.md §7.1.
-        static let medium = Elevation(
-            color: Color(uiColor: UIColor { trait in
-                trait.userInterfaceStyle == .dark
-                    ? UIColor.white.withAlphaComponent(0.07)
-                    : UIColor.black.withAlphaComponent(0.17)
-            }),
-            radius: 12, x: 0, y: 4
-        )
-        /// Sheet, modal, picker. Adaptive per 02-dark-mode-design.md §7.1.
-        static let heavy = Elevation(
-            color: Color(uiColor: UIColor { trait in
-                trait.userInterfaceStyle == .dark
-                    ? UIColor.white.withAlphaComponent(0.12)
-                    : UIColor.black.withAlphaComponent(0.25)
-            }),
-            radius: 20, x: 0, y: 8
-        )
     }
 
     // MARK: - Opacity
 
     enum Opacity {
-        // Label hierarchy — prefer SwiftUI .primary/.secondary/.tertiary
-        static let labelPrimary: Double = 1.0
-        static let labelSecondary: Double = 0.6
-        static let labelTertiary: Double = 0.3
-        static let labelQuaternary: Double = 0.18
-
-        // Interaction states
-        /// Button pressed/highlighted foreground dim
-        static let pressed: Double = 0.2
         /// Disabled control
         static let disabled: Double = 0.4
         /// Modal scrim behind sheets/overlays
         static let scrim: Double = 0.4
-
-        // Region fill (see §2.5 for reduce-transparency variant)
-        static let regionFill: Double = 0.30
-        static let regionFillReducedTransparency: Double = 0.60
-        static let rubberBandFill: Double = 0.15
 
         // Severity tint overlays (see §A6 Toast Severity)
         static let severityTint: Double = 0.10
@@ -143,20 +95,8 @@ enum ResectaTokens {
     // MARK: - Borders
 
     enum Border {
-        /// 0.33pt — Hairline separator (1 pixel on 3× Retina). SwiftUI Divider() default.
-        static let hairline: CGFloat = 1.0 / 3.0
         /// 0.5pt — Subtle border
         static let subtle: CGFloat = 0.5
-        /// 1pt — Standard border, snap guide line
-        static let standard: CGFloat = 1.0
-        /// 2pt — Region border (unselected), emphasized selection
-        static let regionUnselected: CGFloat = 2.0
-        /// 2.5pt — Region border (selected). Preserves existing spec §2.5 value;
-        /// research Area 4 suggests 2pt but 2.5pt provides better visual distinction
-        /// from the 2.0pt unselected border. Revisit if visual testing indicates otherwise.
-        static let regionSelected: CGFloat = 2.5
-        /// 3pt — Heavy accent stroke, iPad sidebar selected-page highlight
-        static let heavy: CGFloat = 3.0
     }
 
     // MARK: - Semantic Colors
@@ -286,14 +226,8 @@ enum ResectaTokens {
     // MARK: - Touch Targets
 
     enum TouchTarget {
-        /// 44pt — Minimum touch target (Apple HIG), finger input
-        static let finger: CGFloat = 44
-        /// 24pt — Trackpad/mouse pointer hit area
-        static let pointer: CGFloat = 24
         /// 22pt — Apple Pencil hit area
         static let pencil: CGFloat = 22
-        /// 10pt — Visible resize handle diameter
-        static let resizeHandleVisible: CGFloat = 10
     }
 
     // MARK: - Branded Surface (Design Spec §5)
@@ -352,12 +286,8 @@ enum ResectaTokens {
         static let modeTransition: Animation = .spring(response: 0.35, dampingFraction: 0.85)
 
         // MARK: Overlays
-        /// Progress overlay, blur/dim appearance
-        static let overlayAppear: Animation = .smooth(duration: 0.3)
         /// Overlay/sheet dismissal (faster than appear)
         static let overlayDismiss: Animation = .smooth(duration: 0.25)
-        /// Background blur/dim behind overlays
-        static let contentDim: Animation = .easeInOut(duration: 0.3)
 
         // MARK: Toasts
         /// Toast entrance (slide + fade)
@@ -365,24 +295,13 @@ enum ResectaTokens {
         /// Toast exit (no bounce on dismissal)
         static let toastOut: Animation = .easeIn(duration: 0.2)
 
-        // MARK: Region Interaction
-        /// Region snap-to-grid/position after drawing
-        static let regionSettle: Animation = .spring(response: 0.3, dampingFraction: 0.7)
-        /// Region delete: scale to 0.8 + fade to 0
-        static let regionDelete: Animation = .spring(response: 0.25, dampingFraction: 0.9)
-        /// Handle appearance, selection highlight
-        static let selectionIn: Animation = .snappy(duration: 0.2)
-        /// Handle disappearance, deselection
-        static let selectionOut: Animation = .easeOut(duration: 0.15)
-
-        /// WU-43 M-D.5: TimeInterval companion to `selectionIn` for the
-        /// resize-handle CADisplayLink path. `RedactionOverlayView`
-        /// interpolates a custom `handleScale` CGFloat that SwiftUI's
-        /// `Animation` value cannot drive — the duration is read by hand
-        /// from this token. Kept in lock-step with the SwiftUI variant.
+        /// WU-43 M-D.5: Handle-appearance duration for the resize-handle
+        /// CADisplayLink path. `RedactionOverlayView` interpolates a custom
+        /// `handleScale` CGFloat that SwiftUI's `Animation` value cannot
+        /// drive — the duration is read by hand from this token.
         static let selectionInDuration: TimeInterval = 0.2
 
-        /// WU-43 M-D.5: TimeInterval companion to `selectionOut`.
+        /// WU-43 M-D.5: Handle-disappearance duration, same CADisplayLink path.
         static let selectionOutDuration: TimeInterval = 0.15
 
         // MARK: Attention
@@ -397,20 +316,8 @@ enum ResectaTokens {
             .repeatCount(1, autoreverses: true)
 
         // MARK: Verification
-        /// Companion to .contentTransition(.numericText())
-        static let numericCount: Animation = .snappy(duration: 0.3)
-        /// Per-item stagger in verification results list.
-        /// 0.035s interval compresses 8-layer cascade to 0.28s spread — snappy
-        /// without losing perceptibility.
-        static func stagger(index: Int) -> Animation {
-            .snappy(duration: 0.35).delay(min(Double(index) * 0.035, 0.35))
-        }
         /// Status color change (gray → green/red)
         static let colorTransition: Animation = .easeInOut(duration: 0.3)
-
-        // MARK: Progress (§A4)
-        /// Progress bar fill to 100%
-        static let progressComplete: Animation = .easeInOut(duration: 0.3)
 
         // MARK: Reduced Motion (§A2.2)
         /// Returns the reduced-motion equivalent of an animation if the user prefers it.
@@ -420,124 +327,6 @@ enum ResectaTokens {
                 return .easeInOut(duration: 0.2)
             }
             return animation
-        }
-
-        /// Transition for reduced-motion contexts. Replaces spatial transitions
-        /// (slide, scale) with opacity-only crossfade.
-        static func resolvedTransition(
-            standard: AnyTransition,
-            reduceMotion: Bool
-        ) -> AnyTransition {
-            reduceMotion ? .opacity : standard
-        }
-    }
-
-    // MARK: - Haptic Choreography (§A3)
-
-    /// Haptic feedback map (UI_UX_SPEC_AMENDMENT §A3).
-    /// Use SwiftUI `.sensoryFeedback(_:trigger:)` as the primary API.
-    /// UIKit `UIFeedbackGenerator` subclasses are the fallback for UIView code paths
-    /// (RedactionOverlayView).
-    ///
-    /// Always call `.prepare()` before time-critical haptic events to reduce
-    /// Taptic Engine latency.
-    ///
-    /// The string constants below name the intended haptic for each interaction.
-    /// Each call site uses the actual `.sensoryFeedback` modifier or `UIFeedbackGenerator`
-    /// subclass directly (see §A3.4 wiring table and §A3.5 SwiftUI examples).
-    enum Haptics {
-        // MARK: Region Interaction (UIKit — overlay view)
-        /// Physical "stamp placed" metaphor. Fire on touchesEnded when region is committed.
-        /// UIKit: UIImpactFeedbackGenerator(.medium).impactOccurred()
-        static let regionCommitted = "impact.medium"
-
-        /// Apple standard for selection state changes. Fire on region tap-to-select.
-        /// UIKit: UISelectionFeedbackGenerator().selectionChanged()
-        static let regionSelected = "selection"
-
-        /// Crisp, definitive removal. Fire on region delete (after undo registration).
-        /// UIKit: UIImpactFeedbackGenerator(.rigid).impactOccurred(intensity: 0.8)
-        static let regionDeleted = "impact.rigid.0.8"
-
-        /// Already implemented (§2.2). Subtle "nope" for sub-threshold regions.
-        /// UIKit: UIImpactFeedbackGenerator(.light).impactOccurred(intensity: 0.3)
-        static let subThresholdRejection = "impact.light.0.3"
-
-        /// Fire when a region edge snaps to a guide (see §A7).
-        /// SwiftUI: .sensoryFeedback(.alignment, trigger: snapPosition)
-        static let snapAlignment = "alignment"
-
-        // MARK: State Transitions (SwiftUI — view modifiers)
-        /// Gentle, ambient transition. Fire on phase change (draw → review → export).
-        /// SwiftUI: .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.5), trigger:)
-        static let modeSwitch = "impact.soft.0.5"
-
-        /// Subtle, frequent action. Fire on undo/redo.
-        /// SwiftUI: .sensoryFeedback(.impact(weight: .light), trigger:)
-        static let undoRedo = "impact.light"
-
-        // MARK: Pipeline Milestones (SwiftUI)
-        /// Positive milestone. Fire when auto-detection completes.
-        /// SwiftUI: .sensoryFeedback(.success, trigger:)
-        static let detectionComplete = "success"
-
-        /// Major milestone completion. Fire when redaction pipeline finishes
-        /// (before verification begins).
-        /// SwiftUI: .sensoryFeedback(.success, trigger:)
-        static let pipelineComplete = "success"
-
-        // MARK: Verification Results (SwiftUI)
-        /// Satisfying confirmation. Fire when overall status is PASS.
-        /// SwiftUI: .sensoryFeedback(.success, trigger:)
-        static let verificationPass = "success"
-
-        /// Medium attention-getting pulse. Fire when overall status is WARN.
-        /// SwiftUI: .sensoryFeedback(.warning, trigger:)
-        static let verificationWarn = "warning"
-
-        /// Distinct triple-buzz alert. Fire when overall status is FAIL.
-        /// SwiftUI: .sensoryFeedback(.error, trigger:)
-        static let verificationFail = "error"
-    }
-}
-
-// MARK: - Export Confirmation AHAP (§A3.2)
-
-extension ResectaTokens.Haptics {
-    /// Two-part haptic for the irreversible export confirmation.
-    /// Part 1 (t=0.0): Sharp transient — "this is serious"
-    /// Part 2 (t=0.15s): Heavy transient — "committed"
-    static func playExportConfirmation() {
-        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
-
-        do {
-            let engine = try CHHapticEngine()
-            try engine.start()
-
-            let sharpTransient = CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.8),
-                ],
-                relativeTime: 0
-            )
-
-            let heavyTransient = CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5),
-                ],
-                relativeTime: 0.15
-            )
-
-            let pattern = try CHHapticPattern(events: [sharpTransient, heavyTransient],
-                                               parameters: [])
-            let player = try engine.makePlayer(with: pattern)
-            try player.start(atTime: 0)
-        } catch {
-            // Haptic failure is non-critical — silently degrade
         }
     }
 }

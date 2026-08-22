@@ -7,8 +7,6 @@ import UIKit
 //
 //   `badgeOuterStrokeWidth`     (badge perimeter contrast)
 //   `selectionHandleOuterStrokeWidth` (handle ring against light bg)
-//   `HandleAnimationDirection` + `reduceMotionHandleScale(…)`
-//           (Reduce-Motion gate for the CADisplayLink path)
 //
 //   `DimensionLabelPosition` + `dimensionLabelPosition(…)`
 //           (above-vs-below placement for small/tall regions; suppress
@@ -37,31 +35,6 @@ extension RedactionOverlayView {
     /// enlarged disc beneath the handle, so the visible ring scales
     /// with `handleScale` alongside the handle itself.
     static let selectionHandleOuterStrokeWidth: CGFloat = 1.0
-
-    // MARK: - Reduce-Motion gate
-
-    /// Names the gesture branch (selection gained vs lost) for the
-    /// resize-handle CADisplayLink path's Reduce-Motion override.
-    enum HandleAnimationDirection {
-        case `in`
-        case out
-    }
-
-    /// Returns the resize-handle target scale when Reduce Motion is
-    /// enabled; `nil` signals the caller to run the CADisplayLink
-    /// interpolation path. The `direction` argument names the gesture
-    /// branch without coupling the test to `UIAccessibility` state.
-    /// Pinned by `CanvasAccessibilityPolishTests`.
-    static func reduceMotionHandleScale(
-        direction: HandleAnimationDirection,
-        reduceMotion: Bool
-    ) -> CGFloat? {
-        guard reduceMotion else { return nil }
-        switch direction {
-        case .in: return 1.0
-        case .out: return 0.0
-        }
-    }
 
     // MARK: - Dimension label placement
 

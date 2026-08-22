@@ -64,7 +64,7 @@ struct SearchRedactIntegrationTests {
         }
         let metadata = redactionState.regionMetadata[region.id]
         #expect(metadata != nil)
-        #expect(metadata?.kindLabel == "Find")
+        #expect(metadata?.badgeLabel == "Find")
         #expect(metadata?.matchedText == "test")
     }
 
@@ -278,7 +278,7 @@ struct SearchRedactIntegrationTests {
             existingRectsByPage: [:],
             appliedAt: Date())
 
-        let labels = Set(prepared.createdMetadata.values.map(\.kindLabel))
+        let labels = Set(prepared.createdMetadata.values.map(\.badgeLabel))
         #expect(labels == ["Phone", "Find"],  // LegalPhrases:safe (UI label constant)
                 "piiScan region surfaces its category label; typed region stays generic")
     }

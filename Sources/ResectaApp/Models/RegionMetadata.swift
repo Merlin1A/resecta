@@ -26,11 +26,8 @@ nonisolated struct RegionMetadata: Sendable {
     /// Populated post-clustering in PipelineCoordinator.runDetectionPipeline.
     var isAmbiguousSurname: Bool = false
 
-    /// Human-readable label for the PII kind (used in badges and triage list).
-    /// Cached at init — all inputs are `let`, so the value never changes.
-    let kindLabel: String
-
     /// Abbreviated label for canvas badge (max 4 characters).
+    /// Cached at init — all inputs are `let`, so the value never changes.
     let badgeLabel: String
 
     /// Full description for accessibility and hover tooltip.
@@ -48,7 +45,6 @@ nonisolated struct RegionMetadata: Sendable {
         self.recognitionLevel = recognitionLevel
         self.isAmbiguousSurname = isAmbiguousSurname
 
-        self.kindLabel = Self.computeKindLabel(piiKind)
         self.badgeLabel = Self.computeKindLabel(piiKind)
 
         let conf = Int(min(max(confidence, 0.0), 1.0) * 100)
