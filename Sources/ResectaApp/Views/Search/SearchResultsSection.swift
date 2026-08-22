@@ -1131,7 +1131,12 @@ enum WU20Strings {
             // description below carries the role sentence.
             return "Not scanned yet"
         case .piiScanPostScanZero:
-            return "Scan complete"
+            // UXC-10(b) — names what the run produced, not an
+            // affirmation: matches the canvas banner's own voice
+            // ("…flagged no items"). A checkmark-style "Scan complete"
+            // read as a clean bill; this names the produced count
+            // instead (zero, stated plainly).
+            return "No items flagged"
         case .piiScanCancelled:
             return "Scan cancelled"
         }
@@ -1143,8 +1148,12 @@ enum WU20Strings {
              .multiTermPreSearchWithRecents, .regexPreSearch,
              .textNotRun, .regexNotRun, .multiTermNotRun:
             return "magnifyingglass"
+        // UXC-10(a) — the post-scan-zero branch shares the neutral
+        // no-match glyph with its Search-side siblings: a checkmark
+        // read as an affirmative clean bill, which this state must
+        // never imply.
         case .textNoMatch, .regexNoMatch, .multiTermNoMatch,
-             .multiTermNoMatchConjunction:
+             .multiTermNoMatchConjunction, .piiScanPostScanZero:
             return "doc.text.magnifyingglass"
         // The Scan side dropped the shield family: `doc.viewfinder`
         // matches the toolbar Scan entry's own glyph, and the outcome
@@ -1154,8 +1163,6 @@ enum WU20Strings {
             return "doc.viewfinder"
         case .piiScanStartFailed:
             return "exclamationmark.triangle"
-        case .piiScanPostScanZero:
-            return "checkmark.circle"
         case .piiScanCancelled:
             return "stop.circle"
         }
@@ -1199,8 +1206,13 @@ enum WU20Strings {
             // stays true and names no retired control.
             return piiScanRoleSentence
         case .piiScanPostScanZero(let detectorCount):
+            // UXC-11 — the threshold-count sentence stays first,
+            // verbatim, then the calibration line and the recourse
+            // pointer (both pinned builders below) so a zero result
+            // never reads as an unqualified clean bill.
             let suffix = detectorCount == 1 ? "" : "s"
-            return "\(detectorCount) detector\(suffix) matched 0 candidates above threshold."
+            let base = "\(detectorCount) detector\(suffix) matched 0 candidates above threshold."
+            return "\(base)\n\n\(piiScanZeroCalibrationLine)\n\n\(piiScanZeroRecourseLine)"
         case .piiScanCancelled(let pagesScanned, let pageCount):
             // Mechanism description, no verdict: a partial run must
             // never read as a clean bill. Names the unscanned remainder
@@ -1209,6 +1221,33 @@ enum WU20Strings {
             return "Detection stopped after \(pagesScanned) of \(pageCount) page\(suffix) — the remaining pages weren't scanned."
         }
     }
+
+    // MARK: Post-scan-zero recourse (UXC-11)
+    //
+    // Fence-safe: copy + pointers to controls that already ship.
+    // No near-threshold candidate display, no new detection surface,
+    // no new setting. Composed into `description(for:
+    // .piiScanPostScanZero)` above; pinned separately by
+    // `EmptyStateTests` so the wording stays testable without
+    // decoding the composed string.
+
+    /// UXC-11(a) — calibration line: a zero result is a threshold
+    /// outcome, not a verdict on document content. Mechanism
+    /// description only — no outcome promise about what the document
+    /// does or doesn't contain.
+    static let piiScanZeroCalibrationLine =
+        "A zero result means nothing on the scanned pages cleared the current threshold for those detectors \u{2014} it is not a statement about what the document contains."
+
+    /// UXC-11(b) — pointer line naming the three existing recourse
+    /// controls by their shipped labels/glyphs: the chips-row re-run
+    /// affordance (\u{21bb}, accessibility label "Scan document for
+    /// PII", `SearchToolbarSection.rescanButton`), the Search
+    /// interface's literal-match modes (`SearchInterface.search`
+    /// displayName "Search"), and the Settings "Detection Sensitivity"
+    /// preset picker (`SettingsView`). Names no control beyond what
+    /// already ships.
+    static let piiScanZeroRecourseLine =
+        "To look further: re-run with different detectors (\u{21bb}), search for specific terms in Search, or change the Detection Sensitivity preset in Settings."
 
     // MARK: Search-interface role line
 
