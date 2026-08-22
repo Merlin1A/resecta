@@ -1852,7 +1852,8 @@ final class PipelineCoordinator: @unchecked Sendable {
                     // nothing" from "never ran".
                     coordinator.documentState.transition(to: .editing)
                     coordinator.redactionState.recordDetectionRun(
-                        .nothingFound(pageCount: coordinator.documentState.pageCount))
+                        .nothingFound(pageCount: coordinator.documentState.pageCount),
+                        ocrSkippedPages: coordinator.redactionState.ocrPixelCapSkippedPages)
                     return
                 }
 
@@ -1870,7 +1871,9 @@ final class PipelineCoordinator: @unchecked Sendable {
                 coordinator.redactionState.triageSelections = [:]
 
                 coordinator.documentState.transition(to: .editing)
-                coordinator.redactionState.recordDetectionRun(.staged)
+                coordinator.redactionState.recordDetectionRun(
+                    .staged,
+                    ocrSkippedPages: coordinator.redactionState.ocrPixelCapSkippedPages)
                 // Triage sheet appears automatically via .sheet binding on pendingTriage
 
             } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
@@ -1936,6 +1939,10 @@ final class PipelineCoordinator: @unchecked Sendable {
         }
         // UXF-06 — the failed outcome also lands in the run record so the
         // summary banner keeps a dismissable trace after this toast expires.
+        // UXC-04 — ocrSkippedPages stays at its default empty set here: a
+        // run that did not complete never reached the write at line 1842,
+        // so `ocrPixelCapSkippedPages` on state may still hold a prior
+        // run's pages, and this outcome must not carry that value forward.
         redactionState.recordDetectionRun(.failed)
         enqueueToast(
             "Couldn't scan this document. Manual redaction tools remain available.",

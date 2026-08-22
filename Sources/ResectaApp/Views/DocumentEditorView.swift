@@ -387,7 +387,10 @@ struct DocumentEditorView: View {
                     onExport: { handleExportTap(report: report) },
                     onRunVerification: { handleRunVerificationTap() },
                     deselectionSnapshot: redactionState.lastRunDeselection,
-                    onReviewDeselections: reviewDeselectionsHandler
+                    onReviewDeselections: reviewDeselectionsHandler,
+                    runFacts: VerificationResultsView.RunFacts.derive(
+                        lastDetectionRun: redactionState.lastDetectionRun,
+                        hasAppliedRegions: redactionState.hasEffectiveRegions)
                 )
                 .transition(.opacity)
 

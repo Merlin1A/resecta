@@ -390,7 +390,8 @@ extension SearchAndRedactSheet {
                                 : .staged,
                             scanSummary: .init(
                                 foundCount: searchState.results.count,
-                                pageCount: searchState.totalPages))
+                                pageCount: searchState.totalPages),
+                            ocrSkippedPages: searchState.ocrSkippedPages)
                     }
 
                     await searcher.setOverlapSink(nil)
