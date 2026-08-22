@@ -140,12 +140,26 @@ struct FailExportGateTests {
         #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.attention("a"), overridden: true)) == false)
     }
 
-    @Test("ATTENTION confirm message quotes the residual diagnostic")
-    func attentionConfirmMessageQuotesDiagnostic() {
-        let msg = DocumentEditorView.shareAnywayConfirmMessage(
-            report: report(.attention("Text matching your redactions is still readable on page 2 (1 instance)")))
-        #expect(msg.contains("still readable on page 2"))
-        #expect(msg.contains("share the document as it is"))
+    @Test("UXC-14: ATTENTION confirm's at-risk item list quotes the layer's shortDescription")
+    func attentionAtRiskItemQuotesDiagnostic() {
+        let attentionReport = VerificationReport(
+            layers: [
+                LayerResult(
+                    name: "OCR Check", symbolName: "doc.text.magnifyingglass",
+                    status: .attention("Text matching your redactions is still readable on page 2 (1 instance)"),
+                    shortDescription: "Text matching your redactions is still readable on page 2.",
+                    detailDescription: "", pageReferences: [1], durationSeconds: 0,
+                    reviewTermTexts: ["redacted-term"]
+                )
+            ],
+            overallStatus: .attention("Text matching your redactions is still readable on page 2 (1 instance)"),
+            durationSeconds: 0
+        )
+        let lines = DocumentEditorView.atRiskItemLines(report: attentionReport)
+        #expect(lines == ["Text matching your redactions is still readable on page 2."])
+        // Content-free (ARCH §12.2): the item list never surfaces
+        // reviewTermTexts (the matched term text), only shortDescription.
+        #expect(!lines.joined().contains("redacted-term"))
     }
 
     // VE-8-1 (F07) emits a synthetic single-layer "Page Count Check" FAIL when
@@ -213,44 +227,82 @@ struct FailExportGateTests {
         #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.pass)) == false)
     }
 
-    // The confirm's message quotes the diagnostic the FAIL aggregate preserved
-    // (the first failing layer's message) instead of asserting the Layer-2
-    // in-region cause for every FAIL class. Empty-message FAILs fall back to
-    // the former sentence.
-    @Test("Confirm message quotes the L2 in-region diagnostic")
-    func confirmMessageQuotesInRegionDiagnostic() {
-        let message = DocumentEditorView.shareAnywayConfirmMessage(
-            report: report(.fail("Readable text detected within a redacted region on 1 page(s): 1")))
-        #expect(message.contains("Readable text detected within a redacted region on 1 page(s): 1"))
-        #expect(message.contains("share the document as it is"))
+    // UXC-14: the confirm sheet's at-risk item list is derived from EVERY
+    // FAIL/ATTENTION layer's shortDescription (`atRiskItemLines`), not a
+    // single quoted-and-fallback sentence — the retired
+    // `shareAnywayConfirmMessage` / `shareAnywayConfirmFallbackMessage`
+    // pinned that older single-message shape. `atRiskItemLines` distinguishes
+    // FAIL classes the same way: each layer's own shortDescription, verbatim.
+    @Test("At-risk item list quotes the L2 in-region diagnostic")
+    func atRiskItemsQuoteInRegionDiagnostic() {
+        let inRegionFail = VerificationReport(
+            layers: [
+                LayerResult(
+                    name: "OCR Check", symbolName: "doc.text.magnifyingglass",
+                    status: .fail("Readable text detected within a redacted region on 1 page(s): 1"),
+                    shortDescription: "Readable text detected within a redacted region on 1 page(s): 1",
+                    detailDescription: "", pageReferences: [1], durationSeconds: 0
+                )
+            ],
+            overallStatus: .fail("Readable text detected within a redacted region on 1 page(s): 1"),
+            durationSeconds: 0
+        )
+        #expect(DocumentEditorView.atRiskItemLines(report: inRegionFail)
+            == ["Readable text detected within a redacted region on 1 page(s): 1"])
     }
 
-    @Test("Confirm message quotes a page-count diagnostic, not the in-region sentence")
-    func confirmMessageQuotesPageCountDiagnostic() {
-        let message = DocumentEditorView.shareAnywayConfirmMessage(
-            report: report(.fail("Output page count does not match the source document")))
-        #expect(message.contains("Output page count does not match the source document"))
-        #expect(!message.contains("readable text within a redacted region"))
+    @Test("At-risk item list quotes a page-count diagnostic, not the in-region sentence")
+    func atRiskItemsQuotePageCountDiagnostic() {
+        let pageCountFail = VerificationReport(
+            layers: [
+                LayerResult(
+                    name: "Page Count Check", symbolName: "exclamationmark.triangle",
+                    status: .fail("Output page count does not match the source document"),
+                    shortDescription: "Output page count does not match the source document.",
+                    detailDescription: "", pageReferences: nil, durationSeconds: 0
+                )
+            ],
+            overallStatus: .fail("Output page count does not match the source document"),
+            durationSeconds: 0
+        )
+        let lines = DocumentEditorView.atRiskItemLines(report: pageCountFail)
+        #expect(lines == ["Output page count does not match the source document."])
+        #expect(!lines.joined().contains("readable text within a redacted region"))
     }
 
-    @Test("Confirm message quotes a metadata (Layer 5) diagnostic, not the in-region sentence")
-    func confirmMessageQuotesMetadataDiagnostic() {
-        let message = DocumentEditorView.shareAnywayConfirmMessage(
-            report: report(.fail("Document metadata contains key: Author")))
-        #expect(message.contains("Document metadata contains key: Author"))
-        #expect(!message.contains("readable text within a redacted region"))
+    @Test("At-risk item list quotes a metadata (Layer 5) diagnostic, not the in-region sentence")
+    func atRiskItemsQuoteMetadataDiagnostic() {
+        let metadataFail = VerificationReport(
+            layers: [
+                LayerResult(
+                    name: "Metadata Check", symbolName: "doc.badge.gearshape",
+                    status: .fail("Document metadata contains key: Author"),
+                    shortDescription: "Document metadata contains key: Author",
+                    detailDescription: "", pageReferences: nil, durationSeconds: 0
+                )
+            ],
+            overallStatus: .fail("Document metadata contains key: Author"),
+            durationSeconds: 0
+        )
+        let lines = DocumentEditorView.atRiskItemLines(report: metadataFail)
+        #expect(lines == ["Document metadata contains key: Author"])
+        #expect(!lines.joined().contains("readable text within a redacted region"))
     }
 
-    @Test("Empty FAIL message falls back to the former sentence")
-    func emptyFailMessageFallsBack() {
-        let message = DocumentEditorView.shareAnywayConfirmMessage(report: report(.fail("")))
-        #expect(message == DocumentEditorView.shareAnywayConfirmFallbackMessage)
+    @Test("A FAIL report with no layers (fixture-only shape) yields an empty at-risk item list, not a crash")
+    func emptyLayersYieldsEmptyList() {
+        // aggregateStatus can never actually produce .fail with empty
+        // layers in production (overallStatus is derived FROM a failing
+        // layer) — this fixture-only shape existed to exercise the former
+        // `shareAnywayConfirmFallbackMessage`. `atRiskItemLines` has no
+        // fallback concept: it degrades to an empty list, and the sheet
+        // renders the header with no bullets under it.
+        #expect(DocumentEditorView.atRiskItemLines(report: report(.fail(""))).isEmpty)
     }
 
-    @Test("Non-FAIL report falls back (alert is unreachable there, copy still defined)")
-    func nonFailFallsBack() {
-        let message = DocumentEditorView.shareAnywayConfirmMessage(report: report(.pass))
-        #expect(message == DocumentEditorView.shareAnywayConfirmFallbackMessage)
+    @Test("Non-FAIL/ATTENTION report yields an empty at-risk item list (the sheet is unreachable there anyway)")
+    func nonFailAttentionYieldsEmptyList() {
+        #expect(DocumentEditorView.atRiskItemLines(report: report(.pass)).isEmpty)
     }
 
     // "Confirm once": after overrideVerificationFailure() flips userOverrodeFailure
@@ -325,36 +377,62 @@ struct SkippedShareGateTests {
         #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: report(.fail("x"))) == false)
     }
 
-    @Test("FAIL and skipped confirms never both fire, across every status")
-    func confirmsAreMutuallyExclusive() {
+    /// The narrow incomplete-WARN shape (UXC-14 / GAP-14): overallStatus
+    /// `.warn` with zero real WARN layers and ≥1 skipped layer. Needs actual
+    /// layers, unlike this suite's zero-layer `report(_:)` fixture helper.
+    private func incompleteWarnReport() -> VerificationReport {
+        VerificationReport(
+            layers: [
+                LayerResult(name: "Character Count Cross-Check", symbolName: "number",
+                           status: .skipped, shortDescription: "", detailDescription: "",
+                           pageReferences: nil, durationSeconds: 0)
+            ],
+            overallStatus: .warn("Verification produced warnings"),
+            durationSeconds: 0
+        )
+    }
+
+    @Test("FAIL/ATTENTION, SKIPPED, and incomplete-WARN confirms never fire together, across every status shape")
+    func threeWayMutualExclusion() {
         let statuses: [VerificationStatus] =
-            [.pass, .info("i"), .warn("w"), .fail("x"), .skipped]
-        for status in statuses {
-            let r = report(status)
-            let bothFire = DocumentEditorView.shareNeedsFailConfirm(report: r)
-                && DocumentEditorView.shareNeedsSkippedConfirm(report: r)
-            #expect(bothFire == false)
+            [.pass, .info("i"), .warn("w"), .fail("x"), .attention("a"), .skipped]
+        var fixtures: [VerificationReport] = statuses.map { report($0) }
+        fixtures.append(incompleteWarnReport())
+        for r in fixtures {
+            let failFires = DocumentEditorView.shareNeedsFailConfirm(report: r)
+            let skippedFires = DocumentEditorView.shareNeedsSkippedConfirm(report: r)
+            let incompleteFires = DocumentEditorView.shareNeedsIncompleteWarnConfirm(
+                report: r, acknowledged: false)
+            let fireCount = [failFires, skippedFires, incompleteFires].filter { $0 }.count
+            #expect(fireCount <= 1,
+                    "more than one confirm family fired for \(r.overallStatus)")
         }
     }
 
-    // Friction ladder (predicate-level): FAIL > SKIPPED > WARN == PASS.
-    // Score = confirms required + red Share tint. FAIL scores 2 (confirm +
-    // red tint), SKIPPED scores 1 (confirm, default tint), WARN and PASS
-    // score 0. Pins the deliberate shape: turning verification off is never
-    // the least-friction path to sharing.
-    @Test("Friction ladder: FAIL > SKIPPED > WARN == PASS")
+    // Friction ladder (predicate-level): FAIL > SKIPPED == incomplete-WARN >
+    // WARN == PASS (RB-34 D8). Score = confirms required + red Share tint.
+    // FAIL scores 2 (confirm + red tint), SKIPPED and incomplete-WARN each
+    // score 1 (confirm, default tint), routine WARN and PASS score 0. Pins
+    // the deliberate shape: turning verification off, or sharing a run whose
+    // digest-dependent layers were skipped, are never the least-friction
+    // path to sharing.
+    @Test("Friction ladder: FAIL > SKIPPED == incomplete-WARN > WARN == PASS")
     func frictionLadderHolds() {
         func friction(_ r: VerificationReport) -> Int {
             (DocumentEditorView.shareNeedsFailConfirm(report: r) ? 1 : 0)
                 + (DocumentEditorView.shareNeedsSkippedConfirm(report: r) ? 1 : 0)
+                + (DocumentEditorView.shareNeedsIncompleteWarnConfirm(
+                    report: r, acknowledged: false) ? 1 : 0)
                 + (VerificationResultsView.shouldTintShareRed(report: r) ? 1 : 0)
         }
         let fail = friction(report(.fail("x")))
         let skipped = friction(report(.skipped))
+        let incompleteWarn = friction(incompleteWarnReport())
         let warn = friction(report(.warn("w")))
         let pass = friction(report(.pass))
         #expect(fail > skipped)
-        #expect(skipped > warn)
+        #expect(skipped == incompleteWarn)
+        #expect(incompleteWarn > warn)
         #expect(warn == pass)
     }
 
@@ -375,12 +453,290 @@ struct SkippedShareGateTests {
         #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: acknowledged) == false)
     }
 
-    @Test("Confirm copy names the state and both choices (mechanism description)")
-    func confirmCopyNamesStateAndChoices() {
-        let message = DocumentEditorView.shareSkippedConfirmMessage
-        #expect(message.contains("Verification did not run"))
-        #expect(message.contains("run it from this screen"))
-        #expect(message.contains("share the document as it is"))
+    @Test("Skip-fact line names the state (mechanism description) — new UXC-14 sheet copy")
+    func skipFactLineNamesState() {
+        #expect(DocumentEditorView.shareRiskConfirmSkipFactLine
+            == "Verification did not run on this output.")
+    }
+}
+
+// UXC-14 — the bespoke share-risk confirm sheet's copy builders and haptic
+// seam, replacing the two retired `.alert`s. Predicate-level suites above
+// (FailExportGateTests, SkippedShareGateTests) cover the gate; this suite
+// covers the sheet's own content derivation.
+@Suite("Share-risk confirm sheet (UXC-14)")
+@MainActor
+struct ShareRiskConfirmSheetTests {
+
+    // MARK: - Title / header / skip line — exact copy pins
+
+    @Test("Title is exact and shared across all three confirm families")
+    func titleExact() {
+        #expect(DocumentEditorView.shareRiskConfirmTitle == "Share with reported issues?")
+    }
+
+    @Test("List header exact")
+    func headerExact() {
+        #expect(DocumentEditorView.shareRiskConfirmListHeader
+            == "The verification check reported:")
+    }
+
+    @Test("Slide-control label exact")
+    func slideLabelExact() {
+        #expect(DocumentEditorView.shareRiskConfirmSlideLabel == "Slide to share anyway")
+    }
+
+    // MARK: - At-risk item list — content-free derivation from a fixture
+
+    private func layer(
+        _ status: VerificationStatus, shortDescription: String,
+        reviewTermTexts: [String]? = nil
+    ) -> LayerResult {
+        LayerResult(
+            name: "Layer", symbolName: "checkmark", status: status,
+            shortDescription: shortDescription, detailDescription: "detail — never surfaced",
+            pageReferences: nil, durationSeconds: 0, reviewTermTexts: reviewTermTexts
+        )
+    }
+
+    @Test("Item list includes only FAIL/ATTENTION layers, in layer order, shortDescription only")
+    func itemListDerivation() {
+        let mixedReport = VerificationReport(
+            layers: [
+                layer(.pass, shortDescription: "passed — must not appear"),
+                layer(.fail("x"), shortDescription: "Output has 2 pages; source has 3."),
+                layer(.info("i"), shortDescription: "note — must not appear"),
+                layer(.attention("a"), shortDescription: "Unredacted text remains on page 2.",
+                      reviewTermTexts: ["a-matched-secret"]),
+                layer(.warn("w"), shortDescription: "warned — must not appear"),
+                layer(.skipped, shortDescription: "skipped — must not appear"),
+            ],
+            overallStatus: .fail("x"), durationSeconds: 0
+        )
+        let lines = DocumentEditorView.atRiskItemLines(report: mixedReport)
+        #expect(lines == [
+            "Output has 2 pages; source has 3.",
+            "Unredacted text remains on page 2.",
+        ])
+        // Content-free (ARCH §12.2): never the matched text
+        // (reviewTermTexts) or the detailDescription — shortDescription only.
+        let joined = lines.joined()
+        #expect(!joined.contains("a-matched-secret"))
+        #expect(!joined.contains("never surfaced"))
+    }
+
+    // MARK: - Deselected-items line — singular/plural
+
+    @Test("Singular")
+    func deselectedLineSingular() {
+        #expect(DocumentEditorView.deselectedItemsConfirmLine(count: 1)
+            == "1 flagged item was deselected before redaction.")
+    }
+
+    @Test("Plural")
+    func deselectedLinePlural() {
+        #expect(DocumentEditorView.deselectedItemsConfirmLine(count: 3)
+            == "3 flagged items were deselected before redaction.")
+    }
+
+    // MARK: - Accessibility identifiers per confirm family
+
+    @Test("Each confirm family keeps a stable accessibility identifier for its completion element")
+    func accessibilityIdentifiersPerFamily() {
+        let empty = VerificationReport(layers: [], overallStatus: .fail("x"), durationSeconds: 0)
+        #expect(ShareRiskConfirmKind.failOrAttention(empty).accessibilityIdentifier
+            == "shareAnywayConfirm")
+        #expect(ShareRiskConfirmKind.skipped(.skipped).accessibilityIdentifier
+            == "shareSkippedConfirm")
+        #expect(ShareRiskConfirmKind.incompleteWarn(empty).accessibilityIdentifier
+            == "shareIncompleteWarnConfirm")
+    }
+
+    // MARK: - Completion function (haptic seam + acknowledgement + export)
+
+    @Test("completeShareRiskConfirm(.failOrAttention): overrides the failure, fires the haptic once, exports the live report")
+    func completeFailOrAttention() {
+        var hapticFireCount = 0
+        let savedHaptic = DocumentEditorView.shareRiskConfirmHaptic
+        DocumentEditorView.shareRiskConfirmHaptic = { hapticFireCount += 1 }
+        defer { DocumentEditorView.shareRiskConfirmHaptic = savedHaptic }
+
+        let doc = DocumentState()
+        let original = VerificationReport(layers: [], overallStatus: .fail("x"), durationSeconds: 0)
+        doc.phase = .verified(report: original)
+
+        var exported: VerificationReport?
+        DocumentEditorView.completeShareRiskConfirm(
+            kind: .failOrAttention(original),
+            documentState: doc,
+            beginExport: { exported = $0 }
+        )
+
+        #expect(hapticFireCount == 1)
+        #expect(exported?.userOverrodeFailure == true)
+        if case .verified(let updated) = doc.phase {
+            #expect(updated.userOverrodeFailure == true)
+        } else {
+            Issue.record("expected .verified phase to persist through completion")
+        }
+    }
+
+    @Test("completeShareRiskConfirm(.skipped): acknowledges the skip, fires the haptic once")
+    func completeSkipped() {
+        var hapticFireCount = 0
+        let savedHaptic = DocumentEditorView.shareRiskConfirmHaptic
+        DocumentEditorView.shareRiskConfirmHaptic = { hapticFireCount += 1 }
+        defer { DocumentEditorView.shareRiskConfirmHaptic = savedHaptic }
+
+        let doc = DocumentState()
+        doc.phase = .verified(report: .skipped(reason: .cancelled))
+
+        var exported: VerificationReport?
+        DocumentEditorView.completeShareRiskConfirm(
+            kind: .skipped(.skipped(reason: .cancelled)),
+            documentState: doc,
+            beginExport: { exported = $0 }
+        )
+
+        #expect(hapticFireCount == 1)
+        #expect(exported?.userAcknowledgedSkippedShare == true)
+    }
+
+    @Test("completeShareRiskConfirm(.incompleteWarn): acknowledges on DocumentState, fires the haptic once")
+    func completeIncompleteWarn() {
+        var hapticFireCount = 0
+        let savedHaptic = DocumentEditorView.shareRiskConfirmHaptic
+        DocumentEditorView.shareRiskConfirmHaptic = { hapticFireCount += 1 }
+        defer { DocumentEditorView.shareRiskConfirmHaptic = savedHaptic }
+
+        let doc = DocumentState()
+        let report = VerificationReport(
+            layers: [LayerResult(name: "L", symbolName: "s", status: .skipped,
+                                 shortDescription: "", detailDescription: "",
+                                 pageReferences: nil, durationSeconds: 0)],
+            overallStatus: .warn("w"), durationSeconds: 0
+        )
+        doc.phase = .verified(report: report)
+        #expect(doc.incompleteWarnShareAcknowledged == false)
+
+        var exportFired = false
+        DocumentEditorView.completeShareRiskConfirm(
+            kind: .incompleteWarn(report),
+            documentState: doc,
+            beginExport: { _ in exportFired = true }
+        )
+
+        #expect(hapticFireCount == 1)
+        #expect(doc.incompleteWarnShareAcknowledged == true)
+        #expect(exportFired == true)
+        // The flag does NOT live on the report — the exported report's own
+        // `userOverrodeFailure` / `userAcknowledgedSkippedShare` are
+        // untouched by this path.
+    }
+
+    @Test("completeShareRiskConfirm re-reads the live phase rather than trusting the captured report")
+    func completeReReadsLivePhase() {
+        DocumentEditorView.shareRiskConfirmHaptic = { }
+        let doc = DocumentState()
+        let staleCaptured = VerificationReport(layers: [], overallStatus: .fail("stale"), durationSeconds: 0)
+        // The live phase holds a DIFFERENT report value than the one
+        // captured in `kind` at presentation time.
+        let live = VerificationReport(layers: [], overallStatus: .fail("live"), durationSeconds: 0)
+        doc.phase = .verified(report: live)
+
+        var exported: VerificationReport?
+        DocumentEditorView.completeShareRiskConfirm(
+            kind: .failOrAttention(staleCaptured),
+            documentState: doc,
+            beginExport: { exported = $0 }
+        )
+
+        if case .fail(let msg) = exported?.overallStatus {
+            #expect(msg == "live")
+        } else {
+            Issue.record("expected the re-read live report to export, not the captured one")
+        }
+    }
+}
+
+// Incomplete-WARN share confirm gate (UXC-14 / GAP-14). Tests target the
+// pure static predicate shareNeedsIncompleteWarnConfirm(report:acknowledged:):
+// a WARN report whose aggregate carries zero real WARN layers but ≥1 skipped
+// layer — the exact condition VerificationResultsView.mastheadSubtitle's
+// skip-induced-WARN branch renders on — routes the Share tap through the
+// same confirm sheet as FAIL/ATTENTION/SKIPPED. Unlike its two siblings the
+// acknowledgement flag is NOT on VerificationReport (Packages/RedactionEngine
+// is C-5-fenced) — it lives on DocumentState instead
+// (`incompleteWarnShareAcknowledged` / `acknowledgeIncompleteWarnShare()`),
+// so the predicate takes `acknowledged` as an explicit parameter.
+@Suite("Incomplete-WARN share confirm gate (UXC-14 / GAP-14)")
+@MainActor
+struct IncompleteWarnShareGateTests {
+
+    private func layer(_ status: VerificationStatus) -> LayerResult {
+        LayerResult(name: "Layer", symbolName: "checkmark", status: status,
+                   shortDescription: "", detailDescription: "",
+                   pageReferences: nil, durationSeconds: 0)
+    }
+
+    private func incompleteWarnReport() -> VerificationReport {
+        VerificationReport(
+            layers: [layer(.skipped), layer(.skipped)],
+            overallStatus: .warn("Verification produced warnings"),
+            durationSeconds: 0
+        )
+    }
+
+    @Test("WARN with zero real WARN layers and ≥1 skipped layer needs the confirm")
+    func narrowConditionNeedsConfirm() {
+        #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
+            report: incompleteWarnReport(), acknowledged: false) == true)
+    }
+
+    @Test("Acknowledged incomplete-WARN shares without re-confirm (confirm once)")
+    func acknowledgedSharesFreely() {
+        #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
+            report: incompleteWarnReport(), acknowledged: true) == false)
+    }
+
+    @Test("A WARN mixing a real WARN layer with a skipped layer does NOT need this confirm")
+    func mixedWarnAndSkipDoesNotConfirm() {
+        // No approved copy exists for this mixed shape (the masthead's own
+        // skip-sentence branch requires warnCount == 0); it stays
+        // confirm-free like any other routine WARN.
+        let mixed = VerificationReport(
+            layers: [layer(.warn("w")), layer(.skipped)],
+            overallStatus: .warn("w"), durationSeconds: 0
+        )
+        #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
+            report: mixed, acknowledged: false) == false)
+    }
+
+    @Test("A WARN with no skipped layers does not need this confirm")
+    func plainWarnDoesNotConfirm() {
+        let plain = VerificationReport(
+            layers: [layer(.warn("w"))], overallStatus: .warn("w"), durationSeconds: 0)
+        #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
+            report: plain, acknowledged: false) == false)
+    }
+
+    @Test("Non-WARN verdicts never need this confirm (PASS / INFO / ATTENTION / FAIL / SKIPPED)")
+    func nonWarnVerdictsDoNotConfirm() {
+        let statuses: [VerificationStatus] =
+            [.pass, .info("i"), .attention("a"), .fail("x"), .skipped]
+        for status in statuses {
+            let r = VerificationReport(layers: [], overallStatus: status, durationSeconds: 0)
+            #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
+                report: r, acknowledged: false) == false)
+        }
+    }
+
+    @Test("acknowledgeIncompleteWarnShare sets the DocumentState flag")
+    func acknowledgeSetsFlag() {
+        let doc = DocumentState()
+        #expect(doc.incompleteWarnShareAcknowledged == false)
+        doc.acknowledgeIncompleteWarnShare()
+        #expect(doc.incompleteWarnShareAcknowledged == true)
     }
 }
 
