@@ -1216,31 +1216,49 @@ final class SearchState: Identifiable {
         navigationScope = .currentPage
     }
 
-    /// Select all results matching `predicate`. Each result's
-    /// `isSelected` is replaced with `predicate(result)` — predicates
-    /// that match a subset deselect the rest, so the
-    /// `SearchResultsSection` "Select where…" Menu can express
-    /// "select only PII results above 90%" / "select only OCR" as a
-    /// single mutation. Bumps `resultVersion` once for the full pass
-    /// (no per-result observer churn). Performance gate: <100ms on
-    /// 10k results — pinned by `SearchStateSelectionTests`.
-    func selectWhere(_ predicate: (SearchResult) -> Bool) {
+    /// Replace-selection primitive: every result's `isSelected` is set to
+    /// `predicate(result)` — predicates that match a subset deselect the
+    /// rest. RB-21 (UXC-12): the `SearchResultsSection` "Select where…"
+    /// Menu no longer routes through this — it's additive now
+    /// (`addToSelection(where:)` below). This primitive survives as the
+    /// footer Select All / Deselect All toggle's building block, where
+    /// "deselect everything not in the target set" is exactly the wanted
+    /// behavior. Bumps `resultVersion` once for the full pass (no
+    /// per-result observer churn). Performance gate: <100ms on 10k
+    /// results — pinned by `SearchStateSelectionTests`.
+    func setSelection(where predicate: (SearchResult) -> Bool) {
         for i in results.indices {
             results[i].isSelected = predicate(results[i])
         }
         resultVersion += 1
     }
 
-    /// Footer bar select-all / deselect-all toggle. Refactored
-    /// to compose with `selectWhere` while preserving filtered-only
-    /// behavior — results outside the active filter retain their
-    /// existing `isSelected`. The captured `filteredIDs` + `target`
+    /// Additive-selection primitive (RB-21/UXC-12): every result matching
+    /// `predicate` is selected; nothing already selected is ever
+    /// deselected. This backs the "Select where…" Menu's mutation —
+    /// tapping a predicate ADDS the matching rows to whatever is already
+    /// picked, and never narrows. Narrowing to exactly a predicate's
+    /// matches is the two-step user flow the footer already offers:
+    /// "Deselect All" (→ `setSelection(where:)` via `toggleSelectAll`),
+    /// then a predicate tap here. Bumps `resultVersion` once per call,
+    /// same contract as `setSelection(where:)`.
+    func addToSelection(where predicate: (SearchResult) -> Bool) {
+        for i in results.indices where predicate(results[i]) {
+            results[i].isSelected = true
+        }
+        resultVersion += 1
+    }
+
+    /// Footer bar select-all / deselect-all toggle. Composes with
+    /// `setSelection(where:)` (the replace primitive) while preserving
+    /// filtered-only behavior — results outside the active filter retain
+    /// their existing `isSelected`. The captured `filteredIDs` + `target`
     /// makes the predicate a pure function of `result.id`.
     func toggleSelectAll() {
         let filtered = filteredResults
         let filteredIDs = Set(filtered.map(\.id))
         let target = !filtered.allSatisfy(\.isSelected)
-        selectWhere { result in
+        setSelection { result in
             filteredIDs.contains(result.id) ? target : result.isSelected
         }
     }

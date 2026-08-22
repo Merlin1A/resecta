@@ -4,9 +4,10 @@ import RedactionEngine
 // Results list + empty / filtered-out states +
 // row helpers + live preview row + scope picker + keyboard shortcuts.
 // Lifted from `SearchAndRedactSheet.swift`; behavior unchanged.
-// "Select where…" Menu lands in the results-header
-// zone; predicate-driven attribute selection routes through the new
-// `SearchState.selectWhere` helper.
+// "Add to selection…" Menu lands in the results-header zone;
+// predicate-driven attribute selection routes through
+// `SearchState.addToSelection(where:)` (RB-21/UXC-12: additive — never
+// deselects).
 
 struct SearchResultsSection: View {
     @Bindable var searchState: SearchState
@@ -214,24 +215,25 @@ struct SearchResultsSection: View {
                 scopeRow
             }
 
-            // "Select where…" Menu surfaces predicate-driven
+            // "Add to selection…" Menu surfaces predicate-driven
             // attribute selection.
             selectWhereMenu
         }
         .background(.background)
     }
 
-    // MARK: - Select Where… Menu
+    // MARK: - Add to Selection… Menu
 
     /// Predicate-driven attribute selection. Each Section corresponds
     /// to one predicate kind (confidence threshold, source, category,
     /// applied state). Tapping an option routes through
-    /// `searchState.selectWhere(_:)` — a pure replacement that
-    /// deselects rows outside the predicate so the Menu reads as
-    /// "select only matching rows" rather than "add to selection". By
-    /// applying to `searchState.results` (not `filteredResults`) the
-    /// Menu remains useful when filters hide candidates the user wants
-    /// to operate on.
+    /// `searchState.addToSelection(where:)` — RB-21/UXC-12: additive
+    /// (union), so a predicate ADDS every matching row to whatever is
+    /// already selected and never deselects anything. Narrowing to
+    /// exactly a predicate's matches is the footer "Deselect All" →
+    /// predicate two-step. By applying to `searchState.results` (not
+    /// `filteredResults`) the Menu remains useful when filters hide
+    /// candidates the user wants to operate on.
     /// Every branch routes through `userSelectWhere` so the conditional-dismiss
     /// touched tracker flips exactly once per user predicate pick.
     @ViewBuilder
@@ -279,11 +281,11 @@ struct SearchResultsSection: View {
                         }
                     }
                 } label: {
-                    Label("Select where...", systemImage: "checkmark.circle")
+                    Label("Add to selection…", systemImage: "checkmark.circle")
                         .font(.caption)
                 }
                 .controlSize(.small)
-                .accessibilityLabel("Select results by attribute")
+                .accessibilityLabel("Add results to the selection by attribute")
                 Spacer()
             }
             .padding(.horizontal, ResectaTokens.Spacing.md)
@@ -291,11 +293,11 @@ struct SearchResultsSection: View {
         }
     }
 
-    /// Select-Where wrapper: the predicate replacement plus the conditional-dismiss
-    /// touched flip — predicate selection is user selection work, so
-    /// the sheet's Dismiss confirms from here forward.
+    /// Select-Where wrapper: the additive predicate union plus the
+    /// conditional-dismiss touched flip — predicate selection is user
+    /// selection work, so the sheet's Dismiss confirms from here forward.
     private func userSelectWhere(_ predicate: (SearchResult) -> Bool) {
-        searchState.selectWhere(predicate)
+        searchState.addToSelection(where: predicate)
         searchState.userModifiedSelections = true
     }
 

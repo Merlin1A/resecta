@@ -3,59 +3,65 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-17 — `SearchState.selectWhere(_:)` is the predicate-driven
-// helper that powers the "Select where…" Menu in
-// `SearchResultsSection`. Each Menu Section corresponds to one
-// predicate kind: confidence threshold, source, category, applied
-// state. The helper replaces (not toggles) `isSelected` on every
-// result, so a predicate that matches a subset deselects the rest.
-// `toggleSelectAll` is refactored on top of `selectWhere` while
-// preserving its filtered-only contract (results outside the active
-// filter retain their existing `isSelected`).
+// WU-17 — `SearchState` predicate-driven selection helpers power the
+// "Add to selection…" Menu in `SearchResultsSection`. Each Menu Section
+// corresponds to one predicate kind: confidence threshold, source,
+// category, applied state.
+//
+// RB-21 (UXC-12, 2026-08-21): the Menu's predicate taps are ADDITIVE
+// (union) — `addToSelection(where:)` selects every matching row and
+// never deselects anything already picked. `setSelection(where:)` is
+// the older REPLACE primitive (`isSelected := predicate(result)`); it
+// no longer backs the Menu, but `toggleSelectAll` still composes with
+// it for its filtered-only select/deselect-all contract, and it's also
+// the primitive behind the narrowing user flow: footer "Deselect All"
+// (→ `setSelection`) then a predicate tap (→ `addToSelection`) yields
+// exactly that predicate's matches.
 //
 // Performance budget: predicate evaluation on 10k synthetic results
-// stays under 100ms — the load-bearing test for the perf gate
-// called out in ACTION-WU-17.
+// stays under 100ms — the load-bearing test for the perf gate called
+// out in ACTION-WU-17, pinned here on `addToSelection(where:)` (the
+// Menu's real hot path).
 
 @Suite("SearchState selectWhere (WU-17)", .tags(.search))
 @MainActor
 struct SearchStateSelectionTests {
 
-    // MARK: - selectWhere base contract
+    // MARK: - setSelection(where:) base contract (replace primitive)
 
-    @Test("selectWhere replaces isSelected with predicate value")
-    func selectWhereReplaces() {
+    @Test("setSelection(where:) replaces isSelected with predicate value")
+    func setSelectionReplaces() {
         let state = SearchState()
         let pre = makeResult(piiConfidence: 0.85, isSelected: true)
         let mid = makeResult(piiConfidence: 0.6, isSelected: true)
         let post = makeResult(piiConfidence: 0.95, isSelected: false)
         state.results = [pre, mid, post]
 
-        state.selectWhere { ($0.piiConfidence ?? 0) >= 0.8 }
+        state.setSelection { ($0.piiConfidence ?? 0) >= 0.8 }
 
         #expect(state.results[0].isSelected == true)
         #expect(state.results[1].isSelected == false)
         #expect(state.results[2].isSelected == true)
     }
 
-    @Test("selectWhere bumps resultVersion exactly once per call")
-    func resultVersionBumps() {
+    @Test("setSelection(where:) bumps resultVersion exactly once per call")
+    func setSelectionResultVersionBumps() {
         let state = SearchState()
         state.results = [makeResult(), makeResult(), makeResult()]
         let before = state.resultVersion
 
-        state.selectWhere { _ in true }
+        state.setSelection { _ in true }
 
         #expect(state.resultVersion == before + 1)
     }
 
-    @Test("selectWhere on empty results no-ops cleanly")
-    func emptyResultsNoOp() {
+    @Test("setSelection(where:) on empty results no-ops cleanly")
+    func setSelectionEmptyResultsNoOp() {
         let state = SearchState()
         state.results = []
         let before = state.resultVersion
 
-        state.selectWhere { _ in true }
+        state.setSelection { _ in true }
 
         // Empty array → for-in loop does no iterations → no per-result
         // mutations. The single resultVersion bump is the contract; UI
@@ -63,6 +69,94 @@ struct SearchStateSelectionTests {
         // unchanged.
         #expect(state.results.isEmpty)
         #expect(state.resultVersion == before + 1)
+    }
+
+    // MARK: - addToSelection(where:) base contract (additive primitive, RB-21/UXC-12)
+
+    @Test("addToSelection(where:) bumps resultVersion exactly once per call")
+    func addToSelectionResultVersionBumps() {
+        let state = SearchState()
+        state.results = [makeResult(), makeResult(), makeResult()]
+        let before = state.resultVersion
+
+        state.addToSelection { _ in true }
+
+        #expect(state.resultVersion == before + 1)
+    }
+
+    @Test("addToSelection(where:) on empty results no-ops cleanly")
+    func addToSelectionEmptyResultsNoOp() {
+        let state = SearchState()
+        state.results = []
+        let before = state.resultVersion
+
+        state.addToSelection { _ in true }
+
+        #expect(state.results.isEmpty)
+        #expect(state.resultVersion == before + 1)
+    }
+
+    @Test("addToSelection(where:) never deselects previously selected rows (union)")
+    func addToSelectionNeverDeselects() {
+        let state = SearchState()
+        // Selected outside the predicate — a prior manual pick.
+        let priorPick = makeResult(piiConfidence: 0.5, isSelected: true)
+        let newMatch = makeResult(piiConfidence: 0.95, isSelected: false)
+        let neverMatched = makeResult(piiConfidence: 0.2, isSelected: false)
+        state.results = [priorPick, newMatch, neverMatched]
+
+        state.addToSelection { ($0.piiConfidence ?? 0) >= 0.9 }
+
+        #expect(state.results.first(where: { $0.id == priorPick.id })?.isSelected == true,
+                "a prior manual pick outside the predicate must survive the union")
+        #expect(state.results.first(where: { $0.id == newMatch.id })?.isSelected == true)
+        #expect(state.results.first(where: { $0.id == neverMatched.id })?.isSelected == false)
+    }
+
+    @Test("addToSelection(where:) is idempotent — repeat calls yield the same selection set")
+    func addToSelectionIsIdempotent() {
+        let state = SearchState()
+        state.results = [
+            makeResult(piiConfidence: 0.95),
+            makeResult(piiConfidence: 0.5)
+        ]
+
+        state.addToSelection { ($0.piiConfidence ?? 0) >= 0.9 }
+        let afterFirst = state.results.map(\.isSelected)
+
+        // Calling again with the same predicate changes no isSelected
+        // value (the selection CONTENT is idempotent) — resultVersion
+        // still bumps once per call, per the primitive's
+        // unconditional-bump-per-call contract.
+        let versionBeforeSecond = state.resultVersion
+        state.addToSelection { ($0.piiConfidence ?? 0) >= 0.9 }
+
+        #expect(state.results.map(\.isSelected) == afterFirst)
+        #expect(state.resultVersion == versionBeforeSecond + 1)
+    }
+
+    @Test("Deselect All then addToSelection(where:) yields exactly the predicate set (narrowing path)")
+    func narrowingPathDeselectAllThenAddToSelection() {
+        let state = SearchState()
+        let match = makeResult(piiConfidence: 0.95, isSelected: true)
+        let offTopicPick = makeResult(piiConfidence: 0.4, isSelected: true)
+        let nonMatch = makeResult(piiConfidence: 0.5, isSelected: true)
+        state.results = [match, offTopicPick, nonMatch]
+
+        // Footer "Deselect All": every result is currently selected (the
+        // `toggleSelectAll` precondition for its deselect branch), so this
+        // call takes that branch and clears everything, including the
+        // off-topic prior picks.
+        state.toggleSelectAll()
+        #expect(state.results.allSatisfy { !$0.isSelected }, "precondition: fully deselected")
+
+        // The predicate tap — RB-21's narrowing recipe.
+        state.addToSelection { ($0.piiConfidence ?? 0) >= 0.9 }
+
+        #expect(state.results.first(where: { $0.id == match.id })?.isSelected == true)
+        #expect(state.results.first(where: { $0.id == offTopicPick.id })?.isSelected == false,
+                "the prior off-topic pick was cleared by Deselect All and the predicate doesn't match it")
+        #expect(state.results.first(where: { $0.id == nonMatch.id })?.isSelected == false)
     }
 
     // MARK: - toggleSelectAll preserves prior filtered-only behavior
@@ -120,9 +214,9 @@ struct SearchStateSelectionTests {
         #expect(state.results.first(where: { $0.id == ocrHit.id })?.isSelected == true)
     }
 
-    // MARK: - Menu predicate kinds
+    // MARK: - Menu predicate kinds (addToSelection — RB-21/UXC-12 additive)
 
-    @Test("Predicate: by confidence threshold ≥ 75% selects only PII results above the floor")
+    @Test("Predicate: by confidence threshold ≥ 75% adds only PII results above the floor to the selection")
     func predicateConfidence75() {
         let state = SearchState()
         let above = makeResult(piiConfidence: 0.80)
@@ -130,53 +224,53 @@ struct SearchStateSelectionTests {
         let nilConf = makeResult()
         state.results = [above, between, nilConf]
 
-        state.selectWhere { ($0.piiConfidence ?? 0) >= 0.75 }
+        state.addToSelection { ($0.piiConfidence ?? 0) >= 0.75 }
 
         #expect(state.results.first(where: { $0.id == above.id })?.isSelected == true)
         #expect(state.results.first(where: { $0.id == between.id })?.isSelected == false)
         #expect(state.results.first(where: { $0.id == nilConf.id })?.isSelected == false)
     }
 
-    @Test("Predicate: by confidence threshold ≥ 90% selects only the high-confidence subset")
+    @Test("Predicate: by confidence threshold ≥ 90% adds only the high-confidence subset to the selection")
     func predicateConfidence90() {
         let state = SearchState()
         let r80 = makeResult(piiConfidence: 0.80)
         let r92 = makeResult(piiConfidence: 0.92)
         state.results = [r80, r92]
 
-        state.selectWhere { ($0.piiConfidence ?? 0) >= 0.90 }
+        state.addToSelection { ($0.piiConfidence ?? 0) >= 0.90 }
 
         #expect(state.results.first(where: { $0.id == r80.id })?.isSelected == false)
         #expect(state.results.first(where: { $0.id == r92.id })?.isSelected == true)
     }
 
-    @Test("Predicate: by source 'Text' selects only text-layer rows")
+    @Test("Predicate: by source 'Text' adds only text-layer rows to the selection")
     func predicateSourceText() {
         let state = SearchState()
         let textHit = makeResult(source: .textLayer)
         let ocrHit = makeResult(source: .ocr(confidence: 0.7))
         state.results = [textHit, ocrHit]
 
-        state.selectWhere { $0.source == .textLayer }
+        state.addToSelection { $0.source == .textLayer }
 
         #expect(state.results.first(where: { $0.id == textHit.id })?.isSelected == true)
         #expect(state.results.first(where: { $0.id == ocrHit.id })?.isSelected == false)
     }
 
-    @Test("Predicate: by source 'OCR' selects only OCR rows")
+    @Test("Predicate: by source 'OCR' adds only OCR rows to the selection")
     func predicateSourceOCR() {
         let state = SearchState()
         let textHit = makeResult(source: .textLayer)
         let ocrHit = makeResult(source: .ocr(confidence: 0.9))
         state.results = [textHit, ocrHit]
 
-        state.selectWhere { $0.source != .textLayer }
+        state.addToSelection { $0.source != .textLayer }
 
         #expect(state.results.first(where: { $0.id == textHit.id })?.isSelected == false)
         #expect(state.results.first(where: { $0.id == ocrHit.id })?.isSelected == true)
     }
 
-    @Test("Predicate: by category selects only matching PII rows (PII Scan mode)")
+    @Test("Predicate: by category adds only matching PII rows to the selection (PII Scan mode)")
     func predicateCategory() {
         let state = SearchState()
         let ssn1 = makeResult(piiCategory: .ssn)
@@ -184,14 +278,14 @@ struct SearchStateSelectionTests {
         let dob = makeResult(piiCategory: .dateOfBirth)
         state.results = [ssn1, ssn2, dob]
 
-        state.selectWhere { $0.piiCategory == .ssn }
+        state.addToSelection { $0.piiCategory == .ssn }
 
         #expect(state.results.first(where: { $0.id == ssn1.id })?.isSelected == true)
         #expect(state.results.first(where: { $0.id == ssn2.id })?.isSelected == true)
         #expect(state.results.first(where: { $0.id == dob.id })?.isSelected == false)
     }
 
-    @Test("Predicate: by applied state 'Applied' selects only rows in appliedResultIDs")
+    @Test("Predicate: by applied state 'Applied' adds only rows in appliedResultIDs to the selection")
     func predicateAppliedState() {
         let state = SearchState()
         let a = makeResult()
@@ -201,14 +295,14 @@ struct SearchStateSelectionTests {
         state.appliedResultIDs = [a.id, c.id]
 
         let applied = state.appliedResultIDs
-        state.selectWhere { applied.contains($0.id) }
+        state.addToSelection { applied.contains($0.id) }
 
         #expect(state.results.first(where: { $0.id == a.id })?.isSelected == true)
         #expect(state.results.first(where: { $0.id == b.id })?.isSelected == false)
         #expect(state.results.first(where: { $0.id == c.id })?.isSelected == true)
     }
 
-    @Test("Predicate: by applied state 'Unapplied' selects the complement")
+    @Test("Predicate: by applied state 'Unapplied' adds the complement to the selection")
     func predicateUnappliedState() {
         let state = SearchState()
         let a = makeResult()
@@ -217,7 +311,7 @@ struct SearchStateSelectionTests {
         state.appliedResultIDs = [a.id]
 
         let applied = state.appliedResultIDs
-        state.selectWhere { !applied.contains($0.id) }
+        state.addToSelection { !applied.contains($0.id) }
 
         #expect(state.results.first(where: { $0.id == a.id })?.isSelected == false)
         #expect(state.results.first(where: { $0.id == b.id })?.isSelected == true)
@@ -225,7 +319,7 @@ struct SearchStateSelectionTests {
 
     // MARK: - Performance gate
 
-    @Test("selectWhere stays under 100ms on 10k synthetic results")
+    @Test("addToSelection(where:) stays under 100ms on 10k synthetic results")
     func performanceBudget10k() {
         let state = SearchState()
         let count = 10_000
@@ -242,7 +336,7 @@ struct SearchStateSelectionTests {
         state.results = results
 
         let start = ContinuousClock.now
-        state.selectWhere { ($0.piiConfidence ?? 0) >= 0.75 }
+        state.addToSelection { ($0.piiConfidence ?? 0) >= 0.75 }
         let elapsed = start.duration(to: .now)
         let elapsedMs = Double(elapsed.components.seconds) * 1000.0
             + Double(elapsed.components.attoseconds) / 1e15
@@ -254,7 +348,7 @@ struct SearchStateSelectionTests {
 
         // Performance gate from ACTION-WU-17 — predicate evaluation on
         // 10k results stays under 100ms.
-        #expect(elapsedMs < 100.0, "selectWhere on 10k results took \(elapsedMs)ms; budget is 100ms")
+        #expect(elapsedMs < 100.0, "addToSelection on 10k results took \(elapsedMs)ms; budget is 100ms")
     }
 
     // MARK: - §4.3 J/K Filter Respect

@@ -281,39 +281,45 @@ struct ScanReviewSection: View {
     // MARK: - Select Where
 
     /// Predicate-driven selection over the staged detections, mirroring
-    /// the search side's menu: replaces every detection's selection with
-    /// the predicate's verdict, so "select only ≥ 90%" is one mutation.
+    /// the search side's menu: RB-21/UXC-12 — additive (union), so
+    /// "≥ 90%" ADDS the matching detections to whatever is already
+    /// selected and never deselects the rest.
     private var selectWhereRow: some View {
         HStack {
             Menu {
                 Section("By confidence") {
-                    Button("\u{2265} 75%") { selectWhere { $0.confidence >= 0.75 } }
-                    Button("\u{2265} 90%") { selectWhere { $0.confidence >= 0.90 } }
+                    Button("\u{2265} 75%") { addToSelection { $0.confidence >= 0.75 } }
+                    Button("\u{2265} 90%") { addToSelection { $0.confidence >= 0.90 } }
                 }
                 if !cachedKindsWithCounts.isEmpty {
                     Section("By category") {
                         ForEach(cachedKindsWithCounts, id: \.kind) { item in
                             Button(item.kind.fullName) {
-                                selectWhere { $0.kind == item.kind }
+                                addToSelection { $0.kind == item.kind }
                             }
                         }
                     }
                 }
             } label: {
-                Label("Select where...", systemImage: "checkmark.circle")
+                Label("Add to selection…", systemImage: "checkmark.circle")
                     .font(.caption)
             }
             .controlSize(.small)
-            .accessibilityLabel("Select findings by attribute")
+            .accessibilityLabel("Add findings to the selection by attribute")
             Spacer()
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .padding(.vertical, ResectaTokens.Spacing.xxs)
     }
 
-    private func selectWhere(_ predicate: (DetectionResult) -> Bool) {
-        redactionState.triageSelections = Self.selections(
-            where: predicate, in: allFindings
+    /// RB-21/UXC-12: additive predicate selection — unions the
+    /// predicate's matches into the existing `triageSelections` via
+    /// `Self.addSelections(where:in:to:)` rather than replacing the
+    /// dictionary outright, so a prior manual pick or an earlier
+    /// predicate's matches are never deselected by a later one.
+    private func addToSelection(_ predicate: (DetectionResult) -> Bool) {
+        redactionState.triageSelections = Self.addSelections(
+            where: predicate, in: allFindings, to: redactionState.triageSelections
         )
         // Conditional dismiss: predicate selection is user selection work.
         searchState.userModifiedSelections = true
@@ -644,8 +650,10 @@ struct ScanReviewSection: View {
     }
 
     /// Predicate selection over the staged detections: every detection gets
-    /// an EXPLICIT entry (predicate verdict), mirroring the search
-    /// side's `selectWhere` replace-semantics.
+    /// an EXPLICIT entry (predicate verdict). Pure — computes a fresh
+    /// verdict dictionary from `findings` alone, with no notion of a
+    /// prior selection. `addSelections(where:in:to:)` below builds the
+    /// additive (RB-21/UXC-12) contract on top of this.
     static func selections(
         where predicate: (DetectionResult) -> Bool,
         in findings: [(page: Int, detection: DetectionResult)]
@@ -655,6 +663,26 @@ struct ScanReviewSection: View {
             next[item.detection.id] = predicate(item.detection)
         }
         return next
+    }
+
+    /// RB-21/UXC-12: unions a predicate's verdicts into `existing`
+    /// instead of replacing it — a detection already `true` in
+    /// `existing` stays `true` even when the new predicate doesn't match
+    /// it (`old || new`). `existing` is first pruned down to the ids
+    /// present in `findings`, so a stale id left over from a prior,
+    /// now-shrunk staged set is dropped exactly as the old whole-dictionary
+    /// replace-write would have dropped it — the result's key set is
+    /// always exactly `findings`'s ids (the explicit-entry contract).
+    static func addSelections(
+        where predicate: (DetectionResult) -> Bool,
+        in findings: [(page: Int, detection: DetectionResult)],
+        to existing: [UUID: Bool]
+    ) -> [UUID: Bool] {
+        let findingIDs = Set(findings.map(\.detection.id))
+        let prunedExisting = existing.filter { findingIDs.contains($0.key) }
+        return prunedExisting.merging(selections(where: predicate, in: findings)) { old, new in
+            old || new
+        }
     }
 }
 
