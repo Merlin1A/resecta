@@ -68,18 +68,21 @@ class RedactionState {
         lastRunSensitiveTerms = sensitiveTerms
     }
 
-    /// Deselection facts of the search session that was live when the
-    /// redaction run started: how many scan results the user left
-    /// un-checked, out of how many total. Captured by `runFullPipeline`
-    /// at run entry (so re-selection while the pipeline is in flight does
-    /// not drift the recorded counts) with the same derivation the scan
-    /// coverage panel renders (`SearchState.deselectionSnapshotForRun()`),
-    /// and recorded here beside `lastRunPerPageModes` when
-    /// `processDocument` returns. Read by `DocumentEditorView` to thread
-    /// the counts into the verification-results details disclosure. Nil
-    /// when no PII-scan session was live at run entry — the results
-    /// screen renders no deselection row in that case. Cleared with the
-    /// output in `clearOutput()`.
+    /// Deselection facts recorded for the run that produced `outputURL`:
+    /// how many scan results the user left un-checked, out of how many
+    /// total. Captured by `runFullPipeline` at run entry via
+    /// `runEntryDeselectionSnapshot()` — UXC-01: the apply-commit
+    /// snapshot (`pendingRunDeselection`) when one is pending, else the
+    /// live search session's snapshot, same derivation the scan coverage
+    /// panel renders (`SearchState.deselectionSnapshotForRun()`) — so
+    /// re-selection while the pipeline is in flight does not drift the
+    /// recorded counts either way. Recorded here beside
+    /// `lastRunPerPageModes` when `processDocument` returns. Read by
+    /// `DocumentEditorView` to thread the counts into the
+    /// verification-results details disclosure. Nil when neither source
+    /// had a snapshot at run entry — the results screen renders no
+    /// deselection row in that case. Cleared with the output in
+    /// `clearOutput()`.
     struct DeselectionSnapshot: Equatable {
         let deselectedCount: Int
         let totalCount: Int
@@ -90,6 +93,38 @@ class RedactionState {
     /// Sibling of `recordLastRunInputs` — same call site, same lifetime.
     func recordLastRunDeselection(_ snapshot: DeselectionSnapshot?) {
         lastRunDeselection = snapshot
+    }
+
+    /// UXC-01 — the deselection facts of the search session the user
+    /// most recently *applied* results from, captured at the apply
+    /// commit (`applySelectedSearchResultsOrigin`) rather than at
+    /// pipeline run entry. Closes the common-path gap where the search
+    /// sheet dismisses (nil-ing `activeSearch`) between the apply and the
+    /// Redact tap, so `runEntryDeselectionSnapshot()` below would
+    /// otherwise see no live session and ship no disclosure even though
+    /// the user deliberately left results un-checked when they applied.
+    ///
+    /// Lifetime: last apply wins — a later apply from a search session
+    /// (this or any other) overwrites the previous value; there is no
+    /// accumulation across applies. It survives a pipeline run
+    /// (including cancel/fail, both of which route through
+    /// `clearOutput()`) so a retry that didn't re-apply still reports
+    /// the same counts — `clearOutput()` deliberately does NOT clear
+    /// this field, only `lastRunDeselection` (which describes a
+    /// completed/attempted run's recorded inputs, not the pending
+    /// apply fact). It must not leak across documents, so both
+    /// document-boundary resets (`clearForNewDocument()`,
+    /// `clearAll()`) clear it explicitly.
+    private(set) var pendingRunDeselection: DeselectionSnapshot?
+
+    /// UXC-01 — the snapshot pipeline entry should record for this run:
+    /// the apply-commit snapshot when one is pending (the common path —
+    /// see `pendingRunDeselection`), falling back to the live search
+    /// session's snapshot when nothing is pending (today's behavior,
+    /// unchanged: a manual-draw-only session or a run started before any
+    /// apply still reads the live `activeSearch`).
+    func runEntryDeselectionSnapshot() -> DeselectionSnapshot? {
+        pendingRunDeselection ?? activeSearch?.deselectionSnapshotForRun()
     }
 
     /// Set when any gazetteer / context-keywords loader failed to
@@ -504,6 +539,12 @@ class RedactionState {
     func clearForNewDocument() {
         regionVersion += 1
         clearOutput()
+        // UXC-01 — a replacement document must not inherit the prior
+        // document's apply-commit deselection facts: the counts describe
+        // search results on the PRIOR document, and `clearOutput()` above
+        // deliberately leaves this field alone (it survives pipeline
+        // retries), so the document boundary is where it is dropped.
+        pendingRunDeselection = nil
         regions = [:]
         detectionResults = [:]
         ocrPixelCapSkippedPages = []
@@ -901,6 +942,10 @@ class RedactionState {
             let outcome = applyStagedDetectionsOrigin(undoManager: undoManager)
             if outcome != nil {
                 activeSearch?.userModifiedSelections = false
+                // UXC-39 — a full staged-review apply resolves the whole
+                // search sheet's selection context, same as the search
+                // origin above.
+                activeSearch?.hasUnreviewedPreselection = false
             }
             return outcome
         case .entityGroup(let group):
@@ -924,6 +969,12 @@ class RedactionState {
         let selected = search.results.filter(\.isSelected)
         guard !selected.isEmpty else {
             search.userModifiedSelections = false
+            // UXC-39 — an apply with nothing selected still resolves the
+            // session's selection context (either it never carried a
+            // preselect, or the user reviewed and deselected every
+            // preselected result before tapping Apply); either way there
+            // is nothing unreviewed left to protect.
+            search.hasUnreviewedPreselection = false
             return .zero
         }
 
@@ -957,11 +1008,23 @@ class RedactionState {
             recordsSearchApplyVersion: true,
             undoManager: undoManager
         )
+        // UXC-01 — capture the CAPTURED session's deselection facts at
+        // the moment of commit, before the caller dismisses the sheet
+        // and nils `activeSearch` out from under a later pipeline-entry
+        // read. Last apply wins: this overwrites whatever a previous
+        // apply (this session or an earlier one) left pending. Derivation
+        // is unchanged — same `deselectionSnapshotForRun()` the coverage
+        // panel and the live-session pipeline-entry path use.
+        pendingRunDeselection = search.deselectionSnapshotForRun()
         // Reset the CAPTURED session's tracker — the one this apply ran
         // against — not whatever `activeSearch` points at after the
         // prepare suspension (a dismissed-and-reopened sheet must not
         // inherit a stale apply's reset).
         search.userModifiedSelections = false
+        // UXC-39 — the applied selections (preselected or not) were just
+        // committed; nothing unreviewed remains to protect from a silent
+        // dismiss.
+        search.hasUnreviewedPreselection = false
 
         // Caller is responsible for clearing activeSearch after showing feedback.
         return ApplyOutcome(
@@ -1589,6 +1652,10 @@ class RedactionState {
         // after this method, so "regions modified since verification"
         // is logically false.
         clearOutput()
+        // UXC-01 — document close must not leave the apply-commit
+        // deselection facts (see `clearForNewDocument()`) around for a
+        // next opened document to inherit.
+        pendingRunDeselection = nil
         regionsModifiedSinceVerification = false
         regions = [:]
         detectionResults = [:]

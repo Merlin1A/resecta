@@ -96,6 +96,118 @@ struct DeselectionRecordLifecycleTests {
     }
 }
 
+@Suite("Deselection apply-commit capture (UXC-01)", .tags(.search))
+@MainActor
+struct DeselectionApplyCommitCaptureTests {
+
+    @Test("Apply commit populates the pending snapshot with the session's counts")
+    func applyCommitPopulatesPendingSnapshot() async {
+        let redaction = RedactionState()
+        redaction.activeSearch = makeScanSession(total: 5, deselected: 2)
+
+        _ = await redaction.applyFindings(.selectedSearchResults, undoManager: nil)
+
+        #expect(redaction.pendingRunDeselection
+            == .init(deselectedCount: 2, totalCount: 5))
+    }
+
+    @Test("A nil-activeSearch run entry still reads the apply-commit snapshot")
+    func nilActiveSearchStillRecordsPendingSnapshot() async {
+        let redaction = RedactionState()
+        redaction.activeSearch = makeScanSession(total: 4, deselected: 1)
+
+        _ = await redaction.applyFindings(.selectedSearchResults, undoManager: nil)
+        // Mirrors DocumentEditorView nil-ing `activeSearch` on sheet dismiss.
+        redaction.activeSearch = nil
+
+        #expect(redaction.runEntryDeselectionSnapshot()
+            == .init(deselectedCount: 1, totalCount: 4),
+            "pipeline entry must still see the apply-commit snapshot with no live session")
+    }
+
+    @Test("Run entry prefers the pending snapshot over a live session's snapshot")
+    func pendingSnapshotTakesPriorityOverLiveSession() async {
+        let redaction = RedactionState()
+        redaction.activeSearch = makeScanSession(total: 5, deselected: 2)
+        _ = await redaction.applyFindings(.selectedSearchResults, undoManager: nil)
+
+        // A different live session is now active (e.g. the user reopened
+        // the sheet and ran a fresh scan) without applying anything from it.
+        redaction.activeSearch = makeScanSession(total: 3, deselected: 1)
+
+        #expect(redaction.runEntryDeselectionSnapshot()
+            == .init(deselectedCount: 2, totalCount: 5),
+            "the apply-commit snapshot wins over an unrelated live session")
+    }
+
+    @Test("Run entry falls back to the live session when nothing is pending")
+    func fallsBackToLiveSessionWhenNothingPending() {
+        let redaction = RedactionState()
+        redaction.activeSearch = makeScanSession(total: 3, deselected: 1)
+
+        #expect(redaction.pendingRunDeselection == nil)
+        #expect(redaction.runEntryDeselectionSnapshot()
+            == .init(deselectedCount: 1, totalCount: 3))
+    }
+
+    @Test("Last apply wins — a later apply overwrites the pending snapshot")
+    func lastApplyWins() async {
+        let redaction = RedactionState()
+        redaction.activeSearch = makeScanSession(total: 5, deselected: 2)
+        _ = await redaction.applyFindings(.selectedSearchResults, undoManager: nil)
+        #expect(redaction.pendingRunDeselection
+            == .init(deselectedCount: 2, totalCount: 5))
+
+        redaction.activeSearch = makeScanSession(total: 6, deselected: 3)
+        _ = await redaction.applyFindings(.selectedSearchResults, undoManager: nil)
+
+        #expect(redaction.pendingRunDeselection
+            == .init(deselectedCount: 3, totalCount: 6),
+            "the second apply's snapshot replaces the first — no accumulation")
+    }
+
+    @Test("clearOutput() alone does not clear the pending snapshot — it survives a pipeline cancel/retry")
+    func clearOutputDoesNotClearPendingSnapshot() async {
+        let redaction = RedactionState()
+        redaction.activeSearch = makeScanSession(total: 5, deselected: 2)
+        _ = await redaction.applyFindings(.selectedSearchResults, undoManager: nil)
+
+        redaction.clearOutput()
+
+        #expect(redaction.pendingRunDeselection
+            == .init(deselectedCount: 2, totalCount: 5),
+            "a cancelled/failed run must not lose the apply-commit snapshot before a retry")
+        #expect(redaction.lastRunDeselection == nil,
+                "lastRunDeselection still clears — it describes the discarded run")
+    }
+
+    @Test("The pending snapshot does not leak past clearForNewDocument()")
+    func pendingSnapshotDoesNotLeakPastNewDocument() async {
+        let redaction = RedactionState()
+        redaction.activeSearch = makeScanSession(total: 5, deselected: 2)
+        _ = await redaction.applyFindings(.selectedSearchResults, undoManager: nil)
+        #expect(redaction.pendingRunDeselection != nil, "precondition")
+
+        redaction.clearForNewDocument()
+
+        #expect(redaction.pendingRunDeselection == nil,
+                "a replacement document must not inherit the prior document's apply-commit snapshot")
+    }
+
+    @Test("The pending snapshot does not leak past clearAll() (document close)")
+    func pendingSnapshotDoesNotLeakPastClearAll() async {
+        let redaction = RedactionState()
+        redaction.activeSearch = makeScanSession(total: 5, deselected: 2)
+        _ = await redaction.applyFindings(.selectedSearchResults, undoManager: nil)
+        #expect(redaction.pendingRunDeselection != nil, "precondition")
+
+        redaction.clearAll()
+
+        #expect(redaction.pendingRunDeselection == nil,
+                "document close must not leave the apply-commit snapshot for the next document")
+    }
+}
+
 @Suite("Deselection row gates and copy", .tags(.display))
 @MainActor
 struct DeselectionRowTests {

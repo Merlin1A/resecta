@@ -106,4 +106,69 @@ struct VerificationResultsAutoExpandTests {
             ) == true
         )
     }
+
+    // MARK: - UXC-02: deselection also forces expansion
+
+    @Test("PASS + deselection → auto-expand (was the collapsed gap)")
+    func passWithDeselectionExpands() {
+        #expect(
+            VerificationResultsView.shouldAutoExpand(
+                status: .pass,
+                hasMixedModes: false,
+                hasDeselection: true
+            ) == true
+        )
+    }
+
+    @Test("PASS + no deselection → collapsed (unchanged default)")
+    func passWithoutDeselectionStaysCollapsed() {
+        #expect(
+            VerificationResultsView.shouldAutoExpand(
+                status: .pass,
+                hasMixedModes: false,
+                hasDeselection: false
+            ) == false
+        )
+        // Omitting the parameter defaults to false — source-compatible
+        // with every pre-UXC-02 call site.
+        #expect(
+            VerificationResultsView.shouldAutoExpand(
+                status: .pass,
+                hasMixedModes: false
+            ) == false
+        )
+    }
+
+    @Test("WARN + no deselection → unchanged (still auto-expands on its own)")
+    func warnWithoutDeselectionUnchanged() {
+        #expect(
+            VerificationResultsView.shouldAutoExpand(
+                status: .warn("noted"),
+                hasMixedModes: false,
+                hasDeselection: false
+            ) == true
+        )
+    }
+
+    @Test("SKIPPED + deselection → auto-expand")
+    func skippedWithDeselectionExpands() {
+        #expect(
+            VerificationResultsView.shouldAutoExpand(
+                status: .skipped,
+                hasMixedModes: false,
+                hasDeselection: true
+            ) == true
+        )
+    }
+
+    @Test("INFO + deselection → auto-expand")
+    func infoWithDeselectionExpands() {
+        #expect(
+            VerificationResultsView.shouldAutoExpand(
+                status: .info("auto-injected /Producer"),
+                hasMixedModes: false,
+                hasDeselection: true
+            ) == true
+        )
+    }
 }
