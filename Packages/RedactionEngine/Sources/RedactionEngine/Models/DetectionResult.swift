@@ -86,18 +86,6 @@ public struct DetectionResult: Sendable, Identifiable {
         /// Vision OCR ran for this page (the default path).
         public static let ocrRan = Provenance(ocrSkipped: false, ocrSkipReason: nil)
 
-        /// OCR was skipped because the embedded text layer covers the page.
-        public static let ocrSkippedDueToCoverage = Provenance(
-            ocrSkipped: true, ocrSkipReason: .coverageHighEnough
-        )
-
-        /// OCR was skipped because the pipeline mode treats embedded text as
-        /// authoritative. Reserved for future modes; the locked PERF-4 gate
-        /// emits `.coverageHighEnough` paired with `.searchableRedaction`.
-        public static let ocrSkippedDueToMode = Provenance(
-            ocrSkipped: true, ocrSkipReason: .modeForcesEmbeddedText
-        )
-
         /// Why Vision OCR was skipped on this detection's page.
         public enum OCRSkipReason: String, Sendable, Equatable, Hashable {
             /// Selectable-text coverage exceeded the locked 0.95 threshold

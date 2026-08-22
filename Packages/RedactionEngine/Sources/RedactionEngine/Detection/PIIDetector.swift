@@ -690,7 +690,7 @@ public struct PIIDetector: Sendable {
     // ENGINE §4.16: DOB on .financial runs label-anchored path only (D4, 2026-06-10).
     // Bare-date detection on financial stays suppressed until (dob,financial) negatives
     // are wired and calibrated (WS2 + WS3). Non-financial: always run full DOBDetector.
-    private static func runsDOB(doctype: DoctypeClass?) -> Bool {
+    private static func runsDOB() -> Bool {
         true  // gate removed; per-doctype branching moved into dispatch block
     }
 
@@ -748,20 +748,8 @@ public struct PIIDetector: Sendable {
 
     // MARK: - SSN Detection (ENGINE §4.3)
 
-    /// SSN regex using NSRegularExpression (Swift Regex doesn't support lookbehind).
-    /// Matches: 123-45-6789, 123 45 6789, 123456789.
-    /// Also matches typographic dashes: en-dash U+2013, em-dash U+2014,
-    /// non-breaking hyphen U+2011, figure dash U+2012 (common in PDF text).
-    /// Excludes area 000/666/900-999, group 00, serial 0000.
-    /// Backreference \1 enforces consistent separator (ENGINE §4.3).
-    // ENGINE §4.3: Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
-    static let ssnPattern = try! NSRegularExpression(
-        pattern: #"(?<!\d)(?!000|666|9\d{2})\d{3}([- \x{2011}\x{2012}\x{2013}\x{2014}]?)(?!00)\d{2}\1(?!0000)\d{4}(?!\d)"#
-    )
-
     /// A6: SSN detection via linear-time state machine + structural validation + context scoring.
     /// Replaces the regex-based approach for lower FP rate.
-    /// The static ssnPattern is retained for backward-compat test assertions.
     ///
     /// S3 §1.2: `doctype` and `gazetteer` enable per-(category, doctype) negative-context
     /// suppression. Both default to nil for backward-compatibility with existing call sites
@@ -982,12 +970,6 @@ public struct PIIDetector: Sendable {
     }
 
     // MARK: - EIN Detection
-
-    // ENGINE §4: Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
-    // WS1 §5: Retained for EINVectorTests backward compatibility (tests reference einPattern directly).
-    static let einPattern = try! NSRegularExpression(
-        pattern: #"(?<!\d)\d{2}-\d{7}(?!\d)"#
-    )
 
     // WS1 §5 (item 1.9, 2026-06-10): Three format variants.
     // Primary: hyphenated (always runs, no extra FP risk).
@@ -1507,18 +1489,6 @@ public struct PIIDetector: Sendable {
     }
 
     #if DEBUG
-    // Test seams. Expose the two private name passes so the
-    // range-correctness fixes can be asserted in isolation, free of the
-    // NLTagger/dedup interaction inside `detectNames`. Observation only.
-    internal func _testRunNLTagger(on text: String, original: String, strict: Bool) -> [PIIMatch] {
-        var cache: [String: NameGazetteer.NameGazetteerVerdict] = [:]
-        return runNLTagger(on: text, original: original, strict: strict, cache: &cache)
-    }
-
-    internal func _testScanLegalPrefixes(in text: String) -> [PIIMatch] {
-        scanLegalPrefixes(in: text)
-    }
-
     /// Test seam: base address of the surname Bloom buffer, or nil
     /// when the name gazetteer is absent from the bundle. Lets DocumentSearcher
     /// prove its process-shared detector reuses one Bloom allocation across
@@ -1760,28 +1730,6 @@ public struct PIIDetector: Sendable {
         "USA", "NYC", "PDF", "OCR", "PII"
     ]
 
-    /// Title-case ALL-CAPS words while preserving known acronyms.
-    /// See ENGINE §4.5 for the L3-TITLECASE fix.
-    ///
-    /// NOTE (FIX-DESIGN Part B): the detection path no longer calls this —
-    /// `detectNames` Pass 2 builds its shadow with `nerShadow(_:)` below,
-    /// which segments label-glued tokens and preserves UTF-16 offsets. This
-    /// helper remains as public API (and as the documented legacy behavior:
-    /// space-delimited tokens only, space runs collapse).
-    public static func titleCaseAllCapsWords(_ text: String) -> String {
-        text.split(separator: " ").map { word in
-            let s = String(word)
-            let stripped = s.trimmingCharacters(in: .punctuationCharacters)
-            if acronymWhitelist.contains(stripped) {
-                return s
-            }
-            if s.count >= 2 && s == s.uppercased() && s.rangeOfCharacter(from: .letters) != nil {
-                return s.prefix(1).uppercased() + s.dropFirst().lowercased()
-            }
-            return s
-        }.joined(separator: " ")
-    }
-
     /// Separator characters that glue name tokens to transaction-line labels
     /// (`INDN:DELIA`, `PAYMENT TO DELIA HARTWELL,CHECKING`). Substituted with
     /// a space in the NER shadow so the tagger sees word boundaries. `.` is
@@ -1791,11 +1739,10 @@ public struct PIIDetector: Sendable {
 
     /// FIX-DESIGN Part B (P1-B1) — build the Pass-2 NER shadow.
     ///
-    /// `titleCaseAllCapsWords` (above) splits on single spaces only, so a
-    /// label-glued token (`INDN:DELIA`) title-cases to `Indn:delia` and the
-    /// embedded name never surfaces as a taggable word; its space-run
-    /// collapse also drifts shadow offsets away from the original. This
-    /// shadow instead:
+    /// The legacy single-space-split title-casing this replaced title-cased
+    /// a label-glued token (`INDN:DELIA`) to `Indn:delia`, so the embedded
+    /// name never surfaced as a taggable word; its space-run collapse also
+    /// drifted shadow offsets away from the original. This shadow instead:
     /// - substitutes separator punctuation (`nerShadowSeparators`) with a
     ///   space, so glued tokens segment into words the tagger can see;
     /// - treats all whitespace (including newlines and tabs) as word
@@ -1886,7 +1833,6 @@ public struct PIIDetector: Sendable {
                     category: cat,
                     ruleID: Self.defaultRuleID(for: cat.piiKind),
                     matched: false,
-                    rawScore: nil,
                     finalScore: nil,
                     threshold: nil,
                     reason: .snippetNotInContext
@@ -1954,7 +1900,6 @@ public struct PIIDetector: Sendable {
                 category: category,
                 ruleID: ruleID,
                 matched: false,
-                rawScore: nil,
                 finalScore: nil,
                 threshold: nil,
                 reason: .doctypeGated
@@ -1967,7 +1912,6 @@ public struct PIIDetector: Sendable {
                 category: category,
                 ruleID: ruleID,
                 matched: false,
-                rawScore: nil,
                 finalScore: nil,
                 threshold: effectiveThreshold,
                 reason: .suppressedByUserTerm
@@ -1980,7 +1924,6 @@ public struct PIIDetector: Sendable {
                 category: category,
                 ruleID: ruleID,
                 matched: true,
-                rawScore: nil,
                 finalScore: 1.0,
                 threshold: effectiveThreshold,
                 reason: .matchedAlwaysFlag
@@ -2000,7 +1943,6 @@ public struct PIIDetector: Sendable {
                 category: category,
                 ruleID: ruleID,
                 matched: false,
-                rawScore: nil,
                 finalScore: nil,
                 threshold: effectiveThreshold,
                 reason: .noMatch
@@ -2009,13 +1951,11 @@ public struct PIIDetector: Sendable {
 
         // 5. Threshold comparison.
         let score = match.rationale?.finalScore ?? match.confidence
-        let preScore = match.rationale?.preThresholdScore ?? match.confidence
         let matched = score >= effectiveThreshold
         return ConsiderationResult(
             category: category,
             ruleID: match.rationale?.ruleID ?? ruleID,
             matched: matched,
-            rawScore: preScore,
             finalScore: score,
             threshold: effectiveThreshold,
             reason: matched ? .aboveThreshold : .belowThreshold
@@ -2030,7 +1970,7 @@ public struct PIIDetector: Sendable {
         category: PIICategory, doctype: DoctypeClass?
     ) -> Bool {
         switch category {
-        case .dateOfBirth:   return !runsDOB(doctype: doctype)
+        case .dateOfBirth:   return !runsDOB()
         case .npi:           return !runsNPI(doctype: doctype)
         case .dea:           return !runsDEA(doctype: doctype)
         case .account:       return !runsAccount(doctype: doctype)

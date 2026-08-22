@@ -27,28 +27,6 @@ public struct CalibratedScorer: Sendable {
         self.temperature = Self.loadTemperature(from: .module)
     }
 
-    /// Testing init — inject a bundle.
-    init(bundle: Bundle) {
-        self.temperature = Self.loadTemperature(from: bundle)
-    }
-
-    /// Direct-inject init (tests).
-    init(temperature: Double) {
-        self.temperature = temperature > 0 ? temperature : 1.0
-    }
-
-    /// Apply calibrated softmax: divide logits by T, then softmax. When T =
-    /// 1 this is the identity of the regular softmax.
-    public func calibratedSoftmax(logits: [DoctypeClass: Double]) -> [DoctypeClass: Double] {
-        guard !logits.isEmpty else { return [:] }
-        let scaled = logits.mapValues { $0 / temperature }
-        let maxVal = scaled.values.max() ?? 0
-        let exps = scaled.mapValues { exp($0 - maxVal) }
-        let sum = exps.values.reduce(0, +)
-        guard sum > 0 else { return logits.mapValues { _ in 1.0 / Double(logits.count) } }
-        return exps.mapValues { $0 / sum }
-    }
-
     /// Posterior = σ(logit(raw) + logit(prior) + contextLogit). A calibrated
     /// Bayesian update that preserves the raw detector signal while anchoring
     /// toward what the user's history says about this category. `contextLogit`
@@ -58,14 +36,6 @@ public struct CalibratedScorer: Sendable {
         let combined = Logit.logit(raw) + Logit.logit(priorMean) + contextLogit
         return Logit.sigmoid(combined)
     }
-
-    /// Threshold comparison shim. Kept trivial so callers can swap in
-    /// custom policy without reshaping the return type.
-    public func meets(threshold: Double, posterior: Double) -> Bool {
-        posterior >= threshold
-    }
-
-    public var effectiveTemperature: Double { temperature }
 
     // MARK: - Loader
 

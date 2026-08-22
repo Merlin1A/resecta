@@ -291,7 +291,6 @@ struct G8BaselineHarnessTests {
                         ContextFeatureContract.scoredFamilies.contains(family) {
                         let feats = contextFeatures(
                             match: match,
-                            doctype: doctype,
                             effectiveDoctype: doctype,
                             pageText: doc.text
                         )

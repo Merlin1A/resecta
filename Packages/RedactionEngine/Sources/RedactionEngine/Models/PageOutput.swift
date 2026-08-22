@@ -91,17 +91,12 @@ public struct PageFilterDigest: Sendable {
     }
 }
 
-/// Boundary character metadata for Layer 7 verification.
-/// Lightweight alternative to full CharacterInfo (~64 bytes → ~24 bytes).
-/// See ENGINE §5B.2.
+/// Boundary character marker for Layer 7 verification. Only the COUNT of
+/// near-a-redaction-edge survivors is load-bearing (`VerificationEngine`
+/// sums `.boundaryCharacters.count` across pages); the per-character
+/// identity/bounds/distance payload this type used to carry was never read
+/// anywhere, so the type carries no fields — its presence in the array is
+/// the signal.
 public struct BoundaryCharacterInfo: Sendable {
-    public let character: String
-    public let bounds: CGRect
-    public let distanceToEdge: CGFloat
-
-    public init(character: String, bounds: CGRect, distanceToEdge: CGFloat) {
-        self.character = character
-        self.bounds = bounds
-        self.distanceToEdge = distanceToEdge
-    }
+    public init() {}
 }

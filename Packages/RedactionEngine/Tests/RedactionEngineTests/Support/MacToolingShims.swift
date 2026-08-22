@@ -31,45 +31,9 @@ final class UIImage {
     init(cgImage: CGImage) {
         self.cgImage = cgImage
     }
-
-    init?(data: Data) {
-        guard let rep = NSBitmapImageRep(data: data), let cg = rep.cgImage else {
-            return nil
-        }
-        self.cgImage = cg
-    }
-
-    func jpegData(compressionQuality: CGFloat) -> Data? {
-        guard let cgImage else { return nil }
-        let rep = NSBitmapImageRep(cgImage: cgImage)
-        return rep.representation(
-            using: .jpeg,
-            properties: [.compressionFactor: compressionQuality]
-        )
-    }
-
-    /// Draw into the current (flipped) context, matching UIKit's
-    /// top-left-origin `draw(in:)` semantics.
-    func draw(in rect: CGRect) {
-        guard let cgImage, let ctx = NSGraphicsContext.current?.cgContext else {
-            return
-        }
-        ctx.saveGState()
-        // Un-flip vertically about the rect's own center so the image lands
-        // upright in the flipped coordinate space.
-        ctx.translateBy(x: 0, y: rect.origin.y * 2 + rect.height)
-        ctx.scaleBy(x: 1, y: -1)
-        ctx.draw(cgImage, in: rect)
-        ctx.restoreGState()
-    }
 }
 
 // MARK: - UIGraphicsPDFRenderer
-
-final class UIGraphicsPDFRendererFormat {
-    var documentInfo: [String: Any] = [:]
-    init() {}
-}
 
 final class UIGraphicsPDFRendererContext {
     let cgContext: CGContext
@@ -112,10 +76,6 @@ final class UIGraphicsPDFRenderer {
 
     init(bounds: CGRect) {
         self.bounds = bounds
-    }
-
-    convenience init(bounds: CGRect, format: UIGraphicsPDFRendererFormat) {
-        self.init(bounds: bounds)
     }
 
     func writePDF(

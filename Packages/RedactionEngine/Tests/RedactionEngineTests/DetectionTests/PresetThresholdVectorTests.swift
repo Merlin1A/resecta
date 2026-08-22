@@ -113,7 +113,7 @@ struct PresetThresholdVectorTests {
                 finalScore: 0.50
             )
         )
-        let afterSuppressed = [suppressedMatch].applying(thresholdVector: vector)
+        let afterSuppressed = [suppressedMatch].applyingCountingDrops(thresholdVector: vector).survivors
         #expect(afterSuppressed.isEmpty,
                 "EIN match at 0.50 must be dropped by balanced threshold 0.55")
 
@@ -130,7 +130,7 @@ struct PresetThresholdVectorTests {
                 finalScore: 0.56
             )
         )
-        let afterPassing = [passingMatch].applying(thresholdVector: vector)
+        let afterPassing = [passingMatch].applyingCountingDrops(thresholdVector: vector).survivors
         #expect(afterPassing.count == 1,
                 "EIN match at 0.56 must pass the balanced threshold 0.55")
     }

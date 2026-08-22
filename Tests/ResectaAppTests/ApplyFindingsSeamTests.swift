@@ -201,7 +201,7 @@ struct ApplySeamDetectionOriginTests {
         let ocrDetection = makeDetection(page: 0)
         let textLayerDetection = makeDetection(
             page: 2, kind: .pii(.email), matchedText: "j@x.com",
-            provenance: .ocrSkippedDueToCoverage)
+            provenance: DetectionResult.Provenance(ocrSkipped: true, ocrSkipReason: .coverageHighEnough))
         state.pendingTriage = [0: [ocrDetection], 2: [textLayerDetection]]
         state.triageSelections = [ocrDetection.id: true, textLayerDetection.id: true]
 

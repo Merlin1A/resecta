@@ -49,7 +49,7 @@ struct ThresholdFilterTests {
             match(.name, confidence: 0.70, rationale: rationale(ruleID: "name.nltagger", score: 0.70)),
             match(.email, confidence: 0.90, rationale: rationale(ruleID: "email.regex", score: 0.90)),
         ]
-        let filtered = matches.applying(thresholdVector: nil)
+        let filtered = matches.applyingCountingDrops(thresholdVector: nil).survivors
         #expect(filtered.count == 3)
         // Rationale still carries no appliedThreshold.
         for m in filtered {
@@ -62,7 +62,7 @@ struct ThresholdFilterTests {
         let vector = PresetThresholdVector(thresholdsByWireName: ["ssn": 0.80])
         let matches = [match(.ssn, confidence: 0.72,
                              rationale: rationale(ruleID: "ssn.state-machine", score: 0.72))]
-        let filtered = matches.applying(thresholdVector: vector)
+        let filtered = matches.applyingCountingDrops(thresholdVector: vector).survivors
         #expect(filtered.isEmpty)
     }
 
@@ -71,7 +71,7 @@ struct ThresholdFilterTests {
         let vector = PresetThresholdVector(thresholdsByWireName: ["name": 0.70])
         let matches = [match(.name, confidence: 0.85,
                              rationale: rationale(ruleID: "name.nltagger", score: 0.85))]
-        let filtered = matches.applying(thresholdVector: vector)
+        let filtered = matches.applyingCountingDrops(thresholdVector: vector).survivors
         #expect(filtered.count == 1)
         let survivor = try! #require(filtered.first)
         let annotated = try! #require(survivor.rationale)
@@ -89,7 +89,7 @@ struct ThresholdFilterTests {
             thresholdsByWireName: ["ssn": 0.80, "name": 0.70])
         let emailRationale = rationale(ruleID: "email.regex", score: 0.60)
         let matches = [match(.email, confidence: 0.60, rationale: emailRationale)]
-        let filtered = matches.applying(thresholdVector: vector)
+        let filtered = matches.applyingCountingDrops(thresholdVector: vector).survivors
         #expect(filtered.count == 1)
         let survivor = try! #require(filtered.first?.rationale)
         #expect(survivor.appliedThreshold == nil)
@@ -105,7 +105,7 @@ struct ThresholdFilterTests {
         let vector = PresetThresholdVector(thresholdsByWireName: ["ssn": 0.80])
         let matches = [match(.name, confidence: 0.40,
                              rationale: rationale(ruleID: "name.nltagger", score: 0.40))]
-        let filtered = matches.applying(thresholdVector: vector)
+        let filtered = matches.applyingCountingDrops(thresholdVector: vector).survivors
         #expect(filtered.count == 1)
         #expect(filtered.first?.rationale?.appliedThreshold == nil)
     }
@@ -116,7 +116,7 @@ struct ThresholdFilterTests {
         // No rationale — PIIDetector's ensureRationales would normally backfill,
         // but the filter must tolerate absent rationales for robustness.
         let matches = [match(.ssn, confidence: 0.90, rationale: nil)]
-        let filtered = matches.applying(thresholdVector: vector)
+        let filtered = matches.applyingCountingDrops(thresholdVector: vector).survivors
         #expect(filtered.count == 1)
         #expect(filtered.first?.rationale == nil)
     }
@@ -133,7 +133,7 @@ struct ThresholdFilterTests {
             match(.email, confidence: 0.60,
                   rationale: rationale(ruleID: "email.regex", score: 0.60)),        // pass-through
         ]
-        let filtered = matches.applying(thresholdVector: vector)
+        let filtered = matches.applyingCountingDrops(thresholdVector: vector).survivors
         #expect(filtered.count == 2)
         // Surviving SSN absent; Name present with annotation; Email pass-through.
         #expect(filtered.contains(where: { $0.kind == .name && $0.rationale?.appliedThreshold == 0.70 }))
@@ -141,32 +141,7 @@ struct ThresholdFilterTests {
         #expect(!filtered.contains(where: { $0.kind == .ssn }))
     }
 
-    // MARK: - D06-F2 Part 1: applyingCountingDrops (parity + drop count)
-
-    @Test("applyingCountingDrops survivor output equals applying(thresholdVector:)")
-    func countingDropsParityWithApplying() {
-        let vector = PresetThresholdVector(
-            thresholdsByWireName: ["ssn": 0.80, "name": 0.70])
-        let matches = [
-            match(.ssn, confidence: 0.72,
-                  rationale: rationale(ruleID: "ssn.state-machine", score: 0.72)),  // drop
-            match(.name, confidence: 0.85,
-                  rationale: rationale(ruleID: "name.nltagger", score: 0.85)),      // keep + annotate
-            match(.email, confidence: 0.60,
-                  rationale: rationale(ruleID: "email.regex", score: 0.60)),        // pass-through
-        ]
-        let pure = matches.applying(thresholdVector: vector)
-        let counted = matches.applyingCountingDrops(thresholdVector: vector)
-        // Survivor list is byte-identical to the pure API (the only added behavior
-        // is the drop tally).
-        #expect(counted.survivors.count == pure.count)
-        for (a, b) in zip(counted.survivors, pure) {
-            #expect(a.kind == b.kind)
-            #expect(a.confidence == b.confidence)
-            #expect(a.range == b.range)
-            #expect(a.rationale?.appliedThreshold == b.rationale?.appliedThreshold)
-        }
-    }
+    // MARK: - D06-F2 Part 1: applyingCountingDrops (drop count)
 
     @Test("applyingCountingDrops counts exactly the below-cutoff matches")
     func countingDropsCountsBelowCutoff() {

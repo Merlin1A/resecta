@@ -7,7 +7,7 @@ import Foundation
 // posterior (see `searchParitySiteBBeforeAfter` below).
 //
 // Plan 04 §5.5 / D-13: Site B (DocumentSearcher) gated RAW match.confidence via
-// `ThresholdFilter.applying(thresholdVector:)` (DocumentSearcher.swift:1146 /
+// `ThresholdFilter.applyingCountingDrops(thresholdVector:)` (DocumentSearcher.swift:1146 /
 // :1338 → ThresholdFilter.swift:28-44) with NO posterior, NO prior, NO learned
 // term. Site A (DetectionOrchestrator.swift:432-446) composes the posterior
 // before its cutoff. B02 measured the C1 scorer reaching none of the five
@@ -24,7 +24,7 @@ import Foundation
 //   - SAME detector matches as the Site-A baseline (detect(in:doctype:) over the
 //     same 1,100 G8 docs, same gateDoctypeClass doctype).
 //   - Site-B surfacing: route those matches through
-//     `[PIIMatch].applying(thresholdVector:)` (the EXACT Site-B gate call) using
+//     `[PIIMatch].applyingCountingDrops(thresholdVector:)` (the EXACT Site-B gate call) using
 //     the SAME balanced PresetThresholdVector the baseline harness reads.
 //   - Aggregate the IDENTICAL BaselineCell schema, keyed <cat>_<doctype>_<bucket>.
 //   - Site-A surfacing (for the delta): match.confidence >= balancedCutoff —
@@ -106,7 +106,7 @@ struct G8SearchParityHarnessTests {
             // Site-B surfacing: the EXACT search-path gate over the same matches.
             // ThresholdFilter passes a match through when its category has no
             // wire-name OR the vector has no entry; otherwise raw >= cutoff.
-            let siteBSurvivors = matches.applying(thresholdVector: vector)
+            let siteBSurvivors = matches.applyingCountingDrops(thresholdVector: vector).survivors
             var siteBByKind: [RedactionRegion.PIIKind: [NSRange]] = [:]
             for m in siteBSurvivors {
                 siteBByKind[m.kind, default: []].append(m.range)
@@ -182,7 +182,7 @@ struct G8SearchParityHarnessTests {
             g8_corpus_seed: corpus.seed,
             cutoff_preset: "balanced",
             site: "B",
-            gate_mechanism: "ThresholdFilter.applying(thresholdVector:)",
+            gate_mechanism: "ThresholdFilter.applyingCountingDrops(thresholdVector:)",
             doc_count: sortedDocs.count,
             cells: siteBCells
         )
@@ -213,14 +213,14 @@ struct G8SearchParityHarnessTests {
 
     /// One BEFORE/AFTER pass over the G8 corpus at Site B, parameterised by how a
     /// scored family is gated:
-    ///   - `.raw`       → `applying(thresholdVector:)` (today's Site-B gate; the
-    ///     literal BEFORE).
+    ///   - `.raw`       → `applyingCountingDrops(thresholdVector:)` (today's
+    ///     Site-B gate; the literal BEFORE).
     ///   - `.identity`  → the production `composedSurvivors` core driven with
     ///     `ContextScorerWeights.identity` (the w=0 control — composed == raw).
     ///   - `.installed` → the same core with the installed (B05) calibrated
     ///     scorer (the AFTER).
-    /// In every variant, NON-scored families flow through `applying(...)`
-    /// untouched, so the recombined survivor SET differs only by the scored
+    /// In every variant, NON-scored families flow through
+    /// `applyingCountingDrops(...)` untouched, so the recombined survivor SET differs only by the scored
     /// families. Returns the aggregated cells plus the per-family tally.
     private enum SiteBVariant { case raw, identity, installed }
 
@@ -262,7 +262,7 @@ struct G8SearchParityHarnessTests {
             let scored: [PIIDetector.PIIMatch]
             switch variant {
             case .raw:
-                scored = scoredAll.applying(thresholdVector: vector)
+                scored = scoredAll.applyingCountingDrops(thresholdVector: vector).survivors
             case .identity, .installed:
                 let scorer: ContextScorerWeights = (variant == .identity) ? .identity : installedScorer
                 // Split off any C3-zeroed family → raw path; the rest → composed.
@@ -274,9 +274,9 @@ struct G8SearchParityHarnessTests {
                 }
                 scored = DocumentSearcher._testComposeSiteB(
                     composedInput, pageText: doc.text, thresholdVector: vector, scorer: scorer
-                ) + rawInput.applying(thresholdVector: vector)
+                ) + rawInput.applyingCountingDrops(thresholdVector: vector).survivors
             }
-            let survivors = rest.applying(thresholdVector: vector) + scored
+            let survivors = rest.applyingCountingDrops(thresholdVector: vector).survivors + scored
 
             var byKind: [RedactionRegion.PIIKind: [NSRange]] = [:]
             for m in survivors { byKind[m.kind, default: []].append(m.range) }
@@ -392,11 +392,11 @@ struct G8SearchParityHarnessTests {
 
         let rawData = try encodeCells(
             rawCells, generatedBy: "G8SearchParityHarness.searchG8Corpus",
-            seed: corpus.seed, gate: "ThresholdFilter.applying(thresholdVector:)"
+            seed: corpus.seed, gate: "ThresholdFilter.applyingCountingDrops(thresholdVector:)"
         )
         let identityData = try encodeCells(
             identityCells, generatedBy: "G8SearchParityHarness.searchG8Corpus",
-            seed: corpus.seed, gate: "ThresholdFilter.applying(thresholdVector:)"
+            seed: corpus.seed, gate: "ThresholdFilter.applyingCountingDrops(thresholdVector:)"
         )
 
         let base = G8BaselineHarnessTests.baselineOutBase()
