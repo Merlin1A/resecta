@@ -1,6 +1,5 @@
 import Testing
 import Foundation
-import RedactionEngine
 @testable import ResectaApp
 
 // WU-42 — canvas polish bundle. Three independently-scoped
