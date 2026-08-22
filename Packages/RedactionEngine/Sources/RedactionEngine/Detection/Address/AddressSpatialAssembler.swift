@@ -5,8 +5,7 @@ import CoreGraphics
 // Replaces the inline PIIDetector.addressPattern regex when OCR lines are
 // available. Strategy:
 //
-//   1. Group OCR lines by y-proximity (reuses Phase-2 BoundingBoxMerger
-//      yGap = 0.020 normalized units).
+//   1. Group OCR lines by y-proximity (own y-gap tolerance, defined below).
 //   2. For each contiguous y-group, scan for a ZIP regex anchor
 //      (\d{5}(-\d{4})?).
 //   3. On ZIP hit, look up to 3 lines upward within x-alignment ±5% page

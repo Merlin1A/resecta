@@ -586,20 +586,6 @@ enum TestFixtures {
         ], rootId: 1)
     }
 
-    /// PDF with explicit cropBox smaller than mediaBox. See TEST §2.11.
-    static func croppedPDF() -> Data {
-        buildRawPDF(objects: [
-            PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
-            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-            PDFObject(id: 3, content: """
-                << /Type /Page /Parent 2 0 R \
-                /MediaBox [0 0 612 792] \
-                /CropBox [36 36 576 756] \
-                /Contents 4 0 R /Resources << >> >>
-                """),
-            PDFObject(id: 4, content: "<< /Length 0 >>\nstream\n\nendstream"),
-        ], rootId: 1)
-    }
 
     /// PDF with /Rotate key — tests rotation-aware rendering. See TEST §2.11.
     static func rotatedPDF(rotation: Int = 90) -> Data {
@@ -724,18 +710,6 @@ enum TestFixtures {
         context.closePDF()
         defer { try? FileManager.default.removeItem(at: url) }
         return (try? Data(contentsOf: url)) ?? Data()
-    }
-
-    /// Render a text PDF at 300 DPI to produce a CGImage for pixel-level tests.
-    /// Named Async because renderPage is async. See OQ-3 resolution, TEST §3.4.
-    static func textPageImageAsync() async throws -> CGImage {
-        let pdfData = textLayerPDF()
-        guard let doc = PDFDocument(data: pdfData),
-              let page = doc.page(at: 0) else {
-            throw FixtureError.invalidPDF
-        }
-        let rasterizer = PageRasterizer()
-        return try await rasterizer.renderPage(page, pageIndex: 0, dpi: 300)
     }
 
     // MARK: - Phase 1 Audit Fixtures

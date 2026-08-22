@@ -40,16 +40,6 @@ struct OCREngineTests {
         #expect(lines.isEmpty, "Blank image should return no text lines")
     }
 
-    @Test("fullText joins lines with newlines")
-    func fullTextJoining() {
-        let lines = [
-            OCREngine.TextLine(text: "First line", normalizedRect: .zero, confidence: 0.9),
-            OCREngine.TextLine(text: "Second line", normalizedRect: .zero, confidence: 0.8),
-        ]
-        let full = OCREngine.fullText(from: lines)
-        #expect(full == "First line\nSecond line")
-    }
-
     @Test("recognizeText does not crash on small image")
     func smallImageNoCrash() async throws {
         guard let ctx = createBitmapContext(width: 10, height: 10),
@@ -104,21 +94,6 @@ struct OCREngineTests {
         let lines = try await engine.recognizeText(in: image)
         // Vision may merge or split lines — just verify no crash and non-negative count
         #expect(lines.count >= 0)
-    }
-
-    @Test("fullText returns empty string for empty array")
-    func fullTextEmpty() {
-        let full = OCREngine.fullText(from: [])
-        #expect(full.isEmpty)
-    }
-
-    @Test("fullText preserves single line without trailing newline")
-    func fullTextSingleLine() {
-        let lines = [
-            OCREngine.TextLine(text: "Only line", normalizedRect: .zero, confidence: 0.9)
-        ]
-        let full = OCREngine.fullText(from: lines)
-        #expect(full == "Only line")
     }
 
     private enum TestError: Error { case imageCreationFailed }

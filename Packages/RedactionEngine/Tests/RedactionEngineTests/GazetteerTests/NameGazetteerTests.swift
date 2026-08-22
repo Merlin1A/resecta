@@ -20,7 +20,6 @@ struct NameGazetteerTests {
             // Expected in scaffold phase (no real .bloom files bundled)
         } else {
             // Valid once production filters are built (G2b)
-            #expect(gazetteer!.manifest.version.isEmpty == false)
         }
     }
 
@@ -58,26 +57,6 @@ struct NameGazetteerTests {
         #expect(filter.contains("NGUYEN"))
     }
 
-    @Test("Adjacent pair lookup: both must hit")
-    func adjacentPairLookup() throws {
-        let surnameFilter = try loadGoldenFilter()
-        let givenFilter = try loadGoldenFilter()
-        let manifest = GazetteerManifest(
-            version: "test", hashAlgorithm: "MurmurHash3_x64_128",
-            seed: 42, filters: [])
-        let gazetteer = NameGazetteer(
-            surnameFilter: surnameFilter,
-            givenNameFilter: givenFilter,
-            manifest: manifest)
-
-        // Both "smith" and "garcia" are in the golden filter
-        #expect(gazetteer.contains(adjacent: (given: "garcia", surname: "smith")))
-
-        // "docket" is not in the filter
-        #expect(!gazetteer.contains(adjacent: (given: "docket", surname: "smith")))
-        #expect(!gazetteer.contains(adjacent: (given: "garcia", surname: "docket")))
-    }
-
     // MARK: - Helpers
 
     /// Load the golden-1000.bloom as a BloomFilter for testing.
@@ -106,13 +85,9 @@ struct NameGazetteerTests {
 
     private func makeGazetteer() throws -> NameGazetteer? {
         let filter = try loadGoldenFilter()
-        let manifest = GazetteerManifest(
-            version: "test", hashAlgorithm: "MurmurHash3_x64_128",
-            seed: 42, filters: [])
         return NameGazetteer(
             surnameFilter: filter,
-            givenNameFilter: filter,
-            manifest: manifest)
+            givenNameFilter: filter)
     }
 
     @Test("Jr. suffix stripped: 'John Smith Jr.' → surname 'Smith' hits → boost ≥ 0.10")

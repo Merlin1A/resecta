@@ -95,9 +95,10 @@ public struct SendablePDFDocument: @unchecked Sendable {
 }
 
 /// Wrapper to pass PDFPage across isolation boundaries.
-/// Safety: consumed by the `renderPageWithTimeout(PDFPage,…)`
-/// test-seam overload only; the production rasterize path renders via
-/// `PDFPageData.cgPage` (`renderPageFromCGPage`), not a live `PDFPage`.
+/// Safety: the production rasterize path renders via `PDFPageData.cgPage`
+/// (`renderPageFromCGPage`), not a live `PDFPage`; other callers (search,
+/// verification) wrap their own `PDFPage` instances with this type to cross
+/// isolation boundaries.
 public struct SendablePDFPage: @unchecked Sendable {
     public let page: PDFPage
     public init(_ page: PDFPage) { self.page = page }

@@ -19,12 +19,10 @@ struct G6SyntheticRecallTests {
 
     struct Corpus: Decodable { let documents: [Document] }
     struct Document: Decodable {
-        let id: String
         let text: String
         let pii_spans: [PIISpan]
     }
     struct PIISpan: Decodable {
-        let category: String
         let start: Int
         let end: Int
     }

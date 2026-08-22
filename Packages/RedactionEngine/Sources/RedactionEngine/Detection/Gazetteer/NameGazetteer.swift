@@ -31,9 +31,6 @@ public struct NameGazetteer: Sendable {
     /// Given-name Bloom filter (SSA + ParaNames + PopNames).
     public let givenNameFilter: BloomFilter
 
-    /// Manifest with provenance and filter parameters.
-    public let manifest: GazetteerManifest
-
     /// Optional nickname sidecar — nil when the file is not yet bundled.
     /// When non-nil, `queryBoosted` uses it to widen given-name bloom queries
     /// via nickname→canonical resolution.
@@ -63,7 +60,9 @@ public struct NameGazetteer: Sendable {
 
             self.surnameFilter = try BloomFilter(data: surnameData)
             self.givenNameFilter = try BloomFilter(data: givenData)
-            self.manifest = try JSONDecoder().decode(
+            // Manifest is decoded (not stored) so a malformed manifest file
+            // still fails this initializer, matching prior behavior.
+            _ = try JSONDecoder().decode(
                 GazetteerManifest.self, from: manifestData)
             // Nickname sidecar is optional: its absence does not fail the init.
             self.nicknameGazetteer = try? NicknameGazetteer(bundle: Bundle.module)
@@ -127,18 +126,15 @@ public struct NameGazetteer: Sendable {
 
         self.surnameFilter = surnameFilter
         self.givenNameFilter = givenFilter
-        self.manifest = manifest
         // Nickname sidecar is optional: its absence does not fail the init.
         self.nicknameGazetteer = try? NicknameGazetteer(bundle: bundle)
     }
 
     /// Init from explicit filter data (for testing with golden files).
     public init(surnameFilter: BloomFilter, givenNameFilter: BloomFilter,
-                manifest: GazetteerManifest,
                 nicknameGazetteer: NicknameGazetteer? = nil) {
         self.surnameFilter = surnameFilter
         self.givenNameFilter = givenNameFilter
-        self.manifest = manifest
         self.nicknameGazetteer = nicknameGazetteer
     }
 
@@ -154,12 +150,6 @@ public struct NameGazetteer: Sendable {
     /// Input is NFKC-normalized and lowercased before lookup.
     public func contains(givenName: String) -> Bool {
         givenNameFilter.contains(givenName)
-    }
-
-    /// Check whether both a given name and surname are in their respective filters.
-    /// Used for NLTagger confirmation in Phase 3 A2 integration.
-    public func contains(adjacent pair: (given: String, surname: String)) -> Bool {
-        contains(givenName: pair.given) && contains(surname: pair.surname)
     }
 
     // MARK: - W2 Boosted Lookup

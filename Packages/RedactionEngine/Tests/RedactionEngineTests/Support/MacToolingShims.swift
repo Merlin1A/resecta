@@ -39,11 +39,6 @@ final class UIImage {
         self.cgImage = cg
     }
 
-    var size: CGSize {
-        guard let cgImage else { return .zero }
-        return CGSize(width: cgImage.width, height: cgImage.height)
-    }
-
     func jpegData(compressionQuality: CGFloat) -> Data? {
         guard let cgImage else { return nil }
         let rep = NSBitmapImageRep(cgImage: cgImage)
@@ -51,12 +46,6 @@ final class UIImage {
             using: .jpeg,
             properties: [.compressionFactor: compressionQuality]
         )
-    }
-
-    func pngData() -> Data? {
-        guard let cgImage else { return nil }
-        let rep = NSBitmapImageRep(cgImage: cgImage)
-        return rep.representation(using: .png, properties: [:])
     }
 
     /// Draw into the current (flipped) context, matching UIKit's
@@ -110,10 +99,6 @@ final class UIGraphicsPDFRendererContext {
         NSGraphicsContext.current = NSGraphicsContext(
             cgContext: cgContext, flipped: true
         )
-    }
-
-    func fill(_ rect: CGRect) {
-        cgContext.fill(rect)
     }
 
     fileprivate func finishPageIfOpen() {

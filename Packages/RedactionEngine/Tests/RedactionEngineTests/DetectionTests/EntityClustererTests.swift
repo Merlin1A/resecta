@@ -7,10 +7,6 @@ import Foundation
 @Suite("EntityClusterer (A5)")
 struct EntityClustererTests {
 
-    private func input(_ id: UUID = UUID(), name: String) -> EntityClusterer.ClusterInput {
-        EntityClusterer.clusterInput(for: id, rawName: name)!
-    }
-
     @Test("John Smith and J. Smith cluster into same group")
     func clusterByInitial() {
         let ids = (0..<2).map { _ in UUID() }

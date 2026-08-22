@@ -172,12 +172,6 @@ struct NameGazetteerNicknameIntegrationTests {
         return try BloomFilter(data: data)
     }
 
-    private func makeManifest() -> GazetteerManifest {
-        GazetteerManifest(
-            version: "test", hashAlgorithm: "MurmurHash3_x64_128",
-            seed: 42, filters: [])
-    }
-
     // MARK: - testBillResolvesToWilliam
 
     @Test("Bill resolves to william via nickname table: boost 0.15 with table, 0.10 without")
@@ -190,7 +184,6 @@ struct NameGazetteerNicknameIntegrationTests {
         let withoutNicknames = NameGazetteer(
             surnameFilter: surnameFilter,
             givenNameFilter: givenFilter,
-            manifest: makeManifest(),
             nicknameGazetteer: nil)
         let withoutVerdict = withoutNicknames.queryBoosted(candidate: "Bill Smith")
         #expect(withoutVerdict.boost == 0.10,
@@ -203,7 +196,6 @@ struct NameGazetteerNicknameIntegrationTests {
         let withNicknames = NameGazetteer(
             surnameFilter: surnameFilter,
             givenNameFilter: givenFilter,
-            manifest: makeManifest(),
             nicknameGazetteer: nicknames)
         let withVerdict = withNicknames.queryBoosted(candidate: "Bill Smith")
         #expect(withVerdict.boost == 0.15,
@@ -224,7 +216,6 @@ struct NameGazetteerNicknameIntegrationTests {
         let gazetteer = NameGazetteer(
             surnameFilter: surnameFilter,
             givenNameFilter: givenFilter,
-            manifest: makeManifest(),
             nicknameGazetteer: nicknames)
 
         // "Xyz Smith" → surname=smith (hit), given=xyz (miss), xyz not in table → no canonical hit
@@ -250,7 +241,6 @@ struct NameGazetteerNicknameIntegrationTests {
         let gazetteer = NameGazetteer(
             surnameFilter: surnameFilter,
             givenNameFilter: givenFilter,
-            manifest: makeManifest(),
             nicknameGazetteer: nicknames)
 
         let verdict = gazetteer.queryBoosted(candidate: "Bob Jones")
@@ -266,12 +256,10 @@ struct NameGazetteerNicknameIntegrationTests {
     @Test("nil nicknameGazetteer: queryBoosted output is unchanged from pre-S5")
     func testNilNicknameGazetteerPreservesExistingBehavior() throws {
         let filter = try loadGoldenFilter()
-        let manifest = makeManifest()
         // Baseline: no nickname gazetteer.
         let g = NameGazetteer(
             surnameFilter: filter,
             givenNameFilter: filter,
-            manifest: manifest,
             nicknameGazetteer: nil)
         // "garcia smith" — both in golden-1000 → boost 0.15 as before.
         let verdict = g.queryBoosted(candidate: "garcia smith")

@@ -103,22 +103,6 @@ public enum PipelineError: Sendable, LocalizedError {
         }
     }
 
-    /// The page index relevant to this error, if applicable.
-    public var pageIndex: Int? {
-        switch self {
-        case .detectionError(.timeout(let p)), .detectionError(.visionError(let p)),
-             .redactionError(.insufficientMemory(let p)),
-             .redactionError(.bitmapCreationFailed(let p)),
-             .redactionError(.fillVerificationFailed(let p)),
-             .redactionError(.renderTimeout(let p)),
-             .redactionError(.pageTooLarge(let p)),
-             .importError(.invalidPageDimensions(let p)):
-            return p
-        default:
-            return nil
-        }
-    }
-
     /// Whether the user can retry after dismissing the error.
     public var isRecoverable: Bool {
         switch self {

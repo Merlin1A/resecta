@@ -11,7 +11,7 @@ struct PageRasterizerTests {
 
     // MARK: - L-19: Pre-flight size rejection
 
-    @Test("renderPageWithTimeout rejects 50,000-pt-wide pages before drawPDFPage")
+    @Test("renderCGPageWithTimeout rejects 50,000-pt-wide pages before drawPDFPage")
     func rejectsPageTooLarge() async throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("pagetoolarge_\(UUID().uuidString).pdf")
@@ -19,14 +19,18 @@ struct PageRasterizerTests {
 
         try synthesizeOversizedPDF(at: url, width: 50_000, height: 500)
 
-        guard let doc = PDFDocument(url: url), let page = doc.page(at: 0) else {
+        guard let doc = PDFDocument(url: url), let page = doc.page(at: 0),
+              let cgPage = page.pageRef else {
             Issue.record("Failed to load synthesized oversized PDF")
             return
         }
 
         let rasterizer = PageRasterizer()
         do {
-            _ = try await rasterizer.renderPageWithTimeout(page, pageIndex: 0, dpi: 150)
+            _ = try await rasterizer.renderCGPageWithTimeout(
+                cgPage, bounds: page.bounds(for: .cropBox), rotation: page.rotation,
+                pageIndex: 0, dpi: 150
+            )
             Issue.record("Expected pageTooLarge error, got success")
         } catch let error as PipelineError {
             guard case .redactionError(.pageTooLarge(let p)) = error else {
@@ -37,7 +41,7 @@ struct PageRasterizerTests {
         }
     }
 
-    @Test("renderPageWithTimeout accepts in-range page dimensions")
+    @Test("renderCGPageWithTimeout accepts in-range page dimensions")
     func acceptsNormalPageDimensions() async throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("pagenormal_\(UUID().uuidString).pdf")
@@ -45,15 +49,17 @@ struct PageRasterizerTests {
 
         try synthesizeOversizedPDF(at: url, width: 612, height: 792)
 
-        guard let doc = PDFDocument(url: url), let page = doc.page(at: 0) else {
+        guard let doc = PDFDocument(url: url), let page = doc.page(at: 0),
+              let cgPage = page.pageRef else {
             Issue.record("Failed to load synthesized PDF")
             return
         }
 
         let rasterizer = PageRasterizer()
         // Should succeed without throwing .pageTooLarge.
-        let image = try await rasterizer.renderPageWithTimeout(
-            page, pageIndex: 0, dpi: 150
+        let image = try await rasterizer.renderCGPageWithTimeout(
+            cgPage, bounds: page.bounds(for: .cropBox), rotation: page.rotation,
+            pageIndex: 0, dpi: 150
         )
         #expect(image.width > 0)
         #expect(image.height > 0)

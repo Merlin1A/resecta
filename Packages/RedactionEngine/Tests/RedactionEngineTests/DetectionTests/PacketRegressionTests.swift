@@ -52,7 +52,6 @@ struct PacketRegressionTests {
 
     struct GroundTruth: Codable {
         let occurrences: [Occ]
-        let carried_stmt: [Occ]
     }
     struct Occ: Codable {
         let id: String
@@ -61,7 +60,6 @@ struct PacketRegressionTests {
         let page: Int?
         let bbox: [Double]?
         let expectation: String           // must_fire | must_not_fire | should_fire | watch
-        let leg_applicability: [String]
         let spans: [Span]?
         struct Span: Codable { let bbox: [Double]? }
     }
@@ -101,7 +99,7 @@ struct PacketRegressionTests {
         return g > 0 ? (inter.width * inter.height) / g : 0
     }
 
-    struct Det { let category: String; let rect: CGRect; let text: String }
+    struct Det { let category: String; let rect: CGRect }
 
     /// D22 region hard-gate (coverage form): is the occurrence value covered by
     /// some detection box (coverage >= threshold), with DetEval-style merge
@@ -193,7 +191,7 @@ struct PacketRegressionTests {
                     guard let rect = Self.boundingRect(for: m.range, in: wordBounds) else { continue }
                     let cat = m.category.flatMap { PresetThresholdVector.wireName(for: $0) }
                         ?? String(describing: m.kind)
-                    dets.append(Det(category: cat, rect: rect, text: m.text))
+                    dets.append(Det(category: cat, rect: rect))
                 }
                 out[pageIndex] = PageMeasurement(doctype: doctype.primary.rawValue, dets: dets)
             } else {
@@ -204,7 +202,7 @@ struct PacketRegressionTests {
                     doctypeContext: nil, thresholdVector: nil,
                     embeddedText: embedded, ocrSkipReason: nil)
                 let dets = result.detections.map {
-                    Det(category: Self.wire(for: $0.kind), rect: $0.normalizedRect, text: $0.matchedText ?? "")
+                    Det(category: Self.wire(for: $0.kind), rect: $0.normalizedRect)
                 }
                 out[pageIndex] = PageMeasurement(doctype: result.doctype.primary.rawValue, dets: dets)
             }

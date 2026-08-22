@@ -65,7 +65,6 @@ struct RotatedPacketDetectionProbeTests {
     /// `variant` block stamped by `packet.variants.rotate_trigger`.
     struct VariantGroundTruth: Codable {
         let occurrences: [PacketPRHarnessTests.Occ]
-        let carried_stmt: [PacketPRHarnessTests.Occ]
         let variant: VariantMeta
         struct VariantMeta: Codable {
             let kind: String
@@ -253,8 +252,7 @@ struct RotatedPacketDetectionProbeTests {
             category: PacketSnapshotTests.wireName(for: d.kind),
             normalizedRect: [
                 Double(d.normalizedRect.minX), Double(d.normalizedRect.minY),
-                Double(d.normalizedRect.width), Double(d.normalizedRect.height)],
-            matchedText: d.matchedText)
+                Double(d.normalizedRect.width), Double(d.normalizedRect.height)])
     }
 
     /// detectPage with cold-start retries (S8/S01 lesson: transient Vision #9
