@@ -339,6 +339,79 @@ struct SearchResultRowTests {
         #expect(SearchResultRow.ocrCapsuleLabel(confidence: 0.495) == "OCR")
     }
 
+    // MARK: - UXC-22: qualitative descriptors replace "N% confidence"
+
+    @Test("ConfidenceTier.descriptor is the exact lowercase mid-sentence form")
+    func confidenceTierDescriptorExactText() {
+        #expect(SearchResultRow.ConfidenceTier.high.descriptor == "high confidence")
+        #expect(SearchResultRow.ConfidenceTier.medium.descriptor == "medium confidence")
+        #expect(SearchResultRow.ConfidenceTier.low.descriptor == "low confidence")
+    }
+
+    @Test("ConfidenceTier.descriptorLabel is the exact capitalized sentence-position form")
+    func confidenceTierDescriptorLabelExactText() {
+        #expect(SearchResultRow.ConfidenceTier.high.descriptorLabel == "High confidence")
+        #expect(SearchResultRow.ConfidenceTier.medium.descriptorLabel == "Medium confidence")
+        #expect(SearchResultRow.ConfidenceTier.low.descriptorLabel == "Low confidence")
+    }
+
+    @Test("piiBadgeAccessibilityLabel routes through the descriptor, text source and OCR source")
+    func piiBadgeAccessibilityLabelUsesDescriptor() {
+        let textResult = makeResult(
+            term: "123-45-6789", piiCategory: .ssn,
+            signals: [.regexPattern(name: "ssn")], piiConfidence: 0.97
+        )
+        // PIICategory.ssn.rawValue is the short badge string "SSN" —
+        // "Social Security Number" is RegionMetadata's full-description
+        // label (a different enum), not this one.
+        #expect(SearchResultRow.piiBadgeAccessibilityLabel(for: textResult, category: .ssn)
+                == "SSN, high confidence")
+        let ocrResult = makeResult(
+            term: "123-45-6789", piiCategory: .ssn,
+            signals: [.regexPattern(name: "ssn")],
+            source: .ocr(confidence: 0.5), piiConfidence: 0.75
+        )
+        #expect(SearchResultRow.piiBadgeAccessibilityLabel(for: ocrResult, category: .ssn)
+                == "SSN, medium confidence, OCR source")
+    }
+
+    @Test("ocrCapsuleAccessibilityLabel routes through the row's floor-relative tier",
+          arguments: [
+            (SearchResultRow.ConfidenceTier.high, "OCR, high confidence"),
+            (SearchResultRow.ConfidenceTier.medium, "OCR, medium confidence"),
+            (SearchResultRow.ConfidenceTier.low, "OCR, low confidence"),
+          ])
+    func ocrCapsuleAccessibilityLabelUsesDescriptor(
+        tier: SearchResultRow.ConfidenceTier, expected: String
+    ) {
+        #expect(SearchResultRow.ocrCapsuleAccessibilityLabel(tier: tier) == expected)
+    }
+
+    @Test("UXC-22 — no new confidence string carries a percent sign")
+    func uxc22NoPercentAnywhere() {
+        let piiSample = SearchResultRow.piiBadgeAccessibilityLabel(
+            for: makeResult(term: "x", piiCategory: .ssn, signals: nil, piiConfidence: 0.9),
+            category: .ssn
+        )
+        let regionMetadataSample = RegionMetadata.mock(confidence: 0.5).accessibilityDescription
+        let samples = [
+            SearchResultRow.ConfidenceTier.high.descriptor,
+            SearchResultRow.ConfidenceTier.medium.descriptor,
+            SearchResultRow.ConfidenceTier.low.descriptor,
+            SearchResultRow.ConfidenceTier.high.descriptorLabel,
+            SearchResultRow.ConfidenceTier.medium.descriptorLabel,
+            SearchResultRow.ConfidenceTier.low.descriptorLabel,
+            piiSample,
+            SearchResultRow.ocrCapsuleAccessibilityLabel(tier: .high),
+            SearchResultRow.ocrCapsuleAccessibilityLabel(tier: .medium),
+            SearchResultRow.ocrCapsuleAccessibilityLabel(tier: .low),
+            regionMetadataSample,
+        ]
+        for sample in samples {
+            #expect(!sample.contains("%"), "percent sign found in: \(sample)")
+        }
+    }
+
     // MARK: - Test fixtures
 
     private func makeResult(

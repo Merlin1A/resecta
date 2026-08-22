@@ -2151,8 +2151,14 @@ class RedactionOverlayView: UIView {
         }
 
         if let metadata = coordinator?.redactionState?.regionMetadata[region.id] {
-            let conf = Int(metadata.confidence * 100)
-            return "\(base), \(conf)% confidence"
+            // UXC-22 (RB-44) — qualitative descriptor replaces the raw
+            // percent; same one threshold source as every other site.
+            // This canvas leg is currently unreachable by VoiceOver in
+            // the served tree (accessibilityElements above never
+            // surfaces it in production use) — swapped for consistency;
+            // unverifiable visually.
+            let descriptor = SearchResultRow.absoluteConfidenceTier(metadata.confidence).descriptor
+            return "\(base), \(descriptor)"
         }
         return base
     }

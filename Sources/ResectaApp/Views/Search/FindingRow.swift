@@ -70,17 +70,20 @@ extension FindingRowModel {
         // content to make accept/reject decisions.
         let status = isSelected ? "Selected" : "Deselected"
         let text = detection.matchedText.map { ", \($0)" } ?? ""
+        // UXC-22 (RB-44) — qualitative descriptor replaces the raw
+        // percent; `absoluteConfidenceTier` is the one threshold source.
+        let descriptorLabel = SearchResultRow.absoluteConfidenceTier(detection.confidence).descriptorLabel
         self.init(
             id: detection.id,
             pageIndex: page,
             title: detection.matchedText ?? detection.kind.fullName,
             titleIsContent: hasText,
-            secondaryText: "\(Int(detection.confidence * 100))% confidence",
+            secondaryText: descriptorLabel,
             secondaryIsContent: false,
             showsAmbiguousSurnameHint: isAmbiguousSurname,
             accessibilityDescription:
                 "\(status). \(detection.kind.fullName)\(text). Page \(page + 1). "
-                + "\(Int(detection.confidence * 100))% confidence."
+                + "\(descriptorLabel)."
         )
     }
 }

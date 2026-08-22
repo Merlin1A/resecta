@@ -315,9 +315,12 @@ struct SearchResultsSection: View {
                     if preview.regexInvalid {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(.red)
+                        // GAP-41 — small error TEXT routes through the
+                        // measured text tier; the glyph above stays on
+                        // the system-color tier.
                         Text("Regex: invalid")
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(ResectaTokens.SemanticColor.failText)
                     } else {
                         Image(systemName: "eye")
                             .foregroundStyle(.secondary)

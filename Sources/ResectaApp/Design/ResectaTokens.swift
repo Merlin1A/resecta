@@ -182,6 +182,19 @@ enum ResectaTokens {
             }
         )
 
+        /// ATTENTION-family text (pink family — shares
+        /// `VerificationStatus.color`'s `.pink` glyph hue; distinct from
+        /// warn orange / fail red). Light #D40028 · Dark #FF6E8B.
+        /// Measured: 5.48/4.91 light (white/grouped) · 7.86/6.36/5.21
+        /// dark (black/#1C1C1E/#2C2C2E).
+        static let attentionText: Color = Color(
+            uiColor: UIColor { trait in
+                trait.userInterfaceStyle == .dark
+                    ? UIColor(red: 0xFF/255, green: 0x6E/255, blue: 0x8B/255, alpha: 1)
+                    : UIColor(red: 0xD4/255, green: 0x00/255, blue: 0x28/255, alpha: 1)
+            }
+        )
+
         // Detection kind badge colors (canvas badges, triage rows, popover)
         static let badgePII: Color = Color(.systemOrange)
         static let badgeFace: Color = Color(.systemPurple)
@@ -328,6 +341,29 @@ enum ResectaTokens {
                 return .easeInOut(duration: 0.2)
             }
             return animation
+        }
+
+        // MARK: Reduced Motion (§A2.2) — partial revival of DC-023
+        //
+        // DC-023 (registers/deadcode/05-REGISTER.md, W1, ref `0f9fc672`)
+        // removed `resolvedTransition(standard:reduceMotion:)` as
+        // never-read in the same sweep that took the `Haptics` enum
+        // above (DC-022) — even though RB-24 had already ruled "wire
+        // through the resolver". UXC-33 gives it its first real call
+        // sites: the eleven `.move(edge:)` transition sites under
+        // `Sources/ResectaApp/Views`. This is a MINIMAL, deliberate
+        // partial revival — only this one function is restored,
+        // verbatim from `git show 09dd889a81af6091287d8e3819d05e608a2184ca`
+        // — none of DC-023's other removed members (Typography, the
+        // never-read TouchTarget/CornerRadius/Shadow/Opacity/Border/Anim
+        // members) are brought back; they stay confirmed-dead.
+        /// Transition for reduced-motion contexts. Replaces spatial transitions
+        /// (slide, scale) with opacity-only crossfade.
+        static func resolvedTransition(
+            standard: AnyTransition,
+            reduceMotion: Bool
+        ) -> AnyTransition {
+            reduceMotion ? .opacity : standard
         }
     }
 

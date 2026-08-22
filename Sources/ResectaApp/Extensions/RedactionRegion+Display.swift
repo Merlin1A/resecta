@@ -6,13 +6,32 @@ import RedactionEngine
 
 extension RedactionRegion {
 
-    /// Display color for the overlay based on region source and selection state.
+    /// Display color for the overlay based on region source and selection
+    /// state.
     ///
-    /// | Source          | Unselected | Selected |
-    /// |-----------------|------------|----------|
-    /// | Manual          | .systemRed | .systemBlue |
-    /// | Detected PII    | .systemOrange | .systemBlue |
-    /// | Detected Face   | .systemPurple | .systemBlue |
+    /// UXC-30 (RB-23) — this table used to omit `.searchMatch`. At tip,
+    /// the one-tap Scan flow applies through the search path, so every
+    /// Scan-applied AND Search-applied region renders `.searchMatch`
+    /// green; `.detectedPII` orange / `.detectedFace` purple are
+    /// reachable only through the vestigial auto-apply pipeline path.
+    /// The render contract the dominant flow actually shows is
+    /// therefore a two-color reality — green (applied) / blue
+    /// (selected) — plus manual red; selection always wins
+    /// (`.systemBlue`) regardless of source.
+    ///
+    /// | Source          | Unselected     | Selected |
+    /// |-----------------|----------------|------------|
+    /// | Manual          | .systemRed     | .systemBlue |
+    /// | Detected PII    | .systemOrange  | .systemBlue |
+    /// | Detected Face   | .systemPurple  | .systemBlue |
+    /// | Search Match    | .systemGreen   | .systemBlue |
+    ///
+    /// This color carries no per-tap ORIGIN (which detector/mechanism
+    /// produced the region) — that lives on the canvas badge
+    /// (`RedactionOverlayView.drawRegionBadge`) and the context-menu
+    /// info title instead. The green→blue tint residue on select (a
+    /// separate rendering-layer gap, not in this function) is a known,
+    /// deferred issue — RW-F-007/PB-139 — not addressed here.
     func displayColor(isSelected: Bool) -> UIColor {
         if isSelected { return .systemBlue }
         switch source {

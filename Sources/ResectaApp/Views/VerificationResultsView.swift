@@ -61,6 +61,10 @@ struct VerificationResultsView: View {
     @Environment(DocumentState.self) private var documentState
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    // UXC-33 (RB-24, partial revival of DC-023): needed to route the
+    // page-modes / layer-detail `.move(edge:)` transitions through
+    // `Anim.resolvedTransition`.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var expandedLayer: Int?
     @State private var detailsExpanded = false
@@ -757,7 +761,12 @@ struct VerificationResultsView: View {
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.sm)
                 .padding(.bottom, ResectaTokens.Spacing.sm)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                // UXC-33 (RB-24, partial revival of DC-023): routed
+                // through the resolver so Reduce Motion swaps the slide
+                // for an opacity-only crossfade.
+                .transition(ResectaTokens.Anim.resolvedTransition(
+                    standard: .opacity.combined(with: .move(edge: .top)),
+                    reduceMotion: reduceMotion))
             }
         }
         .background(.regularMaterial, in: RoundedRectangle(
@@ -1160,7 +1169,12 @@ struct VerificationResultsView: View {
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.sm)
                 .padding(.bottom, ResectaTokens.Spacing.sm)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                // UXC-33 (RB-24, partial revival of DC-023): routed
+                // through the resolver so Reduce Motion swaps the slide
+                // for an opacity-only crossfade.
+                .transition(ResectaTokens.Anim.resolvedTransition(
+                    standard: .opacity.combined(with: .move(edge: .top)),
+                    reduceMotion: reduceMotion))
             }
         }
         .background(.regularMaterial, in: RoundedRectangle(

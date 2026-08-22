@@ -54,6 +54,32 @@ struct RedactionRegionDisplayTests {
         #expect(region.displayColor(isSelected: false) == .systemPurple)
     }
 
+    // UXC-30 (RB-23): the prior per-source tests above never covered
+    // `.searchMatch` — the dominant flow's own color, reached by every
+    // Scan-applied AND Search-applied region. Full 4-source ×
+    // selected/unselected table pin so the render contract stays frozen
+    // exactly as shipped, `.searchMatch` included.
+    @Test("displayColor — full 4-source x selection-state render contract",
+          arguments: [
+            (RedactionRegion.Source.manual, false, UIColor.systemRed),
+            (RedactionRegion.Source.manual, true, UIColor.systemBlue),
+            (RedactionRegion.Source.detectedPII(kind: .ssn), false, UIColor.systemOrange),
+            (RedactionRegion.Source.detectedPII(kind: .ssn), true, UIColor.systemBlue),
+            (RedactionRegion.Source.detectedFace, false, UIColor.systemPurple),
+            (RedactionRegion.Source.detectedFace, true, UIColor.systemBlue),
+            (RedactionRegion.Source.searchMatch(term: "example"), false, UIColor.systemGreen),
+            (RedactionRegion.Source.searchMatch(term: "example"), true, UIColor.systemBlue),
+          ])
+    func displayColorFullRenderContractTable(
+        source: RedactionRegion.Source, isSelected: Bool, expected: UIColor
+    ) {
+        let region = RedactionRegion(
+            id: UUID(),
+            normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.3),
+            source: source)
+        #expect(region.displayColor(isSelected: isSelected) == expected)
+    }
+
     // MARK: - PII Kind Accessibility Names (UI_UX §9.2)
 
     @Test("PIIKind accessibilityName is correct",

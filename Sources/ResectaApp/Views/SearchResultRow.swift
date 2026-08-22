@@ -101,7 +101,8 @@ struct SearchResultRow: View {
                     SearchRowSourceBadge(
                         result: result,
                         isCustomHit: isCustomHit,
-                        isRegexHit: isRegexHit
+                        isRegexHit: isRegexHit,
+                        tier: tier
                     )
                     .equatable()
                 },
@@ -207,22 +208,36 @@ struct SearchResultRow: View {
     /// (SA-1 — the row build precomputes the flags once and calls the
     /// canonical form directly).
     @ViewBuilder
-    static func badgeView(for result: SearchResult, searchMode: SearchModeType) -> some View {
+    static func badgeView(
+        for result: SearchResult,
+        searchMode: SearchModeType,
+        ocrFloor: Float = 0.0
+    ) -> some View {
+        let isCustomHit = Self.isCustomTermHit(result)
         badgeView(
             for: result,
-            isCustomHit: Self.isCustomTermHit(result),
-            isRegexHit: Self.isRegexHit(result, searchMode: searchMode)
+            isCustomHit: isCustomHit,
+            isRegexHit: Self.isRegexHit(result, searchMode: searchMode),
+            tier: Self.confidenceTier(
+                for: result,
+                ocrFloor: Double(ocrFloor),
+                isCustomHit: isCustomHit
+            )
         )
     }
 
     /// Canonical badge renderer over precomputed signal flags. The
     /// flags fully determine the branch together with `result` itself
-    /// (`searchMode` participates only through `isRegexHit`).
+    /// (`searchMode` participates only through `isRegexHit`). `tier` is
+    /// the row's already-computed floor-relative tier (UXC-22) — only
+    /// the OCR leg of the standard source-badge branch reads it, for the
+    /// capsule's accessibility label.
     @ViewBuilder
     static func badgeView(
         for result: SearchResult,
         isCustomHit: Bool,
-        isRegexHit: Bool
+        isRegexHit: Bool,
+        tier: ConfidenceTier
     ) -> some View {
         if isCustomHit {
             // User-defined always-flag term hit.
@@ -257,14 +272,20 @@ struct SearchResultRow: View {
                     .padding(.vertical, 2)
                     .background(Color(uiColor: .systemGreen), in: Capsule())
             case .ocr(let confidence):
-                // Percent-bearing capsule replaces the flat "OCR" label.
+                // The capsule itself renders the flat "OCR" label — see
+                // `ocrCapsuleLabel` (UXC-35 rider: this comment used to
+                // claim the capsule was "percent-bearing", which was
+                // already false — it always rendered flat "OCR"). The
+                // confidence tier descriptor (UXC-22) surfaces via the
+                // accessibility label below and via color on the
+                // leading-edge confidence bar, not via capsule text.
                 Text(Self.ocrCapsuleLabel(confidence: confidence))
                     .font(.caption2.bold())
                     .foregroundStyle(.white)
                     .padding(.horizontal, ResectaTokens.Spacing.xs)
                     .padding(.vertical, 2)
                     .background(Color(uiColor: .systemTeal), in: Capsule())
-                    .accessibilityLabel("OCR, \(Int(confidence * 100))% confidence")
+                    .accessibilityLabel(Self.ocrCapsuleAccessibilityLabel(tier: tier))
             }
         }
     }
@@ -304,9 +325,9 @@ struct SearchResultRow: View {
         for result: SearchResult,
         category: PIICategory
     ) -> String {
-        let conf = Int((result.piiConfidence ?? 0) * 100)
+        let piiConf = result.piiConfidence ?? 0
         let source = result.source == .textLayer ? "" : ", OCR source"
-        return "\(category.rawValue), \(conf)% confidence\(source)"
+        return "\(category.rawValue), \(absoluteConfidenceTier(piiConf).descriptor)\(source)"
     }
 
     static func isCustomTermHit(_ result: SearchResult) -> Bool {
@@ -385,7 +406,12 @@ extension SearchResultRow {
     /// Three-tier classification driving the confidence-bar color.
     /// Reuses existing `ResectaTokens.SemanticColor.confidenceHigh/Medium/Low` —
     /// no new tokens introduced.
-    enum ConfidenceTier: Equatable {
+    /// `nonisolated`: under the SE-0466 MainActor-default flip this pure
+    /// value type (no MainActor state) would otherwise become
+    /// MainActor-isolated, which breaks `RegionMetadata`'s nonisolated
+    /// init (UXC-22) reading `.descriptor` off `absoluteConfidenceTier`'s
+    /// result. Mirrors `ResectaTokens.SemanticColor`'s same-rationale pin.
+    nonisolated enum ConfidenceTier: Equatable {
         case high
         case medium
         case low
@@ -395,6 +421,32 @@ extension SearchResultRow {
             case .high: return ResectaTokens.SemanticColor.confidenceHigh
             case .medium: return ResectaTokens.SemanticColor.confidenceMedium
             case .low: return ResectaTokens.SemanticColor.confidenceLow
+            }
+        }
+
+        /// UXC-22 (RB-44 / RC-1 leg a) — qualitative descriptor replacing
+        /// the retired "N% confidence" copy. Lowercase, for mid-sentence /
+        /// spoken use (e.g. "Social Security Number, high confidence").
+        /// Thresholds live ONLY on `absoluteConfidenceTier` /
+        /// `confidenceTier(for:ocrFloor:)` — this is a pure label over an
+        /// already-computed tier, never a second threshold source.
+        var descriptor: String {
+            switch self {
+            case .high: return "high confidence"
+            case .medium: return "medium confidence"
+            case .low: return "low confidence"
+            }
+        }
+
+        /// UXC-22 — sentence-position form: first letter capitalized, for
+        /// a standalone visible line (e.g. detection-row secondary text)
+        /// or a sentence-final accessibility clause (e.g. "Page 2. High
+        /// confidence.").
+        var descriptorLabel: String {
+            switch self {
+            case .high: return "High confidence"
+            case .medium: return "Medium confidence"
+            case .low: return "Low confidence"
             }
         }
     }
@@ -408,7 +460,11 @@ extension SearchResultRow {
     /// the same tiers the detection review rows use, so one confidence
     /// grammar covers both origins of the unified surface. ≥ 0.9 high,
     /// ≥ 0.7 medium, else low.
-    static func absoluteConfidenceTier(_ confidence: Double) -> ConfidenceTier {
+    /// `nonisolated`: under the SE-0466 MainActor-default flip this pure
+    /// function would otherwise become MainActor-isolated, which breaks
+    /// `RegionMetadata`'s nonisolated init (UXC-22), the one other
+    /// non-View call site.
+    nonisolated static func absoluteConfidenceTier(_ confidence: Double) -> ConfidenceTier {
         if confidence >= 0.9 { return .high }
         if confidence >= 0.7 { return .medium }
         return .low
@@ -487,6 +543,14 @@ extension SearchResultRow {
     /// via the badge's accessibility label.
     static func ocrCapsuleLabel(confidence: Float) -> String {
         "OCR"
+    }
+
+    /// UXC-22 — OCR source-badge accessibility label. Takes the row's
+    /// already-computed floor-relative `tier` (not a raw confidence) so
+    /// the spoken label matches what the leading-edge confidence bar
+    /// shows, and so no percent threshold is duplicated here.
+    static func ocrCapsuleAccessibilityLabel(tier: ConfidenceTier) -> String {
+        "OCR, \(tier.descriptor)"
     }
 }
 
@@ -623,12 +687,17 @@ struct SearchRowSourceBadge: View, Equatable {
     let result: SearchResult
     let isCustomHit: Bool
     let isRegexHit: Bool
+    /// The row's already-computed floor-relative tier (UXC-22) — an
+    /// Equatable value type, so `.equatable()` at the call site keeps
+    /// working off value content only.
+    let tier: SearchResultRow.ConfidenceTier
 
     var body: some View {
         SearchResultRow.badgeView(
             for: result,
             isCustomHit: isCustomHit,
-            isRegexHit: isRegexHit
+            isRegexHit: isRegexHit,
+            tier: tier
         )
     }
 }

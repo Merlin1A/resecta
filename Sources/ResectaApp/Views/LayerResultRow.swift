@@ -5,6 +5,11 @@ import RedactionEngine
 // Shared between VerificationProgressView and VerificationResultsView.
 
 struct LayerResultRow: View {
+    // UXC-33 (RB-24, partial revival of DC-023): needed to route the
+    // detail-expansion `.move(edge:)` transition through
+    // `Anim.resolvedTransition`.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let layer: LayerResult
     let layerIndex: Int
     let isExpanded: Bool
@@ -99,7 +104,12 @@ struct LayerResultRow: View {
                 .padding(.horizontal, ResectaTokens.Spacing.sm)
                 .padding(.bottom, ResectaTokens.Spacing.sm)
                 .padding(.leading, 40) // Align with text, past 28pt icon + sm padding
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                // UXC-33 (RB-24, partial revival of DC-023): routed
+                // through the resolver so Reduce Motion swaps the slide
+                // for an opacity-only crossfade.
+                .transition(ResectaTokens.Anim.resolvedTransition(
+                    standard: .opacity.combined(with: .move(edge: .top)),
+                    reduceMotion: reduceMotion))
             }
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.toast))

@@ -30,9 +30,12 @@ struct ContentView: View {
                 RedactWorkspaceView(workspace: ws)
             }
         }
-        // Design Spec §8.2: Cross-dissolve on workspace switch
+        // Design Spec §8.2: Cross-dissolve on workspace switch.
+        // UXC-33 (RB-24): folded the hand-rolled reduceMotion ternary
+        // into `Anim.resolved` — the one canonical §A2.2 seam every
+        // other animation site already routes through.
         .animation(
-            reduceMotion ? .none : .easeInOut(duration: 0.25),
+            ResectaTokens.Anim.resolved(.easeInOut(duration: 0.25), reduceMotion: reduceMotion),
             value: appCoordinator.activeWorkspace.kind
         )
         .environment(toastManager) // §A4f: inject toast manager
@@ -46,10 +49,15 @@ struct ContentView: View {
             VStack(spacing: ResectaTokens.Spacing.sm) {
                 ForEach(toastManager.activeBottomToasts) { item in
                     ToastView(item: item, toastManager: toastManager)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .bottom).combined(with: .opacity),
-                            removal: .opacity
-                        ))
+                        // UXC-33 (RB-24, partial revival of DC-023):
+                        // routed through the resolver so Reduce Motion
+                        // swaps the slide for an opacity-only crossfade.
+                        .transition(ResectaTokens.Anim.resolvedTransition(
+                            standard: .asymmetric(
+                                insertion: .move(edge: .bottom).combined(with: .opacity),
+                                removal: .opacity
+                            ),
+                            reduceMotion: reduceMotion))
                         .onTapGesture { toastManager.dismiss(item) }
                 }
             }
@@ -66,10 +74,15 @@ struct ContentView: View {
             VStack(spacing: ResectaTokens.Spacing.sm) {
                 ForEach(toastManager.activeTopToasts) { item in
                     ToastView(item: item, toastManager: toastManager)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .top).combined(with: .opacity),
-                            removal: .opacity
-                        ))
+                        // UXC-33 (RB-24, partial revival of DC-023):
+                        // routed through the resolver so Reduce Motion
+                        // swaps the slide for an opacity-only crossfade.
+                        .transition(ResectaTokens.Anim.resolvedTransition(
+                            standard: .asymmetric(
+                                insertion: .move(edge: .top).combined(with: .opacity),
+                                removal: .opacity
+                            ),
+                            reduceMotion: reduceMotion))
                         .onTapGesture { toastManager.dismiss(item) }
                 }
             }

@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import SwiftUI
 @testable import ResectaApp
 
 // §A6 — ToastQueueManager lifecycle. Focused on coalescing, per-position
@@ -126,5 +127,49 @@ struct ToastQueueManagerTests {
                              severity: .error)
         #expect(mgr.displayDuration(for: short) >= 2.5)
         #expect(mgr.displayDuration(for: long) <= 10.0)
+    }
+
+    // MARK: - UXC-27 (GAP-36): severity tint routes through the text tier
+
+    @Test("ToastSeverity.tintColor maps each case to its text-tier token",
+          arguments: [
+            (ToastSeverity.info, ResectaTokens.SemanticColor.infoText),
+            (ToastSeverity.success, ResectaTokens.SemanticColor.passText),
+            (ToastSeverity.warning, ResectaTokens.SemanticColor.warnText),
+            (ToastSeverity.error, ResectaTokens.SemanticColor.failText),
+          ])
+    func tintColorRoutesThroughTextTier(severity: ToastSeverity, expected: Color) {
+        #expect(severity.tintColor == expected)
+    }
+
+    @Test("Source-contains pin: ToastSeverity.tintColor body references the four text-tier tokens")
+    func tintColorSourceReferencesTextTierTokens() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/State/ToastQueueManager.swift")
+        guard let propertyRange = source.range(of: "var tintColor: Color {"),
+              let closeRange = source.range(
+                of: "\n    }", range: propertyRange.upperBound..<source.endIndex)
+        else {
+            Issue.record("Could not locate ToastSeverity.tintColor body")
+            return
+        }
+        let body = source[propertyRange.upperBound..<closeRange.lowerBound]
+        for token in ["infoText", "passText", "warnText", "failText"] {
+            #expect(body.contains(token), "tintColor body missing reference to \(token)")
+        }
+    }
+
+    /// Mirrors `HonestySurfacesTests.loadRepoFile` — reads a repo-relative
+    /// source file from disk so the pin above scans real shipped source,
+    /// not a copy-pasted string.
+    private func loadRepoFile(
+        _ relativePath: String, from file: StaticString = #filePath
+    ) throws -> String {
+        let repoRoot = URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+        return try String(
+            contentsOf: repoRoot.appendingPathComponent(relativePath),
+            encoding: .utf8)
     }
 }

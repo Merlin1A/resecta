@@ -65,12 +65,16 @@ struct VerificationProgressView: View {
                             useIntermediateColors: true,
                             isExpandable: false
                         )
-                        .transition(reduceMotion
-                                    ? .opacity
-                                    : .asymmetric(
-                                        insertion: .move(edge: .bottom).combined(with: .opacity),
-                                        removal: .opacity
-                                    ))
+                        // UXC-33 (RB-24, partial revival of DC-023):
+                        // folded the hand-rolled reduceMotion ternary
+                        // into the resolver — identical behavior, one
+                        // canonical seam.
+                        .transition(ResectaTokens.Anim.resolvedTransition(
+                            standard: .asymmetric(
+                                insertion: .move(edge: .bottom).combined(with: .opacity),
+                                removal: .opacity
+                            ),
+                            reduceMotion: reduceMotion))
                         .accessibilityIdentifier("layerResult_\(index)")
                         .frame(maxWidth: columnMaxWidth)
                     }

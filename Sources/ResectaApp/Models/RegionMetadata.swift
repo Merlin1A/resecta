@@ -47,8 +47,12 @@ nonisolated struct RegionMetadata: Sendable {
 
         self.badgeLabel = Self.computeKindLabel(piiKind)
 
-        let conf = Int(min(max(confidence, 0.0), 1.0) * 100)
-        self.accessibilityDescription = "\(Self.computeFullDescription(piiKind)), \(conf)% confidence"
+        // UXC-22 (RB-44) — qualitative descriptor replaces the raw
+        // percent. `SearchResultRow.absoluteConfidenceTier` is the one
+        // threshold source (same-target reference; acceptable — the
+        // thresholds themselves must not be duplicated here).
+        let descriptor = SearchResultRow.absoluteConfidenceTier(confidence).descriptor
+        self.accessibilityDescription = "\(Self.computeFullDescription(piiKind)), \(descriptor)"
     }
 
     private static func computeKindLabel(_ kind: DetectionResult.Kind) -> String {
