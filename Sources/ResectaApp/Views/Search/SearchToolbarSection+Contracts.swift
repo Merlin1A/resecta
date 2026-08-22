@@ -203,4 +203,20 @@ extension SearchToolbarSection {
         guard let error else { return false }
         return !error.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
+
+    // MARK: - H-13 rider Pure-Function Contract
+
+    /// H-13 rider — the six Search option chips (via `optionChip`),
+    /// Scan's "Include OCR Pages" toggle, and the multi-term conjunction
+    /// toggle all disable while a search/scan run is in flight, so a
+    /// mid-run tap can't restage options a running query has already
+    /// consumed. Trivial today (`isSearching` IS the disabled state) —
+    /// named so the three call sites read as one contract and so a
+    /// future second condition has one place to land. The BH-B-04
+    /// `optionBinding` / `optionChangeShouldRetrigger` re-run path is
+    /// untouched — this only gates whether the control can be tapped at
+    /// all. Pinned by `SearchToolbarSectionTests`.
+    static func optionControlsDisabled(isSearching: Bool) -> Bool {
+        isSearching
+    }
 }

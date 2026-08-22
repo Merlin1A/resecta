@@ -1,14 +1,30 @@
 import SwiftUI
 
-// Dismissal helpers for the search sheet's one-tap Dismiss.
+// Dismissal helpers for the search sheet's Dismiss control.
 //
-// Behavior: tapping `Dismiss` with `searchState.selectedCount > 0`
-// deselects every selected result in-place and dismisses the sheet in
-// the same tap — silently. The selection only feeds Apply, and
-// re-running the search restores it, so nothing irreversible is
-// dropped. The prior two-tap flow (deselect + non-modal undo toast,
-// then a second Done tap to dismiss) and its
-// `enqueueDiscardUndoToast` / `restoreSelection` helpers are gone.
+// UXC-35 — the live contract has TWO branches, both landing on the
+// shared `performDismiss(afterConfirmation:)` (SearchAndRedactSheet.swift)
+// that this file's `currentSelectionSnapshot` / `clearSelection` helpers
+// underpin:
+//
+// - Silent route: when `searchState.requiresDismissConfirmation` is
+//   false, tapping `Dismiss` deselects every selected result in-place
+//   and dismisses the sheet in the same tap. The selection only feeds
+//   Apply, and re-running the search restores it, so nothing
+//   irreversible is dropped — no confirmation is needed.
+// - Confirm-if-touched route: when `requiresDismissConfirmation` is
+//   true — the user modified selections this session
+//   (`userModifiedSelections`), OR (UXC-39) the session carries an
+//   auto-selected set from the magic-wand preselect flow that has never
+//   been reviewed (`hasUnreviewedPreselection`) — Dismiss instead raises
+//   the "Discard selections?" `.confirmationDialog`
+//   (`SearchAndRedactSheet.dismissTitle` / `.dismissMessage`); only a
+//   confirmed tap calls through with `afterConfirmation: true`.
+//
+// The prior two-tap flow (deselect + non-modal undo toast, then a
+// second Done tap to dismiss) and its `enqueueDiscardUndoToast` /
+// `restoreSelection` helpers are gone — superseded by the two branches
+// above.
 //
 // `discardUndoActionLabel` stays: the mode-switch undo toast
 // (`+ModeSwitch.swift`) shares it.

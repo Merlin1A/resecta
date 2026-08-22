@@ -189,6 +189,8 @@ struct SearchToolbarSection: View {
                     ))
                         .toggleStyle(.button)
                         .controlSize(.small)
+                        // H-13 rider — disable while a run is in flight.
+                        .disabled(Self.optionControlsDisabled(isSearching: searchState.isSearching))
                         .accessibilityLabel("All terms must match")
                         .accessibilityHint("When enabled, results come only from pages where every term has a match")
                     Spacer()
@@ -320,6 +322,9 @@ struct SearchToolbarSection: View {
         return FilterChip(label: label, isSelected: binding.wrappedValue) {
             binding.wrappedValue.toggle()
         }
+        // H-13 rider — disable while a run is in flight (all six chips
+        // via this shared builder).
+        .disabled(Self.optionControlsDisabled(isSearching: searchState.isSearching))
         .accessibilityLabel(a11yLabel)
         .accessibilityValue(binding.wrappedValue ? "on" : "off")
         .accessibilityHint(a11yHint ?? "")
@@ -340,9 +345,11 @@ struct SearchToolbarSection: View {
         return HStack(spacing: 4) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
+            // GAP-41 — small error TEXT routes through the measured
+            // text tier; the glyph above stays on the system-color tier.
             Text(error ?? "")
                 .font(.caption)
-                .foregroundStyle(.red)
+                .foregroundStyle(ResectaTokens.SemanticColor.failText)
                 .lineLimit(1)
             Spacer()
         }
@@ -415,6 +422,8 @@ struct SearchToolbarSection: View {
                     Toggle("Include OCR Pages", isOn: $searchState.options.includeOCR)
                         .toggleStyle(.button)
                         .controlSize(.small)
+                        // H-13 rider — disable while a run is in flight.
+                        .disabled(Self.optionControlsDisabled(isSearching: searchState.isSearching))
                         .accessibilityLabel("Include scanned page text")
                     Spacer()
                 }

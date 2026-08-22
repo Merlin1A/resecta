@@ -21,12 +21,16 @@ enum ToastSeverity: Equatable {
         }
     }
 
+    // UXC-27 (GAP-36) — routed through the WCAG-AA text tier: ToastView
+    // applies this to the action-button TEXT, the severity glyph, and a
+    // 10%-opacity background fill. The text use is what mandates the
+    // text tier; the glyph/fill ride along on the same value.
     var tintColor: Color {
         switch self {
-        case .info: .blue
-        case .success: .green
-        case .warning: .orange
-        case .error: .red
+        case .info: ResectaTokens.SemanticColor.infoText
+        case .success: ResectaTokens.SemanticColor.passText
+        case .warning: ResectaTokens.SemanticColor.warnText
+        case .error: ResectaTokens.SemanticColor.failText
         }
     }
 

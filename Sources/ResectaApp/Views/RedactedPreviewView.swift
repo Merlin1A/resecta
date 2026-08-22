@@ -86,7 +86,12 @@ struct RedactedPreviewView: View {
 
     @ViewBuilder
     private func verdictCapsule(text: String) -> some View {
-        let tint = verdict?.color ?? .secondary
+        // UXC-27 (GAP-36) — this is small `.caption` TEXT (plus its 12%
+        // wash background riding the same variable, mirroring
+        // ToastSeverity's text/fill pairing), not a glyph — routed
+        // through the WCAG-AA text tier rather than `.color`'s system
+        // hues.
+        let tint = verdict?.textColor ?? .secondary
         Text(text)
             .font(.caption.weight(.medium))
             .foregroundStyle(tint)

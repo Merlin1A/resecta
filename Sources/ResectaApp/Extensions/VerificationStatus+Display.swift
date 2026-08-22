@@ -45,6 +45,24 @@ extension VerificationStatus {
         }
     }
 
+    /// UXC-27 (GAP-36) — WCAG-AA text tier for SMALL STATUS TEXT. `color`
+    /// / `intermediateColor` above stay the GLYPH tier (system hues,
+    /// which measure too low a contrast for small text in some
+    /// combinations); this routes through the measured
+    /// `ResectaTokens.SemanticColor.*Text` shades instead. `.skipped`
+    /// has no dedicated text-tier shade — `.secondary` already clears
+    /// AA for small text at every size.
+    var textColor: Color {
+        switch self {
+        case .pass:      ResectaTokens.SemanticColor.passText
+        case .warn:      ResectaTokens.SemanticColor.warnText
+        case .info:      ResectaTokens.SemanticColor.infoText
+        case .attention: ResectaTokens.SemanticColor.attentionText
+        case .fail:      ResectaTokens.SemanticColor.failText
+        case .skipped:   .secondary
+        }
+    }
+
     // MARK: - Titles (UI_UX §4.1 — mechanism-description language, R1)
 
     var title: String {

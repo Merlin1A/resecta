@@ -267,7 +267,13 @@ struct DocumentEditorView: View {
                                     documentState.pausedFromPhase = nil
                                 }
                             )
-                            .transition(.move(edge: .top).combined(with: .opacity))
+                            // UXC-33 (RB-24, partial revival of DC-023):
+                            // routed through the resolver so Reduce
+                            // Motion swaps the slide for an opacity-only
+                            // crossfade.
+                            .transition(ResectaTokens.Anim.resolvedTransition(
+                                standard: .move(edge: .top).combined(with: .opacity),
+                                reduceMotion: reduceMotion))
                             .padding(.top, ResectaTokens.Spacing.toolbarClearance)
                             .onAppear {
                                 dismissBannerTask?.cancel()
@@ -302,7 +308,13 @@ struct DocumentEditorView: View {
                                     documentState.annotationNoticeDismissed = true
                                 }
                             }
-                            .transition(.move(edge: .top).combined(with: .opacity))
+                            // UXC-33 (RB-24, partial revival of DC-023):
+                            // routed through the resolver so Reduce
+                            // Motion swaps the slide for an opacity-only
+                            // crossfade.
+                            .transition(ResectaTokens.Anim.resolvedTransition(
+                                standard: .move(edge: .top).combined(with: .opacity),
+                                reduceMotion: reduceMotion))
                             .padding(.top, ResectaTokens.Spacing.toolbarClearance)
                         }
                     }
@@ -366,12 +378,15 @@ struct DocumentEditorView: View {
 
             case .verifying:
                 // D6: Full-screen replacement — verification is a distinct workflow phase
+                // UXC-33 (RB-24, partial revival of DC-023): folded the
+                // hand-rolled reduceMotion ternary into the resolver —
+                // identical behavior, one canonical seam.
                 VerificationProgressView()
-                    .transition(reduceMotion
-                        ? .opacity
-                        : .asymmetric(
+                    .transition(ResectaTokens.Anim.resolvedTransition(
+                        standard: .asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .opacity))
+                            removal: .opacity),
+                        reduceMotion: reduceMotion))
 
             case .verified(let report):
                 VerificationResultsView(
@@ -747,13 +762,26 @@ struct DocumentEditorView: View {
             }
         }
         // §A3: Phase-switched toolbar
+        // UXC-32 (GAP-45): the neutral group tint (routine actions
+        // render via the primary/foreground tone) is applied INSIDE
+        // each item-list computed property below, not chained onto the
+        // `ToolbarItemGroup(...)` here — chaining an extra modifier
+        // directly inside this result-builder closure pushed the
+        // compiler's whole-expression type-check over its time budget
+        // (`DocumentEditorView.swift` is already a large `body`).
+        // Isolating the tint inside each already-separate `@ViewBuilder`
+        // property keeps this closure's own shape unchanged.
         .toolbar {
             // Leading items
             ToolbarItemGroup(placement: .topBarLeading) {
                 leadingToolbarItems
             }
 
-            // Trailing items
+            // Trailing items. The Redact button is the ONE designated
+            // emphasis action and carries its own explicit brand tint
+            // (see `trailingToolbarItems`); `.tint(.red)` (delete) and
+            // the multi-select toggle's active-teal-or-nil pairing are
+            // untouched per-element overrides.
             ToolbarItemGroup(placement: .topBarTrailing) {
                 trailingToolbarItems
             }
@@ -762,12 +790,7 @@ struct DocumentEditorView: View {
             // Phase 4A: undo/redo moved to trailing toolbar for visibility
             if documentState.phaseKind == .editing, horizontalSizeClass == .compact {
                 ToolbarItemGroup(placement: .secondaryAction) {
-                    selectionMenu
-                    selectMoreToggle
-                    deleteButton
-                    batchOpsMenu
-                    pipelineModePicker
-                    openDocumentButton
+                    secondaryActionToolbarItems
                 }
             }
         }
@@ -777,8 +800,15 @@ struct DocumentEditorView: View {
 
     // MARK: - Toolbar Leading Items (§A3)
 
+    /// UXC-32 (GAP-45): routine actions render neutral — the group's
+    /// ambient tint is `.primary`, applied here (inside the property,
+    /// not at the `.toolbar {}` call site — see the comment above). Per-
+    /// element overrides (the draw tools' `.tint(active ? BrandTeal.tint
+    /// : nil)`) still win: `nil` now inherits this neutral instead of
+    /// the root's brand teal, so only the ACTIVE tool stays teal.
     @ViewBuilder
     private var leadingToolbarItems: some View {
+        Group {
         switch documentState.phaseKind {
         case .editing:
             // Drawing tools.
@@ -886,12 +916,17 @@ struct DocumentEditorView: View {
         default:
             EmptyView()
         }
+        }
+        .tint(.primary)
     }
 
     // MARK: - Toolbar Trailing Items (§A3)
 
+    /// UXC-32 (GAP-45): same neutral-group rule as `leadingToolbarItems`
+    /// above.
     @ViewBuilder
     private var trailingToolbarItems: some View {
+        Group {
         switch documentState.phaseKind {
         case .editing:
             // Phase 4A: Undo/redo always visible (both iPhone and iPad)
@@ -906,10 +941,13 @@ struct DocumentEditorView: View {
                 pipelineModePicker
             }
 
-            // Redact button — always visible
+            // Redact button — always visible. UXC-32 (GAP-45): the ONE
+            // designated emphasis action in this toolbar — explicit
+            // brand tint so it stands out against the neutral group.
             Button("Redact", systemImage: "scissors") {
                 coordinator.runFullPipeline(documentOverride: documentOverride)
             }
+            .tint(ResectaTokens.BrandTeal.tint)
             // Pkg D / STATE-3: gate on the full pipeline-start predicate
             // (phase + triage + active task) in addition to the existing
             // effective-regions check. `keyboardShortcut` on a Button
@@ -948,6 +986,8 @@ struct DocumentEditorView: View {
             // during the 150ms debounce window.
             settingsButton
         }
+        }
+        .tint(.primary)
     }
 
     @ViewBuilder
@@ -956,6 +996,23 @@ struct DocumentEditorView: View {
             showSettings = true
         }
         .accessibilityIdentifier("settings-button")
+    }
+
+    /// UXC-32 (GAP-45): iPhone overflow menu — same neutral-group rule.
+    /// Extracted to its own property (mirrors `leadingToolbarItems` /
+    /// `trailingToolbarItems`) so the tint is isolated from the
+    /// `.toolbar {}` result-builder closure.
+    @ViewBuilder
+    private var secondaryActionToolbarItems: some View {
+        Group {
+            selectionMenu
+            selectMoreToggle
+            deleteButton
+            batchOpsMenu
+            pipelineModePicker
+            openDocumentButton
+        }
+        .tint(.primary)
     }
 
     // MARK: - Toolbar Components
@@ -1915,7 +1972,12 @@ struct DocumentEditorView: View {
                         withAnimation { detectionBanner = nil }
                     }
                 )
-                .transition(.move(edge: .top).combined(with: .opacity))
+                // UXC-33 (RB-24, partial revival of DC-023): routed
+                // through the resolver so Reduce Motion swaps the slide
+                // for an opacity-only crossfade.
+                .transition(ResectaTokens.Anim.resolvedTransition(
+                    standard: .move(edge: .top).combined(with: .opacity),
+                    reduceMotion: reduceMotion))
                 .padding(.top, ResectaTokens.Spacing.toolbarClearance)
             }
         }
@@ -2272,7 +2334,13 @@ private struct DetectionSummaryBanner: View {
             Image(systemName: model.isWarning
                 ? "exclamationmark.triangle.fill"
                 : "doc.viewfinder")
-                .foregroundStyle(.orange)
+                // UXC-26 (GAP-35) — the glyph tint now gates on the same
+                // `isWarning` flag the symbol itself switches on: neutral
+                // for routine outcomes (an unearned-alarm budget), warn
+                // tint only when there is actually something to flag.
+                .foregroundStyle(model.isWarning
+                    ? ResectaTokens.SemanticColor.warningTint
+                    : Color.secondary)
                 .accessibilityHidden(true)
             Text(model.message)
                 .font(.subheadline)

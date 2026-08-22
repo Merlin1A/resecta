@@ -75,7 +75,9 @@ struct FindingRowFamilyTests {
         #expect(model.id == det.id)
         #expect(model.title == "123-45-6789")
         #expect(model.titleIsContent)
-        #expect(model.secondaryText == "97% confidence")
+        // UXC-22 — qualitative descriptor replaces "N% confidence".
+        // 0.97 clears the absolute high band (>= 0.9).
+        #expect(model.secondaryText == "High confidence")
         #expect(!model.secondaryIsContent)
     }
 
@@ -86,8 +88,9 @@ struct FindingRowFamilyTests {
             page: 0, detection: det, isSelected: false, isAmbiguousSurname: false
         )
         // F-7 deliberate asymmetry: the review context speaks content.
+        // UXC-22 — qualitative descriptor replaces "N% confidence".
         #expect(deselected.accessibilityDescription
-                == "Deselected. Social Security Number, 123-45-6789. Page 1. 97% confidence.")
+                == "Deselected. Social Security Number, 123-45-6789. Page 1. High confidence.")
         let selected = FindingRowModel(
             page: 0, detection: det, isSelected: true, isAmbiguousSurname: false
         )
@@ -113,10 +116,12 @@ struct FindingRowFamilyTests {
         )
         #expect(model.title == DetectionResult.Kind.face.fullName)
         #expect(!model.titleIsContent)
-        #expect(model.secondaryText == "80% confidence")
+        // UXC-22 — qualitative descriptor replaces "N% confidence".
+        // 0.8 sits in the absolute medium band (>= 0.7, < 0.9).
+        #expect(model.secondaryText == "Medium confidence")
         // No matched text → the a11y label has no content clause.
         #expect(model.accessibilityDescription
-                == "Deselected. \(DetectionResult.Kind.face.fullName). Page 2. 80% confidence.")
+                == "Deselected. \(DetectionResult.Kind.face.fullName). Page 2. Medium confidence.")
     }
 
     @Test("detection adapter — signature candidate and barcode render their kind names honestly")
@@ -128,7 +133,9 @@ struct FindingRowFamilyTests {
             )
             #expect(model.title == kind.fullName)
             #expect(!model.titleIsContent)
-            #expect(model.secondaryText == "66% confidence")
+            // UXC-22 — qualitative descriptor replaces "N% confidence".
+            // 0.66 is below the absolute medium floor (< 0.7).
+            #expect(model.secondaryText == "Low confidence")
         }
     }
 }

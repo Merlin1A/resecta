@@ -301,10 +301,12 @@ struct AddTermRow: View {
                     .accessibilityLabel("Add term to \(listName) list")
                 }
             }
+            // GAP-41 — small error text routes through the measured text
+            // tier (both branches below).
             if let error {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(ResectaTokens.SemanticColor.failText)
             } else if isAtCap {
                 Text("List is at the \(UserTermsStore.perListCap)-entry cap. Remove an item to add another.")
                     .font(.caption)
@@ -312,7 +314,7 @@ struct AddTermRow: View {
             } else if pattern.count > UserTermsStore.patternLengthCap {
                 Text("Pattern too long (max \(UserTermsStore.patternLengthCap) characters).")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(ResectaTokens.SemanticColor.failText)
             }
         }
     }

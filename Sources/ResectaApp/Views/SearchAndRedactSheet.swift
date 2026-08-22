@@ -658,10 +658,15 @@ struct SearchAndRedactSheet: View {
             VStack(spacing: ResectaTokens.Spacing.sm) {
                 ForEach(toastManager.activeBottomToasts) { item in
                     ToastView(item: item, toastManager: toastManager)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .bottom).combined(with: .opacity),
-                            removal: .opacity
-                        ))
+                        // UXC-33 (RB-24, partial revival of DC-023):
+                        // routed through the resolver so Reduce Motion
+                        // swaps the slide for an opacity-only crossfade.
+                        .transition(ResectaTokens.Anim.resolvedTransition(
+                            standard: .asymmetric(
+                                insertion: .move(edge: .bottom).combined(with: .opacity),
+                                removal: .opacity
+                            ),
+                            reduceMotion: reduceMotion))
                         .onTapGesture { toastManager.dismiss(item) }
                 }
             }

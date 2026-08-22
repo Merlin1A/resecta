@@ -145,4 +145,33 @@ struct SearchToolbarSectionTests {
         #expect(SearchToolbarSection.shortTermWarningShouldShow(
             queryCount: 2, isMultiTerm: true, hasRegexError: false) == false)
     }
+
+    // MARK: - H-13 rider — option controls disable mid-run
+
+    @Test("H-13 — option controls disable exactly while a run is in flight")
+    func h13OptionControlsDisabledDuringSearch() {
+        #expect(SearchToolbarSection.optionControlsDisabled(isSearching: true) == true)
+        #expect(SearchToolbarSection.optionControlsDisabled(isSearching: false) == false)
+    }
+
+    @Test("H-13 — source pin: optionChip, the Include OCR Pages toggle, and the multi-term conjunction toggle all route through optionControlsDisabled")
+    func h13SourceSitesRouteThroughContract() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/Views/Search/SearchToolbarSection.swift")
+        let occurrences = source.components(separatedBy: "optionControlsDisabled(isSearching:").count - 1
+        #expect(occurrences == 3,
+                "expected 3 call sites (optionChip, Include OCR Pages toggle, multi-term conjunction toggle); found \(occurrences)")
+    }
+
+    /// Mirrors `HonestySurfacesTests.loadRepoFile`.
+    private func loadRepoFile(
+        _ relativePath: String, from file: StaticString = #filePath
+    ) throws -> String {
+        let repoRoot = URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+        return try String(
+            contentsOf: repoRoot.appendingPathComponent(relativePath),
+            encoding: .utf8)
+    }
 }

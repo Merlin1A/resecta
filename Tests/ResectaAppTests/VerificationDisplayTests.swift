@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 import SwiftUI
 import UIKit
 @testable import ResectaApp
@@ -57,6 +58,52 @@ struct VerificationDisplayTests {
           ])
     func intermediateColorNonPassMatchesColor(status: VerificationStatus, expected: Color) {
         #expect(status.intermediateColor == expected)
+    }
+
+    // MARK: - Text tier reachability (UXC-27 / GAP-36)
+
+    // `color` / `intermediateColor` above stay the GLYPH tier; `textColor`
+    // is the SMALL-TEXT tier every non-glyph consumer routes through
+    // instead (VerificationResultsView's verdict capsule via
+    // RedactedPreviewView, ToastSeverity's mirrored mapping, etc.).
+    @Test("textColor routes each status through the measured text tier",
+          arguments: [
+            (VerificationStatus.pass, ResectaTokens.SemanticColor.passText),
+            (VerificationStatus.warn("w"), ResectaTokens.SemanticColor.warnText),
+            (VerificationStatus.info("i"), ResectaTokens.SemanticColor.infoText),
+            (VerificationStatus.attention("a"), ResectaTokens.SemanticColor.attentionText),
+            (VerificationStatus.fail("f"), ResectaTokens.SemanticColor.failText),
+            (VerificationStatus.skipped, Color.secondary),
+          ])
+    func textColorForAllCases(status: VerificationStatus, expected: Color) {
+        #expect(status.textColor == expected)
+    }
+
+    // MARK: - UXC-27 consumer sweep: RedactedPreviewView's verdict capsule
+
+    // Found via an exhaustive grep of every `VerificationStatus`-typed
+    // `.color` consumer (not just the three named glyph sites) — the
+    // preview's verdict capsule is small `.caption` TEXT, so it was
+    // missed by name-based searches keyed on "status"/"Status".
+    @Test("Source pin: RedactedPreviewView's verdict capsule routes through .textColor, not .color")
+    func redactedPreviewVerdictCapsuleUsesTextColor() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/Views/RedactedPreviewView.swift")
+        #expect(source.contains("verdict?.textColor"),
+                "the verdict capsule's small-text tint must read .textColor")
+        #expect(!source.contains("verdict?.color"),
+                "the verdict capsule must not fall back to the glyph-tier .color")
+    }
+
+    private func loadRepoFile(
+        _ relativePath: String, from file: StaticString = #filePath
+    ) throws -> String {
+        let repoRoot = URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+        return try String(
+            contentsOf: repoRoot.appendingPathComponent(relativePath),
+            encoding: .utf8)
     }
 
     // MARK: - Titles (mechanism-description language, ARCH §1.3)
@@ -149,6 +196,9 @@ struct VerificationDisplayTests {
              0x7A6100, 0xFFD60A),
             ("failText", ResectaTokens.SemanticColor.failText, 0xC2262E, 0xFF7A72),
             ("infoText", ResectaTokens.SemanticColor.infoText, 0x1D5EBF, 0x6CB4EE),
+            // UXC-27 (GAP-36) — pink-family text tier for .attention,
+            // added alongside the five pre-existing tokens above.
+            ("attentionText", ResectaTokens.SemanticColor.attentionText, 0xD40028, 0xFF6E8B),
           ])
     func textTierTokenMatchesSpecHex(name: String, token: Color, lightHex: Int, darkHex: Int) {
         for (style, hex) in [(UIUserInterfaceStyle.light, lightHex),

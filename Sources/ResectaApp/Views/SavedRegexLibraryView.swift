@@ -148,9 +148,11 @@ struct SavedRegexLibraryView: View {
                 }
 
                 if let addError {
+                    // GAP-41 — small error text routes through the
+                    // measured text tier.
                     Text(addError)
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(ResectaTokens.SemanticColor.failText)
                 } else if savedRegexStore.userSavedRegexes.count >= SavedRegexStore.userSavedCap {
                     Text("User-saved list is at the \(SavedRegexStore.userSavedCap)-entry cap. Remove an item to add another.")
                         .font(.caption)
