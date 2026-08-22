@@ -76,6 +76,22 @@ struct VerificationResultsView: View {
                     if !runFactsLines.isEmpty {
                         runFactsStrip
                     }
+                    // UXC-15 (RB-43): on PASS, the honesty disclaimer + the
+                    // non-visual limit line mount here — directly beneath
+                    // the masthead/facts strip, before the action choices
+                    // — instead of at the bottom. Every other verdict
+                    // keeps the original bottom mount below.
+                    // `shouldMountLimitBlockBeneathMasthead` is exhaustive
+                    // over `VerificationStatus`, so exactly one of the two
+                    // mount sites fires per verdict.
+                    if Self.shouldMountLimitBlockBeneathMasthead(
+                        overallStatus: report.overallStatus) {
+                        if Self.shouldShowHonestyDisclaimer(
+                            overallStatus: report.overallStatus) {
+                            honestyDisclaimer
+                        }
+                        voiceOverLimitLine
+                    }
                     actionChoiceStack
                     if Self.shouldShowRunBreakdown(report: report) {
                         detailsSection
@@ -84,10 +100,13 @@ struct VerificationResultsView: View {
                     if Self.shouldShowRunBreakdown(report: report) {
                         footer
                     }
-                    voiceOverLimitLine
-                    if Self.shouldShowHonestyDisclaimer(
+                    if !Self.shouldMountLimitBlockBeneathMasthead(
                         overallStatus: report.overallStatus) {
-                        honestyDisclaimer
+                        voiceOverLimitLine
+                        if Self.shouldShowHonestyDisclaimer(
+                            overallStatus: report.overallStatus) {
+                            honestyDisclaimer
+                        }
                     }
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.md)
@@ -976,6 +995,24 @@ struct VerificationResultsView: View {
     // made. It mounts here, after the timing footer, so VoiceOver reads it
     // last. The component supplies its own caption styling, centered
     // alignment, and accessibility label; Dynamic Type flows through `Text`.
+
+    /// UXC-15 (RB-43): whether the honesty disclaimer + non-visual limit
+    /// line mount directly beneath the masthead/facts strip (before
+    /// `actionChoiceStack`) instead of at the bottom of the results screen.
+    /// PASS is the only verdict re-weighted this way — every other status
+    /// keeps the original bottom placement. Exhaustive switch, no
+    /// `default`, mirrors `shouldShowHonestyDisclaimer`'s all-statuses
+    /// shape so a newly added status forces a decision here too.
+    /// Placement-only: no copy changes, and `shouldShowHonestyDisclaimer`
+    /// still gates the disclaimer itself at whichever site mounts it.
+    static func shouldMountLimitBlockBeneathMasthead(
+        overallStatus: VerificationStatus
+    ) -> Bool {
+        switch overallStatus {
+        case .pass: true
+        case .warn, .info, .attention, .fail, .skipped: false
+        }
+    }
 
     /// Disclaimer mount gate. Deliberately true for EVERY verdict state —
     /// the exhaustive switch (no `default`) forces a decision here if a new

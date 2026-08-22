@@ -316,42 +316,91 @@ class DocumentState {
     static let importBlockedDuringTriageMessage =
         "Cannot import while reviewing detections. Apply or dismiss them first."
 
-    /// Mark the current verification report as user-overridden (§3.4 FAIL override).
+    /// UXC-13 (RB-22 + RB-45) / UXC-14: one-time acknowledgement shadows
+    /// for the three share-risk confirm families. `failShareAcknowledged`
+    /// and `skippedShareAcknowledged` generalize the shape
+    /// `incompleteWarnShareAcknowledged` already had: `overrideVerificationFailure()`
+    /// / `acknowledgeSkippedShare()` still mirror the acknowledgement onto
+    /// the live `.verified` report's `userOverrodeFailure` /
+    /// `userAcknowledgedSkippedShare` fields (kept so
+    /// `LegalGateTests.overrideStoresFlag` and the TransitionTests
+    /// override pin — which read the report field directly — stay green),
+    /// but the shadow, not the report field, is now the actual source of
+    /// truth `shareNeedsFailConfirm` / `shareNeedsSkippedConfirm` read
+    /// (via each predicate's `acknowledged:` parameter). Without an
+    /// app-side shadow the report field stayed set across export
+    /// attempts, so backing out of the share sheet without sending left a
+    /// later Share tap for the SAME report exporting with no re-confirm
+    /// (GAP-12). `incompleteWarnShareAcknowledged` has no report-side
+    /// field to mirror — `VerificationReport` is declared in
+    /// Packages/RedactionEngine, which is C-5-fenced for this sprint, so
+    /// a third field there was never an option; it has lived here since
+    /// UXC-14. `transition(to:)` below resets all three whenever a
+    /// genuinely fresh report lands; `rearmShareRiskConfirms()` further
+    /// down additionally re-arms them (and the two mirrors) when the user
+    /// backs out of the share sheet without sending.
+    private(set) var failShareAcknowledged: Bool = false
+    private(set) var skippedShareAcknowledged: Bool = false
+    private(set) var incompleteWarnShareAcknowledged: Bool = false
+
+    /// Mark the current verification report as user-overridden (§3.4 FAIL
+    /// override). Sets `failShareAcknowledged` — the shadow
+    /// `shareNeedsFailConfirm` actually reads — then mirrors the
+    /// acknowledgement onto the live `.verified` report's
+    /// `userOverrodeFailure` (write-only now; see the shadow doc comment
+    /// above).
     func overrideVerificationFailure() {
         guard case .verified(var report) = phase else { return }
+        failShareAcknowledged = true
         report.userOverrodeFailure = true
         phase = .verified(report: report)
     }
 
     /// Mark the current skipped-verification report as acknowledged for
     /// sharing (the one-time skipped-share confirm). Mirrors
-    /// `overrideVerificationFailure()`: mutates the live `.verified` report,
-    /// so the flag lives and dies with this report.
+    /// `overrideVerificationFailure()`: sets `skippedShareAcknowledged` —
+    /// the shadow `shareNeedsSkippedConfirm` actually reads — then mirrors
+    /// the acknowledgement onto the live `.verified` report's
+    /// `userAcknowledgedSkippedShare`.
     func acknowledgeSkippedShare() {
         guard case .verified(var report) = phase else { return }
+        skippedShareAcknowledged = true
         report.userAcknowledgedSkippedShare = true
         phase = .verified(report: report)
     }
 
-    /// UXC-14: one-time acknowledgement for the incomplete-WARN share-risk
-    /// confirm (a WARN report whose digest-dependent layers were SKIPPED —
-    /// `VerificationResultsView.mastheadSubtitle`'s skip-induced-WARN
-    /// branch). Unlike `userOverrodeFailure` / `userAcknowledgedSkippedShare`
-    /// this flag does NOT live on `VerificationReport` — that type is
-    /// declared in Packages/RedactionEngine, which is C-5-fenced for this
-    /// sprint, so a third field there is not an option. It lives here
-    /// instead; `transition(to:)` below resets it whenever a genuinely
-    /// fresh report lands, giving it the same "confirm once per report"
-    /// shape as the other two without needing to live on the report value.
-    private(set) var incompleteWarnShareAcknowledged: Bool = false
-
     /// Mark the incomplete-WARN share-risk confirm acknowledged for the
     /// current report. No phase guard: unlike the two methods above, this
-    /// flag is not report-scoped storage, so there is nothing to mutate
-    /// back into `phase` — the guard on the READ side (`transition(to:)`'s
-    /// reset conditioning) is what gives it correct per-report lifetime.
+    /// flag is not mirrored into report-scoped storage, so there is
+    /// nothing to mutate back into `phase` — the guard on the READ side
+    /// (`transition(to:)`'s reset conditioning) is what gives it correct
+    /// per-report lifetime.
     func acknowledgeIncompleteWarnShare() {
         incompleteWarnShareAcknowledged = true
+    }
+
+    /// UXC-13 (RB-22 + RB-45): re-arm all three share-risk confirms.
+    /// Called when the user backs out of the share sheet without sending
+    /// — the acknowledgement given was scoped to that one send attempt,
+    /// not to the report forever, so the NEXT Share tap for the same
+    /// report must confirm again (GAP-12). A completed send leaves the
+    /// shadows spent for that report by design; a genuinely fresh report
+    /// re-arms them via `transition(to:)`'s reset instead of this
+    /// function. Clears all three shadows unconditionally, then — under
+    /// the `.verified` guard, since only that phase has a report to
+    /// mirror into — mirrors `userOverrodeFailure` /
+    /// `userAcknowledgedSkippedShare` back to `false` on the live report
+    /// so mirror and shadow never disagree.
+    /// `incompleteWarnShareAcknowledged` has no report-side mirror (same
+    /// asymmetry as `acknowledgeIncompleteWarnShare()`).
+    func rearmShareRiskConfirms() {
+        failShareAcknowledged = false
+        skippedShareAcknowledged = false
+        incompleteWarnShareAcknowledged = false
+        guard case .verified(var report) = phase else { return }
+        report.userOverrodeFailure = false
+        report.userAcknowledgedSkippedShare = false
+        phase = .verified(report: report)
     }
 
     // MARK: - Transition Engine (UI_UX §1.3)
@@ -440,19 +489,22 @@ class DocumentState {
             logger.info("Phase: \(self.phaseKind, privacy: .public) → \(newKind, privacy: .public)")
             let oldKind = phaseKind
             phase = newPhase
-            // UXC-14: a genuinely fresh verification report just landed —
-            // re-arm the incomplete-WARN share-risk confirm.
+            // UXC-13/UXC-14: a genuinely fresh verification report just
+            // landed — re-arm all three share-risk confirm shadows
+            // (fail/attention, skipped, incomplete-WARN).
             // `.redacting → .verified` (autoVerify-off skip path) and
             // `.verifying → .verified` (both the full-pipeline and
             // verify-only completion paths) are the two transitions that
             // produce a NEW report. `.exporting → .verified` (a failed
             // export attempt returning to results) and `.failed →
             // .verified` (KI-4 recovery) resume the SAME report and
-            // deliberately do NOT reset here — this mirrors how
-            // `userOverrodeFailure` / `userAcknowledgedSkippedShare` ride
-            // along unchanged with the same report value through those
-            // two transitions, since they live on the report itself.
+            // deliberately do NOT reset here — this mirrors how the
+            // report-mirrored fields (`userOverrodeFailure` /
+            // `userAcknowledgedSkippedShare`) ride along unchanged with
+            // the same report value through those two transitions.
             if newKind == .verified && (oldKind == .redacting || oldKind == .verifying) {
+                failShareAcknowledged = false
+                skippedShareAcknowledged = false
                 incompleteWarnShareAcknowledged = false
             }
             syncProgress(from: newPhase)

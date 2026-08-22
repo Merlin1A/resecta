@@ -273,16 +273,22 @@ struct TransitionTests {
         #expect(isStillEditing, "wrong-phase override must not mutate the phase")
     }
 
-    // MARK: - UXC-14: incompleteWarnShareAcknowledged reset conditioning
+    // MARK: - UXC-13/UXC-14: share-risk confirm shadow reset conditioning
     //
-    // `incompleteWarnShareAcknowledged` cannot live on `VerificationReport`
-    // (Packages/RedactionEngine is C-5-fenced), so it lives on DocumentState
-    // and `transition(to:)` resets it in place of the "new report starts
-    // false" behavior the report-scoped flags get for free. The reset must
-    // fire exactly on the two transitions that produce a genuinely NEW
-    // report (`.redacting → .verified`, `.verifying → .verified`) and must
-    // NOT fire on the two that resume the SAME report
-    // (`.exporting → .verified`, `.failed → .verified`).
+    // None of the three share-risk confirm shadows
+    // (`failShareAcknowledged`, `skippedShareAcknowledged`,
+    // `incompleteWarnShareAcknowledged`) can be read back off
+    // `VerificationReport` (Packages/RedactionEngine is C-5-fenced), so all
+    // three live on DocumentState and `transition(to:)` resets them in
+    // place of the "new report starts false" behavior a report-scoped flag
+    // would get for free. The reset must fire exactly on the two
+    // transitions that produce a genuinely NEW report
+    // (`.redacting → .verified`, `.verifying → .verified`) and must NOT
+    // fire on the two that resume the SAME report
+    // (`.exporting → .verified`, `.failed → .verified`). Originally pinned
+    // for `incompleteWarnShareAcknowledged` alone (UXC-14); UXC-13
+    // generalized the shape to all three, so these tests now seed and
+    // assert on all three every time.
 
     private func warnReport() -> VerificationReport {
         VerificationReport(
@@ -295,27 +301,46 @@ struct TransitionTests {
         )
     }
 
+    /// Seed all three shadows true. `overrideVerificationFailure()` /
+    /// `acknowledgeSkippedShare()` require a `.verified` phase (guard), so
+    /// this jumps `phase` there directly (bypassing `transition()`, which
+    /// carries no reset side-effect of its own) before calling all three
+    /// acknowledge methods on the same live report.
+    private func seedAllThreeShadowsTrue(_ state: DocumentState) {
+        state.phase = .verified(report: warnReport())
+        state.overrideVerificationFailure()
+        state.acknowledgeSkippedShare()
+        state.acknowledgeIncompleteWarnShare()
+        #expect(state.failShareAcknowledged == true)
+        #expect(state.skippedShareAcknowledged == true)
+        #expect(state.incompleteWarnShareAcknowledged == true)
+    }
+
     @Test("Resets on .verifying → .verified (a fresh verification completed)")
     func resetsOnVerifyingToVerified() {
         let state = DocumentState()
+        seedAllThreeShadowsTrue(state)
+        // Jump directly to `.verifying` (bypassing transition()) so only
+        // the transition under test can fire the reset.
         state.phase = .verifying(progress: .init(
             currentLayer: 1, totalLayers: 1, layerName: "L", completedLayers: []))
-        state.acknowledgeIncompleteWarnShare()
-        #expect(state.incompleteWarnShareAcknowledged == true)
 
         state.transition(to: .verified(report: warnReport()))
+        #expect(state.failShareAcknowledged == false)
+        #expect(state.skippedShareAcknowledged == false)
         #expect(state.incompleteWarnShareAcknowledged == false)
     }
 
     @Test("Resets on .redacting → .verified (autoVerify-off skip path)")
     func resetsOnRedactingToVerified() {
         let state = DocumentState()
+        seedAllThreeShadowsTrue(state)
         state.phase = .redacting(progress: .init(
             currentPage: 0, totalPages: 1, currentStep: "x"))
-        state.acknowledgeIncompleteWarnShare()
-        #expect(state.incompleteWarnShareAcknowledged == true)
 
         state.transition(to: .verified(report: .skipped))
+        #expect(state.failShareAcknowledged == false)
+        #expect(state.skippedShareAcknowledged == false)
         #expect(state.incompleteWarnShareAcknowledged == false)
     }
 
@@ -325,11 +350,19 @@ struct TransitionTests {
         state.phase = .verifying(progress: .init(
             currentLayer: 1, totalLayers: 1, layerName: "L", completedLayers: []))
         state.transition(to: .verified(report: warnReport()))
+        state.overrideVerificationFailure()
+        state.acknowledgeSkippedShare()
         state.acknowledgeIncompleteWarnShare()
+        #expect(state.failShareAcknowledged == true)
+        #expect(state.skippedShareAcknowledged == true)
         #expect(state.incompleteWarnShareAcknowledged == true)
 
         state.transition(to: .exporting)
         state.transition(to: .verified(report: warnReport()))
+        #expect(state.failShareAcknowledged == true,
+                "an export-attempt retry resuming the same report must not re-arm the confirm")
+        #expect(state.skippedShareAcknowledged == true,
+                "an export-attempt retry resuming the same report must not re-arm the confirm")
         #expect(state.incompleteWarnShareAcknowledged == true,
                 "an export-attempt retry resuming the same report must not re-arm the confirm")
     }
@@ -340,7 +373,11 @@ struct TransitionTests {
         state.phase = .verifying(progress: .init(
             currentLayer: 1, totalLayers: 1, layerName: "L", completedLayers: []))
         state.transition(to: .verified(report: warnReport()))
+        state.overrideVerificationFailure()
+        state.acknowledgeSkippedShare()
         state.acknowledgeIncompleteWarnShare()
+        #expect(state.failShareAcknowledged == true)
+        #expect(state.skippedShareAcknowledged == true)
         #expect(state.incompleteWarnShareAcknowledged == true)
 
         // `.verified → .failed` is not itself a legal pair (see
@@ -353,6 +390,10 @@ struct TransitionTests {
             returnPhase: .verified(report: warnReport())
         ))
         state.transition(to: .verified(report: warnReport()))
+        #expect(state.failShareAcknowledged == true,
+                "a KI-4 recovery resuming the same report must not re-arm the confirm")
+        #expect(state.skippedShareAcknowledged == true,
+                "a KI-4 recovery resuming the same report must not re-arm the confirm")
         #expect(state.incompleteWarnShareAcknowledged == true,
                 "a KI-4 recovery resuming the same report must not re-arm the confirm")
     }
