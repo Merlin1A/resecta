@@ -95,7 +95,7 @@ struct VerificationEngineTests {
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: ["NONEXISTENT_TERM_12345"],
+            sensitiveTerms: ["NONEXISTENT_TERM_12345"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
@@ -111,7 +111,7 @@ struct VerificationEngineTests {
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: ["ab", "xy"],  // All < 3 chars — should warn
+            sensitiveTerms: ["ab", "xy"].map { SensitiveTerm(text: $0) },  // All < 3 chars — should warn
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
@@ -152,7 +152,7 @@ struct VerificationEngineTests {
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: ["zzq"],
+            sensitiveTerms: ["zzq"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
@@ -175,7 +175,7 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 1, regions: [:], sensitiveTerms: ["acme"],
+            sourcePageCount: 1, regions: [:], sensitiveTerms: ["acme"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isFail,
@@ -199,7 +199,7 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 1, regions: [:], sensitiveTerms: ["acme"],
+            sourcePageCount: 1, regions: [:], sensitiveTerms: ["acme"].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [nil], perPageModes: [.searchableRedaction])
         #expect(result.status.isAttention,
@@ -220,7 +220,7 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 1, regions: [:], sensitiveTerms: ["Andre\u{0301}"],
+            sourcePageCount: 1, regions: [:], sensitiveTerms: ["Andre\u{0301}"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isFail,
@@ -239,7 +239,7 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 1, regions: [:], sensitiveTerms: ["\u{674E}\u{660E}"],
+            sourcePageCount: 1, regions: [:], sensitiveTerms: ["\u{674E}\u{660E}"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isFail,
@@ -257,7 +257,7 @@ struct VerificationEngineTests {
         // is preserved.
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 1, regions: [:], sensitiveTerms: ["zzqx", "ab"],
+            sourcePageCount: 1, regions: [:], sensitiveTerms: ["zzqx", "ab"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isInfo,
@@ -278,7 +278,7 @@ struct VerificationEngineTests {
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: [String(repeating: "a", count: 400_000)],
+            sensitiveTerms: [String(repeating: "a", count: 400_000)].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isWarn)
@@ -301,7 +301,7 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 1, regions: [:], sensitiveTerms: ["CLASSIFIED"],
+            sourcePageCount: 1, regions: [:], sensitiveTerms: ["CLASSIFIED"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isFail,
@@ -320,7 +320,7 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 1, regions: [:], sensitiveTerms: ["CLASSIFIED"],
+            sourcePageCount: 1, regions: [:], sensitiveTerms: ["CLASSIFIED"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isWarn,
@@ -337,7 +337,7 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 1, regions: [:], sensitiveTerms: ["CLASSIFIED"],
+            sourcePageCount: 1, regions: [:], sensitiveTerms: ["CLASSIFIED"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isWarn,
@@ -1196,7 +1196,7 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         let result = await engine.runLayer(
             1, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term],
+            sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isFail, "term readable inside a region must FAIL; got \(result.status)")
@@ -1299,7 +1299,7 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         let result = await engine.runLayer(
             1, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term],
+            sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: [.searchableRedaction])
         // The .sensitiveTermInRegion super-priority FAIL is mode-independent (it
@@ -1443,7 +1443,7 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         let result = await engine.runLayer(
             1, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term],
+            sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isInfo,
@@ -1469,7 +1469,7 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         let result = await engine.runLayer(
             1, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term],
+            sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: [.searchableRedaction])
         // On a Searchable page the text layer is verified by Layers 3/10; the
@@ -1560,7 +1560,7 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 3, regions: [:], sensitiveTerms: ["acme"],
+            sourcePageCount: 3, regions: [:], sensitiveTerms: ["acme"].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [nil, nil, nil],
             perPageModes: Array(repeating: .searchableRedaction, count: 3))
@@ -1593,7 +1593,7 @@ struct VerificationEngineTests {
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: ["DELIAHARTWELL"],
+            sensitiveTerms: ["DELIAHARTWELL"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isFail,
@@ -1619,7 +1619,7 @@ struct VerificationEngineTests {
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: ["DELIAHARTWELL"],
+            sensitiveTerms: ["DELIAHARTWELL"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(!result.status.isFail,

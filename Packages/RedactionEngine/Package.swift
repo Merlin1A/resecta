@@ -36,9 +36,10 @@ let package = Package(
             dependencies: ["RedactionEngine"],
             resources: [
                 .copy("Fixtures/TestResources"),
-                // S01 (sample-packet series) — committed Stage-1 detection
-                // snapshot of the shipped statement (sample-statement-stage1.json).
-                // Bundled so S05's manifest-driven P/R harness can load it.
+                // Committed Stage-1 detection snapshot of the shipped packet
+                // (`snapshots/packet-stage1.json`, produced by
+                // `PacketSnapshotTests`) — bundled so `PacketPRHarnessTests`
+                // can load it.
                 .copy("Fixtures/snapshots"),
                 // DataPipeline-produced fixtures. Phase 2 adds `corpus`
                 // (awaits Jesse's `make install-assets` for real g8 corpus;

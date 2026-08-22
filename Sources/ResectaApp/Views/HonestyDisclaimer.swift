@@ -7,7 +7,7 @@ import RedactionEngine
 // Always visible. Never removable. No dismiss button.
 
 struct HonestyDisclaimer: View {
-    var profile: DocumentProfile = .unredacted
+    var profile: DocumentProfile
 
     var body: some View {
         Text(disclaimerText)

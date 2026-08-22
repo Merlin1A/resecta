@@ -39,12 +39,6 @@ public enum PageRasterizerTestSeam {
             self._simulatedVerifyFailures = simulatedVerifyFailures
         }
 
-        /// Failure injections still pending. Tests rarely need to inspect
-        /// this directly; expose for completeness.
-        public var simulatedVerifyFailures: Set<Int> {
-            lock.lock(); defer { lock.unlock() }; return _simulatedVerifyFailures
-        }
-
         /// Total rasterize calls observed during the activation.
         public var rasterizeCallCount: Int {
             lock.lock(); defer { lock.unlock() }; return _rasterizeCallCount
@@ -111,7 +105,6 @@ public enum PageRasterizerTestSeam {
     /// for binary compatibility with debug callers but holds no state.
     public final class Recorder: @unchecked Sendable {
         public init(simulatedVerifyFailures: Set<Int> = []) { _ = simulatedVerifyFailures }
-        public var simulatedVerifyFailures: Set<Int> { [] }
         public var rasterizeCallCount: Int { 0 }
         public var dpiCapHistory: [(pageIndex: Int, dpiCap: Int)] { [] }
         public func insertSimulatedFailure(_ pageIndex: Int) {}

@@ -43,9 +43,4 @@ public struct OCREngine: Sendable {
             )
         }
     }
-
-    /// Extract the full text from all observations, joined by newlines.
-    public static func fullText(from lines: [TextLine]) -> String {
-        lines.map(\.text).joined(separator: "\n")
-    }
 }

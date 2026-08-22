@@ -37,16 +37,6 @@ public enum TempFileProtection: Sendable {
         }
     }
 
-    /// Map to the corresponding `URLFileProtection` value for read-back
-    /// comparisons via `URLResourceValues.fileProtection`.
-    public var urlFileProtection: URLFileProtection {
-        switch self {
-        case .complete:
-            return .complete
-        case .completeUntilFirstUserAuthentication:
-            return .completeUntilFirstUserAuthentication
-        }
-    }
 }
 
 /// Namespace for temp-file hardening helpers. Engine-side so producers in

@@ -13,8 +13,6 @@ public struct SSNCandidate: Sendable {
     public let serial: String
     /// Range in the original string (NSRange for compatibility with PIIMatch).
     public let range: NSRange
-    /// The separator character used, or nil for unseparated.
-    public let separator: Character?
     /// The full matched text including separators.
     public let matchedText: String
 }
@@ -172,7 +170,6 @@ public struct SSNStateMachine: Sendable {
                                 group: group,
                                 serial: newDigits,
                                 range: nsRange,
-                                separator: sep,
                                 matchedText: matchedText
                             ))
                         }

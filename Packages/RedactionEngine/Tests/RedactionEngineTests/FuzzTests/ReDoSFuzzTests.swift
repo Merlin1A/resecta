@@ -46,11 +46,9 @@ struct ReDoSFuzzTests {
     /// All compiled regex patterns in PIIDetector, keyed by detector name.
     /// Updated when Phase-3 adds NPI/DEA/Address-spatial/DOB/Account detectors.
     static let piiPatterns: [(name: String, pattern: NSRegularExpression)] = [
-        ("ssn",        PIIDetector.ssnPattern),
         ("creditCard", PIIDetector.ccPattern),
         ("email",      PIIDetector.emailPattern),
         ("phone",      PIIDetector.phonePattern),
-        ("ein",        PIIDetector.einPattern),
         ("address",    PIIDetector.addressPattern),
         ("dob",        PIIDetector.dobPattern),
         ("itin",       PIIDetector.itinPattern),

@@ -41,18 +41,6 @@ enum OCRCustomWordsBuilder {
         )
     }
 
-    /// Testable seam — same composition from injected loaders.
-    static func build(
-        contextKeywords: ContextKeywordsLoader,
-        institutions: InstitutionGazetteer
-    ) -> [String] {
-        compose(
-            anchors: labelAnchors,
-            contextTokens: contextKeywordTokens(from: contextKeywords),
-            institutionTokens: institutionNameTokens(from: institutions)
-        )
-    }
-
     // MARK: - Tier 1+2: context keywords (financial/tax vocabulary)
 
     /// All positive keywords across categories for the financial doctype

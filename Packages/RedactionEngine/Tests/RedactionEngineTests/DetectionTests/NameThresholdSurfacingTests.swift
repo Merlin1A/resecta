@@ -58,4 +58,24 @@ struct NameThresholdSurfacingTests {
             "Unboosted NLTagger name (posterior \(posterior)) is dropped by Balanced name cutoff \(cutoff)"
         )
     }
+
+    @Test("A gazetteer-boosted NLTagger name (the confidence ceiling) survives the shipped Balanced gate")
+    func maxBoostedNameSurvivesBalancedGate() throws {
+        let bundle = PresetThresholdBundle.loadFromEngineBundle()
+        let cutoff = try #require(bundle.presets[.balanced]?.threshold(forWireName: "name"))
+
+        // Reproduce DetectionOrchestrator.detectPage's W4 gate exactly, but at
+        // the TOP of the detector's reachable raw range — no name can score
+        // higher than maxNameConfidence (0.70 base + the full 0.15 exact
+        // surname+given gazetteer boost), so this posterior is the upper
+        // bound of what W4 ever sees for the `name` category.
+        let priorMean = PerCategoryPriors().mean(.name) // 0.5 on a fresh document
+        let posterior = CalibratedScorer().posterior(
+            raw: Self.maxNameConfidence, priorMean: priorMean
+        )
+        #expect(
+            posterior >= cutoff,
+            "Fully gazetteer-boosted NLTagger name (posterior \(posterior)) is dropped by Balanced name cutoff \(cutoff)"
+        )
+    }
 }

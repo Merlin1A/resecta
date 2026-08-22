@@ -2,8 +2,7 @@ import Foundation
 
 // Plan §2 / G10 — per-category Beta priors threaded into detection scoring.
 // Sendable value type. Priors update on triage accept/reject (never during
-// detection). Passed by value into @concurrent `detectPage`; merged back on
-// MainActor at yield via `merged(_:)` (commutative).
+// detection). Passed by value into @concurrent `detectPage`.
 //
 // G10 hardening invariants (defend against prior poisoning on adversarial
 // streams — see plan §C):
@@ -92,39 +91,5 @@ public struct PerCategoryPriors: Sendable, Equatable {
         var updated = byCategory
         updated[category] = current
         return PerCategoryPriors(byCategory: updated)
-    }
-
-    /// Pointwise merge. Commutative: α's add, β's add, streaks reset on
-    /// direction disagreement. Used to fold per-page `priorsDelta` back into
-    /// the MainActor instance after `detectPage` yields.
-    public func merged(_ other: PerCategoryPriors) -> PerCategoryPriors {
-        var result = byCategory
-        for (category, otherBeta) in other.byCategory {
-            guard let current = result[category] else {
-                result[category] = otherBeta
-                continue
-            }
-            // Subtract the shared Beta(1,1) prior once to avoid double-counting.
-            let mergedAlpha: Double = current.alpha + (otherBeta.alpha - 1.0)
-            let mergedBetaValue: Double = current.beta + (otherBeta.beta - 1.0)
-            let dirMatches = current.streakDir == otherBeta.streakDir
-            let newDir: Int8 = dirMatches ? current.streakDir : 0
-            let newLen: UInt8 = dirMatches ? max(current.streakLen, otherBeta.streakLen) : 0
-            var mergedBeta = Beta(
-                alpha: mergedAlpha,
-                beta: mergedBetaValue,
-                streakDir: newDir,
-                streakLen: newLen
-            )
-            // Re-apply ESS cap after merge.
-            let total = mergedBeta.alpha + mergedBeta.beta
-            if total > 50 {
-                let scale = 50 / total
-                mergedBeta.alpha = max(1.0, mergedBeta.alpha * scale)
-                mergedBeta.beta = max(1.0, mergedBeta.beta * scale)
-            }
-            result[category] = mergedBeta
-        }
-        return PerCategoryPriors(byCategory: result)
     }
 }

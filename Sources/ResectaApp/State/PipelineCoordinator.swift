@@ -8,9 +8,7 @@ import RedactionEngine
 /// Signpost emission for the detection-pipeline depth-2
 /// lookahead. The rasterize-for-detection and detect-page intervals are
 /// emitted to this category so they can be sampled in Instruments
-/// without re-instrumenting every release; the in-process
-/// `DetectionRasterizeProbe` (test-only) collects the same intervals
-/// for unit-level overlap assertions. Both are cheap-when-idle.
+/// without re-instrumenting every release. Cheap when idle.
 // nonisolated: file-level OSSignposter (Sendable, immutable) read from both the
 // MainActor detection-pipeline closures and the `nonisolated renderPageForDetection`
 // rasterize path. Under the SE-0466 MainActor-default flip an unannotated global
@@ -20,80 +18,6 @@ import RedactionEngine
 nonisolated private let detectionRasterizeSignposter = OSSignposter(
     subsystem: "com.resecta.app", category: "DetectionRasterize"
 )
-
-/// Test-only collector for `renderPageForDetection` and
-/// `orchestrator.detectPage` intervals dispatched from
-/// `PipelineCoordinator.runDetectionPipeline`. Production code passes
-/// `nil` (the singleton is unset); `DetectionRasterizeOverlapTests`
-/// installs a fresh instance per test via `DetectionRasterizeProbe.install`
-/// and reads the recorded intervals to assert depth-2 overlap.
-///
-/// Synchronous, lock-protected append so tests can read `intervals`
-/// immediately after the pipeline awaits its final result without
-/// awaiting a pending MainActor hop. The lock is uncontended in
-/// practice (depth-2 → at most one rasterize + one detect stamp per
-/// page, never concurrently from different threads writing the same
-/// instance simultaneously beyond what the OSAllocatedUnfairLock
-/// already covers in microseconds).
-// nonisolated: test-only, lock-protected (`@unchecked Sendable`) collector whose
-// `record(_:)` is stamped from the rasterize thread inside the `nonisolated`
-// renderPageForDetection path. The SE-0466 MainActor-default flip would otherwise
-// make its methods MainActor-isolated; pin the type nonisolated to keep
-// `record`/`intervals` callable from any isolation (the NSLock provides the
-// serialization the annotation already asserts).
-nonisolated final class DetectionRasterizeProbe: @unchecked Sendable {
-    /// Single global handle; nil outside tests. Set via
-    /// `DetectionRasterizeProbe.install()` in test setup and reset to
-    /// nil at test teardown so suites do not leak state across runs.
-    nonisolated(unsafe) static var shared: DetectionRasterizeProbe?
-
-    struct Interval: Sendable {
-        enum Kind: Sendable { case rasterize, detect }
-        let pageIndex: Int
-        let phase: PipelineCoordinator.DetectionRasterizePhase
-        let kind: Kind
-        let start: Date
-        let end: Date
-    }
-
-    private let lock = NSLock()
-    private var _intervals: [Interval] = []
-
-    /// Install a fresh probe and return it. Idempotent — replaces any
-    /// existing shared instance. Call from test setup; the matching
-    /// `uninstall()` resets the global handle.
-    @discardableResult
-    static func install() -> DetectionRasterizeProbe {
-        let probe = DetectionRasterizeProbe()
-        shared = probe
-        return probe
-    }
-
-    static func uninstall() {
-        shared = nil
-    }
-
-    /// Snapshot the recorded intervals. Read under lock so writers
-    /// completing on a background thread are observed in test code on
-    /// MainActor without a stale-read.
-    var intervals: [Interval] {
-        lock.lock()
-        defer { lock.unlock() }
-        return _intervals
-    }
-
-    /// Append an interval. Safe to call from any thread; the lock
-    /// serializes the append. Producers in `runDetectionPipeline`
-    /// stamp on the thread the await suspension returned on (often a
-    /// background thread for the lookahead rasterize, MainActor for
-    /// detect), which is fine — the assertion only needs the
-    /// (start,end) tuple per stamp.
-    func record(_ interval: Interval) {
-        lock.lock()
-        _intervals.append(interval)
-        lock.unlock()
-    }
-}
 
 /// Orchestrates the redaction pipeline. MainActor by SE-0466 default.
 /// Does NOT hold progress or status state — all UI-facing state lives
@@ -372,18 +296,22 @@ final class PipelineCoordinator: @unchecked Sendable {
                     effectiveMode: effectiveMode, runSettings: runSettings)
                 let sensitiveTerms = coordinator.collectSensitiveTerms()
 
-                // Capture the live search session's deselection
-                // facts at run entry, before any pipeline work. The value is
-                // recorded onto RedactionState only after `processDocument`
-                // returns (beside `recordLastRunInputs`), but reading it HERE
-                // pins the counts the user saw when they pressed Redact — a
+                // Capture the run's deselection facts at run entry,
+                // before any pipeline work. The value is recorded onto
+                // RedactionState only after `processDocument` returns
+                // (beside `recordLastRunInputs`), but reading it HERE pins
+                // the counts the user saw when they pressed Redact — a
                 // programmatic or user re-selection during `.redacting` /
                 // `.verifying` cannot drift what the results screen reports.
-                // Nil when no PII-scan session is live (sheet closed tears
-                // down `activeSearch`, discarding its selection state).
+                // UXC-01: `runEntryDeselectionSnapshot()` prefers the
+                // apply-commit snapshot (set at the moment the user last
+                // applied selected search results, even if the sheet has
+                // since dismissed and nil'd `activeSearch`) and falls back
+                // to the live search session's snapshot — nil only when
+                // neither source has one (no apply this document session
+                // and no live PII-scan session at run entry).
                 let deselectionSnapshot =
-                    coordinator.redactionState.activeSearch?
-                        .deselectionSnapshotForRun()
+                    coordinator.redactionState.runEntryDeselectionSnapshot()
 
                 // Sub-threshold guard — no pages with effective redactions
                 guard !pages.allSatisfy({ $0.regions.isEmpty }) else { return }
@@ -423,7 +351,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 ))
 
                 let runContext = try await coordinator.processDocument(
-                    pages, effectiveMode: effectiveMode, outputURL: outputURL,
+                    pages, outputURL: outputURL,
                     sensitiveTerms: sensitiveTerms)
                 redactionSucceeded = true
 
@@ -717,7 +645,6 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// Reports progress via documentState self-transitions.
     private func processDocument(
         _ pages: [PDFPageData],
-        effectiveMode: PipelineMode,
         outputURL: URL,
         sensitiveTerms: [SensitiveTerm]
     ) async throws -> PipelineRunContext {
@@ -1769,7 +1696,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                             let prevPrimary: DoctypeClass? =
                                 i > 0 ? accumulatedDiagnostics[i - 1]?.primary : nil
                             let doctypeCtx = prevPrimary.map { prev in
-                                DoctypeWindow(primary: prev, secondary: nil)
+                                DoctypeWindow(primary: prev)
                             }
                             let pageResult: PageDetectionResult
                             do {
@@ -1787,22 +1714,10 @@ final class PipelineCoordinator: @unchecked Sendable {
                                 detectionRasterizeSignposter.endInterval(
                                     "detectPage", detectSignpostState
                                 )
-                                DetectionRasterizeProbe.shared?.record(
-                                    .init(pageIndex: i,
-                                          phase: .rasterizeLookahead,
-                                          kind: .detect,
-                                          start: detectStart, end: Date())
-                                )
                                 throw error
                             }
                             detectionRasterizeSignposter.endInterval(
                                 "detectPage", detectSignpostState
-                            )
-                            DetectionRasterizeProbe.shared?.record(
-                                .init(pageIndex: i,
-                                      phase: .rasterizeLookahead,
-                                      kind: .detect,
-                                      start: detectStart, end: Date())
                             )
                             accumulatedResults[i] = pageResult.detections
                             if let diag = pageResult.classificationDiagnostic {
@@ -1849,7 +1764,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                             let prevPrimary: DoctypeClass? =
                                 i > 0 ? accumulatedDiagnostics[i - 1]?.primary : nil
                             let doctypeCtx = prevPrimary.map { prev in
-                                DoctypeWindow(primary: prev, secondary: nil)
+                                DoctypeWindow(primary: prev)
                             }
                             let pageResult: PageDetectionResult
                             do {
@@ -1867,22 +1782,10 @@ final class PipelineCoordinator: @unchecked Sendable {
                                 detectionRasterizeSignposter.endInterval(
                                     "detectPage", detectSignpostState
                                 )
-                                DetectionRasterizeProbe.shared?.record(
-                                    .init(pageIndex: i,
-                                          phase: .rasterizePreflight,
-                                          kind: .detect,
-                                          start: detectStart, end: Date())
-                                )
                                 throw error
                             }
                             detectionRasterizeSignposter.endInterval(
                                 "detectPage", detectSignpostState
-                            )
-                            DetectionRasterizeProbe.shared?.record(
-                                .init(pageIndex: i,
-                                      phase: .rasterizePreflight,
-                                      kind: .detect,
-                                      start: detectStart, end: Date())
                             )
                             accumulatedResults[i] = pageResult.detections
                             if let diag = pageResult.classificationDiagnostic {
@@ -2041,8 +1944,7 @@ final class PipelineCoordinator: @unchecked Sendable {
 
     /// Phase label for the page render in the detection pipeline.
     /// Used by `renderPageForDetection` to stamp `os_signpost` intervals so
-    /// the depth-2 lookahead overlap is observable in Instruments and from
-    /// tests via the in-process collector below.
+    /// the depth-2 lookahead overlap is observable in Instruments.
     ///
     /// - `.rasterizePreflight`: the bootstrap render at iteration entry
     ///   (page 0). Runs alone — there is no concurrent detect to overlap
@@ -2062,13 +1964,8 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// resolution.
     ///
     /// Emits an `os_signpost` interval around the synchronous
-    /// rasterize work and (if a test-bound `DetectionRasterizeProbe.shared`
-    /// collector is active) appends a `(pageIndex, phase, start, end)`
-    /// tuple to it. The interval lets `DetectionRasterizeOverlapTests`
-    /// assert that the lookahead render for page N+1 overlaps the detect
-    /// for page N (the depth-2 contract). Probe access is on MainActor —
-    /// emits happen post-hop after the @concurrent engine call returns,
-    /// so collector mutation is serialized through MainActor isolation.
+    /// rasterize work so the depth-2 lookahead overlap is observable
+    /// in Instruments.
     /// nonisolated(unsafe): PDFPage is not Sendable but is accessed
     /// single-threaded *per call* — the depth-2 lookahead dispatches
     /// `renderPageForDetection` on at most 2 *different* pages in flight,
@@ -2113,23 +2010,17 @@ final class PipelineCoordinator: @unchecked Sendable {
         // method's doc comment).
         nonisolated(unsafe) let unsafePage = page
 
-        // Signpost + (optional) probe-stamp interval around the
-        // synchronous rasterize call. `OSSignposter` emits to the
-        // configured subsystem when Instruments is attached; the in-process
-        // probe collector is nil outside tests. Both are cheap when idle.
+        // Signpost interval around the synchronous rasterize call.
+        // `OSSignposter` emits to the configured subsystem when Instruments
+        // is attached; cheap when idle.
         let signpostID = detectionRasterizeSignposter.makeSignpostID()
         let signpostState = detectionRasterizeSignposter.beginInterval(
             "renderPageForDetection", id: signpostID,
             "page=\(pageIndex) phase=\(phase.rawValue) dpi=\(Int(detectionDPI))"
         )
-        let stampStart = Date()
         defer {
             detectionRasterizeSignposter.endInterval(
                 "renderPageForDetection", signpostState
-            )
-            DetectionRasterizeProbe.shared?.record(
-                .init(pageIndex: pageIndex, phase: phase,
-                      kind: .rasterize, start: stampStart, end: Date())
             )
         }
 

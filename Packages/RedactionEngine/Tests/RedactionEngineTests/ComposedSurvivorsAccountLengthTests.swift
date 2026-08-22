@@ -77,7 +77,7 @@ struct ComposedSurvivorsAccountLengthTests {
         let (match, pageText) = Self.accountMatch(digits: Self.digits(6))
 
         // Reconstruct the pre-floor posterior the seam composes (no floor).
-        let features = contextFeatures(match: match, doctype: .generic,
+        let features = contextFeatures(match: match,
             effectiveDoctype: .generic, pageText: pageText)
         let contextLogit = contextScorer.learnedContextLogit(family: "account", features: features)
         let priorMean = max(PerCategoryPriors().mean(.account), DetectionOrchestrator.absorbingStateFloor)

@@ -148,7 +148,7 @@ struct RotatedSearchRegionTests {
         // means the pixels under it are destroyed and the term is gone.
         let l2 = await engine.runLayer(
             1, outputDocument: SendablePDFDocument(outDoc),
-            sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: ["MARKER"],
+            sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: ["MARKER"].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [nil], perPageModes: [.searchableRedaction]
         )

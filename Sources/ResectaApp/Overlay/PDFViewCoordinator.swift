@@ -189,20 +189,6 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, UIScribbleIntera
         refreshAllOverlays()
     }
 
-    /// Select all regions on a given page.
-    func selectAllRegions(on page: Int) {
-        guard let state = redactionState,
-              let pageRegions = state.regions[page] else { return }
-        state.selectedRegionIDs = Set(pageRegions.map(\.id))
-        refreshAllOverlays()
-    }
-
-    /// Clear multi-selection.
-    func deselectAll() {
-        redactionState?.selectedRegionIDs = []
-        refreshAllOverlays()
-    }
-
     func commitResize(_ id: UUID, page: Int, newRect: CGRect, undoManager: UndoManager?) {
         redactionState?.resizeRegion(id, page: page, newRect: newRect, undoManager: undoManager)
         refreshOverlay(for: page)
@@ -229,18 +215,6 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, UIScribbleIntera
         guard let state = redactionState else { return }
         state.applyBatch(regions, undoManager: undoManager, toastManager: toastManager)
         refreshAllOverlays()
-    }
-
-    /// GAP-7: Delete all selected regions. Delegates to RedactionState.deleteSelected.
-    func deleteSelectedRegions(undoManager: UndoManager?) {
-        guard let redactionState else { return }
-        let affectedPages = redactionState.deleteSelected(undoManager: undoManager)
-        for page in affectedPages { refreshOverlay(for: page) }
-    }
-
-    // Backward compat alias
-    func deleteSelectedRegion(undoManager: UndoManager?) {
-        deleteSelectedRegions(undoManager: undoManager)
     }
 
     /// UI_UX §9.2: Delete a specific region by ID (used by VoiceOver custom action).

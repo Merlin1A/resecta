@@ -126,7 +126,6 @@ public enum SearchPreviewScope: Sendable, Equatable {
 /// scoped to the visible page so the overlay can highlight without
 /// rescanning, while `totalCount` reflects the requested scope.
 public struct SearchPreviewResult: Sendable, Equatable {
-    public let mode: SearchMode
     public let scope: SearchPreviewScope
     public let totalCount: Int
     public let saturated: Bool
@@ -134,14 +133,12 @@ public struct SearchPreviewResult: Sendable, Equatable {
     public let currentPageMatches: [NSRange]
 
     public init(
-        mode: SearchMode,
         scope: SearchPreviewScope,
         totalCount: Int,
         saturated: Bool,
         regexInvalid: Bool,
         currentPageMatches: [NSRange]
     ) {
-        self.mode = mode
         self.scope = scope
         self.totalCount = totalCount
         self.saturated = saturated
@@ -479,7 +476,6 @@ public struct ConsiderationResult: Sendable, Equatable {
     public let category: PIICategory
     public let ruleID: String
     public let matched: Bool
-    public let rawScore: Double?
     public let finalScore: Double?
     public let threshold: Double?
     public let reason: Reason
@@ -491,7 +487,6 @@ public struct ConsiderationResult: Sendable, Equatable {
         category: PIICategory,
         ruleID: String,
         matched: Bool,
-        rawScore: Double?,
         finalScore: Double?,
         threshold: Double?,
         reason: Reason,
@@ -500,7 +495,6 @@ public struct ConsiderationResult: Sendable, Equatable {
         self.category = category
         self.ruleID = ruleID
         self.matched = matched
-        self.rawScore = rawScore
         self.finalScore = finalScore
         self.threshold = threshold
         self.reason = reason

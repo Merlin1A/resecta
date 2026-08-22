@@ -32,7 +32,6 @@ struct CustomTermsTemplatePicker: View {
         /// matches the count `performImport` actually commits.
         let skippedInvalid: [UserTerm]
         let exceedsCap: Bool
-        let projectedTotal: Int
     }
 
     var body: some View {
@@ -159,8 +158,7 @@ struct CustomTermsTemplatePicker: View {
             toImport: dedup.toImport,
             skipped: dedup.skipped,
             skippedInvalid: invalidCandidates,
-            exceedsCap: projectedTotal > UserTermsStore.perListCap,
-            projectedTotal: projectedTotal
+            exceedsCap: projectedTotal > UserTermsStore.perListCap
         )
         showingConfirmation = true
     }

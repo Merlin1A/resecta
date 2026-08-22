@@ -91,12 +91,4 @@ public final class TempExportDirectory: @unchecked Sendable {
         try? FileManager.default.removeItem(at: url)
         didPrepare = false
     }
-
-    /// Resolve `isExcludedFromBackup` on the directory URL. Returns `nil`
-    /// if the resource value cannot be read (e.g., directory does not
-    /// exist yet). Test affordance.
-    public func isExcludedFromBackup() -> Bool? {
-        let values = try? url.resourceValues(forKeys: [.isExcludedFromBackupKey])
-        return values?.isExcludedFromBackup
-    }
 }

@@ -31,7 +31,8 @@ struct Layer6GrazeClassificationTests {
         let region = bounds.insetBy(dx: -2, dy: -2)
 
         let result = try await verifier.verifySpatialExclusion(
-            outputPage: page, redactionRects: [region])
+            outputPage: page,
+            regionShapes: [RegionShape(expandedBounds: region, polygonVertices: nil)])
         #expect(result.isFail, "center-inside must FAIL; got \(result)")
         if case .fail(let msg) = result {
             #expect(msg.contains("overlaps a redacted area on page 1 (position"),
@@ -53,7 +54,8 @@ struct Layer6GrazeClassificationTests {
             width: 10 + bounds.width * 0.2, height: bounds.height)
 
         let result = try await verifier.verifySpatialExclusion(
-            outputPage: page, redactionRects: [sliver])
+            outputPage: page,
+            regionShapes: [RegionShape(expandedBounds: sliver, polygonVertices: nil)])
         #expect(result.isWarn, "edge graze must WARN; got \(result)")
         if case .warn(let msg) = result {
             #expect(msg.contains("touches the edge of a redacted area on page 1"),
@@ -79,7 +81,11 @@ struct Layer6GrazeClassificationTests {
         let third = thirdSel.bounds(for: page).insetBy(dx: -1, dy: -1)
 
         let result = try await verifier.verifySpatialExclusion(
-            outputPage: page, redactionRects: [sliver, third])
+            outputPage: page,
+            regionShapes: [
+                RegionShape(expandedBounds: sliver, polygonVertices: nil),
+                RegionShape(expandedBounds: third, polygonVertices: nil),
+            ])
         #expect(result.isFail,
                 "in-region hit must win over an earlier graze; got \(result)")
     }
@@ -91,7 +97,9 @@ struct Layer6GrazeClassificationTests {
         let page = try #require(doc.page(at: 0))
         let result = try await verifier.verifySpatialExclusion(
             outputPage: page,
-            redactionRects: [CGRect(x: 0, y: 0, width: 20, height: 20)])
+            regionShapes: [RegionShape(
+                expandedBounds: CGRect(x: 0, y: 0, width: 20, height: 20),
+                polygonVertices: nil)])
         #expect(result == .pass)
     }
 

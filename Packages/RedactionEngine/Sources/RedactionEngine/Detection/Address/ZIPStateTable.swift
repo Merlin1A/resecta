@@ -10,14 +10,6 @@ import Foundation
 // `ZIPStateTableLoader`. The hardcoded switch below remains as the
 // graceful-degradation fallback when the JSON is missing or fails to decode
 // (same pattern as `DocumentTypeClassifier.loadData(from:)`).
-//
-// W-Q (§D12 = L3 full) — `state(forZIP:userOverrides:)` accepts a
-// per-profile user-overrides map (5-digit ZIP → 2-letter state). User
-// entries are checked first under P1 semantics; the shipped+SCF lookup
-// continues through the cached singleton loader. Callers that don't have
-// a per-profile context (e.g. the prefix-only `AddressSpatialAssembler`
-// caller at line 103) keep their existing surface — the default empty
-// dictionary preserves prior behavior verbatim.
 
 enum ZIPStateTable {
 
@@ -31,24 +23,6 @@ enum ZIPStateTable {
         }
         guard let n = Int(prefix), prefix.count == 3 else { return nil }
         return state(forPrefixCode: n)
-    }
-
-    /// Overload for a full 5-digit ZIP — resolves in three tiers under P1
-    /// semantics: per-profile `userOverrides` → shipped 5-digit overrides
-    /// → 3-digit SCF prefix. The default empty `userOverrides` preserves
-    /// shipped+SCF behavior for callers without a profile context.
-    static func state(forZIP zip: String, userOverrides: [String: String] = [:]) -> String? {
-        let trimmed = zip.trimmingCharacters(in: .whitespacesAndNewlines)
-        let digits = trimmed.prefix { $0.isWholeNumber }
-        if !userOverrides.isEmpty, digits.count >= 5,
-           let hit = userOverrides[String(digits.prefix(5))] {
-            return hit
-        }
-        if let loader, let hit = loader.state(forZIP: zip) {
-            return hit
-        }
-        guard digits.count >= 3 else { return nil }
-        return state(forZIPPrefix: String(digits.prefix(3)))
     }
 
     // swiftlint:disable cyclomatic_complexity function_body_length

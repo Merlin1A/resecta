@@ -39,20 +39,6 @@ public enum GazetteerLoader {
         case signatureMismatch
     }
 
-    /// Verify the bundled gazetteer manifest's Ed25519 signature against
-    /// the engine module bundle (`Bundle.module`).
-    ///
-    /// On success: returns normally. On any failure (missing resource,
-    /// malformed key, malformed signature, or invalid signature) throws
-    /// `PipelineError.detectionError(.detectionCorpusInvalid)`. The throw
-    /// type is the PipelineError surface the rest of the pipeline already
-    /// routes through; the underlying `VerificationError` is captured in
-    /// the OS log for offline diagnosis (mechanism-only — no document
-    /// content, no key bytes — per ARCH §12.2).
-    public static func verifySignedManifest() throws {
-        try verifySignedManifest(bundle: .module)
-    }
-
     /// Testing / composition overload. Internal so a temp bundle with
     /// hand-built fixtures can be injected from `SignedManifestTests` without
     /// exposing a `Bundle.module` default-argument surface on the public

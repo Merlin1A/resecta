@@ -63,12 +63,10 @@ struct LegalKeyExistenceTests {
     // MARK: - Helpers (mirror LegalPhraseLintTests loader; D-12 parity)
 
     private struct XCStringsCatalog: Decodable {
-        let sourceLanguage: String?
         let strings: [String: Entry]
     }
 
     private struct Entry: Decodable {
-        let extractionState: String?
         let localizations: [String: Localization]?
     }
 
@@ -77,7 +75,6 @@ struct LegalKeyExistenceTests {
     }
 
     private struct StringUnit: Decodable {
-        let state: String?
         let value: String?
     }
 

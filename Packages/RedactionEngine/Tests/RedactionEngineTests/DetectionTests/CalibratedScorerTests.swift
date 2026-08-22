@@ -6,51 +6,19 @@ import Testing
 @Suite("CalibratedScorer")
 struct CalibratedScorerTests {
 
-    @Test("Loaded temperature when doctype-temperature.json bundled (post-S5)")
-    func loadedTemperature() {
-        // doctype-temperature.json ships
-        // in Resources/Classifier; default init loads T from the JSON.
-        // Identity-case (T=1.0) coverage lives in the explicit-T tests below
-        // (softmaxIdentity, neutralPosterior, monotonicComposition,
-        // thresholdGate). The cutover triage rewrote this test.
-        let scorer = CalibratedScorer()
-        #expect(scorer.effectiveTemperature > 0.0)
-        #expect(scorer.effectiveTemperature <= 1.0)
-    }
-
-    @Test("calibratedSoftmax with T=1 equals regular softmax")
-    func softmaxIdentity() {
-        let scorer = CalibratedScorer(temperature: 1.0)
-        let logits: [DoctypeClass: Double] = [
-            .court: 2.0, .medical: 1.0, .financial: 0.5, .foia: 0.0, .generic: -0.5,
-        ]
-        let softmax = scorer.calibratedSoftmax(logits: logits)
-        let sum = softmax.values.reduce(0, +)
-        #expect(abs(sum - 1.0) < 1e-9)
-        // Primary class has max logit.
-        #expect(softmax.max(by: { $0.value < $1.value })?.key == .court)
-    }
-
     @Test("posterior(0.5, 0.5) == 0.5")
     func neutralPosterior() {
-        let scorer = CalibratedScorer(temperature: 1.0)
+        let scorer = CalibratedScorer()
         let p = scorer.posterior(raw: 0.5, priorMean: 0.5)
         #expect(abs(p - 0.5) < 1e-6)
     }
 
     @Test("High raw + high prior → higher posterior")
     func monotonicComposition() {
-        let scorer = CalibratedScorer(temperature: 1.0)
+        let scorer = CalibratedScorer()
         let weak = scorer.posterior(raw: 0.7, priorMean: 0.5)
         let strong = scorer.posterior(raw: 0.7, priorMean: 0.9)
         #expect(strong > weak)
-    }
-
-    @Test("Threshold gate returns true when posterior meets threshold")
-    func thresholdGate() {
-        let scorer = CalibratedScorer(temperature: 1.0)
-        #expect(scorer.meets(threshold: 0.7, posterior: 0.75))
-        #expect(!scorer.meets(threshold: 0.7, posterior: 0.65))
     }
 
     // MARK: - S7 / design 03 §3.6 — absorbing-state floor
@@ -62,7 +30,7 @@ struct CalibratedScorerTests {
         // worst case (mixture mean after 5 rejections ≈ 0.161 → ≈ 0.366)
         // stays below the threshold, which is exactly the absorbing state
         // the floor removes.
-        let scorer = CalibratedScorer(temperature: 1.0)
+        let scorer = CalibratedScorer()
 
         let floored = scorer.posterior(raw: 0.75, priorMean: DetectionOrchestrator.absorbingStateFloor)
         #expect(abs(floored - 0.618) < 0.005, "design math pin: got \(floored)")
@@ -91,7 +59,7 @@ struct CalibratedScorerTests {
         let sixth = priors.updated(category: .account, decision: .rejected)
         #expect(sixth == priors, "6th same-direction update must be dropped")
 
-        let scorer = CalibratedScorer(temperature: 1.0)
+        let scorer = CalibratedScorer()
         let effectivePrior = max(mean, DetectionOrchestrator.absorbingStateFloor)
         let posterior = scorer.posterior(raw: 0.75, priorMean: effectivePrior)
         #expect(posterior > 0.60,
@@ -109,7 +77,7 @@ struct CalibratedScorerTests {
 
     @Test("Unfloored: a separator-less, no-keyword phone collapses to ≈ 0.0006")
     func phoneUnflooredCollapses() {
-        let scorer = CalibratedScorer(temperature: 1.0)
+        let scorer = CalibratedScorer()
         // contextLogit computed from the shipped fecd89b6 phone weights for a
         // separator-less / no-keyword / generic / mid-line phone — the standardized
         // has_separator term (≈ −7.43) dominates. Drives a valid raw 0.60 phone to

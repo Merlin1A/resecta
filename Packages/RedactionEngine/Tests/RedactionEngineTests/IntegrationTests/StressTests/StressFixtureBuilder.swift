@@ -41,14 +41,12 @@ enum StressFixtureBuilder {
     ///   - seed: LCG seed; identical seeds produce identical bytes
     ///     within the same Swift runtime. Default 42 matches the
     ///     plan body's reproducibility target.
-    ///   - directory: destination directory; defaults to a per-call
-    ///     UUID subdirectory under the test bundle's temporary path.
-    /// - Returns: file URL of the generated fixture. The caller owns
+    /// - Returns: file URL of the generated fixture, under a per-call UUID
+    ///   subdirectory of the test bundle's temporary path. The caller owns
     ///   cleanup; tests typically `removeItem(at:)` in a `defer` block.
     static func buildStressFixture(
         pageCount: Int = 500,
-        seed: UInt64 = 42,
-        directory: URL? = nil
+        seed: UInt64 = 42
     ) throws -> URL {
         let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
@@ -56,7 +54,7 @@ enum StressFixtureBuilder {
         // Per-call UUID subdirectory so parallel test runs (Swift
         // Testing runs `@Test` cases concurrently within a suite by
         // default) do not race over the same file path.
-        let parentDir = directory ?? FileManager.default.temporaryDirectory
+        let parentDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("StressFixtures", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(

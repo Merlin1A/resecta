@@ -257,8 +257,7 @@ class RedactionOverlayView: UIView {
     //   badgeOuterStrokeWidth / selectionHandleOuterStrokeWidth,
     //   dimensionLabelSmallRegionThreshold,
     //   DimensionLabelPosition + dimensionLabelPosition(…),
-    //   clampedDragOrigin(…),
-    //   HandleAnimationDirection + reduceMotionHandleScale(…).
+    //   clampedDragOrigin(…).
 
     // Predicate for the touchesBegan branch that routes a region tap
     // through `coordinator?.toggleRegionSelection`. Returns true when either
@@ -1409,7 +1408,7 @@ class RedactionOverlayView: UIView {
             // shape inside that box.
             if let vertices = region.vertices, vertices.count >= 3 {
                 drawPolygonRegion(
-                    ctx: ctx, vertices: vertices, isBeingMoved: isBeingMoved
+                    ctx: ctx, vertices: vertices
                 )
             } else {
                 ctx.addRect(drawRect)
@@ -1586,8 +1585,7 @@ class RedactionOverlayView: UIView {
     /// `fillPath(using: .evenOdd)`).
     private func drawPolygonRegion(
         ctx: CGContext,
-        vertices: [CGPoint],
-        isBeingMoved: Bool
+        vertices: [CGPoint]
     ) {
         let overlayPoints = vertices.map(normalizedPointToOverlay)
         guard overlayPoints.count >= 3 else { return }
@@ -2312,7 +2310,6 @@ extension RedactionOverlayView: UIContextMenuInteractionDelegate {
             ) { [weak self] _ in
                 guard let self else { return }
                 let request = MagicWandSearchRequest(
-                    rawTerm: ocrWord.text,
                     escapedTerm: escapedTerm
                 )
                 self.coordinator?.redactionState?.pendingMagicWandRequest = request
@@ -2337,10 +2334,8 @@ extension RedactionOverlayView: UIContextMenuInteractionDelegate {
 
 /// Payload carried by `RedactionState.pendingMagicWandRequest`
 /// when the canvas long-press menu fires "Select all instances".
-/// `rawTerm` preserves the user-visible text; `escapedTerm` is the
-/// regex-escaped form to feed into the search engine via
+/// `escapedTerm` is the regex-escaped form fed into the search engine via
 /// `SearchMode.text(escapedTerm, options:)` with `exactMatch = true`.
 struct MagicWandSearchRequest: Equatable, Sendable {
-    let rawTerm: String
     let escapedTerm: String
 }

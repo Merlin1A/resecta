@@ -211,8 +211,7 @@ public struct EmbeddedTextSource: Sendable {
 /// address assembly → calibrated scoring → face detection → merge.
 ///
 /// Phase 3: primary entry point is `detectPage(...)` which returns a
-/// `PageDetectionResult`. The older `detect(pageImage:pageIndex:)` remains
-/// as a thin compatibility shim.
+/// `PageDetectionResult`.
 public struct DetectionOrchestrator: Sendable {
     private let piiDetector: PIIDetector
     private let classifier = DocumentTypeClassifier()
@@ -253,12 +252,6 @@ public struct DetectionOrchestrator: Sendable {
     /// and the Settings reset affordance can reference the shipped value.
     public static let absorbingStateFloor = 0.35
 
-    /// SEC-7 — non-nil whenever this orchestrator was built via
-    /// `init(recognitionLevel:diagnostics:)` (SEC-7 entry point through
-    /// `PIIDetector.loadWithDiagnostics(...)`). The legacy default init
-    /// path produces no diagnostics value (existing callers, all tests).
-    public let gazetteerDiagnostics: GazetteerLoadDiagnostics?
-
     // MARK: - PERF-4 OCR invocation counter
 
     /// Process-global counter incremented every time `runOCR` is invoked on
@@ -275,11 +268,6 @@ public struct DetectionOrchestrator: Sendable {
             return _count
         }
 
-        public static func reset() {
-            lock.lock(); defer { lock.unlock() }
-            _count = 0
-        }
-
         fileprivate static func increment() {
             lock.lock(); defer { lock.unlock() }
             _count += 1
@@ -289,7 +277,6 @@ public struct DetectionOrchestrator: Sendable {
     public init(recognitionLevel: VNRequestTextRecognitionLevel = .fast) {
         self.piiDetector = PIIDetector()
         self.recognitionLevel = recognitionLevel
-        self.gazetteerDiagnostics = nil
         // Gazetteer / classifier / scorer / address-assembler loaders
         // run as stored-property defaults before this body executes, so the
         // engine is fully constructed by the time we reach this line.
@@ -311,7 +298,6 @@ public struct DetectionOrchestrator: Sendable {
     ) {
         self.piiDetector = detector
         self.recognitionLevel = recognitionLevel
-        self.gazetteerDiagnostics = diagnostics
         ColdStartTimer.shared.markEngineLoaded()
     }
 
@@ -523,7 +509,6 @@ public struct DetectionOrchestrator: Sendable {
                     family: wire,
                     features: contextFeatures(
                         match: match,
-                        doctype: effectiveDoctype,
                         effectiveDoctype: effectiveDoctype,
                         pageText: text
                     )
@@ -717,10 +702,8 @@ public struct DetectionOrchestrator: Sendable {
             : ClassificationDiagnostic(from: classifierOutput)
 
         return PageDetectionResult(
-            pageIndex: pageIndex,
             detections: detections,
             doctype: classifierOutput,
-            priorsDelta: PerCategoryPriors(),  // priors move on triage, not detection
             classificationDiagnostic: diagnostic,
             overlapSuppressedCountByCategory: resolved.suppressedCountByCategory,
             ocrProvenance: provenance
@@ -757,26 +740,6 @@ public struct DetectionOrchestrator: Sendable {
         switch doctype {
         case .court, .medical, .financial, .foia, .generic: return true
         }
-    }
-
-    // MARK: - Deprecated pre-Phase-3 entry point
-
-    /// Legacy entry point kept for existing call sites. Delegates to
-    /// `detectPage` with empty priors/surfaceForms and nil doctype context
-    /// (every detector runs unconditionally), then unwraps to a flat array.
-    @concurrent
-    public func detect(
-        pageImage: CGImage,
-        pageIndex: Int
-    ) async throws -> [DetectionResult] {
-        let result = try await detectPage(
-            image: pageImage,
-            pageIndex: pageIndex,
-            priors: PerCategoryPriors(),
-            surfaceForms: SurfaceFormDictionary(),
-            doctypeContext: nil
-        )
-        return result.detections
     }
 
     // MARK: - OCR (ENGINE §4.2, GAP §3.1)
@@ -962,7 +925,6 @@ public struct DetectionOrchestrator: Sendable {
             family: wire,
             features: contextFeatures(
                 match: match,
-                doctype: effectiveDoctype,
                 effectiveDoctype: effectiveDoctype,
                 pageText: pageText
             )

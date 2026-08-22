@@ -62,8 +62,6 @@ struct FlowLayout: Layout {
             switch alignment {
             case .center:
                 rowOffset = max(0, (maxWidth - row.width) / 2)
-            case .trailing:
-                rowOffset = max(0, maxWidth - row.width)
             default:
                 rowOffset = 0
             }

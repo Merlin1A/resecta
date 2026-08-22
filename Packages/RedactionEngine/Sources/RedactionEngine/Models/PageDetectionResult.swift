@@ -2,21 +2,18 @@ import Foundation
 
 // Plan §2 — the wrapper a single page's detection output threads through.
 // Carries raw detections + the doctype that gated them + an optional
-// classification diagnostic for the G5 triage panel. `priorsDelta` is the
-// per-category Beta update this page contributes (merged back on MainActor
-// when the coordinator yields). Phase 3 populates priorsDelta as an empty
-// update — priors move on triage accept/reject, not during detection.
+// classification diagnostic for the G5 triage panel.
 
 public struct PageDetectionResult: Sendable {
-    public let pageIndex: Int
     public let detections: [DetectionResult]
     public let doctype: DoctypeResult
-    public let priorsDelta: PerCategoryPriors
     public let classificationDiagnostic: ClassificationDiagnostic?
     /// W10 — per-category count of pre-threshold detections that lost
     /// an overlap group inside `DetectionOrchestrator.resolveOverlaps`.
-    /// Aggregated across pages by the coordinator and surfaced on
-    /// `CoverageReport.overlapSuppressedCountByCategory`.
+    /// Populated per page by the detection orchestrator; the app's scan-path
+    /// coordinator does not read or aggregate this field today (the search
+    /// path's `CoverageReport.overlapSuppressedCountByCategory` is computed
+    /// independently). Consumed by engine snapshot tests for parity checks.
     public let overlapSuppressedCountByCategory: [PIICategory: Int]
     /// ST-83 — PAGE-level OCR provenance. Per-detection provenance cannot
     /// carry the oversized-page skip on a page that produced zero
@@ -27,18 +24,14 @@ public struct PageDetectionResult: Sendable {
     public let ocrProvenance: DetectionResult.Provenance
 
     public init(
-        pageIndex: Int,
         detections: [DetectionResult],
         doctype: DoctypeResult,
-        priorsDelta: PerCategoryPriors,
         classificationDiagnostic: ClassificationDiagnostic?,
         overlapSuppressedCountByCategory: [PIICategory: Int] = [:],
         ocrProvenance: DetectionResult.Provenance = .ocrRan
     ) {
-        self.pageIndex = pageIndex
         self.detections = detections
         self.doctype = doctype
-        self.priorsDelta = priorsDelta
         self.classificationDiagnostic = classificationDiagnostic
         self.overlapSuppressedCountByCategory = overlapSuppressedCountByCategory
         self.ocrProvenance = ocrProvenance

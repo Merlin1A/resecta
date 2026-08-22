@@ -124,13 +124,6 @@ struct ModelTypeTests {
         #expect(err.errorDescription!.contains("could not be opened"))
     }
 
-    @Test("PipelineError.pageIndex extracts page for relevant cases")
-    func pipelineErrorPageIndex() {
-        #expect(PipelineError.redactionError(.bitmapCreationFailed(pageIndex: 3)).pageIndex == 3)
-        #expect(PipelineError.redactionError(.reconstructionFailed).pageIndex == nil)
-        #expect(PipelineError.importError(.corrupt).pageIndex == nil)
-    }
-
     @Test("PipelineError.isRecoverable flags correctly")
     func pipelineErrorRecoverable() {
         #expect(PipelineError.importError(.corrupt).isRecoverable == false)

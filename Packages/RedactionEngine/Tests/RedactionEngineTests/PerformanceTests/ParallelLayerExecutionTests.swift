@@ -29,6 +29,14 @@ import os
 //                         Character Lineage                  → sequential
 //
 // Mechanism-description language only — no outcome promises.
+//
+// REPORT-ONLY: this suite is listed in PERF_ALONE_RedactionEngine in
+// Scripts/test-batched.sh, so it runs by itself after the batches and its
+// results do not gate the batched exit status. The overlap-floor assertion
+// measures wall-clock concurrency shape and has read red under full
+// batch load while passing alone on the same build; a red here is a
+// maintainer review signal (re-run the suite alone on a quiet machine),
+// not a batch verdict.
 
 // `.serialized` keeps the five tests from racing each other inside the
 // suite. They measure wall-clock and concurrency shape, so concurrent
@@ -66,7 +74,7 @@ struct ParallelLayerExecutionTests {
         doc: SendablePDFDocument,
         sourcePageCount: Int,
         regions: [Int: [RedactionRegion]],
-        sensitiveTerms: [String],
+        sensitiveTerms: [SensitiveTerm],
         pipelineMode: PipelineMode,
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode]
@@ -113,7 +121,7 @@ struct ParallelLayerExecutionTests {
         doc: SendablePDFDocument,
         sourcePageCount: Int,
         regions: [Int: [RedactionRegion]],
-        sensitiveTerms: [String],
+        sensitiveTerms: [SensitiveTerm],
         pipelineMode: PipelineMode,
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode]
@@ -319,7 +327,7 @@ struct ParallelLayerExecutionTests {
             doc: SendablePDFDocument(doc),
             sourcePageCount: pageCount,
             regions: [:],
-            sensitiveTerms: ["NONEXISTENT_SAMPLE_PII_TOKEN_XYZ123"],
+            sensitiveTerms: ["NONEXISTENT_SAMPLE_PII_TOKEN_XYZ123"].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: digests,
             perPageModes: perPageModes
@@ -384,7 +392,7 @@ struct ParallelLayerExecutionTests {
 
         // Provide non-empty sensitive terms so Layer 2 builds and
         // runs an Aho-Corasick automaton against the PDF byte stream.
-        let sensitiveTerms = ["NONEXISTENT_SAMPLE_PII_TOKEN_XYZ123"]
+        let sensitiveTerms = ["NONEXISTENT_SAMPLE_PII_TOKEN_XYZ123"].map { SensitiveTerm(text: $0) }
 
         let verifier = VerificationEngine()
         let wrappedDoc = SendablePDFDocument(doc)

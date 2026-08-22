@@ -19,9 +19,6 @@ public struct NegativeContextGazetteer: Sendable {
     struct ScopedEntries: Sendable {
         let keywords: [String]
         let weights: [Double]
-        /// Bucket-level maximum — retained for the index builder; NOT used in
-        /// suppression scoring (the per-matched-keyword semantics fix, S3).
-        let maxPrecedenceWeight: Double
     }
 
     public enum LoaderError: Error {
@@ -164,17 +161,6 @@ public struct NegativeContextGazetteer: Sendable {
         return max(0.25, base * 0.6)
     }
 
-    /// Forward-feedback hint for `DocumentTypeClassifier`: scan the document
-    /// header for any known institution and return the doctype class that
-    /// institution anchors. Today `federal_agency` → `.foia`; other
-    /// categories return `nil` until their mapping is authorized.
-    public func anchoredDoctype(documentHeader: String) -> DoctypeClass? {
-        guard let institutions,
-              let entry = institutions.findInstitution(in: documentHeader)
-        else { return nil }
-        return InstitutionGazetteer.anchoredDoctype(for: entry)
-    }
-
     // MARK: - Wire name mapping
 
     /// The schema constrains category_scope to {ssn, npi, dea, name, address, dob}.
@@ -254,11 +240,9 @@ private struct WireFormat: Decodable {
         return grouped.mapValues { bucket in
             let keywords = bucket.map { $0.keyword.lowercased() }
             let weights = bucket.map { $0.precedence_weight }
-            let maxWeight = weights.max() ?? 0.25
             return NegativeContextGazetteer.ScopedEntries(
                 keywords: keywords,
-                weights: weights,
-                maxPrecedenceWeight: maxWeight
+                weights: weights
             )
         }
     }

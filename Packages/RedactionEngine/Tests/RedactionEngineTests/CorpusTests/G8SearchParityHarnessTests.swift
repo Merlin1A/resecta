@@ -7,7 +7,7 @@ import Foundation
 // posterior (see `searchParitySiteBBeforeAfter` below).
 //
 // Plan 04 §5.5 / D-13: Site B (DocumentSearcher) gated RAW match.confidence via
-// `ThresholdFilter.applying(thresholdVector:)` (DocumentSearcher.swift:1146 /
+// `ThresholdFilter.applyingCountingDrops(thresholdVector:)` (DocumentSearcher.swift:1146 /
 // :1338 → ThresholdFilter.swift:28-44) with NO posterior, NO prior, NO learned
 // term. Site A (DetectionOrchestrator.swift:432-446) composes the posterior
 // before its cutoff. B02 measured the C1 scorer reaching none of the five
@@ -24,16 +24,12 @@ import Foundation
 //   - SAME detector matches as the Site-A baseline (detect(in:doctype:) over the
 //     same 1,100 G8 docs, same gateDoctypeClass doctype).
 //   - Site-B surfacing: route those matches through
-//     `[PIIMatch].applying(thresholdVector:)` (the EXACT Site-B gate call) using
+//     `[PIIMatch].applyingCountingDrops(thresholdVector:)` (the EXACT Site-B gate call) using
 //     the SAME balanced PresetThresholdVector the baseline harness reads.
 //   - Aggregate the IDENTICAL BaselineCell schema, keyed <cat>_<doctype>_<bucket>.
 //   - Site-A surfacing (for the delta): match.confidence >= balancedCutoff —
 //     the existing baseline `surfaced` rule.
 //   - M10 = per-family (Site-B FP − Site-A FP) for {account, phone, mrn, ein, itin}.
-//
-// `searchG8Corpus` is BEFORE-only and Tests-only. It emits a DISTINCT output base
-// (<base>_siteb_cells.json) and prints the per-family M10 deltas. It does NOT
-// touch the frozen Site-A cells/raw_scores files.
 //
 // Privacy (ARCH §12.2): offset-only — overlap arithmetic on NSRange locations;
 // no document text, no PII value, no coordinate is read or emitted.
@@ -41,8 +37,7 @@ import Foundation
 @Suite("G8 Site-B parity twin (M10, standing emitter)", .serialized)
 struct G8SearchParityHarnessTests {
 
-    // Reuse the baseline suite's wire format + cell schema by reference.
-    typealias Corpus = G8BaselineHarnessTests.BaselineG8Corpus
+    // Reuse the baseline suite's cell schema by reference.
     typealias Cell = G8BaselineHarnessTests.BaselineCell
 
     struct SiteBCellsReport: Encodable, Sendable {
@@ -62,146 +57,6 @@ struct G8SearchParityHarnessTests {
         PresetThresholdBundle.loadFromEngineBundle().presets[.balanced]
     }
 
-    @Test("Emit Site-B BEFORE cells + the M10 per-family FP divergence")
-    func searchG8Corpus() async throws {
-        guard let corpus = try G8BaselineHarnessTests.loadBaselineCorpus() else {
-            print("[M10] g8_corpus.json not bundled; Site-B twin skipped.")
-            return
-        }
-        guard let vector = Self.balancedVector() else {
-            print("[M10] balanced preset vector unavailable; Site-B twin skipped.")
-            return
-        }
-
-        let detector = PIIDetector()
-        let sortedDocs = corpus.documents.sorted { $0.id < $1.id }
-
-        var siteBCells: [String: Cell] = [:]
-        // Per-family false-positive tallies for the M10 delta.
-        var siteAFP: [String: Int] = [:]
-        var siteBFP: [String: Int] = [:]
-        let families = ContextFeatureContract.scoredFamilies
-
-        for doc in sortedDocs {
-            guard let doctype = gateDoctypeClass(doc.doctype) else { continue }
-            let bucket = doc.demographic_bucket
-
-            let matches = await detector.detect(in: doc.text, doctype: doctype)
-
-            // Ground truth grouped by kind (same split as the baseline harness:
-            // suppress → decoy; everything else → positive; union = allGT).
-            var positiveGTByKind: [RedactionRegion.PIIKind: [NSRange]] = [:]
-            var decoyGTByKind: [RedactionRegion.PIIKind: [NSRange]] = [:]
-            var allGTByKind: [RedactionRegion.PIIKind: [NSRange]] = [:]
-            for span in doc.pii_spans {
-                guard let kind = G8BaselineHarnessTests.baselineMapCategory(span.category) else { continue }
-                let r = NSRange(location: span.start, length: span.end - span.start)
-                allGTByKind[kind, default: []].append(r)
-                if span.expected_outcome == "suppress" {
-                    decoyGTByKind[kind, default: []].append(r)
-                } else {
-                    positiveGTByKind[kind, default: []].append(r)
-                }
-            }
-
-            // Site-B surfacing: the EXACT search-path gate over the same matches.
-            // ThresholdFilter passes a match through when its category has no
-            // wire-name OR the vector has no entry; otherwise raw >= cutoff.
-            let siteBSurvivors = matches.applying(thresholdVector: vector)
-            var siteBByKind: [RedactionRegion.PIIKind: [NSRange]] = [:]
-            for m in siteBSurvivors {
-                siteBByKind[m.kind, default: []].append(m.range)
-            }
-
-            // Site-A surfacing: the baseline harness rule (raw vs balancedCutoff;
-            // nil cutoff → passes unfiltered). Recomputed here only for the M10
-            // FP tally so both sites are measured from the SAME matches.
-            var siteAByKind: [RedactionRegion.PIIKind: [NSRange]] = [:]
-            for m in matches {
-                let cutoff = balancedCutoff(for: m.kind)
-                let surfaced = cutoff.map { m.confidence >= $0 } ?? true
-                if surfaced { siteAByKind[m.kind, default: []].append(m.range) }
-            }
-
-            var kinds = Set(allGTByKind.keys)
-            kinds.formUnion(siteBByKind.keys)
-            kinds.formUnion(siteAByKind.keys)
-
-            for kind in kinds {
-                guard let catKey = G8BaselineHarnessTests.cellCategoryKey(for: kind) else { continue }
-                let cellKey = "\(catKey)_\(doc.doctype)_\(bucket)"
-                var cell = siteBCells[cellKey] ?? Cell()
-
-                let positives = positiveGTByKind[kind] ?? []
-                let decoys = decoyGTByKind[kind] ?? []
-                let allGT = allGTByKind[kind] ?? []
-                let siteB = siteBByKind[kind] ?? []
-
-                // TP / FN against Site-B survivors.
-                for gt in positives {
-                    let covered = siteB.contains { G8BaselineHarnessTests.rangesOverlap($0, gt) }
-                    if covered { cell.true_positives += 1 } else { cell.false_negatives += 1 }
-                }
-
-                // Adversarial suppression (decoy GT fired at Site B).
-                cell.adversarial_suppress_total += decoys.count
-                for decoy in decoys {
-                    let fired = siteB.contains { G8BaselineHarnessTests.rangesOverlap($0, decoy) }
-                    if fired { cell.adversarial_suppress_fired += 1 }
-                }
-
-                // Generic FP: a Site-B survivor overlapping NO GT span (any label).
-                for det in siteB {
-                    let overlapsAnyGT = allGT.contains { G8BaselineHarnessTests.rangesOverlap(det, $0) }
-                    if !overlapsAnyGT { cell.false_positives += 1 }
-                }
-                siteBCells[cellKey] = cell
-
-                // M10 tally: per-family Site-A / Site-B FP for the five families.
-                if let family = PIICategory(piiKind: kind)
-                    .flatMap({ PresetThresholdVector.wireName(for: $0) }),
-                    families.contains(family) {
-                    let siteA = siteAByKind[kind] ?? []
-                    for det in siteB {
-                        if !allGT.contains(where: { G8BaselineHarnessTests.rangesOverlap(det, $0) }) {
-                            siteBFP[family, default: 0] += 1
-                        }
-                    }
-                    for det in siteA {
-                        if !allGT.contains(where: { G8BaselineHarnessTests.rangesOverlap(det, $0) }) {
-                            siteAFP[family, default: 0] += 1
-                        }
-                    }
-                }
-            }
-        }
-
-        let base = G8BaselineHarnessTests.baselineOutBase()
-        let report = SiteBCellsReport(
-            schema_version: 1,
-            generated_by: "G8SearchParityHarness.searchG8Corpus",
-            g8_corpus_seed: corpus.seed,
-            cutoff_preset: "balanced",
-            site: "B",
-            gate_mechanism: "ThresholdFilter.applying(thresholdVector:)",
-            doc_count: sortedDocs.count,
-            cells: siteBCells
-        )
-        try G8BaselineHarnessTests.writeJSON(report, to: "\(base)_siteb_cells.json")
-
-        print("[M10] Site-B cells → \(base)_siteb_cells.json (\(siteBCells.count) cells)")
-        print("[M10] per-family FP divergence (Site-B − Site-A), five scored families:")
-        for family in families.sorted() {
-            let a = siteAFP[family, default: 0]
-            let b = siteBFP[family, default: 0]
-            print("[M10]   \(family): siteA_FP=\(a) siteB_FP=\(b) delta=\(b - a)")
-        }
-
-        #expect(!siteBCells.isEmpty, "no Site-B cells emitted — corpus loaded but produced nothing")
-        #expect(sortedDocs.count == 1100,
-                "G8 doc_count expected 1100; got \(sortedDocs.count)")
-    }
-
     // MARK: - B06 BEFORE/AFTER leg (Site-B parity)
 
     /// Per-family Site-B tallies for the predicate + the C3 Search recall floor.
@@ -214,14 +69,14 @@ struct G8SearchParityHarnessTests {
 
     /// One BEFORE/AFTER pass over the G8 corpus at Site B, parameterised by how a
     /// scored family is gated:
-    ///   - `.raw`       → `applying(thresholdVector:)` (today's Site-B gate; the
-    ///     literal BEFORE).
+    ///   - `.raw`       → `applyingCountingDrops(thresholdVector:)` (today's
+    ///     Site-B gate; the literal BEFORE).
     ///   - `.identity`  → the production `composedSurvivors` core driven with
     ///     `ContextScorerWeights.identity` (the w=0 control — composed == raw).
     ///   - `.installed` → the same core with the installed (B05) calibrated
     ///     scorer (the AFTER).
-    /// In every variant, NON-scored families flow through `applying(...)`
-    /// untouched, so the recombined survivor SET differs only by the scored
+    /// In every variant, NON-scored families flow through
+    /// `applyingCountingDrops(...)` untouched, so the recombined survivor SET differs only by the scored
     /// families. Returns the aggregated cells plus the per-family tally.
     private enum SiteBVariant { case raw, identity, installed }
 
@@ -263,7 +118,7 @@ struct G8SearchParityHarnessTests {
             let scored: [PIIDetector.PIIMatch]
             switch variant {
             case .raw:
-                scored = scoredAll.applying(thresholdVector: vector)
+                scored = scoredAll.applyingCountingDrops(thresholdVector: vector).survivors
             case .identity, .installed:
                 let scorer: ContextScorerWeights = (variant == .identity) ? .identity : installedScorer
                 // Split off any C3-zeroed family → raw path; the rest → composed.
@@ -275,9 +130,9 @@ struct G8SearchParityHarnessTests {
                 }
                 scored = DocumentSearcher._testComposeSiteB(
                     composedInput, pageText: doc.text, thresholdVector: vector, scorer: scorer
-                ) + rawInput.applying(thresholdVector: vector)
+                ) + rawInput.applyingCountingDrops(thresholdVector: vector).survivors
             }
-            let survivors = rest.applying(thresholdVector: vector) + scored
+            let survivors = rest.applyingCountingDrops(thresholdVector: vector).survivors + scored
 
             var byKind: [RedactionRegion.PIIKind: [NSRange]] = [:]
             for m in survivors { byKind[m.kind, default: []].append(m.range) }
@@ -393,11 +248,11 @@ struct G8SearchParityHarnessTests {
 
         let rawData = try encodeCells(
             rawCells, generatedBy: "G8SearchParityHarness.searchG8Corpus",
-            seed: corpus.seed, gate: "ThresholdFilter.applying(thresholdVector:)"
+            seed: corpus.seed, gate: "ThresholdFilter.applyingCountingDrops(thresholdVector:)"
         )
         let identityData = try encodeCells(
             identityCells, generatedBy: "G8SearchParityHarness.searchG8Corpus",
-            seed: corpus.seed, gate: "ThresholdFilter.applying(thresholdVector:)"
+            seed: corpus.seed, gate: "ThresholdFilter.applyingCountingDrops(thresholdVector:)"
         )
 
         let base = G8BaselineHarnessTests.baselineOutBase()

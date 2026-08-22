@@ -91,11 +91,96 @@ struct SearchSheetDismissRuleTests {
                 "a programmatic restore is not user selection work")
     }
 
-    @Test("SearchState.selectWhere itself never flips the tracker (gesture sites own the flip)")
-    func selectWhereAloneDoesNotFlip() {
+    // MARK: - UXC-39: the arm-on-preselect tracker
+
+    @Test("Magic-wand preselect consumption arms hasUnreviewedPreselection")
+    func magicWandPreselectArmsUnreviewedTracker() {
+        let state = SearchState()
+        state.preselectIncomingResults = true
+        state.appendResult(makeResult())
+        state.flushPendingResults()
+
+        #expect(state.hasUnreviewedPreselection == true,
+                "a session that actually received an auto-selected result is armed")
+        #expect(state.userModifiedSelections == false,
+                "the separate USER-touched tracker stays false — predicate #3 above")
+        #expect(state.requiresDismissConfirmation == true,
+                "the combined gate reads true from the unreviewed-preselect fact alone")
+    }
+
+    @Test("A session that never receives a preselected result stays unarmed")
+    func noPreselectLeavesUnreviewedTrackerFalse() {
+        let state = SearchState()
+        state.appendResult(makeResult())
+        state.flushPendingResults()
+
+        #expect(state.hasUnreviewedPreselection == false)
+        #expect(state.requiresDismissConfirmation == false)
+    }
+
+    @Test("Mode-switch undo restore does not arm hasUnreviewedPreselection")
+    func modeSwitchRestoreDoesNotArmUnreviewedTracker() {
+        let state = SearchState()
+        let snapshot = SearchAndRedactSheet.ModeSwitchSnapshot(
+            mode: .text,
+            results: [makeResult(selected: true)],
+            appliedResultIDs: [],
+            piiCategoryFilter: nil,
+            sortOrder: .discoveryOrder,
+            appliedFilter: .all
+        )
+        SearchAndRedactSheet.restoreModeSwitchSnapshot(snapshot, in: state)
+
+        #expect(state.hasUnreviewedPreselection == false,
+                "a programmatic restore writes `results` directly — it never calls appendResult")
+        #expect(state.requiresDismissConfirmation == false)
+    }
+
+    @Test("clear() resets hasUnreviewedPreselection with the session")
+    func clearResetsUnreviewedPreselectionTracker() {
+        let state = SearchState()
+        state.preselectIncomingResults = true
+        state.appendResult(makeResult())
+        state.flushPendingResults()
+        #expect(state.hasUnreviewedPreselection == true, "precondition")
+
+        state.clear()
+
+        #expect(state.hasUnreviewedPreselection == false)
+        #expect(state.requiresDismissConfirmation == false)
+    }
+
+    @Test("A successful search-origin apply resets hasUnreviewedPreselection")
+    func applyResetsUnreviewedPreselectionTracker() async {
+        let redactionState = RedactionState()
+        let search = SearchState()
+        search.preselectIncomingResults = true
+        search.appendResult(makeResult())
+        search.flushPendingResults()
+        redactionState.activeSearch = search
+        #expect(search.hasUnreviewedPreselection == true, "precondition")
+
+        _ = await redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
+
+        #expect(search.hasUnreviewedPreselection == false,
+                "the committed preselected set no longer needs protecting")
+    }
+
+    @Test("SearchState.addToSelection itself never flips the tracker (gesture sites own the flip)")
+    func addToSelectionAloneDoesNotFlip() {
         let state = SearchState()
         state.results = [makeResult()]
-        state.selectWhere { _ in true }
+        state.addToSelection { _ in true }
+        #expect(state.results.first?.isSelected == true)
+        #expect(state.userModifiedSelections == false,
+                "the state method is shared by user + programmatic paths; the flip lives at the gesture sites")
+    }
+
+    @Test("SearchState.setSelection itself never flips the tracker (gesture sites own the flip)")
+    func setSelectionAloneDoesNotFlip() {
+        let state = SearchState()
+        state.results = [makeResult()]
+        state.setSelection { _ in true }
         #expect(state.results.first?.isSelected == true)
         #expect(state.userModifiedSelections == false,
                 "the state method is shared by user + programmatic paths; the flip lives at the gesture sites")

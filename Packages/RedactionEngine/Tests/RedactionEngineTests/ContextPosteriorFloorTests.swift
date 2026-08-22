@@ -107,7 +107,7 @@ struct ContextPosteriorFloorTests {
         let digits = "12345678"
         let range = (pageText as NSString).range(of: digits)
         let match = PIIDetector.PIIMatch(text: digits, range: range, kind: .account, confidence: 0.75)
-        let features = contextFeatures(match: match, doctype: .generic,
+        let features = contextFeatures(match: match,
             effectiveDoctype: .generic, pageText: pageText)
         let contextLogit = scorer.learnedContextLogit(family: "account", features: features)
         let bare = calibrated.posterior(raw: 0.75, priorMean: 0.5, contextLogit: contextLogit)
@@ -130,7 +130,7 @@ struct ContextPosteriorFloorTests {
         let digits = "5551234567"
         let range = (pageText as NSString).range(of: digits)
         let match = PIIDetector.PIIMatch(text: digits, range: range, kind: .phone, confidence: 0.80)
-        let features = contextFeatures(match: match, doctype: .generic,
+        let features = contextFeatures(match: match,
             effectiveDoctype: .generic, pageText: pageText)
         let contextLogit = scorer.learnedContextLogit(family: "phone", features: features)
         let bare = calibrated.posterior(raw: 0.80, priorMean: 0.5, contextLogit: contextLogit)

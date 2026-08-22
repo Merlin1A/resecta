@@ -86,17 +86,12 @@ struct NameRecallTransactionLinesTests {
                 == "Indn Delia Hartwell Co Id 1364419872")
         #expect(PIIDetector.nerShadow("PAYMENT TO DELIA HARTWELL,CHECKING")
                 == "Payment To Delia Hartwell Checking")
-        // Legacy behavior on the same input (documents why the shadow
-        // replaced it): the glued name never surfaced as a taggable word.
-        #expect(PIIDetector.titleCaseAllCapsWords("INDN:DELIA HARTWELL CO ID:1364419872")
-                == "Indn:delia Hartwell Co Id:1364419872")
     }
 
-    @Test("Shadow matches legacy title-casing on plain ALL-CAPS text")
+    @Test("Shadow title-cases plain ALL-CAPS text word-by-word")
     func shadowMatchesLegacyOnPlainAllCaps() {
         let text = "JOHN SMITH FILED A CLAIM"
         #expect(PIIDetector.nerShadow(text) == "John Smith Filed A Claim")
-        #expect(PIIDetector.nerShadow(text) == PIIDetector.titleCaseAllCapsWords(text))
     }
 
     @Test("Shadow preserves UTF-16 length across edge cases",

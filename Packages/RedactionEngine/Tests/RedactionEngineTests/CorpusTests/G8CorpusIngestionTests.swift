@@ -47,7 +47,6 @@ struct G8CorpusIngestionTests {
         let demographic_bucket: String
         let text: String
         let pii_spans: [PIISpan]
-        let adversarial_tags: [String]?
     }
 
     struct PIISpan: Decodable, Sendable {
@@ -55,8 +54,6 @@ struct G8CorpusIngestionTests {
         let start: Int
         let end: Int
         let value: String
-        let adversarial: Bool?
-        let expected_outcome: String?
     }
 
     // MARK: - Tests

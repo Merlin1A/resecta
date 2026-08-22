@@ -141,7 +141,6 @@ struct SearchResultsListObservationCrashTests {
         )
         .environment(DocumentState())
         .environment(RedactionState())
-        .environment(SettingsState())
         .environment(ToastQueueManager())
 
         let controller = UIHostingController(rootView: AnyView(section))

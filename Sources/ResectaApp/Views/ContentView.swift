@@ -15,7 +15,6 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppCoordinator.self) private var appCoordinator
-    @Environment(SettingsState.self) private var settingsState
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 

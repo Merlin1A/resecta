@@ -17,7 +17,6 @@ struct SSNDetectionTests {
         #expect(candidates.first?.area == "123")
         #expect(candidates.first?.group == "45")
         #expect(candidates.first?.serial == "6789")
-        #expect(candidates.first?.separator == "-")
     }
 
     @Test("State machine finds space-separated SSN")
@@ -25,7 +24,6 @@ struct SSNDetectionTests {
         let sm = SSNStateMachine()
         let candidates = sm.scan("123 45 6789")
         #expect(candidates.count == 1)
-        #expect(candidates.first?.separator == " ")
     }
 
     @Test("State machine finds unseparated SSN")
@@ -33,7 +31,6 @@ struct SSNDetectionTests {
         let sm = SSNStateMachine()
         let candidates = sm.scan("123456789")
         #expect(candidates.count == 1)
-        #expect(candidates.first?.separator == nil)
         #expect(candidates.first?.matchedText == "123456789")
     }
 
@@ -111,42 +108,42 @@ struct SSNDetectionTests {
     @Test("Validator rejects area 000")
     func validatorArea000() {
         let v = SSNStructuralValidator()
-        let c = SSNCandidate(area: "000", group: "45", serial: "6789", range: NSRange(), separator: "-", matchedText: "")
+        let c = SSNCandidate(area: "000", group: "45", serial: "6789", range: NSRange(), matchedText: "")
         #expect(!v.isValid(c))
     }
 
     @Test("Validator rejects area 666")
     func validatorArea666() {
         let v = SSNStructuralValidator()
-        let c = SSNCandidate(area: "666", group: "45", serial: "6789", range: NSRange(), separator: "-", matchedText: "")
+        let c = SSNCandidate(area: "666", group: "45", serial: "6789", range: NSRange(), matchedText: "")
         #expect(!v.isValid(c))
     }
 
     @Test("Validator rejects area 900-999", arguments: ["900", "950", "999"])
     func validatorArea900(area: String) {
         let v = SSNStructuralValidator()
-        let c = SSNCandidate(area: area, group: "45", serial: "6789", range: NSRange(), separator: "-", matchedText: "")
+        let c = SSNCandidate(area: area, group: "45", serial: "6789", range: NSRange(), matchedText: "")
         #expect(!v.isValid(c))
     }
 
     @Test("Validator rejects group 00")
     func validatorGroup00() {
         let v = SSNStructuralValidator()
-        let c = SSNCandidate(area: "123", group: "00", serial: "6789", range: NSRange(), separator: "-", matchedText: "")
+        let c = SSNCandidate(area: "123", group: "00", serial: "6789", range: NSRange(), matchedText: "")
         #expect(!v.isValid(c))
     }
 
     @Test("Validator rejects serial 0000")
     func validatorSerial0000() {
         let v = SSNStructuralValidator()
-        let c = SSNCandidate(area: "123", group: "45", serial: "0000", range: NSRange(), separator: "-", matchedText: "")
+        let c = SSNCandidate(area: "123", group: "45", serial: "0000", range: NSRange(), matchedText: "")
         #expect(!v.isValid(c))
     }
 
     @Test("Validator rejects Woolworth SSN (078-05-1120)")
     func validatorWoolworth() {
         let v = SSNStructuralValidator()
-        let c = SSNCandidate(area: "078", group: "05", serial: "1120", range: NSRange(), separator: "-", matchedText: "")
+        let c = SSNCandidate(area: "078", group: "05", serial: "1120", range: NSRange(), matchedText: "")
         #expect(!v.isValid(c))
     }
 
@@ -162,14 +159,14 @@ struct SSNDetectionTests {
     ] as [(String, String, String)])
     func validatorAllSameDigit(_ area: String, _ group: String, _ serial: String) {
         let v = SSNStructuralValidator()
-        let c = SSNCandidate(area: area, group: group, serial: serial, range: NSRange(), separator: "-", matchedText: "")
+        let c = SSNCandidate(area: area, group: group, serial: serial, range: NSRange(), matchedText: "")
         #expect(!v.isValid(c))
     }
 
     @Test("Validator accepts structurally valid SSN")
     func validatorAcceptsValid() {
         let v = SSNStructuralValidator()
-        let c = SSNCandidate(area: "123", group: "45", serial: "6789", range: NSRange(), separator: "-", matchedText: "")
+        let c = SSNCandidate(area: "123", group: "45", serial: "6789", range: NSRange(), matchedText: "")
         #expect(v.isValid(c))
     }
 

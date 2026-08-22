@@ -1149,6 +1149,8 @@ final class SearchState: Identifiable {
         preselectIncomingResults = false
         // Conditional dismiss: the touched-selections tracker is per-sheet-session.
         userModifiedSelections = false
+        // UXC-39 — sibling tracker, same per-sheet-session lifetime.
+        hasUnreviewedPreselection = false
         // Defensive: an armed-but-unconsumed auto-run must not leak
         // into the next sheet session (the flag is normally consumed
         // by the sheet's `.onAppear` before any teardown can run).
@@ -1214,31 +1216,49 @@ final class SearchState: Identifiable {
         navigationScope = .currentPage
     }
 
-    /// Select all results matching `predicate`. Each result's
-    /// `isSelected` is replaced with `predicate(result)` — predicates
-    /// that match a subset deselect the rest, so the
-    /// `SearchResultsSection` "Select where…" Menu can express
-    /// "select only PII results above 90%" / "select only OCR" as a
-    /// single mutation. Bumps `resultVersion` once for the full pass
-    /// (no per-result observer churn). Performance gate: <100ms on
-    /// 10k results — pinned by `SearchStateSelectionTests`.
-    func selectWhere(_ predicate: (SearchResult) -> Bool) {
+    /// Replace-selection primitive: every result's `isSelected` is set to
+    /// `predicate(result)` — predicates that match a subset deselect the
+    /// rest. RB-21 (UXC-12): the `SearchResultsSection` "Select where…"
+    /// Menu no longer routes through this — it's additive now
+    /// (`addToSelection(where:)` below). This primitive survives as the
+    /// footer Select All / Deselect All toggle's building block, where
+    /// "deselect everything not in the target set" is exactly the wanted
+    /// behavior. Bumps `resultVersion` once for the full pass (no
+    /// per-result observer churn). Performance gate: <100ms on 10k
+    /// results — pinned by `SearchStateSelectionTests`.
+    func setSelection(where predicate: (SearchResult) -> Bool) {
         for i in results.indices {
             results[i].isSelected = predicate(results[i])
         }
         resultVersion += 1
     }
 
-    /// Footer bar select-all / deselect-all toggle. Refactored
-    /// to compose with `selectWhere` while preserving filtered-only
-    /// behavior — results outside the active filter retain their
-    /// existing `isSelected`. The captured `filteredIDs` + `target`
+    /// Additive-selection primitive (RB-21/UXC-12): every result matching
+    /// `predicate` is selected; nothing already selected is ever
+    /// deselected. This backs the "Select where…" Menu's mutation —
+    /// tapping a predicate ADDS the matching rows to whatever is already
+    /// picked, and never narrows. Narrowing to exactly a predicate's
+    /// matches is the two-step user flow the footer already offers:
+    /// "Deselect All" (→ `setSelection(where:)` via `toggleSelectAll`),
+    /// then a predicate tap here. Bumps `resultVersion` once per call,
+    /// same contract as `setSelection(where:)`.
+    func addToSelection(where predicate: (SearchResult) -> Bool) {
+        for i in results.indices where predicate(results[i]) {
+            results[i].isSelected = true
+        }
+        resultVersion += 1
+    }
+
+    /// Footer bar select-all / deselect-all toggle. Composes with
+    /// `setSelection(where:)` (the replace primitive) while preserving
+    /// filtered-only behavior — results outside the active filter retain
+    /// their existing `isSelected`. The captured `filteredIDs` + `target`
     /// makes the predicate a pure function of `result.id`.
     func toggleSelectAll() {
         let filtered = filteredResults
         let filteredIDs = Set(filtered.map(\.id))
         let target = !filtered.allSatisfy(\.isSelected)
-        selectWhere { result in
+        setSelection { result in
             filteredIDs.contains(result.id) ? target : result.isSelected
         }
     }
@@ -1277,6 +1297,38 @@ final class SearchState: Identifiable {
     /// on session teardown.
     var userModifiedSelections: Bool = false
 
+    /// UXC-39 — whether this session actually received results that
+    /// arrived pre-selected (the magic-wand `preselectIncomingResults`
+    /// flow, `appendResult` below) and the user has not yet resolved
+    /// them one way or another. Deliberately a SEPARATE fact from
+    /// `userModifiedSelections`: that tracker means "the user touched
+    /// selections," and a magic-wand session that arrives with
+    /// everything auto-selected and is dismissed untouched would
+    /// otherwise read as untouched — a stray swipe or Dismiss silently
+    /// discards the whole auto-selected set with no confirmation. Written
+    /// `true` only when `appendResult` actually consumes
+    /// `preselectIncomingResults` for a streamed result — never by the
+    /// mode-switch undo restore (`restoreModeSwitchSnapshot` assigns
+    /// `results` directly, bypassing `appendResult`, so it cannot set
+    /// this by construction). Reset rules mirror `userModifiedSelections`:
+    /// a successful apply resets it (the preselected set was committed —
+    /// see `RedactionState.applySelectedSearchResultsOrigin` /
+    /// `applyFindings(.stagedDetections)`), the review-arrival re-target
+    /// resets it (`DocumentEditorView.presentReviewInScanInterface`, a
+    /// fresh all-deselected context), and `clear()` resets it on session
+    /// teardown. See `requiresDismissConfirmation`.
+    var hasUnreviewedPreselection: Bool = false
+
+    /// UXC-39 — the single predicate both dismiss-gate sites
+    /// (`DocumentEditorView`'s `.interactiveDismissDisabled` and
+    /// `SearchSheetHeaderSection`'s Dismiss handler) read: true when
+    /// either the user touched selections, or an auto-selected set has
+    /// never been reviewed. Either fact means a silent dismiss would
+    /// discard work the user hasn't confirmed away.
+    var requiresDismissConfirmation: Bool {
+        userModifiedSelections || hasUnreviewedPreselection
+    }
+
     /// Buffer a result from the search stream. Flushed in batches
     /// to avoid per-result @Observable change notifications (P2).
     /// Stops accepting at engine cap and cancels the search (P3).
@@ -1298,6 +1350,10 @@ final class SearchState: Identifiable {
         // delivering the "all instances selected by default" UX.
         if preselectIncomingResults {
             stored.isSelected = true
+            // UXC-39 — this session actually received an auto-selected
+            // result; arm the dismiss-confirmation tracker so it cannot
+            // be silently swiped away unreviewed.
+            hasUnreviewedPreselection = true
         }
         pendingResults.append(stored)
         if pendingResults.count >= Self.batchFlushSize {

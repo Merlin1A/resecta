@@ -253,7 +253,6 @@ struct PencilCircleSelectOverlay: UIViewRepresentable {
         // layer, so finger touches proceed to the List untouched while
         // Pencil pans still drive the circle gesture.
         view.hostedRecognizer = recognizer
-        context.coordinator.recognizer = recognizer
         context.coordinator.overlayView = view
         return view
     }
@@ -269,7 +268,6 @@ struct PencilCircleSelectOverlay: UIViewRepresentable {
     final class Coordinator: NSObject {
         var onLoopClose: ([CGPoint]) -> Void
         var onStrokeActiveChanged: (Bool) -> Void
-        weak var recognizer: PencilCircleSelectGestureRecognizer?
         /// The overlay view, used to convert the recognizer's
         /// window-space path into overlay-local coordinates — the
         /// overlay spans the List, so overlay-local equals the named
