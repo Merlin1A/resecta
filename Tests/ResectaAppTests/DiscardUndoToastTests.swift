@@ -22,6 +22,11 @@ struct DiscardUndoToastTests {
         #expect(SearchAndRedactSheet.discardUndoActionLabel == "Undo")
     }
 
+    @Test("Detection-results-dismissed toast is punctuated as a complete sentence (UXC-31/RB-40)")
+    func detectionResultsDismissedToastPinned() {
+        #expect(SearchAndRedactSheet.detectionResultsDismissedToast == "Detection results dismissed.")
+    }
+
     // MARK: - Snapshot
 
     @Test("currentSelectionSnapshot returns IDs of selected results only")

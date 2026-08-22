@@ -99,10 +99,25 @@ struct CustomTermsTemplatePicker: View {
 
     private var confirmationTitle: String {
         guard let preview = importPreview, let template else { return "" }
-        if preview.exceedsCap {
-            return "Cannot import"
-        }
-        return "Import \(preview.toImport.count) of \(template.entries.count) entries"
+        return Self.confirmationTitle(
+            toImportCount: preview.toImport.count,
+            totalCount: template.entries.count,
+            exceedsCap: preview.exceedsCap
+        )
+    }
+
+    /// UXC-31 (RB-40): dialog-grammar normalization — sentence-case
+    /// question title when under cap, a distinct title (not a
+    /// question — there's nothing to confirm) when the cap is
+    /// exceeded.
+    static func confirmationTitle(
+        toImportCount: Int,
+        totalCount: Int,
+        exceedsCap: Bool
+    ) -> String {
+        exceedsCap
+            ? "Cannot add entries"
+            : "Add \(toImportCount) of \(totalCount) entries?"
     }
 
     private var confirmationBody: String {

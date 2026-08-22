@@ -395,7 +395,7 @@ struct SearchAndRedactSheet: View {
         // `RegexSentinelCheck.validate(_:)`, then commits through
         // `savedRegexStore.add(label:pattern:)`; on success a toast
         // names where the saved pattern is managed (UXF-20).
-        .alert(SearchToolbarSection.saveCurrentRegexMenuItem, isPresented: $showSavedRegexSavePrompt) {
+        .alert(Self.saveCurrentRegexAlertTitle, isPresented: $showSavedRegexSavePrompt) {
             TextField("Label", text: $savedRegexSaveLabel)
                 .textInputAutocapitalization(.words)
             Button("Save") {
@@ -1074,7 +1074,7 @@ struct SearchAndRedactSheet: View {
             if !afterConfirmation {
                 // Carried from the retired review surface — the info
                 // trace that staged findings were dropped.
-                toastManager.enqueue("Detection results dismissed", severity: .info)
+                toastManager.enqueue(Self.detectionResultsDismissedToast, severity: .info)
             }
             redactionState.dismissTriage()
         }
@@ -1263,6 +1263,12 @@ struct SearchAndRedactSheet: View {
     }
 
     // MARK: - Save current regex (UXF-04)
+
+    /// UXC-31 (RB-40): the alert's own title — previously borrowed the
+    /// "Save current..." menu item's label text; the alert isn't a
+    /// menu, so it gets independent copy. The menu item itself is
+    /// unchanged.
+    static let saveCurrentRegexAlertTitle = "Save current pattern"
 
     /// Success toast for a committed "Save current..." — names where the
     /// saved pattern is managed so the save isn't a dead end (UXF-20).

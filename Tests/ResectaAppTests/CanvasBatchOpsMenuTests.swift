@@ -120,6 +120,15 @@ struct CanvasBatchOpsMenuTests {
         #expect(state.selectedRegionIDs.count == 4)
     }
 
+    // MARK: - UXC-31 (RB-40) — dialog-grammar normalization
+
+    @Test("Batch-delete dialog title is a sentence-case question, singular-aware")
+    func batchDeleteDialogTitlePinned() {
+        #expect(DocumentEditorView.batchDeleteDialogTitle(regionCount: 1) == "Delete 1 region?")
+        #expect(DocumentEditorView.batchDeleteDialogTitle(regionCount: 2) == "Delete 2 regions?")
+        #expect(DocumentEditorView.batchDeleteDialogTitle(regionCount: 40) == "Delete 40 regions?")
+    }
+
     // MARK: - Cross-verify WU-42 M-D.2 message renders for this entry too
 
     @Test("Delete Selected reuses the batch-delete dialog page-span line")

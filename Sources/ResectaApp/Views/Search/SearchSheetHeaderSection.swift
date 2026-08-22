@@ -151,7 +151,75 @@ extension SearchAndRedactSheet {
             ) {
                 degradedDetectionBanner
             }
+
+            // UXC-40 shape C (RB-42): orientation line — pages with
+            // hits out of total pages, mounted only after a completed
+            // run that actually produced something. Orientation
+            // framing only (EV-P1-02): never "scanned" / "covered" /
+            // "clear" wording — the builder below is the only copy
+            // for this line. Search reads the UNFILTERED result set
+            // (document-wide distribution, not the filtered view);
+            // Scan review reads the staged detections.
+            if isReviewActive {
+                let reviewPages = ScanReviewSection.flattenedFindings(
+                    redactionState.pendingTriage
+                ).map(\.page)
+                if Self.shouldShowPagesWithHitsLine(
+                    hasCompletedRun: true,
+                    resultCount: reviewPages.count
+                ) {
+                    pagesWithHitsLineView(pagesWithHits: Self.distinctPageCount(reviewPages))
+                }
+            } else if Self.shouldShowPagesWithHitsLine(
+                hasCompletedRun: searchState.hasCompletedRunSinceClear,
+                resultCount: searchState.results.count
+            ) {
+                pagesWithHitsLineView(
+                    pagesWithHits: Self.distinctPageCount(searchState.results.map(\.pageIndex))
+                )
+            }
         }
         .background(.background)
+    }
+
+    /// UXC-40 shape C (RB-42) header sub-line view — `.caption`
+    /// `.secondary`, spoken text identical to the visible text.
+    @ViewBuilder
+    private func pagesWithHitsLineView(pagesWithHits: Int) -> some View {
+        Text(Self.pagesWithHitsLine(
+            pageCount: documentState.pageCount,
+            pagesWithHits: pagesWithHits
+        ))
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, ResectaTokens.Spacing.md)
+        .padding(.bottom, ResectaTokens.Spacing.xs)
+        .accessibilityIdentifier("pagesWithHitsLine")
+    }
+
+    // MARK: - UXC-40 shape C (RB-42) — pages-with-hits orientation line
+
+    /// Header sub-line text — "N pages · M with hits". Orientation
+    /// framing only: never "scanned" / "covered" / "clear" wording.
+    /// "with hits" never inflects; only the page-count noun does.
+    static func pagesWithHitsLine(pageCount: Int, pagesWithHits: Int) -> String {
+        let pageWord = pageCount == 1 ? "page" : "pages"
+        return "\(pageCount) \(pageWord) \u{00B7} \(pagesWithHits) with hits"
+    }
+
+    /// Gate: the line mounts only after a completed run that actually
+    /// produced results — an empty or not-yet-run state shows nothing.
+    static func shouldShowPagesWithHitsLine(
+        hasCompletedRun: Bool,
+        resultCount: Int
+    ) -> Bool {
+        hasCompletedRun && resultCount > 0
+    }
+
+    /// Distinct-page count for a list of page indices — the same
+    /// derivation whether the source is Search's unfiltered results or
+    /// Scan review's staged detections.
+    static func distinctPageCount(_ pageIndices: [Int]) -> Int {
+        Set(pageIndices).count
     }
 }

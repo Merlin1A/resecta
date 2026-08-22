@@ -684,13 +684,15 @@ struct DocumentEditorView: View {
             }
         }
         // GAP-7: Batch delete confirmation (mechanism-description language)
+        // UXC-31 (RB-40): dialog-grammar normalization — sentence-case
+        // question title, bare-verb destructive button.
         .confirmationDialog(
-            "Delete \(redactionState.selectedRegionIDs.count) Regions",
+            DocumentEditorView.batchDeleteDialogTitle(
+                regionCount: redactionState.selectedRegionIDs.count),
             isPresented: $showBatchDeleteConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Delete \(redactionState.selectedRegionIDs.count) Regions",
-                   role: .destructive) {
+            Button("Delete", role: .destructive) {
                 deleteSelectedRegions()
             }
             Button("Cancel", role: .cancel) { }
@@ -753,13 +755,13 @@ struct DocumentEditorView: View {
         }
         // Keyboard shortcuts for editing — handled via single onKeyPress to reduce body complexity
         .onKeyPress(phases: .down, action: handleKeyPress)
-        // UI_UX §6.5, §10.1: Page navigation bar on iPhone only (editing phase)
+        // UI_UX §6.5, §10.1: Page navigation bar on iPhone only (editing
+        // phase). UXC-40 shape C (RB-42): extracted to a small helper
+        // property so the compact-float inset math stays out of this
+        // long modifier chain — see the `.toolbar {}` note below on
+        // this file's type-checker budget.
         .safeAreaInset(edge: .bottom) {
-            if horizontalSizeClass == .compact,
-               documentState.pageCount > 1,
-               documentState.phaseKind == .editing {
-                PageNavigationBar()
-            }
+            pageNavigationBarInset
         }
         // §A3: Phase-switched toolbar
         // UXC-32 (GAP-45): the neutral group tint (routine actions
@@ -1153,9 +1155,37 @@ struct DocumentEditorView: View {
             } label: {
                 // UXF-22: verb-object menu label (was the bare noun
                 // "Selection").
+                // GAP-42: the off state is a none-selected STATE
+                // indicator, not an action icon — plain "circle"
+                // instead of the unfilled checkmark glyph.
                 Label("Select Regions", systemImage: selectedCount > 0
-                      ? "checkmark.circle.fill" : "checkmark.circle")
+                      ? "checkmark.circle.fill" : "circle")
             }
+        }
+    }
+
+    /// UI_UX §6.5, §10.1: Page navigation bar on iPhone only (editing
+    /// phase). UXC-40 shape C (RB-42): while the search sheet floats at
+    /// the compact detent, extra bottom padding lifts the bar clear of
+    /// the compact strip — every control up through compact already
+    /// reaches the canvas via the existing background-interaction
+    /// grant, so only this geometry needs to change.
+    @ViewBuilder
+    private var pageNavigationBarInset: some View {
+        if horizontalSizeClass == .compact,
+           documentState.pageCount > 1,
+           documentState.phaseKind == .editing {
+            let inset = Self.pageBarCompactInset(
+                sheetPresented: redactionState.activeSearch != nil,
+                detent: searchSheetDetent
+            )
+            PageNavigationBar()
+                .padding(.bottom, inset)
+                .animation(
+                    ResectaTokens.Anim.resolved(
+                        ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion),
+                    value: inset
+                )
         }
     }
 
@@ -1192,6 +1222,29 @@ struct DocumentEditorView: View {
         return "Deleting \(regionCount) \(regionLabel) across "
             + "\(pageCount) \(pageLabel).\n"
             + "This removes the selected redaction regions. Use Undo to restore them."
+    }
+
+    /// UXC-31 (RB-40): dialog-grammar normalization — sentence-case
+    /// question title, singular-aware. The destructive button is now
+    /// bare "Delete" (dominant grammar for this dialog family); the
+    /// title alone carries the count.
+    static func batchDeleteDialogTitle(regionCount: Int) -> String {
+        regionCount == 1 ? "Delete 1 region?" : "Delete \(regionCount) regions?"
+    }
+
+    // MARK: - UXC-40 shape C (RB-42) — pager compact-float inset
+
+    /// Bottom padding for the page nav bar while the search sheet floats
+    /// at the compact detent — clears the compact strip
+    /// (`CompactFloatDetent.hugHeight`) instead of sitting underneath
+    /// it. Zero whenever the sheet isn't presented or sits at a taller
+    /// detent.
+    static func pageBarCompactInset(
+        sheetPresented: Bool,
+        detent: PresentationDetent
+    ) -> CGFloat {
+        guard sheetPresented, detent == .compactFloat else { return 0 }
+        return CompactFloatDetent.hugHeight
     }
 
     // MARK: - WU-42 M-C.8 — Drawing-mode caption helpers

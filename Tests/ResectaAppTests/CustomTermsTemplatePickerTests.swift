@@ -147,4 +147,19 @@ struct CustomTermsTemplatePickerTests {
         )
         #expect(dedup.toImport.count == partition.valid.count)
     }
+
+    // MARK: - UXC-31 (RB-40) — dialog-grammar normalization
+
+    @Test("Confirmation title is a sentence-case question under cap, a distinct title when capped")
+    func confirmationTitleGrammar() {
+        #expect(CustomTermsTemplatePicker.confirmationTitle(
+            toImportCount: 12, totalCount: 50, exceedsCap: false
+        ) == "Add 12 of 50 entries?")
+        #expect(CustomTermsTemplatePicker.confirmationTitle(
+            toImportCount: 0, totalCount: 50, exceedsCap: false
+        ) == "Add 0 of 50 entries?")
+        #expect(CustomTermsTemplatePicker.confirmationTitle(
+            toImportCount: 12, totalCount: 50, exceedsCap: true
+        ) == "Cannot add entries")
+    }
 }

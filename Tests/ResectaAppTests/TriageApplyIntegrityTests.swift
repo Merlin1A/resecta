@@ -67,16 +67,19 @@ struct TriageApplyIntegrityTests {
 
     @Test("markedMessage covers created-only, mixed, skip-only, and no-op cases")
     func markedMessageCopy() {
+        // UXC-24 (RB-39): every non-nil case carries the
+        // "Not redacted until you tap Redact." suffix so "Marked"
+        // doesn't read as already-redacted.
         #expect(CommitFeedback.markedMessage(applied: 3)
-                == "Marked 3 for redaction")
+                == "Marked 3 for redaction. Not redacted until you tap Redact.")
         #expect(CommitFeedback.markedMessage(applied: 1)
-                == "Marked 1 for redaction")
+                == "Marked 1 for redaction. Not redacted until you tap Redact.")
         #expect(CommitFeedback.markedMessage(applied: 3, alreadyCovered: 2)
-                == "Marked 3 for redaction (2 already covered)")
+                == "Marked 3 for redaction (2 already covered). Not redacted until you tap Redact.")
         // All-overlap apply still reports — the user needs to know why
         // nothing new appeared.
         #expect(CommitFeedback.markedMessage(applied: 0, alreadyCovered: 4)
-                == "Marked 0 for redaction (4 already covered)")
+                == "Marked 0 for redaction (4 already covered). Not redacted until you tap Redact.")
         // True no-op: no toast at all.
         #expect(CommitFeedback.markedMessage(applied: 0) == nil)
     }
@@ -153,7 +156,7 @@ struct TriageApplyIntegrityTests {
         #expect(CommitFeedback.markedMessage(
             applied: outcome?.applied ?? 0,
             alreadyCovered: outcome?.skippedOverlaps ?? 0)
-            == "Marked 3 for redaction")
+            == "Marked 3 for redaction. Not redacted until you tap Redact.")
     }
 
     // MARK: - UXF-29 rider: group apply records accepted priors
