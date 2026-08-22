@@ -7,7 +7,6 @@ import SwiftUI
 
 struct PipelineProgressCard: View {
     @Environment(DocumentState.self) private var documentState
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {

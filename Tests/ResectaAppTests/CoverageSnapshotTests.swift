@@ -18,11 +18,6 @@ struct CoverageSnapshotTests {
 
     // MARK: - Static contracts
 
-    @Test("Disclosure auto-opens by default")
-    func disclosureExpandedByDefault() {
-        #expect(CoverageReportView.disclosureExpandedByDefault == true)
-    }
-
     @Test("Share Snapshot button label pins the SAFE-classified copy")
     func shareSnapshotButtonLabel() {
         #expect(CoverageReportView.shareSnapshotButtonLabel == "Share Snapshot")
@@ -154,7 +149,6 @@ struct CoverageSnapshotTests {
         // from the struct's stored property at init time.
         _ = defaultView
         _ = collapsedView
-        #expect(CoverageReportView.disclosureExpandedByDefault == true)
     }
 
     // MARK: - Fixtures

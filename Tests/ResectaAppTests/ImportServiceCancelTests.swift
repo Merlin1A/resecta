@@ -24,7 +24,6 @@ struct ImportServiceCancelTests {
     @Test(".importing is in the cancellable phase set")
     func importingIsCancellable() {
         #expect(DocumentState.PhaseKind.importing.isCancellable)
-        #expect(DocumentState.Phase.importing.isCancellable)
     }
 
     // MARK: - cancelActivePipeline behaviour

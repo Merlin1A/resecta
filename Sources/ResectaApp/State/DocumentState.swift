@@ -33,14 +33,12 @@ class DocumentState {
         var currentPage: Int
         var totalPages: Int
         var currentStep: String
-        var fraction: Double { Double(currentPage) / Double(max(totalPages, 1)) }
     }
 
     struct RedactionProgress: Sendable {
         var currentPage: Int
         var totalPages: Int
         var currentStep: String
-        var fraction: Double { Double(currentPage) / Double(max(totalPages, 1)) }
     }
 
     struct VerificationProgress: Sendable {
@@ -54,16 +52,9 @@ class DocumentState {
         // but never wired to a production writer; `ocrReturnReport` +
         // `SubPhase.ocrProcessing` are removed. SubPhase now discriminates a
         // single verification sub-phase; the property is retained so existing
-        // call sites and the progress fraction need no signature change.
+        // call sites need no signature change.
         enum SubPhase: Sendable {
             case verifying
-        }
-
-        var fraction: Double {
-            switch subPhase {
-            case .verifying:
-                return Double(currentLayer - 1) / Double(max(totalLayers, 1))
-            }
         }
     }
 
@@ -106,18 +97,6 @@ class DocumentState {
         var stepDescription: String    // "Processing page 3…" or layer name
         var completedLayers: [LayerResult] = []
         var verificationSubPhase: VerificationProgress.SubPhase = .verifying
-
-        var fraction: Double {
-            switch verificationSubPhase {
-            case .verifying:
-                return Double(current - 1) / Double(max(total, 1))
-            }
-        }
-
-        /// Page-oriented fraction (detecting/redacting).
-        var pageFraction: Double {
-            Double(current) / Double(max(total, 1))
-        }
     }
 
     var pipelineProgress: PipelineProgress?
@@ -629,11 +608,3 @@ extension DocumentState.PhaseKind {
     }
 }
 
-extension DocumentState.Phase {
-    var isCancellable: Bool {
-        switch self {
-        case .detecting, .redacting, .verifying, .importing: true
-        default: false
-        }
-    }
-}

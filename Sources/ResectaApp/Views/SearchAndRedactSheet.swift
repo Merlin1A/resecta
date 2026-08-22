@@ -118,16 +118,6 @@ struct SearchAndRedactSheet: View {
     /// non-`private`.
     @State var activeModal: SearchModal?
 
-    /// Audit-export schema choice for the confirmation dialog. v4 is
-    /// the engine's current default — see
-    /// `Packages/RedactionEngine/Sources/RedactionEngine/Export/ExportMetadata.swift`
-    /// `init(schemaVersion: UInt8 = 4, ...)` — and the only schema
-    /// V1.0 exports.
-    /// The state is per-sheet-session — resets on sheet dismiss
-    /// because @State on `SearchAndRedactSheet` re-instantiates with
-    /// `.v4` on next open.
-    @State var auditSchemaVersion: AuditSchemaVersion = .v4
-
     /// Per-sheet-session pulse gate.
     /// Resets to `false` on `.onDisappear` so the next sheet session
     /// re-enables the pulse. The flag flips to `true` immediately when

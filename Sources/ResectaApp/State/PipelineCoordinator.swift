@@ -427,7 +427,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 ))
 
                 let runContext = try await coordinator.processDocument(
-                    pages, effectiveMode: effectiveMode, outputURL: outputURL,
+                    pages, outputURL: outputURL,
                     sensitiveTerms: sensitiveTerms)
                 redactionSucceeded = true
 
@@ -721,7 +721,6 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// Reports progress via documentState self-transitions.
     private func processDocument(
         _ pages: [PDFPageData],
-        effectiveMode: PipelineMode,
         outputURL: URL,
         sensitiveTerms: [SensitiveTerm]
     ) async throws -> PipelineRunContext {

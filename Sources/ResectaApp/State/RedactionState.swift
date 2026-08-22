@@ -522,16 +522,6 @@ class RedactionState {
         _cachedEffectiveCount = nil
     }
 
-    /// Rebuild the entire reverse index from the regions dictionary.
-    private func rebuildPageIndex() {
-        regionPageIndex.removeAll(keepingCapacity: true)
-        for (page, pageRegions) in regions {
-            for region in pageRegions {
-                regionPageIndex[region.id] = page
-            }
-        }
-    }
-
     // MARK: - Cleanup
 
     /// Reset all state for a new document import. Called only after validation

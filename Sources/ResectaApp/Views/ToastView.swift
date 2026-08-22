@@ -12,7 +12,6 @@ import SwiftUI
 
 struct ToastView: View {
     let item: ToastItem
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     // ACCESSIBILITY.md §9.3 — toast line cap lifts at AX5 so long messages
     // don't truncate mid-sentence at the largest accessibility text size.
     // Mirrors the `InlineWarningBanner.lineLimit(for:)` pattern.
