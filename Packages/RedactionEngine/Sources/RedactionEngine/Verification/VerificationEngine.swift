@@ -115,37 +115,6 @@ public struct VerificationEngine: Sendable {
         }
     }
 
-    /// Convenience for callers holding a plain term list: every term keeps
-    /// substring matching (`requiresTokenBoundary` false), which is the
-    /// pre-`SensitiveTerm` behavior byte for byte.
-    ///
-    /// `@_disfavoredOverload` so an empty-array literal resolves to the
-    /// `[SensitiveTerm]` overload instead of being ambiguous; the two are
-    /// interchangeable when empty.
-    @_disfavoredOverload
-    @concurrent
-    public func runLayer(
-        _ layerIndex: Int,
-        outputDocument: SendablePDFDocument,
-        sourcePageCount: Int,
-        regions: [Int: [RedactionRegion]],
-        sensitiveTerms: [String],
-        pipelineMode: PipelineMode,
-        filterDigests: [PageFilterDigest?],
-        perPageModes: [PipelineMode]
-    ) async -> LayerResult {
-        await runLayer(
-            layerIndex,
-            outputDocument: outputDocument,
-            sourcePageCount: sourcePageCount,
-            regions: regions,
-            sensitiveTerms: sensitiveTerms.map { SensitiveTerm(text: $0) },
-            pipelineMode: pipelineMode,
-            filterDigests: filterDigests,
-            perPageModes: perPageModes
-        )
-    }
-
     /// Run a single verification layer.
     /// See ENGINE §6.7a for parameter documentation.
     @concurrent
@@ -193,7 +162,7 @@ public struct VerificationEngine: Sendable {
         do { // LegalPhrases:safe (Swift keyword usage below)
             switch layerIndex {
             case 0:
-                let (s0, pages0) = try runLayer1TextExtraction(doc, pipelineMode: pipelineMode, regions: regions)
+                let (s0, pages0) = try runLayer1TextExtraction(doc, pipelineMode: pipelineMode)
                 status = s0
                 layerPageReferences = pages0
             case 1:
@@ -382,8 +351,7 @@ public struct VerificationEngine: Sendable {
     /// Document-level findings (bookmarks, AcroForm) carry nil references.
     private func runLayer1TextExtraction(
         _ doc: PDFDocument,
-        pipelineMode: PipelineMode,
-        regions: [Int: [RedactionRegion]]
+        pipelineMode: PipelineMode
     ) throws -> (VerificationStatus, [Int]?) {
         // PERF-8 / CANCEL-001: entry-level cooperative cancellation.
         try Task.checkCancellation()

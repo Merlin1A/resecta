@@ -26,10 +26,10 @@ import CryptoKit
 // detection-count / fire-miss assertion is frozen here -- that freeze is the
 // must-fire smoke suite (S05 Step C), gated on this snapshot's measurement.
 //
-// SCHEMA: a forward-compatible SUPERSET of the S01 snapshot schema
-// (`sample-statement-stage1.json`) -- identical keys, plus a per-leg
-// `overlapSuppressedByCategory` map (plan A.3) so the account->phone collision
-// (Sec 1.5#2) is machine-readable by the P/R harness.
+// SCHEMA: a forward-compatible SUPERSET of the S01 snapshot schema --
+// identical keys, plus a per-leg `overlapSuppressedByCategory` map
+// (plan A.3) so the account->phone collision (Sec 1.5#2) is
+// machine-readable by the P/R harness.
 //
 // MATCHED-TEXT LOGGING (D31): this fixture is fully synthetic with a public
 // values manifest, so matched text is logged here (same exemption as the

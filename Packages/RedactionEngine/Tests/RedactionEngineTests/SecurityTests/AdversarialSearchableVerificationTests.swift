@@ -293,7 +293,7 @@ struct AdversarialSearchableVerificationTests {
             2,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: [term],
+            sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [nil],
             perPageModes: [.searchableRedaction]
@@ -315,7 +315,7 @@ struct AdversarialSearchableVerificationTests {
             2,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: [term],
+            sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [nil],
             perPageModes: [.searchableRedaction]
@@ -351,7 +351,7 @@ struct AdversarialSearchableVerificationTests {
         let resultA = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(docA),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: [termA],
+            sensitiveTerms: [termA].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [nil],
             perPageModes: [.searchableRedaction]
@@ -359,7 +359,7 @@ struct AdversarialSearchableVerificationTests {
         let resultB = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(docB),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: [termB],
+            sensitiveTerms: [termB].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [nil],
             perPageModes: [.searchableRedaction]
@@ -462,7 +462,7 @@ struct AdversarialSearchableVerificationTests {
             9,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: [term],
+            sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [nil],
             perPageModes: [.searchableRedaction]
@@ -489,7 +489,7 @@ struct AdversarialSearchableVerificationTests {
             9,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: [term],
+            sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [nil],
             perPageModes: [.searchableRedaction]
@@ -515,7 +515,7 @@ struct AdversarialSearchableVerificationTests {
             9,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: ["acme"],
+            sensitiveTerms: ["acme"].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [nil],
             perPageModes: [.searchableRedaction]
@@ -542,8 +542,8 @@ struct AdversarialSearchableVerificationTests {
         // surface as INFO, mirroring Layer 3.
         let result = await sandwichVerifier.verifyTextOperatorSemantics(
             outputDocument: SendablePDFDocument(doc),
-            sensitiveTerms: ["zzqx", "ab"]
-        )
+            sensitiveTerms: ["zzqx", "ab"].map { SensitiveTerm(text: $0) }
+        ).status
         #expect(result.isInfo,
                 "partial short-term drop must surface as INFO; got \(result)")
         if case .info(let msg) = result {
@@ -585,8 +585,8 @@ struct AdversarialSearchableVerificationTests {
         // WARNed on the identical input — the tiers now match.
         let result = await sandwichVerifier.verifyTextOperatorSemantics(
             outputDocument: SendablePDFDocument(doc),
-            sensitiveTerms: ["ab", "xy"]
-        )
+            sensitiveTerms: ["ab", "xy"].map { SensitiveTerm(text: $0) }
+        ).status
         #expect(result.isWarn,
                 "all-short terms → WARN, matching Layer 3; got \(result)")
     }
@@ -644,7 +644,7 @@ struct AdversarialSearchableVerificationTests {
             9,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
-            sensitiveTerms: [term],
+            sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [nil],
             perPageModes: [.searchableRedaction]
@@ -677,8 +677,9 @@ struct AdversarialSearchableVerificationTests {
         // runs without producing a spatial intersection FAIL.
         let result = try await sandwichVerifier.verifySpatialExclusion(
             outputPage: page,
-            redactionRects: [CGRect(x: 0, y: 0, width: 1, height: 1)],
-            safetyMargin: 0,
+            regionShapes: [RegionShape(
+                expandedBounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+                polygonVertices: nil)],
             pageIndex: 0
         )
         #expect(result.isFail,

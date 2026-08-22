@@ -104,7 +104,7 @@ struct PDFKitConcurrencyStressTests {
     // layer indices valid; empty regions/terms make the layer outcomes
     // deterministic functions of the (immutable) fixture bytes.
     private func layerParams(pageCount: Int)
-        -> (regions: [Int: [RedactionRegion]], terms: [String],
+        -> (regions: [Int: [RedactionRegion]], terms: [SensitiveTerm],
             digests: [PageFilterDigest?], modes: [PipelineMode]) {
         (
             regions: [:],
@@ -521,7 +521,7 @@ struct PDFKitConcurrencyStressTests {
 
     private func serialLayerReference(
         url: URL, layers: [Int], verifier: VerificationEngine,
-        params: (regions: [Int: [RedactionRegion]], terms: [String],
+        params: (regions: [Int: [RedactionRegion]], terms: [SensitiveTerm],
                  digests: [PageFilterDigest?], modes: [PipelineMode])
     ) async throws -> [Int: VerificationStatus] {
         let doc = SendablePDFDocument(try #require(PDFDocument(url: url)))

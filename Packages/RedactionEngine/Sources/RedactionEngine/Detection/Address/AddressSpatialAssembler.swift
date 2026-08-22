@@ -38,12 +38,6 @@ struct AddressSpatialAssembler: Sendable {
         self.addressComponents = Self.sharedAddressComponents
     }
 
-    /// Explicit-injection init for tests and composition. Pass `nil` to
-    /// exercise the gazetteer-absent fallback path.
-    init(addressComponents: AddressComponentsGazetteer?) {
-        self.addressComponents = addressComponents
-    }
-
     static let zipPattern = try! NSRegularExpression(
         pattern: #"\b(\d{5})(?:-(\d{4}))?\b"#
     )

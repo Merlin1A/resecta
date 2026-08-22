@@ -67,7 +67,7 @@ struct Layer2FillGuardBatteryTests {
     static func layer2Status(
         pdf: Data,
         regions: [Int: [RedactionRegion]],
-        sensitiveTerms: [String] = [],
+        sensitiveTerms: [SensitiveTerm] = [],
         mode: PipelineMode = .secureRasterization
     ) async throws -> VerificationStatus {
         let doc = try #require(PDFDocument(data: pdf))
