@@ -67,11 +67,6 @@ nonisolated struct UserDefaultsJSONBlob<T: Codable & Sendable>: @unchecked Senda
         }
     }
 
-    /// Remove the stored value. Subsequent `load()` calls return `fallback`.
-    func clear() {
-        defaults.removeObject(forKey: key)
-    }
-
     private struct Envelope: Codable {
         let schemaVersion: UInt8
         let payload: T

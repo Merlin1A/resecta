@@ -40,12 +40,10 @@ struct LegalPhraseLintTests {
     // MARK: - Helpers
 
     private struct XCStringsCatalog: Decodable {
-        let sourceLanguage: String?
         let strings: [String: Entry]
     }
 
     private struct Entry: Decodable {
-        let extractionState: String?
         let localizations: [String: Localization]?
     }
 
@@ -54,7 +52,6 @@ struct LegalPhraseLintTests {
     }
 
     private struct StringUnit: Decodable {
-        let state: String?
         let value: String?
     }
 
