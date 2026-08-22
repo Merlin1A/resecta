@@ -341,12 +341,6 @@ final class SavedSearchStore {
         return (envelope.savedSearches, envelope.unrecognized)
     }
 
-    // MARK: - Read
-
-    func lookup(id: UUID) -> SavedSearch? {
-        savedSearches.first(where: { $0.id == id })
-    }
-
     // MARK: - Mutate
 
     /// H-74 — duplicate-save collision check per the in-repo

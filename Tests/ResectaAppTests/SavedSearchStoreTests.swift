@@ -164,7 +164,7 @@ struct SavedSearchStoreTests {
         store.add(original)
         store.rename(id: original.id, to: "after")
 
-        let renamed = store.lookup(id: original.id)
+        let renamed = store.savedSearches.first(where: { $0.id == original.id })
         #expect(renamed?.stripDigitSeparators == true)
         #expect(renamed?.normalizeSmartPunctuation == false)
         #expect(renamed?.foldDiacritics == true)
@@ -493,10 +493,10 @@ struct SavedSearchStoreTests {
         // encode/decode round-trip through disk.
         let rehydrated = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
         #expect(rehydrated.savedSearches.count == 2)
-        #expect(rehydrated.lookup(id: s1.id) == s1)
+        #expect(rehydrated.savedSearches.first(where: { $0.id == s1.id }) == s1)
 
         rehydrated.rename(id: s1.id, to: "Renamed")
-        #expect(rehydrated.lookup(id: s1.id)?.name == "Renamed")
+        #expect(rehydrated.savedSearches.first(where: { $0.id == s1.id })?.name == "Renamed")
 
         rehydrated.remove(id: s2.id)
         #expect(rehydrated.savedSearches.count == 1)
@@ -753,7 +753,7 @@ struct SavedSearchStoreTests {
         store.add(original)
         store.rename(id: original.id, to: oversize)
 
-        let renamed = store.lookup(id: original.id)
+        let renamed = store.savedSearches.first(where: { $0.id == original.id })
         #expect(renamed?.name.count == SavedSearch.nameLengthCap,
                 "rename(id:to:) must produce the same clamp as the decoder")
     }
@@ -805,10 +805,10 @@ struct SavedSearchStoreTests {
         store.add(a)
         store.add(b)
         #expect(store.rename(id: b.id, to: "Alpha") == false)
-        #expect(store.lookup(id: b.id)?.name == "Beta")
+        #expect(store.savedSearches.first(where: { $0.id == b.id })?.name == "Beta")
         #expect(store.rename(id: b.id, to: "Beta"),
                 "renaming an entry to its own current name is a no-op success")
         #expect(store.rename(id: b.id, to: "Gamma"))
-        #expect(store.lookup(id: b.id)?.name == "Gamma")
+        #expect(store.savedSearches.first(where: { $0.id == b.id })?.name == "Gamma")
     }
 }

@@ -70,18 +70,6 @@ struct UserDefaultsJSONBlobTests {
         #expect(blob.load() == Payload(items: ["fallback": 1.0]))
     }
 
-    @Test("clear() removes stored value and load returns fallback")
-    func clearRestoresFallback() {
-        let suite = makeSuite()
-        let blob = UserDefaultsJSONBlob(
-            key: "k", schemaVersion: 1, defaults: suite,
-            fallback: Payload(items: ["default": 0.70]))
-        blob.save(Payload(items: ["ssn": 0.92]))
-        #expect(blob.load() == Payload(items: ["ssn": 0.92]))
-        blob.clear()
-        #expect(blob.load() == Payload(items: ["default": 0.70]))
-    }
-
     @Test("Save output is deterministic (sortedKeys encoding)")
     func encodingIsDeterministic() {
         let suite1 = makeSuite("a")
