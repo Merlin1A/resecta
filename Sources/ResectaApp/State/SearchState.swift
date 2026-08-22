@@ -1149,6 +1149,8 @@ final class SearchState: Identifiable {
         preselectIncomingResults = false
         // Conditional dismiss: the touched-selections tracker is per-sheet-session.
         userModifiedSelections = false
+        // UXC-39 — sibling tracker, same per-sheet-session lifetime.
+        hasUnreviewedPreselection = false
         // Defensive: an armed-but-unconsumed auto-run must not leak
         // into the next sheet session (the flag is normally consumed
         // by the sheet's `.onAppear` before any teardown can run).
@@ -1277,6 +1279,38 @@ final class SearchState: Identifiable {
     /// on session teardown.
     var userModifiedSelections: Bool = false
 
+    /// UXC-39 — whether this session actually received results that
+    /// arrived pre-selected (the magic-wand `preselectIncomingResults`
+    /// flow, `appendResult` below) and the user has not yet resolved
+    /// them one way or another. Deliberately a SEPARATE fact from
+    /// `userModifiedSelections`: that tracker means "the user touched
+    /// selections," and a magic-wand session that arrives with
+    /// everything auto-selected and is dismissed untouched would
+    /// otherwise read as untouched — a stray swipe or Dismiss silently
+    /// discards the whole auto-selected set with no confirmation. Written
+    /// `true` only when `appendResult` actually consumes
+    /// `preselectIncomingResults` for a streamed result — never by the
+    /// mode-switch undo restore (`restoreModeSwitchSnapshot` assigns
+    /// `results` directly, bypassing `appendResult`, so it cannot set
+    /// this by construction). Reset rules mirror `userModifiedSelections`:
+    /// a successful apply resets it (the preselected set was committed —
+    /// see `RedactionState.applySelectedSearchResultsOrigin` /
+    /// `applyFindings(.stagedDetections)`), the review-arrival re-target
+    /// resets it (`DocumentEditorView.presentReviewInScanInterface`, a
+    /// fresh all-deselected context), and `clear()` resets it on session
+    /// teardown. See `requiresDismissConfirmation`.
+    var hasUnreviewedPreselection: Bool = false
+
+    /// UXC-39 — the single predicate both dismiss-gate sites
+    /// (`DocumentEditorView`'s `.interactiveDismissDisabled` and
+    /// `SearchSheetHeaderSection`'s Dismiss handler) read: true when
+    /// either the user touched selections, or an auto-selected set has
+    /// never been reviewed. Either fact means a silent dismiss would
+    /// discard work the user hasn't confirmed away.
+    var requiresDismissConfirmation: Bool {
+        userModifiedSelections || hasUnreviewedPreselection
+    }
+
     /// Buffer a result from the search stream. Flushed in batches
     /// to avoid per-result @Observable change notifications (P2).
     /// Stops accepting at engine cap and cancels the search (P3).
@@ -1298,6 +1332,10 @@ final class SearchState: Identifiable {
         // delivering the "all instances selected by default" UX.
         if preselectIncomingResults {
             stored.isSelected = true
+            // UXC-39 — this session actually received an auto-selected
+            // result; arm the dismiss-confirmation tracker so it cannot
+            // be silently swiped away unreviewed.
+            hasUnreviewedPreselection = true
         }
         pendingResults.append(stored)
         if pendingResults.count >= Self.batchFlushSize {

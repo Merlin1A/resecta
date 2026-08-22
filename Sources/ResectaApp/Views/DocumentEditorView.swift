@@ -526,9 +526,11 @@ struct DocumentEditorView: View {
                     // modified selections this session, so the Dismiss
                     // button's confirmation dialog can't be bypassed.
                     // An untouched sheet swipes away freely (one-tap
-                    // dismiss rule; machine-made selections drop
-                    // silently, as the magic-wand flow always has).
-                    .interactiveDismissDisabled(searchState.userModifiedSelections)
+                    // dismiss rule). UXC-39: an unreviewed magic-wand
+                    // preselect also blocks the swipe now — a
+                    // never-reviewed auto-selected set no longer drops
+                    // silently.
+                    .interactiveDismissDisabled(searchState.requiresDismissConfirmation)
                     // Compact float detent — a fixed title-only hug
                     // (`CompactFloatDetent.swift`, WA/D-75). The PDF
                     // surfaces behind; every control lives at
@@ -1839,6 +1841,10 @@ struct DocumentEditorView: View {
                 state.piiCategoryFilter = nil
                 state.sortOrder = .discoveryOrder
                 state.userModifiedSelections = false
+                // UXC-39 — the arriving review is a fresh all-deselected
+                // context; a stale unreviewed-preselect flag from the
+                // cleared session must not carry into it.
+                state.hasUnreviewedPreselection = false
             }
         } else {
             let state = SearchState()

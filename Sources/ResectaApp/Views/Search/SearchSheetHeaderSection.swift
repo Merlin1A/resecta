@@ -109,14 +109,16 @@ extension SearchAndRedactSheet {
                        // round-trip.
                        || searchState.selectionFullyApplied),
                 onDismiss: {
-                    // Conditional dismiss: only route through the
-                    // dialog when the USER has modified selections
-                    // this session. An untouched sheet dismisses
-                    // directly so the no-op case adds no friction;
-                    // machine-made selections (magic-wand
-                    // preselect) don't count as user work and drop
-                    // silently on the way out, as before.
-                    if searchState.userModifiedSelections {
+                    // Conditional dismiss: route through the dialog
+                    // when the USER has modified selections this
+                    // session, OR (UXC-39) when this session received
+                    // an auto-selected set (magic-wand preselect) that
+                    // has not yet been reviewed — a never-reviewed
+                    // preselect no longer drops silently on the way
+                    // out. An untouched, non-preselected sheet still
+                    // dismisses directly so the common no-op case adds
+                    // no friction.
+                    if searchState.requiresDismissConfirmation {
                         showDismissConfirmation = true
                     } else {
                         performDismiss(afterConfirmation: false)
