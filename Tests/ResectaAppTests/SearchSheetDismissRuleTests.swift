@@ -166,11 +166,21 @@ struct SearchSheetDismissRuleTests {
                 "the committed preselected set no longer needs protecting")
     }
 
-    @Test("SearchState.selectWhere itself never flips the tracker (gesture sites own the flip)")
-    func selectWhereAloneDoesNotFlip() {
+    @Test("SearchState.addToSelection itself never flips the tracker (gesture sites own the flip)")
+    func addToSelectionAloneDoesNotFlip() {
         let state = SearchState()
         state.results = [makeResult()]
-        state.selectWhere { _ in true }
+        state.addToSelection { _ in true }
+        #expect(state.results.first?.isSelected == true)
+        #expect(state.userModifiedSelections == false,
+                "the state method is shared by user + programmatic paths; the flip lives at the gesture sites")
+    }
+
+    @Test("SearchState.setSelection itself never flips the tracker (gesture sites own the flip)")
+    func setSelectionAloneDoesNotFlip() {
+        let state = SearchState()
+        state.results = [makeResult()]
+        state.setSelection { _ in true }
         #expect(state.results.first?.isSelected == true)
         #expect(state.userModifiedSelections == false,
                 "the state method is shared by user + programmatic paths; the flip lives at the gesture sites")
