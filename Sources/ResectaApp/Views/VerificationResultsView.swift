@@ -49,6 +49,14 @@ struct VerificationResultsView: View {
     /// phase transition. Nil hides the affordance — the search session the
     /// counts came from is gone, so there is no panel to reopen.
     var onReviewDeselections: (() -> Void)? = nil
+    /// UXC-04/05/06 pre-derived run facts for the run-facts strip
+    /// (RB-28/29/30). This view injects no RedactionState (mirrors
+    /// `deselectionSnapshot`/`previewAvailable`); `DocumentEditorView`
+    /// builds this via the pure `RunFacts.derive(...)` static func.
+    /// Defaults to the empty/false value, so the strip renders nothing
+    /// when unthreaded (keeps any future fixture call site
+    /// source-compatible).
+    var runFacts: RunFacts = RunFacts()
 
     @Environment(DocumentState.self) private var documentState
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -65,6 +73,9 @@ struct VerificationResultsView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: ResectaTokens.Spacing.xl) {
                     statusMasthead
+                    if !runFactsLines.isEmpty {
+                        runFactsStrip
+                    }
                     actionChoiceStack
                     if Self.shouldShowRunBreakdown(report: report) {
                         detailsSection
@@ -73,6 +84,7 @@ struct VerificationResultsView: View {
                     if Self.shouldShowRunBreakdown(report: report) {
                         footer
                     }
+                    voiceOverLimitLine
                     if Self.shouldShowHonestyDisclaimer(
                         overallStatus: report.overallStatus) {
                         honestyDisclaimer
@@ -280,6 +292,112 @@ struct VerificationResultsView: View {
             }
         }
         return texts
+    }
+
+    // MARK: - Run facts strip (RB-28/29/30)
+    //
+    // UXC-04/05/06: 0-3 conditional caption-weight lines disclosing what
+    // this run's detection did or did not cover. Mounted directly
+    // beneath the masthead, above the action stack, on every verdict —
+    // a routine PASS with nothing to disclose renders no strip (no
+    // empty container). Every line is a pinned static builder (T-03
+    // discipline) so the rendered text is unit-testable without a
+    // SwiftUI host.
+
+    /// Pure facts input for the strip. `derive` is the single production
+    /// source (called from `DocumentEditorView`); the plain-value
+    /// default keeps every field off.
+    struct RunFacts: Equatable {
+        /// UXC-04 — 0-indexed pages whose raster exceeded the OCR pixel
+        /// caps during the run behind this output.
+        var ocrSkippedPages: Set<Int> = []
+        /// UXC-05 — no detection ran this session, yet a region was
+        /// applied for this output (Search or manual marking produced
+        /// it).
+        var detectionNeverRan: Bool = false
+        /// UXC-06 — the degrade-failure list snapshotted when the run
+        /// behind this output was recorded; nil when that run was not
+        /// degraded.
+        var degradeFailures: [String]? = nil
+
+        /// Pure derivation from the two facts `DocumentEditorView`
+        /// already computes. `lastDetectionRun` is the session's most
+        /// recent detection/scan record, not necessarily the run behind
+        /// `report` — the common scan-then-apply-then-Redact-then-Verify
+        /// path keeps the two in step, since leaving `.verified` is
+        /// required before another scan can start; a later scan not
+        /// followed by another Redact would leave this strip describing
+        /// the newer scan rather than the on-screen report.
+        static func derive(
+            lastDetectionRun: RedactionState.DetectionRunRecord?,
+            hasAppliedRegions: Bool
+        ) -> RunFacts {
+            RunFacts(
+                ocrSkippedPages: lastDetectionRun?.ocrSkippedPages ?? [],
+                detectionNeverRan: lastDetectionRun == nil && hasAppliedRegions,
+                degradeFailures: lastDetectionRun?.degradeFailures
+            )
+        }
+    }
+
+    /// Pinned line builders + line-order assembly.
+    enum RunFactsStrip {
+        /// UXC-04. 0-indexed input (mirrors
+        /// `ScanReviewSection.ocrSkipBannerHeadline`); 1-based page
+        /// numbers via `SearchResultsSection.formatPageList`.
+        static func ocrSkipLine(pages: [Int]) -> String {
+            let oneBased = pages.sorted().map { $0 + 1 }
+            let list = SearchResultsSection.formatPageList(oneBased)
+            if oneBased.count == 1 {
+                return "Page \(list) was too large to scan for text, so its image content was not examined by detection. Review that page manually before sharing."
+            }
+            return "Pages \(list) were too large to scan for text, so image content there was not examined by detection. Review those pages manually before sharing."
+        }
+
+        /// UXC-05.
+        static let detectionNeverRanLine =
+            "Automated detection did not run on this document. Every region here came from Search or manual marking \u{2014} review each page for anything those did not cover before sharing."
+
+        /// UXC-06 — reuses `DetectionDegradeCopy.banner` verbatim; no new
+        /// degrade string.
+        static func degradeLine(failedGazetteers: [String]) -> String {
+            DetectionDegradeCopy.banner(failedGazetteers: failedGazetteers)
+        }
+
+        /// Ordered lines for the given facts — F-04, then F-05, then
+        /// F-06. F-04 and F-05 are mutually exclusive by construction
+        /// (both key off `lastDetectionRun`'s nilness), so at most two
+        /// lines render for this fact set today.
+        static func lines(for facts: RunFacts) -> [String] {
+            var result: [String] = []
+            if !facts.ocrSkippedPages.isEmpty {
+                result.append(ocrSkipLine(pages: Array(facts.ocrSkippedPages)))
+            }
+            if facts.detectionNeverRan {
+                result.append(detectionNeverRanLine)
+            }
+            if let degradeFailures = facts.degradeFailures {
+                result.append(degradeLine(failedGazetteers: degradeFailures))
+            }
+            return result
+        }
+    }
+
+    private var runFactsLines: [String] { RunFactsStrip.lines(for: runFacts) }
+
+    private var runFactsStrip: some View {
+        VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
+            ForEach(Array(runFactsLines.enumerated()), id: \.offset) { _, line in
+                Text(line)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(maxWidth: columnMaxWidth)
+        .accessibilityIdentifier("runFactsStrip")
     }
 
     // MARK: - Action choice stack
@@ -825,6 +943,29 @@ struct VerificationResultsView: View {
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
         .padding(.horizontal, ResectaTokens.Spacing.sm)
+    }
+
+    // MARK: - Non-visual review limitation (UXC-16)
+    //
+    // The preview is a visual pass; VoiceOver has no way to judge region
+    // coverage from the rendered page image. This line mounts on every
+    // verdict, directly above the honesty disclaimer, and is reused
+    // verbatim as the `RedactedPreviewView` verdict capsule's
+    // accessibility copy (composed into its label, not its hint — a
+    // hint only speaks when the "Speak Hints" setting is on, which is
+    // off by default, and this line exists to reach VoiceOver users).
+
+    static let voiceOverLimitText =
+        "The preview is a visual check \u{2014} VoiceOver cannot tell you whether a region fully covers what is beneath it. A non-visual review can go page by page in the editor, where each page announces its region count and each region's details name the kind of item it covers."
+
+    private var voiceOverLimitLine: some View {
+        Text(Self.voiceOverLimitText)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: columnMaxWidth, alignment: .leading)
+            .accessibilityIdentifier("voiceOverLimitLine")
     }
 
     // MARK: - Honesty disclaimer
