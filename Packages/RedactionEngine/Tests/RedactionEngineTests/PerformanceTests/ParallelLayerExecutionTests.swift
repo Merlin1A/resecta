@@ -74,7 +74,7 @@ struct ParallelLayerExecutionTests {
         doc: SendablePDFDocument,
         sourcePageCount: Int,
         regions: [Int: [RedactionRegion]],
-        sensitiveTerms: [String],
+        sensitiveTerms: [SensitiveTerm],
         pipelineMode: PipelineMode,
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode]
@@ -121,7 +121,7 @@ struct ParallelLayerExecutionTests {
         doc: SendablePDFDocument,
         sourcePageCount: Int,
         regions: [Int: [RedactionRegion]],
-        sensitiveTerms: [String],
+        sensitiveTerms: [SensitiveTerm],
         pipelineMode: PipelineMode,
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode]
@@ -327,7 +327,7 @@ struct ParallelLayerExecutionTests {
             doc: SendablePDFDocument(doc),
             sourcePageCount: pageCount,
             regions: [:],
-            sensitiveTerms: ["NONEXISTENT_SAMPLE_PII_TOKEN_XYZ123"],
+            sensitiveTerms: ["NONEXISTENT_SAMPLE_PII_TOKEN_XYZ123"].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: digests,
             perPageModes: perPageModes
@@ -392,7 +392,7 @@ struct ParallelLayerExecutionTests {
 
         // Provide non-empty sensitive terms so Layer 2 builds and
         // runs an Aho-Corasick automaton against the PDF byte stream.
-        let sensitiveTerms = ["NONEXISTENT_SAMPLE_PII_TOKEN_XYZ123"]
+        let sensitiveTerms = ["NONEXISTENT_SAMPLE_PII_TOKEN_XYZ123"].map { SensitiveTerm(text: $0) }
 
         let verifier = VerificationEngine()
         let wrappedDoc = SendablePDFDocument(doc)

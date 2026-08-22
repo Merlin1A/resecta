@@ -47,9 +47,8 @@ shared types.
   and verification metadata that cross subdirectory boundaries. User
   term and saved-regex persistence lives in the app target
   (`UserTermsStore` / `SavedRegexStore`), not in this package.
-- **PDFInternals** — Provides low-level PDF structure traversal via
-  CoreGraphics and PDFKit, reading both metadata (Layer 5 fields) and
-  active content (Layer 4) for security analysis.
+- **PDFInternals** — Defines `PDFFinding`, the shared structural-finding
+  type `Import`'s `AnnotationAnalyzer` reports through.
 - **Pipeline** — Processes individual PDF pages through rasterization,
   character filtering, pixel destruction, and text-layer reconstruction,
   coordinating DPI budgeting and memory constraints across the

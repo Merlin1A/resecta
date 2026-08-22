@@ -66,22 +66,4 @@ struct PerCategoryPriorsTests {
         #expect(priors.mean(.dea) < 1.0)
         #expect(priors.mean(.dea) > 0.5)
     }
-
-    @Test("Merge is commutative on commutative inputs")
-    func mergeCommutative() {
-        var a = PerCategoryPriors()
-        a = a.updated(category: .ssn, decision: .accepted)
-        a = a.updated(category: .ssn, decision: .accepted)
-
-        var b = PerCategoryPriors()
-        b = b.updated(category: .ssn, decision: .rejected)
-
-        let ab = a.merged(b)
-        let ba = b.merged(a)
-
-        let abBeta = ab.byCategory[.ssn]!
-        let baBeta = ba.byCategory[.ssn]!
-        #expect(abs(abBeta.alpha - baBeta.alpha) < 1e-9)
-        #expect(abs(abBeta.beta - baBeta.beta) < 1e-9)
-    }
 }

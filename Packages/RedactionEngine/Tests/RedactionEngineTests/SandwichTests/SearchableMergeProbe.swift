@@ -118,7 +118,7 @@ enum SearchableMergeProbe {
         regions: [Int: [RedactionRegion]],
         digests: [PageFilterDigest?],
         perPageModes: [PipelineMode],
-        sensitiveTerms: [String] = []
+        sensitiveTerms: [SensitiveTerm] = []
     ) async -> [Int: LayerResult] {
         let engine = VerificationEngine()
         let count = engine.layerCount(for: .searchableRedaction)

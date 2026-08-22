@@ -6,8 +6,7 @@ import Foundation
 // same decision without re-scoring.
 //
 // Keys normalized via TextNormalizer.normalize (NFKC + ligature expansion)
-// then lowercased with whitespace collapsed. Sendable value type; merged
-// commutatively at yield alongside PerCategoryPriors.
+// then lowercased with whitespace collapsed. Sendable value type.
 //
 // Bounded-growth cap at 10,000 entries via
 // insertion-LRU. The cap is a hardcoded compile-time constant; no runtime
@@ -32,18 +31,6 @@ public struct SurfaceFormDictionary: Sendable, Equatable {
     public init() {
         self.map = [:]
         self.order = []
-    }
-
-    public init(_ initial: [String: Decision]) {
-        let normalizedPairs = initial.map { (Self.normalize($0.key), $0.value) }
-        var newMap = Dictionary(uniqueKeysWithValues: normalizedPairs)
-        var newOrder = normalizedPairs.map { $0.0 }
-        while newMap.count > Self.capacity, let oldest = newOrder.first {
-            newMap.removeValue(forKey: oldest)
-            newOrder.removeFirst()
-        }
-        self.map = newMap
-        self.order = newOrder
     }
 
     public var isEmpty: Bool { map.isEmpty }
@@ -74,42 +61,6 @@ public struct SurfaceFormDictionary: Sendable, Equatable {
         assert(result.map.count == result.order.count)
         #endif
         return result
-    }
-
-    /// Commutative merge. Conflicts (same surface, different decision) favor
-    /// the **newer** argument (`other` wins). Callers on MainActor fold
-    /// per-page deltas via `existing.merged(pageResult.surfaceDelta)`.
-    ///
-    /// Cap policy: if the merged result would exceed `capacity`,
-    /// evict from the oldest-write end. Tie-break for ordering in the merged
-    /// result: keys present only in `self` keep `self`'s order; all keys
-    /// from `other` (whether new or conflicting) appear after, in `other`'s
-    /// relative order. This means `other`-side writes survive eviction over
-    /// older `self`-side writes at conflict, matching the existing
-    /// "other wins" content semantics.
-    public func merged(_ other: SurfaceFormDictionary) -> SurfaceFormDictionary {
-        var newMap = map
-        let otherKeys = Set(other.order)
-        var newOrder = order.filter { !otherKeys.contains($0) }
-        for (key, value) in other.map {
-            newMap[key] = value
-        }
-        newOrder.append(contentsOf: other.order)
-        let excess = newMap.count - Self.capacity
-        if excess > 0 {
-            for i in 0..<excess {
-                newMap.removeValue(forKey: newOrder[i])
-            }
-            newOrder.removeFirst(excess)
-        }
-        var copy = SurfaceFormDictionary()
-        copy.map = newMap
-        copy.order = newOrder
-        #if DEBUG
-        assert(copy.map.count <= Self.capacity)
-        assert(copy.map.count == copy.order.count)
-        #endif
-        return copy
     }
 
     /// Manual implementation preserves V1 dictionary-equality semantics

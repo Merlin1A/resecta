@@ -133,36 +133,12 @@ public struct SandwichVerification: Sendable {
     /// CC-5-1: Receives PDFPage (non-Sendable). Safety: verification runner
     /// calls layers sequentially; output PDFDocument is distinct from source.
     ///
-    /// IMPORTANT: redactionRects must be in PDF page coordinates (bottom-left
-    /// origin, in points). Use normalizedToPDFPageCoordinates() with the
-    /// OUTPUT page bounds (always zero-origin per EXP-011).
+    /// IMPORTANT: each `RegionShape`'s bounds must be in PDF page coordinates
+    /// (bottom-left origin, in points). Use normalizedToPDFPageCoordinates()
+    /// with the OUTPUT page bounds (always zero-origin per EXP-011).
     /// Called from the @concurrent runLayer() context — inherits caller isolation.
     /// Not marked @concurrent itself to avoid PDFPage sending errors (CC-5-1).
-    /// This convenience overload checks one rect per region — raw
-    /// intersection at the default 0pt margin — by building shapes whose
-    /// floor and halo coincide at the (optionally margined) rect. The
-    /// production dispatch (VerificationEngine Layer 6) builds two-tier
-    /// shapes instead: un-expanded floor + safety-margin halo (PD-8; see
-    /// the regionShapes overload).
-    public func verifySpatialExclusion(
-        outputPage: PDFPage,
-        redactionRects: [CGRect],
-        safetyMargin: CGFloat = 0.0,
-        pageIndex: Int = 0
-    ) async throws -> VerificationStatus {
-        let shapes = redactionRects.map { rect in
-            RegionShape(
-                expandedBounds: rect.insetBy(dx: -safetyMargin, dy: -safetyMargin),
-                polygonVertices: nil
-            )
-        }
-        return try await verifySpatialExclusion(
-            outputPage: outputPage,
-            regionShapes: shapes,
-            pageIndex: pageIndex
-        )
-    }
-
+    ///
     /// DRAW-1 polygon-aware overload. Each `RegionShape` carries the
     /// safety-margin-expanded bounding rect, the un-expanded rect, and an
     /// optional polygon.
@@ -844,22 +820,6 @@ public struct SandwichVerification: Sendable {
     /// scanner; a literal-string surrogate-pair surfaced by both decoders).
     /// See plan §4.5 and ENGINE §5C.3 SVT-5.
     ///
-    /// Convenience for callers holding a plain term list: every term keeps
-    /// substring matching (`requiresTokenBoundary` false), the
-    /// pre-`SensitiveTerm` behavior byte for byte. `@_disfavoredOverload` so
-    /// an empty-array literal resolves to the `[SensitiveTerm]` overload
-    /// instead of being ambiguous; the two are interchangeable when empty.
-    @_disfavoredOverload
-    public func verifyTextOperatorSemantics(
-        outputDocument: SendablePDFDocument,
-        sensitiveTerms: [String]
-    ) async -> VerificationStatus {
-        await verifyTextOperatorSemantics(
-            outputDocument: outputDocument,
-            sensitiveTerms: sensitiveTerms.map { SensitiveTerm(text: $0) }
-        ).status
-    }
-
     /// CC-5-1: receives a SendablePDFDocument. The page walk reads
     /// `pageRef` (non-Sendable); the verification runner calls this layer
     /// on a single executor at a time. Hand-off across the @concurrent

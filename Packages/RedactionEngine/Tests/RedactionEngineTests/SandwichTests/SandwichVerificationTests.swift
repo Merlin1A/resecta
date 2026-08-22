@@ -25,7 +25,7 @@ struct SandwichVerificationTests {
 
         let result = try await verifier.verifySpatialExclusion(
             outputPage: page,
-            redactionRects: [redactionRect]
+            regionShapes: [RegionShape(expandedBounds: redactionRect, polygonVertices: nil)]
         )
         #expect(result == .pass)
     }
@@ -47,7 +47,7 @@ struct SandwichVerificationTests {
 
         let result = try await verifier.verifySpatialExclusion(
             outputPage: page,
-            redactionRects: [redactionRect]
+            regionShapes: [RegionShape(expandedBounds: redactionRect, polygonVertices: nil)]
         )
         #expect(result == .fail(""),
                 "Spatial verification should FAIL when text overlaps redaction region")
@@ -61,7 +61,9 @@ struct SandwichVerificationTests {
 
         let result = try await verifier.verifySpatialExclusion(
             outputPage: page,
-            redactionRects: [CGRect(x: 0, y: 0, width: 612, height: 792)]
+            regionShapes: [RegionShape(
+                expandedBounds: CGRect(x: 0, y: 0, width: 612, height: 792),
+                polygonVertices: nil)]
         )
         #expect(result == .pass)
     }

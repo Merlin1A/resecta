@@ -1,9 +1,6 @@
 import Testing
 import Foundation
 import CoreGraphics
-#if canImport(UIKit)
-import UIKit
-#endif
 @testable import RedactionEngine
 
 // .serialized: Vision's VNImageRequestHandler.perform() blocks cooperative pool
@@ -94,81 +91,6 @@ struct DetectionOrchestratorTests {
         // region the resolver now widens to is covered downstream.
         let coalesced = orchestrator.boundingRect(for: NSRange(location: 0, length: 16), in: bounds)
         #expect(coalesced == headBox.union(tailBox))
-    }
-
-    // MARK: - Smoke Tests (Vision-dependent)
-
-    @Test("Blank image returns empty results")
-    func blankImageReturnsEmpty() async {
-        guard let ctx = createBitmapContext(width: 200, height: 200) else {
-            Issue.record("Could not create context")
-            return
-        }
-        ctx.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
-        ctx.fill(CGRect(x: 0, y: 0, width: 200, height: 200))
-        guard let image = ctx.makeImage() else {
-            Issue.record("Could not make image")
-            return
-        }
-
-        let orchestrator = DetectionOrchestrator()
-        do {
-            let results = try await orchestrator.detect(pageImage: image, pageIndex: 0)
-            #expect(results.isEmpty, "Blank image should return no detections")
-        } catch {
-            // Vision error on simulator is acceptable
-        }
-    }
-
-    @Test("Text image does not crash")
-    func textImageNoCrash() async {
-        let image = renderTextImage("Hello World 123-45-6789", width: 600, height: 100)
-        guard let image else {
-            Issue.record("Could not create text image")
-            return
-        }
-
-        let orchestrator = DetectionOrchestrator()
-        do {
-            let results = try await orchestrator.detect(pageImage: image, pageIndex: 0)
-            // Vision may or may not detect text/PII on simulator — no crash is success
-            _ = results
-        } catch {
-            // Vision error on simulator is acceptable
-        }
-    }
-
-    @Test("recognitionLevel mapping: fast produces fast")
-    func recognitionLevelFast() async {
-        let image = renderTextImage("Test SSN 123-45-6789", width: 600, height: 100)
-        guard let image else {
-            Issue.record("Could not create text image")
-            return
-        }
-
-        let orchestrator = DetectionOrchestrator(recognitionLevel: .fast)
-        do {
-            let results = try await orchestrator.detect(pageImage: image, pageIndex: 0)
-            for result in results {
-                if case .pii = result.kind {
-                    #expect(result.recognitionLevel == .fast)
-                }
-            }
-        } catch {
-            // Vision error on simulator is acceptable
-        }
-    }
-
-    @Test("Small image does not crash")
-    func smallImageNoCrash() async {
-        guard let ctx = createBitmapContext(width: 10, height: 10),
-              let image = ctx.makeImage() else { return }
-        let orchestrator = DetectionOrchestrator()
-        do {
-            _ = try await orchestrator.detect(pageImage: image, pageIndex: 0)
-        } catch {
-            // Vision error on simulator is acceptable
-        }
     }
 
     // MARK: - L-10: Face-detection doctype gate
@@ -263,20 +185,5 @@ struct DetectionOrchestratorTests {
         ctx.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
         ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
         return ctx.makeImage()
-    }
-
-    private func renderTextImage(_ text: String, width: Int, height: Int) -> CGImage? {
-        let size = CGSize(width: width, height: height)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        let uiImage = renderer.image { ctx in
-            UIColor.white.setFill()
-            ctx.fill(CGRect(origin: .zero, size: size))
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 36),
-                .foregroundColor: UIColor.black
-            ]
-            (text as NSString).draw(at: CGPoint(x: 10, y: 10), withAttributes: attrs)
-        }
-        return uiImage.cgImage
     }
 }

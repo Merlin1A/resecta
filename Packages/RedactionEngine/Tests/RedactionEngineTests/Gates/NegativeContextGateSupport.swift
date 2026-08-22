@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import PDFKit
 @testable import RedactionEngine
@@ -24,12 +23,6 @@ struct GateG8Span: Decodable, Sendable {
 }
 
 // MARK: - Output JSON shapes (design 02 §12)
-
-struct GateReport: Encodable, Sendable {
-    let run_id: String
-    let asset_sha256: String
-    let g8_results: GateG8Results
-}
 
 struct GateG8Results: Encodable, Sendable {
     let by_category_doctype: [String: GateCellResult]
@@ -104,20 +97,6 @@ func isNegativeContextSuppressed(_ match: PIIDetector.PIIMatch) -> Bool {
     }
 }
 
-// MARK: - Output helpers
-
-func writeGateReport(_ report: GateReport, to path: String) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-    let data = try encoder.encode(report)
-    let url = URL(fileURLWithPath: path)
-    try FileManager.default.createDirectory(
-        at: url.deletingLastPathComponent(),
-        withIntermediateDirectories: true
-    )
-    try data.write(to: url, options: .atomic)
-}
-
 // MARK: - G8 corpus loader
 
 func loadGateG8Corpus() throws -> GateG8Corpus? {
@@ -130,54 +109,3 @@ func loadGateG8Corpus() throws -> GateG8Corpus? {
     return try JSONDecoder().decode(GateG8Corpus.self, from: data)
 }
 
-// MARK: - Negative-context asset SHA-256
-
-func negativeContextAssetSHA256(gazetteer: NegativeContextGazetteer?) -> String {
-    // The gazetteer is constructed from negative-context.json in the module
-    // bundle. We re-open the file to compute its SHA-256 for the report.
-    guard gazetteer != nil else { return "none" }
-    // Try env override path first, then fall back to the bundled resource.
-    let env = ProcessInfo.processInfo.environment
-    let assetPath = env["RESECTA_NEGCTX_ASSET"] ?? env["TEST_RUNNER_RESECTA_NEGCTX_ASSET"]
-    if let envPath = assetPath, !envPath.isEmpty {
-        if let data = try? Data(contentsOf: URL(fileURLWithPath: envPath)) {
-            return sha256Hex(data)
-        }
-    }
-    guard let url = Bundle.module.url(
-        forResource: "negative-context",
-        withExtension: "json",
-        subdirectory: "Gazetteers"
-    ), let data = try? Data(contentsOf: url) else {
-        return "bundle-read-failed"
-    }
-    return sha256Hex(data)
-}
-
-private func sha256Hex(_ data: Data) -> String {
-    let digest = SHA256.hash(data: data)
-    return digest.map { String(format: "%02x", $0) }.joined()
-}
-
-// MARK: - Output path resolver
-
-// Env var resolution: check the bare name first (set when running directly
-// against the xctest process), then the TEST_RUNNER_-prefixed name (the
-// mechanism xcodebuild uses to forward env vars to the test host on macOS,
-// but which Swift Testing on the simulator may expose under the original name).
-// Callers pass vars as `TEST_RUNNER_RESECTA_GATE_OUT=<path>` on the
-// xcodebuild command line.
-
-func gateOutputPath(default defaultPath: String = "/tmp/negative_context_gate.json") -> String {
-    let env = ProcessInfo.processInfo.environment
-    if let p = env["RESECTA_GATE_OUT"], !p.isEmpty { return p }
-    if let p = env["TEST_RUNNER_RESECTA_GATE_OUT"], !p.isEmpty { return p }
-    return defaultPath
-}
-
-func gateRunID(default defaultID: String) -> String {
-    let env = ProcessInfo.processInfo.environment
-    if let id = env["RESECTA_GATE_RUN_ID"], !id.isEmpty { return id }
-    if let id = env["TEST_RUNNER_RESECTA_GATE_RUN_ID"], !id.isEmpty { return id }
-    return defaultID
-}
