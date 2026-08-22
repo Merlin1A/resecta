@@ -7,20 +7,28 @@ import RedactionEngine
 // Source-of-truth helpers:
 //   • VerificationResultsView.shareDisabled(canExport:) — the card's
 //     enabled/disabled mapping (Share enabled exactly when canExport is true).
-//   • DocumentEditorView.shareNeedsFailConfirm(report:) — §3.4 FAIL override
-//     "Option B": a standing FAIL verdict (not user-overridden) routes the
-//     Share tap through a one-time "Share Anyway" confirm before export.
-//     canExport(report:) no longer folds this in — a FAIL leaves the Share
-//     card enabled (red-tinted) — and handleExportTap consults the predicate
-//     to present the confirm before ever entering beginExport.
-//   • DocumentEditorView.shareNeedsSkippedConfirm(report:) — the one-time
-//     skipped-share confirm: a SKIPPED report (verification never ran) not
-//     yet acknowledged routes the Share tap through its own confirm
-//     (SkippedShareGateTests below).
+//   • DocumentEditorView.shareNeedsFailConfirm(report:acknowledged:) — §3.4
+//     FAIL override "Option B": a standing FAIL verdict (not yet
+//     acknowledged) routes the Share tap through a one-time "Share Anyway"
+//     confirm before export. canExport(report:) no longer folds this in — a
+//     FAIL leaves the Share card enabled (red-tinted) — and handleExportTap
+//     consults the predicate to present the confirm before ever entering
+//     beginExport.
+//   • DocumentEditorView.shareNeedsSkippedConfirm(report:acknowledged:) —
+//     the one-time skipped-share confirm: a SKIPPED report (verification
+//     never ran) not yet acknowledged routes the Share tap through its own
+//     confirm (SkippedShareGateTests below).
 //
-// The userOverrodeFailure conjunct is what makes the confirm one-time: once
-// overrideVerificationFailure() sets it, the predicate is false and the Share
-// tap falls straight through to beginExport.
+// UXC-13 (RB-22 + RB-45): the `acknowledged` conjunct is what makes each
+// confirm one-time — sourced from an app-side DocumentState shadow
+// (`failShareAcknowledged` / `skippedShareAcknowledged`), NOT from the
+// report's own `userOverrodeFailure` / `userAcknowledgedSkippedShare`
+// fields anymore. Those report fields are still written (mirrors, pinned
+// directly by LegalGateTests.overrideStoresFlag and the TransitionTests
+// override pin) but the predicates below no longer read them — the shadow
+// re-arms independently of the report whenever the user backs out of the
+// share sheet without sending (`DocumentState.rearmShareRiskConfirms()`),
+// which a report-scoped flag alone could never express (GAP-12).
 
 @Suite("Verification results Share gate (§4.4a)")
 @MainActor
@@ -87,11 +95,14 @@ struct ShareDisabledReasonTests {
 }
 
 // §3.4 FAIL override / "Option B" — the Share gate after a FAIL. Tests target
-// the pure static predicate shareNeedsFailConfirm(report:): canExport(report:)
-// no longer hard-blocks on it, and handleExportTap consults it to decide whether
-// to present the one-time "Share Anyway" confirm before beginExport. Building a
-// SwiftUI host is neither possible nor needed on this machine; the predicate is
-// the single source of truth.
+// the pure static predicate shareNeedsFailConfirm(report:acknowledged:):
+// canExport(report:) no longer hard-blocks on it, and handleExportTap consults
+// it to decide whether to present the one-time "Share Anyway" confirm before
+// beginExport. Building a SwiftUI host is neither possible nor needed on this
+// machine; the predicate is the single source of truth. UXC-13: `acknowledged`
+// is the app-side shadow (`DocumentState.failShareAcknowledged`) — the
+// report's own `userOverrodeFailure` is a write-only mirror the predicate no
+// longer reads (see `engineFlagAloneDoesNotSuppressConfirm` below).
 @Suite("§3.4 Share-after-FAIL confirm gate (Option B)")
 @MainActor
 struct FailExportGateTests {
@@ -102,42 +113,57 @@ struct FailExportGateTests {
                            durationSeconds: 0, userOverrodeFailure: overridden)
     }
 
-    @Test("FAIL (no override) needs the one-time confirm before sharing")
+    @Test("FAIL (not acknowledged) needs the one-time confirm before sharing")
     func failVerificationNeedsConfirm() {
         // Post-Option-B: a standing FAIL no longer disables Share; the tap routes
         // through the "Share Anyway" confirm (handleExportTap presents it).
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.fail("x"))) == true)
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: report(.fail("x")), acknowledged: false) == true)
     }
 
-    @Test("FAIL with user override shares without re-confirm (passes under A and B)")
+    @Test("FAIL with acknowledged=true shares without re-confirm (passes under A and B)")
     func failWithOverrideEnablesShare() {
-        // Once overrideVerificationFailure() has run, the predicate is false and
-        // the Share tap falls straight through to beginExport — "confirm once".
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.fail("x"), overridden: true)) == false)
+        // Once the app-side shadow is acknowledged, the predicate is false and
+        // the Share tap falls straight through to beginExport — "confirm once
+        // per attempt". The report's own (still-set) userOverrodeFailure is
+        // irrelevant to this call — see engineFlagAloneDoesNotSuppressConfirm.
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: report(.fail("x"), overridden: true), acknowledged: true) == false)
+    }
+
+    @Test("UXC-13: engine flag alone no longer matters — userOverrodeFailure == true but acknowledged: false still needs the confirm")
+    func engineFlagAloneDoesNotSuppressConfirm() {
+        // GAP-12: a report-scoped flag alone could not be re-armed when the
+        // user backed out of the share sheet without sending, so the
+        // predicate now reads only the app-side shadow via `acknowledged`.
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: report(.fail("x"), overridden: true), acknowledged: false) == true)
     }
 
     @Test("Non-FAIL verdicts never need the FAIL confirm (PASS / INFO / WARN / SKIPPED)")
     func nonFailVerdictsDoNotBlock() {
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.pass)) == false)
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.info("i"))) == false)
-        // WARN shares freely — only an un-overridden FAIL routes through this confirm.
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.warn("w"))) == false)
+        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.pass), acknowledged: false) == false)
+        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.info("i")), acknowledged: false) == false)
+        // WARN shares freely — only an unacknowledged FAIL routes through this confirm.
+        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.warn("w")), acknowledged: false) == false)
         // SKIPPED never takes the FAIL confirm — it routes through its own
         // one-time skipped-share confirm (SkippedShareGateTests below). The
         // former "skipped shares freely" pin is deliberately flipped there.
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.skipped)) == false)
+        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.skipped), acknowledged: false) == false)
     }
 
     // PD-17 residual tier: ATTENTION keeps the one-time confirm — the tier
     // re-class changes presentation, not the share-time acknowledgment.
-    @Test("ATTENTION (no override) needs the one-time confirm before sharing")
+    @Test("ATTENTION (not acknowledged) needs the one-time confirm before sharing")
     func attentionNeedsConfirm() {
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.attention("a"))) == true)
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: report(.attention("a")), acknowledged: false) == true)
     }
 
-    @Test("ATTENTION with user override shares without re-confirm")
+    @Test("ATTENTION with acknowledged=true shares without re-confirm")
     func attentionOverrideSharesFreely() {
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.attention("a"), overridden: true)) == false)
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: report(.attention("a"), overridden: true), acknowledged: true) == false)
     }
 
     @Test("UXC-14: ATTENTION confirm's at-risk item list quotes the layer's shortDescription")
@@ -182,7 +208,8 @@ struct FailExportGateTests {
             overallStatus: .fail("Output page count does not match the source document"),
             durationSeconds: 0
         )
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: pageCountFail) == true)
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: pageCountFail, acknowledged: false) == true)
     }
 
     // D08-F2 (search pre-launch S1): the Secure-Rasterization in-region
@@ -208,7 +235,8 @@ struct FailExportGateTests {
         // The card's enabled/disabled mapping is unchanged in isolation — Share is
         // disabled only when no fresh output exists (canExport false). A FAIL report
         // no longer forces that; it routes through the confirm instead.
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: ocrFail) == true)
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: ocrFail, acknowledged: false) == true)
         #expect(VerificationResultsView.shareDisabled(canExport: false) == true)
     }
 
@@ -221,10 +249,13 @@ struct FailExportGateTests {
     @Test("ERR-06: FAIL-without-override routes through the confirm before beginExport")
     func err06FailWithoutOverrideRoutesThroughConfirm() {
         // handleExportTap presents the confirm (returns early) on this:
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.fail("x"))) == true)
-        // beginExport() is reached only on the open paths (override / non-FAIL):
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.fail("x"), overridden: true)) == false)
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.pass)) == false)
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: report(.fail("x")), acknowledged: false) == true)
+        // beginExport() is reached only on the open paths (acknowledged / non-FAIL):
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: report(.fail("x"), overridden: true), acknowledged: true) == false)
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: report(.pass), acknowledged: false) == false)
     }
 
     // UXC-14: the confirm sheet's at-risk item list is derived from EVERY
@@ -317,8 +348,13 @@ struct FailExportGateTests {
             Issue.record("phase should remain .verified after override")
             return
         }
+        // The mirror is still written (LegalGateTests.overrideStoresFlag
+        // pins this directly)...
         #expect(overridden.userOverrodeFailure == true)
-        #expect(DocumentEditorView.shareNeedsFailConfirm(report: overridden) == false)
+        // ...but UXC-13: the app-side shadow is what the predicate reads.
+        #expect(doc.failShareAcknowledged == true)
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: overridden, acknowledged: doc.failShareAcknowledged) == false)
     }
 }
 
@@ -326,9 +362,10 @@ struct FailExportGateTests {
 // (verification never ran). Deliberately FLIPS the former pin that .skipped
 // shared with zero friction: a skipped output carries no verification result,
 // so sharing it now asks once, naming the state. Mirrors the FAIL confirm's
-// machinery: pure static predicate shareNeedsSkippedConfirm(report:), a
-// report-scoped userAcknowledgedSkippedShare flag set by
-// DocumentState.acknowledgeSkippedShare(), and handleExportTap routing (after
+// machinery: pure static predicate shareNeedsSkippedConfirm(report:acknowledged:),
+// an app-side skippedShareAcknowledged shadow (UXC-13) set by
+// DocumentState.acknowledgeSkippedShare() and cleared by
+// DocumentState.rearmShareRiskConfirms(), and handleExportTap routing (after
 // the FAIL branch — mutually exclusive by overallStatus). WARN friction is
 // deliberately NOT added.
 @Suite("Skipped-share confirm gate")
@@ -348,33 +385,43 @@ struct SkippedShareGateTests {
         let reasons: [VerificationReport.SkipReason] = [.autoVerifyOff, .cancelled, .error]
         for reason in reasons {
             let skipped = VerificationReport.skipped(reason: reason)
-            #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: skipped) == true)
+            #expect(DocumentEditorView.shareNeedsSkippedConfirm(
+                report: skipped, acknowledged: false) == true)
         }
     }
 
-    @Test("SKIPPED with acknowledgement shares without re-confirm (confirm once)")
+    @Test("SKIPPED with acknowledged=true shares without re-confirm (confirm once)")
     func acknowledgedSkippedSharesFreely() {
         #expect(DocumentEditorView.shareNeedsSkippedConfirm(
-            report: report(.skipped, acknowledged: true)) == false)
+            report: report(.skipped, acknowledged: true), acknowledged: true) == false)
+    }
+
+    @Test("UXC-13: engine flag alone no longer matters — userAcknowledgedSkippedShare == true but acknowledged: false still needs the confirm")
+    func engineFlagAloneDoesNotSuppressConfirm() {
+        #expect(DocumentEditorView.shareNeedsSkippedConfirm(
+            report: report(.skipped, acknowledged: true), acknowledged: false) == true)
     }
 
     @Test("A fresh skipped report re-arms the confirm")
     func freshReportRearmsConfirm() {
-        // Report-scoped flag: every factory-made report starts
-        // unacknowledged, so a new verification run (or a new skip) re-arms
-        // the confirm even if the user acknowledged a previous report.
+        // Every factory-made report starts unacknowledged (the report's own
+        // field is a write-only mirror now), and a fresh DocumentState's
+        // shadow likewise defaults false, so a new verification run (or a
+        // new skip) re-arms the confirm even after a previous report was
+        // acknowledged.
         let fresh = VerificationReport.skipped(reason: .autoVerifyOff)
         #expect(fresh.userAcknowledgedSkippedShare == false)
-        #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: fresh) == true)
+        #expect(DocumentEditorView.shareNeedsSkippedConfirm(
+            report: fresh, acknowledged: false) == true)
     }
 
     @Test("Non-SKIPPED verdicts never need the skipped confirm (PASS / INFO / WARN / FAIL)")
     func nonSkippedVerdictsDoNotConfirm() {
-        #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: report(.pass)) == false)
-        #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: report(.info("i"))) == false)
+        #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: report(.pass), acknowledged: false) == false)
+        #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: report(.info("i")), acknowledged: false) == false)
         // WARN and PASS stay confirm-free — friction was added for SKIPPED only.
-        #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: report(.warn("w"))) == false)
-        #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: report(.fail("x"))) == false)
+        #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: report(.warn("w")), acknowledged: false) == false)
+        #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: report(.fail("x")), acknowledged: false) == false)
     }
 
     /// The narrow incomplete-WARN shape (UXC-14 / GAP-14): overallStatus
@@ -399,8 +446,8 @@ struct SkippedShareGateTests {
         var fixtures: [VerificationReport] = statuses.map { report($0) }
         fixtures.append(incompleteWarnReport())
         for r in fixtures {
-            let failFires = DocumentEditorView.shareNeedsFailConfirm(report: r)
-            let skippedFires = DocumentEditorView.shareNeedsSkippedConfirm(report: r)
+            let failFires = DocumentEditorView.shareNeedsFailConfirm(report: r, acknowledged: false)
+            let skippedFires = DocumentEditorView.shareNeedsSkippedConfirm(report: r, acknowledged: false)
             let incompleteFires = DocumentEditorView.shareNeedsIncompleteWarnConfirm(
                 report: r, acknowledged: false)
             let fireCount = [failFires, skippedFires, incompleteFires].filter { $0 }.count
@@ -419,8 +466,8 @@ struct SkippedShareGateTests {
     @Test("Friction ladder: FAIL > SKIPPED == incomplete-WARN > WARN == PASS")
     func frictionLadderHolds() {
         func friction(_ r: VerificationReport) -> Int {
-            (DocumentEditorView.shareNeedsFailConfirm(report: r) ? 1 : 0)
-                + (DocumentEditorView.shareNeedsSkippedConfirm(report: r) ? 1 : 0)
+            (DocumentEditorView.shareNeedsFailConfirm(report: r, acknowledged: false) ? 1 : 0)
+                + (DocumentEditorView.shareNeedsSkippedConfirm(report: r, acknowledged: false) ? 1 : 0)
                 + (DocumentEditorView.shareNeedsIncompleteWarnConfirm(
                     report: r, acknowledged: false) ? 1 : 0)
                 + (VerificationResultsView.shouldTintShareRed(report: r) ? 1 : 0)
@@ -449,8 +496,12 @@ struct SkippedShareGateTests {
             Issue.record("phase should remain .verified after acknowledgement")
             return
         }
+        // The mirror is still written...
         #expect(acknowledged.userAcknowledgedSkippedShare == true)
-        #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: acknowledged) == false)
+        // ...but UXC-13: the app-side shadow is what the predicate reads.
+        #expect(doc.skippedShareAcknowledged == true)
+        #expect(DocumentEditorView.shareNeedsSkippedConfirm(
+            report: acknowledged, acknowledged: doc.skippedShareAcknowledged) == false)
     }
 
     @Test("Skip-fact line names the state (mechanism description) — new UXC-14 sheet copy")
@@ -769,5 +820,155 @@ struct ShareTintAndPreviewDecouplingTests {
         #expect(VerificationResultsView.shouldTintShareRed(report: report(.warn("w"))) == false)
         #expect(VerificationResultsView.shouldTintShareRed(report: report(.info("i"))) == false)
         #expect(VerificationResultsView.shouldTintShareRed(report: report(.skipped)) == false)
+    }
+}
+
+// UXC-13 (RB-22 + RB-45) — re-arming the share-risk confirms per send
+// attempt, and UXC-36 (RB-41) — the post-share acknowledgment toast.
+// `DocumentState.rearmShareRiskConfirms()` and
+// `DocumentEditorView.handleShareSheetCompletion(completed:...)` are the two
+// pure/near-pure seams: the share sheet's `completionWithItemsHandler` itself
+// is not unit-hostable (real UIActivityViewController + presented view
+// controller), so these tests exercise the extracted logic directly, mirroring
+// the `completeShareRiskConfirm` spy pattern already used above.
+@Suite("Share-risk re-arm (UXC-13) + post-share acknowledgment (UXC-36)")
+@MainActor
+struct ShareRiskRearmAndAcknowledgmentTests {
+
+    @Test("rearmShareRiskConfirms clears all three shadows and the mirror")
+    func rearmClearsShadowsAndMirror() {
+        let doc = DocumentState()
+        let original = VerificationReport(layers: [], overallStatus: .fail("x"), durationSeconds: 0)
+        doc.phase = .verified(report: original)
+        doc.overrideVerificationFailure()
+        doc.acknowledgeSkippedShare()
+        doc.acknowledgeIncompleteWarnShare()
+        #expect(doc.failShareAcknowledged == true)
+        #expect(doc.skippedShareAcknowledged == true)
+        #expect(doc.incompleteWarnShareAcknowledged == true)
+
+        doc.rearmShareRiskConfirms()
+
+        #expect(doc.failShareAcknowledged == false)
+        #expect(doc.skippedShareAcknowledged == false)
+        #expect(doc.incompleteWarnShareAcknowledged == false)
+        if case .verified(let updated) = doc.phase {
+            #expect(updated.userOverrodeFailure == false)
+            #expect(updated.userAcknowledgedSkippedShare == false)
+        } else {
+            Issue.record("expected .verified phase to persist through re-arm")
+        }
+    }
+
+    @Test("rearmShareRiskConfirms in a non-verified phase clears the shadows without crashing (no report to mirror into)")
+    func rearmInNonVerifiedPhaseIsSafe() {
+        let doc = DocumentState()
+        doc.phase = .editing
+        doc.rearmShareRiskConfirms()
+        #expect(doc.failShareAcknowledged == false)
+        #expect(doc.skippedShareAcknowledged == false)
+        #expect(doc.incompleteWarnShareAcknowledged == false)
+        let isStillEditing: Bool = { if case .editing = doc.phase { true } else { false } }()
+        #expect(isStillEditing)
+    }
+
+    @Test("handleShareSheetCompletion(completed: false) re-arms and does NOT announce")
+    func completionFalseRearmsWithoutAnnouncing() {
+        let doc = DocumentState()
+        let original = VerificationReport(layers: [], overallStatus: .fail("x"), durationSeconds: 0)
+        doc.phase = .verified(report: original)
+        doc.overrideVerificationFailure()
+        #expect(doc.failShareAcknowledged == true)
+
+        DocumentEditorView.handleShareSheetCompletion(
+            completed: false,
+            documentState: doc,
+            announceShared: { Issue.record("must not announce on a cancelled share") },
+            recordSuccessfulExport: { Issue.record("must not record a cancelled share") }
+        )
+
+        #expect(doc.failShareAcknowledged == false)
+    }
+
+    @Test("handleShareSheetCompletion(completed: true) announces exactly once, records the export, and leaves the flags spent")
+    func completionTrueAnnouncesAndRecordsLeavingFlagsSpent() {
+        let doc = DocumentState()
+        let original = VerificationReport(layers: [], overallStatus: .fail("x"), durationSeconds: 0)
+        doc.phase = .verified(report: original)
+        doc.overrideVerificationFailure()
+        #expect(doc.failShareAcknowledged == true)
+
+        var announceCount = 0
+        var recordCount = 0
+        DocumentEditorView.handleShareSheetCompletion(
+            completed: true,
+            documentState: doc,
+            announceShared: { announceCount += 1 },
+            recordSuccessfulExport: { recordCount += 1 }
+        )
+
+        #expect(announceCount == 1)
+        #expect(recordCount == 1)
+        // A completed send leaves the shadow spent for THIS report — only a
+        // cancelled attempt re-arms; a fresh report re-arms via
+        // transition(to:)'s reset instead.
+        #expect(doc.failShareAcknowledged == true)
+    }
+
+    @Test("sharedAcknowledgmentToast exact text")
+    func sharedAcknowledgmentToastExactText() {
+        #expect(DocumentEditorView.sharedAcknowledgmentToast == "Shared.")
+    }
+
+    // RB-22 sequence: confirm → the presented share sheet is dismissed
+    // without sending → the NEXT Share tap for the same report must confirm
+    // again. Uses the existing completeShareRiskConfirm spy pattern
+    // (ShareRiskConfirmSheetTests above) for the confirm half, and
+    // handleShareSheetCompletion for the cancel half.
+    @Test("RB-22: confirm, then cancel the share sheet, then Share again — re-confirms")
+    func completionThenCancelThenShareReConfirms() {
+        let savedHaptic = DocumentEditorView.shareRiskConfirmHaptic
+        DocumentEditorView.shareRiskConfirmHaptic = { }
+        defer { DocumentEditorView.shareRiskConfirmHaptic = savedHaptic }
+
+        let doc = DocumentState()
+        let original = VerificationReport(layers: [], overallStatus: .fail("x"), durationSeconds: 0)
+        doc.phase = .verified(report: original)
+
+        // First Share tap: FAIL, unacknowledged — needs the confirm.
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: original, acknowledged: doc.failShareAcknowledged) == true)
+
+        // User slides to confirm — completeShareRiskConfirm records the
+        // acknowledgement and hands the live report to beginExport (the spy
+        // here stands in for presenting the share sheet).
+        var exportedReports: [VerificationReport] = []
+        DocumentEditorView.completeShareRiskConfirm(
+            kind: .failOrAttention(original),
+            documentState: doc,
+            beginExport: { exportedReports.append($0) }
+        )
+        #expect(doc.failShareAcknowledged == true)
+        #expect(exportedReports.count == 1)
+
+        // Immediately after confirming, the same report would not
+        // re-confirm...
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: exportedReports[0], acknowledged: doc.failShareAcknowledged) == false)
+
+        // ...but the user backs out of the presented share sheet without
+        // sending (`completed == false`) — RB-22: this re-arms the confirm
+        // for the NEXT Share tap on the same report.
+        DocumentEditorView.handleShareSheetCompletion(
+            completed: false,
+            documentState: doc,
+            announceShared: { Issue.record("must not announce on cancel") },
+            recordSuccessfulExport: { Issue.record("must not record on cancel") }
+        )
+        #expect(doc.failShareAcknowledged == false)
+
+        // The next Share tap for the same report needs the confirm again.
+        #expect(DocumentEditorView.shareNeedsFailConfirm(
+            report: exportedReports[0], acknowledged: doc.failShareAcknowledged) == true)
     }
 }

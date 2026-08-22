@@ -50,6 +50,22 @@ struct HonestyDisclaimerMountTests {
         }
     }
 
+    // UXC-15 (RB-43): placement-only re-weight — PASS mounts the honesty
+    // disclaimer + non-visual limit line beneath the masthead instead of
+    // at the bottom; every other verdict keeps the bottom mount.
+    @Test("shouldMountLimitBlockBeneathMasthead: true for PASS, false for every other status")
+    func mountLimitBlockBeneathMastheadTable() {
+        #expect(VerificationResultsView.shouldMountLimitBlockBeneathMasthead(
+            overallStatus: .pass) == true)
+        let bottomMounted: [VerificationStatus] =
+            [.warn("w"), .info("i"), .attention("a"), .fail("x"), .skipped]
+        for status in bottomMounted {
+            #expect(VerificationResultsView.shouldMountLimitBlockBeneathMasthead(
+                overallStatus: status) == false,
+                    "\(status) must keep the bottom mount, not the beneath-masthead one")
+        }
+    }
+
     @Test("Results view mounts the .redacted-profile disclaimer (source pin)")
     func resultsViewMountsRedactedProfile() throws {
         let source = try loadRepoFile(

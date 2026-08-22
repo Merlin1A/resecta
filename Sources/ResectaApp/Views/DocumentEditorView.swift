@@ -1366,27 +1366,37 @@ struct DocumentEditorView: View {
     /// Anyway" confirmation before exporting — it no longer hard-blocks the
     /// Share card. Pure + `static` so the predicate is one source of truth and
     /// is unit-testable without a SwiftUI host (mirrors
-    /// `VerificationResultsView.shareDisabled`). Body is unchanged from the
-    /// former `exportBlockedByFailure`; only the role changed (block → confirm),
-    /// so `userOverrodeFailure == true` makes the confirm a no-op — Share goes
-    /// straight through ("confirm once").
+    /// `VerificationResultsView.shareDisabled`).
     /// An ATTENTION verdict (un-redacted residual text) keeps the same
     /// one-time confirm: the tier re-class changes presentation, not the
     /// share-time acknowledgment. WARN and PASS stay confirm-free.
-    static func shareNeedsFailConfirm(report: VerificationReport) -> Bool {
+    /// UXC-13 (RB-22 + RB-45): `report` alone can no longer answer whether
+    /// the confirm is needed — `report.userOverrodeFailure` is a write-only
+    /// mirror now (see `DocumentState.failShareAcknowledged`), because a
+    /// value that lived and died with the report couldn't be re-armed when
+    /// the user backed out of the share sheet without sending (GAP-12).
+    /// The predicate takes `acknowledged` as an explicit parameter instead,
+    /// sourced at the call site from `DocumentState.failShareAcknowledged`
+    /// — `acknowledged == true` makes the confirm a no-op for THIS send
+    /// ("confirm once per attempt", not "once per report").
+    static func shareNeedsFailConfirm(report: VerificationReport, acknowledged: Bool) -> Bool {
         (report.overallStatus.isFail || report.overallStatus.isAttention)
-            && !report.userOverrodeFailure
+            && !acknowledged
     }
 
     /// Skipped-share confirm predicate: a SKIPPED report (verification never
     /// ran — any skip reason) not yet acknowledged for sharing routes the
     /// Share tap through a one-time confirm before exporting. Same shape as
-    /// `shareNeedsFailConfirm(report:)`: pure + `static` so it is
-    /// unit-testable without a SwiftUI host, and the acknowledgement conjunct
-    /// makes it one-time per report. WARN and PASS deliberately stay
-    /// confirm-free.
-    static func shareNeedsSkippedConfirm(report: VerificationReport) -> Bool {
-        report.overallStatus.isSkipped && !report.userAcknowledgedSkippedShare
+    /// `shareNeedsFailConfirm(report:acknowledged:)`: pure + `static` so it
+    /// is unit-testable without a SwiftUI host, and the acknowledgement
+    /// conjunct makes it one-time per attempt. WARN and PASS deliberately
+    /// stay confirm-free. UXC-13: `acknowledged` is sourced at the call site
+    /// from `DocumentState.skippedShareAcknowledged` — see
+    /// `shareNeedsFailConfirm(report:acknowledged:)`'s doc comment for why
+    /// the report's own `userAcknowledgedSkippedShare` is a write-only
+    /// mirror rather than the read source now.
+    static func shareNeedsSkippedConfirm(report: VerificationReport, acknowledged: Bool) -> Bool {
+        report.overallStatus.isSkipped && !acknowledged
     }
 
     /// UXC-14 / GAP-14: incomplete-WARN share-risk confirm predicate. A WARN
@@ -1533,7 +1543,10 @@ struct DocumentEditorView: View {
         // share-risk confirm sheet before any export. WARN/INFO/PASS (and an
         // already-overridden FAIL/ATTENTION) fall straight through to the
         // share sheet.
-        if Self.shareNeedsFailConfirm(report: report) {
+        if Self.shareNeedsFailConfirm(
+            report: report,
+            acknowledged: documentState.failShareAcknowledged
+        ) {
             shareRiskConfirmKind = .failOrAttention(report)
             return
         }
@@ -1541,7 +1554,10 @@ struct DocumentEditorView: View {
         // through the same sheet — the user is sharing an output whose
         // redaction was never verified. Mutually exclusive with the FAIL
         // branch by overallStatus.
-        if Self.shareNeedsSkippedConfirm(report: report) {
+        if Self.shareNeedsSkippedConfirm(
+            report: report,
+            acknowledged: documentState.skippedShareAcknowledged
+        ) {
             shareRiskConfirmKind = .skipped(report)
             return
         }
@@ -1556,6 +1572,42 @@ struct DocumentEditorView: View {
             return
         }
         beginExport(report: report)
+    }
+
+    // MARK: - Post-share acknowledgment (UXC-36 / RB-41) + re-arm (UXC-13)
+
+    /// UXC-36: toast enqueued when the share sheet reports the document was
+    /// actually sent (`completed == true`) — confirms the app's own action
+    /// (handing the file to the share sheet) went through, without naming
+    /// which destination the user chose. Never enqueued on cancel — see
+    /// `handleShareSheetCompletion`.
+    static let sharedAcknowledgmentToast = "Shared."
+
+    /// UXC-13 (RB-22 + RB-45): the share sheet's `completionWithItemsHandler`
+    /// routes through this pure static so the re-arm / announce /
+    /// record-export decision is unit-testable without
+    /// `UIActivityViewController`. `completed == false` means the user
+    /// backed out of the sheet without sending — the share-risk confirms
+    /// are spent only for a send that actually happened, so a cancelled
+    /// attempt re-arms all three (`DocumentState.rearmShareRiskConfirms()`)
+    /// for the next Share tap on the same report (GAP-12). `completed ==
+    /// true` announces the share (UXC-36) and then records it — the
+    /// `successfulExportCount` bump / App Store review-request check,
+    /// unchanged from the prior inline body — leaving the confirms spent
+    /// for this report; a fresh report re-arms via `transition(to:)`'s
+    /// reset instead of this function.
+    static func handleShareSheetCompletion(
+        completed: Bool,
+        documentState: DocumentState,
+        announceShared: () -> Void,
+        recordSuccessfulExport: () -> Void
+    ) {
+        guard completed else {
+            documentState.rearmShareRiskConfirms()
+            return
+        }
+        announceShared()
+        recordSuccessfulExport()
     }
 
     // DateFormatter is expensive to create; reuse a static instance.
@@ -1622,11 +1674,24 @@ struct DocumentEditorView: View {
         activityVC.completionWithItemsHandler = { _, completed, _, _ in
             try? FileManager.default.removeItem(at: exportURL)
             documentState.transition(to: .verified(report: currentReport))
-            guard completed else { return }
-            settingsState.successfulExportCount += 1
-            if settingsState.successfulExportCount == 3 {
-                Task { @MainActor in requestReview() }
-            }
+            // Order matters (UXC-13): the transition above restores the
+            // captured report onto `.verified` FIRST, then re-arm/announce
+            // reads or mutates that live phase.
+            DocumentEditorView.handleShareSheetCompletion(
+                completed: completed,
+                documentState: documentState,
+                announceShared: {
+                    toastManager.enqueue(
+                        DocumentEditorView.sharedAcknowledgmentToast,
+                        severity: .success)
+                },
+                recordSuccessfulExport: {
+                    settingsState.successfulExportCount += 1
+                    if settingsState.successfulExportCount == 3 {
+                        Task { @MainActor in requestReview() }
+                    }
+                }
+            )
         }
 
         // `connectedScenes` is an unordered Set; `.first as? UIWindowScene`
@@ -1638,6 +1703,14 @@ struct DocumentEditorView: View {
         guard let topVC = MatchExportService.topViewController() else {
             try? FileManager.default.removeItem(at: exportURL)
             documentState.transition(to: .verified(report: currentReport))
+            // UXC-13: the share sheet never presented, so no send
+            // happened — re-arm exactly as a cancelled share would.
+            DocumentEditorView.handleShareSheetCompletion(
+                completed: false,
+                documentState: documentState,
+                announceShared: {},
+                recordSuccessfulExport: {}
+            )
             toastManager.enqueue(
                 "Unable to present the share sheet right now.",
                 severity: .warning
