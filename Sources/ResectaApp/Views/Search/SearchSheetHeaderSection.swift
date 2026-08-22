@@ -43,7 +43,19 @@ struct SearchSheetHeaderSection: View {
         // innocent in the COOP probe runs (chips, footer) is
         // plain-styled.
         HStack(spacing: ResectaTokens.Spacing.sm) {
-            Button("Dismiss", action: onDismiss)
+            // UXC-18: 57-61×19.5 measured — height only, width already
+            // clears the floor. Restructured from the `Button(_:action:)`
+            // string initializer to a closure-label form so a
+            // `.frame(minHeight:)` can sit on the label without
+            // touching `.buttonStyle(.plain)` (load-bearing — see the
+            // comment above). `Text("Dismiss")` is the exact same
+            // label SwiftUI derives from the string initializer, so
+            // the accessibility name stays byte-identical.
+            Button(action: onDismiss) {
+                Text("Dismiss")
+                    .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                    .contentShape(Rectangle())
+            }
                 .buttonStyle(.plain)
                 .foregroundStyle(.tint)
                 .accessibilityIdentifier("searchDismissButton")
@@ -62,7 +74,11 @@ struct SearchSheetHeaderSection: View {
             // Identifier BEFORE `.disabled` — the retired toolbar's
             // modifier order, which keeps the identifier on the AX
             // surface in the disabled state too.
-            Button("Apply \(applyCount)", action: onApply)
+            Button(action: onApply) {
+                Text("Apply \(applyCount)")
+                    .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                    .contentShape(Rectangle())
+            }
                 .buttonStyle(.plain)
                 .fontWeight(.semibold)
                 .foregroundStyle(applyDisabled

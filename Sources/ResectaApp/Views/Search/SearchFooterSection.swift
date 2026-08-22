@@ -124,12 +124,25 @@ struct SearchFooterSection: View {
                 // Conditional dismiss: footer bulk selection is user selection work.
                 searchState.userModifiedSelections = true
             }
+        // UXC-18: 81×26.9 measured — height only, width already
+        // clears the floor. Closure-label form so `.frame(minHeight:)`
+        // can sit on the label; `Text(...)` reproduces the exact
+        // string-initializer label, so the accessible name is
+        // unchanged in both states.
         if allSelected {
-            Button("Deselect All", action: action)
+            Button(action: action) {
+                Text("Deselect All")
+                    .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                    .contentShape(Rectangle())
+            }
                 .controlSize(.small)
                 .accessibilityIdentifier("footerSelectAllButton")
         } else {
-            Button("Select All", action: action)
+            Button(action: action) {
+                Text("Select All")
+                    .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                    .contentShape(Rectangle())
+            }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
                 .accessibilityIdentifier("footerSelectAllButton")

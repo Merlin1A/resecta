@@ -242,6 +242,26 @@ enum ResectaTokens {
     enum TouchTarget {
         /// 22pt — Apple Pencil hit area
         static let pencil: CGFloat = 22
+        /// 46pt — Apple HIG minimum EFFECTIVE (as-hit-tested) touch
+        /// target floor. UXC-18: the default-size floor for
+        /// interactive controls whose visual glyph/label is smaller
+        /// than this — enlarge the tappable frame/contentShape around
+        /// the content, never the glyph or label itself.
+        ///
+        /// RB-54: 46 = 44 ÷ 0.96 — the medium-detent inset sheet
+        /// renders its content at ~0.96 scale on iOS 26 (measured
+        /// 2026-08-22 on the iPhone 17 Pro sim: a 44-pt frame lands at
+        /// 42.2 pt effective), so a 46-pt layout frame yields ≥ 44pt
+        /// effective inside the sheet and 46pt outside it (page bar,
+        /// canvas) — harmless. The ruled floor is the EFFECTIVE size,
+        /// not the layout frame, hence 46 rather than 44 here.
+        ///
+        /// Catalog note: DC-023 (2026-08-21) deleted a never-read
+        /// `TouchTarget.finger: CGFloat = 44` member from this enum as
+        /// dead code. This is a deliberate, register-noted
+        /// re-introduction of the same idea under a new name for a
+        /// new, now-referenced purpose — not a revert of DC-023.
+        static let minimum: CGFloat = 46
     }
 
     // MARK: - Branded Surface (Design Spec §5)

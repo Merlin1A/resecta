@@ -16,7 +16,15 @@ struct PageNavigationBar: View {
             Button {
                 documentState.currentPageIndex = max(0, documentState.currentPageIndex - 1)
             } label: {
+                // UXC-18: this pair measured as the smallest
+                // interactive targets in the app (12.7×16.7 at Large
+                // type) — the bare glyph carried no hit-area floor.
                 Image(systemName: "chevron.left")
+                    .frame(
+                        width: ResectaTokens.TouchTarget.minimum,
+                        height: ResectaTokens.TouchTarget.minimum
+                    )
+                    .contentShape(Rectangle())
             }
             // Label + identifier BEFORE `.disabled` — the header-section
             // modifier order, keeping the AX surface (and XCUI queries)
@@ -48,6 +56,11 @@ struct PageNavigationBar: View {
                 )
             } label: {
                 Image(systemName: "chevron.right")
+                    .frame(
+                        width: ResectaTokens.TouchTarget.minimum,
+                        height: ResectaTokens.TouchTarget.minimum
+                    )
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel("Next page")
             .accessibilityIdentifier("pageNavNext")

@@ -160,7 +160,12 @@ struct SearchResultRow: View {
                 Image(systemName: isRationaleExpanded ? "chevron.up" : "chevron.down")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(width: 20, height: 20)
+                    // UXC-18: was a fixed 20×20 — floored to the HIG
+                    // minimum. Same contentShape idiom, just resized.
+                    .frame(
+                        width: ResectaTokens.TouchTarget.minimum,
+                        height: ResectaTokens.TouchTarget.minimum
+                    )
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -168,6 +173,7 @@ struct SearchResultRow: View {
                                 ? "Collapse rationale"
                                 : "Expand rationale")
             .accessibilityHint("Reveals a short summary of the detector's match signals")
+            .accessibilityIdentifier("rationaleDisclosureButton")
         }
     }
 
