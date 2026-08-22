@@ -75,8 +75,6 @@ targets:
       # checkout; `optional` stays as tolerance for local deletion.
       - path: UITestFixtures
         optional: true
-    resources:
-      - path: Resources
     settings:
       base:
         # NSPhotoLibraryUsageDescription is deliberately absent:
