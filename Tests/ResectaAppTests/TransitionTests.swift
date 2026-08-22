@@ -272,5 +272,89 @@ struct TransitionTests {
         }()
         #expect(isStillEditing, "wrong-phase override must not mutate the phase")
     }
+
+    // MARK: - UXC-14: incompleteWarnShareAcknowledged reset conditioning
+    //
+    // `incompleteWarnShareAcknowledged` cannot live on `VerificationReport`
+    // (Packages/RedactionEngine is C-5-fenced), so it lives on DocumentState
+    // and `transition(to:)` resets it in place of the "new report starts
+    // false" behavior the report-scoped flags get for free. The reset must
+    // fire exactly on the two transitions that produce a genuinely NEW
+    // report (`.redacting → .verified`, `.verifying → .verified`) and must
+    // NOT fire on the two that resume the SAME report
+    // (`.exporting → .verified`, `.failed → .verified`).
+
+    private func warnReport() -> VerificationReport {
+        VerificationReport(
+            layers: [
+                LayerResult(name: "L", symbolName: "s", status: .skipped,
+                           shortDescription: "", detailDescription: "",
+                           pageReferences: nil, durationSeconds: 0)
+            ],
+            overallStatus: .warn("w"), durationSeconds: 0
+        )
+    }
+
+    @Test("Resets on .verifying → .verified (a fresh verification completed)")
+    func resetsOnVerifyingToVerified() {
+        let state = DocumentState()
+        state.phase = .verifying(progress: .init(
+            currentLayer: 1, totalLayers: 1, layerName: "L", completedLayers: []))
+        state.acknowledgeIncompleteWarnShare()
+        #expect(state.incompleteWarnShareAcknowledged == true)
+
+        state.transition(to: .verified(report: warnReport()))
+        #expect(state.incompleteWarnShareAcknowledged == false)
+    }
+
+    @Test("Resets on .redacting → .verified (autoVerify-off skip path)")
+    func resetsOnRedactingToVerified() {
+        let state = DocumentState()
+        state.phase = .redacting(progress: .init(
+            currentPage: 0, totalPages: 1, currentStep: "x"))
+        state.acknowledgeIncompleteWarnShare()
+        #expect(state.incompleteWarnShareAcknowledged == true)
+
+        state.transition(to: .verified(report: .skipped))
+        #expect(state.incompleteWarnShareAcknowledged == false)
+    }
+
+    @Test("Does NOT reset on .exporting → .verified (failed-export retry resumes the same report)")
+    func doesNotResetOnExportingToVerified() {
+        let state = DocumentState()
+        state.phase = .verifying(progress: .init(
+            currentLayer: 1, totalLayers: 1, layerName: "L", completedLayers: []))
+        state.transition(to: .verified(report: warnReport()))
+        state.acknowledgeIncompleteWarnShare()
+        #expect(state.incompleteWarnShareAcknowledged == true)
+
+        state.transition(to: .exporting)
+        state.transition(to: .verified(report: warnReport()))
+        #expect(state.incompleteWarnShareAcknowledged == true,
+                "an export-attempt retry resuming the same report must not re-arm the confirm")
+    }
+
+    @Test("Does NOT reset on .failed → .verified (KI-4 recovery resumes the same report)")
+    func doesNotResetOnFailedToVerified() {
+        let state = DocumentState()
+        state.phase = .verifying(progress: .init(
+            currentLayer: 1, totalLayers: 1, layerName: "L", completedLayers: []))
+        state.transition(to: .verified(report: warnReport()))
+        state.acknowledgeIncompleteWarnShare()
+        #expect(state.incompleteWarnShareAcknowledged == true)
+
+        // `.verified → .failed` is not itself a legal pair (see
+        // `legalTransitions`) — the real ERR-06 export-failure path always
+        // routes `.verified → .exporting → .failed`, so the test mirrors
+        // that route rather than a synthetic direct edge.
+        state.transition(to: .exporting)
+        state.transition(to: .failed(
+            error: .exportError(.writeFailed),
+            returnPhase: .verified(report: warnReport())
+        ))
+        state.transition(to: .verified(report: warnReport()))
+        #expect(state.incompleteWarnShareAcknowledged == true,
+                "a KI-4 recovery resuming the same report must not re-arm the confirm")
+    }
 }
 

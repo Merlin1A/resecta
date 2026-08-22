@@ -57,19 +57,15 @@ struct DocumentEditorView: View {
     // empty sessions close directly.
     @State private var showDoneConfirmation = false
 
-    // §3.4 FAIL override / "Option B": drives the one-time "Share Anyway"
-    // confirmation shown when a Share tap reaches handleExportTap while a FAIL
-    // verdict stands un-overridden. The Share card is now enabled on FAIL
-    // (canExport no longer hard-blocks it), so this confirm is the gate the
-    // user passes through once per report before sharing a flagged document.
-    @State private var showShareAnywayConfirm = false
-
-    // Skipped-share confirm: drives the one-time confirmation shown when a
-    // Share tap reaches handleExportTap while the report is SKIPPED
-    // (verification never ran) and the user has not yet acknowledged sharing
-    // it. Parallel to showShareAnywayConfirm; the two are mutually exclusive
-    // by overallStatus (a report is FAIL or SKIPPED, never both).
-    @State private var showShareSkippedConfirm = false
+    // UXC-14: drives the bespoke share-risk confirm sheet shown when a
+    // Share tap reaches handleExportTap while the report is FAIL/ATTENTION
+    // (not yet overridden), SKIPPED (not yet acknowledged), or an
+    // incomplete-WARN (digest-dependent layers skipped, not yet
+    // acknowledged). One optional-enum slot replaces the former two
+    // booleans — the three families are mutually exclusive by
+    // overallStatus, so at most one case is ever non-nil, and the type
+    // itself now says so rather than a convention across two Bools.
+    @State private var shareRiskConfirmKind: ShareRiskConfirmKind?
 
     // GAP §6.2: iPad hover popover state
     @State private var showHoverPopover = false
@@ -713,15 +709,17 @@ struct DocumentEditorView: View {
         } message: {
             Text("Drawn regions and verification results will be cleared.")
         }
-        // Both one-time share confirms (§3.4 FAIL "Share Anyway" + the
-        // skipped-share confirm), extracted into ShareConfirmAlerts — see the
-        // modifier for the lifecycle commentary. Extraction keeps this body's
-        // modifier chain within the type-checker's expression budget (a second
-        // inline .alert pushed it past).
-        .modifier(ShareConfirmAlerts(
-            showShareAnywayConfirm: $showShareAnywayConfirm,
-            showShareSkippedConfirm: $showShareSkippedConfirm,
+        // UXC-14: the bespoke share-risk confirm sheet (FAIL/ATTENTION,
+        // SKIPPED, incomplete-WARN — see ShareRiskConfirmSheet for the
+        // lifecycle commentary), extracted into ShareRiskConfirmPresentation.
+        // Extraction keeps this body's modifier chain within the
+        // type-checker's expression budget (an inline .sheet here pushed it
+        // past, same reason the former two-.alert ShareConfirmAlerts was
+        // extracted).
+        .modifier(ShareRiskConfirmPresentation(
+            kind: $shareRiskConfirmKind,
             documentState: documentState,
+            deselectionSnapshot: redactionState.lastRunDeselection,
             beginExport: beginExport
         ))
         .onDisappear {
@@ -1391,6 +1389,30 @@ struct DocumentEditorView: View {
         report.overallStatus.isSkipped && !report.userAcknowledgedSkippedShare
     }
 
+    /// UXC-14 / GAP-14: incomplete-WARN share-risk confirm predicate. A WARN
+    /// report whose aggregate carries zero real WARN layers but at least one
+    /// SKIPPED layer is the digest-less verify-only degrade
+    /// (`VerificationResultsView.mastheadSubtitle`'s "Completed with N of M
+    /// checks skipped — results may be incomplete." branch) — the narrow
+    /// condition is deliberately identical to that branch's own gate, so the
+    /// confirm sheet can reuse its exact sentence with no new string. A WARN
+    /// that mixes real WARN layers with skipped ones does NOT take this
+    /// confirm (`warnCount == 0` fails) — that combination has no approved
+    /// copy and stays confirm-free, same as any other routine WARN. `report`
+    /// alone can't carry the acknowledgement (`VerificationReport` lives in
+    /// the C-5-fenced Packages/RedactionEngine), so unlike its two siblings
+    /// this predicate takes `acknowledged` as an explicit parameter, sourced
+    /// at the call site from `DocumentState.incompleteWarnShareAcknowledged`.
+    /// Pure + `static` for the same testability reason as the two siblings.
+    static func shareNeedsIncompleteWarnConfirm(
+        report: VerificationReport, acknowledged: Bool
+    ) -> Bool {
+        guard report.overallStatus.isWarn else { return false }
+        let warnCount = report.layers.filter(\.status.isWarn).count
+        let skippedCount = report.layers.filter(\.status.isSkipped).count
+        return warnCount == 0 && skippedCount > 0 && !acknowledged
+    }
+
     private func canExport(report: VerificationReport) -> Bool {
         // §3.4 FAIL override / "Option B": a standing FAIL no longer disables
         // the Share card — it stays enabled (red-tinted via
@@ -1422,55 +1444,115 @@ struct DocumentEditorView: View {
     /// or absent URL degrades to ContentUnavailableView rather than crashing.
     private var previewAvailable: Bool { outputFileExists }
 
-    /// Confirm copy for the §3.4 FAIL override / "Option B" one-time "Share
-    /// Anyway" path when the report carries no diagnostic to quote — the
-    /// former hard-coded sentence named the Layer-2 in-region cause even for
-    /// page-count / metadata / structure FAILs.
-    static let shareAnywayConfirmFallbackMessage =
-        "A verification check reported readable text within a redacted region. You can review the findings on this screen, or share the document as it is."
+    /// UXC-14: title for the bespoke share-risk confirm sheet. One title
+    /// across all three confirm families (FAIL/ATTENTION, SKIPPED,
+    /// incomplete-WARN) — RB-34 D3; only one title is approved copy, and
+    /// re-scoping a second one is out of the sprint's timeline.
+    static let shareRiskConfirmTitle = "Share with reported issues?"
 
-    /// Confirm copy for the §3.4 FAIL override / "Option B" one-time "Share
-    /// Anyway" path. Mechanism-description (ARCH §1.3): quotes the diagnostic
-    /// the FAIL aggregate preserved (the first failing layer's message —
-    /// content-free by ARCH §12.2, page numbers/key names only) and the two
-    /// choices, with no outcome-promise wording. Static so the report → copy
-    /// mapping is unit-testable without a SwiftUI host.
-    static func shareAnywayConfirmMessage(report: VerificationReport) -> String {
-        if case .fail(let message) = report.overallStatus, !message.isEmpty {
-            return "A verification check reported: \(message). "
-                + "You can review the findings on this screen, or share the document as it is."
-        }
-        if case .attention(let message) = report.overallStatus, !message.isEmpty {
-            return "A verification check reported: \(message). "
-                + "You can review the items on this screen, or share the document as it is."
-        }
-        return shareAnywayConfirmFallbackMessage
+    /// List header shown above the at-risk item list — the FAIL/ATTENTION
+    /// confirm family only.
+    static let shareRiskConfirmListHeader = "The verification check reported:"
+
+    /// At-risk item lines for the FAIL/ATTENTION confirm family: every
+    /// failed- or attention-flagged layer's `shortDescription` — already
+    /// content-free by ARCH §12.2 (page numbers / key names only, never
+    /// matched text). Replaces the retired `shareAnywayConfirmMessage`,
+    /// which quoted only the aggregate's first failing layer; this lists
+    /// every at-risk layer. Static so the derivation is unit-testable
+    /// without a SwiftUI host.
+    static func atRiskItemLines(report: VerificationReport) -> [String] {
+        report.layers
+            .filter { $0.status.isFail || $0.status.isAttention }
+            .map(\.shortDescription)
     }
 
-    /// Confirm copy for the one-time skipped-share confirm.
-    /// Mechanism-description (ARCH §1.3): names what did not happen and the
-    /// two choices, with no outcome-promise wording. One sentence for every
-    /// skip reason — a skipped report carries no diagnostic to quote. Static
-    /// so the copy is unit-testable without a SwiftUI host.
-    static let shareSkippedConfirmMessage =
-        "Verification did not run for this output. You can run it from this screen, or share the document as it is."
+    /// Skip-fact line for the SKIPPED confirm family. A new string — the
+    /// former `.alert`-era `shareSkippedConfirmMessage` named both the fact
+    /// and the two choices in one sentence; the sheet draws the choices as
+    /// the slide control + Go back, so this line names only the fact.
+    static let shareRiskConfirmSkipFactLine =
+        "Verification did not run on this output."
+
+    /// Deselected-items fact line for the confirm sheet, singular/plural.
+    /// Distinct from `VerificationResultsView.deselectionRowText(deselected:
+    /// total:)` — different wording ("flagged" not "detected", no "of M"
+    /// total) for a different surface. Static so the copy is pinned exactly.
+    static func deselectedItemsConfirmLine(count: Int) -> String {
+        count == 1
+            ? "1 flagged item was deselected before redaction."
+            : "\(count) flagged items were deselected before redaction."
+    }
+
+    /// UXC-14: engagement-control completion label (the slide track's
+    /// visible + accessible text).
+    static let shareRiskConfirmSlideLabel = "Slide to share anyway"
+
+    /// Test seam: overridable in tests to assert the confirm's haptic fired
+    /// without CoreHaptics/hardware (mirrors the "Test seam:" convention
+    /// already used elsewhere, e.g. PipelineCoordinator's replay-order
+    /// hooks). `playExportConfirmation()` is the RB-33 minimal DC-022
+    /// revival — see ResectaTokens.swift.
+    static var shareRiskConfirmHaptic: () -> Void = {
+        ResectaTokens.Haptics.playExportConfirmation()
+    }
+
+    /// UXC-14 confirm-sheet completion. Records the acknowledgement for
+    /// whichever family presented (routes through the same three
+    /// DocumentState methods the old two `.alert`s used, plus the new
+    /// third), fires the haptic seam once, then re-reads `documentState
+    /// .phase` for the live report and exports it — re-reading rather than
+    /// trusting `kind`'s captured report mirrors the former `.alert`
+    /// actions' lifecycle (a phase change racing the presented sheet is
+    /// possible in principle; the re-read is the same defense they used).
+    /// A plain `static` function with explicit dependencies (no SwiftUI
+    /// coupling) so a unit test can call it directly and assert on
+    /// `documentState`, the haptic spy, and the `beginExport` spy.
+    static func completeShareRiskConfirm(
+        kind: ShareRiskConfirmKind,
+        documentState: DocumentState,
+        beginExport: (VerificationReport) -> Void
+    ) {
+        switch kind {
+        case .failOrAttention:
+            documentState.overrideVerificationFailure()
+        case .skipped:
+            documentState.acknowledgeSkippedShare()
+        case .incompleteWarn:
+            documentState.acknowledgeIncompleteWarnShare()
+        }
+        shareRiskConfirmHaptic()
+        if case .verified(let report) = documentState.phase {
+            beginExport(report)
+        }
+    }
 
     private func handleExportTap(report: VerificationReport) {
-        // §3.4 FAIL override / "Option B": a standing FAIL verdict (not yet
-        // overridden) routes the Share tap through the one-time "Share Anyway"
-        // confirmation before any export. The confirm's "Share Anyway" action
-        // records the override and then calls beginExport. WARN/INFO/PASS (and
-        // an already-overridden FAIL) fall straight through to the share sheet.
+        // §3.4 FAIL override / "Option B": a standing FAIL/ATTENTION verdict
+        // (not yet overridden) routes the Share tap through the bespoke
+        // share-risk confirm sheet before any export. WARN/INFO/PASS (and an
+        // already-overridden FAIL/ATTENTION) fall straight through to the
+        // share sheet.
         if Self.shareNeedsFailConfirm(report: report) {
-            showShareAnywayConfirm = true
+            shareRiskConfirmKind = .failOrAttention(report)
             return
         }
         // Skipped-share confirm: an unacknowledged SKIPPED report routes
-        // through its own one-time confirm — the user is sharing an output
-        // whose redaction was never verified. Mutually exclusive with the
-        // FAIL branch by overallStatus.
+        // through the same sheet — the user is sharing an output whose
+        // redaction was never verified. Mutually exclusive with the FAIL
+        // branch by overallStatus.
         if Self.shareNeedsSkippedConfirm(report: report) {
-            showShareSkippedConfirm = true
+            shareRiskConfirmKind = .skipped(report)
+            return
+        }
+        // UXC-14 / GAP-14: incomplete-WARN confirm — a WARN whose
+        // digest-dependent layers were skipped, not yet acknowledged.
+        // Mutually exclusive with both branches above by overallStatus.
+        if Self.shareNeedsIncompleteWarnConfirm(
+            report: report,
+            acknowledged: documentState.incompleteWarnShareAcknowledged
+        ) {
+            shareRiskConfirmKind = .incompleteWarn(report)
             return
         }
         beginExport(report: report)
@@ -2147,71 +2229,263 @@ private struct DetectionSummaryBanner: View {
     }
 }
 
-// MARK: - Share confirms (§3.4 FAIL override + skipped-share)
+// MARK: - Share-risk confirm sheet (UXC-14)
 
-/// Both one-time share confirms, extracted from DocumentEditorView.body so
-/// its modifier chain stays within the type-checker's expression budget.
+/// The three families of confirm that route through the bespoke share-risk
+/// confirm sheet, each carrying the report that triggered it (for display —
+/// `completeShareRiskConfirm` re-reads `documentState.phase` for the actual
+/// export, not this captured value). Mutually exclusive by construction:
+/// `handleExportTap` sets at most one, gated by `overallStatus`, which can
+/// never simultaneously satisfy more than one of the three predicates.
+enum ShareRiskConfirmKind: Identifiable {
+    /// §3.4 FAIL override / "Option B", widened to ATTENTION (PD-17
+    /// residual tier — the tier re-class changes presentation, not the
+    /// share-time acknowledgment).
+    case failOrAttention(VerificationReport)
+    /// Verification never ran (any `SkipReason`).
+    case skipped(VerificationReport)
+    /// GAP-14: WARN whose digest-dependent layers were skipped.
+    case incompleteWarn(VerificationReport)
+
+    var id: String {
+        switch self {
+        case .failOrAttention: "failOrAttention"
+        case .skipped: "skipped"
+        case .incompleteWarn: "incompleteWarn"
+        }
+    }
+
+    /// The captured report, for display derivation.
+    var report: VerificationReport {
+        switch self {
+        case .failOrAttention(let r), .skipped(let r), .incompleteWarn(let r): r
+        }
+    }
+
+    /// Accessibility identifier of the element that completes the share —
+    /// the hidden-but-accessible Button inside `SlideToShareControl` (RB-32
+    /// / D6). `shareAnywayConfirm` / `shareSkippedConfirm` are the former
+    /// `.alert` Share buttons' identifiers, kept stable across the
+    /// alert→sheet restructure; `shareIncompleteWarnConfirm` is new.
+    var accessibilityIdentifier: String {
+        switch self {
+        case .failOrAttention: "shareAnywayConfirm"
+        case .skipped: "shareSkippedConfirm"
+        case .incompleteWarn: "shareIncompleteWarnConfirm"
+        }
+    }
+}
+
+/// The bespoke share-risk confirm sheet, extracted from DocumentEditorView
+/// .body so its modifier chain stays within the type-checker's expression
+/// budget (mirrors the former two-.alert `ShareConfirmAlerts` this
+/// replaces).
 ///
-/// §3.4 FAIL override / "Option B": one-time "Share Anyway" confirmation when
-/// a Share tap reaches handleExportTap while a FAIL verdict stands
-/// un-overridden. "Share" records the override on the .verified phase, then
-/// re-reads documentState.phase and exports the overridden report so the
-/// post-share return transition stays consistent (02-FIX "Change set 2").
-///
-/// Skipped-share confirm: one-time confirmation when a Share tap reaches
-/// handleExportTap while the report is SKIPPED — verification never ran, so
-/// the output carries no verification result either way. Mirrors the FAIL
-/// confirm's lifecycle: "Share" records the acknowledgement, re-reads the
-/// phase, and exports the acknowledged report. "Run it from this screen"
-/// names the Run Verification card, which every skipped report shows.
-///
-/// Copy for both is mechanism-description (ARCH §1.3). The two alerts are
-/// mutually exclusive by overallStatus (a report is FAIL or SKIPPED, never
-/// both), so at most one presents per Share tap.
-private struct ShareConfirmAlerts: ViewModifier {
-    @Binding var showShareAnywayConfirm: Bool
-    @Binding var showShareSkippedConfirm: Bool
+/// UXC-14: replaces the former text-variant system `.alert`s for
+/// FAIL/ATTENTION and SKIPPED, and adds the third incomplete-WARN family
+/// (GAP-14), with one EV-P1-11-shaped content-engaging step: the confirm
+/// names the specific at-risk items and requires a swipe-class engagement
+/// (never type-to-confirm) rather than a single default-focused alert
+/// button. "Slide to share anyway" records the acknowledgement on
+/// `documentState` (`completeShareRiskConfirm`), fires the restored
+/// `playExportConfirmation()` haptic once, then re-reads the live report
+/// and exports it — same post-share lifecycle the former `.alert` Share
+/// actions used (02-FIX "Change set 2").
+private struct ShareRiskConfirmPresentation: ViewModifier {
+    @Binding var kind: ShareRiskConfirmKind?
     let documentState: DocumentState
+    let deselectionSnapshot: RedactionState.DeselectionSnapshot?
     let beginExport: (VerificationReport) -> Void
 
     func body(content: Content) -> some View {
         content
-            .alert(
-                "Verification reported a problem",
-                isPresented: $showShareAnywayConfirm
-            ) {
-                Button("Share", role: .destructive) {
-                    documentState.overrideVerificationFailure()
-                    if case .verified(let overridden) = documentState.phase {
-                        beginExport(overridden)
+            .sheet(item: $kind) { activeKind in
+                ShareRiskConfirmSheet(
+                    kind: activeKind,
+                    deselectionSnapshot: deselectionSnapshot,
+                    onConfirm: {
+                        DocumentEditorView.completeShareRiskConfirm(
+                            kind: activeKind,
+                            documentState: documentState,
+                            beginExport: beginExport
+                        )
+                        kind = nil
+                    },
+                    onCancel: { kind = nil }
+                )
+                .presentationDetents([.medium])
+            }
+    }
+}
+
+/// UXC-14 confirm-sheet content. Title is shared across all three families
+/// (RB-34 D3); body content is family-specific. The deselected-items line
+/// is cross-cutting — it renders whenever `shouldShowDeselectionRow` is
+/// true, regardless of which family presented.
+struct ShareRiskConfirmSheet: View {
+    let kind: ShareRiskConfirmKind
+    let deselectionSnapshot: RedactionState.DeselectionSnapshot?
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    private var atRiskItems: [String] {
+        switch kind {
+        case .failOrAttention(let report): DocumentEditorView.atRiskItemLines(report: report)
+        case .skipped, .incompleteWarn: []
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: ResectaTokens.Spacing.lg) {
+            Text(DocumentEditorView.shareRiskConfirmTitle)
+                .font(.title2.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
+
+            // The item list can in principle be long (many failed/attention
+            // layers); the slide track below must never sit inside this (or
+            // any) ScrollView — a SwiftUI DragGesture inside a ScrollView
+            // kills the ScrollView's own scroll.
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: ResectaTokens.Spacing.sm) {
+                    switch kind {
+                    case .failOrAttention:
+                        Text(DocumentEditorView.shareRiskConfirmListHeader)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        ForEach(Array(atRiskItems.enumerated()), id: \.offset) { _, line in
+                            Label {
+                                Text(line).font(.subheadline)
+                            } icon: {
+                                Image(systemName: "exclamationmark.circle")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    case .skipped:
+                        Text(DocumentEditorView.shareRiskConfirmSkipFactLine)
+                            .font(.subheadline)
+                    case .incompleteWarn(let report):
+                        // RB-34 D4: reuse the masthead's own skip-induced-WARN
+                        // sentence verbatim — no new string.
+                        Text(VerificationResultsView.mastheadSubtitle(report: report))
+                            .font(.subheadline)
+                    }
+
+                    if VerificationResultsView.shouldShowDeselectionRow(
+                        snapshot: deselectionSnapshot),
+                       let snapshot = deselectionSnapshot {
+                        Text(DocumentEditorView.deselectedItemsConfirmLine(
+                            count: snapshot.deselectedCount))
+                            .font(.subheadline)
                     }
                 }
-                .accessibilityIdentifier("shareAnywayConfirm")
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                // The confirm is only reachable from handleExportTap on a
-                // .verified FAIL phase, so the re-read normally succeeds; the
-                // fallback covers a phase change racing the presented alert.
-                if case .verified(let report) = documentState.phase {
-                    Text(DocumentEditorView.shareAnywayConfirmMessage(report: report))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Spacer(minLength: 0)
+
+            // Footer: plain VStack, never a ScrollView — see the comment
+            // above the item-list ScrollView.
+            VStack(spacing: ResectaTokens.Spacing.md) {
+                SlideToShareControl(
+                    label: DocumentEditorView.shareRiskConfirmSlideLabel,
+                    accessibilityIdentifier: kind.accessibilityIdentifier,
+                    onComplete: onConfirm
+                )
+                Button("Go back", action: onCancel)
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("shareRiskConfirmGoBack")
+            }
+        }
+        .padding(ResectaTokens.Spacing.lg)
+    }
+}
+
+/// UXC-14 engagement control: a swipe-class, cheap-but-physical slide track
+/// (never type-to-confirm). RB-32 / D6: the visible track is the touch
+/// path; a hidden-but-accessible `Button` overlaid at a single point off
+/// the track's hit area carries the family's stable accessibility
+/// identifier and is the VoiceOver / XCUI completion path — VoiceOver
+/// activation and XCUITest's `.tap()` both reach a Button directly, where
+/// neither can replay a physical drag.
+struct SlideToShareControl: View {
+    let label: String
+    let accessibilityIdentifier: String
+    let onComplete: () -> Void
+
+    @State private var dragX: CGFloat = 0
+    @State private var trackWidth: CGFloat = 0
+    @State private var completed = false
+
+    private let knobDiameter: CGFloat = 44
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            Capsule()
+                .fill(Color.secondary.opacity(0.15))
+            Text(label)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+            Circle()
+                .fill(Color.accentColor)
+                .frame(width: knobDiameter, height: knobDiameter)
+                .overlay {
+                    Image(systemName: "chevron.right.2")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
+                .offset(x: dragX)
+                .gesture(dragGesture)
+        }
+        .frame(height: knobDiameter)
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { trackWidth = geo.size.width }
+                    .onChange(of: geo.size.width) { _, newValue in trackWidth = newValue }
+            }
+        )
+        .accessibilityHidden(true)
+        // Positioned above the track (negative y-offset) rather than at any
+        // point WITHIN it: the knob's hit area sweeps the whole horizontal
+        // range as it drags (x ∈ [0, trackWidth]), so any in-track corner
+        // risks the hidden Button's 1×1 frame coinciding with the knob at
+        // some position along the slide. Placed outside the vertical range
+        // instead, it can never overlap the knob at rest or mid-drag.
+        .overlay(alignment: .top) {
+            Button(label, action: complete)
+                .frame(width: 1, height: 1)
+                .opacity(0.02)
+                .offset(y: -12)
+                .accessibilityIdentifier(accessibilityIdentifier)
+        }
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard !completed, trackWidth > knobDiameter else { return }
+                let maxX = trackWidth - knobDiameter
+                dragX = min(max(0, value.translation.width), maxX)
+            }
+            .onEnded { _ in
+                guard !completed, trackWidth > knobDiameter else { return }
+                let maxX = trackWidth - knobDiameter
+                if dragX >= maxX * 0.9 {
+                    dragX = maxX
+                    complete()
                 } else {
-                    Text(DocumentEditorView.shareAnywayConfirmFallbackMessage)
-                }
-            }
-            .alert(
-                "This output was not verified",
-                isPresented: $showShareSkippedConfirm
-            ) {
-                Button("Share", role: .destructive) {
-                    documentState.acknowledgeSkippedShare()
-                    if case .verified(let acknowledged) = documentState.phase {
-                        beginExport(acknowledged)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        dragX = 0
                     }
                 }
-                .accessibilityIdentifier("shareSkippedConfirm")
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                Text(DocumentEditorView.shareSkippedConfirmMessage)
             }
+    }
+
+    private func complete() {
+        guard !completed else { return }
+        completed = true
+        onComplete()
     }
 }

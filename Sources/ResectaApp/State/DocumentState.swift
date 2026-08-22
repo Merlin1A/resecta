@@ -333,6 +333,27 @@ class DocumentState {
         phase = .verified(report: report)
     }
 
+    /// UXC-14: one-time acknowledgement for the incomplete-WARN share-risk
+    /// confirm (a WARN report whose digest-dependent layers were SKIPPED —
+    /// `VerificationResultsView.mastheadSubtitle`'s skip-induced-WARN
+    /// branch). Unlike `userOverrodeFailure` / `userAcknowledgedSkippedShare`
+    /// this flag does NOT live on `VerificationReport` — that type is
+    /// declared in Packages/RedactionEngine, which is C-5-fenced for this
+    /// sprint, so a third field there is not an option. It lives here
+    /// instead; `transition(to:)` below resets it whenever a genuinely
+    /// fresh report lands, giving it the same "confirm once per report"
+    /// shape as the other two without needing to live on the report value.
+    private(set) var incompleteWarnShareAcknowledged: Bool = false
+
+    /// Mark the incomplete-WARN share-risk confirm acknowledged for the
+    /// current report. No phase guard: unlike the two methods above, this
+    /// flag is not report-scoped storage, so there is nothing to mutate
+    /// back into `phase` — the guard on the READ side (`transition(to:)`'s
+    /// reset conditioning) is what gives it correct per-report lifetime.
+    func acknowledgeIncompleteWarnShare() {
+        incompleteWarnShareAcknowledged = true
+    }
+
     // MARK: - Transition Engine (UI_UX §1.3)
 
     /// All legal transitions as (from-kind, to-kind) pairs.
@@ -417,7 +438,23 @@ class DocumentState {
             syncProgress(from: newPhase)
         } else {
             logger.info("Phase: \(self.phaseKind, privacy: .public) → \(newKind, privacy: .public)")
+            let oldKind = phaseKind
             phase = newPhase
+            // UXC-14: a genuinely fresh verification report just landed —
+            // re-arm the incomplete-WARN share-risk confirm.
+            // `.redacting → .verified` (autoVerify-off skip path) and
+            // `.verifying → .verified` (both the full-pipeline and
+            // verify-only completion paths) are the two transitions that
+            // produce a NEW report. `.exporting → .verified` (a failed
+            // export attempt returning to results) and `.failed →
+            // .verified` (KI-4 recovery) resume the SAME report and
+            // deliberately do NOT reset here — this mirrors how
+            // `userOverrodeFailure` / `userAcknowledgedSkippedShare` ride
+            // along unchanged with the same report value through those
+            // two transitions, since they live on the report itself.
+            if newKind == .verified && (oldKind == .redacting || oldKind == .verifying) {
+                incompleteWarnShareAcknowledged = false
+            }
             syncProgress(from: newPhase)
         }
         return true

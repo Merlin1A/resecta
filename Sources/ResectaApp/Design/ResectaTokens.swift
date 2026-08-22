@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreHaptics
 
 // §A1: Centralized design tokens for Resecta.
 // All magic numbers in the UI should reference these constants.
@@ -327,6 +328,61 @@ enum ResectaTokens {
                 return .easeInOut(duration: 0.2)
             }
             return animation
+        }
+    }
+
+    // MARK: - Haptics (UXC-14 — partial revival of DC-022)
+    //
+    // DC-022 (registers/deadcode/05-REGISTER.md, W1) removed the full
+    // `Haptics` enum — 13 string-constant "intended haptic" documentation
+    // entries plus this `playExportConfirmation()` CoreHaptics
+    // implementation — as confirmed-dead: zero readers/callers anywhere,
+    // export shipped with no haptic at all. UXC-14 gives
+    // `playExportConfirmation()` its first real call site (the share-risk
+    // confirm sheet's slide-to-confirm completion). RB-33: this is a
+    // MINIMAL, deliberate partial revival — only the empty `Haptics`
+    // namespace and this one function are restored, verbatim from
+    // `git show 09dd889a81af6091287d8e3819d05e608a2184ca` — the other 12
+    // now-unused string constants DC-022 also removed are NOT brought
+    // back and stay confirmed-dead.
+    enum Haptics {}
+}
+
+extension ResectaTokens.Haptics {
+    /// Two-part haptic for the irreversible export confirmation.
+    /// Part 1 (t=0.0): Sharp transient — "this is serious"
+    /// Part 2 (t=0.15s): Heavy transient — "committed"
+    static func playExportConfirmation() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+
+        do {
+            let engine = try CHHapticEngine()
+            try engine.start()
+
+            let sharpTransient = CHHapticEvent(
+                eventType: .hapticTransient,
+                parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.8),
+                ],
+                relativeTime: 0
+            )
+
+            let heavyTransient = CHHapticEvent(
+                eventType: .hapticTransient,
+                parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5),
+                ],
+                relativeTime: 0.15
+            )
+
+            let pattern = try CHHapticPattern(events: [sharpTransient, heavyTransient],
+                                               parameters: [])
+            let player = try engine.makePlayer(with: pattern)
+            try player.start(atTime: 0)
+        } catch { // LegalPhrases:safe (Swift keyword)
+            // Haptic failure is non-critical — silently degrade
         }
     }
 }
