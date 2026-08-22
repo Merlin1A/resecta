@@ -198,6 +198,16 @@ class RedactionState {
         let run: Int
         let outcome: Outcome
         let scanSummary: ScanRunSummary?
+        /// UXC-04 — pages whose raster exceeded the OCR pixel caps
+        /// during the run this record describes (pipeline:
+        /// `ocrPixelCapSkippedPages`; Scan-interface:
+        /// `SearchState.ocrSkippedPages`), snapshotted at record time so
+        /// the verification screen reads a stable value instead of a
+        /// live session set the sheet later clears.
+        var ocrSkippedPages: Set<Int> = []
+        /// UXC-06 — the degrade-failure list active when this run was
+        /// recorded; nil when the run was not degraded.
+        var degradeFailures: [String]? = nil
     }
     var lastDetectionRun: DetectionRunRecord? = nil
 
@@ -215,11 +225,13 @@ class RedactionState {
     /// default and the banner reads `pendingTriage` for their counts.
     func recordDetectionRun(
         _ outcome: DetectionRunRecord.Outcome,
-        scanSummary: DetectionRunRecord.ScanRunSummary? = nil
+        scanSummary: DetectionRunRecord.ScanRunSummary? = nil,
+        ocrSkippedPages: Set<Int> = []
     ) {
         lastDetectionRun = DetectionRunRecord(
             run: (lastDetectionRun?.run ?? 0) + 1, outcome: outcome,
-            scanSummary: scanSummary)
+            scanSummary: scanSummary, ocrSkippedPages: ocrSkippedPages,
+            degradeFailures: autoDetectionDegraded ? autoDetectionDegradeFailures : nil)
         triagePromotionOccurred = false
     }
 

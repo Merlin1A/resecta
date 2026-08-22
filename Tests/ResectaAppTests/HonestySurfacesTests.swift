@@ -218,3 +218,244 @@ struct FailedStatePrimaryActionTests {
         }
     }
 }
+
+// RB-28/29/30 — the run-facts strip (UXC-04/05/06) and the non-visual
+// review-limitation line (UXC-16).
+//
+// UXC-04: OCR pixel-cap skip pages snapshotted onto
+// `RedactionState.DetectionRunRecord`, rendered as a pinned singular/
+// plural builder using `SearchResultsSection.formatPageList`.
+// UXC-05: no detection ran this session, yet a region was applied for
+// this output.
+// UXC-06: the degrade-failure list snapshotted onto the record at
+// record time, rendered by reusing `DetectionDegradeCopy.banner`
+// verbatim.
+// UXC-16: a pinned line above the honesty disclaimer, reused as the
+// `RedactedPreviewView` verdict capsule's accessibility label.
+
+@Suite("Run-facts strip (UXC-04/05/06) + non-visual limit line (UXC-16)")
+@MainActor
+struct RunFactsStripTests {
+
+    // MARK: - F-04 (UXC-04)
+
+    @Test("F-04 singular exact text — 0-indexed page 6 renders as Page 7")
+    func ocrSkipLineSingular() {
+        let line = VerificationResultsView.RunFactsStrip.ocrSkipLine(pages: [6])
+        #expect(line == "Page 7 was too large to scan for text, so its image content was not examined by detection. Review that page manually before sharing.")
+    }
+
+    @Test("F-04 plural exact text — pages sorted regardless of Set iteration order")
+    func ocrSkipLinePlural() {
+        let unordered: Set<Int> = [6, 2, 4]
+        let line = VerificationResultsView.RunFactsStrip.ocrSkipLine(pages: Array(unordered))
+        #expect(line == "Pages 3, 5, and 7 were too large to scan for text, so image content there was not examined by detection. Review those pages manually before sharing.")
+    }
+
+    // MARK: - F-05 (UXC-05)
+
+    @Test("F-05 exact text")
+    func detectionNeverRanExactText() {
+        #expect(VerificationResultsView.RunFactsStrip.detectionNeverRanLine
+                == "Automated detection did not run on this document. Every region here came from Search or manual marking — review each page for anything those did not cover before sharing.")
+    }
+
+    // MARK: - F-16 (UXC-16)
+
+    @Test("F-16 exact text")
+    func voiceOverLimitExactText() {
+        #expect(VerificationResultsView.voiceOverLimitText
+                == "The preview is a visual check — VoiceOver cannot tell you whether a region fully covers what is beneath it. A non-visual review can go page by page in the editor, where each page announces its region count and each region's details name the kind of item it covers.")
+    }
+
+    // MARK: - F-06 (UXC-06) — verbatim reuse
+
+    @Test("F-06 equals DetectionDegradeCopy.banner verbatim on both branches")
+    func degradeLineMatchesBannerVerbatim() {
+        let nerOnly = [GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue]
+        let corpus = ["NameGazetteer"]
+        #expect(VerificationResultsView.RunFactsStrip.degradeLine(failedGazetteers: nerOnly)
+                == DetectionDegradeCopy.banner(failedGazetteers: nerOnly))
+        #expect(VerificationResultsView.RunFactsStrip.degradeLine(failedGazetteers: corpus)
+                == DetectionDegradeCopy.banner(failedGazetteers: corpus))
+    }
+
+    // MARK: - RunFactsStrip.lines(for:) gating + order
+
+    @Test("Empty facts render no strip")
+    func linesEmptyFacts() {
+        #expect(VerificationResultsView.RunFactsStrip
+            .lines(for: VerificationResultsView.RunFacts()).isEmpty)
+    }
+
+    @Test("Each single fact renders exactly one line")
+    func linesSingleFact() {
+        let ocrOnly = VerificationResultsView.RunFacts(ocrSkippedPages: [0])
+        #expect(VerificationResultsView.RunFactsStrip.lines(for: ocrOnly).count == 1)
+
+        let neverRanOnly = VerificationResultsView.RunFacts(detectionNeverRan: true)
+        #expect(VerificationResultsView.RunFactsStrip.lines(for: neverRanOnly).count == 1)
+
+        let degradeOnly = VerificationResultsView.RunFacts(degradeFailures: ["NameGazetteer"])
+        #expect(VerificationResultsView.RunFactsStrip.lines(for: degradeOnly).count == 1)
+    }
+
+    @Test("F-04 + F-06 render in order [F-04, F-06]")
+    func linesOCRAndDegrade() {
+        let facts = VerificationResultsView.RunFacts(
+            ocrSkippedPages: [0], degradeFailures: ["NameGazetteer"])
+        let lines = VerificationResultsView.RunFactsStrip.lines(for: facts)
+        #expect(lines.count == 2)
+        #expect(lines[0] == VerificationResultsView.RunFactsStrip.ocrSkipLine(pages: [0]))
+        #expect(lines[1] == VerificationResultsView.RunFactsStrip
+            .degradeLine(failedGazetteers: ["NameGazetteer"]))
+    }
+
+    @Test("F-05 + F-06 render in order [F-05, F-06]")
+    func linesNeverRanAndDegrade() {
+        let facts = VerificationResultsView.RunFacts(
+            detectionNeverRan: true, degradeFailures: ["NameGazetteer"])
+        let lines = VerificationResultsView.RunFactsStrip.lines(for: facts)
+        #expect(lines.count == 2)
+        #expect(lines[0] == VerificationResultsView.RunFactsStrip.detectionNeverRanLine)
+        #expect(lines[1] == VerificationResultsView.RunFactsStrip
+            .degradeLine(failedGazetteers: ["NameGazetteer"]))
+    }
+
+    // MARK: - RunFacts.derive predicate table
+
+    @Test("derive: nil record + no applied regions → nothing")
+    func deriveNilRecordNoRegions() {
+        let facts = VerificationResultsView.RunFacts.derive(
+            lastDetectionRun: nil, hasAppliedRegions: false)
+        #expect(facts == VerificationResultsView.RunFacts())
+    }
+
+    @Test("derive: nil record + applied regions → detectionNeverRan only")
+    func deriveNilRecordWithRegions() {
+        let facts = VerificationResultsView.RunFacts.derive(
+            lastDetectionRun: nil, hasAppliedRegions: true)
+        #expect(facts.detectionNeverRan)
+        #expect(facts.ocrSkippedPages.isEmpty)
+        #expect(facts.degradeFailures == nil)
+    }
+
+    @Test("derive: record with skips carries them; detectionNeverRan false")
+    func deriveRecordWithSkips() {
+        let record = RedactionState.DetectionRunRecord(
+            run: 1, outcome: .staged, scanSummary: nil, ocrSkippedPages: [2, 4])
+        let facts = VerificationResultsView.RunFacts.derive(
+            lastDetectionRun: record, hasAppliedRegions: true)
+        #expect(facts.ocrSkippedPages == [2, 4])
+        #expect(!facts.detectionNeverRan)
+    }
+
+    @Test("derive: record with degradeFailures carries them; without, nil")
+    func deriveRecordDegrade() {
+        let degraded = RedactionState.DetectionRunRecord(
+            run: 1, outcome: .staged, scanSummary: nil,
+            degradeFailures: ["NameGazetteer"])
+        let clean = RedactionState.DetectionRunRecord(
+            run: 2, outcome: .staged, scanSummary: nil)
+        #expect(VerificationResultsView.RunFacts.derive(
+            lastDetectionRun: degraded, hasAppliedRegions: true
+        ).degradeFailures == ["NameGazetteer"])
+        #expect(VerificationResultsView.RunFacts.derive(
+            lastDetectionRun: clean, hasAppliedRegions: true
+        ).degradeFailures == nil)
+    }
+
+    // MARK: - DetectionRunRecord lifecycle
+
+    @Test("recordDetectionRun stores the passed ocrSkippedPages")
+    func recordDetectionRunStoresOCRSkips() {
+        let state = RedactionState()
+        state.recordDetectionRun(.staged, ocrSkippedPages: [2, 4, 6])
+        #expect(state.lastDetectionRun?.ocrSkippedPages == [2, 4, 6])
+    }
+
+    @Test("recordDetectionRun snapshots degradeFailures from self — nil when not degraded, carried when degraded")
+    func recordDetectionRunSnapshotsDegrade() {
+        let state = RedactionState()
+        state.recordDetectionRun(.staged)
+        #expect(state.lastDetectionRun?.degradeFailures == nil)
+
+        state.autoDetectionDegraded = true
+        state.autoDetectionDegradeFailures = ["NameGazetteer"]
+        state.recordDetectionRun(.staged)
+        #expect(state.lastDetectionRun?.degradeFailures == ["NameGazetteer"])
+    }
+
+    @Test("clearForNewDocument nils the record — the new fields ride along with it")
+    func clearForNewDocumentNilsRecord() {
+        let state = RedactionState()
+        state.autoDetectionDegraded = true
+        state.autoDetectionDegradeFailures = ["NameGazetteer"]
+        state.recordDetectionRun(.staged, ocrSkippedPages: [1])
+        #expect(state.lastDetectionRun != nil)
+
+        state.clearForNewDocument()
+        #expect(state.lastDetectionRun == nil)
+    }
+
+    // MARK: - Mechanism-only vocabulary, no percent sign
+
+    @Test("run-facts strip + limit-line copy stays mechanism-only, no percent sign")
+    func runFactsCopyIsMechanismOnly() {
+        let samples = [
+            VerificationResultsView.RunFactsStrip.ocrSkipLine(pages: [6]),
+            VerificationResultsView.RunFactsStrip.ocrSkipLine(pages: [2, 4, 6]),
+            VerificationResultsView.RunFactsStrip.detectionNeverRanLine,
+            VerificationResultsView.RunFactsStrip.degradeLine(
+                failedGazetteers: ["NameGazetteer"]),
+            VerificationResultsView.RunFactsStrip.degradeLine(
+                failedGazetteers: [GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue]),
+            VerificationResultsView.voiceOverLimitText,
+        ]
+        // Forbidden absolutes assembled from halves so this source does
+        // not itself trip the M-1 sweep (mirrors Q11TruthLegibilityTests
+        // .subtitleIsMechanism).
+        let halves: [(String, String)] = [
+            ("guaran", "tee"), ("ens", "ure"), ("imposs", "ible"),
+            ("fin", "d"), ("cat", "ch"), ("perfect", "ly"),
+            ("flaw", "lessly"), ("10", "0%"),
+        ]
+        for sample in samples {
+            let lower = sample.lowercased()
+            #expect(!lower.contains("%"), "percent sign in: \(sample)")
+            for (a, b) in halves {
+                let phrase = a + b
+                #expect(!lower.contains(phrase), "forbidden phrase '\(phrase)' in: \(sample)")
+            }
+        }
+    }
+
+    // MARK: - Source pin (mirrors HonestyDisclaimerMountTests.resultsViewMountsRedactedProfile)
+
+    @Test("VerificationResultsView mounts runFactsStrip + voiceOverLimitLine; RedactedPreviewView references voiceOverLimitText")
+    func sourcePinsForNewMounts() throws {
+        let viewSource = try loadRepoFile(
+            "Sources/ResectaApp/Views/VerificationResultsView.swift")
+        #expect(viewSource.contains("runFactsStrip"),
+                "VerificationResultsView must mount the run-facts strip")
+        #expect(viewSource.contains("voiceOverLimitLine"),
+                "VerificationResultsView must mount the non-visual limit line")
+
+        let previewSource = try loadRepoFile(
+            "Sources/ResectaApp/Views/RedactedPreviewView.swift")
+        #expect(previewSource.contains("voiceOverLimitText"),
+                "RedactedPreviewView must reference the shared UXC-16 copy")
+    }
+
+    private func loadRepoFile(
+        _ relativePath: String, from file: StaticString = #filePath
+    ) throws -> String {
+        let repoRoot = URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+        return try String(
+            contentsOf: repoRoot.appendingPathComponent(relativePath),
+            encoding: .utf8)
+    }
+}
