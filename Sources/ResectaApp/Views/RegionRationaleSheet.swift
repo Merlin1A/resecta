@@ -8,14 +8,6 @@ import RedactionEngine
 // `RedactionState.pendingCanvasRationaleRequest`. Copy is
 // mechanism-description only — no matched-text echo.
 
-/// Identifier wrapper that drives the `.sheet(item:)` presentation of
-/// `RegionRationaleSheet` for a single canvas-tapped region. Mirrors
-/// `RegionTagRequest`.
-struct RegionRationaleRequest: Identifiable, Equatable {
-    let regionID: UUID
-    var id: UUID { regionID }
-}
-
 struct RegionRationaleSheet: View {
     let rationale: MatchRationale
     let onDismiss: () -> Void

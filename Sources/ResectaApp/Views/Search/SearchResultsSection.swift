@@ -12,10 +12,6 @@ struct SearchResultsSection: View {
     @Bindable var searchState: SearchState
     @Environment(DocumentState.self) private var documentState
     @Environment(RedactionState.self) private var redactionState
-    // SettingsState injected so the Coverage Report
-    // can build snapshot metadata without threading it through from the
-    // sheet body.
-    @Environment(SettingsState.self) private var settingsState
     // ToastQueueManager injected so the coverage
     // snapshot share path can surface a `.error` toast when the temp
     // file write fails (previously a silent return — indistinguishable

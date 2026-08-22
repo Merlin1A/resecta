@@ -231,13 +231,6 @@ extension CoverageReportView {
     /// Classified SAFE under §19 — standard share affordance.
     static let shareSnapshotButtonLabel: String = "Share Snapshot"
 
-    /// The disclosure auto-opens when the view first
-    /// appears, immediately after the scan lands. The auto-open gate at
-    /// `SearchResultsSection.swift:26-31` already conditions this view
-    /// on a completed scan, so the disclosure surfaces the summary the
-    /// moment a coverage report exists. Pinned by `CoverageSnapshotTests`.
-    static let disclosureExpandedByDefault: Bool = true
-
     /// Number of bands in the confidence histogram.
     /// 5 bands cover `[0.0, 0.2, 0.4, 0.6, 0.8, 1.0]`; the last band is
     /// inclusive of 1.0 so a score of exactly 1.0 lands in the top

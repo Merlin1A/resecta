@@ -54,8 +54,8 @@ struct HonestyDisclaimerMountTests {
     func resultsViewMountsRedactedProfile() throws {
         let source = try loadRepoFile(
             "Sources/ResectaApp/Views/VerificationResultsView.swift")
-        // The mount must use the `.redacted` profile — the `.unredacted`
-        // default carries the audit-dashboard wording, not the
+        // The mount must use the `.redacted` profile — `.unredacted`
+        // carries the audit-dashboard wording, not the
         // post-redaction scope-limitation wording this surface needs.
         #expect(source.contains("HonestyDisclaimer(profile: .redacted"),
                 "VerificationResultsView must mount HonestyDisclaimer with the .redacted profile")
