@@ -135,7 +135,6 @@ struct G8OrchestratorHarnessTests {
                         family: PresetThresholdVector.wireName(for: category) ?? "",
                         features: contextFeatures(
                             match: match,
-                            doctype: doctype,
                             effectiveDoctype: doctype,
                             pageText: doc.text
                         )

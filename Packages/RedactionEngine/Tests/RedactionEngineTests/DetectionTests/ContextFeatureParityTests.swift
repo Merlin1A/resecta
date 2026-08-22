@@ -90,7 +90,6 @@ struct ContextFeatureParityTests {
             )
             let got = contextFeatures(
                 match: match,
-                doctype: c.doctype,
                 effectiveDoctype: c.doctype,
                 pageText: c.text
             )

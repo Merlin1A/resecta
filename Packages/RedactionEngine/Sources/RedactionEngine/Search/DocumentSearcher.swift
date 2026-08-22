@@ -223,14 +223,6 @@ public actor DocumentSearcher {
         self.textLayerStatusByPage = textLayerStatusByPage
     }
 
-    /// Clear the OCR cache between search sessions.
-    public func clearCache() {
-        ocrCache.removeAll()
-        ocrCacheAccess.removeAll()
-        ocrNormalizedConcat.removeAll()
-        ocrAccessCounter = 0
-    }
-
     // MARK: - B06 Site-B posterior composition
 
     /// B06 — Site-B gate for the five scored families, composing the SAME
@@ -301,7 +293,6 @@ public actor DocumentSearcher {
                 family: wire,
                 features: contextFeatures(
                     match: match,
-                    doctype: .generic,
                     effectiveDoctype: .generic,
                     pageText: pageText
                 )
@@ -637,7 +628,7 @@ public actor DocumentSearcher {
         switch mode {
         case .piiScan:
             return SearchPreviewResult(
-                mode: mode, scope: scope,
+                scope: scope,
                 totalCount: 0, saturated: false, regexInvalid: false,
                 currentPageMatches: []
             )
@@ -645,7 +636,7 @@ public actor DocumentSearcher {
         case .regex(let pattern, let options):
             guard let regex = Self.validateRegexPattern(pattern) else {
                 return SearchPreviewResult(
-                    mode: mode, scope: scope,
+                    scope: scope,
                     totalCount: 0, saturated: false, regexInvalid: true,
                     currentPageMatches: []
                 )
@@ -661,7 +652,7 @@ public actor DocumentSearcher {
         case .text(let query, let options):
             guard !query.isEmpty else {
                 return SearchPreviewResult(
-                    mode: mode, scope: scope,
+                    scope: scope,
                     totalCount: 0, saturated: false, regexInvalid: false,
                     currentPageMatches: []
                 )
@@ -676,7 +667,7 @@ public actor DocumentSearcher {
             let nonEmpty = terms.filter { !$0.isEmpty }
             guard !nonEmpty.isEmpty else {
                 return SearchPreviewResult(
-                    mode: mode, scope: scope,
+                    scope: scope,
                     totalCount: 0, saturated: false, regexInvalid: false,
                     currentPageMatches: []
                 )
@@ -765,7 +756,7 @@ public actor DocumentSearcher {
         }
 
         return SearchPreviewResult(
-            mode: mode, scope: scope,
+            scope: scope,
             totalCount: totalCount,
             saturated: saturated,
             regexInvalid: false,
@@ -883,7 +874,7 @@ public actor DocumentSearcher {
         }
 
         return SearchPreviewResult(
-            mode: mode, scope: scope,
+            scope: scope,
             totalCount: totalCount,
             saturated: saturated,
             regexInvalid: false,

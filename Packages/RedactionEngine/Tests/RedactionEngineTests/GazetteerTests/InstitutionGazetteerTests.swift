@@ -171,24 +171,6 @@ struct NegativeContextInstitutionAnchorTests {
         #expect(anchored >= 0.25)
     }
 
-    @Test("Anchored doctype hint returns .foia when SSA appears in the header")
-    func testAnchoredDoctypeHintSSA() throws {
-        let institutions = try InstitutionGazetteer()
-        let scorer = try NegativeContextGazetteer(
-            bundle: .module, institutions: institutions)
-        #expect(scorer.anchoredDoctype(
-            documentHeader: "SOCIAL SECURITY ADMINISTRATION") == .foia)
-    }
-
-    @Test("Anchored doctype hint returns nil when no institution is present")
-    func testAnchoredDoctypeHintMissing() throws {
-        let institutions = try InstitutionGazetteer()
-        let scorer = try NegativeContextGazetteer(
-            bundle: .module, institutions: institutions)
-        #expect(scorer.anchoredDoctype(
-            documentHeader: "Acme Corp — Internal Memo") == nil)
-    }
-
     @Test("Anchor has no effect for categories outside {ssn, npi}")
     func testAnchorNoEffectForOtherCategories() throws {
         let institutions = try InstitutionGazetteer()

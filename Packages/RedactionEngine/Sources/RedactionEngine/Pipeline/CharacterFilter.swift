@@ -563,11 +563,7 @@ extension FilterResult {
                 minEdgeDistance(char.bounds, to: rect)
             }.min() ?? .greatestFiniteMagnitude
             guard minDist < safetyMargin * 2 else { return nil }
-            return BoundaryCharacterInfo(
-                character: char.character,
-                bounds: char.bounds,
-                distanceToEdge: minDist
-            )
+            return BoundaryCharacterInfo()
         }
         return PageFilterDigest(
             pageIndex: pageIndex,

@@ -4,9 +4,10 @@ import Foundation
 
 // D-19 fixture-driven test for EIN detection. The DataPipeline-generated
 // vectors at Fixtures/vectors/ein_vectors.json carry a `valid` flag whose
-// rejection_reasons are length/shape mismatches — exactly what the inline
-// einPattern gate filters. The audit at cc-derive D-19 confirmed the
-// fixture is schema-clean and determinism-clean.
+// rejection_reasons are length/shape mismatches — exactly what the
+// production shape gate (einPatternHyphen/Space/NoSep) filters. The audit
+// at cc-derive D-19 confirmed the fixture is schema-clean and
+// determinism-clean.
 
 @Suite("EIN fixture-driven detector vectors (D-19)")
 struct EINVectorTests {
@@ -38,18 +39,6 @@ struct EINVectorTests {
             return
         }
         #expect(!vectors.isEmpty)
-    }
-
-    @Test("Inline regex shape gate agrees with fixture validity")
-    func patternMatchesValidFlag() throws {
-        guard let vectors = try loadVectors() else { return }
-        for vec in vectors {
-            let ns = vec.ein as NSString
-            let count = PIIDetector.einPattern.numberOfMatches(
-                in: vec.ein, range: NSRange(location: 0, length: ns.length)
-            )
-            #expect((count >= 1) == vec.valid, "Mismatch for \(vec.ein) (\(vec.notes))")
-        }
     }
 
     @Test("Detector surfaces every valid EIN and rejects every invalid one")

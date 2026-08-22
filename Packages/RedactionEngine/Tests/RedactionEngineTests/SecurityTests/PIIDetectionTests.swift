@@ -8,41 +8,6 @@ import CoreGraphics
 @Suite("PII Detection")
 struct PIIDetectionTests {
 
-    // MARK: - SSN Regex (TEST §7.1)
-
-    @Test("SSN regex matches valid formats", arguments: [
-        "123-45-6789",    // Standard dashed
-        "123 45 6789",    // Space-separated
-        "123456789",      // No separator
-        "123\u{2013}45\u{2013}6789",  // En-dash (U+2013) — common in typeset PDFs
-        "123\u{2014}45\u{2014}6789",  // Em-dash (U+2014)
-        "123\u{2011}45\u{2011}6789",  // Non-breaking hyphen (U+2011)
-        "123\u{2012}45\u{2012}6789",  // Figure dash (U+2012)
-    ])
-    func validSSN(_ input: String) {
-        let nsInput = input as NSString
-        let range = NSRange(location: 0, length: nsInput.length)
-        let matches = PIIDetector.ssnPattern.matches(in: input, range: range)
-        #expect(!matches.isEmpty, "Expected SSN match for '\(input)'")
-    }
-
-    @Test("SSN regex rejects invalid patterns", arguments: [
-        "000-45-6789",    // Invalid area: 000
-        "666-45-6789",    // Invalid area: 666
-        "900-45-6789",    // Invalid area: 900-999
-        "123-00-6789",    // Invalid group: 00
-        "123-45-0000",    // Invalid serial: 0000
-        "1234567890",     // 10 digits (phone number)
-        "12345678",       // 8 digits (too short)
-        "123\u{2013}45-6789",  // Mixed separators: en-dash then hyphen (backreference \1 rejects)
-    ])
-    func invalidSSN(_ input: String) {
-        let nsInput = input as NSString
-        let range = NSRange(location: 0, length: nsInput.length)
-        let matches = PIIDetector.ssnPattern.matches(in: input, range: range)
-        #expect(matches.isEmpty, "Expected no SSN match for '\(input)'")
-    }
-
     @Test("SSN with context words boosts confidence")
     func ssnContextBoost() async {
         let detector = PIIDetector()
@@ -285,27 +250,6 @@ struct PIIDetectionTests {
         let einResults = results.filter { $0.kind == .ein }
         #expect(!einResults.isEmpty)
         #expect(einResults.first!.confidence >= 0.80)
-    }
-
-    // MARK: - ALL-CAPS Title-Casing (ENGINE §4.5)
-
-    @Test("titleCaseAllCapsWords converts ALL-CAPS to title case")
-    func titleCaseConversion() {
-        let result = PIIDetector.titleCaseAllCapsWords("JOHN SMITH FILED A CLAIM")
-        #expect(result == "John Smith Filed A Claim")
-    }
-
-    @Test("titleCaseAllCapsWords preserves known acronyms")
-    func titleCasePreservesAcronyms() {
-        let result = PIIDetector.titleCaseAllCapsWords("FBI AGENT SSN: 123")
-        #expect(result.contains("FBI"))
-        #expect(result.contains("SSN:"))
-    }
-
-    @Test("titleCaseAllCapsWords leaves mixed-case words unchanged")
-    func titleCaseMixedCase() {
-        let result = PIIDetector.titleCaseAllCapsWords("Hello World test")
-        #expect(result == "Hello World test")
     }
 
     // MARK: - Name Deduplication
@@ -657,11 +601,9 @@ struct PIIDetectionTests {
         // Validates the try! safety documented in PIIDetector.swift.
         // These are hardcoded constant patterns that cannot fail at runtime,
         // but this test makes that guarantee explicit and CI-enforced.
-        _ = PIIDetector.ssnPattern
         _ = PIIDetector.ccPattern
         _ = PIIDetector.emailPattern
         _ = PIIDetector.phonePattern
-        _ = PIIDetector.einPattern
         _ = PIIDetector.addressPattern
         _ = PIIDetector.dobPattern
         _ = PIIDetector.itinPattern

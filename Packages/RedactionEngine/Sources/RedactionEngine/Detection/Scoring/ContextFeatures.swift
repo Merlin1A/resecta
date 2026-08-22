@@ -107,15 +107,11 @@ private enum ContextFeatureKeywords {
 ///
 /// - Parameters:
 ///   - match: the detector hit (range + kind + confidence + text).
-///   - doctype: the doctype the detector ran under (the gate doctype). Present
-///     for signature parity with the seam; the feature one-hots use
-///     `effectiveDoctype`.
 ///   - effectiveDoctype: the doctype whose one-hot is emitted (features 9-13).
 ///   - pageText: the full page text the match was located in.
 /// - Returns: `[Double]` of length 13 (`ContextFeatureContract.featureOrder`).
 func contextFeatures(
     match: PIIDetector.PIIMatch,
-    doctype: DoctypeClass,
     effectiveDoctype: DoctypeClass,
     pageText: String
 ) -> [Double] {

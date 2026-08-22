@@ -523,7 +523,6 @@ public struct DetectionOrchestrator: Sendable {
                     family: wire,
                     features: contextFeatures(
                         match: match,
-                        doctype: effectiveDoctype,
                         effectiveDoctype: effectiveDoctype,
                         pageText: text
                     )
@@ -717,10 +716,8 @@ public struct DetectionOrchestrator: Sendable {
             : ClassificationDiagnostic(from: classifierOutput)
 
         return PageDetectionResult(
-            pageIndex: pageIndex,
             detections: detections,
             doctype: classifierOutput,
-            priorsDelta: PerCategoryPriors(),  // priors move on triage, not detection
             classificationDiagnostic: diagnostic,
             overlapSuppressedCountByCategory: resolved.suppressedCountByCategory,
             ocrProvenance: provenance
@@ -962,7 +959,6 @@ public struct DetectionOrchestrator: Sendable {
             family: wire,
             features: contextFeatures(
                 match: match,
-                doctype: effectiveDoctype,
                 effectiveDoctype: effectiveDoctype,
                 pageText: pageText
             )

@@ -114,11 +114,6 @@ public struct DocumentTypeClassifier: Sendable {
         self.data = Self.loadData(from: .module).data
     }
 
-    /// Testing init — inject a custom bundle for fixture-based tests.
-    init(bundle: Bundle) {
-        self.data = Self.loadData(from: bundle).data
-    }
-
     /// Construct from a pre-loaded keyword table so
     /// `loadWithDiagnostics` builds the classifier and its load diagnostic from
     /// a single `loadData` pass.

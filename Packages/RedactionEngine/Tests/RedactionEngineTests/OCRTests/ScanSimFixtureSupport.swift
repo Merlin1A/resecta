@@ -6,77 +6,21 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// S8 OCR Quality Program — scan-simulation fixture machinery.
+// S8 OCR Quality Program — scan-simulation fixture support.
 // Design reference: design/04-search-ocr-ux-security.md §5.4 "Scanned fixture
 // acquisition" + "OCR Quality Program: Rollout Order and Measurement".
 //
-// Born-digital and scanned PDFs exercise Vision OCR differently. The builder
-// renders each page of a source PDF to raster at a target DPI and reassembles
-// a PDF with NO text layer — a reproducible "scan" analogue that forces the
-// OCR leg. Used with the synthetic fixtures defined below.
+// Born-digital and scanned PDFs exercise Vision OCR differently. The in-repo
+// PDF-to-raster builder that once lived here was superseded by the sd
+// (sample-doc) repo's cross-repo Python scan-sim pipeline, which produces the
+// committed scan-sim fixture PDFs directly; `FixtureError.unreadableSource`
+// remains as the shared "fixture failed to load" signal `RealDocOCRQualityTests`
+// throws when reading those shipped fixtures.
 
 enum ScanSimulatorFixtureBuilder {
 
-    /// Render every page of `pdfData` at `targetDPI`, JPEG-encode the
-    /// rasters (keeps the committed fixture small; CGPDFContext passes
-    /// DCT streams through), and reassemble as a raster-only PDF whose
-    /// pages keep the ORIGINAL point geometry. Keeping the page boxes
-    /// unchanged matters: downstream detection-DPI selection sees the
-    /// same page dimensions as the born-digital original, so the scan-sim
-    /// measures OCR quality, not accidental geometry changes.
-    static func buildScanSimulation(
-        from pdfData: Data,
-        targetDPI: CGFloat
-    ) async throws -> Data {
-        guard let document = PDFDocument(data: pdfData) else {
-            throw FixtureError.unreadableSource
-        }
-        let rasterizer = PageRasterizer()
-        let format = UIGraphicsPDFRendererFormat()
-
-        // Pre-render all pages (and capture their point bounds) before
-        // entering the renderer closure — the closure is synchronous.
-        var pages: [(image: UIImage, bounds: CGRect)] = []
-        for pageIndex in 0..<document.pageCount {
-            guard let page = document.page(at: pageIndex) else {
-                throw FixtureError.unreadableSource
-            }
-            let cgImage = try await rasterizer.renderPage(
-                page, pageIndex: pageIndex, dpi: targetDPI
-            )
-            // JPEG round-trip so the PDF embeds a compressed DCT stream
-            // instead of a lossless bitmap (~10× smaller committed file).
-            // Quality 0.8 ≈ visually indistinguishable scanner output.
-            guard let jpegData = UIImage(cgImage: cgImage)
-                .jpegData(compressionQuality: 0.8),
-                let jpegImage = UIImage(data: jpegData)
-            else {
-                throw FixtureError.encodingFailed(pageIndex: pageIndex)
-            }
-            let rawBounds = page.bounds(for: .cropBox)
-            let rotation = page.rotation
-            let effectiveSize: CGSize = (rotation == 90 || rotation == 270)
-                ? CGSize(width: rawBounds.height, height: rawBounds.width)
-                : rawBounds.size
-            pages.append((jpegImage, CGRect(origin: .zero, size: effectiveSize)))
-        }
-
-        guard let firstBounds = pages.first?.bounds else {
-            throw FixtureError.unreadableSource
-        }
-        let renderer = UIGraphicsPDFRenderer(bounds: firstBounds, format: format)
-        return renderer.pdfData { context in
-            for (image, bounds) in pages {
-                context.beginPage(withBounds: bounds, pageInfo: [:])
-                image.draw(in: bounds)
-            }
-        }
-    }
-
     enum FixtureError: Error {
         case unreadableSource
-        case encodingFailed(pageIndex: Int)
-        case missingResource
     }
 }
 

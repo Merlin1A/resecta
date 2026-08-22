@@ -27,7 +27,6 @@ public struct BloomFilter: Sendable {
 
     static let headerSize = 63
     static let currentVersion: UInt16 = 1
-    private static let magicBytes: [UInt8] = [0x52, 0x53, 0x42, 0x46] // "RSBF"
 
     // MARK: - Properties
 

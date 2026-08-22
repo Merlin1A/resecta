@@ -1773,7 +1773,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                             let prevPrimary: DoctypeClass? =
                                 i > 0 ? accumulatedDiagnostics[i - 1]?.primary : nil
                             let doctypeCtx = prevPrimary.map { prev in
-                                DoctypeWindow(primary: prev, secondary: nil)
+                                DoctypeWindow(primary: prev)
                             }
                             let pageResult: PageDetectionResult
                             do {
@@ -1853,7 +1853,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                             let prevPrimary: DoctypeClass? =
                                 i > 0 ? accumulatedDiagnostics[i - 1]?.primary : nil
                             let doctypeCtx = prevPrimary.map { prev in
-                                DoctypeWindow(primary: prev, secondary: nil)
+                                DoctypeWindow(primary: prev)
                             }
                             let pageResult: PageDetectionResult
                             do {
