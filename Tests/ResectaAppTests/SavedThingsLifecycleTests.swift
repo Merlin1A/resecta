@@ -123,6 +123,13 @@ struct SaveCurrentRegexCommitTests {
         #expect(toast.contains("Settings"))
         #expect(toast.contains("Saved Regexes"))
     }
+
+    @Test("Alert gets its own title independent of the menu-item label (UXC-31/RB-40)")
+    func alertTitleIndependentOfMenuLabel() {
+        #expect(SearchAndRedactSheet.saveCurrentRegexAlertTitle == "Save current pattern")
+        // The menu item itself stays unchanged.
+        #expect(SearchToolbarSection.saveCurrentRegexMenuItem == "Save current...")
+    }
 }
 
 // MARK: - Presentation path (UXF-04)
@@ -281,6 +288,13 @@ struct SavedSearchDeleteConfirmationTests {
         let saved = makeSaved(name: "Tax terms")
         #expect(SavedSearchListSheet.deleteConfirmTitle(for: saved) == "Delete “Tax terms”?")
         #expect(SavedSearchListSheet.deleteConfirmTitle(for: nil) == "Delete saved search?")
+    }
+
+    @Test("UXC-31 (RB-40): rename-alert title names the saved search, same quote shape as delete's")
+    func renameTitle() {
+        let saved = makeSaved(name: "Tax terms")
+        #expect(SavedSearchListSheet.renameTitle(for: saved) == "Rename “Tax terms”")
+        #expect(SavedSearchListSheet.renameTitle(for: nil) == "Rename Saved Search")
     }
 
     @Test("Q6 (D-86): dialog body noun follows the entry's own interface")

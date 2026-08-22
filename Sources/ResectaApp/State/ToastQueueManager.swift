@@ -312,15 +312,25 @@ final class ToastQueueManager {
 /// the number the user sees is the count of regions actually created,
 /// never the raw detection or selection total.
 enum CommitFeedback {
-    /// "Marked 3 for redaction (2 already covered)". Returns nil when
-    /// nothing was created and nothing was skipped — callers suppress the
-    /// toast rather than announce a no-op.
+    /// UXC-24 (RB-39): appended to every non-nil `markedMessage` result —
+    /// "Marked" on its own reads as already-redacted, so the suffix
+    /// names the step that still has to happen. Its own `static let` so
+    /// the pin below is exact-text. RW-F-003 class note: at AX3 the
+    /// 2-line toast cap may truncate this longer message — the ruling
+    /// accepted the length.
+    static let notYetRedactedSuffix = ". Not redacted until you tap Redact."
+
+    /// "Marked 3 for redaction (2 already covered). Not redacted until
+    /// you tap Redact." Returns nil when nothing was created and
+    /// nothing was skipped — callers suppress the toast rather than
+    /// announce a no-op.
     static func markedMessage(applied: Int, alreadyCovered: Int = 0) -> String? {
         guard applied > 0 || alreadyCovered > 0 else { return nil }
         var message = "Marked \(applied) for redaction"
         if alreadyCovered > 0 {
             message += " (\(alreadyCovered) already covered)"
         }
+        message += notYetRedactedSuffix
         return message
     }
 }

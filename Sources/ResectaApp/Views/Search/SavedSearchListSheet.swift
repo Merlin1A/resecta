@@ -102,7 +102,7 @@ struct SavedSearchListSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .alert("Rename Saved Search", isPresented: Binding(
+            .alert(Self.renameTitle(for: renameTarget), isPresented: Binding(
                 get: { renameTarget != nil },
                 set: { if !$0 { renameTarget = nil } }
             ), presenting: renameTarget) { search in
@@ -303,7 +303,16 @@ struct SavedSearchListSheet: View {
     /// Search side names query text and filters — the prompt never
     /// describes the other interface's shape.
     static func savePromptTitle(for interface: SearchInterface) -> String {
-        interface == .scan ? "Save Current Scan" : "Save Current Search"
+        interface == .scan ? "Save current scan" : "Save current search"
+    }
+
+    /// UXC-31 (RB-40): rename-alert title — same curly-quote shape as
+    /// `deleteConfirmTitle(for:)`. The nil fallback is defensive only:
+    /// the alert's `isPresented` binding is false whenever
+    /// `renameTarget` is nil, so this branch never reaches the screen.
+    static func renameTitle(for search: SavedSearch?) -> String {
+        guard let search else { return "Rename Saved Search" }
+        return "Rename “\(search.name)”"
     }
 
     static func savePromptMessage(for interface: SearchInterface) -> String {

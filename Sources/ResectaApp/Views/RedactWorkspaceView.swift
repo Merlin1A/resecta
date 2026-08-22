@@ -132,11 +132,11 @@ struct RedactWorkspaceView: View {
             }
             // D12: Import-while-editing confirmation dialog
             .confirmationDialog(
-                "You have a document open",
+                RedactWorkspaceView.importWhileEditingTitle,
                 isPresented: $showImportWhileEditingConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("Import New", role: .destructive) {
+                Button(RedactWorkspaceView.importWhileEditingConfirmButton, role: .destructive) {
                     performPendingImport()
                 }
                 Button("Cancel", role: .cancel) {
@@ -288,6 +288,11 @@ struct RedactWorkspaceView: View {
         // Reset selection so the same photo can be re-selected
         selectedPhoto = nil
     }
+
+    /// UXC-31 (RB-40): dialog-grammar normalization — sentence-case
+    /// question title, bare-verb destructive button.
+    static let importWhileEditingTitle = "Replace the open document?"
+    static let importWhileEditingConfirmButton = "Replace"
 
     /// D12: Execute the pending import after user confirms replacement.
     private func performPendingImport() {

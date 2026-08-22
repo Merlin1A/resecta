@@ -63,8 +63,9 @@ struct SavedListPartitionTests {
 
     @Test("Save-prompt chrome follows the interface whose shape it captures")
     func savePromptChromePerInterface() {
-        #expect(SavedSearchListSheet.savePromptTitle(for: .search) == "Save Current Search")
-        #expect(SavedSearchListSheet.savePromptTitle(for: .scan) == "Save Current Scan")
+        // UXC-31 (RB-40): dialog-grammar normalization — sentence case.
+        #expect(SavedSearchListSheet.savePromptTitle(for: .search) == "Save current search")
+        #expect(SavedSearchListSheet.savePromptTitle(for: .scan) == "Save current scan")
         #expect(SavedSearchListSheet.savePromptMessage(for: .search)
                 == "Saves the current query shape — mode, query text, and filter settings. Never document content or results.")
         #expect(SavedSearchListSheet.savePromptMessage(for: .scan)
