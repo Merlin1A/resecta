@@ -9,8 +9,7 @@ import CoreGraphics
 //
 // M-D.3 — badge outer stroke width (dark-mode contrast)
 // M-D.4 — resize-handle outer stroke width (selection visibility)
-// M-D.5 — handle in/out durations sourced from `ResectaTokens.Anim`
-//          + Reduce-Motion gate that snaps to the target scale.
+// M-D.5 — handle in/out durations sourced from `ResectaTokens.Anim`.
 
 @Suite("Canvas accessibility polish (WU-43)")
 @MainActor
@@ -55,47 +54,5 @@ struct CanvasAccessibilityPolishTests {
         // reasoning as selectionInDuration: shared posture across the
         // two animation surfaces.
         #expect(ResectaTokens.Anim.selectionOutDuration == 0.15)
-    }
-
-    // MARK: - M-D.5 — Reduce Motion gate
-
-    @Test("Reduce Motion in: handle scale snaps to 1.0 (full size)")
-    func reduceMotionSelectionInSnapsToOne() {
-        // Selection-gained branch with Reduce Motion on. The caller
-        // bypasses the CADisplayLink path and sets handleScale directly
-        // to 1.0. The pure helper returns a non-nil CGFloat so the call
-        // site can route through one branch.
-        let scale = RedactionOverlayView.reduceMotionHandleScale(
-            direction: .in,
-            reduceMotion: true
-        )
-        #expect(scale == 1.0)
-    }
-
-    @Test("Reduce Motion out: handle scale snaps to 0.0 (hidden)")
-    func reduceMotionSelectionOutSnapsToZero() {
-        let scale = RedactionOverlayView.reduceMotionHandleScale(
-            direction: .out,
-            reduceMotion: true
-        )
-        #expect(scale == 0.0)
-    }
-
-    @Test("Reduce Motion off: helper returns nil — CADisplayLink path runs")
-    func reduceMotionOffReturnsNil() {
-        // Without Reduce Motion, the helper returns nil so the call site
-        // runs the standard CADisplayLink interpolation. nil distinguishes
-        // "no override" from "snap to scale 0.0" so the in/out branches
-        // share one routing.
-        let inScale = RedactionOverlayView.reduceMotionHandleScale(
-            direction: .in,
-            reduceMotion: false
-        )
-        #expect(inScale == nil)
-        let outScale = RedactionOverlayView.reduceMotionHandleScale(
-            direction: .out,
-            reduceMotion: false
-        )
-        #expect(outScale == nil)
     }
 }

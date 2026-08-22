@@ -77,36 +77,6 @@ extension SearchToolbarSection {
         statusKnown == false || anyPageAwaitsOCR
     }
 
-    // MARK: - Customize-disclosure contracts
-
-    /// Pre-scan, the PII "Customize"
-    /// disclosure starts collapsed (Hybrid IA novice default).
-    /// Pinned by `PIICategoryChipTests.customizeDisclosureCollapsedPreScan`.
-    static let customizeDisclosureCollapsedPreScan: Bool = false
-
-    /// Per WU-12 / ACTION-WU-12: count-badge label for the pre-scan PII
-    /// chip row inside the Customize disclosure. Pre-scan, count is 0
-    /// for every category; post-scan it reflects `SearchState.categoryCounts`.
-    /// Format ships verbatim per ACTION-WU-12. Classified SAFE under §19
-    /// — mechanism description (factual count, no outcome promise).
-    static func pIICategoryChipLabel(for category: PIICategory, count: Int) -> String {
-        "\(category.rawValue) (\(count))"
-    }
-
-    /// Per WU-12: VoiceOver label for the pre-scan PII chip — surfaces
-    /// the toggle state and result count so VoiceOver users can both
-    /// (a) understand what tapping the chip does and (b) hear how many
-    /// matches the most recent scan produced for this category.
-    static func pIICategoryChipAccessibilityLabel(
-        category: PIICategory,
-        isEnabled: Bool,
-        count: Int
-    ) -> String {
-        let plural = count == 1 ? "match" : "matches"
-        let state = isEnabled ? "enabled" : "disabled"
-        return "\(category.rawValue), \(state), \(count) \(plural)"
-    }
-
     // MARK: - WU-15 Pure-Function Contracts
 
     /// Per WU-15 / [TOKEN_ADDITIONS]: saved-regex submenu section header.

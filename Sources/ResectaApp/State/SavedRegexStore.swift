@@ -195,13 +195,6 @@ final class SavedRegexStore {
         return true
     }
 
-    /// Delete a user-saved regex by id. Built-in ids are a no-op.
-    func delete(id: UUID) {
-        guard let idx = userSavedRegexes.firstIndex(where: { $0.id == id }) else { return }
-        userSavedRegexes.remove(at: idx)
-        persist()
-    }
-
     /// Delete user-saved entries at the given offsets within the
     /// `userSavedRegexes` array (NOT within the merged `regexes`).
     /// Used by `List.onDelete` inside `SavedRegexLibraryView`.

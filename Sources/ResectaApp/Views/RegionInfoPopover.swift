@@ -6,8 +6,6 @@ import RedactionEngine
 
 struct RegionInfoPopover: View {
     let metadata: RegionMetadata
-    /// W9 — present the "Why this match?" popover. nil-callback hides the button.
-    var onRequestWhy: ((String) -> Void)? = nil
     /// WU-71 / [P10] path (a): forward-rationale carried by the region's
     /// `Source`. nil hides the disclosure entirely. When non-nil the row
     /// renders rule ID + final score so the reviewer sees the detector's
@@ -84,22 +82,6 @@ struct RegionInfoPopover: View {
                         .font(.caption)
                 }
                 .accessibilityLabel("View rationale, detector \(DetectorNameCatalog.displayName(forRuleID: rationale.ruleID))")
-            }
-
-            // W9 — reverse rationale entry. Visible only for PII regions
-            // that carry matched text (we need a snippet to score).
-            if let text = metadata.matchedText,
-               case .pii = metadata.piiKind,
-               let onRequestWhy {
-                Button {
-                    onRequestWhy(text)
-                } label: {
-                    Label("Why this match?", systemImage: "questionmark.circle")
-                        .font(.caption)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .padding(.top, ResectaTokens.Spacing.xxs)
             }
         }
         .padding(ResectaTokens.Spacing.sm)
