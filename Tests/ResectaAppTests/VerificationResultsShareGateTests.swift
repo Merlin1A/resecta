@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import ResectaApp
 import RedactionEngine
 
@@ -601,6 +602,38 @@ struct ShareRiskConfirmSheetTests {
             == "shareSkippedConfirm")
         #expect(ShareRiskConfirmKind.incompleteWarn(empty).accessibilityIdentifier
             == "shareIncompleteWarnConfirm")
+    }
+
+    // MARK: - Hidden completion Button geometry (RB-55 source pin)
+
+    /// RB-55: a 1×1-pt hidden Button proved unreliable for a
+    /// coordinate-driven `.tap()` on a re-presented sheet. Source-scan
+    /// pin (mirrors `HonestySurfacesTests.loadRepoFile`) proving
+    /// `SlideToShareControl`'s hidden completion Button is sized by the
+    /// shared touch-target token and that the former 1×1 frame is gone —
+    /// a predicate-level test can't reach a SwiftUI `.frame` literal, so
+    /// this is deliberately a source-contains pin, not a rendered one.
+    @Test("SlideToShareControl's hidden completion Button is sized by TouchTarget.minimum, not a 1×1 point")
+    func hiddenCompletionButtonSizedByTouchTargetMinimum() throws {
+        let source = try loadRepoFile(
+            "Sources/ResectaApp/Views/DocumentEditorView.swift")
+        #expect(source.contains("ResectaTokens.TouchTarget.minimum"),
+                "SlideToShareControl's hidden completion Button must be sized by the shared touch-target token")
+        #expect(!source.contains("frame(width: 1, height: 1)"),
+                "the former 1×1-point hidden Button frame must not remain in SlideToShareControl")
+    }
+
+    /// Mirrors `HonestySurfacesTests.loadRepoFile`.
+    private func loadRepoFile(
+        _ relativePath: String, from file: StaticString = #filePath
+    ) throws -> String {
+        let repoRoot = URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+        return try String(
+            contentsOf: repoRoot.appendingPathComponent(relativePath),
+            encoding: .utf8)
     }
 
     // MARK: - Completion function (haptic seam + acknowledgement + export)
