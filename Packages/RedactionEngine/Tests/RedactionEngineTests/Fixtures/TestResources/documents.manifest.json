@@ -1,0 +1,209 @@
+[
+  {
+    "id": "packet",
+    "path": "packet.pdf",
+    "sha256": "362375692b8cff378d66c43fcf46f00ba09e1ea982602fcc5c8b70e96f54339a",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K0",
+    "features": [
+      "F0"
+    ],
+    "gt": "packet-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "text",
+      "ocr"
+    ],
+    "source": "bundled",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.build_packet",
+      "seed": null,
+      "variant": null
+    }
+  },
+  {
+    "id": "sample-bank-statement",
+    "path": "sample-bank-statement.pdf",
+    "sha256": "992ca0543eb1a2eaab8d8dba0a4ad4b8339cf95b804a0347ab1b0987ce18fa20",
+    "pages": 3,
+    "class": "C1",
+    "capture": "K0",
+    "features": [
+      "F0"
+    ],
+    "gt": null,
+    "gt_kind": null,
+    "leg_applicability": [
+      "text",
+      "ocr"
+    ],
+    "source": "bundled",
+    "provenance": {
+      "generator": "resecta-sample-doc generate_statement.py",
+      "seed": null,
+      "variant": null
+    }
+  },
+  {
+    "id": "g8-corpus",
+    "path": "corpus/g8_corpus.json",
+    "sha256": "3f941a6bf2ba16b69efc1e935314eb7c4f70c78ff6f062c87abb0fb4d4db73d7",
+    "pages": null,
+    "class": null,
+    "capture": null,
+    "features": [],
+    "gt": "corpus/g8_corpus.json",
+    "gt_kind": "span",
+    "leg_applicability": [
+      "text"
+    ],
+    "source": "bundled",
+    "provenance": {
+      "generator": "resecta-datapipeline build g8-corpus",
+      "seed": 20260416,
+      "variant": null,
+      "note": "installed via make install-assets; span ground truth inline"
+    }
+  },
+  {
+    "id": "packet-rotate-trigger",
+    "path": "packet-rotate-trigger.pdf",
+    "sha256": "452798bb06e20c5c1b34172c496b92f504cce302a9df20f023dcf168f5deb9a6",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K0",
+    "features": [
+      "F1"
+    ],
+    "gt": "variants/packet-rotate-trigger-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "text",
+      "ocr"
+    ],
+    "source": "bundled",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants rotate_trigger",
+      "seed": null,
+      "variant": "rotate-90"
+    }
+  },
+  {
+    "id": "perf-filler-120pp",
+    "path": "variants/perf-filler-120pp.pdf",
+    "sha256": "327680624ad73feed3e1ac8d93e721d9ef544322651f19de77e12bdeba7e3e28",
+    "pages": 120,
+    "class": "C1",
+    "capture": "K0",
+    "features": [
+      "F6"
+    ],
+    "gt": null,
+    "gt_kind": null,
+    "leg_applicability": [
+      "text"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants perf_filler",
+      "seed": null,
+      "variant": "filler-120pp"
+    }
+  },
+  {
+    "id": "packet-scan-sim-150dpi",
+    "path": "packet-scan-sim-150dpi.pdf",
+    "sha256": "9af85bcef11b7e0cc14db1b43040f0cc121482598a8f5174296775268bf51874",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-scan-sim-150dpi-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "bundled",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants scan_sim",
+      "seed": null,
+      "variant": "scan-sim-150",
+      "gt_sha256": "28b159c6dd8ba59ca433ceb576155958adcf2aa5dcea4f018ed6db964c45e21c"
+    }
+  },
+  {
+    "id": "packet-degrade-skew",
+    "path": "variants/packet-degrade-skew.pdf",
+    "sha256": "a1f3585f37e36c9804441a3d0b5d29cbfdbf0d83ca3cdf2d435753e59acc2aa2",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-degrade-skew-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-skew",
+      "gt_sha256": "490fc0ce5513428871797dc904d8d50aa1a4a595e739f99f9b1fe4aca7e9857f",
+      "note": "150 DPI raster rotated 1.5deg; GT boxes = axis-aligned hull (approximate)"
+    }
+  },
+  {
+    "id": "packet-degrade-blur",
+    "path": "variants/packet-degrade-blur.pdf",
+    "sha256": "4344c62d43e922c0aea5346e6d0e3111844ab0da11df6877bd9fcdd4f6005cbc",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-degrade-blur-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-blur",
+      "gt_sha256": "57524cbd6442b02aa95094b8eec30dec035c408ab0812a3ae2c3bf375e13f13a",
+      "note": "150 DPI raster softened by 50% down/up resample; GT geometry inherited"
+    }
+  },
+  {
+    "id": "packet-degrade-lowdpi",
+    "path": "variants/packet-degrade-lowdpi.pdf",
+    "sha256": "3ff37cb24996363059b5fe86c5a14af62b2bc64bf3ba2a2d17ddce0908fbfc52",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-degrade-lowdpi-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-lowdpi",
+      "gt_sha256": "cb6faedab8f59d3feac67382e2c968426c95af2fd878fc6929131b2f142921d1",
+      "note": "re-rasterized at 100 DPI; GT geometry inherited"
+    }
+  }
+]
