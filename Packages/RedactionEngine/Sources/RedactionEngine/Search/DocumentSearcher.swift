@@ -1612,6 +1612,20 @@ public actor DocumentSearcher {
         continuation.finish()
     }
 
+    /// H1.2 document-harness seam -- force the OCR leg on a page regardless of
+    /// its text-layer status. The product routes rich pages down the text path,
+    /// so the harness's forced-OCR measurement (rotated / born-digital pages)
+    /// needs a direct entry to the same private OCR body the product runs on
+    /// `.sparse`/`.none` pages. Observation-only, no new behavior; internal for
+    /// `@testable` reach, mirroring `_testComposeSiteB`.
+    func _testScanPagePIIViaOCR(
+        page: SendablePDFPage,
+        pageIndex: Int,
+        categories: Set<PIICategory>
+    ) async -> [SearchResult] {
+        await scanPagePIIViaOCR(page: page.page, pageIndex: pageIndex, categories: categories)
+    }
+
     /// Run PII detection on a page via OCR when no text layer is available.
     /// Concatenates OCR lines into a single text block, runs PIIDetector,
     /// then maps match ranges back to OCR line bounding boxes.
