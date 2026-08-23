@@ -2641,17 +2641,30 @@ struct SlideToShareControl: View {
             }
         )
         .accessibilityHidden(true)
-        // Positioned above the track (negative y-offset) rather than at any
-        // point WITHIN it: the knob's hit area sweeps the whole horizontal
-        // range as it drags (x ∈ [0, trackWidth]), so any in-track corner
-        // risks the hidden Button's 1×1 frame coinciding with the knob at
-        // some position along the slide. Placed outside the vertical range
-        // instead, it can never overlap the knob at rest or mid-drag.
-        .overlay(alignment: .top) {
+        // RB-55: the completion Button is sized to
+        // `ResectaTokens.TouchTarget.minimum` — a real touch target, not
+        // a 1×1 point — because the 1×1 target proved unreliable for a
+        // coordinate-driven activation (XCUITest's `.tap()` on a
+        // re-presented sheet; the same reasoning covers Switch Control
+        // and a pointer click). It stays out of sight by placement, not
+        // by size: anchored to this view's own bottom-leading corner and
+        // pushed further down still, clear of the footer's "Go back"
+        // row, so it lands beneath that row rather than inside the
+        // knob's sweep band (which stays within this view's own height
+        // as it drags) or the "Go back" pill itself (centered, well
+        // short of the row's full width, leaving the space beside and
+        // below it open). No sighted tap lands where this sits.
+        .overlay(alignment: .bottomLeading) {
             Button(label, action: complete)
-                .frame(width: 1, height: 1)
+                .frame(
+                    width: ResectaTokens.TouchTarget.minimum,
+                    height: ResectaTokens.TouchTarget.minimum
+                )
+                .contentShape(Rectangle())
                 .opacity(0.02)
-                .offset(y: -12)
+                .offset(y: ResectaTokens.TouchTarget.minimum
+                    + ResectaTokens.Spacing.md
+                    + 34) // clears the "Go back" row
                 .accessibilityIdentifier(accessibilityIdentifier)
         }
     }
