@@ -62,7 +62,7 @@ nonisolated final class SavedSearchCollisionUITests: XCTestCase {
         let saveRow = app.buttons["Save current search…"]
         XCTAssertTrue(saveRow.waitForExistence(timeout: 5))
         saveRow.tap()
-        let alert = app.alerts["Save Current Search"]
+        let alert = app.alerts["Save current search"]
         XCTAssertTrue(alert.waitForExistence(timeout: 10))
         XCTAssertEqual(
             alert.textFields.firstMatch.value as? String, "Text: Sample",
@@ -178,7 +178,7 @@ nonisolated final class SavedSearchCollisionUITests: XCTestCase {
         let saveRow = app.buttons["Save current search…"]
         XCTAssertTrue(saveRow.waitForExistence(timeout: 10))
         saveRow.tap()
-        let alert = app.alerts["Save Current Search"]
+        let alert = app.alerts["Save current search"]
         XCTAssertTrue(alert.waitForExistence(timeout: 10), "Save prompt never presented.")
         XCTAssertEqual(
             alert.textFields.firstMatch.value as? String, prefill,
@@ -218,7 +218,7 @@ nonisolated final class SavedSearchCollisionUITests: XCTestCase {
             "Leading-swipe Rename action not revealed."
         )
         renameAction.tap()
-        let alert = app.alerts["Rename Saved Search"]
+        let alert = app.alerts["Rename \u{201C}\(name)\u{201D}"]
         XCTAssertTrue(alert.waitForExistence(timeout: 10), "Rename prompt never presented.")
         replaceText(in: alert.textFields.firstMatch, clearing: name, with: newName)
         alert.buttons["Rename"].tap()
