@@ -72,6 +72,10 @@ struct G8BaselineHarnessTests {
         let generated_by: String
         let g8_corpus_seed: Int
         let cutoff_preset: String
+        // 1.2 H1.1: which surfacing gate produced the cells — "detector"
+        // (PIIDetector raw vs balanced cutoff, this suite) or "siteB" (the
+        // composed Search-and-Redact gate, G8SearchParityHarnessTests).
+        let site: String
         let doc_count: Int
         let cells: [String: BaselineCell]
     }
@@ -86,6 +90,7 @@ struct G8BaselineHarnessTests {
 
     struct RawScoresReport: Encodable, Sendable {
         let schema_version: Int
+        let site: String
         let balanced_cutoffs: [String: Double]
         let absorbing_state_floor: Double
         let rows: [RawScoreRow]
@@ -121,6 +126,7 @@ struct G8BaselineHarnessTests {
     struct FireFeaturesReport: Encodable, Sendable {
         let schema_version: Int
         let generated_by: String
+        let site: String
         let feature_order: [String]
         let fires: [FireFeatureRow]
     }
@@ -374,6 +380,7 @@ struct G8BaselineHarnessTests {
             generated_by: "G8BaselineHarness.sweepG8Corpus",
             g8_corpus_seed: corpus.seed,
             cutoff_preset: "balanced",
+            site: "detector",
             doc_count: sortedDocs.count,
             cells: cells
         )
@@ -381,6 +388,7 @@ struct G8BaselineHarnessTests {
 
         let rawReport = RawScoresReport(
             schema_version: 1,
+            site: "detector",
             balanced_cutoffs: cutoffMap,
             absorbing_state_floor: DetectionOrchestrator.absorbingStateFloor,
             rows: rawRows
@@ -393,6 +401,7 @@ struct G8BaselineHarnessTests {
         let fireReport = FireFeaturesReport(
             schema_version: 1,
             generated_by: "G8BaselineHarness.fireFeatures",
+            site: "detector",
             feature_order: ContextFeatureContract.featureOrder,
             fires: fireRows
         )
