@@ -8,6 +8,31 @@ The entries below follow the Keep-a-Changelog index format.
 
 ## [Unreleased]
 
+## [1.1.0] — YYYY-MM-DD
+
+### Added
+
+- **Run-facts disclosure on the verification results screen.** Lines beneath the verdict state what the run did not cover: pages too large to scan for text, runs where detection never ran, and a degraded detector.
+- **Non-visual review note.** A line beside the scope disclaimer (and on the redacted preview's verdict capsule for VoiceOver) explains that the preview is a visual check and how to review page by page in the editor.
+- **Post-share acknowledgment.** A "Shared." toast after the share sheet reports completion.
+- **Review orientation line.** "N pages · M with hits" beneath the sheet header after a completed run; the page bar stays reachable while the sheet is parked at its compact height.
+- **Zero-result guidance.** The zero-result state reads "No items flagged" with a calibration line and pointers to the existing controls.
+
+### Changed
+
+- **Share confirm for reported issues.** The alert is now a sheet that lists the reported items and completes with a slide gesture; it also covers runs whose checks were partly skipped. Backing out of the share sheet re-arms the confirm; a completed share leaves it spent for that report.
+- **Select-where is additive** ("Add to selection…"); Deselect All narrows.
+- **Confidence reads as a tier** — high, medium, or low — on review rows, badges, and region details, instead of a number.
+- **Apply toast** names the remaining step: nothing is redacted until you tap Redact.
+- **Dialog grammar** normalized across confirms (sentence-case question titles, verb buttons; the import-while-editing confirm reads "Replace").
+- **On PASS, the scope disclaimer sits beneath the verdict** rather than at the bottom of the screen.
+- **Touch targets** floored at the default type size on the page bar, review rows, sheet header and footer buttons, popups, chips, and the canvas resize handles.
+- **Reduce Motion** now applies to every slide-in transition; the post-run banner tints orange only for warnings; toast and status colors use the measured text tier; the editor toolbar keeps the brand tint on Redact only; search option toggles wait for a running search.
+
+### Removed
+
+- Unreferenced code and assets across the app and engine (no behavior change; detection outputs unchanged).
+
 ## [1.0.0] — 2026-08-12
 
 Initial public release.
