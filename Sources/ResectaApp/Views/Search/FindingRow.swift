@@ -121,7 +121,19 @@ struct FindingRow<Leading: View, Badge: View, Trailing: View>: View {
                         .contentTransition(.symbolEffect(.replace))
                 }
                 .buttonStyle(.plain)
-                .frame(width: 28)
+                // UXC-18: floor the effective hit area to the HIG
+                // minimum on BOTH axes — the prior `width: 28` slot
+                // did not extend the hit frame (no height constraint
+                // at all), so the row's tallest sibling governed the
+                // circle's real tap height. Framing the whole button
+                // (not just the inner Image) plus `.contentShape`
+                // grows the tap region without changing the glyph's
+                // own rendered size.
+                .frame(
+                    width: ResectaTokens.TouchTarget.minimum,
+                    height: ResectaTokens.TouchTarget.minimum
+                )
+                .contentShape(Rectangle())
                 .sensoryFeedback(.selection, trigger: isSelected) // §4.6: haptic on toggle
 
                 badge()

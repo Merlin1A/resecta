@@ -283,6 +283,10 @@ struct SearchResultsSection: View {
                 } label: {
                     Label("Add to selection…", systemImage: "checkmark.circle")
                         .font(.caption)
+                        // UXC-18: 106×14.3 measured (search-side twin
+                        // of ScanReviewSection's selectWhereRow).
+                        .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                        .contentShape(Rectangle())
                 }
                 .controlSize(.small)
                 .accessibilityLabel("Add results to the selection by attribute")

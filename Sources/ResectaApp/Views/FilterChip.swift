@@ -71,6 +71,15 @@ struct FilterChip: View {
                             : AnyShapeStyle(.secondary))
                 }
             }
+            // UXC-18: floor the chip's effective hit area on both
+            // axes before the padding/background chain, so short
+            // labels (a bare "All" or a 1-2 digit count) still clear
+            // the HIG minimum without changing the drawn capsule's
+            // visual padding for longer labels that already exceed it.
+            .frame(
+                minWidth: ResectaTokens.TouchTarget.minimum,
+                minHeight: ResectaTokens.TouchTarget.minimum
+            )
             .padding(.horizontal, ResectaTokens.Spacing.sm)
             .padding(.vertical, ResectaTokens.Spacing.xs)
             .background(fillStyle, in: Capsule())

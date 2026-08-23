@@ -841,12 +841,20 @@ struct SearchAndRedactSheet: View {
         Button {
             activeModal = .savedSearches
         } label: {
+            // UXC-18: 33.9×26.9 measured — floor the bordered
+            // control's tap area to the HIG minimum.
             Image(systemName: "bookmark")
+                .frame(
+                    width: ResectaTokens.TouchTarget.minimum,
+                    height: ResectaTokens.TouchTarget.minimum
+                )
+                .contentShape(Rectangle())
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
         .disabled(redactionState.pendingTriage != nil)
         .accessibilityLabel("Saved Searches")
+        .accessibilityIdentifier("savedSearchesBookmark")
     }
 
     /// Compact re-run control for the Scan interface bar — the
@@ -863,12 +871,22 @@ struct SearchAndRedactSheet: View {
         Button {
             triggerSearch()
         } label: {
+            // UXC-18: 34.2×26.9 measured — same shape and fix as
+            // SearchToolbarSection.rescanButton; identifier matches
+            // that sibling since the two are mutually exclusive (only
+            // one renders per `scanCategoryStripEnabled` state).
             Image(systemName: "arrow.clockwise")
+                .frame(
+                    width: ResectaTokens.TouchTarget.minimum,
+                    height: ResectaTokens.TouchTarget.minimum
+                )
+                .contentShape(Rectangle())
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
         .disabled(searchState.isSearching)
         .accessibilityLabel("Scan document for PII")
+        .accessibilityIdentifier("rescanButton")
     }
 
     // MARK: - Grabber Pulse
@@ -923,9 +941,19 @@ struct SearchAndRedactSheet: View {
                     searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
                     navigateToCurrentResult()
                 } label: {
+                    // UXC-18: 37×19.3 measured for the pair — floor
+                    // each chevron's tap area to the HIG minimum. The
+                    // pair keeps its 2pt spacing (Lead: the visual
+                    // pass judges the resulting slab).
                     Image(systemName: "chevron.up")
+                        .frame(
+                            width: ResectaTokens.TouchTarget.minimum,
+                            height: ResectaTokens.TouchTarget.minimum
+                        )
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Previous result")
+                .accessibilityIdentifier("resultNavPrevious")
                 .keyboardShortcut("g", modifiers: [.command, .shift])
 
                 Button {
@@ -933,8 +961,14 @@ struct SearchAndRedactSheet: View {
                     navigateToCurrentResult()
                 } label: {
                     Image(systemName: "chevron.down")
+                        .frame(
+                            width: ResectaTokens.TouchTarget.minimum,
+                            height: ResectaTokens.TouchTarget.minimum
+                        )
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Next result")
+                .accessibilityIdentifier("resultNavNext")
                 .keyboardShortcut("g", modifiers: .command)
             }
             .buttonStyle(.bordered)

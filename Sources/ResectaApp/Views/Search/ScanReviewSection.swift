@@ -183,9 +183,18 @@ struct ScanReviewSection: View {
                         Image(systemName: "questionmark.circle")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
+                            // UXC-18: 14.4×14.4 measured — floor to
+                            // the HIG minimum without growing the
+                            // glyph itself.
+                            .frame(
+                                width: ResectaTokens.TouchTarget.minimum,
+                                height: ResectaTokens.TouchTarget.minimum
+                            )
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Show detector evaluation")
+                    .accessibilityIdentifier("detectorEvaluationButton")
                 }
             }
         )
@@ -243,6 +252,11 @@ struct ScanReviewSection: View {
                         .accessibilityHidden(true)
                 }
                 .font(.caption)
+                // UXC-18: 55.7×13.8 measured — this label carried no
+                // padding at all. Floor the tap height; width stays
+                // content-driven (text + chevron).
+                .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                .contentShape(Rectangle())
             }
             // AX exposure parity with the retired menu-style Picker:
             // "View, <mode>".
@@ -303,6 +317,10 @@ struct ScanReviewSection: View {
             } label: {
                 Label("Add to selection…", systemImage: "checkmark.circle")
                     .font(.caption)
+                    // UXC-18: 102×13.8 measured — no manual padding
+                    // beyond `.controlSize(.small)`.
+                    .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                    .contentShape(Rectangle())
             }
             .controlSize(.small)
             .accessibilityLabel("Add findings to the selection by attribute")

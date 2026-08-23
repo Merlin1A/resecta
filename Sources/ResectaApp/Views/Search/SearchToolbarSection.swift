@@ -462,7 +462,14 @@ struct SearchToolbarSection: View {
         Button {
             onTriggerSearch()
         } label: {
+            // UXC-18: 34.2×26.9 measured — floor the bordered
+            // control's tap area to the HIG minimum.
             Image(systemName: "arrow.clockwise")
+                .frame(
+                    width: ResectaTokens.TouchTarget.minimum,
+                    height: ResectaTokens.TouchTarget.minimum
+                )
+                .contentShape(Rectangle())
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
@@ -470,6 +477,7 @@ struct SearchToolbarSection: View {
         // scan everything (`effectiveScanCategories`).
         .disabled(searchState.isSearching)
         .accessibilityLabel("Scan document for PII")
+        .accessibilityIdentifier("rescanButton")
     }
 
     /// Pre-scan detector-selection chips over the full category set.
@@ -655,6 +663,12 @@ struct SearchToolbarSection: View {
                 Text(active.rawValue)
                     .font(.caption2)
             }
+            // UXC-18: same Menu+padding+Capsule shape as the sibling
+            // sortChip below — floor both before the padding chain.
+            .frame(
+                minWidth: ResectaTokens.TouchTarget.minimum,
+                minHeight: ResectaTokens.TouchTarget.minimum
+            )
             .padding(.horizontal, ResectaTokens.Spacing.sm)
             .padding(.vertical, ResectaTokens.Spacing.xxs)
             .background(isFiltered ? ResectaTokens.BrandTeal.tint.opacity(0.2) : Color.clear, in: Capsule())
@@ -698,6 +712,14 @@ struct SearchToolbarSection: View {
                 Text(Self.sortChipLabel(active: active))
                     .font(.caption2)
             }
+            // UXC-18: 56×17.3 measured — height was short despite the
+            // existing padding; floor both (width is already usually
+            // above the floor from the label text, so this is inert
+            // there and only matters for the shortest labels).
+            .frame(
+                minWidth: ResectaTokens.TouchTarget.minimum,
+                minHeight: ResectaTokens.TouchTarget.minimum
+            )
             .padding(.horizontal, ResectaTokens.Spacing.sm)
             .padding(.vertical, ResectaTokens.Spacing.xxs)
             .background(isCustomSort ? ResectaTokens.BrandTeal.tint.opacity(0.2) : Color.clear, in: Capsule())
