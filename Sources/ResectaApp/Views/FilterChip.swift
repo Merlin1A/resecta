@@ -71,17 +71,18 @@ struct FilterChip: View {
                             : AnyShapeStyle(.secondary))
                 }
             }
-            // UXC-18: floor the chip's effective hit area on both
-            // axes before the padding/background chain, so short
-            // labels (a bare "All" or a 1-2 digit count) still clear
-            // the HIG minimum without changing the drawn capsule's
-            // visual padding for longer labels that already exceed it.
-            .frame(
-                minWidth: ResectaTokens.TouchTarget.minimum,
-                minHeight: ResectaTokens.TouchTarget.minimum
-            )
-            .padding(.horizontal, ResectaTokens.Spacing.sm)
-            .padding(.vertical, ResectaTokens.Spacing.xs)
+            // REV-01 (packet §7.2 item 1, RB-66): compact drawn
+            // capsule — 36pt drawn height (a minimum: Dynamic Type
+            // text growth raises it), 12pt horizontal padding (the
+            // board's one proportion change from the old 8), natural
+            // width. RB-67: the UXC-18 46pt floor moves AFTER the
+            // background chain as a pure LAYOUT frame + contentShape —
+            // the hit area still clears the HIG effective minimum
+            // (RB-54 held) while the capsule draws at chip scale. Hit
+            // expansion beyond the layout frame is banned, so sibling
+            // hit zones can never overlap.
+            .padding(.horizontal, 12)
+            .frame(minHeight: 36)
             .background(fillStyle, in: Capsule())
             .overlay(
                 Capsule()
@@ -90,6 +91,11 @@ struct FilterChip: View {
                         lineWidth: ResectaTokens.Border.subtle
                     )
             )
+            .frame(
+                minWidth: ResectaTokens.TouchTarget.minimum,
+                minHeight: ResectaTokens.TouchTarget.minimum
+            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .sensoryFeedback(.selection, trigger: isSelected) // §4.6: haptic on filter toggle

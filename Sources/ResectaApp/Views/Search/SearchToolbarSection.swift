@@ -52,6 +52,10 @@ struct SearchToolbarSection: View {
     @State private var optionsExpanded: Bool = SearchToolbarSection.optionsExpandedByDefault
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // RB-64 AX rider (packet §7.3): at accessibility type sizes the
+    // two chip strips fall back to the FlowLayout wrap — every chip
+    // visible, no panning.
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(spacing: ResectaTokens.Spacing.xs) {
@@ -462,17 +466,27 @@ struct SearchToolbarSection: View {
         Button {
             onTriggerSearch()
         } label: {
-            // UXC-18: 34.2×26.9 measured — floor the bordered
-            // control's tap area to the HIG minimum.
+            // REV-01 (packet §7.2 item 3, RB-66/RB-67): drawn Ø44
+            // circle + 18pt glyph in place of the `.bordered` wash
+            // that rendered the UXC-18 floor as a ~64pt slab. The
+            // 46pt floor is a LAYOUT frame AFTER the chrome — hit
+            // area unchanged, visual back to circle scale. States
+            // live on `CircularIconButtonStyle`.
             Image(systemName: "arrow.clockwise")
+                .font(.system(size: CircularIconButtonStyle.glyphPointSize))
+                .foregroundStyle(.tint)
+                .frame(
+                    width: CircularIconButtonStyle.diameter,
+                    height: CircularIconButtonStyle.diameter
+                )
+                .background(CircularIconButtonStyle.wash, in: Circle())
                 .frame(
                     width: ResectaTokens.TouchTarget.minimum,
                     height: ResectaTokens.TouchTarget.minimum
                 )
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
+        .buttonStyle(.circularIcon)
         // An empty chip selection does not disable the run — it means
         // scan everything (`effectiveScanCategories`).
         .disabled(searchState.isSearching)
@@ -488,40 +502,65 @@ struct SearchToolbarSection: View {
     /// scan; runs stay trigger-driven. Rendered through `FilterChip`
     /// (the one chip component), category-tinted.
     private var scanCategoryChips: some View {
-        // SA-2 (D-70): FlowLayout wrap replaces the horizontal
-        // ScrollView (cooperation poison — 18-SCROLL-ARCH §3). This
-        // surface is flag-dark in 1.0 (`--showRetiredSheetControls`),
-        // but it converts with its component family so the DEBUG
-        // reveal can never re-poison the sheet; the 17-category worst
-        // case wraps tall, which the reveal surface accepts.
-        FlowLayout(spacing: ResectaTokens.Spacing.xs) {
-            ForEach(PIICategory.allCases, id: \.self) { category in
-                let isEnabled = searchState.enabledPIICategories.contains(category)
-                FilterChip(
-                    label: category.rawValue,
-                    systemImage: category.symbolName,
-                    tint: SearchResultRow.categoryColor(category),
-                    isSelected: isEnabled
-                ) {
-                    if isEnabled {
-                        searchState.enabledPIICategories.remove(category)
-                    } else {
-                        searchState.enabledPIICategories.insert(category)
-                    }
+        // RB-64 (packet §7.3): single-row horizontal strip INSIDE the
+        // sheet's existing safeAreaInset chrome layer. LAW:
+        // 18-SCROLL-ARCH §10 (the D-72 addendum, superseding §3's
+        // species framing) — `.automatic` detent cooperation binds
+        // GEOMETRICALLY: the List stays root-bound at the sheet top
+        // with ALL fixed chrome on the `.safeAreaInset(.top)` stack,
+        // and the horizontal chip ScrollView species itself proved
+        // INNOCENT in the SA-2 bisect. A strip inside the inset
+        // chrome therefore complies with the standing law. Recorded
+        // as a supersession of SA-2 B-1's wrap VISUAL on exactly this
+        // surface + `chipRowSubstrate` (visual, not architectural).
+        // The surface stays flag-dark (`--showRetiredSheetControls`)
+        // and converts with its component family; the 17-category set
+        // scrolls in one row, with the wrap returning at
+        // accessibility type sizes (B-1's every-chip-visible
+        // rationale, preserved as the AX fallback).
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                FlowLayout(spacing: ResectaTokens.Spacing.xs) {
+                    scanCategoryChipItems
                 }
-                .accessibilityLabel("\(category.rawValue) detector")
-                .accessibilityValue(isEnabled ? "enabled" : "disabled")
-                .accessibilityHint("Applies to the next scan")
+                .padding(.horizontal, ResectaTokens.Spacing.md)
+            } else {
+                chipStrip {
+                    scanCategoryChipItems
+                }
             }
         }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
         // BH-A-06 — chips freeze while a run is in flight, matching the
         // sibling ↻ control: kickoff snapshots the category set, so a
         // mid-run toggle neither re-scopes the running scan nor warns —
         // it only desynced the completion copy from the run that
         // actually executed.
         .disabled(searchState.isSearching)
+        // Container id rides the strip/wrap chassis (packet §7.3).
         .accessibilityIdentifier("scanCategoryChips")
+    }
+
+    /// The 17 pre-scan detector chips — shared by the strip and its
+    /// accessibility-size wrap fallback.
+    private var scanCategoryChipItems: some View {
+        ForEach(PIICategory.allCases, id: \.self) { category in
+            let isEnabled = searchState.enabledPIICategories.contains(category)
+            FilterChip(
+                label: category.rawValue,
+                systemImage: category.symbolName,
+                tint: SearchResultRow.categoryColor(category),
+                isSelected: isEnabled
+            ) {
+                if isEnabled {
+                    searchState.enabledPIICategories.remove(category)
+                } else {
+                    searchState.enabledPIICategories.insert(category)
+                }
+            }
+            .accessibilityLabel("\(category.rawValue) detector")
+            .accessibilityValue(isEnabled ? "enabled" : "disabled")
+            .accessibilityHint("Applies to the next scan")
+        }
     }
 
     // MARK: - OCR Controls (shared by standardSearchOptions + piiScanOptions)
@@ -594,11 +633,15 @@ struct SearchToolbarSection: View {
             || !searchState.results.isEmpty
     }
 
-    /// One wrapping chip block hosting all post-scan filter chips
-    /// (SA-2/D-70: FlowLayout replaced the horizontal ScrollView —
-    /// cooperation poison, 18-SCROLL-ARCH §3). Established as the
-    /// integration substrate; downstream additions append chip groups
-    /// inside the layout without altering the substrate's shape.
+    /// One chip block hosting all post-scan filter chips — since
+    /// RB-64 (packet §7.3) a single-row horizontal strip inside the
+    /// sheet's inset chrome layer, wrapping again at accessibility
+    /// type sizes. LAW: 18-SCROLL-ARCH §10 — the strip complies (see
+    /// `scanCategoryChips` for the full citation; supersedes SA-2
+    /// B-1's wrap visual on these two surfaces only). Established as
+    /// the integration substrate; downstream additions append chip
+    /// groups inside `chipRowSubstrateItems` without altering the
+    /// chassis.
     ///
     /// Visual order:
     /// - PII category filter chips (post-scan, PII Scan mode)
@@ -608,28 +651,85 @@ struct SearchToolbarSection: View {
     /// - Saturation-scope chip (pending)
     /// - Selective PII chips stay in `piiScanOptions` (pre-scan disclosure)
     private var chipRowSubstrate: some View {
-        FlowLayout(spacing: ResectaTokens.Spacing.xs) {
-            if searchState.hasPIIResults {
-                piiCategoryFilterChips
-            }
-            if !searchState.results.isEmpty {
-                // The applied-state chip renders only once it
-                // can do something: after the first apply, or while a
-                // non-default filter is active (so an active filter
-                // can never strand invisibly). Kills the
-                // double-"All" chip row pre-apply. Sort chip's
-                // visibility is unchanged.
-                if Self.appliedFilterChipShouldShow(
-                    hasAppliedResults: !searchState.appliedResultIDs.isEmpty,
-                    activeFilter: searchState.appliedFilter
-                ) {
-                    appliedFilterChip
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                FlowLayout(spacing: ResectaTokens.Spacing.xs) {
+                    chipRowSubstrateItems
                 }
-                sortChip
+                .padding(.horizontal, ResectaTokens.Spacing.md)
+            } else {
+                chipStrip {
+                    chipRowSubstrateItems
+                }
             }
-            // Downstream chip groups inserted here.
         }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
+        // Container id for the XCUI strip-cooperation battery (packet
+        // §7.5 grants ids where XCUITest needs to measure or drive) —
+        // mirrors `scanCategoryChips`' container-id shape.
+        .accessibilityIdentifier("chipRowSubstrate")
+    }
+
+    /// Post-scan chip groups consumed by the substrate chassis.
+    @ViewBuilder
+    private var chipRowSubstrateItems: some View {
+        if searchState.hasPIIResults {
+            piiCategoryFilterChips
+        }
+        if !searchState.results.isEmpty {
+            // The applied-state chip renders only once it
+            // can do something: after the first apply, or while a
+            // non-default filter is active (so an active filter
+            // can never strand invisibly). Kills the
+            // double-"All" chip row pre-apply. Sort chip's
+            // visibility is unchanged.
+            if Self.appliedFilterChipShouldShow(
+                hasAppliedResults: !searchState.appliedResultIDs.isEmpty,
+                activeFilter: searchState.appliedFilter
+            ) {
+                appliedFilterChip
+            }
+            sortChip
+        }
+        // Downstream chip groups inserted here.
+    }
+
+    /// RB-64 strip chassis shared by `scanCategoryChips` and
+    /// `chipRowSubstrate` (packet §7.3 — exactly these two surfaces;
+    /// the options rows, multi-term chips, and the review bar keep
+    /// their wraps). Single row, 8pt gap, with a trailing ~44pt fade
+    /// that signals the pan without stealing touches.
+    private func chipStrip<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: ResectaTokens.Spacing.sm) {
+                content()
+            }
+            .padding(.leading, ResectaTokens.Spacing.md)
+            // Trailing inset matches the fade width so the last chip
+            // sits clear of the faded zone at scroll-end.
+            .padding(.trailing, 44)
+        }
+        .scrollIndicators(.hidden)
+        // Right-edge ~44pt fade (packet §7.3), rendered as a MASK so
+        // the fade tracks whatever the inset chrome paints beneath it:
+        // a gradient overlay painted `Color(.systemBackground)` read
+        // as a hard black box over the ELEVATED sheet background in
+        // dark mode (impl-session visual pass, 2026-08-24). Masking
+        // leaves hit-testing untouched, so chips under the fade stay
+        // tappable — the overlay sketch's `.allowsHitTesting(false)`
+        // contract, preserved by construction.
+        .mask {
+            HStack(spacing: 0) {
+                Rectangle()
+                LinearGradient(
+                    colors: [.black, .clear],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: 44)
+            }
+        }
     }
 
     // MARK: - Applied Filter Chip
@@ -663,16 +763,19 @@ struct SearchToolbarSection: View {
                 Text(active.rawValue)
                     .font(.caption2)
             }
-            // UXC-18: same Menu+padding+Capsule shape as the sibling
-            // sortChip below — floor both before the padding chain.
+            // REV-01 (packet §7.2 item 2, RB-66/RB-67): the ruled
+            // chain, matching the sibling sortChip below — 12pt h-pad,
+            // 36pt drawn minimum, then the 46pt LAYOUT floor +
+            // contentShape AFTER the background.
+            .padding(.horizontal, 12)
+            .frame(minHeight: 36)
+            .background(isFiltered ? ResectaTokens.BrandTeal.tint.opacity(0.2) : Color.clear, in: Capsule())
+            .overlay(Capsule().strokeBorder(isFiltered ? ResectaTokens.BrandTeal.tint : Color.secondary.opacity(0.3)))
             .frame(
                 minWidth: ResectaTokens.TouchTarget.minimum,
                 minHeight: ResectaTokens.TouchTarget.minimum
             )
-            .padding(.horizontal, ResectaTokens.Spacing.sm)
-            .padding(.vertical, ResectaTokens.Spacing.xxs)
-            .background(isFiltered ? ResectaTokens.BrandTeal.tint.opacity(0.2) : Color.clear, in: Capsule())
-            .overlay(Capsule().strokeBorder(isFiltered ? ResectaTokens.BrandTeal.tint : Color.secondary.opacity(0.3)))
+            .contentShape(Rectangle())
         }
         .accessibilityLabel(Self.appliedFilterChipAccessibilityLabel(active: active))
     }
@@ -712,18 +815,20 @@ struct SearchToolbarSection: View {
                 Text(Self.sortChipLabel(active: active))
                     .font(.caption2)
             }
-            // UXC-18: 56×17.3 measured — height was short despite the
-            // existing padding; floor both (width is already usually
-            // above the floor from the label text, so this is inert
-            // there and only matters for the shortest labels).
+            // REV-01 (packet §7.2 item 2, RB-66/RB-67): the ruled
+            // FilterChip chain — 12pt h-pad, 36pt drawn minimum, then
+            // the 46pt LAYOUT floor + contentShape AFTER the
+            // background, so the hit area keeps the UXC-18 guarantee
+            // while the capsule draws compact.
+            .padding(.horizontal, 12)
+            .frame(minHeight: 36)
+            .background(isCustomSort ? ResectaTokens.BrandTeal.tint.opacity(0.2) : Color.clear, in: Capsule())
+            .overlay(Capsule().strokeBorder(isCustomSort ? ResectaTokens.BrandTeal.tint : Color.secondary.opacity(0.3)))
             .frame(
                 minWidth: ResectaTokens.TouchTarget.minimum,
                 minHeight: ResectaTokens.TouchTarget.minimum
             )
-            .padding(.horizontal, ResectaTokens.Spacing.sm)
-            .padding(.vertical, ResectaTokens.Spacing.xxs)
-            .background(isCustomSort ? ResectaTokens.BrandTeal.tint.opacity(0.2) : Color.clear, in: Capsule())
-            .overlay(Capsule().strokeBorder(isCustomSort ? ResectaTokens.BrandTeal.tint : Color.secondary.opacity(0.3)))
+            .contentShape(Rectangle())
         }
         .accessibilityLabel(Self.sortChipAccessibilityLabel(active: active))
     }

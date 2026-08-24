@@ -124,9 +124,8 @@ struct SearchFooterSection: View {
                 // Conditional dismiss: footer bulk selection is user selection work.
                 searchState.userModifiedSelections = true
             }
-        // UXC-18: 81×26.9 measured — height only, width already
-        // clears the floor. Closure-label form so `.frame(minHeight:)`
-        // can sit on the label; `Text(...)` reproduces the exact
+        // UXC-18/REV-01: closure-label form so the floor can sit on
+        // the label; `Text(...)` reproduces the exact
         // string-initializer label, so the accessible name is
         // unchanged in both states.
         if allSelected {
@@ -138,13 +137,25 @@ struct SearchFooterSection: View {
                 .controlSize(.small)
                 .accessibilityIdentifier("footerSelectAllButton")
         } else {
+            // REV-01 (packet §7.2 item 5, RB-66/RB-67): custom
+            // prominent chrome — subheadline white label on a 36pt
+            // drawn BrandTeal capsule (visual parity with the retired
+            // `.borderedProminent` small control), with the 46pt
+            // LAYOUT floor + contentShape AFTER the fill so the drawn
+            // pill stays compact. The Deselect branch above is
+            // untouched (quiet style; its floor was already
+            // invisible). Pressed state on `CapsulePressButtonStyle`.
             Button(action: action) {
                 Text("Select All")
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 36)
+                    .background(ResectaTokens.BrandTeal.tint, in: Capsule())
                     .frame(minHeight: ResectaTokens.TouchTarget.minimum)
                     .contentShape(Rectangle())
             }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .buttonStyle(.capsulePress)
                 .accessibilityIdentifier("footerSelectAllButton")
         }
     }

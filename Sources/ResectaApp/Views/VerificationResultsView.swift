@@ -80,37 +80,29 @@ struct VerificationResultsView: View {
                     if !runFactsLines.isEmpty {
                         runFactsStrip
                     }
-                    // UXC-15 (RB-43): on PASS, the honesty disclaimer + the
-                    // non-visual limit line mount here — directly beneath
-                    // the masthead/facts strip, before the action choices
-                    // — instead of at the bottom. Every other verdict
-                    // keeps the original bottom mount below.
-                    // `shouldMountLimitBlockBeneathMasthead` is exhaustive
-                    // over `VerificationStatus`, so exactly one of the two
-                    // mount sites fires per verdict.
-                    if Self.shouldMountLimitBlockBeneathMasthead(
-                        overallStatus: report.overallStatus) {
-                        if Self.shouldShowHonestyDisclaimer(
-                            overallStatus: report.overallStatus) {
-                            honestyDisclaimer
-                        }
-                        voiceOverLimitLine
-                    }
                     actionChoiceStack
                     if Self.shouldShowRunBreakdown(report: report) {
                         detailsSection
                     }
+                    // REV-03 (RB-61/RB-68): the audit-scope disclaimer
+                    // mounts HERE on every verdict — beneath
+                    // "Verification Details", above the trust strip —
+                    // one site, no per-status placement branches
+                    // (supersedes RB-43's PASS-only top mount; the
+                    // UXC-16 visible limit line is removed entirely,
+                    // REV-02). On SKIPPED the details section does not
+                    // render, so the disclaimer sits directly above
+                    // the strip — accepted as-falls. The always-true
+                    // `shouldShowHonestyDisclaimer` gate stays: its
+                    // exhaustive switch forces a mount decision if a
+                    // new verdict status is ever added.
+                    if Self.shouldShowHonestyDisclaimer(
+                        overallStatus: report.overallStatus) {
+                        honestyDisclaimer
+                    }
                     trustStrip
                     if Self.shouldShowRunBreakdown(report: report) {
                         footer
-                    }
-                    if !Self.shouldMountLimitBlockBeneathMasthead(
-                        overallStatus: report.overallStatus) {
-                        voiceOverLimitLine
-                        if Self.shouldShowHonestyDisclaimer(
-                            overallStatus: report.overallStatus) {
-                            honestyDisclaimer
-                        }
                     }
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.md)
@@ -973,55 +965,15 @@ struct VerificationResultsView: View {
         .padding(.horizontal, ResectaTokens.Spacing.sm)
     }
 
-    // MARK: - Non-visual review limitation (UXC-16)
-    //
-    // The preview is a visual pass; VoiceOver has no way to judge region
-    // coverage from the rendered page image. This line mounts on every
-    // verdict, directly above the honesty disclaimer, and is reused
-    // verbatim as the `RedactedPreviewView` verdict capsule's
-    // accessibility copy (composed into its label, not its hint — a
-    // hint only speaks when the "Speak Hints" setting is on, which is
-    // off by default, and this line exists to reach VoiceOver users).
-
-    static let voiceOverLimitText =
-        "The preview is a visual check \u{2014} VoiceOver cannot tell you whether a region fully covers what is beneath it. A non-visual review can go page by page in the editor, where each page announces its region count and each region's details name the kind of item it covers."
-
-    private var voiceOverLimitLine: some View {
-        Text(Self.voiceOverLimitText)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.leading)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: columnMaxWidth, alignment: .leading)
-            .accessibilityIdentifier("voiceOverLimitLine")
-    }
-
     // MARK: - Honesty disclaimer
     //
     // The legally reviewed scope-limitation copy (`HonestyDisclaimer`,
     // `.redacted` profile) had zero production call sites — no surface named
     // the checks' epistemic limits at the point where the share decision is
-    // made. It mounts here, after the timing footer, so VoiceOver reads it
-    // last. The component supplies its own caption styling, centered
-    // alignment, and accessibility label; Dynamic Type flows through `Text`.
-
-    /// UXC-15 (RB-43): whether the honesty disclaimer + non-visual limit
-    /// line mount directly beneath the masthead/facts strip (before
-    /// `actionChoiceStack`) instead of at the bottom of the results screen.
-    /// PASS is the only verdict re-weighted this way — every other status
-    /// keeps the original bottom placement. Exhaustive switch, no
-    /// `default`, mirrors `shouldShowHonestyDisclaimer`'s all-statuses
-    /// shape so a newly added status forces a decision here too.
-    /// Placement-only: no copy changes, and `shouldShowHonestyDisclaimer`
-    /// still gates the disclaimer itself at whichever site mounts it.
-    static func shouldMountLimitBlockBeneathMasthead(
-        overallStatus: VerificationStatus
-    ) -> Bool {
-        switch overallStatus {
-        case .pass: true
-        case .warn, .info, .attention, .fail, .skipped: false
-        }
-    }
+    // made. Since REV-03 (RB-61/RB-68) it mounts at ONE site on every
+    // verdict — beneath "Verification Details", above the trust strip. The
+    // component supplies its own caption styling, centered alignment, and
+    // accessibility label; Dynamic Type flows through `Text`.
 
     /// Disclaimer mount gate. Deliberately true for EVERY verdict state —
     /// the exhaustive switch (no `default`) forces a decision here if a new
