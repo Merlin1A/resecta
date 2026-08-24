@@ -125,17 +125,23 @@ struct TouchTargetFloorTests {
         )
     }
 
-    @Test("Select All / Deselect All stay free of a default (non-.plain, non-.borderedProminent) style")
+    @Test("Select All keeps the ruled prominent/quiet asymmetry (REV-01 custom capsule vs untouched quiet branch)")
     func footerSelectAllStaysOnItsExistingStyles() throws {
-        // Not a .plain requirement here (Select All was always
-        // .borderedProminent / default, proven innocent in the COOP
-        // probe runs per the file's own header comment) — just a
-        // source-contains guard that the restructuring kept both
-        // branches' styling intact.
+        // REV-01 (packet §7.2 item 5): the prominent branch draws a
+        // compact BrandTeal capsule itself — the system
+        // `.borderedProminent` wash rendered the floored label as a
+        // ≥46pt pill — with states on `CapsulePressButtonStyle`; the
+        // Deselect branch keeps the quiet default styling it always
+        // had. Both labels survive byte-identical.
         let source = try loadRepoFile(
             "Sources/ResectaApp/Views/Search/SearchFooterSection.swift"
         )
-        #expect(source.contains(".buttonStyle(.borderedProminent)"))
+        #expect(source.contains("ResectaTokens.BrandTeal.tint, in: Capsule()"),
+                "the prominent Select All must draw the ruled BrandTeal capsule")
+        #expect(source.contains(".buttonStyle(.capsulePress)"),
+                "the prominent Select All must carry the custom pressed state")
+        #expect(!source.contains(".buttonStyle(.borderedProminent)"),
+                "the system prominent wash must stay retired on this surface (REV-01)")
         #expect(source.contains("\"Select All\""))
         #expect(source.contains("\"Deselect All\""))
     }

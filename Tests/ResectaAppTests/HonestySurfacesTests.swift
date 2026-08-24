@@ -50,20 +50,23 @@ struct HonestyDisclaimerMountTests {
         }
     }
 
-    // UXC-15 (RB-43): placement-only re-weight — PASS mounts the honesty
-    // disclaimer + non-visual limit line beneath the masthead instead of
-    // at the bottom; every other verdict keeps the bottom mount.
-    @Test("shouldMountLimitBlockBeneathMasthead: true for PASS, false for every other status")
-    func mountLimitBlockBeneathMastheadTable() {
-        #expect(VerificationResultsView.shouldMountLimitBlockBeneathMasthead(
-            overallStatus: .pass) == true)
-        let bottomMounted: [VerificationStatus] =
-            [.warn("w"), .info("i"), .attention("a"), .fail("x"), .skipped]
-        for status in bottomMounted {
-            #expect(VerificationResultsView.shouldMountLimitBlockBeneathMasthead(
-                overallStatus: status) == false,
-                    "\(status) must keep the bottom mount, not the beneath-masthead one")
-        }
+    // REV-03 (RB-61/RB-68, supersedes RB-43's PASS-only top mount):
+    // the disclaimer's one gate-wrapped mount sits between
+    // "Verification Details" and the trust strip on EVERY verdict —
+    // no per-status placement branches. On SKIPPED the details
+    // section does not render, so the disclaimer sits directly above
+    // the strip (accepted as-falls, RB-68).
+    @Test("REV-03 placement: one gate-wrapped mount, directly above the trust strip")
+    func disclaimerMountSitsAboveTrustStrip() throws {
+        let source = try loadRepoFile(
+            "Sources/ResectaApp/Views/VerificationResultsView.swift")
+        let gateCalls = source.components(
+            separatedBy: "Self.shouldShowHonestyDisclaimer(").count - 1
+        #expect(gateCalls == 1,
+                "expected exactly ONE gated disclaimer mount in the body, found \(gateCalls)")
+        #expect(source.contains(
+            "honestyDisclaimer\n                    }\n                    trustStrip"),
+                "the disclaimer mount must sit immediately above trustStrip (REV-03)")
     }
 
     @Test("Results view mounts the .redacted-profile disclaimer (source pin)")
@@ -276,14 +279,6 @@ struct RunFactsStripTests {
                 == "Automated detection did not run on this document. Every region here came from Search or manual marking — review each page for anything those did not cover before sharing.")
     }
 
-    // MARK: - F-16 (UXC-16)
-
-    @Test("F-16 exact text")
-    func voiceOverLimitExactText() {
-        #expect(VerificationResultsView.voiceOverLimitText
-                == "The preview is a visual check — VoiceOver cannot tell you whether a region fully covers what is beneath it. A non-visual review can go page by page in the editor, where each page announces its region count and each region's details name the kind of item it covers.")
-    }
-
     // MARK: - F-06 (UXC-06) — verbatim reuse
 
     @Test("F-06 equals DetectionDegradeCopy.banner verbatim on both branches")
@@ -416,8 +411,10 @@ struct RunFactsStripTests {
 
     // MARK: - Mechanism-only vocabulary, no percent sign
 
-    @Test("run-facts strip + limit-line copy stays mechanism-only, no percent sign")
+    @Test("run-facts strip copy stays mechanism-only, no percent sign")
     func runFactsCopyIsMechanismOnly() {
+        // REV-02 removed the UXC-16 limit line — its copy is out of
+        // the sample set with it.
         let samples = [
             VerificationResultsView.RunFactsStrip.ocrSkipLine(pages: [6]),
             VerificationResultsView.RunFactsStrip.ocrSkipLine(pages: [2, 4, 6]),
@@ -426,7 +423,6 @@ struct RunFactsStripTests {
                 failedGazetteers: ["NameGazetteer"]),
             VerificationResultsView.RunFactsStrip.degradeLine(
                 failedGazetteers: [GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue]),
-            VerificationResultsView.voiceOverLimitText,
         ]
         // Forbidden absolutes assembled from halves so this source does
         // not itself trip the M-1 sweep (mirrors Q11TruthLegibilityTests
@@ -448,19 +444,15 @@ struct RunFactsStripTests {
 
     // MARK: - Source pin (mirrors HonestyDisclaimerMountTests.resultsViewMountsRedactedProfile)
 
-    @Test("VerificationResultsView mounts runFactsStrip + voiceOverLimitLine; RedactedPreviewView references voiceOverLimitText")
+    @Test("VerificationResultsView mounts runFactsStrip")
     func sourcePinsForNewMounts() throws {
+        // REV-02 removed the UXC-16 limit line (and with it the
+        // RedactedPreviewView label composition) — the strip pin is
+        // what remains of the F-16-era source pins.
         let viewSource = try loadRepoFile(
             "Sources/ResectaApp/Views/VerificationResultsView.swift")
         #expect(viewSource.contains("runFactsStrip"),
                 "VerificationResultsView must mount the run-facts strip")
-        #expect(viewSource.contains("voiceOverLimitLine"),
-                "VerificationResultsView must mount the non-visual limit line")
-
-        let previewSource = try loadRepoFile(
-            "Sources/ResectaApp/Views/RedactedPreviewView.swift")
-        #expect(previewSource.contains("voiceOverLimitText"),
-                "RedactedPreviewView must reference the shared UXC-16 copy")
     }
 
     private func loadRepoFile(

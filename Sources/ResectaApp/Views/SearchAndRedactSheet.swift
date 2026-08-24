@@ -830,6 +830,30 @@ struct SearchAndRedactSheet: View {
         .padding(.vertical, ResectaTokens.Spacing.sm)
     }
 
+    /// REV-01 (packet §7.2 items 3–4, RB-66/RB-67): shared label
+    /// chrome for this sheet's circular icon buttons — an 18pt SF
+    /// glyph in a drawn Ø44 circle whose wash is matched by eye to
+    /// the retired `.bordered`-small background, floored to the
+    /// `TouchTarget.minimum` LAYOUT square with the floor AFTER the
+    /// chrome (hit area unchanged, visual back to circle scale; hit
+    /// expansion beyond the layout frame is banned — RB-67).
+    /// Interaction states live on `CircularIconButtonStyle`.
+    private func circularIconLabel(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: CircularIconButtonStyle.glyphPointSize))
+            .foregroundStyle(.tint)
+            .frame(
+                width: CircularIconButtonStyle.diameter,
+                height: CircularIconButtonStyle.diameter
+            )
+            .background(CircularIconButtonStyle.wash, in: Circle())
+            .frame(
+                width: ResectaTokens.TouchTarget.minimum,
+                height: ResectaTokens.TouchTarget.minimum
+            )
+            .contentShape(Rectangle())
+    }
+
     /// Bookmark button presenting the saved-searches list through the
     /// single modal slot. Parked while staged detections await review:
     /// a recall re-triggers a run, and a run must not race the pending
@@ -841,17 +865,12 @@ struct SearchAndRedactSheet: View {
         Button {
             activeModal = .savedSearches
         } label: {
-            // UXC-18: 33.9×26.9 measured — floor the bordered
-            // control's tap area to the HIG minimum.
-            Image(systemName: "bookmark")
-                .frame(
-                    width: ResectaTokens.TouchTarget.minimum,
-                    height: ResectaTokens.TouchTarget.minimum
-                )
-                .contentShape(Rectangle())
+            // REV-01 (packet §7.2 item 3): drawn Ø44 circle + 18pt
+            // glyph in place of the `.bordered` wash that rendered the
+            // UXC-18 floor as a ~64pt slab; hit area unchanged.
+            circularIconLabel("bookmark")
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
+        .buttonStyle(.circularIcon)
         .disabled(redactionState.pendingTriage != nil)
         .accessibilityLabel("Saved Searches")
         .accessibilityIdentifier("savedSearchesBookmark")
@@ -871,19 +890,14 @@ struct SearchAndRedactSheet: View {
         Button {
             triggerSearch()
         } label: {
-            // UXC-18: 34.2×26.9 measured — same shape and fix as
-            // SearchToolbarSection.rescanButton; identifier matches
-            // that sibling since the two are mutually exclusive (only
-            // one renders per `scanCategoryStripEnabled` state).
-            Image(systemName: "arrow.clockwise")
-                .frame(
-                    width: ResectaTokens.TouchTarget.minimum,
-                    height: ResectaTokens.TouchTarget.minimum
-                )
-                .contentShape(Rectangle())
+            // REV-01 (packet §7.2 item 3): the ruled circle chrome,
+            // same as SearchToolbarSection.rescanButton; identifier
+            // matches that sibling since the two are mutually
+            // exclusive (only one renders per
+            // `scanCategoryStripEnabled` state).
+            circularIconLabel("arrow.clockwise")
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
+        .buttonStyle(.circularIcon)
         .disabled(searchState.isSearching)
         .accessibilityLabel("Scan document for PII")
         .accessibilityIdentifier("rescanButton")
@@ -936,21 +950,17 @@ struct SearchAndRedactSheet: View {
 
     private var resultNavigationControls: some View {
         HStack(spacing: ResectaTokens.Spacing.xs) {
-            HStack(spacing: 2) {
+            // REV-01 (packet §7.2 item 4, RB-65): geometry only —
+            // the pair keeps its row, counter, labels, ids, and
+            // shortcuts. Each chevron is the ruled Ø44 drawn circle;
+            // pair spacing 2 → 6 (≈8pt visual gap between the drawn
+            // circles inside the 46pt floors).
+            HStack(spacing: 6) {
                 Button {
                     searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
                     navigateToCurrentResult()
                 } label: {
-                    // UXC-18: 37×19.3 measured for the pair — floor
-                    // each chevron's tap area to the HIG minimum. The
-                    // pair keeps its 2pt spacing (Lead: the visual
-                    // pass judges the resulting slab).
-                    Image(systemName: "chevron.up")
-                        .frame(
-                            width: ResectaTokens.TouchTarget.minimum,
-                            height: ResectaTokens.TouchTarget.minimum
-                        )
-                        .contentShape(Rectangle())
+                    circularIconLabel("chevron.up")
                 }
                 .accessibilityLabel("Previous result")
                 .accessibilityIdentifier("resultNavPrevious")
@@ -960,19 +970,13 @@ struct SearchAndRedactSheet: View {
                     searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
                     navigateToCurrentResult()
                 } label: {
-                    Image(systemName: "chevron.down")
-                        .frame(
-                            width: ResectaTokens.TouchTarget.minimum,
-                            height: ResectaTokens.TouchTarget.minimum
-                        )
-                        .contentShape(Rectangle())
+                    circularIconLabel("chevron.down")
                 }
                 .accessibilityLabel("Next result")
                 .accessibilityIdentifier("resultNavNext")
                 .keyboardShortcut("g", modifiers: .command)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .buttonStyle(.circularIcon)
 
             // Counter respects active filters. When no filter is
             // active (filteredCount == totalCount) the simple 1-of-N form

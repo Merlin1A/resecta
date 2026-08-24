@@ -99,11 +99,7 @@ struct RedactedPreviewView: View {
             .padding(.vertical, ResectaTokens.Spacing.xxs)
             .background(tint.opacity(0.12), in: Capsule())
             .accessibilityIdentifier("previewVerdictCapsule")
-            // UXC-16 — composed into the label rather than a hint: a
-            // hint only speaks when "Speak Hints" is on (off by
-            // default), and this copy needs to reach VoiceOver users on
-            // this surface. Visible capsule text is unchanged.
-            .accessibilityLabel("\(text). \(VerificationResultsView.voiceOverLimitText)")
+            .accessibilityLabel(text)
     }
 
     @ViewBuilder
