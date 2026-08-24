@@ -826,7 +826,14 @@ struct DocumentEditorView: View {
             // system "…" overflow menu. Polygon keeps hexagon/hexagon.fill — fill variants
             // share advance width, so that selected cue is width-safe.
             Button("Rectangle", systemImage: "rectangle.dashed") {
-                activeTool = activeTool == .rectangle ? nil : .rectangle
+                // Draw wins (RB-75 / S2-a): entering the tool drops the
+                // selection and the Add-to-Selection toggle so the next
+                // drag draws instead of resizing or marquee-selecting.
+                let entering = activeTool != .rectangle
+                activeTool = entering ? .rectangle : nil
+                let effects = DocumentEditorView.drawToolEntryEffects(entering: entering)
+                if effects.clearSelection { redactionState.selectedRegionIDs = [] }
+                if effects.disableMultiSelect { isMultiSelectActive = false }
             }
             .tint(activeTool == .rectangle ? ResectaTokens.BrandTeal.tint : nil)
             .accessibilityIdentifier("drawTool")
@@ -1123,6 +1130,9 @@ struct DocumentEditorView: View {
         if pageRegionCount > 0 {
             Button {
                 isMultiSelectActive.toggle()
+                // Mutual exclusion with the Rectangle tool (RB-75 / S2-a):
+                // whichever was activated last wins.
+                if isMultiSelectActive { activeTool = nil }
             } label: {
                 Label(
                     RedactionOverlayView.selectMoreToggleLabel(selectedCount: selectedCount),
@@ -1283,6 +1293,15 @@ struct DocumentEditorView: View {
     /// active (rectangle or polygon — DRAW-1) AND (b) the document is
     /// in the editing phase. Other phases blur the canvas underneath
     /// their own progress UI, so the caption would be stale.
+    /// Pure static behind the Rectangle button (RB-75 / S2-a): on ENTRY
+    /// the selection and the Add-to-Selection toggle are cleared; on exit
+    /// nothing else changes.
+    static func drawToolEntryEffects(
+        entering: Bool
+    ) -> (clearSelection: Bool, disableMultiSelect: Bool) {
+        (clearSelection: entering, disableMultiSelect: entering)
+    }
+
     static func drawingModeCaptionShouldShow(
         activeTool: DrawingTool?,
         phaseKind: DocumentState.PhaseKind
@@ -2341,13 +2360,13 @@ struct DocumentEditorView: View {
         case .escape:
             return handleEscapeKey()
         case .upArrow:
-            return nudgeSelection(dx: 0, dy: -nudgeAmount)
+            return nudgeSelection(dx: 0, dy: -nudgeDelta.dy)
         case .downArrow:
-            return nudgeSelection(dx: 0, dy: nudgeAmount)
+            return nudgeSelection(dx: 0, dy: nudgeDelta.dy)
         case .leftArrow:
-            return nudgeSelection(dx: -nudgeAmount, dy: 0)
+            return nudgeSelection(dx: -nudgeDelta.dx, dy: 0)
         case .rightArrow:
-            return nudgeSelection(dx: nudgeAmount, dy: 0)
+            return nudgeSelection(dx: nudgeDelta.dx, dy: 0)
         default:
             if press.characters == "a", press.modifiers.contains(.command) {
                 return handleSelectAllKey()
@@ -2390,9 +2409,24 @@ struct DocumentEditorView: View {
 
     // MARK: - Keyboard Nudge
 
-    /// Nudge amount in normalized coordinates (1pt ≈ 1/page-dimension).
-    /// Approximate: assumes ~400pt page width, so 1pt ≈ 0.0025.
-    private var nudgeAmount: CGFloat { 0.0025 }
+    /// Nudge amount in normalized coordinates: ONE PDF point on the
+    /// current page (S2-d / DT-15), i.e. 1/pageWidth × 1/pageHeight from
+    /// the page's crop box; the pre-1.1.0 0.0025 stands in when no page
+    /// geometry is available.
+    static let nudgeFallback: CGFloat = 0.0025
+
+    static func nudgeDelta(pageSize: CGSize?) -> (dx: CGFloat, dy: CGFloat) {
+        guard let size = pageSize, size.width > 0, size.height > 0 else {
+            return (dx: nudgeFallback, dy: nudgeFallback)
+        }
+        return (dx: 1 / size.width, dy: 1 / size.height)
+    }
+
+    private var nudgeDelta: (dx: CGFloat, dy: CGFloat) {
+        let page = documentState.currentPageIndex
+        let size = documentState.sourceDocument?.page(at: page)?.bounds(for: .cropBox).size
+        return DocumentEditorView.nudgeDelta(pageSize: size)
+    }
 
     private func nudgeSelection(dx: CGFloat, dy: CGFloat) -> KeyPress.Result {
         guard documentState.phaseKind == .editing,

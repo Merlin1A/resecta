@@ -214,11 +214,24 @@ class RedactionOverlayView: UIView {
     private var activeTextSnapTicks: [TextSnapTick] = []
 
     /// Test override for the zoom scale used by
-    /// `applyTextBoxSnapping(to:)`. The production path walks the view
-    /// hierarchy looking for a `PDFView`; tests synthesise the overlay
-    /// without a parent and pin the zoom directly here. Default `nil`
-    /// so production falls through to `currentZoomScale()`.
+    /// `applyTextBoxSnapping(to:)` and, since S2-b (DT-06), by
+    /// `fingerScale` — i.e. every finger tolerance in the overlay. The
+    /// production path walks the view hierarchy looking for a `PDFView`;
+    /// tests synthesise the overlay without a parent and pin the zoom
+    /// directly here. Default `nil` so production falls through to
+    /// `currentZoomScale()`.
     var snapZoomScaleOverride: CGFloat?
+
+    /// Screen points → overlay units (S2-b / DT-06). Finger tolerances
+    /// (drag-start gate, commit floor, resize floor, long-press travel,
+    /// region hit inset, handle boxes, snap proximity) are specified in
+    /// SCREEN points; the overlay's space is the page's unscaled bounds
+    /// (PDFKit zooms the container), so a tolerance in overlay units is
+    /// the screen tolerance × 1/zoom. Document geometry (page-margin
+    /// inset, the dimension label) is deliberately NOT scaled.
+    private var fingerScale: CGFloat {
+        1 / max(snapZoomScaleOverride ?? currentZoomScale(), 0.01)
+    }
 
     /// Haptic for snap alignment — fires when a new guide activates.
     private lazy var snapFeedback: UIImpactFeedbackGenerator = {
@@ -438,72 +451,12 @@ class RedactionOverlayView: UIView {
         guard primaryTouch == nil else { return }
         primaryTouch = touch
         let point = touch.location(in: self)
-
-        // Priority 1: Resize handle of selected region
-        if let handle = hitTestResizeHandle(at: point) {
-            activeResizeHandle = handle
-            isActivelyDragging = true
-            return
-        }
-
-        // Priority 2: Tap on existing region — select, and start move if already selected
-        if let tappedRegion = hitTestRegion(at: point) {
-            // iPad Shift+tap OR iPhone "Select More" toggle: tap toggles
-            // multi-selection. Both routes converge on the same toggle
-            // call — the toolbar toggle layers on top of the existing
-            // selection model, no parallel mutation path.
-            let shiftHeld = event?.modifierFlags.contains(.shift) ?? false
-            if RedactionOverlayView.shouldToggleSelection(
-                isMultiSelectActive: isMultiSelectActive,
-                shiftHeld: shiftHeld
-            ) {
-                coordinator?.toggleRegionSelection(tappedRegion.id)
-                return
-            }
-
-            if selectedIDs.contains(tappedRegion.id), selectedIDs.count == 1 {
-                // Single-selected — begin move immediately
-                beginMove(for: tappedRegion, at: point)
-            } else if selectedIDs.contains(tappedRegion.id), selectedIDs.count > 1 {
-                // Multi-selected and tapped one of them — begin group move
-                beginGroupMove(at: point)
-            } else {
-                // Not selected — select and start long-press timer for move
-                coordinator?.selectRegion(tappedRegion.id)
-                longPressOrigin = point
-                longPressCandidateID = tappedRegion.id
-                longPressTimer = Timer.scheduledTimer(
-                    withTimeInterval: Self.longPressDuration, repeats: false
-                ) { [weak self] _ in
-                    MainActor.assumeIsolated {
-                        self?.longPressTimerFired()
-                    }
-                }
-            }
-            return
-        }
-
-        // Priority 3: lasso marquee — empty-space touch-down while the
-        // "Select More" toggle is on becomes a rect-marquee multi-select drag.
-        // Gated on `isMultiSelectActive && !isDrawingMode` (S1-f / DT-07):
-        // while the Rectangle tool is on, an empty-space drag draws — the
-        // marquee never runs in draw mode. The branch is orthogonal to
-        // `currentDragRect` — see `marqueeRect` declaration. The
-        // undo-grouped commit happens in `touchesEnded` via
-        // `coordinator?.commitLassoSelection`.
-        if isMultiSelectActive && !isDrawingMode {
-            marqueeOrigin = point
-            marqueeRect = nil
-            isActivelyDragging = true
-            // VoiceOver announcement for marquee-in-progress.
-            // Mechanism-description language — names the
-            // observable affordance without making a promise claim.
-            UIAccessibility.post(notification: .announcement,
-                                 argument: "Selecting regions")
-            return
-        }
-
-        // Priority 4: Start drawing new region (only in drawing mode)
+        // DRAW WINS (RB-75 / DT-04, DT-05, DT-07): while the Rectangle tool
+        // is on, a touch-down ALWAYS starts a draw — over region bodies and
+        // over resize-handle boxes alike. The handle / region / marquee
+        // branches below run only with the tool off (`hitTest` already
+        // claims every point in draw mode; the editor clears the selection
+        // and the Add-to-Selection toggle on tool entry).
         if isDrawingMode {
             coordinator?.selectRegion(nil)
             switch activeShapeTool {
@@ -568,6 +521,71 @@ class RedactionOverlayView: UIView {
                     argument: "Drawing freeform region"
                 )
             }
+            return
+        }
+
+        // Priority 1: Resize handle of selected region
+        if let handle = hitTestResizeHandle(at: point) {
+            activeResizeHandle = handle
+            isActivelyDragging = true
+            return
+        }
+
+        // Priority 2: Tap on existing region — select, and start move if already selected
+        if let tappedRegion = hitTestRegion(at: point) {
+            // iPad Shift+tap OR iPhone "Select More" toggle: tap toggles
+            // multi-selection. Both routes converge on the same toggle
+            // call — the toolbar toggle layers on top of the existing
+            // selection model, no parallel mutation path.
+            let shiftHeld = event?.modifierFlags.contains(.shift) ?? false
+            if RedactionOverlayView.shouldToggleSelection(
+                isMultiSelectActive: isMultiSelectActive,
+                shiftHeld: shiftHeld
+            ) {
+                coordinator?.toggleRegionSelection(tappedRegion.id)
+                return
+            }
+
+            if selectedIDs.contains(tappedRegion.id), selectedIDs.count == 1 {
+                // Single-selected — begin move immediately
+                beginMove(for: tappedRegion, at: point)
+            } else if selectedIDs.contains(tappedRegion.id), selectedIDs.count > 1 {
+                // Multi-selected and tapped one of them — begin group move
+                beginGroupMove(at: point)
+            } else {
+                // Not selected — select and start long-press timer for move
+                coordinator?.selectRegion(tappedRegion.id)
+                longPressOrigin = point
+                longPressCandidateID = tappedRegion.id
+                longPressTimer = Timer.scheduledTimer(
+                    withTimeInterval: Self.longPressDuration, repeats: false
+                ) { [weak self] _ in
+                    MainActor.assumeIsolated {
+                        self?.longPressTimerFired()
+                    }
+                }
+            }
+            return
+        }
+
+        // Priority 3: lasso marquee — empty-space touch-down while the
+        // "Select More" toggle is on becomes a rect-marquee multi-select drag.
+        // Gated on `isMultiSelectActive && !isDrawingMode` (S1-f / DT-07):
+        // while the Rectangle tool is on, an empty-space drag draws — the
+        // marquee never runs in draw mode. The branch is orthogonal to
+        // `currentDragRect` — see `marqueeRect` declaration. The
+        // undo-grouped commit happens in `touchesEnded` via
+        // `coordinator?.commitLassoSelection`.
+        if isMultiSelectActive && !isDrawingMode {
+            marqueeOrigin = point
+            marqueeRect = nil
+            isActivelyDragging = true
+            // VoiceOver announcement for marquee-in-progress.
+            // Mechanism-description language — names the
+            // observable affordance without making a promise claim.
+            UIAccessibility.post(notification: .announcement,
+                                 argument: "Selecting regions")
+            return
         }
     }
 
@@ -812,7 +830,8 @@ class RedactionOverlayView: UIView {
         if let origin = longPressOrigin {
             let dx = abs(point.x - origin.x)
             let dy = abs(point.y - origin.y)
-            if dx > Self.longPressMoveThreshold || dy > Self.longPressMoveThreshold {
+            let travel = Self.longPressMoveThreshold * fingerScale
+            if dx > travel || dy > travel {
                 cancelLongPress()
             }
         }
@@ -871,8 +890,8 @@ class RedactionOverlayView: UIView {
             let dx = abs(point.x - origin.x)
             let dy = abs(point.y - origin.y)
             if currentDragRect != nil
-                || dx >= Self.minimumDragThreshold
-                || dy >= Self.minimumDragThreshold {
+                || dx >= Self.minimumDragThreshold * fingerScale
+                || dy >= Self.minimumDragThreshold * fingerScale {
                 var rect = CGRect(
                     x: min(origin.x, point.x),
                     y: min(origin.y, point.y),
@@ -1134,8 +1153,8 @@ class RedactionOverlayView: UIView {
 
         // Reject sub-threshold regions (< 20×20pt in overlay space).
         // Animate shrink-to-center + fade, soft haptic, VoiceOver announcement.
-        if rect.width < Self.minimumCommittedRegionSize
-            || rect.height < Self.minimumCommittedRegionSize {
+        let floor = Self.minimumCommittedRegionSize * fingerScale
+        if rect.width < floor || rect.height < floor {
             rejectSubThresholdRegion(rect)
             return
         }
@@ -1338,8 +1357,9 @@ class RedactionOverlayView: UIView {
         }
 
         // Enforce minimum size in overlay space
-        newRect.size.width = max(abs(newRect.size.width), Self.minimumRegionSize)
-        newRect.size.height = max(abs(newRect.size.height), Self.minimumRegionSize)
+        let resizeFloor = Self.minimumRegionSize * fingerScale
+        newRect.size.width = max(abs(newRect.size.width), resizeFloor)
+        newRect.size.height = max(abs(newRect.size.height), resizeFloor)
 
         // Apply snap guides to moving edges during resize
         newRect = applyResizeSnapping(to: newRect, handle: handle, excluding: selectedID)
@@ -1359,7 +1379,7 @@ class RedactionOverlayView: UIView {
         for region in regions.reversed() {
             let viewRect = pdfNormalizedToOverlay(region.normalizedRect)
             // 8-point inset expansion for easier touch targeting
-            let hitRect = viewRect.insetBy(dx: -8, dy: -8)
+            let hitRect = viewRect.insetBy(dx: -8 * fingerScale, dy: -8 * fingerScale)
             if hitRect.contains(point) {
                 return region
             }
@@ -1393,11 +1413,12 @@ class RedactionOverlayView: UIView {
     internal static func resolveResizeHandle(
         at point: CGPoint,
         regionRect: CGRect,
-        targetHandleSize: CGFloat = ResectaTokens.TouchTarget.minimum
+        targetHandleSize: CGFloat = ResectaTokens.TouchTarget.minimum,
+        minimumHandleSize: CGFloat = 22
     ) -> ResizeHandle? {
         let clamped = min(
             targetHandleSize,
-            max(22, min(regionRect.width, regionRect.height) / 2)
+            max(minimumHandleSize, min(regionRect.width, regionRect.height) / 2)
         )
 
         let handles: [(ResizeHandle, CGPoint)] = [
@@ -1428,7 +1449,12 @@ class RedactionOverlayView: UIView {
         else { return nil }
 
         let rect = pdfNormalizedToOverlay(region.normalizedRect)
-        return Self.resolveResizeHandle(at: point, regionRect: rect)
+        return Self.resolveResizeHandle(
+            at: point,
+            regionRect: rect,
+            targetHandleSize: ResectaTokens.TouchTarget.minimum * fingerScale,
+            minimumHandleSize: 22 * fingerScale
+        )
     }
 
     // MARK: - Drawing
@@ -1689,7 +1715,7 @@ class RedactionOverlayView: UIView {
         // Scale handles by animated handleScale (0 = hidden, 1 = full size)
         guard handleScale > 0.001 else { return }
 
-        let handleRadius: CGFloat = 5.0 * handleScale
+        let handleRadius: CGFloat = 5.0 * handleScale * fingerScale
         // Mid-gray outer ring scales together with the handle so
         // it animates in/out alongside the white-fill / blue-stroke disc.
         let outerStroke: CGFloat = Self.selectionHandleOuterStrokeWidth * handleScale
@@ -1859,7 +1885,7 @@ class RedactionOverlayView: UIView {
     /// Apply snapping to a rect. Returns the adjusted rect; populates `activeGuides`.
     /// Fires snap haptic when new guides appear.
     private func applySnapping(to rect: CGRect, excluding excludeID: UUID?) -> CGRect {
-        let threshold = ResectaTokens.Snap.proximityThreshold
+        let threshold = ResectaTokens.Snap.proximityThreshold * fingerScale
         let (hTargets, vTargets) = collectGuideTargets(excluding: excludeID)
 
         var result = rect
@@ -1918,7 +1944,7 @@ class RedactionOverlayView: UIView {
 
     /// Apply snapping to a resize operation. Only snaps the edges that are being moved.
     private func applyResizeSnapping(to rect: CGRect, handle: ResizeHandle, excluding excludeID: UUID?) -> CGRect {
-        let threshold = ResectaTokens.Snap.proximityThreshold
+        let threshold = ResectaTokens.Snap.proximityThreshold * fingerScale
         let (hTargets, vTargets) = collectGuideTargets(excluding: excludeID)
 
         var result = rect
@@ -2268,6 +2294,10 @@ extension RedactionOverlayView: UIContextMenuInteractionDelegate {
         _ interaction: UIContextMenuInteraction,
         configurationForMenuAtLocation location: CGPoint
     ) -> UIContextMenuConfiguration? {
+        // Draw wins (RB-75 / S2-a): no context menu while the Rectangle
+        // tool is on — a hold-then-drag would otherwise pop the menu and
+        // cancel the draw in flight.
+        guard !isDrawingMode else { return nil }
         // When no region is at the touch point but an OCR word is,
         // surface the magic-wand "Select all instances" menu (gated on hit).
         // Existing region menu still wins when both are present so the
