@@ -13,6 +13,8 @@ import Foundation
 //    neutral (`.tint(.primary)` on the three `ToolbarItemGroup`s); the
 //    Redact button is the one designated emphasis action and carries
 //    the brand tint explicitly.
+//  - 1.1.0 Home swap (UXC-41): the iPhone overflow group leads with Home and the
+//    former file-import entry is gone from the editor.
 
 @Suite("DocumentEditorView source contracts (UXC-26 / UXC-32)")
 struct DocumentEditorViewSourceContractsTests {
@@ -63,6 +65,31 @@ struct DocumentEditorViewSourceContractsTests {
             separatedBy: ".tint(ResectaTokens.BrandTeal.tint)").count - 1
         #expect(brandTintOccurrences == 1,
                 "expected exactly 1 explicit brand-tint literal (the Redact button); found \(brandTintOccurrences)")
+    }
+
+    @Test("1.1.0 Home swap (UXC-41) — the file-import entry is gone and Home leads the overflow group")
+    func homeLeadsSecondaryActionGroup() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        #expect(!source.contains("Open Document"),
+                "the editor's former file-import entry must not return (opening a file is HomeView's job)")
+        #expect(!source.contains("openDocumentButton"),
+                "the retired property must stay deleted with its mount")
+        guard let groupStart = source.range(of: "private var secondaryActionToolbarItems: some View {"),
+              let groupEnd = source.range(of: ".tint(.primary)",
+                                          range: groupStart.upperBound..<source.endIndex)
+        else {
+            Issue.record("Could not locate secondaryActionToolbarItems")
+            return
+        }
+        let group = source[groupStart.upperBound..<groupEnd.lowerBound]
+        guard let home = group.range(of: "homeButton"),
+              let selection = group.range(of: "selectionMenu")
+        else {
+            Issue.record("secondaryActionToolbarItems must mount homeButton and selectionMenu")
+            return
+        }
+        #expect(home.lowerBound < selection.lowerBound,
+                "Home must be the first of our items in the overflow group")
     }
 
     /// Mirrors `HonestySurfacesTests.loadRepoFile`.

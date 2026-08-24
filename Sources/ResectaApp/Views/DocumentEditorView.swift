@@ -54,7 +54,9 @@ struct DocumentEditorView: View {
     // GATE-3 (Pkg I): Done confirmation for the verification results screen.
     // Lifted from VerificationActionBar when Done moved into the top-left
     // toolbar. The dialog gates only when drawn regions are present —
-    // empty sessions close directly.
+    // empty sessions close directly. Since the 1.1.0 Home swap the
+    // editing-phase Home entry shares it (`handleHomeTap()`, gated by
+    // `homeNeedsCloseConfirm`).
     @State private var showDoneConfirmation = false
 
     // UXC-14: drives the bespoke share-risk confirm sheet shown when a
@@ -713,6 +715,9 @@ struct DocumentEditorView: View {
         // mechanism-description (ARCH §1.3) — describes what Close does,
         // not an outcome promise. Pinned by
         // VerificationActionBarDoneConfirmationTests.testConfirmationCopyIsMechanismDescription.
+        // Shared with the editing-phase Home entry (1.1.0 Home swap,
+        // `handleHomeTap()`): title and buttons identical; only the
+        // message switches on phase (`closeDialogMessage(phaseKind:)`).
         .confirmationDialog(
             "Close this document?",
             isPresented: $showDoneConfirmation,
@@ -724,7 +729,7 @@ struct DocumentEditorView: View {
             .accessibilityIdentifier("verificationActionBarDoneConfirm")
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Drawn regions and verification results will be cleared.")
+            Text(DocumentEditorView.closeDialogMessage(phaseKind: documentState.phaseKind))
         }
         // UXC-14: the bespoke share-risk confirm sheet (FAIL/ATTENTION,
         // SKIPPED, incomplete-WARN — see ShareRiskConfirmSheet for the
@@ -1007,12 +1012,12 @@ struct DocumentEditorView: View {
     @ViewBuilder
     private var secondaryActionToolbarItems: some View {
         Group {
+            homeButton
             selectionMenu
             selectMoreToggle
             deleteButton
             batchOpsMenu
             pipelineModePicker
-            openDocumentButton
         }
         .tint(.primary)
     }
@@ -1387,11 +1392,20 @@ struct DocumentEditorView: View {
         .accessibilityIdentifier("pipelineMode")
     }
 
+    /// 1.1.0 Home swap (UXC-41, tester feedback; replaces the former
+    /// file-import entry): closes the open document and returns to HomeView. Rides the
+    /// verification-screen Done teardown behind the shared "Close this
+    /// document?" dialog when the session carries work (`handleHomeTap()`);
+    /// the return itself is the existing `.empty` auto-return
+    /// (`shouldAutoReturnHome`). iPhone only — the enclosing group is
+    /// mounted for `.editing` + compact width. No tint of its own: the
+    /// group's neutral tint is the pinned UXC-32 contract.
     @ViewBuilder
-    private var openDocumentButton: some View {
-        Button("Open Document", systemImage: "folder") {
-            showFilePicker = true
+    private var homeButton: some View {
+        Button("Home", systemImage: "house") {
+            handleHomeTap()
         }
+        .accessibilityIdentifier("editorHomeButton")
     }
 
     // MARK: - DRAW-5 Magic Wand
@@ -1448,7 +1462,8 @@ struct DocumentEditorView: View {
     /// `VerificationActionBar.performDoneCloseSession()` — the bar is
     /// gone; the close path now hangs off the top-left Done button.
     /// Extracted so the empty-regions direct path and the
-    /// confirmed-with-regions path share one implementation.
+    /// confirmed-with-regions path share one implementation. The
+    /// editing-phase Home entry (`handleHomeTap()`) shares this exact path.
     private func performDoneCloseSession() {
         // SEC-1: downgrade temp-file protection before tearing down
         // the session state. Done before clearAll() so the path
@@ -1464,6 +1479,51 @@ struct DocumentEditorView: View {
         documentState.wasPausedByBackground = false
         documentState.pausedFromPhase = nil
         documentState.transition(to: .empty)
+    }
+
+    // MARK: - Home (1.1.0 Home swap, UXC-41 — shares the Done close path)
+
+    /// Editing-phase Home: confirm through the shared close dialog when
+    /// the session carries work, else tear down directly — the same
+    /// two-way split the verification-screen Done button makes, on Done's
+    /// own teardown (`performDoneCloseSession()`). The return to HomeView
+    /// is the existing `.empty` auto-return; nothing here calls
+    /// `appCoordinator.returnHome()` directly.
+    private func handleHomeTap() {
+        if Self.homeNeedsCloseConfirm(
+            hasDrawnRegions: hasDrawnRegions,
+            hasPendingTriage: redactionState.pendingTriage != nil
+        ) {
+            showDoneConfirmation = true
+        } else {
+            performDoneCloseSession()
+        }
+    }
+
+    /// Pure gate for the Home close confirm (mirrors
+    /// `batchOpsMenuShouldShow` / `shareNeedsFailConfirm`): drawn or
+    /// applied regions — Done's GATE-3 gate — or a staged Scan review
+    /// awaiting the user (`pendingTriage`), the one editing-only work
+    /// state Done never sees. An active search session with nothing
+    /// applied is transient, not work — no confirm.
+    static func homeNeedsCloseConfirm(hasDrawnRegions: Bool, hasPendingTriage: Bool) -> Bool {
+        hasDrawnRegions || hasPendingTriage
+    }
+
+    /// Message for the shared close dialog, switched on phase. The
+    /// verification screen names verification results (the literal pinned
+    /// by `VerificationActionBarDoneConfirmationTests`); every other
+    /// phase — the editing-phase Home entry — names detection results,
+    /// the sentence the D12 Replace dialog already uses
+    /// (`RedactWorkspaceView`; byte-identity pinned by
+    /// `DocumentEditorHomeCloseTests`).
+    static func closeDialogMessage(phaseKind: DocumentState.PhaseKind) -> String {
+        switch phaseKind {
+        case .verified:
+            "Drawn regions and verification results will be cleared."
+        default:
+            "Drawn regions and detection results will be cleared."
+        }
     }
 
     // MARK: - Export (Phase 1A — lifted from VerificationResultsView)
