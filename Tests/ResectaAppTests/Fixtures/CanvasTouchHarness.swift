@@ -26,6 +26,12 @@ final class RecordingCoordinator: PDFViewCoordinator {
     var resizedRegions: [(id: UUID, newRect: CGRect)] = []
     var lassoCommits: [[RedactionRegion]] = []
     var testOverlays: [RedactionOverlayView] = []
+    /// Every `selectRegion(_:)` call in order (`nil` = clear) — S2 draw-wins pins.
+    var selections: [UUID?] = []
+
+    override func selectRegion(_ id: UUID?) {
+        selections.append(id)
+    }
 
     override func addRegion(
         _ region: RedactionRegion,

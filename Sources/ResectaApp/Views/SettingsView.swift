@@ -349,22 +349,13 @@ struct SettingsView: View {
                 Text("The on-device record of accepted and rejected detections is cleared. Future scans start from the uniform default weighting.")
             }
 
-            // DRAW-7: Snap-to-text-box assist. While drawing a rectangle,
-            // edges within 8 points of a recognized text-block edge are
-            // nudged onto it. Mechanism-description language (I6) —
-            // describes the alignment behavior without promising it.
-            Toggle(isOn: Binding(
-                get: { settingsState.snapToTextEnabled },
-                set: { settingsState.snapToTextEnabled = $0 }
-            )) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Snap to Text Boxes")
-                    Text("While drawing a rectangle, edges near recognized text rows are nudged to align with them")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .accessibilityHint("When enabled, rectangle edges near recognized text rows are nudged to align with them while you draw")
+            // DRAW-7 UI removed 1.1.0 (D-109/RB-77): the snap-to-text
+            // assist has no OCR feed in production — revival = wire
+            // `RedactionOverlayView.ocrTextBlockNormalizedRects` (see
+            // ~/resecta-1.1-planning/sessions/drawtool-packet-2026-08-24.md
+            // §4.1), then restore the snap-to-text Toggle here.
+            // `SettingsState.snapToTextEnabled` and the overlay machinery
+            // stay compiled and tested (DC-005 pattern).
 
             // Always-flag / never-flag custom keyword lists.
             NavigationLink("Custom Terms") {
