@@ -1473,3 +1473,84 @@ enum TestFixtures {
     }
 }
 
+// MARK: - Family-4 robustness factories (T4.1 / T4.4, P1.6)
+
+extension TestFixtures {
+
+    /// Single text page whose page dictionary carries a non-default /UserUnit.
+    /// The H-16 guard (`validatePage`, ENGINE §2.6) must refuse to rasterize it;
+    /// import validation has no /UserUnit check, so the document OPENS and the
+    /// rejection surfaces at redact time (IM-17 / C12-16).
+    static func userUnitPDF(
+        userUnit: Double = 2.0,
+        term: String = "USERUNIT PROBE LINE"
+    ) -> Data {
+        let stream = "BT /F1 18 Tf 72 700 Td (\(term)) Tj ET"
+        return buildRawPDF(objects: [
+            PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            PDFObject(id: 3, content: """
+                << /Type /Page /Parent 2 0 R \
+                /MediaBox [0 0 612 792] /UserUnit \(userUnit) \
+                /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+                """),
+            PDFObject(id: 4, content: "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"),
+            PDFObject(id: 5, content: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
+        ], rootId: 1)
+    }
+
+    /// Minimal real AcroForm (IM-15): /AcroForm in the catalog, one merged
+    /// field+widget dictionary per entry with /FT /Tx, /T, /V, and /DA — no
+    /// appearance streams (/NeedAppearances asks the viewer to build them),
+    /// so whether the /V value surfaces through `page.string` / Scan is a
+    /// MEASUREMENT, not a premise ([R01] §1.9 leak-class probe).
+    static func acroFormPDF(
+        fields: [(name: String, value: String)] = [
+            ("applicant_ssn", "987-65-4329"),
+            ("applicant_phone", "(208) 555-0147"),
+        ]
+    ) -> Data {
+        let anchor = "ACROFORM VISIBLE ANCHOR LINE"
+        let stream = "BT /F1 14 Tf 72 720 Td (\(anchor)) Tj ET"
+        let firstFieldId = 6
+        let fieldRefs = fields.indices
+            .map { "\(firstFieldId + $0) 0 R" }.joined(separator: " ")
+
+        var objects: [PDFObject] = [
+            PDFObject(id: 1, content: """
+                << /Type /Catalog /Pages 2 0 R \
+                /AcroForm << /Fields [\(fieldRefs)] \
+                /DA (/Helv 0 Tf 0 g) /NeedAppearances true >> >>
+                """),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            PDFObject(id: 3, content: """
+                << /Type /Page /Parent 2 0 R \
+                /MediaBox [0 0 612 792] \
+                /Contents 4 0 R /Annots [\(fieldRefs)] \
+                /Resources << /Font << /F1 5 0 R >> >> >>
+                """),
+            PDFObject(id: 4, content: "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"),
+            PDFObject(id: 5, content: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
+        ]
+        for (i, field) in fields.enumerated() {
+            let y = 640 - i * 40
+            objects.append(PDFObject(id: firstFieldId + i, content: """
+                << /Type /Annot /Subtype /Widget /FT /Tx \
+                /T (\(field.name)) /V (\(field.value)) \
+                /Rect [72 \(y) 372 \(y + 24)] /F 4 \
+                /DA (/Helv 12 Tf 0 g) /P 3 0 R >>
+                """))
+        }
+        return buildRawPDF(objects: objects, rootId: 1)
+    }
+
+    /// Structurally valid PDF whose page tree contains ZERO pages — the
+    /// import mirror's `pageCount > 0` guard target (10- §4 robustness row).
+    static func zeroPagePDF() -> Data {
+        buildRawPDF(objects: [
+            PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [] /Count 0 >>"),
+        ], rootId: 1)
+    }
+}
+
