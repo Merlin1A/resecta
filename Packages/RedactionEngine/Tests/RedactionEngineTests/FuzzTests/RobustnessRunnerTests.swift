@@ -500,3 +500,47 @@ struct Family4FactorySmokeTests {
         }
     }
 }
+
+@Suite("T2.3 fixture factory smoke (IM-14/IM-23)")
+struct T23FactorySmokeTests {
+
+    @Test("annotatedAPContentsPDF: all four annots surface; terms live outside the page text")
+    func annotatedFactory() throws {
+        let data = TestFixtures.annotatedAPContentsPDF()
+        let doc = try #require(PDFDocument(data: data))
+        #expect(doc.pageCount == 1)
+        let page = try #require(doc.page(at: 0))
+        let types = Set(page.annotations.map(\.type))
+        for want in ["FreeText", "Stamp", "Square", "Popup"] {
+            #expect(types.contains(want), "missing \(want) in \(types)")
+        }
+        let raw = String(decoding: data, as: UTF8.self)
+        let text = page.string ?? ""
+        #expect(text.contains("ANNOTATED FIXTURE ANCHOR LINE"))
+        for term in [TestFixtures.annotFreeTextTerm,
+                     TestFixtures.annotStampTerm,
+                     TestFixtures.annotPopupTerm] {
+            #expect(raw.contains(term), "term must be in the file bytes: \(term)")
+            // Pinned PDFKit stance: page.string covers page CONTENT text only —
+            // annotation /AP and /Contents text stays out. Drift = re-adjudicate.
+            #expect(!text.contains(term), "page.string surfaced annotation term \(term)")
+        }
+    }
+
+    @Test("incrementalUpdateRealPrev: current view is revision 2, prior bytes remain")
+    func realPrevFactory() throws {
+        let data = TestFixtures.incrementalUpdateRealPrev()
+        let doc = try #require(PDFDocument(data: data))
+        #expect(doc.pageCount == 1)
+        let text = try #require(doc.page(at: 0)).string ?? ""
+        #expect(text.contains("withdrawn in revision 2"),
+                "the /Prev-linked revision 2 must be the current view")
+        #expect(!text.contains("987-65-4377"), "revision 1 text must be replaced")
+        let raw = String(decoding: data, as: UTF8.self)
+        #expect(raw.contains("PRIOR-REV SSN 987-65-4377"),
+                "revision 1 bytes must remain in the file")
+        #expect(raw.components(separatedBy: "%%EOF").count - 1 == 2,
+                "exactly two revisions")
+        #expect(raw.contains("/Prev "), "trailer must carry a real /Prev link")
+    }
+}

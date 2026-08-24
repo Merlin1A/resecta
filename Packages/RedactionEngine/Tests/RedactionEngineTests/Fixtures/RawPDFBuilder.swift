@@ -1552,5 +1552,99 @@ extension TestFixtures {
             PDFObject(id: 2, content: "<< /Type /Pages /Kids [] /Count 0 >>"),
         ], rootId: 1)
     }
+
+    // MARK: - T2.3 factories (IM-14 / IM-23, P1.7)
+
+    static let annotFreeTextTerm = "987-65-4362"
+    static let annotStampTerm = "(208) 555-0181"
+    static let annotPopupTerm = "Rowena Castellane"
+
+    private static func annotFormXObject(_ content: String, w: Int, h: Int) -> String {
+        "<< /Type /XObject /Subtype /Form /BBox [0 0 \(w) \(h)] "
+            + "/Resources << /Font << /F1 5 0 R >> >> /Length \(content.utf8.count) >>\n"
+            + "stream\n\(content)\nendstream"
+    }
+
+    /// IM-14: annotation text surfaces on one page, three signatures —
+    /// FreeText (term in /AP AND /Contents) · Stamp (term ONLY in the /AP
+    /// form XObject; /Contents benign) · Square+Popup (term ONLY in the
+    /// markup /Contents; no /AP). Whether Scan or an extractor surfaces any
+    /// of them is a MEASUREMENT, not a premise ([R01] §1.10; sd twin =
+    /// `t23/packet-annotated.pdf`).
+    static func annotatedAPContentsPDF() -> Data {
+        let anchor = "ANNOTATED FIXTURE ANCHOR LINE"
+        let stream = "BT /F1 14 Tf 72 720 Td (\(anchor)) Tj ET"
+        let ftText = "Verified against file: SSN \(annotFreeTextTerm)"
+        let stampText = "CALLBACK \(annotStampTerm)"
+        let popupText = "Route to records clerk \(annotPopupTerm) for indexing."
+        return buildRawPDF(objects: [
+            PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            PDFObject(id: 3, content: """
+                << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] \
+                /Contents 4 0 R /Annots [6 0 R 8 0 R 10 0 R 11 0 R] \
+                /Resources << /Font << /F1 5 0 R >> >> >>
+                """),
+            PDFObject(id: 4, content: "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"),
+            PDFObject(id: 5, content: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
+            PDFObject(id: 6, content: """
+                << /Type /Annot /Subtype /FreeText /Rect [72 600 420 630] \
+                /Contents (\(ftText)) /DA (/F1 9 Tf 0 g) /F 4 /AP << /N 7 0 R >> >>
+                """),
+            PDFObject(id: 7, content: annotFormXObject("BT /F1 9 Tf 3 10 Td (\(ftText)) Tj ET", w: 348, h: 30)),
+            PDFObject(id: 8, content: """
+                << /Type /Annot /Subtype /Stamp /Name /Draft /Rect [72 540 340 580] \
+                /Contents (synthetic routing stamp) /F 4 /AP << /N 9 0 R >> >>
+                """),
+            PDFObject(id: 9, content: annotFormXObject("BT /F1 10 Tf 3 14 Td (\(stampText)) Tj ET", w: 268, h: 40)),
+            PDFObject(id: 10, content: """
+                << /Type /Annot /Subtype /Square /Rect [72 470 420 510] \
+                /Contents (\(popupText)) /F 4 /Popup 11 0 R >>
+                """),
+            PDFObject(id: 11, content: "<< /Type /Annot /Subtype /Popup /Rect [430 470 560 540] /Parent 10 0 R /F 4 >>"),
+        ], rootId: 1)
+    }
+
+    /// IM-23: a REAL /Prev-chained two-revision document — revision 1's
+    /// content object carries `originalText`; revision 2 replaces that object
+    /// via a classic appended update section whose trailer /Prev links the
+    /// first xref. The prior revision's bytes remain in the file ([R01] §1.5).
+    /// The existing `incrementalUpdate()` (unlinked `/Prev 0`) stays as the
+    /// malformed-shape fixture; this is the well-formed one.
+    static func incrementalUpdateRealPrev(
+        originalText: String = "PRIOR-REV SSN 987-65-4377",
+        updatedText: String = "PRIOR REFERENCE [withdrawn in revision 2]"
+    ) -> Data {
+        let s1 = "BT /F1 14 Tf 72 700 Td (\(originalText)) Tj ET"
+        let rev1 = buildRawPDF(objects: [
+            PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            PDFObject(id: 3, content: """
+                << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] \
+                /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+                """),
+            PDFObject(id: 4, content: "<< /Length \(s1.utf8.count) >>\nstream\n\(s1)\nendstream"),
+            PDFObject(id: 5, content: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
+        ], rootId: 1)
+
+        // Revision 1's xref offset, read back from its own startxref line.
+        let rev1Str = String(decoding: rev1, as: UTF8.self)
+        guard let sx = rev1Str.range(of: "startxref\n", options: .backwards),
+              let rev1XrefOffset = Int(rev1Str[sx.upperBound...]
+                  .prefix(while: { $0.isNumber })) else {
+            fatalError("revision 1 startxref not parseable")
+        }
+
+        let s2 = "BT /F1 14 Tf 72 700 Td (\(updatedText)) Tj ET"
+        var upd = "\n"
+        let objOffset = rev1.count + upd.utf8.count
+        upd += "4 0 obj\n<< /Length \(s2.utf8.count) >>\nstream\n\(s2)\nendstream\nendobj\n"
+        let xref2Offset = rev1.count + upd.utf8.count
+        upd += "xref\n0 1\n0000000000 65535 f \n4 1\n"
+            + String(format: "%010d 00000 n \n", objOffset)
+        upd += "trailer\n<< /Size 6 /Root 1 0 R /Prev \(rev1XrefOffset) >>\n"
+            + "startxref\n\(xref2Offset)\n%%EOF"
+        return rev1 + Data(upd.utf8)
+    }
 }
 
