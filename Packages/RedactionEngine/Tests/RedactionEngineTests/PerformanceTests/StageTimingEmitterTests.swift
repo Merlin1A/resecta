@@ -30,7 +30,8 @@ import CryptoKit
 // v0 doc×stage boundaries (recorded, not silent): filler-120 skips the
 // verification stage (10 layers × 120 pp × 5 sweeps of output OCR is a
 // device-runsheet cost, not a sim-emitter one) and the huge/filler docs skip
-// the OCR scan stages (no OCR leg applicability).
+// the OCR scan stages (no OCR leg applicability). A doc-level failure is
+// recorded as a `doc_error` row and the remaining docs still emit.
 
 @Suite("H4.1 stage-timing emitter (standing, ISOLATED run only)", .serialized)
 struct StageTimingEmitterTests {
@@ -411,6 +412,85 @@ struct StageTimingEmitterTests {
         return samples
     }
 
+    // MARK: - Per-doc + cancellation emit blocks
+
+    static func emitStages(
+        for doc: Doc, balanced: PresetThresholdVector?, scratch: URL,
+        into rows: inout [StageRow]
+    ) async throws {
+        let tValidate = FootprintTracker()
+        rows.append(row(doc: doc, stage: "validate_page", unit: "per_page",
+                        samples: sweepValidatePage(doc, tracker: tValidate),
+                        tracker: tValidate))
+
+        let tDetect = FootprintTracker()
+        rows.append(row(doc: doc, stage: "text_layer_detect", unit: "per_page",
+                        samples: sweepTextLayerDetect(doc, tracker: tDetect),
+                        tracker: tDetect))
+
+        if doc.textLeg {
+            let t = FootprintTracker()
+            rows.append(row(doc: doc, stage: "scan_text", unit: "per_doc",
+                            samples: try await sweepScan(
+                                doc, forcedOCR: false, balanced: balanced, tracker: t),
+                            tracker: t))
+        }
+        if doc.ocrLeg {
+            let t = FootprintTracker()
+            let forced = doc.id == "packet"
+            rows.append(row(
+                doc: doc, stage: forced ? "scan_ocr_forced" : "scan_ocr_natural",
+                unit: "per_doc",
+                samples: try await sweepScan(
+                    doc, forcedOCR: forced, balanced: balanced, tracker: t),
+                tracker: t,
+                notes: forced ? "every page via the _testScanPagePIIViaOCR seam"
+                              : "product natural path (all pages image-only)"))
+        }
+
+        let tRaster = FootprintTracker()
+        let raster = try await sweepRasterizeReconstruct(
+            doc, scratch: scratch, tracker: tRaster)
+        rows.append(row(doc: doc, stage: "rasterize_render_fill", unit: "per_page",
+                        samples: raster.rasterMs, tracker: tRaster))
+        rows.append(row(doc: doc, stage: "reconstruct_append", unit: "per_page",
+                        samples: raster.appendMs, tracker: tRaster))
+        rows.append(row(doc: doc, stage: "reconstruct_finalize", unit: "per_doc",
+                        samples: raster.finalizeMs, tracker: tRaster))
+
+        if doc.verifyLeg, let outputURL = raster.lastOutputURL,
+           let outcome = raster.lastOutcome {
+            let tVerify = FootprintTracker()
+            let verify = try await sweepVerification(
+                doc, outputURL: outputURL, outcome: outcome, tracker: tVerify)
+            rows.append(row(doc: doc, stage: "verify_total", unit: "per_doc",
+                            samples: verify.total, tracker: tVerify))
+            for (layer, samples) in verify.perLayer.sorted(by: { $0.key < $1.key }) {
+                rows.append(row(doc: doc, stage: "verify_layer:\(layer)",
+                                unit: "per_doc", samples: samples, tracker: tVerify,
+                                notes: "product LayerResult.durationSeconds"))
+            }
+        } else if !doc.verifyLeg {
+            print("[H4.1] \(doc.id): verification stage skipped (v0 bound, see header)")
+        }
+    }
+
+    static func emitCancellation(into rows: inout [StageRow]) async throws {
+        let synthetic = Doc(id: "synthetic-5000px", docClass: "synthetic-bitmap",
+                            data: Data(), pages: 1, textLeg: false, ocrLeg: false,
+                            verifyLeg: false)
+        let tCancelFill = FootprintTracker()
+        rows.append(row(doc: synthetic, stage: "cancel_fill", unit: "per_call",
+                        samples: try await cancellationSamples(verifyLeg: false),
+                        tracker: tCancelFill,
+                        notes: "cancel→surrender, applyRedactionFills loop (PERF-8 shape)"))
+        let tCancelVerify = FootprintTracker()
+        rows.append(row(doc: synthetic, stage: "cancel_verify", unit: "per_call",
+                        samples: try await cancellationSamples(verifyLeg: true),
+                        tracker: tCancelVerify,
+                        notes: "cancel→surrender, verifyFill loop (PERF-8 shape)"))
+    }
+
     // MARK: - The emit
 
     @Test("Emit stage-timing p50/p95 + footprint over the Family-4 doc set")
@@ -434,77 +514,20 @@ struct StageTimingEmitterTests {
         var rows: [StageRow] = []
         for doc in docs {
             print("[H4.1] doc=\(doc.id) pages=\(doc.pages)")
-
-            let tValidate = FootprintTracker()
-            rows.append(Self.row(doc: doc, stage: "validate_page", unit: "per_page",
-                                 samples: Self.sweepValidatePage(doc, tracker: tValidate),
-                                 tracker: tValidate))
-
-            let tDetect = FootprintTracker()
-            rows.append(Self.row(doc: doc, stage: "text_layer_detect", unit: "per_page",
-                                 samples: Self.sweepTextLayerDetect(doc, tracker: tDetect),
-                                 tracker: tDetect))
-
-            if doc.textLeg {
+            do {
+                try await Self.emitStages(for: doc, balanced: balanced,
+                                          scratch: scratch, into: &rows)
+            } catch { // LegalPhrases:safe (Swift keyword)
+                // Partial evidence beats none: a doc-level failure becomes a
+                // recorded row (classified), and the remaining docs still emit.
                 let t = FootprintTracker()
-                rows.append(Self.row(doc: doc, stage: "scan_text", unit: "per_doc",
-                                     samples: try await Self.sweepScan(
-                                        doc, forcedOCR: false, balanced: balanced, tracker: t),
-                                     tracker: t))
-            }
-            if doc.ocrLeg {
-                let t = FootprintTracker()
-                let forced = doc.id == "packet"
-                rows.append(Self.row(
-                    doc: doc, stage: forced ? "scan_ocr_forced" : "scan_ocr_natural",
-                    unit: "per_doc",
-                    samples: try await Self.sweepScan(
-                        doc, forcedOCR: forced, balanced: balanced, tracker: t),
-                    tracker: t,
-                    notes: forced ? "every page via the _testScanPagePIIViaOCR seam"
-                                  : "product natural path (all pages image-only)"))
-            }
-
-            let tRaster = FootprintTracker()
-            let raster = try await Self.sweepRasterizeReconstruct(
-                doc, scratch: scratch, tracker: tRaster)
-            rows.append(Self.row(doc: doc, stage: "rasterize_render_fill", unit: "per_page",
-                                 samples: raster.rasterMs, tracker: tRaster))
-            rows.append(Self.row(doc: doc, stage: "reconstruct_append", unit: "per_page",
-                                 samples: raster.appendMs, tracker: tRaster))
-            rows.append(Self.row(doc: doc, stage: "reconstruct_finalize", unit: "per_doc",
-                                 samples: raster.finalizeMs, tracker: tRaster))
-
-            if doc.verifyLeg, let outputURL = raster.lastOutputURL,
-               let outcome = raster.lastOutcome {
-                let tVerify = FootprintTracker()
-                let verify = try await Self.sweepVerification(
-                    doc, outputURL: outputURL, outcome: outcome, tracker: tVerify)
-                rows.append(Self.row(doc: doc, stage: "verify_total", unit: "per_doc",
-                                     samples: verify.total, tracker: tVerify))
-                for (layer, samples) in verify.perLayer.sorted(by: { $0.key < $1.key }) {
-                    rows.append(Self.row(doc: doc, stage: "verify_layer:\(layer)",
-                                         unit: "per_doc", samples: samples, tracker: tVerify,
-                                         notes: "product LayerResult.durationSeconds"))
-                }
-            } else if !doc.verifyLeg {
-                print("[H4.1] \(doc.id): verification stage skipped (v0 bound, see header)")
+                rows.append(Self.row(doc: doc, stage: "doc_error", unit: "per_doc",
+                                     samples: [], tracker: t,
+                                     notes: RobustnessRunnerTests.classify(error)))
+                print("[H4.1] \(doc.id) ERROR: \(RobustnessRunnerTests.classify(error))")
             }
         }
-
-        let synthetic = Doc(id: "synthetic-5000px", docClass: "synthetic-bitmap",
-                            data: Data(), pages: 1, textLeg: false, ocrLeg: false,
-                            verifyLeg: false)
-        let tCancelFill = FootprintTracker()
-        rows.append(Self.row(doc: synthetic, stage: "cancel_fill", unit: "per_call",
-                             samples: try await Self.cancellationSamples(verifyLeg: false),
-                             tracker: tCancelFill,
-                             notes: "cancel→surrender, applyRedactionFills loop (PERF-8 shape)"))
-        let tCancelVerify = FootprintTracker()
-        rows.append(Self.row(doc: synthetic, stage: "cancel_verify", unit: "per_call",
-                             samples: try await Self.cancellationSamples(verifyLeg: true),
-                             tracker: tCancelVerify,
-                             notes: "cancel→surrender, verifyFill loop (PERF-8 shape)"))
+        try await Self.emitCancellation(into: &rows)
 
         struct DocMeta: Encodable {
             let id: String
