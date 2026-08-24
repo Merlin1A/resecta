@@ -157,34 +157,11 @@ struct PolygonDrawingTests {
 
     // MARK: - Tap sequence builds vertices via the coordinator path
 
-    /// Test-only coordinator: records `addRegion` calls so the polygon
-    /// commit path can be asserted without mounting a full PDFView.
-    /// `testOverlays` mirrors the base class's private `activeOverlays`
-    /// dictionary so the tool-switch discard path can be exercised
-    /// without the PDFKit delegate callback that normally populates it
-    /// (the locator-driven `activeOverlays` path is covered in manual
-    /// verification during Session 2/3).
-    private final class RecordingCoordinator: PDFViewCoordinator {
-        var addedRegions: [RedactionRegion] = []
-        var testOverlays: [RedactionOverlayView] = []
-        override func addRegion(
-            _ region: RedactionRegion,
-            page: Int,
-            undoManager: UndoManager?
-        ) {
-            addedRegions.append(region)
-        }
-        override func updateActiveShapeTool(
-            _ tool: RedactionOverlayView.ShapeTool
-        ) {
-            let changed = activeShapeTool != tool
-            activeShapeTool = tool
-            for overlay in testOverlays {
-                overlay.activeShapeTool = tool
-                if changed { overlay.discardInProgressPolygon() }
-            }
-        }
-    }
+    // `RecordingCoordinator` (records `addRegion`; `testOverlays` mirrors
+    // the base class's private `activeOverlays` so the tool-switch discard
+    // path can be exercised without the PDFKit delegate callback) and
+    // `StubTouch` live in the shared `Fixtures/CanvasTouchHarness.swift`
+    // (one internal copy since the 1.1.0 draw-tool S1 session).
 
     // MARK: - Polygon test helper
 
@@ -446,21 +423,3 @@ struct PolygonDrawingTests {
     }
 }
 
-// MARK: - Test helpers
-
-/// Minimal UITouch stub for synthesising touch sequences in tests.
-private final class StubTouch: UITouch {
-    private let _location: CGPoint
-    private let _view: UIView
-
-    init(location: CGPoint, view: UIView) {
-        self._location = location
-        self._view = view
-        super.init()
-    }
-
-    override func location(in view: UIView?) -> CGPoint {
-        return _location
-    }
-    override var view: UIView? { _view }
-}

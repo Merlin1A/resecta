@@ -79,12 +79,13 @@ struct SnapToTextBoxTests {
         let beginPoint = CGPoint(x: endOverlay.minX, y: endOverlay.minY)
         let movePoint = CGPoint(x: endOverlay.maxX, y: endOverlay.maxY)
 
-        let beganTouch = StubTouch(location: beginPoint, view: overlay)
-        overlay.touchesBegan([beganTouch], with: nil)
-        let movedTouch = StubTouch(location: movePoint, view: overlay)
-        overlay.touchesMoved([movedTouch], with: nil)
-        let endedTouch = StubTouch(location: movePoint, view: overlay)
-        overlay.touchesEnded([endedTouch], with: nil)
+        // ONE touch identity across began → moved → ended: the overlay
+        // keys the gesture on the primary `UITouch` instance (S1-d).
+        let touch = StubTouch(location: beginPoint, view: overlay)
+        overlay.touchesBegan([touch], with: nil)
+        touch.move(to: movePoint)
+        overlay.touchesMoved([touch], with: nil)
+        overlay.touchesEnded([touch], with: nil)
 
         return recorder.addedRegions.first?.normalizedRect
     }
@@ -217,35 +218,6 @@ struct SnapToTextBoxTests {
 
 // MARK: - Test helpers
 
-/// Test-only coordinator that records `addRegion` calls. Used by the
-/// drag-end commit path to capture the committed region's normalized
-/// rect without mounting a real PDFView.
-private final class RecordingCoordinator: PDFViewCoordinator {
-    var addedRegions: [RedactionRegion] = []
-    override func addRegion(
-        _ region: RedactionRegion,
-        page: Int,
-        undoManager: UndoManager?
-    ) {
-        addedRegions.append(region)
-    }
-}
-
-/// Minimal `UITouch` stub for synthesising touch sequences in tests.
-/// Mirrors the helper in `PolygonDrawingTests` — kept private here so
-/// each test file owns its own surface.
-private final class StubTouch: UITouch {
-    private let _location: CGPoint
-    private let _view: UIView
-
-    init(location: CGPoint, view: UIView) {
-        self._location = location
-        self._view = view
-        super.init()
-    }
-
-    override func location(in view: UIView?) -> CGPoint {
-        return _location
-    }
-    override var view: UIView? { _view }
-}
+// `RecordingCoordinator` + `StubTouch` live in the shared
+// `Fixtures/CanvasTouchHarness.swift` (one internal copy since the
+// 1.1.0 draw-tool S1 session).
