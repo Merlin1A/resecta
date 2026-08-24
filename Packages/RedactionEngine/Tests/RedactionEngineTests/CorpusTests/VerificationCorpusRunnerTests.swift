@@ -426,6 +426,17 @@ struct VerificationCorpusRunnerTests {
                 input, modes: [.secureRasterization, .searchableRedaction])
         }
 
+        // --- E. PB-86 hidden-text probe (searchable path; 1.2 P1.4) ---
+        var pb86Rows: [PB86PlantRow] = []
+        for (input, rows) in Self.pb86FactoryInputs()
+            + Self.pb86SDInputs(root: root, skipped: &cellsSkipped) {
+            try await execute(input, modes: [.searchableRedaction])
+            pb86Rows.append(contentsOf: rows)
+        }
+        if !pb86Rows.isEmpty {
+            try Self.writePB86Plants(pb86Rows, out: out)
+        }
+
         #if targetEnvironment(simulator)
         let platform = "simulator \(ProcessInfo.processInfo.operatingSystemVersionString)"
         #else

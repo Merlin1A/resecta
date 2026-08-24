@@ -706,6 +706,60 @@ enum TestFixtures {
         return (try? Data(contentsOf: url)) ?? Data()
     }
 
+    /// Geometry shared by the two T2.4 hidden-text factories below: a visible
+    /// anchor line and one hidden plant at fixed Td positions, so PB-86 cells
+    /// can burn a region over exactly one of them (1.2 registers/31- §B row 2).
+    static let hiddenPlantAnchorTd = CGPoint(x: 72, y: 700)   // 18 pt visible line
+    static let hiddenPlantHiddenTd = CGPoint(x: 72, y: 400)   // 18 pt hidden line
+
+    /// White-on-white hidden text (IM-09; ABSENT from the suite until 1.2 P1.4):
+    /// the hidden line is drawn with a pure-white fill (`1 g`) on the undrawn
+    /// white page — extractors see it, the eye does not. The visible anchor
+    /// keeps the page's post-redaction text layer non-empty so PB-86 covered
+    /// cells do not collapse into the F12-05 empty-survivor edge.
+    static func whiteOnWhiteTextPDF(
+        visible: String = "WOW VISIBLE ANCHOR LINE",
+        hidden: String = "PLANT-ENGWOW-01"
+    ) -> Data {
+        let stream = """
+            BT /F1 18 Tf 72 700 Td (\(visible)) Tj ET
+            1 g
+            BT /F1 18 Tf 72 400 Td (\(hidden)) Tj ET
+            0 g
+            """
+        return singleTextPagePDF(stream: stream)
+    }
+
+    /// Content-stream opaque box over live text (IM-11's painted-rect variant;
+    /// `fakeRedaction` is the ANNOTATION-based cover — this one paints a black
+    /// `re f` rect after the glyphs inside the page content stream, the
+    /// [R01] §1.1 minimal construct).
+    static func opaqueBoxCoveredTextPDF(
+        visible: String = "BOX VISIBLE ANCHOR LINE",
+        hidden: String = "PLANT-ENGBOX-01"
+    ) -> Data {
+        let stream = """
+            BT /F1 18 Tf 72 700 Td (\(visible)) Tj ET
+            BT /F1 18 Tf 72 400 Td (\(hidden)) Tj ET
+            0 g 66 392 220 30 re f
+            """
+        return singleTextPagePDF(stream: stream)
+    }
+
+    private static func singleTextPagePDF(stream: String) -> Data {
+        buildRawPDF(objects: [
+            PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            PDFObject(id: 3, content: """
+                << /Type /Page /Parent 2 0 R \
+                /MediaBox [0 0 612 792] \
+                /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+                """),
+            PDFObject(id: 4, content: "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"),
+            PDFObject(id: 5, content: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
+        ], rootId: 1)
+    }
+
     // MARK: - Phase 1 Audit Fixtures
 
     /// PDF with embedded file attachment via /Names -> /EmbeddedFiles name tree.
