@@ -197,11 +197,35 @@ struct RobustnessRunnerTests {
     struct SDManifest: Decodable { let fixtures: [SDRow] }
 
     static func sdFixtures(root: String) throws -> [Fixture] {
-        let url = URL(fileURLWithPath: root)
-            .appendingPathComponent("robustness/robustness-fixtures.json")
+        try decodeSidecar(root: root,
+                          relativePath: "robustness/robustness-fixtures.json",
+                          source: "sd")
+    }
+
+    /// T4.3 mutated set (P1.7) — 100 deterministically damaged copies of the packet,
+    /// built in resecta-datapipeline and mirrored into robustness/fuzz/ by packet/fuzz.py.
+    ///
+    /// A SECOND sidecar rather than rows appended to robustness-fixtures.json: that manifest
+    /// is regenerated wholesale by packet/robustness.py, which would drop rows it does not
+    /// own. The row shape is identical, so the decoder is shared. Absence is tolerated so a
+    /// docs root without the T4.3 set still runs the rest of the table.
+    static func fuzzFixtures(root: String) throws -> [Fixture] {
+        let relative = "robustness/robustness-fuzz.json"
+        let url = URL(fileURLWithPath: root).appendingPathComponent(relative)
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            print("[H4.2] \(relative) absent; T4.3 rows skipped.")
+            return []
+        }
+        return try decodeSidecar(root: root, relativePath: relative, source: "fuzz")
+    }
+
+    static func decodeSidecar(root: String,
+                              relativePath: String,
+                              source: String) throws -> [Fixture] {
+        let url = URL(fileURLWithPath: root).appendingPathComponent(relativePath)
         let manifest = try JSONDecoder().decode(SDManifest.self, from: try Data(contentsOf: url))
         return manifest.fixtures.map { row in
-            Fixture(id: row.id, source: "sd", data: nil, path: row.path,
+            Fixture(id: row.id, source: source, data: nil, path: row.path,
                     expected: Expected(importOutcome: row.expected.`import`,
                                        importError: row.expected.import_error,
                                        redact: row.expected.redact,
@@ -263,7 +287,7 @@ struct RobustnessRunnerTests {
 
     // MARK: - The run
 
-    @Test("Family-4 robustness outcome table over factories + sd fixtures")
+    @Test("Family-4 robustness outcome table over factories + sd fixtures + T4.3 mutated set")
     func robustnessOutcomeTable() async throws {
         guard let out = Self.robustOut() else {
             print("[H4.2] RESECTA_ROBUST_OUT not set; robustness runner skipped.")
@@ -273,6 +297,7 @@ struct RobustnessRunnerTests {
         var fixtures = Self.factoryFixtures()
         if let root {
             fixtures += try Self.sdFixtures(root: root)
+            fixtures += try Self.fuzzFixtures(root: root)
         } else {
             print("[H4.2] RESECTA_DOCS_ROOT not set; sd rows skipped.")
         }
