@@ -399,6 +399,13 @@ public actor DocumentSearcher {
     #if DEBUG
     internal var _testOCRCacheKeys: Set<Int> { Set(ocrCache.keys) }
     internal var _testOCRNormalizedConcatKeys: Set<Int> { Set(ocrNormalizedConcat.keys) }
+    /// H3.1 (1.2 instrumentation plan §6) — read-only view of one page's
+    /// cached Vision lines so the search-GT harness can emit the exact OCR
+    /// text the OCR leg matched against. Observation-only, same contract as
+    /// `_testOCRCacheKeys` above; never touches the LRU access ordering.
+    internal func _testOCRCachedLines(forPageIndex pageIndex: Int) -> [OCREngine.TextLine]? {
+        ocrCache[pageIndex]
+    }
 
     /// Seeds the three OCR caches with `occupiedCount` placeholder entries,
     /// inserted in ascending page-index order so the smallest index is the
