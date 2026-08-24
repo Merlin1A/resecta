@@ -51,7 +51,9 @@ class RedactionOverlayView: UIView {
     // MARK: - Drawing State
 
     private var dragOrigin: CGPoint?
-    private var currentDragRect: CGRect?
+    /// Read-only outside the overlay so `RectangleDrawGestureTests` can
+    /// observe the rubber band mid-gesture (S1).
+    private(set) var currentDragRect: CGRect?
     private var activeResizeHandle: ResizeHandle?
 
     // MARK: - Lasso Marquee State
@@ -299,6 +301,24 @@ class RedactionOverlayView: UIView {
         return regions.filter { $0.normalizedRect.intersects(marqueeNormalized) }
     }
 
+    // Resize handle that models the finger's corner while a new rectangle
+    // is being drawn (S1-b / DT-03): the drag origin is the anchored
+    // corner, so only the two edges under the finger move — and snap —
+    // through `applyResizeSnapping`. Ties (dx == 0 / dy == 0) fall to the
+    // bottom/right side, matching the rect the drag produces. Pure so
+    // `RectangleDrawGestureTests` can pin the quadrant table without a
+    // UITouch host.
+    static func drawSnapHandle(origin: CGPoint, point: CGPoint) -> ResizeHandle {
+        let dx = point.x - origin.x
+        let dy = point.y - origin.y
+        switch (dx >= 0, dy >= 0) {
+        case (true, true): return .bottomRight
+        case (true, false): return .topRight
+        case (false, true): return .bottomLeft
+        case (false, false): return .topLeft
+        }
+    }
+
     /// Minimum region dimension in overlay points.
     private static let minimumRegionSize: CGFloat = 10.0
 
@@ -465,14 +485,13 @@ class RedactionOverlayView: UIView {
 
         // Priority 3: lasso marquee — empty-space touch-down while the
         // "Select More" toggle is on becomes a rect-marquee multi-select drag.
-        // Branch is gated on `isMultiSelectActive` and checked before the
-        // drawing-mode branch so the marquee wins when both flags would
-        // otherwise be eligible (the user opted into multi-select; new-region
-        // drawing while multi-select is on is by design unreachable through
-        // empty-space drag). The branch is orthogonal to `currentDragRect`
-        // — see `marqueeRect` declaration. The undo-grouped commit happens
-        // in `touchesEnded` via `coordinator?.commitLassoSelection`.
-        if isMultiSelectActive {
+        // Gated on `isMultiSelectActive && !isDrawingMode` (S1-f / DT-07):
+        // while the Rectangle tool is on, an empty-space drag draws — the
+        // marquee never runs in draw mode. The branch is orthogonal to
+        // `currentDragRect` — see `marqueeRect` declaration. The
+        // undo-grouped commit happens in `touchesEnded` via
+        // `coordinator?.commitLassoSelection`.
+        if isMultiSelectActive && !isDrawingMode {
             marqueeOrigin = point
             marqueeRect = nil
             isActivelyDragging = true
@@ -782,8 +801,11 @@ class RedactionOverlayView: UIView {
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        // Only honor touchesMoved while a gesture is in flight.
-        guard primaryTouch != nil, let touch = touches.first else { return }
+        // Only honor the primary touch while a gesture is in flight
+        // (S1-d / DT-10): a second finger's moves must not steer it.
+        guard let primaryTouch,
+              let touch = touches.first(where: { $0 === primaryTouch })
+        else { return }
         let point = touch.location(in: self)
 
         // Cancel long-press timer if finger moved too far
@@ -842,18 +864,29 @@ class RedactionOverlayView: UIView {
                 setNeedsDisplay()
             }
         } else if let origin = dragOrigin {
-            // Draw new region — only commit visually once past threshold
+            // Draw new region — the 8-pt start gate applies only until the
+            // first over-threshold move; after that the band tracks the
+            // finger back in as well (S1-e / DT-11). A drag that returns
+            // to its origin commits nothing (the 20-pt floor rejects it).
             let dx = abs(point.x - origin.x)
             let dy = abs(point.y - origin.y)
-            if dx >= Self.minimumDragThreshold || dy >= Self.minimumDragThreshold {
+            if currentDragRect != nil
+                || dx >= Self.minimumDragThreshold
+                || dy >= Self.minimumDragThreshold {
                 var rect = CGRect(
                     x: min(origin.x, point.x),
                     y: min(origin.y, point.y),
                     width: abs(point.x - origin.x),
                     height: abs(point.y - origin.y)
                 )
-                // Apply snap guides during new region drawing
-                rect = applySnapping(to: rect, excluding: nil)
+                // Apply snap guides during new region drawing — anchored
+                // edges (S1-b / DT-03): only the two edges under the finger
+                // snap; the origin corner is invariant by construction.
+                rect = applyResizeSnapping(
+                    to: rect,
+                    handle: Self.drawSnapHandle(origin: origin, point: point),
+                    excluding: nil
+                )
                 // Apply snap-to-text-box assist during new
                 // region drawing. The assist runs after the region-edge
                 // snap so a strong text-edge match overrides a weaker
@@ -862,6 +895,11 @@ class RedactionOverlayView: UIView {
                 // `1/zoomScale` so the same finger drift on screen
                 // means the same number of overlay points at any zoom.
                 rect = applyTextBoxSnapping(to: rect)
+                // Clamp the rubber band to the page (S1-c / DT-08) —
+                // mirrors the resize clamp in `updateSelectedRegionForResize`.
+                // A band entirely off-page leaves the last rect in place.
+                rect = rect.intersection(bounds)
+                guard !rect.isNull else { return }
                 currentDragRect = rect
                 setNeedsDisplay()
             }
@@ -1012,6 +1050,9 @@ class RedactionOverlayView: UIView {
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        // A secondary finger's lift must not end — or reset — the primary's
+        // gesture (S1-d / DT-10). Checked BEFORE the defer on purpose.
+        guard let primaryTouch, touches.contains(primaryTouch) else { return }
         defer { resetDragState() }
 
         // Commit lasso marquee — intersect every visible region's
@@ -1111,6 +1152,9 @@ class RedactionOverlayView: UIView {
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        // Only the primary touch's cancel discards the gesture (S1-d /
+        // DT-10); a system cancel of the primary still cancels.
+        guard let primaryTouch, touches.contains(primaryTouch) else { return }
         // Discard without committing — restore pre-drag region state
         if isGroupMoving {
             for i in regions.indices {
@@ -1168,6 +1212,13 @@ class RedactionOverlayView: UIView {
         // on commit, escape, or tool deactivation.
         freeformPath = []
         freeformZoomScale = 1.0
+        // Repaint on gesture end (S1-a / DT-01, DT-02). The commit paths
+        // run under `isActivelyDragging`, which makes the coordinator's
+        // `configure` a no-op, and the later state sync sees `regions`
+        // unchanged (the overlay already holds the final rect) — so this
+        // is the only repaint that erases a rejected rubber band, its
+        // label and guides, or drops the lifted look after a move/resize.
+        setNeedsDisplay()
     }
 
     /// Clear the in-progress polygon vertex list. Call when the
