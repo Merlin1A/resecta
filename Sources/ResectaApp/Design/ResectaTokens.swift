@@ -195,6 +195,22 @@ enum ResectaTokens {
             }
         )
 
+        /// SUPPORT-family text (neutral grey; UXC-42). Darker support tier
+        /// for the small explanatory text on Home and the verification
+        /// screens (card bodies, subtitles, run facts, trust labels, the
+        /// version and timing footers) — replaces system `.secondary`
+        /// (≈4.6:1) and `.tertiary` (≈2.3:1) there, which measure below
+        /// the 7:1 target as light-mode small text. Light #4A4A52 ·
+        /// Dark #B8B8C3. Measured: 8.78/7.87 light (white/grouped) ·
+        /// 10.68/8.66/7.09 dark (black/#1C1C1E/#2C2C2E).
+        static let supportText: Color = Color(
+            uiColor: UIColor { trait in
+                trait.userInterfaceStyle == .dark
+                    ? UIColor(red: 0xB8/255, green: 0xB8/255, blue: 0xC3/255, alpha: 1)
+                    : UIColor(red: 0x4A/255, green: 0x4A/255, blue: 0x52/255, alpha: 1)
+            }
+        )
+
         // Detection kind badge colors (canvas badges, triage rows, popover)
         static let badgePII: Color = Color(.systemOrange)
         static let badgeFace: Color = Color(.systemPurple)

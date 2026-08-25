@@ -28,6 +28,7 @@ The entries below follow the Keep-a-Changelog index format.
 - **The scope disclaimer sits under Verification Details, above the trust strip,** on every verdict, rather than at the bottom of the screen.
 - **Touch targets** floored at the default type size on the page bar, review rows, sheet header and footer buttons, popups, chips, and the canvas resize handles.
 - **Reduce Motion** now applies to every slide-in transition; the post-run banner tints orange only for warnings; toast and status colors use the measured text tier; the editor toolbar keeps the brand tint on Redact only; search option toggles wait for a running search.
+- **Easier-to-read support text.** The home and verification screens render their explanatory text one size larger in a darker grey; the version line and the On-device / No tracking / Open source strip are no longer faint.
 
 ### Removed
 

@@ -151,8 +151,8 @@ struct HomeChoiceCardContent: View {
                     .foregroundStyle(.primary)
 
                 Text(bodyText)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -204,11 +204,11 @@ struct TrustItem: View {
     var body: some View {
         HStack(spacing: 5) {
             Image(systemName: "checkmark")
-                .font(.caption.weight(.bold))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(ResectaTokens.BrandTeal.text)
             Text(label)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
         }
     }
 }
