@@ -107,7 +107,7 @@ struct HomeView: View {
 
             Text("On-device PDF redaction designed to remove the underlying content.")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 320)
         }
@@ -140,9 +140,9 @@ struct HomeView: View {
     private var trustStrip: some View {
         FlowLayout(spacing: ResectaTokens.Spacing.sm, alignment: .center) {
             TrustItem(label: "On-device")
-            Text("·").foregroundStyle(.tertiary).font(.caption)
+            Text("·").foregroundStyle(.tertiary).font(.footnote)
             TrustItem(label: "No tracking")
-            Text("·").foregroundStyle(.tertiary).font(.caption)
+            Text("·").foregroundStyle(.tertiary).font(.footnote)
             TrustItem(label: "Open source")
         }
         .frame(maxWidth: columnMaxWidth)
@@ -150,8 +150,8 @@ struct HomeView: View {
 
     private var footer: some View {
         Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")")
-            .font(.caption)
-            .foregroundStyle(.tertiary)
+            .font(.footnote)
+            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, ResectaTokens.Spacing.sm)
     }

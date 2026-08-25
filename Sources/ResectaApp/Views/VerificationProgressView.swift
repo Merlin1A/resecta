@@ -155,9 +155,9 @@ struct VerificationProgressView: View {
     private var trustStrip: some View {
         FlowLayout(spacing: ResectaTokens.Spacing.sm, alignment: .center) {
             TrustItem(label: "On-device")
-            Text("·").foregroundStyle(.tertiary).font(.caption)
+            Text("·").foregroundStyle(.tertiary).font(.footnote)
             TrustItem(label: "No tracking")
-            Text("·").foregroundStyle(.tertiary).font(.caption)
+            Text("·").foregroundStyle(.tertiary).font(.footnote)
             TrustItem(label: "Open source")
         }
         .frame(maxWidth: columnMaxWidth)
