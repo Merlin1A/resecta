@@ -396,10 +396,14 @@ struct G8SearchParityHarnessTests {
             var positiveGTByKind: [RedactionRegion.PIIKind: [NSRange]] = [:]
             var decoyGTByKind:    [RedactionRegion.PIIKind: [NSRange]] = [:]
             var allGTByKind:      [RedactionRegion.PIIKind: [NSRange]] = [:]
+            // Every GT span with its packet tier (additive per-tier counters,
+            // 1.2 P1.10 — same bridge as the detector-site emitter).
+            var tierGTByKind:     [RedactionRegion.PIIKind: [(NSRange, String)]] = [:]
             for span in doc.pii_spans {
                 guard let kind = G8BaselineHarnessTests.baselineMapCategory(span.category) else { continue }
                 let r = NSRange(location: span.start, length: span.end - span.start)
                 allGTByKind[kind, default: []].append(r)
+                tierGTByKind[kind, default: []].append((r, span.bridgedTier))
                 if span.expected_outcome == "suppress" {
                     decoyGTByKind[kind, default: []].append(r)
                 } else {
@@ -497,6 +501,11 @@ struct G8SearchParityHarnessTests {
                     if !overlapsAnyGT { cell.false_positives += 1 }
                     if suppressed { cell.suppressed_by_negative_context += 1 }
                 }
+                // Per-tier counters (additive), same overlap rule.
+                for (gt, tier) in tierGTByKind[kind] ?? [] {
+                    let hit = surfaced.contains { G8BaselineHarnessTests.rangesOverlap($0.0, gt) }
+                    cell.tally(tier: tier, hit: hit)
+                }
                 cells[cellKey] = cell
             }
         }
@@ -504,11 +513,7 @@ struct G8SearchParityHarnessTests {
         // Balanced cutoff map (raw_scores header) — same construction as the
         // Site-A emitter; informational at Site B (see semantics notes above).
         var cutoffMap: [String: Double] = [:]
-        let allKinds: [RedactionRegion.PIIKind] = [
-            .ssn, .name, .address, .account, .ein, .npi, .dea,
-            .phone, .email, .routingNumber, .medicalRecord, .dateOfBirth,
-        ]
-        for kind in allKinds {
+        for kind in G8BaselineHarnessTests.allCorpusKinds {
             guard let catKey = G8BaselineHarnessTests.cellCategoryKey(for: kind) else { continue }
             if let c = balancedCutoff(for: kind) { cutoffMap[catKey] = c }
         }

@@ -53,7 +53,13 @@ struct G8CorpusIngestionTests {
         let start: Int
         let end: Int
         let value: String
+        // 1.2 P1.10 (C12-25): the packet-tier bridge written by the dp
+        // generator (must / should / watch / must_not). Optional so the
+        // decoder also reads a pre-extension corpus.
+        let tier: String?
     }
+
+    static let allowedTiers: Set<String> = ["must", "should", "watch", "must_not"]
 
     // MARK: - Tests
 
@@ -93,14 +99,18 @@ struct G8CorpusIngestionTests {
         let corpus = try loadCorpus()
         guard let corpus else { return }
 
+        // 17/17 since 1.2 T1.1 (C12-25): itin / creditCard / driversLicense /
+        // passport / licensePlate joined the original twelve.
         let allowedCategories: Set<String> = [
             "ssn", "npi", "dea", "dob", "address", "account",
             "mrn", "name", "phone", "email", "routingNumber", "ein",
+            "itin", "creditCard", "driversLicense", "passport", "licensePlate",
         ]
         let allowedDoctypes: Set<String> = [
             "court", "medical", "financial", "foia", "generic",
         ]
 
+        var seenCategories: Set<String> = []
         for doc in corpus.documents {
             #expect(allowedDoctypes.contains(doc.doctype), "unknown doctype in \(doc.id)")
             #expect(!doc.pii_spans.isEmpty, "\(doc.id) has no PII spans")
@@ -111,8 +121,17 @@ struct G8CorpusIngestionTests {
                 #expect(span.end > span.start)
                 #expect(span.end <= doc.text.count)
                 #expect(!span.value.isEmpty)
+                if let tier = span.tier {
+                    #expect(Self.allowedTiers.contains(tier),
+                            "unknown tier \(tier) in \(doc.id)")
+                }
+                seenCategories.insert(span.category)
             }
         }
+        // The bundled corpus is the 17/17 one (1.2 T1.1); a 12/17 fixture
+        // would silently under-measure the five added categories.
+        #expect(seenCategories == allowedCategories,
+                "corpus categories \(seenCategories.sorted()) != the 17-category set")
     }
 
     // MARK: - Loader

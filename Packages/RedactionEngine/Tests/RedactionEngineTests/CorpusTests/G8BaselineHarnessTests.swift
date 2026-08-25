@@ -52,12 +52,34 @@ struct G8BaselineHarnessTests {
         let start: Int
         let end: Int
         let expected_outcome: String?
+        // 1.2 P1.10 (C12-25 clause 2): the packet-tier bridge the dp generator
+        // writes (must / should / watch / must_not). Optional so a
+        // pre-extension corpus still decodes; `bridgedTier` re-derives it.
+        let tier: String?
+
+        /// The span's packet tier: the generator's explicit `tier`, else the
+        /// same bridge dp applies (redact -> must, flag -> watch,
+        /// suppress -> must_not).
+        var bridgedTier: String {
+            if let tier { return tier }
+            switch expected_outcome {
+            case "suppress": return "must_not"
+            case "flag":     return "watch"
+            default:         return "must"
+            }
+        }
     }
 
     // MARK: - Output JSON shapes
 
     /// One (category, doctype, bucket) cell. Field names and semantics are
     /// fixed by the baseline's output schema.
+    ///
+    /// The eight `tier_*` counters are ADDITIVE. The six legacy counts keep
+    /// their original semantics (positive = every non-suppress span); the
+    /// tier counters split the same ground truth by the packet-tier bridge so
+    /// the datapipeline's `eval-baseline` can score per tier (must / should /
+    /// watch recall, must_not fire rate) beside the document harness rows.
     struct BaselineCell: Encodable, Sendable {
         var true_positives: Int = 0
         var false_negatives: Int = 0
@@ -65,6 +87,35 @@ struct G8BaselineHarnessTests {
         var adversarial_suppress_total: Int = 0
         var adversarial_suppress_fired: Int = 0
         var suppressed_by_negative_context: Int = 0
+        var tier_must_total: Int = 0
+        var tier_must_covered: Int = 0
+        var tier_should_total: Int = 0
+        var tier_should_covered: Int = 0
+        var tier_watch_total: Int = 0
+        var tier_watch_covered: Int = 0
+        var tier_must_not_total: Int = 0
+        var tier_must_not_fired: Int = 0
+
+        /// Fold one ground-truth span of `tier` into the tier counters;
+        /// `hit` = at least one surfaced detection overlaps it.
+        mutating func tally(tier: String, hit: Bool) {
+            switch tier {
+            case "must":
+                tier_must_total += 1
+                if hit { tier_must_covered += 1 }
+            case "should":
+                tier_should_total += 1
+                if hit { tier_should_covered += 1 }
+            case "watch":
+                tier_watch_total += 1
+                if hit { tier_watch_covered += 1 }
+            case "must_not":
+                tier_must_not_total += 1
+                if hit { tier_must_not_fired += 1 }
+            default:
+                break
+            }
+        }
     }
 
     struct BaselineCellsReport: Encodable, Sendable {
@@ -131,35 +182,50 @@ struct G8BaselineHarnessTests {
         let fires: [FireFeatureRow]
     }
 
-    // MARK: - Category map (ALL 12 G8 categories, incl. phone/email)
+    // MARK: - Category map (ALL 17 G8 categories, incl. phone/email)
     //
     // G8 corpus category strings (G8CorpusIngestionTests.allowedCategories):
     //   ssn, npi, dea, dob, address, account, mrn, name, phone, email,
-    //   routingNumber, ein.
+    //   routingNumber, ein — and, since 1.2 T1.1 (C12-25): itin, creditCard,
+    //   driversLicense, passport, licensePlate.
     // This is the baseline's OWN map (the gate's gateMapCategory drops
     // phone/email and the detector emits both with no doctype gate).
 
     static func baselineMapCategory(_ s: String) -> RedactionRegion.PIIKind? {
         switch s {
-        case "ssn":           return .ssn
-        case "npi":           return .npi
-        case "dea":           return .dea
-        case "dob":           return .dateOfBirth
-        case "address":       return .address
-        case "account":       return .account
-        case "mrn":           return .medicalRecord
-        case "name":          return .name
-        case "phone":         return .phone
-        case "email":         return .email
-        case "routingNumber": return .routingNumber
-        case "ein":           return .ein
-        default:              return nil
+        case "ssn":            return .ssn
+        case "npi":            return .npi
+        case "dea":            return .dea
+        case "dob":            return .dateOfBirth
+        case "address":        return .address
+        case "account":        return .account
+        case "mrn":            return .medicalRecord
+        case "name":           return .name
+        case "phone":          return .phone
+        case "email":          return .email
+        case "routingNumber":  return .routingNumber
+        case "ein":            return .ein
+        case "itin":           return .itin
+        case "creditCard":     return .creditCard
+        case "driversLicense": return .driversLicense
+        case "passport":       return .passport
+        case "licensePlate":   return .licensePlate
+        default:               return nil
         }
     }
 
+    /// Every kind the corpus can carry, in the cutoff-map order the raw_scores
+    /// header lists them (the 12 original kinds, then the five added ones).
+    static let allCorpusKinds: [RedactionRegion.PIIKind] = [
+        .ssn, .name, .address, .account, .ein, .npi, .dea,
+        .phone, .email, .routingNumber, .medicalRecord, .dateOfBirth,
+        .itin, .creditCard, .driversLicense, .passport, .licensePlate,
+    ]
+
     /// Cell category key = PIICategory.rawValue, lowercased, spaces stripped.
     /// (ssn, name, address, account, ein, npi, dea, phone, email,
-    /// routingnumber, medicalrecord, dateofbirth.)
+    /// routingnumber, medicalrecord, dateofbirth, itin, creditcard,
+    /// driver'slicense, passport, licenseplate — the apostrophe survives.)
     static func cellCategoryKey(for kind: RedactionRegion.PIIKind) -> String? {
         guard let cat = PIICategory(piiKind: kind) else { return nil }
         return cat.rawValue.lowercased().replacingOccurrences(of: " ", with: "")
@@ -242,10 +308,14 @@ struct G8BaselineHarnessTests {
             // All GT of a kind (positive ∪ decoy) — used to decide a generic FP
             // (a surfaced detection overlapping NO GT span of any label).
             var allGTByKind:      [RedactionRegion.PIIKind: [NSRange]] = [:]
+            // Every GT span of a kind with its packet tier (the additive
+            // per-tier counters, 1.2 P1.10).
+            var tierGTByKind:     [RedactionRegion.PIIKind: [(NSRange, String)]] = [:]
             for span in doc.pii_spans {
                 guard let kind = Self.baselineMapCategory(span.category) else { continue }
                 let r = NSRange(location: span.start, length: span.end - span.start)
                 allGTByKind[kind, default: []].append(r)
+                tierGTByKind[kind, default: []].append((r, span.bridgedTier))
                 if span.expected_outcome == "suppress" {
                     decoyGTByKind[kind, default: []].append(r)
                 } else {
@@ -357,6 +427,13 @@ struct G8BaselineHarnessTests {
                     if suppressed { cell.suppressed_by_negative_context += 1 }
                 }
 
+                // Per-tier counters (additive): the same overlap rule, split
+                // by the packet-tier bridge.
+                for (gt, tier) in tierGTByKind[kind] ?? [] {
+                    let hit = surfaced.contains { Self.rangesOverlap($0.0, gt) }
+                    cell.tally(tier: tier, hit: hit)
+                }
+
                 cells[cellKey] = cell
             }
         }
@@ -364,11 +441,7 @@ struct G8BaselineHarnessTests {
         // Balanced cutoff map for the raw_scores header — one entry per cell
         // category key that has a non-nil balanced cutoff (nil omitted).
         var cutoffMap: [String: Double] = [:]
-        let allKinds: [RedactionRegion.PIIKind] = [
-            .ssn, .name, .address, .account, .ein, .npi, .dea,
-            .phone, .email, .routingNumber, .medicalRecord, .dateOfBirth,
-        ]
-        for kind in allKinds {
+        for kind in Self.allCorpusKinds {
             guard let catKey = Self.cellCategoryKey(for: kind) else { continue }
             if let c = balancedCutoff(for: kind) { cutoffMap[catKey] = c }
         }
