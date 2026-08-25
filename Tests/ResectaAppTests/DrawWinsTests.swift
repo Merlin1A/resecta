@@ -284,6 +284,25 @@ struct DrawWinsTests {
         #expect(source.contains("DocumentEditorView.drawToolEntryEffects(entering: entering)"))
     }
 
+    // MARK: - S3 source contract (packet §7.7)
+
+    @Test("S3 (§7.7): applyResizeSnapping posts the 'Aligned to guide' VoiceOver announcement like applySnapping — the draw path snaps through it since S1-b (source pin)")
+    func testResizeSnapAnnouncesGuideAlignment() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/Overlay/RedactionOverlayView.swift")
+        guard let start = source.range(of: "private func applyResizeSnapping("),
+              let end = source.range(of: "// MARK: - Handle Animation",
+                                     range: start.upperBound..<source.endIndex)
+        else {
+            Issue.record("Could not locate applyResizeSnapping")
+            return
+        }
+        let body = source[start.upperBound..<end.lowerBound]
+        #expect(body.contains("UIAccessibility.isVoiceOverRunning"),
+                "the announcement must be gated on VoiceOver, as in applySnapping")
+        #expect(body.contains("argument: \"Aligned to guide\""),
+                "the resize/draw snap path must post the same announcement the move path posts")
+    }
+
     private func loadRepoFile(_ relativePath: String, file: StaticString = #filePath) throws -> String {
         let repoRoot = URL(fileURLWithPath: "\(file)")
             .deletingLastPathComponent()   // Tests/ResectaAppTests

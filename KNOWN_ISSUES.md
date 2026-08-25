@@ -54,17 +54,6 @@ mmap/copy-on-write backing. Cannot be used for proactive eviction thresholds.
 
 ---
 
-### KI-6: Multi-Selection State Model Missing (Low–Medium)
-**Affects:** Context menus (Amendment A10.5)
-
-`RedactionState.selectedRegionID` is a single `UUID?`. Multi-selection requires
-changing to `Set<UUID>` and updating all consumers. Both "Select All" context menu
-items deferred to post-v1.
-
-**Workaround:** Select and edit regions one at a time; bulk selection is not available in V1.0.
-
----
-
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low)
 **Affects:** Detection pipeline, region management
 
@@ -92,7 +81,19 @@ page when the draw completes; no output is produced from a failed run.
 
 ---
 
+### KI-10: Rectangle Edges Do Not Align to Text Rows (Low)
+**Affects:** Rectangle draw tool
+
+While drawing, rectangle edges align to other boxes and page guides; alignment to recognized text rows is not available in this release (the "Snap to Text Boxes" setting that described it was removed in 1.1.0).
+
+---
+
 ## Fixed
+
+### KI-6: Multi-Selection State Model Missing (Low–Medium) — FIXED (entry moved 2026-08-25)
+**Resolution:** `RedactionState.selectedRegionIDs` is a `Set<UUID>`; Select All / Deselect All, Shift-tap on iPad and the iPhone "Add to Selection" toggle operate on the set (DRAW-6 / WU-38). The entry was stale.
+
+---
 
 ### KI-7: Detection Orchestration Wrapper Undefined (Medium) — FIXED 2026-03-30
 **Resolution:** `DetectionOrchestrator` implemented in `Packages/RedactionEngine/Sources/RedactionEngine/Detection/DetectionOrchestrator.swift`. Bridges `PIIDetector.detect(in:)` with per-page orchestration including OCR, PII detection, and face detection.

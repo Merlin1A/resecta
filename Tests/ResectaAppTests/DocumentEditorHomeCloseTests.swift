@@ -79,6 +79,84 @@ struct DocumentEditorHomeCloseTests {
         )
     }
 
+    // MARK: - REV-05 route (RB-85): a presented sheet parks before the dialog
+
+    @Test("REV-05: no confirm owed → close directly, sheet presented or not")
+    func noConfirmClosesDirectlyRegardlessOfSheet() {
+        #expect(DocumentEditorView.homeCloseRoute(needsConfirm: false, sheetPresented: false)
+                == .closeDirectly)
+        #expect(DocumentEditorView.homeCloseRoute(needsConfirm: false, sheetPresented: true)
+                == .closeDirectly)
+    }
+
+    @Test("REV-05: confirm owed with the sheet slot idle → the dialog")
+    func confirmWithIdleSlotPresentsDialog() {
+        #expect(DocumentEditorView.homeCloseRoute(needsConfirm: true, sheetPresented: false)
+                == .presentDialog)
+    }
+
+    @Test("REV-05: confirm owed while the slot presents → park the sheet, dialog from onDismiss")
+    func confirmWithPresentedSheetParksFirst() {
+        #expect(DocumentEditorView.homeCloseRoute(needsConfirm: true, sheetPresented: true)
+                == .parkSheetThenDialog)
+    }
+
+    @Test("REV-05: a parked review re-presents only while still pending, with the slot idle, in an editing session")
+    func parkedReviewRepresentGate() {
+        #expect(DocumentEditorView.homeCloseShouldRepresentReview(
+            parkedReview: true, hasPendingTriage: true, sheetPresented: false, phaseKind: .editing))
+        #expect(!DocumentEditorView.homeCloseShouldRepresentReview(
+            parkedReview: false, hasPendingTriage: true, sheetPresented: false, phaseKind: .editing),
+                "nothing was parked")
+        #expect(!DocumentEditorView.homeCloseShouldRepresentReview(
+            parkedReview: true, hasPendingTriage: false, sheetPresented: false, phaseKind: .editing),
+                "the staged set is gone (Close ran clearAll)")
+        #expect(!DocumentEditorView.homeCloseShouldRepresentReview(
+            parkedReview: true, hasPendingTriage: true, sheetPresented: true, phaseKind: .editing),
+                "a sheet is already up")
+        let notEditing: [DocumentState.PhaseKind] = [
+            .empty, .importing, .detecting, .redacting,
+            .verifying, .verified, .exporting, .failed,
+        ]
+        for phase in notEditing {
+            #expect(!DocumentEditorView.homeCloseShouldRepresentReview(
+                parkedReview: true, hasPendingTriage: true, sheetPresented: false, phaseKind: phase),
+                    "phase \(phase) is not an editing session")
+        }
+    }
+
+    @Test("REV-05 wiring: the sheet slot hands off to the dialog on dismissal, the dialog presents through the restoring binding, Close drops the parked state (source pin)")
+    func rev05WiringSourcePin() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        guard let slot = source.range(of: ".sheet(item: Binding<ActiveSheet?>("),
+              let content = source.range(of: ") { sheet in",
+                                         range: slot.upperBound..<source.endIndex)
+        else {
+            Issue.record("Could not locate the editor sheet slot")
+            return
+        }
+        let slotCall = source[slot.upperBound..<content.lowerBound]
+        #expect(slotCall.contains("onDismiss: {"), "the sheet slot must carry the onDismiss hand-off")
+        #expect(slotCall.contains("guard homeCloseAwaitsSheetDismissal else { return }"))
+        #expect(slotCall.contains("showDoneConfirmation = true"))
+
+        #expect(source.contains("isPresented: doneConfirmationPresented,"),
+                "the close dialog must present through doneConfirmationPresented")
+        #expect(!source.contains("isPresented: $showDoneConfirmation"),
+                "no direct $showDoneConfirmation presentation may remain")
+
+        guard let close = source.range(of: "private func performDoneCloseSession() {"),
+              let sec1 = source.range(of: "coordinator.downgradeTempProtectionOnSessionClose()",
+                                      range: close.upperBound..<source.endIndex)
+        else {
+            Issue.record("Could not locate performDoneCloseSession")
+            return
+        }
+        let prologue = source[close.upperBound..<sec1.lowerBound]
+        #expect(prologue.contains("homeCloseAwaitsSheetDismissal = false"))
+        #expect(prologue.contains("homeCloseParkedReview = false"))
+    }
+
     /// Mirrors `HonestySurfacesTests.loadRepoFile`.
     private func loadRepoFile(
         _ relativePath: String, from file: StaticString = #filePath

@@ -351,9 +351,9 @@ struct SettingsView: View {
 
             // DRAW-7 UI removed 1.1.0 (D-109/RB-77): the snap-to-text
             // assist has no OCR feed in production — revival = wire
-            // `RedactionOverlayView.ocrTextBlockNormalizedRects` (see
-            // ~/resecta-1.1-planning/sessions/drawtool-packet-2026-08-24.md
-            // §4.1), then restore the snap-to-text Toggle here.
+            // `RedactionOverlayView.ocrTextBlockNormalizedRects` (the
+            // 1.1 draw-tool packet, §4.1, in the planning estate), then
+            // restore the snap-to-text Toggle here.
             // `SettingsState.snapToTextEnabled` and the overlay machinery
             // stay compiled and tested (DC-005 pattern).
 

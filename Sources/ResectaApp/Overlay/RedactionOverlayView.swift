@@ -1992,6 +1992,14 @@ class RedactionOverlayView: UIView {
         let newPositions = snappedPositions.subtracting(previousGuideSet)
         if !newPositions.isEmpty {
             snapFeedback.impactOccurred(intensity: 0.4)
+            // VoiceOver announcement — gated to avoid throttling during
+            // drag. The draw path snaps through here since S1-b (packet
+            // §7.7): same announcement the move path's `applySnapping`
+            // posts, so drawing and resizing both report guide alignment.
+            if UIAccessibility.isVoiceOverRunning {
+                UIAccessibility.post(notification: .announcement,
+                                     argument: "Aligned to guide")
+            }
         }
         previousGuideSet = snappedPositions
         activeGuides = guides
