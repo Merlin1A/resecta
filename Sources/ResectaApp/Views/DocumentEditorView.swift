@@ -59,6 +59,25 @@ struct DocumentEditorView: View {
     // `homeNeedsCloseConfirm`).
     @State private var showDoneConfirmation = false
 
+    /// REV-05 (RB-85): the shared close dialog cannot present while the
+    /// editor's `.sheet(item:)` slot is presenting — UIKit refuses a second
+    /// presentation on the same host and SwiftUI tears the sheet down
+    /// instead (no dialog; a staged review discarded with the sheet).
+    /// `handleHomeTap()` therefore parks a presented sheet first and raises
+    /// this flag; the slot's `onDismiss` presents the dialog once the sheet
+    /// is actually down. A second Home tap during the park is absorbed.
+    @State private var homeCloseAwaitsSheetDismissal = false
+
+    /// REV-05: true while a parked sheet carried the staged Scan review.
+    /// The review itself stays in `redactionState.pendingTriage` (only the
+    /// sheet goes down, not the work); backing out of the dialog
+    /// re-presents it through the review bridge
+    /// (`restoreParkedReviewIfNeeded()`), Close tears it down with the
+    /// session. A parked plain search session is not restored — its
+    /// results are transient and the sheet clears them on disappearance,
+    /// the same outcome as its own Dismiss.
+    @State private var homeCloseParkedReview = false
+
     // UXC-14: drives the bespoke share-risk confirm sheet shown when a
     // Share tap reaches handleExportTap while the report is FAIL/ATTENTION
     // (not yet overridden), SKIPPED (not yet acknowledged), or an
@@ -534,7 +553,13 @@ struct DocumentEditorView: View {
                     }
                 }
             }
-        )) { sheet in
+        ), onDismiss: {
+            // REV-05: a sheet parked by `handleHomeTap()` hands off to the
+            // close dialog here, once its presentation is actually down.
+            guard homeCloseAwaitsSheetDismissal else { return }
+            homeCloseAwaitsSheetDismissal = false
+            showDoneConfirmation = true
+        }) { sheet in
             switch sheet {
             case .search(let searchState):
                 SearchAndRedactSheet(searchState: searchState, selectedDetent: $searchSheetDetent)
@@ -718,9 +743,12 @@ struct DocumentEditorView: View {
         // Shared with the editing-phase Home entry (1.1.0 Home swap,
         // `handleHomeTap()`): title and buttons identical; only the
         // message switches on phase (`closeDialogMessage(phaseKind:)`).
+        // Presented through `doneConfirmationPresented` (REV-05): the
+        // binding re-presents a review parked for this dialog when it
+        // goes down without Close.
         .confirmationDialog(
             "Close this document?",
-            isPresented: $showDoneConfirmation,
+            isPresented: doneConfirmationPresented,
             titleVisibility: .visible
         ) {
             Button("Close", role: .destructive) {
@@ -1484,6 +1512,10 @@ struct DocumentEditorView: View {
     /// confirmed-with-regions path share one implementation. The
     /// editing-phase Home entry (`handleHomeTap()`) shares this exact path.
     private func performDoneCloseSession() {
+        // REV-05: a sheet parked for the close dialog goes down with the
+        // session — nothing is re-presented after the teardown.
+        homeCloseAwaitsSheetDismissal = false
+        homeCloseParkedReview = false
         // SEC-1: downgrade temp-file protection before tearing down
         // the session state. Done before clearAll() so the path
         // walked still matches the live session's outputURL.
@@ -1507,16 +1539,111 @@ struct DocumentEditorView: View {
     /// two-way split the verification-screen Done button makes, on Done's
     /// own teardown (`performDoneCloseSession()`). The return to HomeView
     /// is the existing `.empty` auto-return; nothing here calls
-    /// `appCoordinator.returnHome()` directly.
+    /// `appCoordinator.returnHome()` directly. REV-05 (RB-85): while the
+    /// sheet slot is presenting, the confirm route parks the sheet first
+    /// (`parkEditorSheetForHomeClose()`) and the dialog presents from the
+    /// slot's `onDismiss`.
     private func handleHomeTap() {
-        if Self.homeNeedsCloseConfirm(
+        guard !homeCloseAwaitsSheetDismissal else { return }
+        let needsConfirm = Self.homeNeedsCloseConfirm(
             hasDrawnRegions: hasDrawnRegions,
             hasPendingTriage: redactionState.pendingTriage != nil
-        ) {
-            showDoneConfirmation = true
-        } else {
+        )
+        switch Self.homeCloseRoute(needsConfirm: needsConfirm,
+                                   sheetPresented: editorSheetIsPresented) {
+        case .closeDirectly:
             performDoneCloseSession()
+        case .presentDialog:
+            showDoneConfirmation = true
+        case .parkSheetThenDialog:
+            homeCloseAwaitsSheetDismissal = true
+            parkEditorSheetForHomeClose()
         }
+    }
+
+    /// How a Home tap reaches the teardown (REV-05, RB-85). No confirm
+    /// owed → the direct teardown, sheet or not (a presented sheet drops
+    /// with it — the idle path proven at D-111). Confirm owed with the
+    /// sheet slot idle → the dialog. Confirm owed while the slot is
+    /// presenting → park the sheet first; the dialog presents from the
+    /// slot's `onDismiss`, since UIKit refuses two presentations on one
+    /// host.
+    enum HomeCloseRoute: Equatable {
+        case closeDirectly
+        case presentDialog
+        case parkSheetThenDialog
+    }
+
+    /// Pure route for the Home tap (mirrors `homeNeedsCloseConfirm`).
+    static func homeCloseRoute(needsConfirm: Bool, sheetPresented: Bool) -> HomeCloseRoute {
+        guard needsConfirm else { return .closeDirectly }
+        return sheetPresented ? .parkSheetThenDialog : .presentDialog
+    }
+
+    /// Pure gate for re-presenting a parked review after the close dialog
+    /// went down without Close: only when a review was parked, the staged
+    /// set is still pending, the sheet slot is idle and the session is
+    /// still editing (Close clears the parked flag before this can run).
+    static func homeCloseShouldRepresentReview(
+        parkedReview: Bool, hasPendingTriage: Bool,
+        sheetPresented: Bool, phaseKind: DocumentState.PhaseKind
+    ) -> Bool {
+        parkedReview && hasPendingTriage && !sheetPresented && phaseKind == .editing
+    }
+
+    /// Mirrors the `.sheet(item:)` getter: the slot is presenting whenever
+    /// either source is live.
+    private var editorSheetIsPresented: Bool {
+        redactionState.activeSearch != nil
+            || redactionState.pendingCanvasRationaleRequest != nil
+    }
+
+    /// Take the presenting sheet down without touching the work behind it.
+    /// Only `activeSearch` is cleared — a staged review stays in
+    /// `pendingTriage` (the presentation bridge observes the pending set's
+    /// arrival, not its persistence, so nothing re-presents meanwhile); a
+    /// rationale sheet is simply dropped.
+    private func parkEditorSheetForHomeClose() {
+        if redactionState.activeSearch != nil {
+            homeCloseParkedReview = redactionState.pendingTriage != nil
+            redactionState.activeSearch = nil
+        } else if redactionState.pendingCanvasRationaleRequest != nil {
+            redactionState.pendingCanvasRationaleRequest = nil
+        }
+    }
+
+    /// Re-present a parked review after the dialog went down without
+    /// Close, through the same bridge every review arrival uses
+    /// (`presentReviewInScanInterface()` — fresh Scan interface, medium
+    /// detent, the staged set untouched).
+    private func restoreParkedReviewIfNeeded() {
+        let shouldRepresent = Self.homeCloseShouldRepresentReview(
+            parkedReview: homeCloseParkedReview,
+            hasPendingTriage: redactionState.pendingTriage != nil,
+            sheetPresented: editorSheetIsPresented,
+            phaseKind: documentState.phaseKind
+        )
+        homeCloseParkedReview = false
+        guard shouldRepresent else { return }
+        presentReviewInScanInterface()
+    }
+
+    /// `$showDoneConfirmation` with one hook (REV-05): when the dialog goes
+    /// down without Close — the Cancel row, or the tap-outside dismissal
+    /// of the iOS 26 popover — a parked review comes back. Deferred one
+    /// runloop turn: the setter runs inside SwiftUI's dismiss transaction,
+    /// where re-presenting a sheet is the re-entrant write class the sheet
+    /// slot's own setter defers (see its comment). Close clears the parked
+    /// flag first, so the restore is a no-op on that path.
+    private var doneConfirmationPresented: Binding<Bool> {
+        Binding(
+            get: { showDoneConfirmation },
+            set: { presented in
+                showDoneConfirmation = presented
+                guard !presented else { return }
+                Task { @MainActor in restoreParkedReviewIfNeeded() }
+            }
+        )
     }
 
     /// Pure gate for the Home close confirm (mirrors

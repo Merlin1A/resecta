@@ -32,6 +32,11 @@ The entries below follow the Keep-a-Changelog index format.
 ### Removed
 
 - Unreferenced code and assets across the app and engine (no behavior change; detection outputs unchanged).
+- **"Snap to Text Boxes" setting.** Rectangle edges align to other boxes and page guides; the text-row assist the setting described is not available in this release.
+
+### Fixed
+
+- **Rectangle tool.** Drawing always starts a new box while the tool is on (existing boxes are moved or resized with the tool off); a box's starting corner stays put while its far edge aligns to guides; boxes stay within the page; the canvas redraws after every gesture (no lingering dashed box, size label, or guide lines); size and touch thresholds are measured on screen so they feel the same at any zoom; turning the tool on clears the selection and the Add-to-Selection toggle.
 
 ## [1.0.0] — 2026-08-12
 

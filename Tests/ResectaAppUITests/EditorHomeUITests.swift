@@ -8,7 +8,7 @@ import XCTest
 /// (drawn/applied regions or a staged Scan review); an idle session
 /// closes in one tap.
 ///
-/// Two legs, driven end to end on the real device tree (black-box
+/// Three legs, driven end to end on the real device tree (black-box
 /// XCUITest, no `@testable import`):
 ///  - T1 idle: `--loadTestDocument` → overflow → Home → HomeView, no
 ///    dialog, editor chrome gone.
@@ -16,6 +16,11 @@ import XCTest
 ///    → overflow → Home → dialog → back out (Cancel row, or a tap
 ///    outside the iOS 26 popover) keeps the editor → overflow → Home →
 ///    Close → HomeView.
+///  - T3 REV-05 (RB-85): `--seedTriage` → the review sheet dropped to
+///    the compact float (toolbar reachable behind it) → overflow → Home
+///    → the sheet parks first and the dialog presents once it is down →
+///    back out re-presents the review → overflow → Home → Close →
+///    HomeView.
 ///
 /// Home is resolved by LABEL first (identifiers do not reliably
 /// propagate into the system overflow menu — `ShareRiskSheetUITests`
@@ -90,7 +95,85 @@ nonisolated final class EditorHomeUITests: XCTestCase {
         assertHomeViewPresent()
     }
 
+    /// T3 — REV-05 (RB-85): Home with the Scan review sheet parked at the
+    /// compact float AND a confirm owed (the staged review). The shared
+    /// dialog cannot present over a presented sheet, so the editor parks
+    /// the sheet first and presents the dialog once it is down; backing
+    /// out re-presents the review; Close tears the session down.
+    func testHomeOverFloatingReviewSheetPresentsDialogAfterParkingIt() {
+        app.launchArguments = ["--uitesting", "--seedTriage"]
+        app.launch()
+        awaitSeededReview()
+        dropReviewSheetToCompactFloat()
+
+        openOverflowAndTapHome()
+        let title = app.staticTexts["Close this document?"]
+        XCTAssertTrue(
+            title.waitForExistence(timeout: 10),
+            "Home over a floating review sheet with a confirm owed must present the close dialog (REV-05)."
+        )
+        XCTAssertFalse(
+            compactStrip.exists,
+            "The review sheet must be parked while the close dialog is up."
+        )
+        attachScreenshot(named: "editorhome-t3-dialog-over-parked-sheet")
+
+        backOutOfCloseDialog(title: title)
+        XCTAssertTrue(
+            reviewSummary.waitForExistence(timeout: 10),
+            "Backing out must re-present the staged review — the work behind the parked sheet survives."
+        )
+        attachScreenshot(named: "editorhome-t3-review-restored")
+
+        dropReviewSheetToCompactFloat()
+        openOverflowAndTapHome()
+        XCTAssertTrue(
+            title.waitForExistence(timeout: 10),
+            "The close dialog must present again on the second Home tap."
+        )
+        tapDialogClose()
+
+        assertHomeViewPresent()
+    }
+
     // MARK: - Helpers
+
+    private var reviewSummary: XCUIElement {
+        app.staticTexts["6 found — none selected yet"]
+    }
+
+    private var compactStrip: XCUIElement {
+        app.descendants(matching: .any)
+            .matching(identifier: "compactFloatStrip").firstMatch
+    }
+
+    private func awaitSeededReview() {
+        XCTAssertTrue(
+            reviewSummary.waitForExistence(timeout: 30),
+            "Seeded review never presented — check the --seedTriage launch hook."
+        )
+    }
+
+    /// Drop the seeded review to the compact float with a row-BODY tap
+    /// (the shipped navigation idiom — `SearchDetentLayoutUITests`), the
+    /// one detent where the toolbar stays reachable behind the sheet.
+    private func dropReviewSheetToCompactFloat() {
+        let ssnRow = app.staticTexts["123-45-6789"].firstMatch
+        XCTAssertTrue(ssnRow.waitForExistence(timeout: 10), "SSN row not present on the seeded review.")
+        ssnRow.tap()
+        XCTAssertTrue(
+            compactStrip.waitForExistence(timeout: 10),
+            "Row-body tap did not drop the review sheet to the compact float."
+        )
+        sleep(1)
+    }
+
+    private func attachScreenshot(named name: String) {
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
 
     private func awaitEditor() {
         XCTAssertTrue(
