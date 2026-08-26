@@ -121,14 +121,16 @@ nonisolated final class SearchMarkForRedactionUITests: XCTestCase {
         selectAllAndApply()
     }
 
-    /// UXC-45 (D-117, RB-104): the row's chevron expands the context
-    /// window plus the detector's rationale line, and collapses it again.
-    /// Driven on the multipage fixture's Scan interface — its pages carry
-    /// SSN / email / phone / card text, so every row has a rationale — and
-    /// witnessed through AX text only: the rationale line exists ONLY while
-    /// the row is expanded (the highlighted window itself is pixel-only
-    /// and, per F-7, never spoken), and the chevron's own label flips.
-    func testContextRow_chevronExpandsAndCollapsesTheRationaleLine() {
+    /// UXC-45 (D-117, RB-104) + UXC-46 (D-121): the row's chevron expands
+    /// the context window and reveals the Details button into the Match
+    /// rationale sheet, and collapses both again. Driven on the multipage
+    /// fixture's Scan interface — its pages carry SSN / email / phone /
+    /// card text, so every row has a rationale — and witnessed through AX
+    /// only: the Details button exists ONLY while the row is expanded (the
+    /// highlighted window itself is pixel-only and, per F-7, never
+    /// spoken), the retired "Reason:" summary renders in NEITHER state,
+    /// and the chevron's own label flips.
+    func testContextRow_chevronExpandsAndCollapsesTheDetailsButton() {
         app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
         app.launch()
 
@@ -153,25 +155,28 @@ nonisolated final class SearchMarkForRedactionUITests: XCTestCase {
         )
         XCTAssertEqual(chevron.label, "Show full context")
 
-        let rationaleLine = app.staticTexts.matching(
+        let details = app.buttons["View full rationale"].firstMatch
+        let retiredSummary = app.staticTexts.matching(
             NSPredicate(format: #"label BEGINSWITH "Reason:""#)
         ).firstMatch
-        XCTAssertFalse(rationaleLine.exists, "The rationale line rendered before the row was expanded.")
+        XCTAssertFalse(details.exists, "The Details button rendered before the row was expanded.")
+        XCTAssertFalse(retiredSummary.exists, "The retired rationale summary rendered on a collapsed row.")
 
         chevron.tap()
         XCTAssertTrue(
-            rationaleLine.waitForExistence(timeout: 5),
-            "Expanding the row did not reveal its rationale line."
+            details.waitForExistence(timeout: 5),
+            "Expanding the row did not reveal its Details button."
         )
+        XCTAssertFalse(retiredSummary.exists, "The retired rationale summary rendered on an expanded row.")
         XCTAssertEqual(chevron.label, "Show less")
 
         chevron.tap()
         let gone = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == false"), object: rationaleLine
+            predicate: NSPredicate(format: "exists == false"), object: details
         )
         XCTAssertEqual(
             XCTWaiter().wait(for: [gone], timeout: 5), .completed,
-            "Collapsing the row left the rationale line on screen."
+            "Collapsing the row left the Details button on screen."
         )
         XCTAssertEqual(chevron.label, "Show full context")
     }

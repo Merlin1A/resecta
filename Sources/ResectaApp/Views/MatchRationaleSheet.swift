@@ -3,9 +3,12 @@ import RedactionEngine
 
 // W1 — power-user rationale disclosure for a single PII hit.
 //
-// Presented as a sheet from the info.circle accessory on a PII result row.
-// Renders the rule ID, the signals the detector recorded, and the score
-// journey from raw detector output to the final score.
+// Presented as a sheet from the Details button a result row's chevron
+// expansion reveals. Renders the rule ID, the signals the detector
+// recorded, and the score journey from raw detector output to the final
+// score. UXC-46 (D-121): this sheet is the one home of the match
+// confidence and of the one-line rationale summary — the rows spell out
+// neither.
 //
 // Language is strictly mechanism-descriptive:
 // describe what the detector observed, not what the app "guarantees".
@@ -49,8 +52,9 @@ struct MatchRationaleSheet: View {
             // Every number gets a noun. "Detector score" is the
             // detector's internal signal; "Required threshold" is the
             // cutoff it had to clear; "Match confidence" is the separate
-            // per-row quantity shown in the results list. Labeling all
-            // three keeps a row confidence that differs from the detector
+            // per-match quantity (UXC-46: this sheet is its only home —
+            // the row spells out no confidence). Labeling all three
+            // keeps a match confidence that differs from the detector
             // score from reading as a contradiction.
             Section {
                 scoreRow(
@@ -65,12 +69,12 @@ struct MatchRationaleSheet: View {
                     scoreRow(label: "Required threshold", value: threshold)
                 }
                 if let confidence = result.piiConfidence {
-                    scoreRow(label: "Match confidence (shown on row)", value: confidence)
+                    scoreRow(label: "Match confidence", value: confidence)
                 }
             } header: {
                 Text("Score")
             } footer: {
-                Text("The final detector score is what the detector compared against the required threshold. Match confidence is a separate per-match quantity shown in the results list. Values are descriptive of the detector's internal signal and are not a measure of outcome.")
+                Text("The final detector score is what the detector compared against the required threshold. Match confidence is a separate per-match quantity from the detector score. Values are descriptive of the detector's internal signal and are not a measure of outcome.")
                     .font(.caption2)
             }
 
@@ -81,6 +85,12 @@ struct MatchRationaleSheet: View {
                     }
                 } header: {
                     Text("Signals")
+                } footer: {
+                    // UXC-46 (D-121): the one-line summary the row used
+                    // to show on expansion now closes this section, in
+                    // its existing format.
+                    Text(SearchResultRow.inlineRationaleSummaryString(for: rationale))
+                        .font(.caption2)
                 }
             }
         }
@@ -93,10 +103,15 @@ struct MatchRationaleSheet: View {
             Text(result.matchedText)
                 .font(.subheadline.monospaced())
                 .privacySensitive()
-            Text(result.contextSnippet)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .privacySensitive()
+            // UXC-46 (D-121): the same attributed window the row
+            // renders — the match run semibold-mono on the wash — so
+            // the sheet's context reads like the row that opened it.
+            Text(SearchResultRow.attributedSnippet(
+                result.contextSnippet,
+                matchRange: result.matchRangeInSnippet,
+                matchedText: result.matchedText
+            ))
+            .privacySensitive()
         }
     }
 

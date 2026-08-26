@@ -50,8 +50,10 @@ struct TouchTargetFloorTests {
             "Sources/ResectaApp/Views/Search/ScanReviewSection.swift",
             // UXC-45 (RB-105/109): `SearchResultsSection`'s only floored
             // control — the "Add to selection…" menu — relocated into
-            // `SearchFooterSection` (listed below); the section hosts no
-            // floored control now, so it leaves this inventory.
+            // `SearchFooterSection`, and UXC-46 (D-121) then removed the
+            // menu outright; the section hosts no floored control, so
+            // it stays out of this inventory (the footer keeps its
+            // Select All floor, listed below).
             "Sources/ResectaApp/Views/Search/SearchToolbarSection.swift",
             "Sources/ResectaApp/Views/SearchAndRedactSheet.swift",
             "Sources/ResectaApp/Views/Search/SearchSheetHeaderSection.swift",

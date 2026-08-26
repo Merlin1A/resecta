@@ -6,16 +6,19 @@ import RedactionEngine
 // match itself set semibold-monospaced on a soft brand-teal wash inside
 // proportional context (the engine windows the text so the match can
 // never truncate; `SearchResult.matchRangeInSnippet` locates it). A
-// small meta line above it carries the source badge, the confidence
-// tier word where the tier is graded, and the page label only when the
-// visible list is not sectioned by page. The chevron accessory expands
-// the window to its full text plus the detector's rationale line. The
-// leading confidence bar, the applied marker, and the 46-pt selection
-// circle keep the shared-family idiom of `FindingRow`, which this row no
-// longer mounts: the scan-review origin still renders through
-// `FindingRow` unchanged (RB-100 — that surface is frozen this release;
-// its unification with this row is the 1.2 rider). The pure display
-// contracts (badges, tiers, tooltips, rationale summaries) other
+// small meta line above it carries the source badge and the page label
+// only when the visible list is not sectioned by page. UXC-46 (D-121):
+// confidence is not spelled out on the row — no tier word, no rationale
+// line; the leading bar stays as the family's quiet cue and the spoken
+// tier stays in the merged a11y label for parity with it, while the
+// quantities themselves live in `MatchRationaleSheet`, reached through
+// the Details button the chevron expansion reveals beneath the full
+// window. The leading confidence bar, the applied marker, and the 46-pt
+// selection circle keep the shared-family idiom of `FindingRow`, which
+// this row no longer mounts: the scan-review origin still renders
+// through `FindingRow` unchanged (RB-100 — that surface is frozen this
+// release; its unification with this row is the 1.2 rider). The pure
+// display contracts (badges, tiers, tooltips, rationale summaries) other
 // surfaces and tests consume stay in this file.
 //
 // Bar grading: PII and detection rows grade on the shared absolute
@@ -136,8 +139,7 @@ struct SearchResultRow: View {
                             metaLine(
                                 isCustomHit: isCustomHit,
                                 isRegexHit: isRegexHit,
-                                tier: tier,
-                                showsTier: showsTier
+                                tier: tier
                             )
                             // The one text block: proportional context,
                             // the match run mono on the wash. Collapsed =
@@ -155,8 +157,9 @@ struct SearchResultRow: View {
                     }
                     .padding(.leading, ResectaTokens.Spacing.xs)
                     // F-7 (LAW): ONE merged element that names the page
-                    // (and the spoken tier where the meta line shows
-                    // one) — never the matched text, never the window.
+                    // (and the spoken tier where the row is graded —
+                    // the bar's non-visual twin, UXC-46) — never the
+                    // matched text, never the window.
                     // The `.ignore` merge hides the inner selection
                     // circle; the named action keeps non-visual
                     // selection first-class.
@@ -180,10 +183,12 @@ struct SearchResultRow: View {
             .onTapGesture { onNavigate() }
             .modifier(PressHighlightModifier())
 
-            // Inline rationale line (PII / Custom rows carry one), in
-            // the expanded state only, beneath the un-clamped window.
-            if isRationaleExpanded, let rationale = result.rationale {
-                inlineRationaleSummary(for: rationale)
+            // Details line (PII / Custom rows carry a rationale), in the
+            // expanded state only, beneath the un-clamped window — the
+            // row's one path into `MatchRationaleSheet` (UXC-46: the
+            // former "Reason:" one-liner is gone; the sheet carries it).
+            if isRationaleExpanded, result.rationale != nil {
+                detailsLine
             }
         }
         .listRowBackground(isCurrent ? ResectaTokens.BrandTeal.tint.opacity(0.12) : nil)
@@ -219,14 +224,14 @@ struct SearchResultRow: View {
         .sensoryFeedback(.selection, trigger: result.isSelected)
     }
 
-    /// UXC-45 meta line: source badge · tier word (graded rows only,
-    /// RB-108) · adaptive page label (RB-103) · spacer · term label
-    /// (multi-term under page grouping).
+    /// UXC-45 meta line: source badge · adaptive page label (RB-103) ·
+    /// spacer · term label (multi-term under page grouping). UXC-46
+    /// (D-121) retired the tier word that used to follow the badge —
+    /// confidence is not spelled out on the row.
     private func metaLine(
         isCustomHit: Bool,
         isRegexHit: Bool,
-        tier: ConfidenceTier,
-        showsTier: Bool
+        tier: ConfidenceTier
     ) -> some View {
         HStack(spacing: ResectaTokens.Spacing.xs) {
             SearchRowSourceBadge(
@@ -236,11 +241,6 @@ struct SearchResultRow: View {
                 tier: tier
             )
             .equatable()
-            if showsTier {
-                Text(tier.shortLabel)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
             if showsPageLabel {
                 Text("p.\(result.pageIndex + 1)")
                     .font(.caption2)
@@ -262,8 +262,9 @@ struct SearchResultRow: View {
     /// every row has context to reveal — and outside the row's a11y
     /// merge so it stays a reachable control. Id FROZEN
     /// (`rationaleDisclosureButton`). Expanded = the full context window
-    /// un-clamped + the rationale line (where one exists) with its
-    /// "Details" link into `MatchRationaleSheet`. Per the long-press
+    /// un-clamped + the "Details" button into `MatchRationaleSheet`
+    /// (rows that carry a rationale; UXC-46 retired the one-line
+    /// rationale summary that used to sit beside it). Per the long-press
     /// density cap the row keeps a single tap-target affordance for
     /// rationale (this chevron); the contextMenu's "Why this match?"
     /// path opens the broader `ReverseRationalePopover` and is unchanged.
@@ -286,23 +287,21 @@ struct SearchResultRow: View {
         .accessibilityLabel(isRationaleExpanded ? "Show less" : "Show full context")
         .accessibilityHint(isRationaleExpanded
                            ? "Collapses the surrounding text back to its short form"
-                           : "Expands the match's surrounding text and the detector's reasoning")
+                           : "Expands the match's surrounding text")
         .accessibilityIdentifier("rationaleDisclosureButton")
     }
 
-    /// Inline rationale line rendered below the row when expanded.
-    /// "Reason: <signals> (<score>)." — mechanism-only nouns (regex /
-    /// context / validator / name / doctype / threshold / ocr / custom);
-    /// the string format is `inlineRationaleSummaryString` (UNCHANGED).
-    /// Two lines max, aligned to the content column's leading edge. The
-    /// trailing "Details" button preserves the MatchRationaleSheet path.
-    @ViewBuilder
-    private func inlineRationaleSummary(for rationale: MatchRationale) -> some View {
+    /// The Details line rendered below the un-clamped window when the
+    /// row is expanded (UXC-46, D-121): a single trailing "Details"
+    /// button into `MatchRationaleSheet`, where the detector's signals,
+    /// the scores, and the match confidence live. It keeps the position
+    /// the retired "Reason:" summary's button had — leading inset to the
+    /// content column, trailing-aligned — so the expansion reads as the
+    /// window plus one action; now that it stands alone it carries the
+    /// UXC-18 46-pt layout floor (RB-54/67) the text beside it used to
+    /// excuse.
+    private var detailsLine: some View {
         HStack(spacing: ResectaTokens.Spacing.xs) {
-            Text(Self.inlineRationaleSummaryString(for: rationale))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
             Spacer()
             Button {
                 onShowRationale()
@@ -310,6 +309,8 @@ struct SearchResultRow: View {
                 Text("Details")
                     .font(.caption2)
                     .foregroundStyle(.tint)
+                    .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("View full rationale")
@@ -568,18 +569,6 @@ extension SearchResultRow {
             case .low: return "Low confidence"
             }
         }
-
-        /// UXC-45 (RB-103/108) — the meta line's tier word. Rendered only
-        /// where the tier is graded (`showsTierWord(for:)`); the a11y
-        /// string keeps the full `descriptor`. A label over an already-
-        /// computed tier, never a second threshold source.
-        var shortLabel: String {
-            switch self {
-            case .high: return "High"
-            case .medium: return "Medium"
-            case .low: return "Low"
-            }
-        }
     }
 
     /// Within-floor band (15 percentage points) for OCR grading —
@@ -688,11 +677,14 @@ extension SearchResultRow {
 // MARK: - UXC-45 Context-first row contracts
 
 extension SearchResultRow {
-    /// UXC-45 (RB-108) — the tier word renders only where the tier is
-    /// graded: PII rows (absolute bands) and OCR-source rows (floor-
-    /// relative). Literal text / regex / custom text-layer hits grade
-    /// `.high` by construction, so their word would be noise; their bar
-    /// still renders the literal-match green.
+    /// UXC-45 (RB-108) — true where the tier is graded: PII rows
+    /// (absolute bands) and OCR-source rows (floor-relative). Literal
+    /// text / regex / custom text-layer hits grade `.high` by
+    /// construction, so a spoken tier would be noise; their bar still
+    /// renders the literal-match green. UXC-46 (D-121): the meta line no
+    /// longer renders a tier word, so this predicate gates ONLY the
+    /// spoken tier in the merged a11y label (the bar's non-visual twin);
+    /// the name is kept for the pins that reference it.
     nonisolated static func showsTierWord(for result: SearchResult) -> Bool {
         if result.piiConfidence != nil { return true }
         if case .ocr = result.source { return true }
@@ -701,8 +693,9 @@ extension SearchResultRow {
 
     /// UXC-45 — the merged row element's spoken label: the family
     /// adapter's page-only string (F-7 LAW: never matched text, never
-    /// the window) plus the tier descriptor where the meta line shows
-    /// a tier word.
+    /// the window) plus the tier descriptor where the row is graded
+    /// (UXC-46: spoken for parity with the bar, no longer mirrored by
+    /// a visible word).
     static func accessibilityLabel(
         for result: SearchResult,
         tier: ConfidenceTier,
@@ -771,7 +764,7 @@ extension SearchResultRow {
     }
 }
 
-// MARK: - Inline Rationale Summary
+// MARK: - Rationale Summary (the MatchRationaleSheet Signals footer)
 
 extension SearchResultRow {
     /// Short mechanism-noun label per `MatchRationale.Signal` case.
@@ -816,8 +809,10 @@ extension SearchResultRow {
         }
     }
 
-    /// Inline rationale summary line for the row-expansion area.
-    /// Format: `"Reason: <signals> (detector score <score>)."` —
+    /// One-line rationale summary. Since UXC-46 (D-121) it renders as
+    /// the Signals footer of `MatchRationaleSheet` (it used to sit in
+    /// the row-expansion area). Format: `"Reason: <signals> (detector
+    /// score <score>)."` —
     /// signals join with `+` (deduped, preserving first-encounter order),
     /// score formats to two decimal places. The number carries the
     /// "detector score" noun so it can't be misread as the row's match

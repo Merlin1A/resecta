@@ -6,9 +6,8 @@ import RedactionEngine
 // Lifted from `SearchAndRedactSheet.swift`; behavior unchanged.
 // UXC-45 (RB-105/109): the "Add to selection" predicate Menu moved out
 // of the results-header zone into `SearchFooterSection`, the surface's
-// single selection authority; predicate-driven attribute selection
-// still routes through `SearchState.addToSelection(where:)` (RB-21/
-// UXC-12: additive — never deselects).
+// single selection authority; UXC-46 (D-121) then removed the menu —
+// selection is per row or the footer's Select All.
 
 struct SearchResultsSection: View {
     @Bindable var searchState: SearchState

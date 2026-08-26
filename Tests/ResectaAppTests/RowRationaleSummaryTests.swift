@@ -2,11 +2,12 @@ import Testing
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-30: pin the inline rationale summary format and
-// verify the §19 mechanism-only invariant. The view-side toggle
-// (chevron flip → expansion + Details button → MatchRationaleSheet)
-// is UI-only and deferred to manual on-device verification per
-// CLAUDE.md.
+// WU-30: pin the rationale summary format and verify the §19
+// mechanism-only invariant. Since UXC-46 (D-121) the summary renders as
+// the Signals footer of `MatchRationaleSheet`, not on the row; the
+// view-side toggle (chevron flip → expansion + Details button →
+// MatchRationaleSheet) is UI-only and covered by
+// `SearchMarkForRedactionUITests`.
 //
 // Forbidden-phrase fixtures are assembled mid-word per audit-lint
 // learning so the test source itself stays clear of the audit-lint
@@ -14,7 +15,7 @@ import RedactionEngine
 // boundaries, since the trailing-suffix split still surfaces the
 // stem token to the regex word-boundary check).
 
-@Suite("Inline rationale summary on PII row tap-expand (WU-30)")
+@Suite("Rationale summary line (WU-30; the MatchRationaleSheet Signals footer since UXC-46)")
 struct RowRationaleSummaryTests {
     @Test("Reason format with regex + context signals + score")
     func basicRegexPlusContext() {

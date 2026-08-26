@@ -1,5 +1,4 @@
 import SwiftUI
-import RedactionEngine
 
 // SEARCH-AND-REDACT §S3 / §S4: Footer summary, grouping, audit export.
 // Lifted from `SearchAndRedactSheet.swift` (WU-01).
@@ -10,11 +9,10 @@ import RedactionEngine
 // origins: search/scan-run results (reading `searchState`) and staged
 // detections under review (via `ReviewFooterModel`). UXC-45 (D-117,
 // RB-105/109): it is the surface's ONE selection authority — the
-// "M of N selected" count, the compact "Add to selection" predicate
-// menu (each origin's predicates, relocated here from the full-width
-// rows both origins used to mount above their lists), and the
-// prominent global Select All (the affordance set that makes all-
-// deselected arrival livable).
+// "M of N selected" count and the prominent global Select All (the
+// affordance set that makes all-deselected arrival livable). UXC-46
+// (D-121) removed the "Add to selection" predicate menu that sat
+// between them: selection is per row or Select All.
 
 struct SearchFooterSection: View {
     @Bindable var searchState: SearchState
@@ -95,8 +93,8 @@ struct SearchFooterSection: View {
                 }
 
                 // Grouping toggle. The piiScan "By Category"
-                // sibling was deleted (redundant with the category chips +
-                // "Select where…"); piiScan results always group by page.
+                // sibling was deleted (redundant with the category
+                // chips); piiScan results always group by page.
                 if review == nil,
                    searchState.searchModeType == .multiTerm && searchState.searchTerms.count > 1 {
                     Toggle("By Term", isOn: $searchState.groupByTerm)
@@ -104,144 +102,11 @@ struct SearchFooterSection: View {
                         .controlSize(.small)
                 }
 
-                addToSelectionMenu
                 selectAllButton
             }
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .padding(.vertical, ResectaTokens.Spacing.sm)
-    }
-
-    // MARK: - Add to selection (UXC-45, RB-105/109)
-
-    /// Compact predicate menu beside Select All — the "Add to selection"
-    /// affordance both origins used to render as a full-width row above
-    /// their lists. The items are each origin's predicates, unchanged:
-    /// RB-21/UXC-12 additive (union) semantics — a predicate ADDS every
-    /// matching row to whatever is already selected and never deselects
-    /// anything; narrowing to exactly a predicate's matches is the
-    /// "Deselect All" → predicate two-step. Search predicates apply to
-    /// `searchState.results` (not `filteredResults`) so the menu stays
-    /// useful when filters hide candidates; review predicates apply to
-    /// every staged detection. Every pick flips the conditional-dismiss
-    /// touched tracker exactly once. (Menus are fine here — the D-70
-    /// arbitration poisons concern the compact strip, not the footer.)
-    private var addToSelectionMenu: some View {
-        Menu {
-            if review != nil {
-                reviewPredicateItems
-            } else {
-                searchPredicateItems
-            }
-        } label: {
-            Image(systemName: "checklist")
-                .font(.body)
-                .foregroundStyle(.tint)
-                // RB-54/67: 46-pt layout floor on both axes.
-                .frame(
-                    width: ResectaTokens.TouchTarget.minimum,
-                    height: ResectaTokens.TouchTarget.minimum
-                )
-                .contentShape(Rectangle())
-        }
-        .accessibilityLabel("Add to selection")
-        .accessibilityHint("Adds every result matching an attribute to the selection")
-        .accessibilityIdentifier("footerAddToSelectionMenu")
-    }
-
-    /// Search-origin predicates (relocated from `SearchResultsSection`,
-    /// items unchanged). Each Section corresponds to one predicate kind
-    /// (confidence threshold, source, category, applied state); every
-    /// branch routes through `userSelectWhere`.
-    @ViewBuilder
-    private var searchPredicateItems: some View {
-        Section("By confidence") {
-            Button("\u{2265} 75%") {
-                userSelectWhere { ($0.piiConfidence ?? 0) >= 0.75 }
-            }
-            Button("\u{2265} 90%") {
-                userSelectWhere { ($0.piiConfidence ?? 0) >= 0.90 }
-            }
-        }
-        Section("By source") {
-            Button("Text") {
-                userSelectWhere { $0.source == .textLayer }
-            }
-            Button("OCR") {
-                userSelectWhere { $0.source != .textLayer }
-            }
-        }
-        if searchState.searchModeType == .piiScan {
-            let categories = searchState.categoryCounts.keys
-                .sorted(by: { $0.rawValue < $1.rawValue })
-            if !categories.isEmpty {
-                Section("By category") {
-                    ForEach(categories, id: \.self) { category in
-                        Button(category.rawValue) {
-                            userSelectWhere { $0.piiCategory == category }
-                        }
-                    }
-                }
-            }
-        }
-        Section("By applied state") {
-            Button("Applied") {
-                let applied = searchState.appliedResultIDs
-                userSelectWhere { applied.contains($0.id) }
-            }
-            Button("Unapplied") {
-                let applied = searchState.appliedResultIDs
-                userSelectWhere { !applied.contains($0.id) }
-            }
-        }
-    }
-
-    /// Select-Where wrapper: the additive predicate union plus the
-    /// conditional-dismiss touched flip — predicate selection is user
-    /// selection work, so the sheet's Dismiss confirms from here forward.
-    private func userSelectWhere(_ predicate: (SearchResult) -> Bool) {
-        searchState.addToSelection(where: predicate)
-        searchState.userModifiedSelections = true
-    }
-
-    /// Review-origin predicates (relocated from `ScanReviewSection`,
-    /// items unchanged): RB-21/UXC-12 — additive (union), so "≥ 90%"
-    /// ADDS the matching detections to whatever is already selected and
-    /// never deselects the rest.
-    @ViewBuilder
-    private var reviewPredicateItems: some View {
-        let kindsWithCounts = ScanReviewSection.kindsWithCounts(
-            in: ScanReviewSection.flattenedFindings(redactionState.pendingTriage)
-        )
-        Section("By confidence") {
-            Button("\u{2265} 75%") { addToReviewSelection { $0.confidence >= 0.75 } }
-            Button("\u{2265} 90%") { addToReviewSelection { $0.confidence >= 0.90 } }
-        }
-        if !kindsWithCounts.isEmpty {
-            Section("By category") {
-                ForEach(kindsWithCounts, id: \.kind) { item in
-                    Button(item.kind.fullName) {
-                        addToReviewSelection { $0.kind == item.kind }
-                    }
-                }
-            }
-        }
-    }
-
-    /// RB-21/UXC-12: additive predicate selection over the staged
-    /// detections — unions the predicate's matches into the existing
-    /// `triageSelections` via `ScanReviewSection.addSelections(where:in:to:)`
-    /// rather than replacing the dictionary outright, so a prior manual
-    /// pick or an earlier predicate's matches are never deselected by a
-    /// later one.
-    private func addToReviewSelection(_ predicate: (DetectionResult) -> Bool) {
-        redactionState.triageSelections = ScanReviewSection.addSelections(
-            where: predicate,
-            in: ScanReviewSection.flattenedFindings(redactionState.pendingTriage),
-            to: redactionState.triageSelections
-        )
-        // Conditional dismiss: predicate selection is user selection work.
-        searchState.userModifiedSelections = true
     }
 
     // MARK: - Select All (selection-throughput prominence)

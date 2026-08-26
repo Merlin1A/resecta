@@ -614,42 +614,6 @@ struct ScanReviewSection: View {
             return true
         }
     }
-
-    /// Predicate selection over the staged detections: every detection gets
-    /// an EXPLICIT entry (predicate verdict). Pure — computes a fresh
-    /// verdict dictionary from `findings` alone, with no notion of a
-    /// prior selection. `addSelections(where:in:to:)` below builds the
-    /// additive (RB-21/UXC-12) contract on top of this.
-    static func selections(
-        where predicate: (DetectionResult) -> Bool,
-        in findings: [(page: Int, detection: DetectionResult)]
-    ) -> [UUID: Bool] {
-        var next: [UUID: Bool] = [:]
-        for item in findings {
-            next[item.detection.id] = predicate(item.detection)
-        }
-        return next
-    }
-
-    /// RB-21/UXC-12: unions a predicate's verdicts into `existing`
-    /// instead of replacing it — a detection already `true` in
-    /// `existing` stays `true` even when the new predicate doesn't match
-    /// it (`old || new`). `existing` is first pruned down to the ids
-    /// present in `findings`, so a stale id left over from a prior,
-    /// now-shrunk staged set is dropped exactly as the old whole-dictionary
-    /// replace-write would have dropped it — the result's key set is
-    /// always exactly `findings`'s ids (the explicit-entry contract).
-    static func addSelections(
-        where predicate: (DetectionResult) -> Bool,
-        in findings: [(page: Int, detection: DetectionResult)],
-        to existing: [UUID: Bool]
-    ) -> [UUID: Bool] {
-        let findingIDs = Set(findings.map(\.detection.id))
-        let prunedExisting = existing.filter { findingIDs.contains($0.key) }
-        return prunedExisting.merging(selections(where: predicate, in: findings)) { old, new in
-            old || new
-        }
-    }
 }
 
 // MARK: - DRAW-4 CrossPageGroupRow
