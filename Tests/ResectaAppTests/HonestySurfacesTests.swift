@@ -50,23 +50,48 @@ struct HonestyDisclaimerMountTests {
         }
     }
 
-    // REV-03 (RB-61/RB-68, supersedes RB-43's PASS-only top mount):
-    // the disclaimer's one gate-wrapped mount sits between
-    // "Verification Details" and the trust strip on EVERY verdict —
-    // no per-status placement branches. On SKIPPED the details
-    // section does not render, so the disclaimer sits directly above
-    // the strip (accepted as-falls, RB-68).
-    @Test("REV-03 placement: one gate-wrapped mount, directly above the trust strip")
-    func disclaimerMountSitsAboveTrustStrip() throws {
+    // UXC-43 (D-118; supersedes REV-03's placement, RB-61/RB-68): the
+    // disclaimer's one gate-wrapped mount is the LAST element of the
+    // page on EVERY verdict — inside the footer block beneath the
+    // trust strip, after the timing footer's mount — no per-status
+    // placement branches. On SKIPPED there is no timing line, so the
+    // disclaimer sits directly under the strip (accepted as-falls).
+    @Test("UXC-43 placement: one gate-wrapped mount, last on the page beneath the trust strip and the timing footer")
+    func disclaimerMountSitsAtThePageFoot() throws {
         let source = try loadRepoFile(
             "Sources/ResectaApp/Views/VerificationResultsView.swift")
         let gateCalls = source.components(
             separatedBy: "Self.shouldShowHonestyDisclaimer(").count - 1
         #expect(gateCalls == 1,
                 "expected exactly ONE gated disclaimer mount in the body, found \(gateCalls)")
+        // Ordering inside the page stack, by mount position: the trust
+        // strip, then the timing footer's mount, then the disclaimer's.
+        guard let stackStart = source.range(
+                  of: "VStack(spacing: ResectaTokens.Spacing.xl) {"),
+              let strip = source.range(
+                  of: "\n                    trustStrip\n",
+                  range: stackStart.upperBound..<source.endIndex),
+              let footerMount = source.range(
+                  of: "\n                            footer\n",
+                  range: strip.upperBound..<source.endIndex),
+              let disclaimerMount = source.range(
+                  of: "\n                            honestyDisclaimer\n",
+                  range: footerMount.upperBound..<source.endIndex)
+        else {
+            Issue.record("Could not locate the page stack's trustStrip → footer → honestyDisclaimer mounts")
+            return
+        }
+        #expect(strip.upperBound <= footerMount.lowerBound
+                    && footerMount.upperBound <= disclaimerMount.lowerBound,
+                "the disclaimer mount must be the last element, beneath trustStrip and the footer mount (UXC-43)")
+        // The two mounts share ONE tight footer block (`Spacing.sm`).
         #expect(source.contains(
-            "honestyDisclaimer\n                    }\n                    trustStrip"),
-                "the disclaimer mount must sit immediately above trustStrip (REV-03)")
+            "VStack(spacing: ResectaTokens.Spacing.sm) {\n"
+            + "                        if Self.shouldShowRunBreakdown(report: report) {\n"
+            + "                            footer\n"
+            + "                        }\n"
+            + "                        if Self.shouldShowHonestyDisclaimer("),
+                "the timing footer and the disclaimer must share one Spacing.sm footer block (UXC-43)")
     }
 
     @Test("Results view mounts the .redacted-profile disclaimer (source pin)")

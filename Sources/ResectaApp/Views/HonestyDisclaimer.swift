@@ -14,7 +14,6 @@ struct HonestyDisclaimer: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
-            .padding(.top, ResectaTokens.Spacing.lg)
             .accessibilityLabel("Disclaimer: \(disclaimerText)")
     }
 
