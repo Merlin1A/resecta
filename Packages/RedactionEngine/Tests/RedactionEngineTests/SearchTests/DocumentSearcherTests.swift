@@ -210,9 +210,25 @@ struct DocumentSearcherTests {
         }
     }
 
-    @Test("Context snippet includes surrounding text")
+    // MARK: - Context window (UXC-45 / RB-101 — the contract these pin)
+    //
+    // `contextSnippet` returns the window text AND the match's Character
+    // range inside it; every builder path threads that range onto
+    // `SearchResult.matchRangeInSnippet`. The pins below replaced the
+    // former loose "contains the term" check.
+
+    /// The snippet slice the result's `matchRangeInSnippet` addresses.
+    private func windowSlice(_ result: SearchResult) -> String? {
+        guard let range = result.matchRangeInSnippet else { return nil }
+        let chars = Array(result.contextSnippet)
+        guard range.lowerBound >= 0, range.upperBound <= chars.count else { return nil }
+        return String(chars[range])
+    }
+
+    @Test("Context window on the text path: short page, no cuts, range addresses the match")
     func contextSnippet() async {
-        let data = TestFixtures.textLayerPDF(text: "The quick brown fox jumps over the lazy dog")
+        let text = "The quick brown fox jumps over the lazy dog"
+        let data = TestFixtures.textLayerPDF(text: text)
         guard let doc = PDFDocument(data: data) else {
             Issue.record("Failed to create PDFDocument")
             return
@@ -230,11 +246,229 @@ struct DocumentSearcherTests {
             results.append(result)
         }
 
-        #expect(results.count >= 1)
-        if let snippet = results.first?.contextSnippet {
-            #expect(snippet.contains("fox"))
-            // Snippet should include surrounding context
-            #expect(snippet.count > 3)
+        #expect(results.count == 1)
+        guard let result = results.first else { return }
+        // 43 characters sit inside the radius on both sides: nothing is
+        // cut, so no ellipsis on either side and the window is the text.
+        #expect(result.contextSnippet == text)
+        #expect(result.matchRangeInSnippet == 16..<19)
+        #expect(windowSlice(result) == "fox")
+        #expect(windowSlice(result) == result.matchedText)
+    }
+
+    @Test("Context window: radius 44 honored, both sides ellipsized, no partial word at either cut")
+    func contextWindowRadiusAndWordTrim() async {
+        let words = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf",
+                     "hotel", "india", "juliet", "kilo", "lima", "MATCH", "mike",
+                     "november", "oscar", "papa", "quebec", "romeo", "sierra", "tango",
+                     "uniform", "victor", "whiskey", "xray", "yankee", "zulu"]
+        let text = words.joined(separator: " ")
+        let matchStart = text.distance(from: text.startIndex, to: text.range(of: "MATCH")!.lowerBound)
+
+        let searcher = DocumentSearcher()
+        let window = await searcher.contextSnippet(text: text, matchStart: matchStart, matchLength: 5)
+
+        #expect(window.snippet.hasPrefix("…"))
+        #expect(window.snippet.hasSuffix("…"))
+        let body = String(window.snippet.dropFirst().dropLast())
+        // Never longer than the raw window; the trim only shortens.
+        #expect(body.count <= DocumentSearcher.contextRadius * 2 + 5)
+        // No leading/trailing separator run survives a cut side.
+        #expect(body.first?.isLetter == true)
+        #expect(body.last?.isLetter == true)
+        // The first and last words of the window are WHOLE words of the
+        // text (a partial word would not appear space-delimited in it).
+        let bodyWords = body.split(separator: " ").map(String.init)
+        #expect(words.contains(bodyWords.first ?? ""))
+        #expect(words.contains(bodyWords.last ?? ""))
+        // The range addresses the match after the trim.
+        let chars = Array(window.snippet)
+        #expect(String(chars[window.matchRange]) == "MATCH")
+    }
+
+    @Test("Context window never trims into the match: an adjoining partial word keeps the raw cut")
+    func contextWindowKeepsRawCutAgainstTheMatch() async {
+        let text = String(repeating: "a", count: 60) + "MATCH" + String(repeating: "b", count: 60)
+        let searcher = DocumentSearcher()
+        let window = await searcher.contextSnippet(text: text, matchStart: 60, matchLength: 5)
+
+        let radius = DocumentSearcher.contextRadius
+        #expect(window.snippet
+                == "…" + String(repeating: "a", count: radius) + "MATCH"
+                + String(repeating: "b", count: radius) + "…")
+        #expect(window.matchRange == (radius + 1)..<(radius + 6))
+        #expect(String(Array(window.snippet)[window.matchRange]) == "MATCH")
+    }
+
+    @Test("Context window: ellipsis only on a cut side; a separator-run cut starts the window at the next word")
+    func contextWindowEllipsisSides() async {
+        let searcher = DocumentSearcher()
+
+        // Match at the very start: nothing cut on the left.
+        let tail = String(repeating: "x", count: 100)
+        let atStart = await searcher.contextSnippet(text: "MATCH " + tail, matchStart: 0, matchLength: 5)
+        #expect(!atStart.snippet.hasPrefix("…"))
+        #expect(atStart.snippet.hasSuffix("…"))
+        #expect(atStart.matchRange == 0..<5)
+        #expect(String(Array(atStart.snippet)[atStart.matchRange]) == "MATCH")
+
+        // Match at the very end, the raw left cut lands inside the x-run:
+        // the partial run is dropped, the space after it too, so the
+        // window begins at the match.
+        let atEnd = await searcher.contextSnippet(text: tail + " MATCH", matchStart: 101, matchLength: 5)
+        #expect(atEnd.snippet == "…MATCH")
+        #expect(atEnd.matchRange == 1..<6)
+
+        // A raw cut that lands on a separator run: the run is dropped
+        // (no "… word" with a stranded leading space).
+        let sentence = String(repeating: "y", count: 20) + " " + String(repeating: "z", count: 23)
+            + " MATCH " + String(repeating: "w", count: 50)
+        let matchStart = sentence.distance(from: sentence.startIndex,
+                                           to: sentence.range(of: "MATCH")!.lowerBound)
+        let onSeparator = await searcher.contextSnippet(text: sentence, matchStart: matchStart, matchLength: 5)
+        #expect(onSeparator.snippet.hasPrefix("…z"))
+        #expect(String(Array(onSeparator.snippet)[onSeparator.matchRange]) == "MATCH")
+    }
+
+    @Test("Context window flattens newlines LAST, one Character each, so the range stays valid")
+    func contextWindowNewlineFlatten() async {
+        let text = "line one\nMATCH here\r\nend"
+        let searcher = DocumentSearcher()
+        let window = await searcher.contextSnippet(text: text, matchStart: 9, matchLength: 5)
+        let keepsANewline = window.snippet.contains { $0.isNewline }
+        #expect(!keepsANewline)
+        #expect(window.snippet == "line one MATCH here end")
+        #expect(window.matchRange == 9..<14)
+        #expect(String(Array(window.snippet)[window.matchRange]) == "MATCH")
+    }
+
+    @Test("Context window NSRange overload converts UTF-16 offsets past non-BMP characters")
+    func contextWindowNSRangeOverload() async {
+        let text = "😀😀 MATCH tail"
+        let searcher = DocumentSearcher()
+        let ns = text as NSString
+        let window = await searcher.contextSnippet(text: text, matchNSRange: ns.range(of: "MATCH"))
+        #expect(window.snippet == text)
+        #expect(window.matchRange == 3..<8)
+        #expect(String(Array(window.snippet)[window.matchRange]) == "MATCH")
+    }
+
+    @Test("Regex path threads the window range onto the result")
+    func contextWindowRegexPath() async {
+        let data = TestFixtures.textLayerPDF(text: "Call 555-0100 before noon")
+        guard let doc = PDFDocument(data: data) else {
+            Issue.record("Failed to create PDFDocument")
+            return
+        }
+        let searcher = DocumentSearcher()
+        let stream = searcher.search(
+            SendablePDFDocument(doc),
+            mode: .regex("\\d{3}-\\d{4}", options: SearchOptions()),
+            progress: { _, _ in }
+        )
+        var results: [SearchResult] = []
+        for await result in stream { results.append(result) }
+
+        #expect(results.count == 1)
+        guard let result = results.first else { return }
+        #expect(result.matchedText == "555-0100")
+        #expect(windowSlice(result) == result.matchedText)
+    }
+
+    @Test("PII scan path threads the window range onto the result")
+    func contextWindowPIIPath() async {
+        let data = TestFixtures.textLayerPDF(text: "Taxpayer SSN 123-45-6789 on file")
+        guard let doc = PDFDocument(data: data) else {
+            Issue.record("Failed to create PDFDocument")
+            return
+        }
+        let searcher = DocumentSearcher()
+        let stream = searcher.search(
+            SendablePDFDocument(doc),
+            mode: .piiScan(categories: [.ssn], options: SearchOptions()),
+            progress: { _, _ in }
+        )
+        var results: [SearchResult] = []
+        for await result in stream { results.append(result) }
+
+        #expect(!results.isEmpty)
+        for result in results {
+            #expect(result.matchRangeInSnippet != nil)
+            #expect(windowSlice(result) == result.matchedText)
+        }
+    }
+
+    @Test("OCR literal path yields the canonical window shape with the range (CR-1c)")
+    func contextWindowOCRLiteralPath() async {
+        let data = TestFixtures.imageOnlyPDF()
+        guard let doc = PDFDocument(data: data) else {
+            Issue.record("Failed to create PDFDocument")
+            return
+        }
+        let line = "Invoice total due to Delia Hartwell on Monday"
+        let searcher = DocumentSearcher()
+        await searcher._testSeedOCRLines(
+            [OCREngine.TextLine(
+                text: line,
+                normalizedRect: CGRect(x: 0.1, y: 0.5, width: 0.6, height: 0.05),
+                confidence: 0.9
+            )],
+            forPageIndex: 0
+        )
+        let stream = searcher.search(
+            SendablePDFDocument(doc),
+            mode: .text("Hartwell", options: SearchOptions(includeOCR: true)),
+            progress: { _, _ in }
+        )
+        var results: [SearchResult] = []
+        for await result in stream { results.append(result) }
+
+        #expect(results.count == 1)
+        guard let result = results.first else { return }
+        if case .ocr = result.source {} else {
+            Issue.record("Expected .ocr source; got \(String(describing: result.source))")
+        }
+        // The whole line fits inside the radius: same shape as the text
+        // path — no ellipsis, the line itself, the range on the match.
+        #expect(result.contextSnippet == line)
+        #expect(result.matchRangeInSnippet == 27..<35)
+        #expect(windowSlice(result) == "Hartwell")
+        #expect(windowSlice(result) == result.matchedText)
+    }
+
+    @Test("OCR PII path yields the canonical window with the range (CR-1c)")
+    func contextWindowOCRPIIPath() async {
+        let data = TestFixtures.imageOnlyPDF()
+        guard let doc = PDFDocument(data: data) else {
+            Issue.record("Failed to create PDFDocument")
+            return
+        }
+        let searcher = DocumentSearcher()
+        await searcher._testSeedOCRLines(
+            [OCREngine.TextLine(
+                text: "Taxpayer SSN 123-45-6789 on file",
+                normalizedRect: CGRect(x: 0.1, y: 0.5, width: 0.6, height: 0.05),
+                confidence: 0.9
+            )],
+            forPageIndex: 0
+        )
+        let stream = searcher.search(
+            SendablePDFDocument(doc),
+            mode: .piiScan(categories: [.ssn], options: SearchOptions(includeOCR: true)),
+            progress: { _, _ in }
+        )
+        var results: [SearchResult] = []
+        for await result in stream { results.append(result) }
+
+        #expect(!results.isEmpty)
+        for result in results {
+            if case .ocr = result.source {} else {
+                Issue.record("Expected .ocr source; got \(String(describing: result.source))")
+            }
+            #expect(!result.contextSnippet.hasPrefix("…"))
+            #expect(!result.contextSnippet.hasSuffix("…"))
+            #expect(result.matchRangeInSnippet != nil)
+            #expect(windowSlice(result) == result.matchedText)
         }
     }
 

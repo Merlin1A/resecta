@@ -259,7 +259,12 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
     /// matching RedactionRegion.normalizedRect. See CANVAS_OVERLAY §S2.3.
     public let normalizedRect: CGRect
     public let matchedText: String
-    /// ~40 characters of surrounding text for context display.
+    /// Surrounding text for context display: the engine's centered
+    /// window (`DocumentSearcher.contextRadius` characters each side of
+    /// the match, trimmed back to word boundaries on a truncated side,
+    /// `…` only where text was cut, newlines flattened). Every builder
+    /// path — text layer, regex, PII scan, and both OCR legs — yields
+    /// this one shape; `matchRangeInSnippet` locates the match inside it.
     public let contextSnippet: String
     public let source: SearchSource
     /// The search term that produced this match.
@@ -274,6 +279,13 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
     /// rows (no inferred rule to explain). Used by MatchRationaleSheet and
     /// by W5 audit export.
     public let rationale: MatchRationale?
+    /// UXC-45 — where `matchedText` sits inside `contextSnippet`, as
+    /// Character offsets into the snippet (the leading `…`, when
+    /// present, counts as one). Populated by every engine builder path
+    /// so the row can highlight the match without re-searching; nil only
+    /// for hand-built values (fixtures, older callers), where the app
+    /// falls back to the first verbatim occurrence of `matchedText`.
+    public let matchRangeInSnippet: Range<Int>?
 
     public init(
         id: UUID = UUID(),
@@ -286,7 +298,8 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
         isSelected: Bool = false,
         piiCategory: PIICategory? = nil,
         piiConfidence: Double? = nil,
-        rationale: MatchRationale? = nil
+        rationale: MatchRationale? = nil,
+        matchRangeInSnippet: Range<Int>? = nil
     ) {
         self.id = id
         self.pageIndex = pageIndex
@@ -299,6 +312,7 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
         self.piiCategory = piiCategory
         self.piiConfidence = piiConfidence
         self.rationale = rationale
+        self.matchRangeInSnippet = matchRangeInSnippet
     }
 }
 

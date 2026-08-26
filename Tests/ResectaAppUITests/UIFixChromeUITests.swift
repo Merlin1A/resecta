@@ -179,7 +179,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         field.tap()
         field.typeText("Sample\n")
         XCTAssertTrue(
-            app.staticTexts["1 found — none selected yet"].waitForExistence(timeout: 15),
+            app.staticTexts["0 of 1 selected"].waitForExistence(timeout: 15),
             "Text search returned no results for the bundled fixture."
         )
 
@@ -317,7 +317,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         field.tap()
         field.typeText("Sample\n")
         XCTAssertTrue(
-            app.staticTexts["1 found — none selected yet"].waitForExistence(timeout: 15),
+            app.staticTexts["0 of 1 selected"].waitForExistence(timeout: 15),
             "Text search returned no results for the bundled fixture."
         )
         // Results arrival raises the sheet — normalize back down so

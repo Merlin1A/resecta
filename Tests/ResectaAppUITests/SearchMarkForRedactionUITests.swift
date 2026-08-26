@@ -103,22 +103,77 @@ nonisolated final class SearchMarkForRedactionUITests: XCTestCase {
         )
         byTerm.tap()
 
-        // Both terms searched: the footer states the review-first arrival
-        // default explicitly — "2 found — none selected yet" replaces
-        // the former "0 of 2 selected". (The term-grouped SECTION
+        // Both terms searched: the footer states the count plainly —
+        // "0 of 2 selected" (UXC-45: one "M of N selected" family in
+        // every state). (The term-grouped SECTION
         // HEADERS are lazily materialized and sit offscreen at this
         // detent — the results list viewport is ~18 pt tall on the 26.4
         // sim — so they can be absent from the AX tree even though the
         // List content closure, where the crash lived, has already
         // evaluated `resultsByTerm`. Assert on the footer count
         // instead; the By Term toggle state above pins the branch.)
-        let footerCount = app.staticTexts["2 found — none selected yet"]
+        let footerCount = app.staticTexts["0 of 2 selected"]
         XCTAssertTrue(
             footerCount.waitForExistence(timeout: 15),
             "Footer never showed both terms' results — a term submission failed."
         )
 
         selectAllAndApply()
+    }
+
+    /// UXC-45 (D-117, RB-104): the row's chevron expands the context
+    /// window plus the detector's rationale line, and collapses it again.
+    /// Driven on the multipage fixture's Scan interface — its pages carry
+    /// SSN / email / phone / card text, so every row has a rationale — and
+    /// witnessed through AX text only: the rationale line exists ONLY while
+    /// the row is expanded (the highlighted window itself is pixel-only
+    /// and, per F-7, never spoken), and the chevron's own label flips.
+    func testContextRow_chevronExpandsAndCollapsesTheRationaleLine() {
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
+        app.launch()
+
+        // The editor's Scan button arms the one-shot auto-run and opens
+        // the sheet on the Scan interface (its identifier is plumbing
+        // carried from the Auto-Detect era).
+        let scan = app.buttons["autoDetect"]
+        XCTAssertTrue(scan.waitForExistence(timeout: 30), "Editor Scan button not found.")
+        let enabled = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "isEnabled == true"), object: scan
+        )
+        XCTAssertEqual(
+            XCTWaiter().wait(for: [enabled], timeout: 30), .completed,
+            "Editor Scan button never enabled — the multipage fixture did not load."
+        )
+        scan.tap()
+
+        let chevron = app.buttons["rationaleDisclosureButton"].firstMatch
+        XCTAssertTrue(
+            chevron.waitForExistence(timeout: 90),
+            "No context row rendered — the scan returned nothing or the sheet never presented."
+        )
+        XCTAssertEqual(chevron.label, "Show full context")
+
+        let rationaleLine = app.staticTexts.matching(
+            NSPredicate(format: #"label BEGINSWITH "Reason:""#)
+        ).firstMatch
+        XCTAssertFalse(rationaleLine.exists, "The rationale line rendered before the row was expanded.")
+
+        chevron.tap()
+        XCTAssertTrue(
+            rationaleLine.waitForExistence(timeout: 5),
+            "Expanding the row did not reveal its rationale line."
+        )
+        XCTAssertEqual(chevron.label, "Show less")
+
+        chevron.tap()
+        let gone = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"), object: rationaleLine
+        )
+        XCTAssertEqual(
+            XCTWaiter().wait(for: [gone], timeout: 5), .completed,
+            "Collapsing the row left the rationale line on screen."
+        )
+        XCTAssertEqual(chevron.label, "Show full context")
     }
 
     // MARK: - Launch

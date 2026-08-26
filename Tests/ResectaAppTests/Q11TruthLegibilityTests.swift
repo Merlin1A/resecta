@@ -149,14 +149,18 @@ struct SelectionDefaultLabelTests {
     // all-preselected arrival default itself: the review-first arrival rule flips every
     // producer to all-DESELECTED, and the one footer label family
     // below covers both result origins of the unified surface.
+    // UXC-45 (RB-105): the footer is the surface's one selection
+    // authority and states "M of N selected" in EVERY state — the
+    // "N found — none selected yet" arrival phrasing retired.
 
-    @Test("footer states the none-selected arrival default explicitly — any origin")
+    @Test("footer states the zero state as a plain count — any origin (UXC-45)")
     func noneSelectedYet() {
         let label = SearchFooterSection.selectionCountLabel(selected: 0, total: 27)
-        #expect(label == "27 found — none selected yet")
+        #expect(label == "0 of 27 selected")
+        #expect(SearchFooterSection.selectionCountLabel(selected: 0, total: 1) == "0 of 1 selected")
     }
 
-    @Test("footer keeps M-of-N form outside the arrival default")
+    @Test("footer keeps the M-of-N form in every other state")
     func footerOtherForms() {
         #expect(SearchFooterSection.selectionCountLabel(selected: 4, total: 27)
                 == "4 of 27 selected")

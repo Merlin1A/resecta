@@ -139,7 +139,7 @@ nonisolated final class EditorHomeUITests: XCTestCase {
     // MARK: - Helpers
 
     private var reviewSummary: XCUIElement {
-        app.staticTexts["6 found — none selected yet"]
+        app.staticTexts["0 of 6 selected"]
     }
 
     private var compactStrip: XCUIElement {

@@ -82,6 +82,41 @@ struct RedactionRegionDisplayTests {
 
     // MARK: - PII Kind Accessibility Names (UI_UX §9.2)
 
+    // MARK: - Twin display tables (UXC-45 / CX-09)
+
+    /// Every `DetectionResult.Kind` the app can stage. The exhaustive
+    /// switch below stops compiling when a PII case is added, so this
+    /// list cannot silently go stale.
+    private static let everyKind: [DetectionResult.Kind] = {
+        let pii: [RedactionRegion.PIIKind] = [
+            .ssn, .creditCard, .name, .address, .email, .phone, .ein, .itin,
+            .driversLicense, .passport, .medicalRecord, .dateOfBirth, .npi, .dea,
+            .account, .routingNumber, .licensePlate, .barcode, .signatureCandidate, .other,
+        ]
+        for kind in pii {
+            switch kind {
+            case .ssn, .creditCard, .name, .address, .email, .phone, .ein, .itin,
+                 .driversLicense, .passport, .medicalRecord, .dateOfBirth, .npi, .dea,
+                 .account, .routingNumber, .licensePlate, .barcode, .signatureCandidate, .other:
+                break
+            }
+        }
+        return pii.map { .pii($0) } + [.face, .searchMatch(term: "term")]
+    }()
+
+    @Test("RegionMetadata's kind tables mirror DetectionKind+Display for every kind (F2-1 parity; UXC-45 / CX-09)")
+    func regionMetadataMirrorsDisplayTables() {
+        for kind in Self.everyKind {
+            let metadata = RegionMetadata(
+                piiKind: kind, confidence: 0.95, matchedText: nil, recognitionLevel: .fast
+            )
+            #expect(metadata.badgeLabel == kind.badge, "badge label drift for \(kind)")
+            // UXC-22: "<full name>, <tier descriptor>" — 0.95 is the high band.
+            #expect(metadata.accessibilityDescription == "\(kind.fullName), high confidence",
+                    "full-name drift for \(kind)")
+        }
+    }
+
     @Test("PIIKind accessibilityName is correct",
           arguments: [
             (RedactionRegion.PIIKind.ssn, "social security number"),

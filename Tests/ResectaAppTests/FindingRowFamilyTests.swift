@@ -6,10 +6,18 @@ import SwiftUI
 @testable import RedactionEngine
 
 // The unified row family's adapter contracts: one `FindingRowModel`
-// renders BOTH result origins (engine `SearchResult`s and staged
+// serves BOTH result origins (engine `SearchResult`s and staged
 // `DetectionResult`s), carrying each origin's deliberate asymmetries —
 // the a11y content policy (detection review rows speak matched text per
 // F-7; search rows never do) and the per-origin secondary line.
+//
+// UXC-45 (D-117): the search row (`SearchResultRow`) went context-first
+// and no longer mounts `FindingRow` — the adapter keeps serving its
+// page-only a11y string, and the row's own contracts (tier-word
+// suppression, the spoken tier, the attributed context window) pin in
+// the "Search origin — context-first row" section below. The scan-side
+// pins are UNTOUCHED: they are the RB-100 freeze proof for the review
+// rows, which still render through `FindingRow`.
 
 @Suite("FindingRow family — adapter contracts")
 @MainActor
@@ -62,6 +70,164 @@ struct FindingRowFamilyTests {
         let model = FindingRowModel(result: makeSearchResult(matchedText: "123-45-6789"))
         #expect(model.accessibilityDescription == "Search match, page 3")
         #expect(!model.accessibilityDescription.contains("123-45-6789"))
+    }
+
+    // MARK: - Search origin — context-first row (UXC-45, RB-98..104)
+
+    private func makePIIResult(
+        matchedText: String = "123-45-6789",
+        snippet: String = "Taxpayer SSN 123-45-6789 on file",
+        source: SearchSource = .textLayer,
+        confidence: Double = 0.95
+    ) -> SearchResult {
+        SearchResult(
+            pageIndex: 0,
+            normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+            matchedText: matchedText,
+            contextSnippet: snippet,
+            source: source,
+            term: "SSN",
+            piiCategory: .ssn,
+            piiConfidence: confidence,
+            rationale: MatchRationale(
+                ruleID: "ssn.regex",
+                signals: [.regexPattern(name: "ssn")],
+                preThresholdScore: confidence,
+                finalScore: confidence,
+                appliedThreshold: 0.5
+            )
+        )
+    }
+
+    @Test("UXC-45 — search row a11y label: the adapter's page-only string, plus the spoken tier where the meta line shows one")
+    func searchRowAccessibilityLabel() {
+        let literal = makeSearchResult(matchedText: "123-45-6789")
+        #expect(SearchResultRow.accessibilityLabel(for: literal, tier: .high, showsTier: false)
+                == "Search match, page 3")
+
+        let pii = makePIIResult()
+        let spoken = SearchResultRow.accessibilityLabel(for: pii, tier: .high, showsTier: true)
+        #expect(spoken == "Search match, page 1, high confidence")
+        // F-7 LAW: never the matched text, never the window.
+        #expect(!spoken.contains("123-45-6789"))
+        #expect(!spoken.contains("Taxpayer"))
+    }
+
+    @Test("UXC-45 (RB-108) — tier word shows on PII and OCR rows, hides on literal text/regex/custom text-layer rows")
+    func tierWordSuppression() {
+        // PII (absolute bands) → shown, whichever source.
+        #expect(SearchResultRow.showsTierWord(for: makePIIResult()))
+        #expect(SearchResultRow.showsTierWord(for: makePIIResult(source: .ocr(confidence: 0.8))))
+        // OCR source without a PII grade (floor-relative) → shown.
+        let ocrLiteral = SearchResult(
+            pageIndex: 0,
+            normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+            matchedText: "alpha", contextSnippet: "alpha beta",
+            source: .ocr(confidence: 0.8), term: "alpha"
+        )
+        #expect(SearchResultRow.showsTierWord(for: ocrLiteral))
+        // Literal text / regex / custom text-layer hits are `.high` by
+        // construction → no tier word (the bar still renders green).
+        #expect(!SearchResultRow.showsTierWord(for: makeSearchResult()))
+        let custom = SearchResult(
+            pageIndex: 0,
+            normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+            matchedText: "alpha", contextSnippet: "alpha beta",
+            source: .textLayer, term: "Custom",
+            rationale: MatchRationale(
+                ruleID: "user.alwaysFlag",
+                signals: [.userAlwaysFlag(pattern: "alpha")],
+                preThresholdScore: 1.0, finalScore: 1.0, appliedThreshold: nil
+            )
+        )
+        #expect(!SearchResultRow.showsTierWord(for: custom))
+        let regex = SearchResult(
+            pageIndex: 0,
+            normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+            matchedText: "555-0100", contextSnippet: "Call 555-0100 now",
+            source: .textLayer, term: "\\d{3}-\\d{4}",
+            rationale: MatchRationale(
+                ruleID: "regex", signals: [.regexPattern(name: "phone")],
+                preThresholdScore: 1.0, finalScore: 1.0, appliedThreshold: nil
+            )
+        )
+        #expect(!SearchResultRow.showsTierWord(for: regex))
+    }
+
+    @Test("UXC-45 — ConfidenceTier.shortLabel is the meta-line word; the descriptor stays the spoken form")
+    func tierShortLabel() {
+        #expect(SearchResultRow.ConfidenceTier.high.shortLabel == "High")
+        #expect(SearchResultRow.ConfidenceTier.medium.shortLabel == "Medium")
+        #expect(SearchResultRow.ConfidenceTier.low.shortLabel == "Low")
+        #expect(SearchResultRow.ConfidenceTier.high.descriptor == "high confidence")
+    }
+
+    @Test("UXC-45 (RB-102) — attributed window from the engine range: mono semibold primary run on the wash, base footnote secondary")
+    func attributedWindowFromEngineRange() {
+        let match = "d.hartwell@example.net"
+        let snippet = "…reach d.hartwell@example.net before the close…"
+        let start = snippet.distance(from: snippet.startIndex, to: snippet.range(of: match)!.lowerBound)
+        let attributed = SearchResultRow.attributedSnippet(
+            snippet, matchRange: start..<(start + match.count), matchedText: match
+        )
+        let runs = Array(attributed.runs)
+        #expect(runs.count == 3)
+        guard runs.count == 3 else { return }
+        #expect(String(attributed[runs[1].range].characters) == match)
+        #expect(runs[1].font == Font.footnote.monospaced().weight(.semibold))
+        #expect(runs[1].foregroundColor == Color.primary)
+        #expect(runs[1].backgroundColor != nil)
+        for base in [runs[0], runs[2]] {
+            #expect(base.font == Font.footnote)
+            #expect(base.foregroundColor == Color.secondary)
+            #expect(base.backgroundColor == nil)
+        }
+        #expect(String(attributed.characters) == snippet)
+    }
+
+    @Test("UXC-45 (RB-102) — nil or out-of-bounds range falls back to the first verbatim occurrence")
+    func attributedWindowFallsBackToFirstOccurrence() {
+        let snippet = "alpha MATCH beta MATCH"
+        for range: Range<Int>? in [nil, 40..<45, -1..<4] {
+            let attributed = SearchResultRow.attributedSnippet(snippet, matchRange: range, matchedText: "MATCH")
+            let highlighted = attributed.runs.filter { $0.backgroundColor != nil }
+            #expect(highlighted.count == 1)
+            guard let run = highlighted.first else { continue }
+            #expect(String(attributed[run.range].characters) == "MATCH")
+            #expect(attributed.characters.distance(from: attributed.startIndex, to: run.range.lowerBound) == 6)
+        }
+    }
+
+    @Test("UXC-45 (RB-102) — no occurrence returns the plain base: one run, no wash")
+    func attributedWindowWithoutOccurrenceIsPlain() {
+        let attributed = SearchResultRow.attributedSnippet("alpha beta", matchRange: nil, matchedText: "gamma")
+        let runs = Array(attributed.runs)
+        #expect(runs.count == 1)
+        #expect(runs.first?.backgroundColor == nil)
+        #expect(runs.first?.font == Font.footnote)
+        #expect(runs.first?.foregroundColor == Color.secondary)
+        let empty = SearchResultRow.attributedSnippet("alpha beta", matchRange: nil, matchedText: "")
+        #expect(Array(empty.runs).count == 1)
+    }
+
+    @Test("RB-113 — the collapsed window clamps to two lines through XXL and three from XXXL up")
+    func collapsedLineLimitByTypeSize() {
+        #expect(SearchResultRow.collapsedLineLimit(for: .large) == 2)
+        #expect(SearchResultRow.collapsedLineLimit(for: .xxLarge) == 2)
+        #expect(SearchResultRow.collapsedLineLimit(for: .xxxLarge) == 3)
+        #expect(SearchResultRow.collapsedLineLimit(for: .accessibility1) == 3)
+        #expect(SearchResultRow.collapsedLineLimit(for: .accessibility5) == 3)
+    }
+
+    @Test("UXC-45 — the content column's leading inset is the chassis geometry, not a literal; the applied slot counts only when shown")
+    func contentColumnLeadingInset() {
+        let base = SearchRowConfidenceBar.width + ResectaTokens.Spacing.xs
+            + ResectaTokens.TouchTarget.minimum + ResectaTokens.Spacing.sm
+        #expect(SearchResultRow.contentColumnLeadingInset(isApplied: false) == base)
+        #expect(SearchResultRow.contentColumnLeadingInset(isApplied: false) == 60)
+        #expect(SearchResultRow.contentColumnLeadingInset(isApplied: true)
+                == base + SearchResultRow.appliedIndicatorWidth)
+        #expect(SearchResultRow.contentColumnLeadingInset(isApplied: true) == 72)
     }
 
     // MARK: - Detection origin (text kinds)

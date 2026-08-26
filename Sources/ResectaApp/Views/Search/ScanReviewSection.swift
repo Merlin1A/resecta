@@ -106,11 +106,14 @@ struct ScanReviewSection: View {
     }
 
     /// The review surface's fixed chrome — OCR-skip banner,
-    /// classification diagnostics, the view-mode/kind chip bar, and
-    /// the Select-Where row — riding the review List's top safe-area
-    /// inset (SA-2/D-70: chrome must not offset the List's frame from
-    /// the sheet top or cooperative arbitration unbinds; 18- §10).
-    /// Opaque background — rows scroll UNDER the inset region.
+    /// classification diagnostics, and the view-mode/kind chip bar —
+    /// riding the review List's top safe-area inset (SA-2/D-70: chrome
+    /// must not offset the List's frame from the sheet top or
+    /// cooperative arbitration unbinds; 18- §10). Opaque background —
+    /// rows scroll UNDER the inset region. UXC-45 (RB-109): the
+    /// Select-Where row that closed this stack moved into the footer's
+    /// "Add to selection" menu (the surface's single selection
+    /// authority); its predicate items are unchanged there.
     private var reviewTopChrome: some View {
         VStack(spacing: 0) {
             // ST-83 — pipeline-side OCR-skip disclosure: pages whose
@@ -126,10 +129,6 @@ struct ScanReviewSection: View {
 
             // View-mode picker + kind filter chips (one chip component).
             reviewChipBar
-
-            // Select-Where predicates over the staged findings —
-            // the review-side selection-throughput tools.
-            selectWhereRow
         }
         .background(.background)
     }
@@ -290,57 +289,6 @@ struct ScanReviewSection: View {
         .padding(.vertical, ResectaTokens.Spacing.xs)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Detection filters")
-    }
-
-    // MARK: - Select Where
-
-    /// Predicate-driven selection over the staged detections, mirroring
-    /// the search side's menu: RB-21/UXC-12 — additive (union), so
-    /// "≥ 90%" ADDS the matching detections to whatever is already
-    /// selected and never deselects the rest.
-    private var selectWhereRow: some View {
-        HStack {
-            Menu {
-                Section("By confidence") {
-                    Button("\u{2265} 75%") { addToSelection { $0.confidence >= 0.75 } }
-                    Button("\u{2265} 90%") { addToSelection { $0.confidence >= 0.90 } }
-                }
-                if !cachedKindsWithCounts.isEmpty {
-                    Section("By category") {
-                        ForEach(cachedKindsWithCounts, id: \.kind) { item in
-                            Button(item.kind.fullName) {
-                                addToSelection { $0.kind == item.kind }
-                            }
-                        }
-                    }
-                }
-            } label: {
-                Label("Add to selection…", systemImage: "checkmark.circle")
-                    .font(.caption)
-                    // UXC-18: 102×13.8 measured — no manual padding
-                    // beyond `.controlSize(.small)`.
-                    .frame(minHeight: ResectaTokens.TouchTarget.minimum)
-                    .contentShape(Rectangle())
-            }
-            .controlSize(.small)
-            .accessibilityLabel("Add findings to the selection by attribute")
-            Spacer()
-        }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.xxs)
-    }
-
-    /// RB-21/UXC-12: additive predicate selection — unions the
-    /// predicate's matches into the existing `triageSelections` via
-    /// `Self.addSelections(where:in:to:)` rather than replacing the
-    /// dictionary outright, so a prior manual pick or an earlier
-    /// predicate's matches are never deselected by a later one.
-    private func addToSelection(_ predicate: (DetectionResult) -> Bool) {
-        redactionState.triageSelections = Self.addSelections(
-            where: predicate, in: allFindings, to: redactionState.triageSelections
-        )
-        // Conditional dismiss: predicate selection is user selection work.
-        searchState.userModifiedSelections = true
     }
 
     // MARK: - ST-83 OCR-Skip Banner (pipeline-side)
