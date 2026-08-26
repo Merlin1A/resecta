@@ -54,6 +54,15 @@ class RedactionOverlayView: UIView {
     private var selectedID: UUID? { selectedIDs.count == 1 ? selectedIDs.first : nil }
     private var cachedAccessibilityElements: [UIAccessibilityElement]?
 
+    /// UXC-49 (D-124 / REV-13): the "canvas touch in flight" flag that
+    /// window-level cancelling pans are required to fail against — see
+    /// `CanvasTouchClaimGestureRecognizer` and `reconcileWindowPanDeference()`.
+    private let canvasTouchClaim = CanvasTouchClaimGestureRecognizer(target: nil, action: nil)
+
+    /// Window pans already carrying the failure requirement (weak: a
+    /// sheet's pan goes away with its presentation).
+    private let deferredWindowPans = NSHashTable<UIGestureRecognizer>.weakObjects()
+
     // MARK: - Drawing State
 
     private var dragOrigin: CGPoint?
@@ -373,6 +382,11 @@ class RedactionOverlayView: UIView {
         let hover = UIHoverGestureRecognizer(target: self, action: #selector(handleHover(_:)))
         addGestureRecognizer(hover)
 
+        // UXC-49: the canvas claim — installed once; the failure
+        // requirements against window pans are wired per window in
+        // `reconcileWindowPanDeference()`.
+        addGestureRecognizer(canvasTouchClaim)
+
         // Context menu for region info + delete
         let contextMenu = UIContextMenuInteraction(delegate: self)
         addInteraction(contextMenu)
@@ -431,26 +445,76 @@ class RedactionOverlayView: UIView {
     // MARK: - Hit Testing (tool-based routing)
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        // Pass through to PDFView for pan/zoom unless the overlay owns the
+        // point (`claimsTouch(at:)`).
+        guard claimsTouch(at: point) else { return nil }
+        // UXC-49 (D-124 / REV-13): hit-testing runs at touch-down, before
+        // the gesture environment dispatches the touch, so this is the
+        // timing-proof seam to wire the failure requirement against a
+        // window pan that arrived with a sheet since the last canvas
+        // touch. Idempotent; a walk of the window's ~10 recognizers.
+        reconcileWindowPanDeference()
+        return super.hitTest(point, with: event)
+    }
+
+    /// Tool-based routing: the points this overlay owns.
+    private func claimsTouch(at point: CGPoint) -> Bool {
         // Always intercept if drawing mode is on
-        if isDrawingMode {
-            return super.hitTest(point, with: event)
-        }
+        if isDrawingMode { return true }
         // When multi-select is active, intercept empty-space touches
         // so the marquee can capture them. Without this, empty-space touches
         // would pass through to PDFView for pan and the lasso would never
         // begin. The marquee path is gated again inside `touchesBegan` on
         // `isMultiSelectActive && empty touch-down`, so this hit-test gate
         // only widens the routing — it does not commit a marquee on its own.
-        if isMultiSelectActive {
-            return super.hitTest(point, with: event)
-        }
+        if isMultiSelectActive { return true }
         // Without drawing mode, intercept touches on handles, regions, or selected
         // region body (for move).
-        if hitTestResizeHandle(at: point) != nil { return super.hitTest(point, with: event) }
-        if hitTestRegion(at: point) != nil { return super.hitTest(point, with: event) }
-        // Pass through to PDFView for pan/zoom
-        return nil
+        if hitTestResizeHandle(at: point) != nil { return true }
+        if hitTestRegion(at: point) != nil { return true }
+        return false
     }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        reconcileWindowPanDeference()
+    }
+
+    // MARK: - UXC-49 window-pan deference (D-124 / REV-13)
+
+    /// Every window-level pan that would cancel this view's touches must
+    /// fail before it may recognize while a canvas touch is in flight —
+    /// iOS 26's sheet "exterior pan" is the one that exists today. Beneath
+    /// the compact float it recognized on the first moves of a drag and
+    /// cancelled the touches PDFKit's scroll view was still holding, so
+    /// no draw / move / resize ever reached `touchesBegan` (taps did).
+    /// The requirement is set once per recognizer; the table is weak, so a
+    /// pan that leaves with its sheet drops out and a later presentation's
+    /// pan is picked up on the next canvas touch (`hitTest`).
+    func reconcileWindowPanDeference() {
+        guard let window else { return }
+        for recognizer in window.gestureRecognizers ?? [] {
+            guard Self.windowPanShouldDeferToCanvas(recognizer),
+                  !deferredWindowPans.contains(recognizer)
+            else { continue }
+            recognizer.require(toFail: canvasTouchClaim)
+            deferredWindowPans.add(recognizer)
+        }
+    }
+
+    /// Pure predicate: a `UIPanGestureRecognizer` attached to a `UIWindow`
+    /// with `cancelsTouchesInView`. Name-agnostic on purpose — the iOS 26
+    /// flex-interaction pans carry `cancelsTouchesInView == false` and are
+    /// left alone, as is every recognizer on an ordinary view (PDFKit's
+    /// scroll pan, the sheet's own grabber pan on its drop-shadow view).
+    static func windowPanShouldDeferToCanvas(_ recognizer: UIGestureRecognizer) -> Bool {
+        recognizer is UIPanGestureRecognizer
+            && recognizer.cancelsTouchesInView
+            && recognizer.view is UIWindow
+    }
+
+    /// Window pans currently carrying the requirement (test hook).
+    var deferredWindowPanCount: Int { deferredWindowPans.count }
 
     // MARK: - Touch Handling
 

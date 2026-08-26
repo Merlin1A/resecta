@@ -502,7 +502,11 @@ struct DocumentEditorView: View {
         // (search), WU-71 / [P10] path (a) (rationale). Staged
         // detections ride the search case — the `pendingTriage`
         // observer below keeps `activeSearch` populated while
-        // detections are pending.
+        // detections are pending. The slot sits ABOVE the phase
+        // switch, so a live session would ride over every phase;
+        // STATE-7 keeps it out of the pipeline phases by tearing the
+        // session down at the Apply seam (`runFullPipeline`, UXC-49)
+        // and on the purge re-run (`prepareForPurgeRerun`).
         .sheet(item: Binding<ActiveSheet?>(
             get: {
                 if let searchState = redactionState.activeSearch { return .search(searchState) }
@@ -951,13 +955,14 @@ struct DocumentEditorView: View {
             // bottom bar was removed; the GATE-3 confirmation dialog (pinned
             // by ARCH §1.3 and VerificationActionBarDoneConfirmationTests)
             // still gates sessions that carry drawn regions. Identifier
-            // kept (plumbing).
+            // kept (plumbing). UXC-49 (D-124, RB-117 rider): routed through
+            // `handleHomeTap()` so a sheet that is somehow still presented
+            // on this screen takes the REV-05 park-then-dialog route
+            // instead of the refused second presentation (a staged review
+            // cannot be pending after an Apply, so the confirm gate
+            // resolves to `hasDrawnRegions` here as before).
             Button("Home", systemImage: "house") {
-                if hasDrawnRegions {
-                    showDoneConfirmation = true
-                } else {
-                    performDoneCloseSession()
-                }
+                handleHomeTap()
             }
             .accessibilityIdentifier("verificationDoneButton")
         default:
@@ -2083,7 +2088,7 @@ struct DocumentEditorView: View {
         documentState: DocumentState,
         redactionState: RedactionState
     ) {
-        redactionState.activeSearch = nil
+        redactionState.dismissActiveSearch()
         documentState.transition(to: .editing)
     }
 

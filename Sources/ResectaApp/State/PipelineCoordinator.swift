@@ -244,6 +244,19 @@ final class PipelineCoordinator: @unchecked Sendable {
         // the triage-sheet check and phase-must-be-`.editing` rule.
         guard documentState.canStartPipeline(with: redactionState) else { return }
 
+        // UXC-49 (D-124 / REV-14 — STATE-7 at the Apply seam): the Search &
+        // Redact sheet mutates `redactionState.regions` and is incompatible
+        // with the `.redacting` / `.verifying` phases this run enters, and
+        // the editor's ONE `.sheet(item:)` slot sits above its phase
+        // switch — a live session rode the compact float over the progress
+        // card, the results screen and its Preview / Details pushes, and
+        // Keep Editing came back with Scan / Search still disabled. Tear it
+        // down here, the single funnel for Redact, ⇧⌘R, the resume banner's
+        // Restart and the purge re-run — exactly what `prepareForPurgeRerun`
+        // already did for its path. A staged review cannot be pending here
+        // (`canStartPipeline(with:)`), so nothing needs parking.
+        redactionState.dismissActiveSearch()
+
         // Snapshot pipeline-affecting settings once at run
         // entry. Subsequent reads (verify-for-run, fillColor, exportDPI,
         // etc.) route through `runSettings` instead of `settingsState`
