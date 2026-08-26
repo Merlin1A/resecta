@@ -56,7 +56,10 @@ struct HonestyDisclaimerMountTests {
     // trust strip, after the timing footer's mount — no per-status
     // placement branches. On SKIPPED there is no timing line, so the
     // disclaimer sits directly under the strip (accepted as-falls).
-    @Test("UXC-43 placement: one gate-wrapped mount, last on the page beneath the trust strip and the timing footer")
+    // UXC-47 (D-122): the block's spacing is `disclaimerFootGap` (144 pt,
+    // was `Spacing.sm`) so the note starts below the first screen at the
+    // default type size on the 6.3″ and 6.9″ phones.
+    @Test("UXC-43/47 placement: one gate-wrapped mount, last on the page beneath the trust strip and the timing footer, spaced by disclaimerFootGap")
     func disclaimerMountSitsAtThePageFoot() throws {
         let source = try loadRepoFile(
             "Sources/ResectaApp/Views/VerificationResultsView.swift")
@@ -84,14 +87,25 @@ struct HonestyDisclaimerMountTests {
         #expect(strip.upperBound <= footerMount.lowerBound
                     && footerMount.upperBound <= disclaimerMount.lowerBound,
                 "the disclaimer mount must be the last element, beneath trustStrip and the footer mount (UXC-43)")
-        // The two mounts share ONE tight footer block (`Spacing.sm`).
+        // The two mounts share ONE footer block spaced by
+        // `disclaimerFootGap` (UXC-47; was `Spacing.sm` under UXC-43).
         #expect(source.contains(
-            "VStack(spacing: ResectaTokens.Spacing.sm) {\n"
+            "VStack(spacing: Self.disclaimerFootGap) {\n"
             + "                        if Self.shouldShowRunBreakdown(report: report) {\n"
             + "                            footer\n"
             + "                        }\n"
             + "                        if Self.shouldShowHonestyDisclaimer("),
-                "the timing footer and the disclaimer must share one Spacing.sm footer block (UXC-43)")
+                "the timing footer and the disclaimer must share one footer block spaced by disclaimerFootGap (UXC-43/47)")
+    }
+
+    // UXC-47 (D-122): the gap is a pinned value — 3 × `Spacing.xxl` =
+    // 144 pt, sized from the measured PASS layout so the note's top edge
+    // lands ≈23 pt below the 6.9″ screen and ≈105 pt below the 6.3″ one.
+    // Re-measure before changing it (the App Store frame depends on it).
+    @Test("UXC-47: the timing-line → disclaimer gap is 3 × Spacing.xxl = 144 pt")
+    func disclaimerFootGapIsPinned() {
+        #expect(VerificationResultsView.disclaimerFootGap == 144)
+        #expect(VerificationResultsView.disclaimerFootGap == ResectaTokens.Spacing.xxl * 3)
     }
 
     @Test("Results view mounts the .redacted-profile disclaimer (source pin)")

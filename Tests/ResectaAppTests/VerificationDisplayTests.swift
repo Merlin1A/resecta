@@ -303,6 +303,54 @@ struct VerificationDisplayTests {
                     pageReferences: nil, durationSeconds: 0)
     }
 
+    // MARK: - Masthead subtitle presence (UXC-47, D-122)
+
+    // PASS renders the title alone in both pipeline modes — the
+    // "All N verification checks completed without issues." line (and its
+    // informational-notes tail) is gone; the Verification Details header
+    // still carries the counts. Every verdict that asks for action keeps
+    // its line. INFO never aggregates (kept nil for exhaustiveness).
+    @Test("UXC-47: PASS masthead has no subtitle — 5-check, 10-check, and INFO-bearing runs")
+    func passMastheadHasNoSubtitle() {
+        let raster = VerificationReport(
+            layers: Array(repeating: layer(.pass), count: 5),
+            overallStatus: .pass, durationSeconds: 1.0)
+        #expect(VerificationResultsView.mastheadSubtitle(report: raster) == nil)
+
+        let searchable = VerificationReport(
+            layers: Array(repeating: layer(.pass), count: 10),
+            overallStatus: .pass, durationSeconds: 1.0)
+        #expect(VerificationResultsView.mastheadSubtitle(report: searchable) == nil)
+
+        let withNotes = VerificationReport(
+            layers: [layer(.pass), layer(.pass), layer(.info("a")), layer(.info("b"))],
+            overallStatus: .pass, durationSeconds: 1.0)
+        #expect(VerificationResultsView.mastheadSubtitle(report: withNotes) == nil)
+        // The count and the notes pointer survive one row down.
+        #expect(VerificationResultsView.detailsSummaryText(for: withNotes)
+                == "4 of 4 checks passed · 2 informational notes")
+
+        let info = VerificationReport(
+            layers: [layer(.info("i"))], overallStatus: .info("i"), durationSeconds: 0)
+        #expect(VerificationResultsView.mastheadSubtitle(report: info) == nil)
+    }
+
+    @Test("UXC-47: every non-PASS verdict keeps a masthead subtitle",
+          arguments: [
+            VerificationStatus.warn("w"),
+            VerificationStatus.attention("a"),
+            VerificationStatus.fail("f"),
+            VerificationStatus.skipped,
+          ])
+    func nonPassMastheadKeepsSubtitle(status: VerificationStatus) {
+        let report = VerificationReport(
+            layers: [layer(.pass), layer(status)],
+            overallStatus: status, durationSeconds: 0.5)
+        let subtitle = VerificationResultsView.mastheadSubtitle(report: report)
+        #expect(subtitle != nil)
+        #expect(!(subtitle ?? "").isEmpty)
+    }
+
     @Test("detailsSummaryText: a pass run with INFO layers reads passed + informational-notes suffix")
     func detailsSummaryPassWithInfoNotes() {
         // INFO layers count as passed (no actionable issue) and ride the
