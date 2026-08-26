@@ -41,6 +41,8 @@ The entries below follow the Keep-a-Changelog index format.
 
 ### Fixed
 
+- **Drawing beneath the minimized review sheet.** With the Scan or Search sheet parked at its compact height, drawing, moving and resizing regions on the page now work; the sheet's drag gesture on iOS 26 no longer cancels the touch before the page receives it.
+- **The review sheet closes when Redact starts.** Tapping Redact closes the Scan or Search sheet before the run, so it no longer covers the progress card, the results screen or the preview; Keep Editing returns with Scan and Search available again.
 - **Zoom floor on the document view.** Pinching out stops at the page's fit size — the whole page in view — in the editor and in the redacted preview; the page no longer shrinks into the canvas background.
 - **Rectangle tool.** Drawing always starts a new box while the tool is on (existing boxes are moved or resized with the tool off); a box's starting corner stays put while its far edge aligns to guides; boxes stay within the page; the canvas redraws after every gesture (no lingering dashed box, size label, or guide lines); size and touch thresholds are measured on screen so they feel the same at any zoom; turning the tool on clears the selection and the Add-to-Selection toggle.
 

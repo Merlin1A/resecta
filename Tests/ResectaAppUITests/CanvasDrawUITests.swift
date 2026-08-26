@@ -20,6 +20,14 @@ import XCTest
 ///    device pass and the unit-level `snapZoomScaleOverride` proofs in
 ///    `DrawWinsTests` carry it).
 ///  - T6 Undo removes the drawn box.
+///  - T7 (UXC-49 / REV-13) with the Search sheet parked at the compact
+///    float, a drag on the page still draws one box — beneath the float
+///    iOS 26's window-level sheet pan cancelled every moving canvas
+///    touch (0/6 on the parent tree); the overlay's claim recognizer and
+///    failure requirement carry the drag through.
+///  - T8 (UXC-49 / REV-14) Redact with the sheet parked at the compact
+///    float closes the sheet before the run — no float over the results
+///    screen — and Keep Editing returns with Search available again.
 ///
 /// Rails (packet §3 / §6): canvas regions are not in the accessibility
 /// tree (D2-10), so every assertion reads the page bar's "N region(s)"
@@ -208,13 +216,62 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         attachScreenshot(named: "canvasdraw-t6-after-undo")
     }
 
+    /// T7 — the compact-float draw (UXC-49 / REV-13).
+    func testDragBeneathCompactFloatDrawsOneBox() {
+        launchSampleInEditor(extraArguments: ["--searchDetent=compact"])
+        openSearchSheetAtCompact()
+        enterDrawMode()
+        drag(from: boxAStart, to: boxAEnd)
+        XCTAssertTrue(
+            waitForRegionCount(1, timeout: 12),
+            "A drag beneath the compact float must draw one box (page bar read \(currentRegionCount()))."
+        )
+        attachScreenshot(named: "canvasdraw-t7-compact-float-draw")
+    }
+
+    /// T8 — Redact with the sheet parked at the compact float (UXC-49 /
+    /// REV-14): the sheet is down on the results screen and Keep Editing
+    /// re-enables Search.
+    func testRedactWithCompactFloatClosesTheSheet() {
+        launchSampleInEditor(extraArguments: ["--searchDetent=compact"])
+        enterDrawMode()
+        _ = drawBaselineBox("Box A never drew — the Redact leg has nothing to redact.")
+        leaveDrawMode()
+        openSearchSheetAtCompact()
+        openOverflowAndTap(label: "Redact", identifier: "redactButton")
+
+        let resultsHome = app.buttons["verificationDoneButton"]
+        XCTAssertTrue(
+            resultsHome.waitForExistence(timeout: 90),
+            "The results screen never appeared after Redact."
+        )
+        XCTAssertFalse(
+            compactFloatStrip.exists,
+            "The Search sheet must be down on the results screen (REV-14)."
+        )
+        attachScreenshot(named: "canvasdraw-t8-results-no-float")
+
+        let keepEditing = app.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH 'Keep Editing'"))
+            .firstMatch
+        XCTAssertTrue(keepEditing.waitForExistence(timeout: 10), "The Keep Editing card never appeared.")
+        keepEditing.tap()
+        let search = app.buttons["searchRedact"]
+        XCTAssertTrue(search.waitForExistence(timeout: 15), "The editor's Search button never came back.")
+        XCTAssertTrue(
+            waitForEnabled(search, timeout: 10),
+            "Search must be enabled again after Keep Editing (RW-F-001)."
+        )
+        attachScreenshot(named: "canvasdraw-t8-keep-editing-search-enabled")
+    }
+
     // MARK: - Launch + tool
 
     /// Home → "Try the Sample" → editor on page 1 of the 3-page sample;
     /// waits for the text-layer toast (bottom edge, ~7 s) to clear so
     /// no drag lands on it.
-    private func launchSampleInEditor() {
-        app.launchArguments = ["--uitesting"]
+    private func launchSampleInEditor(extraArguments: [String] = []) {
+        app.launchArguments = ["--uitesting"] + extraArguments
         app.launch()
         let sampleCard = app.buttons
             .matching(NSPredicate(format: "label BEGINSWITH 'Try the Sample'"))
@@ -270,6 +327,43 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
             usleep(250_000)
         }
         return (tool.value as? String) == expected
+    }
+
+    /// Leave the Rectangle tool (same retry shape as `enterDrawMode`).
+    private func leaveDrawMode() {
+        let tool = app.buttons["drawTool"]
+        for _ in 0..<3 {
+            tool.tap()
+            if waitForToolValue("Tap to enter drawing mode", timeout: 6) { return }
+        }
+        XCTFail("The Rectangle tool did not leave drawing mode after three taps.")
+    }
+
+    /// Tap the toolbar Search button; under the `--searchDetent=compact`
+    /// launch hook the sheet's onAppear parks it at the compact float.
+    private func openSearchSheetAtCompact() {
+        let search = app.buttons["searchRedact"]
+        XCTAssertTrue(search.waitForExistence(timeout: 10), "Search button not present.")
+        search.tap()
+        XCTAssertTrue(
+            compactFloatStrip.waitForExistence(timeout: 15),
+            "The Search sheet never parked at the compact float — check the --searchDetent launch hook."
+        )
+        // Let the pager's compact inset re-fit the page before any drag.
+        sleep(1)
+    }
+
+    private var compactFloatStrip: XCUIElement {
+        app.descendants(matching: .any).matching(identifier: "compactFloatStrip").firstMatch
+    }
+
+    private func waitForEnabled(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if element.exists, element.isEnabled { return true }
+            usleep(250_000)
+        }
+        return element.exists && element.isEnabled
     }
 
     // MARK: - Drags

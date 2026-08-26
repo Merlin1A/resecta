@@ -577,9 +577,7 @@ class RedactionState {
         // Cancel and drop any in-flight search so its sheet does not
         // linger into the new document — mirrors the clearAll() pattern (the
         // `activeSearch` didSet does not itself cancel the search task).
-        let search = activeSearch
-        activeSearch = nil
-        MainActor.assumeIsolated { search?.cancelSearchWithoutAwait() }
+        dismissActiveSearch()
         // A healthy second-document run must not show the prior run's
         // "auto-detect degraded" banner (`signalDegradedDetection` treats the
         // flag as an already-toasted gate and never resets it).
@@ -1313,6 +1311,20 @@ class RedactionState {
         triageSelections = [:]
     }
 
+    /// UXC-49 (D-124 / REV-14 — STATE-7): tear the live Search & Redact
+    /// session down. The editor's ONE `.sheet(item:)` slot reads
+    /// `activeSearch`, so this dismisses the sheet (its `onDisappear`
+    /// clears the results, the same outcome as its own Dismiss); the
+    /// in-flight search task is cancelled without awaiting (the
+    /// `activeSearch` didSet does not cancel it). Shared by the two
+    /// document-lifecycle resets, the KI-4 purge re-run and the Apply
+    /// seam (`PipelineCoordinator.runFullPipeline`). Idempotent.
+    func dismissActiveSearch() {
+        let search = activeSearch
+        activeSearch = nil
+        MainActor.assumeIsolated { search?.cancelSearchWithoutAwait() }
+    }
+
     // MARK: - Shared commit + the one undo implementation
 
     /// The single write-back transaction every apply origin commits
@@ -1663,9 +1675,7 @@ class RedactionState {
         detectionResults = [:]
         selectedRegionIDs = []
         hoveredRegionID = nil
-        let search = activeSearch
-        activeSearch = nil
-        MainActor.assumeIsolated { search?.cancelSearchWithoutAwait() }
+        dismissActiveSearch()
         pendingTriage = nil
         triageSelections = [:]
         // Document close drops the detection-run record + promotion flag —
