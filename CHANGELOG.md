@@ -29,6 +29,7 @@ The entries below follow the Keep-a-Changelog index format.
 - **Reduce Motion** now applies to every slide-in transition; the post-run banner tints orange only for warnings; toast and status colors use the measured text tier; the editor toolbar keeps the brand tint on Redact only; search option toggles wait for a running search.
 - **Easier-to-read support text.** The home and verification screens render their explanatory text one size larger in a darker grey; the version line and the On-device / No tracking / Open source strip are no longer faint.
 - **Results screen layout.** The verdict title now leads the screen directly beneath the toolbar (the symbol slot above it is removed), the audit-scope note sits with the run's timing line at the foot of the screen, the top-left toolbar button is Home, and the home screen's Settings button uses the same neutral tint as the editor toolbar.
+- **Result navigation.** The Previous/Next result buttons now step through matches with the review sheet parked at its compact height, where the buttons and the position counter stay available; the current match is outlined on the page, and the list scrolls to it when the sheet is expanded.
 
 ### Removed
 

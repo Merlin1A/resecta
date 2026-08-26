@@ -70,6 +70,11 @@ struct SearchAndRedactSheet: View {
     /// the `Anim.resolved` fade since the pulse is a one-shot affordance
     /// hint, not a state-change cue. See `CompactFloatDetent.shouldPulseGrabber`.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// UXC-44 (RB-94 rider, measured on-sim): the compact handle
+    /// hides the result counter from the XXXL Dynamic Type size up
+    /// and lays the row out as a plain HStack at accessibility sizes
+    /// so the title never collides with the trailing cluster.
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State var searchDebounceTask: Task<Void, Never>?
     // The prior `applyResultMessage`
     // state field drove an `.alert("Redaction Applied", ...)` that blocked
@@ -252,7 +257,7 @@ struct SearchAndRedactSheet: View {
                         onShowSavedSearches: {
                             activeModal = .savedSearches
                         },
-                        onNavigateToCurrentResult: navigateToCurrentResult
+                        onNavigateToCurrentResult: navigateToCurrentResult(dropToCompact:)
                     )
                     .safeAreaInset(edge: .top, spacing: 0) {
                         // The Search interface's whole fixed chrome
@@ -309,9 +314,12 @@ struct SearchAndRedactSheet: View {
     }
 
     var body: some View {
-        // Compact composition branch (BH-B-01 origin; WA/D-75 shape):
-        // at the compact detent the sheet renders ONLY the title-only
-        // handle (`compactFloatStrip`) — every control lives at
+        // Compact composition branch (BH-B-01 origin; WA/D-75 shape,
+        // AMENDED by UXC-44 / D-116 / RB-92/94): at the compact detent
+        // the sheet renders ONLY the glanceable handle
+        // (`compactFloatStrip`) — the interface title plus the
+        // result-nav cluster (‹ › + k/N) so the result walk continues
+        // while the sheet is parked. Every OTHER control lives at
         // medium/large, and the canvas owns interaction below the
         // sheet (BH-A-04 grant). The full chrome returns at medium+.
         Group {
@@ -682,23 +690,71 @@ struct SearchAndRedactSheet: View {
         .shieldedSheetContent(monitor: captureMonitor)
     }
 
-    // MARK: - compactFloat Strip (WA/D-75)
+    // MARK: - compactFloat Strip (WA/D-75, amended by UXC-44)
 
     /// The compact detent's WHOLE composition: the centered interface
-    /// title and nothing else. CONSTRAINT (WA/D-75, superseding the
-    /// BH-B-01 control strip): compact is a glanceable title-only
-    /// handle — every control lives at medium+, and the canvas owns
-    /// interaction below the sheet (BH-A-04 grant). Identifier kept:
-    /// the detent-layout pins assert strip presence by id.
+    /// title with the result-nav cluster (‹ › + k/N) overlaid at the
+    /// trailing edge. CONSTRAINT (WA/D-75 as AMENDED by UXC-44 /
+    /// D-116 / RB-92/94, superseding the BH-B-01 control strip):
+    /// compact is a glanceable handle — title + result-nav cluster;
+    /// every OTHER control lives at medium+, and the canvas owns
+    /// interaction below the sheet (BH-A-04 grant). The cluster is
+    /// the SAME builder the medium+ search bar mounts
+    /// (`resultNavCluster`) — the two sites are never co-mounted
+    /// (`body` switches on the detent), so the ids stay unique in
+    /// the live tree. It renders only with results on board and no
+    /// review pending (`showsResultNavCluster`). RB-94 rider, tuned
+    /// by measurement (FB-2/FB-9): the counter hides from the XXXL
+    /// Dynamic Type size up (both chevrons stay) — at XXXL the
+    /// headline already met the counter-widened cluster on the
+    /// 390-pt iPhone 17e — and at accessibility sizes the row falls
+    /// back from the centred overlay to a plain HStack (title centred
+    /// in the leading space, chevrons trailing) because the headline
+    /// alone reaches the pair there (AX5: "Search" ≈143 pt). So the
+    /// title never collides with the cluster at any size.
+    /// Identifier kept: the detent-layout pins assert strip presence
+    /// by id; `.accessibilityElement(children: .contain)` scopes it
+    /// so the cluster's own ids survive (the D-75 cascade rider).
     private var compactFloatStrip: some View {
         VStack(spacing: 0) {
-            Text(searchState.searchModeType.interface.displayName)
-                .font(.headline)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    HStack(spacing: ResectaTokens.Spacing.sm) {
+                        Spacer(minLength: 0)
+                        compactStripTitle
+                        Spacer(minLength: 0)
+                        if showsResultNavCluster {
+                            resultNavCluster(hidesCounterAtLargeTypeSizes: true)
+                                .padding(.trailing, ResectaTokens.Spacing.md)
+                        }
+                    }
+                } else {
+                    ZStack(alignment: .trailing) {
+                        compactStripTitle
+                            .frame(maxWidth: .infinity)
+                        if showsResultNavCluster {
+                            resultNavCluster(hidesCounterAtLargeTypeSizes: true)
+                                .padding(.trailing, ResectaTokens.Spacing.md)
+                        }
+                    }
+                }
+            }
+            // The row is always the cluster's 46-pt layout height so
+            // the title sits on the same line whether or not the
+            // cluster renders (no jump between results / no results /
+            // review; measured on-sim, FB-2).
+            .frame(minHeight: ResectaTokens.TouchTarget.minimum)
             Spacer(minLength: 0)
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("compactFloatStrip")
+    }
+
+    /// The compact handle's title — the D-75 centred headline, unchanged.
+    private var compactStripTitle: some View {
+        Text(searchState.searchModeType.interface.displayName)
+            .font(.headline)
+            .lineLimit(1)
     }
 
     // MARK: - Search Bar
@@ -821,8 +877,9 @@ struct SearchAndRedactSheet: View {
                 .accessibilityLabel("Cancel search")
             }
 
-            // Prev/Next navigation + position indicator
-            if !searchState.results.isEmpty {
+            // Prev/Next navigation + position indicator (UXC-44:
+            // gated on the pending review too — packet RN-06).
+            if showsResultNavCluster {
                 resultNavigationControls
             }
         }
@@ -948,17 +1005,48 @@ struct SearchAndRedactSheet: View {
 
     // MARK: - Result Navigation
 
+    /// UXC-44 (RB-92) + packet RN-06 gate: the ‹ k/N › cluster renders
+    /// at EITHER site only with search results on board and no
+    /// pipeline review pending — stale sheet-scan results must not
+    /// show a walk over a detections list, which has no "current".
+    private var showsResultNavCluster: Bool {
+        !searchState.results.isEmpty && !isReviewActive
+    }
+
+    /// The medium+ search-bar site of the ‹ k/N › cluster. REV-01
+    /// (packet §7.2 item 4, RB-65): geometry only — the pair keeps
+    /// its row, counter, labels, ids, and shortcuts; each chevron is
+    /// the ruled Ø44 drawn circle inside the 46pt layout floor, pair
+    /// spacing 2 → 6 (≈8pt visual gap between the drawn circles).
+    /// UXC-44 (D-116, RB-92) changed the pair's BEHAVIOUR (a tap parks
+    /// the sheet at the compact float — `navigateToCurrentResult(dropToCompact:)`)
+    /// and re-homed the composition into the shared `resultNavCluster`
+    /// builder so this site and the compact handle never drift; the
+    /// geometry here is untouched (`UIFixChromeUITests` measures it)
+    /// and the counter always renders at this site.
     private var resultNavigationControls: some View {
+        resultNavCluster(hidesCounterAtLargeTypeSizes: false)
+    }
+
+    /// UXC-44 (D-116, RB-92/94): the ONE result-nav cluster — the
+    /// ‹ › pair plus the k/N counter — mounted at BOTH sites (the
+    /// medium+ search bar's trailing edge via
+    /// `resultNavigationControls`, and the compact handle's trailing
+    /// edge in `compactFloatStrip`). The sites are never co-mounted,
+    /// so the ids / labels / ⌘G shortcuts stay unique in the live
+    /// tree. A chevron tap steps the current result AND parks the
+    /// sheet at the compact float (the row-tap idiom, RB-92); ⌘G /
+    /// ⇧⌘G ride these same Buttons, so the shortcut ≡ the chevron by
+    /// construction (J/K keep the medium semantics —
+    /// `SearchResultsSection`). `hidesCounterAtLargeTypeSizes` is
+    /// the RB-94 rider for the compact handle only: the counter hides
+    /// from XXXL up (measured — see `compactFloatStrip`).
+    private func resultNavCluster(hidesCounterAtLargeTypeSizes: Bool) -> some View {
         HStack(spacing: ResectaTokens.Spacing.xs) {
-            // REV-01 (packet §7.2 item 4, RB-65): geometry only —
-            // the pair keeps its row, counter, labels, ids, and
-            // shortcuts. Each chevron is the ruled Ø44 drawn circle;
-            // pair spacing 2 → 6 (≈8pt visual gap between the drawn
-            // circles inside the 46pt floors).
             HStack(spacing: 6) {
                 Button {
                     searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
-                    navigateToCurrentResult()
+                    navigateToCurrentResult(dropToCompact: true)
                 } label: {
                     circularIconLabel("chevron.up")
                 }
@@ -968,7 +1056,7 @@ struct SearchAndRedactSheet: View {
 
                 Button {
                     searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
-                    navigateToCurrentResult()
+                    navigateToCurrentResult(dropToCompact: true)
                 } label: {
                     circularIconLabel("chevron.down")
                 }
@@ -978,39 +1066,55 @@ struct SearchAndRedactSheet: View {
             }
             .buttonStyle(.circularIcon)
 
-            // Counter respects active filters. When no filter is
-            // active (filteredCount == totalCount) the simple 1-of-N form
-            // is shown. When a filter is active the counter shows the
-            // position within the visible filtered set; an en dash (–)
-            // signals that the current result is hidden by the filter.
-            if let idx = searchState.currentResultIndex {
-                if searchState.filteredCount == searchState.totalCount {
-                    Text("\(idx + 1)/\(searchState.totalCount)")
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("Result \(idx + 1) of \(searchState.totalCount)")
-                } else if let filteredPos = searchState.currentResultFilteredPosition {
-                    Text("\(filteredPos)/\(searchState.filteredCount)")
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("Result \(filteredPos) of \(searchState.filteredCount), \(searchState.totalCount - searchState.filteredCount) filtered")
-                } else {
-                    Text("–/\(searchState.filteredCount)")
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("Current result hidden by filters, \(searchState.filteredCount) of \(searchState.totalCount) shown")
-                }
+            if !(hidesCounterAtLargeTypeSizes && dynamicTypeSize >= .xxxLarge) {
+                resultNavCounter
+            }
+        }
+    }
+
+    /// Counter respects active filters. When no filter is
+    /// active (filteredCount == totalCount) the simple 1-of-N form
+    /// is shown. When a filter is active the counter shows the
+    /// position within the visible filtered set; an en dash (–)
+    /// signals that the current result is hidden by the filter.
+    /// Rendered by `resultNavCluster` at both sites — the strings
+    /// and a11y labels are the RB-65 survivors, unchanged.
+    @ViewBuilder
+    private var resultNavCounter: some View {
+        if let idx = searchState.currentResultIndex {
+            if searchState.filteredCount == searchState.totalCount {
+                Text("\(idx + 1)/\(searchState.totalCount)")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Result \(idx + 1) of \(searchState.totalCount)")
+            } else if let filteredPos = searchState.currentResultFilteredPosition {
+                Text("\(filteredPos)/\(searchState.filteredCount)")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Result \(filteredPos) of \(searchState.filteredCount), \(searchState.totalCount - searchState.filteredCount) filtered")
+            } else {
+                Text("–/\(searchState.filteredCount)")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Current result hidden by filters, \(searchState.filteredCount) of \(searchState.totalCount) shown")
             }
         }
     }
 
     /// The ONE result-navigation seam (SA-3 rider d — the former
     /// section-side duplicate is deleted; its J/K keyboard buttons
-    /// call back through `onNavigateToCurrentResult`).
-    private func navigateToCurrentResult() {
+    /// call back through `onNavigateToCurrentResult`). UXC-44 (D-116,
+    /// RB-92): two detent targets behind the one seam — the chevrons
+    /// and ⌘G pass `dropToCompact: true` (step AND park the sheet at
+    /// the compact float, the row-tap idiom, so the outlined match is
+    /// in view and the walk continues from the handle's cluster); J/K
+    /// pass `false` and keep the prior large → medium rule (keyboard
+    /// users read the list while stepping). The page write + rect
+    /// scroll half is shared by both.
+    private func navigateToCurrentResult(dropToCompact: Bool) {
         guard let result = searchState.currentResult else { return }
         documentState.currentPageIndex = result.pageIndex
         // SA-3 rider (D-70): rect-level half — when the canvas is
@@ -1021,9 +1125,19 @@ struct SearchAndRedactSheet: View {
             toPageIndex: result.pageIndex,
             normalizedRect: result.normalizedRect
         )
-        // Only minimize from .large; preserve .medium so results list stays visible
-        if selectedDetent == .large {
-            selectedDetent = .medium
+        if dropToCompact {
+            // RB-92: the chevron walk parks the sheet (the row-tap
+            // idiom in `SearchResultsSection`). The UXF-05 arrival
+            // raise is untouched — the first tap from large drops
+            // straight to compact.
+            if selectedDetent != .compactFloat {
+                selectedDetent = .compactFloat
+            }
+        } else {
+            // Only minimize from .large; preserve .medium so results list stays visible
+            if selectedDetent == .large {
+                selectedDetent = .medium
+            }
         }
     }
 

@@ -137,7 +137,8 @@ struct SearchResultsListObservationCrashTests {
             onRequestShowRationale: { _ in },
             onTriggerSearch: {},
             onShowSavedSearches: {},
-            onNavigateToCurrentResult: {}
+            // UXC-44: the seam takes `dropToCompact`; inert here.
+            onNavigateToCurrentResult: { _ in }
         )
         .environment(DocumentState())
         .environment(RedactionState())

@@ -572,13 +572,15 @@ struct DocumentEditorView: View {
                     // never-reviewed auto-selected set no longer drops
                     // silently.
                     .interactiveDismissDisabled(searchState.requiresDismissConfirmation)
-                    // Compact float detent — a fixed title-only hug
-                    // (`CompactFloatDetent.swift`, WA/D-75). The PDF
-                    // surfaces behind; every control lives at
-                    // medium/large. Tap-on-row drops to compact; the
-                    // chevron/keyboard navigation path keeps the prior
-                    // large → medium semantics so result-list visibility
-                    // is preserved while the user scans.
+                    // Compact float detent — a fixed hug for the
+                    // glanceable handle (`CompactFloatDetent.swift`,
+                    // WA/D-75 as amended by UXC-44 / D-116): title +
+                    // the result-nav cluster. The PDF surfaces behind;
+                    // every OTHER control lives at medium/large.
+                    // Tap-on-row AND the chevron / ⌘G walk drop to
+                    // compact (RB-92); only the J/K keyboard path keeps
+                    // the prior large → medium semantics so the list
+                    // stays readable while a keyboard user steps.
                     .presentationDetents([.compactFloat, .medium, .large], selection: $searchSheetDetent)
                     // WU-59: hide the system drag indicator so the custom
                     // pulsing grabber inside `SearchAndRedactSheet` is the
