@@ -1,4 +1,5 @@
 import UIKit
+import SwiftUI
 import PDFKit
 import RedactionEngine
 
@@ -44,6 +45,11 @@ class RedactionOverlayView: UIView {
     /// current page. Drawn even more lightly than `searchHighlights` so the
     /// transition into committed results is visible.
     private var livePreviewRects: [CGRect] = []
+    /// UXC-44 (D-116, RB-93): id of the search result the result walk
+    /// currently focuses (`SearchState.currentResult`). Drawn as ONE
+    /// 2-pt brand-tint ring just outside that highlight's rect; the
+    /// highlight fills are untouched, no animation.
+    private var focusedHighlightID: UUID?
     /// Convenience: the single selected ID when exactly one is selected.
     private var selectedID: UUID? { selectedIDs.count == 1 ? selectedIDs.first : nil }
     private var cachedAccessibilityElements: [UIAccessibilityElement]?
@@ -383,18 +389,23 @@ class RedactionOverlayView: UIView {
         with regions: [RedactionRegion],
         selectedIDs: Set<UUID>,
         searchHighlights: [SearchResult] = [],
-        livePreviewRects: [CGRect] = []
+        livePreviewRects: [CGRect] = [],
+        focusedHighlightID: UUID? = nil
     ) {
         guard !isActivelyDragging else { return }
         let geometryChanged = regions != self.regions
         let selectionChanged = selectedIDs != self.selectedIDs
         let searchChanged = searchHighlights != self.searchHighlights
         let previewChanged = livePreviewRects != self.livePreviewRects
+        // UXC-44 (RB-93): the walk moves the ring without any other
+        // input changing — its own dirty bit.
+        let focusChanged = focusedHighlightID != self.focusedHighlightID
         self.regions = regions
         self.selectedIDs = selectedIDs
         self.searchHighlights = searchHighlights
         self.livePreviewRects = livePreviewRects
-        if geometryChanged || selectionChanged || searchChanged || previewChanged {
+        self.focusedHighlightID = focusedHighlightID
+        if geometryChanged || selectionChanged || searchChanged || previewChanged || focusChanged {
             cachedAccessibilityElements = nil
             setNeedsDisplay()
         }
@@ -1568,6 +1579,25 @@ class RedactionOverlayView: UIView {
             }
         }
 
+        // UXC-44 (D-116, RB-93): the result walk's current match wears
+        // ONE 2-pt brand-tint ring drawn 3 pt OUTSIDE its highlight
+        // rect so it sits clear of the selected state's orange border.
+        // Fills untouched, no animation (Reduce Motion moot). The tint
+        // is the dynamic token (`AccentColorLockstepTests` resolves both
+        // appearances from this same UIColor conversion) and `cgColor`
+        // resolves against the trait collection UIKit installs for
+        // `draw(_:)`.
+        if let focusedHighlightID,
+           let focused = searchHighlights.first(where: { $0.id == focusedHighlightID }) {
+            let ringRect = pdfNormalizedToOverlay(focused.normalizedRect)
+                .insetBy(dx: -3, dy: -3)
+            if ringRect.intersects(rect) {
+                ctx.setStrokeColor(UIColor(ResectaTokens.BrandTeal.tint).cgColor)
+                ctx.setLineWidth(2.0)
+                ctx.stroke(ringRect)
+            }
+        }
+
         // Draw active snap guide lines
         drawSnapGuides(ctx: ctx)
 
@@ -2207,8 +2237,12 @@ class RedactionOverlayView: UIView {
                 let element = UIAccessibilityElement(accessibilityContainer: self)
                 let viewRect = pdfNormalizedToOverlay(highlight.normalizedRect)
                 element.accessibilityFrame = UIAccessibility.convertToScreenCoordinates(viewRect, in: self)
-                // NEVER include matched text — announce page only
-                element.accessibilityLabel = "Search highlight, page \(pageIndex + 1)"
+                // NEVER include matched text — announce page only.
+                // UXC-44 (RB-93): the walk's current match carries a
+                // ", current" suffix — still no matched text.
+                element.accessibilityLabel = highlight.id == focusedHighlightID
+                    ? "Search highlight, page \(pageIndex + 1), current"
+                    : "Search highlight, page \(pageIndex + 1)"
                 element.accessibilityTraits = .staticText
                 elements.append(element)
             }

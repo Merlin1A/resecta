@@ -422,11 +422,15 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
         row.tap()
 
-        // WA/D-75: a row tap drops the sheet to the title-only compact
-        // handle — no counter, no chevrons render there. The strip +
-        // title prove the drop landed; the navigation evidence (the
-        // counter) and the no-selection-toggle proof are asserted at
-        // medium after a grabber re-expand, one detent later.
+        // WA/D-75 as amended by UXC-44 (D-116, RB-92/94): a row tap
+        // drops the sheet to the compact handle, which now carries the
+        // title AND the trailing ‹ k/N › cluster so the walk continues
+        // while the sheet is parked. The strip + title prove the drop
+        // landed; the cluster's presence + hittability at compact is
+        // the UXC-44 pin (pinned ABSENT under the D-75 title-only
+        // contract before it); the no-selection-toggle proof is
+        // asserted at medium after a grabber re-expand, one detent
+        // later.
         let strip = app.descendants(matching: .any)
             .matching(identifier: "compactFloatStrip").firstMatch
         XCTAssertTrue(
@@ -437,17 +441,22 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             app.staticTexts["Search"].waitForExistence(timeout: 5),
             "Compact handle is missing its interface title."
         )
-        XCTAssertFalse(
-            app.buttons["Next result"].exists,
-            "The Next-result chevron rendered on the title-only compact handle."
+        let compactNext = app.buttons["Next result"]
+        XCTAssertTrue(
+            compactNext.waitForExistence(timeout: 5),
+            "The Next-result chevron is missing from the compact handle (UXC-44 cluster)."
         )
-        XCTAssertFalse(
-            app.buttons["Previous result"].exists,
-            "The Previous-result chevron rendered on the title-only compact handle."
+        XCTAssertTrue(
+            compactNext.isHittable,
+            "The Next-result chevron exists on the compact handle but is not hittable."
         )
-        XCTAssertFalse(
+        XCTAssertTrue(
+            app.buttons["Previous result"].isHittable,
+            "The Previous-result chevron is missing or not hittable on the compact handle (UXC-44 cluster)."
+        )
+        XCTAssertTrue(
             app.staticTexts["Result 1 of 1"].exists || app.staticTexts["1/1"].exists,
-            "The result counter rendered on the title-only compact handle."
+            "The result counter is missing from the compact handle (UXC-44 cluster)."
         )
 
         // One detent later: the grabber expand restores the full
@@ -469,9 +478,9 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         // D-63/UT chevron pin: the shared bar's trailing result-nav
         // chevrons stay present and hittable with results on board
         // (they had zero coverage pre-UT, and the UT-04 relocation
-        // reshaped their row's leading content). Since WA/D-75 the
-        // chevrons render at medium+ only, so the pin rides the
-        // re-expanded sheet.
+        // reshaped their row's leading content). Since UXC-44 the
+        // cluster renders at compact too; this pin proves the medium+
+        // pair survives the expand (the sites are never co-mounted).
         let nextResult = app.buttons["Next result"]
         XCTAssertTrue(
             nextResult.waitForExistence(timeout: 10),
@@ -485,6 +494,69 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             app.buttons["Previous result"].isHittable,
             "Previous result chevron exists but is not hittable at the medium detent."
         )
+    }
+
+    // MARK: - Result walk parks the sheet; the compact cluster keeps stepping (UXC-44)
+
+    /// UXC-44 (D-116, RB-92/94): a chevron tap steps the current
+    /// result AND parks the sheet at the compact float, where the
+    /// handle's trailing cluster keeps the walk going; the counter
+    /// survives the grabber re-expand. AX-text assertions only — the
+    /// on-page ring is pixel-only (region overlays are not served
+    /// through AX). Deterministic launch: the multipage fixture with
+    /// a seeded "Amount" query (151 hits) at the medium detent (the
+    /// UXF-05 arrival raise may lift it to large — either is a valid
+    /// start for the first tap).
+    func testResultNavChevron_parksAtCompactAndClusterKeepsStepping() {
+        app.launchArguments = [
+            "--uitesting", "--loadTestDocument", "--multipageDoc",
+            "--openSearchSheet", "--searchQuery=Amount", "--searchDetent=medium",
+        ]
+        app.launch()
+
+        let next = app.buttons["resultNavNext"]
+        XCTAssertTrue(
+            next.waitForExistence(timeout: 30),
+            "Next-result chevron never appeared — the seeded query returned nothing or the sheet never presented."
+        )
+        XCTAssertTrue(
+            app.staticTexts["151 found — none selected yet"].waitForExistence(timeout: 15),
+            "Seeded search did not return the fixture's 151 \"Amount\" hits."
+        )
+        XCTAssertTrue(next.isHittable, "Next-result chevron exists but is not hittable before the first step.")
+        next.tap()
+
+        let strip = app.descendants(matching: .any)
+            .matching(identifier: "compactFloatStrip").firstMatch
+        XCTAssertTrue(
+            strip.waitForExistence(timeout: 10),
+            "The first chevron tap did not park the sheet at the compact float (RB-92)."
+        )
+        XCTAssertTrue(
+            app.staticTexts["Result 1 of 151"].waitForExistence(timeout: 10),
+            "Counter did not read 1/151 after the first step."
+        )
+        let compactNext = app.buttons["resultNavNext"]
+        XCTAssertTrue(
+            compactNext.waitForExistence(timeout: 5) && compactNext.isHittable,
+            "Next-result chevron is not hittable on the compact handle — the cluster is missing (RB-94)."
+        )
+        compactNext.tap()
+        XCTAssertTrue(
+            app.staticTexts["Result 2 of 151"].waitForExistence(timeout: 10),
+            "The compact handle's chevron did not step the walk (counter never read 2/151)."
+        )
+        XCTAssertTrue(
+            strip.exists,
+            "Stepping from the compact handle moved the sheet off the compact float."
+        )
+
+        expandCompactStripToMedium()
+        XCTAssertTrue(
+            app.staticTexts["Result 2 of 151"].waitForExistence(timeout: 10),
+            "Walk position lost across the compact → medium expand — the counter no longer reads 2/151."
+        )
+        attachScreenshot(named: "uxc44-result-walk")
     }
 
     // MARK: - Cooperative arbitration (D-70/SA-2)

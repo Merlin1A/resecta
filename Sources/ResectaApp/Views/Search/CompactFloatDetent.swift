@@ -2,13 +2,16 @@ import SwiftUI
 
 // Compact float detent for the Search & Redact sheet.
 //
-// WA/D-75: the compact detent hugs the title-only handle — the
-// grabber capsule plus the centered interface title
-// (`compactFloatStrip`) — so the document stays the primary surface
-// while the sheet is parked. Height is a fixed hug clamped to the
+// WA/D-75 (as AMENDED by UXC-44 / D-116 / RB-94): the compact detent
+// hugs the glanceable handle — the grabber capsule plus the centered
+// interface title with the result-nav cluster (‹ › + k/N) overlaid
+// at its trailing edge (`compactFloatStrip`) — so the document stays
+// the primary surface while the sheet is parked and the result walk
+// continues from the handle. Height is a fixed hug clamped to the
 // available height. The prior max(110pt, 15%-of-screen) contract
 // sized a control strip (search bar + nav controls + first result
-// row) that no longer renders at compact.
+// row) that no longer renders at compact; the D-75 title-only hug
+// (60) pre-dates the cluster's 46-pt layout floors.
 //
 // The pure-function `compactHeight(maxDetentValue:)` helper isolates
 // the math from the SwiftUI runtime so tests can verify the hug +
@@ -25,10 +28,13 @@ struct CompactFloatDetent: CustomPresentationDetent {
         min(hugHeight, maxDetentValue)
     }
 
-    /// Grabber inset (~15pt) + one headline line + breathing room —
-    /// tuned live on the iPhone 17 sim (WA-IMPL-2, B-1): grabber and
-    /// title fully visible, no clip, canvas exposed behind.
-    static let hugHeight: CGFloat = 60
+    /// Grabber inset (6+5+4 = 15pt) + the result-nav cluster's 46-pt
+    /// layout floor (RB-54/RB-67 — the title rides inside that row) +
+    /// breathing room — tuned live on the iPhone 17 and the 390-pt
+    /// iPhone 17e sims (UXC-44, FB-3): grabber, title, chevrons and
+    /// counter fully visible, no clip, canvas exposed behind. Was 60
+    /// under the D-75 title-only handle (WA-IMPL-2, B-1).
+    static let hugHeight: CGFloat = 72
 }
 
 extension PresentationDetent {

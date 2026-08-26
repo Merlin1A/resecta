@@ -125,4 +125,51 @@ struct OverlayCoordinateTests {
         #expect(abs(roundTripped.width - testRect.width) < 0.01)
         #expect(abs(roundTripped.height - testRect.height) < 0.01)
     }
+
+    // MARK: - UXC-44 (D-116, RB-93) — focused-highlight round-trip
+
+    private func highlight(y: CGFloat, text: String) -> SearchResult {
+        SearchResult(
+            pageIndex: 2,
+            normalizedRect: CGRect(x: 0.1, y: y, width: 0.2, height: 0.05),
+            matchedText: text,
+            contextSnippet: "…",
+            source: .textLayer,
+            term: text
+        )
+    }
+
+    private func highlightLabels(_ overlay: RedactionOverlayView) -> [String] {
+        (overlay.accessibilityElements as? [UIAccessibilityElement])?
+            .compactMap(\.accessibilityLabel) ?? []
+    }
+
+    @Test("configure(focusedHighlightID:) round-trips into the AX labels — ', current' on the focused highlight only")
+    func focusedHighlightCarriesTheCurrentSuffixOnly() {
+        let overlay = makeOverlay()
+        overlay.pageIndex = 2
+        let a = highlight(y: 0.7, text: "ACCT-4471")
+        let b = highlight(y: 0.5, text: "ACCT-9920")
+
+        overlay.configure(with: [], selectedIDs: [], searchHighlights: [a, b], focusedHighlightID: b.id)
+        let first = highlightLabels(overlay)
+        #expect(first == ["Search highlight, page 3", "Search highlight, page 3, current"])
+        // Privacy rule: never the matched text.
+        #expect(!first.joined().contains("ACCT"))
+
+        // Focus alone moving (same highlights) invalidates the cached
+        // elements — the suffix follows the walk.
+        overlay.configure(with: [], selectedIDs: [], searchHighlights: [a, b], focusedHighlightID: a.id)
+        #expect(highlightLabels(overlay) == ["Search highlight, page 3, current", "Search highlight, page 3"])
+
+        // The default (nil) drops the suffix everywhere — every other
+        // configure caller stays source-compatible and ring-free.
+        overlay.configure(with: [], selectedIDs: [], searchHighlights: [a, b])
+        #expect(highlightLabels(overlay) == ["Search highlight, page 3", "Search highlight, page 3"])
+
+        // A focused id that is not on this page draws nothing here and
+        // leaves the labels plain.
+        overlay.configure(with: [], selectedIDs: [], searchHighlights: [a, b], focusedHighlightID: UUID())
+        #expect(highlightLabels(overlay) == ["Search highlight, page 3", "Search highlight, page 3"])
+    }
 }

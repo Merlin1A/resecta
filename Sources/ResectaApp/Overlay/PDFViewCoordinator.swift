@@ -43,6 +43,17 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, UIScribbleIntera
     /// W7 — track the visible page index so a page change rebinds the
     /// live-preview overlay (rects are scoped to the visible page only).
     private var lastVisiblePageIndex: Int = -1
+    /// UXC-44 (D-116, RB-93): the last focused search-result id pushed
+    /// to the overlays. Navigation changes `currentResultIndex`
+    /// without bumping `resultVersion`, so the ring has its own
+    /// dirty check in `refreshAllOverlaysIfNeeded`.
+    private var lastFocusedHighlightID: UUID?
+
+    /// UXC-44 (RB-93): the result the walk currently focuses — the
+    /// id every overlay `configure` receives for the focus ring.
+    private var focusedHighlightID: UUID? {
+        redactionState?.activeSearch?.currentResult?.id
+    }
 
     /// Strong reference to DocumentState for page-change sync.
     /// CONC-3 (Pkg N): the property is a `var DocumentState?` (strong),
@@ -140,7 +151,8 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, UIScribbleIntera
             with: regions,
             selectedIDs: redactionState?.selectedRegionIDs ?? [],
             searchHighlights: searchHighlights,
-            livePreviewRects: livePreviewRects
+            livePreviewRects: livePreviewRects,
+            focusedHighlightID: focusedHighlightID
         )
 
         activeOverlays[pageIndex] = overlay
@@ -235,7 +247,8 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, UIScribbleIntera
             with: regions,
             selectedIDs: redactionState?.selectedRegionIDs ?? [],
             searchHighlights: searchHighlights,
-            livePreviewRects: livePreviewRects(forPage: pageIndex)
+            livePreviewRects: livePreviewRects(forPage: pageIndex),
+            focusedHighlightID: focusedHighlightID
         )
     }
 
@@ -249,12 +262,14 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, UIScribbleIntera
                 with: regions,
                 selectedIDs: selectedIDs,
                 searchHighlights: searchHighlights,
-                livePreviewRects: livePreviewRects(forPage: pageIndex)
+                livePreviewRects: livePreviewRects(forPage: pageIndex),
+                focusedHighlightID: focusedHighlightID
             )
         }
     }
 
-    /// Phase 5C: Refresh overlays only if regions, selection, or search results changed.
+    /// Phase 5C: Refresh overlays only if regions, selection, search results,
+    /// or the walk's focused result changed.
     /// Uses O(1) version counter instead of O(n) dictionary comparison.
     func refreshAllOverlaysIfNeeded() {
         let currentVersion = redactionState?.regionVersion ?? 0
@@ -267,16 +282,23 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, UIScribbleIntera
         // W7 — page change rebinds the live-preview overlay (rects scoped
         // to the visible page only).
         let visibleChanged = currentVisible != lastVisiblePageIndex
+        // UXC-44 (RB-93): a step of the result walk moves the focus
+        // ring without a resultVersion bump (the SwiftUI update pass
+        // still runs — the step writes the page index + scroll target).
+        let currentFocusedID = focusedHighlightID
+        let focusChanged = currentFocusedID != lastFocusedHighlightID
         guard currentVersion != lastRegionVersion
                 || currentSelectedIDs != lastSelectedIDs
                 || currentSearchVersion != lastSearchResultsVersion
                 || searchCleared
-                || visibleChanged else { return }
+                || visibleChanged
+                || focusChanged else { return }
         lastRegionVersion = currentVersion
         lastSelectedIDs = currentSelectedIDs
         lastSearchResultsVersion = currentSearchVersion
         lastHadActiveSearch = hasActiveSearch
         lastVisiblePageIndex = currentVisible
+        lastFocusedHighlightID = currentFocusedID
         refreshAllOverlays()
     }
 

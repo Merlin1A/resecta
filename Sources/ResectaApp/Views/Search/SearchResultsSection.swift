@@ -46,8 +46,12 @@ struct SearchResultsSection: View {
     /// SA-3 rider (d): result navigation is ONE seam on the hub —
     /// the J/K keyboard buttons call back through this instead of a
     /// section-side duplicate (the hub's copy also carries the
-    /// rect-level scroll-to-match half).
-    let onNavigateToCurrentResult: () -> Void
+    /// rect-level scroll-to-match half). UXC-44 (D-116, RB-92): the
+    /// Bool is the seam's `dropToCompact` — J/K pass `false` (the
+    /// list stays readable while a keyboard user steps: large →
+    /// medium only); the hub's chevrons / ⌘G pass `true` and park
+    /// the sheet at the compact float.
+    let onNavigateToCurrentResult: (Bool) -> Void
 
     /// Per-sheet-session dismiss state for the doctype banner.
     /// `SearchResultsSection` is re-instantiated when the sheet
@@ -592,14 +596,14 @@ struct SearchResultsSection: View {
         Group {
             Button {
                 searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
-                onNavigateToCurrentResult()
+                onNavigateToCurrentResult(false)
             } label: { EmptyView() }
                 .accessibilityLabel("Previous match")
                 .keyboardShortcut("j", modifiers: [])
 
             Button {
                 searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
-                onNavigateToCurrentResult()
+                onNavigateToCurrentResult(false)
             } label: { EmptyView() }
                 .accessibilityLabel("Next match")
                 .keyboardShortcut("k", modifiers: [])
@@ -692,6 +696,21 @@ struct SearchResultsSection: View {
         .accessibilityIdentifier("searchResultsList")
         .onChange(of: pendingAnchorID, initial: false) { (_: UUID?, newID: UUID?) in
             anchorTappedRow(newID: newID, proxy: proxy)
+        }
+        // UXC-44 (D-116, RB-92): the list FOLLOWS the walk — every
+        // step of the current result (chevron / ⌘G / J/K) re-anchors
+        // the current row at the top, the way the row tap does. The
+        // row-tap path writes the same id in the same tick, so the
+        // consumer above fires once (harmless).
+        .onChange(of: searchState.currentResult?.id, initial: false) { (_: UUID?, newID: UUID?) in
+            if let newID { pendingAnchorID = newID }
+        }
+        // The section is UNMOUNTED at the compact float (the sheet
+        // body renders only the handle) and re-instantiated on expand
+        // with fresh @State — anchoring on appear is what makes
+        // "grabber-up lands on the current row" true.
+        .onAppear {
+            if let id = searchState.currentResult?.id { pendingAnchorID = id }
         }
 
         // Pencil circle-to-select. The named
@@ -799,8 +818,10 @@ struct SearchResultsSection: View {
                     normalizedRect: result.normalizedRect
                 )
                 // Tap-on-row drops to compact so the
-                // PDF gets max area; the chevron / J/K nav path stays
-                // at large → medium per the prior contract. Set
+                // PDF gets max area. Since UXC-44 (D-116, RB-92) the
+                // chevron / ⌘G walk parks the sheet the same way
+                // (`navigateToCurrentResult(dropToCompact: true)` on
+                // the hub); only J/K keep the large → medium rule. Set
                 // `pendingAnchorID` BEFORE the detent transition fires
                 // so the `.onChange` on `resultsList`'s ScrollViewReader
                 // proxy snaps the tapped row to the top.
