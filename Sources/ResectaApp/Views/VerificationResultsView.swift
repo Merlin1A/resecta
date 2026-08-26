@@ -87,19 +87,22 @@ struct VerificationResultsView: View {
                     trustStrip
                     // UXC-43 (D-118; supersedes REV-03's placement,
                     // RB-61/RB-68): the timing footer and the audit-scope
-                    // disclaimer close the page as ONE tight footer block
-                    // — the disclaimer is the LAST element on every
-                    // verdict, 8 pt beneath "Completed in … · N checks"
-                    // (the 1.0.0 position, now coupled to the timing
-                    // line). One gate-wrapped mount, no per-status
-                    // placement branches. On SKIPPED there is no timing
-                    // line (`layers.isEmpty`), so the block holds only
-                    // the disclaimer, one section gap under the trust
-                    // strip — accepted as-falls. The always-true
-                    // `shouldShowHonestyDisclaimer` gate stays: its
-                    // exhaustive switch forces a mount decision if a
-                    // new verdict status is ever added.
-                    VStack(spacing: ResectaTokens.Spacing.sm) {
+                    // disclaimer close the page as ONE footer block — the
+                    // disclaimer is the LAST element on every verdict,
+                    // beneath "Completed in … · N checks". One
+                    // gate-wrapped mount, no per-status placement
+                    // branches. UXC-47 (D-122): the block's spacing is
+                    // `disclaimerFootGap` (144 pt, was 8) so the note
+                    // starts below the first screen on the 6.3″ and 6.9″
+                    // phones at the default type size — the timing line
+                    // stays in view, the note is one scroll away. On
+                    // SKIPPED there is no timing line (`layers.isEmpty`),
+                    // so the block holds only the disclaimer, one section
+                    // gap under the trust strip — accepted as-falls. The
+                    // always-true `shouldShowHonestyDisclaimer` gate
+                    // stays: its exhaustive switch forces a mount
+                    // decision if a new verdict status is ever added.
+                    VStack(spacing: Self.disclaimerFootGap) {
                         if Self.shouldShowRunBreakdown(report: report) {
                             footer
                         }
@@ -196,6 +199,9 @@ struct VerificationResultsView: View {
     // title/subtitle text and the combined accessibility label below (the
     // former 56pt status-symbol slot above the title is removed; the
     // per-layer status glyphs in `LayerResultRow` are unchanged).
+    // UXC-47 (D-122): PASS renders the title alone — `mastheadSubtitle`
+    // is nil on PASS, so the subtitle `Text` is not mounted at all (no
+    // empty line, no stray spacing); every other verdict keeps its line.
 
     private var statusMasthead: some View {
         VStack(spacing: ResectaTokens.Spacing.sm) {
@@ -204,11 +210,13 @@ struct VerificationResultsView: View {
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
 
-            Text(mastheadSubtitle)
-                .font(.subheadline)
-                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 320)
+            if let mastheadSubtitle {
+                Text(mastheadSubtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 320)
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Self.mastheadAccessibilityLabel(report: report))
@@ -240,23 +248,27 @@ struct VerificationResultsView: View {
 
     /// Plain subtitle (no timing). Timing moved to the footer; the
     /// per-page-mode summary moves into the details disclosure header.
-    private var mastheadSubtitle: String {
+    /// Nil on PASS (UXC-47) — the masthead mounts no subtitle at all.
+    private var mastheadSubtitle: String? {
         Self.mastheadSubtitle(report: report)
     }
 
     /// Subtitle derivation, lifted to a `static` helper so the skip-induced
     /// WARN arm is unit-testable without a SwiftUI host (mirrors
-    /// `skippedSubtitle`).
-    static func mastheadSubtitle(report: VerificationReport) -> String {
+    /// `skippedSubtitle`). Returns nil exactly when the masthead shows the
+    /// title alone (PASS, and the never-aggregated INFO for exhaustiveness);
+    /// every verdict that asks the user to do something keeps its line.
+    static func mastheadSubtitle(report: VerificationReport) -> String? {
         switch report.overallStatus {
         case .pass:
-            let layerCount = report.layers.count
-            let infoCount = report.layers.filter(\.status.isInfo).count
-            let base = "All \(layerCount) verification checks completed without issues."
-            if infoCount > 0 {
-                return base + " · \(infoCount) informational \(infoCount == 1 ? "note" : "notes") below."
-            }
-            return base
+            // UXC-47 (D-122): "All N verification checks completed without
+            // issues." (+ the informational-notes tail) is gone in both
+            // pipeline modes — "Checks Passed" carries the verdict, and the
+            // Verification Details header still reads "N of N checks
+            // passed · N informational notes" one row down. Reduced
+            // assurance never takes this arm: an INFO-only run aggregates
+            // to PASS, skips degrade the aggregate to WARN (its arm below).
+            return nil
         case .warn:
             let warnCount = report.layers.filter(\.status.isWarn).count
             // Skip-induced WARN: on the digest-less verify-only
@@ -273,12 +285,9 @@ struct VerificationResultsView: View {
             // Overall status never aggregates to .info — aggregateStatus
             // returns .fail/.warn/.pass, or .skipped when every layer was
             // skipped (skip-aware aggregation). Keep an arm for
-            // exhaustiveness; if ever surfaced, treat like .pass with the
-            // note-count tail.
-            let layerCount = report.layers.count
-            let infoCount = report.layers.filter(\.status.isInfo).count
-            return "All \(layerCount) verification checks completed without issues."
-                + (infoCount > 0 ? " · \(infoCount) informational \(infoCount == 1 ? "note" : "notes") below." : "")
+            // exhaustiveness; if ever surfaced, treat like .pass (title
+            // alone, UXC-47).
+            return nil
         case .attention:
             // Name the exact text once at the masthead (display-only
             // field) — each attention row repeats it with the remediation
@@ -973,10 +982,22 @@ struct VerificationResultsView: View {
     // the checks' epistemic limits at the point where the share decision is
     // made. It mounts at ONE site on every verdict: since UXC-43 (D-118,
     // superseding REV-03's placement under "Verification Details") it is
-    // the last element of the page, in the footer block 8 pt beneath the
-    // timing line. The component supplies its own caption styling,
+    // the last element of the page, in the footer block beneath the
+    // timing line — `disclaimerFootGap` under it (8 pt at UXC-43, 144 pt
+    // since UXC-47). The component supplies its own caption styling,
     // centered alignment, and accessibility label; the call site owns the
     // spacing; Dynamic Type flows through `Text`.
+
+    /// UXC-47 (D-122): the footer block's spacing — the distance from the
+    /// timing line to the audit-scope note. 3 × `Spacing.xxl` = 144 pt,
+    /// sized from the measured PASS layout at the default type size: the
+    /// timing line ends ≈835 pt from the top of the screen on the 6.3″ and
+    /// 6.9″ iPhones, so the note's top edge lands ≈23 pt below the 956-pt
+    /// 6.9″ screen (≈105 pt below the 874-pt 6.3″ one) — the first screen,
+    /// which is the App Store frame, shows the verdict through the timing
+    /// line and the note is one scroll away. Static so the value is pinned
+    /// without a SwiftUI host (`HonestySurfacesTests`).
+    static let disclaimerFootGap: CGFloat = ResectaTokens.Spacing.xxl * 3
 
     /// Disclaimer mount gate. Deliberately true for EVERY verdict state —
     /// the exhaustive switch (no `default`) forces a decision here if a new

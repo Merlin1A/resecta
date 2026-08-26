@@ -2785,9 +2785,13 @@ struct ShareRiskConfirmSheet: View {
                             .font(.subheadline)
                     case .incompleteWarn(let report):
                         // RB-34 D4: reuse the masthead's own skip-induced-WARN
-                        // sentence verbatim — no new string.
-                        Text(VerificationResultsView.mastheadSubtitle(report: report))
-                            .font(.subheadline)
+                        // sentence verbatim — no new string. The helper is
+                        // optional only for PASS (UXC-47, title-only
+                        // masthead); a WARN report always carries a line.
+                        if let line = VerificationResultsView.mastheadSubtitle(report: report) {
+                            Text(line)
+                                .font(.subheadline)
+                        }
                     }
 
                     if VerificationResultsView.shouldShowDeselectionRow(
