@@ -741,8 +741,9 @@ final class SearchState: Identifiable {
             }
             // The PII confidence post-filter is retired with the
             // per-run Confidence slider — every above-threshold result
-            // the engine returns is listed; selection predicates
-            // (Select where… ≥75/≥90) are the confidence tools now.
+            // the engine returns is listed; the confidence sort is the
+            // one review-side confidence tool (the Select where… ≥75/≥90
+            // predicates retired under UXC-46).
             // Applied-state filter. `.all` no-ops; `.applied`
             // keeps only results whose IDs are in `appliedResultIDs`;
             // `.unapplied` keeps the complement.
@@ -1218,33 +1219,17 @@ final class SearchState: Identifiable {
 
     /// Replace-selection primitive: every result's `isSelected` is set to
     /// `predicate(result)` — predicates that match a subset deselect the
-    /// rest. RB-21 (UXC-12): the `SearchResultsSection` "Select where…"
-    /// Menu no longer routes through this — it's additive now
-    /// (`addToSelection(where:)` below). This primitive survives as the
-    /// footer Select All / Deselect All toggle's building block, where
-    /// "deselect everything not in the target set" is exactly the wanted
-    /// behavior. Bumps `resultVersion` once for the full pass (no
+    /// rest. It is the footer Select All / Deselect All toggle's building
+    /// block, where "deselect everything not in the target set" is
+    /// exactly the wanted behavior (UXC-46, D-121: the "Select where…"
+    /// predicate menu and its additive `addToSelection(where:)` sibling
+    /// retired with the footer menu — this is the one predicate
+    /// primitive left). Bumps `resultVersion` once for the full pass (no
     /// per-result observer churn). Performance gate: <100ms on 10k
     /// results — pinned by `SearchStateSelectionTests`.
     func setSelection(where predicate: (SearchResult) -> Bool) {
         for i in results.indices {
             results[i].isSelected = predicate(results[i])
-        }
-        resultVersion += 1
-    }
-
-    /// Additive-selection primitive (RB-21/UXC-12): every result matching
-    /// `predicate` is selected; nothing already selected is ever
-    /// deselected. This backs the "Select where…" Menu's mutation —
-    /// tapping a predicate ADDS the matching rows to whatever is already
-    /// picked, and never narrows. Narrowing to exactly a predicate's
-    /// matches is the two-step user flow the footer already offers:
-    /// "Deselect All" (→ `setSelection(where:)` via `toggleSelectAll`),
-    /// then a predicate tap here. Bumps `resultVersion` once per call,
-    /// same contract as `setSelection(where:)`.
-    func addToSelection(where predicate: (SearchResult) -> Bool) {
-        for i in results.indices where predicate(results[i]) {
-            results[i].isSelected = true
         }
         resultVersion += 1
     }

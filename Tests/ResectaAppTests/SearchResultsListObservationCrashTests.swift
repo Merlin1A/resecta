@@ -38,7 +38,7 @@ import RedactionEngine
 //
 // UP-5 deleted the category-grouped List branch (and its `.category` case
 // here); piiScan results always group by page now. `resultsByCategory`
-// itself stays (chips + "Select where…" consume it) — its cache vars keep
+// itself stays (the category chips consume it) — its cache vars keep
 // the same @ObservationIgnored treatment, exercised through the surviving
 // branches' shared invalidation path.
 

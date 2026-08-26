@@ -382,9 +382,9 @@ struct SearchToolbarSection: View {
             //
             // The per-run Confidence slider that lived here is retired:
             // Settings' Detection Sensitivity preset is the one
-            // engine-level control, and the confidence sort +
-            // Select-where ≥75/≥90 predicates are the review-side
-            // confidence tools.
+            // engine-level control, and the confidence sort is the
+            // review-side confidence tool (the Select-where ≥75/≥90
+            // predicates retired with the footer menu, UXC-46).
 
             // Category chips — pre-scan detector selection over
             // `enabledPIICategories` — plus the trailing re-run

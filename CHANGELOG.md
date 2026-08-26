@@ -21,8 +21,7 @@ The entries below follow the Keep-a-Changelog index format.
 ### Changed
 
 - **Share confirm for reported issues.** The alert is now a sheet that lists the reported items and completes with a slide gesture; it also covers runs whose checks were partly skipped. Backing out of the share sheet re-arms the confirm; a completed share leaves it spent for that report.
-- **Select-where is additive** ("Add to selection…"); Deselect All narrows.
-- **Confidence reads as a tier** — high, medium, or low — on review rows, badges, and region details, instead of a number.
+- **Confidence reads as a tier** — high, medium, or low — on review rows and region details, instead of a number.
 - **Apply toast** names the remaining step: nothing is redacted until you tap Redact.
 - **Dialog grammar** normalized across confirms (sentence-case question titles, verb buttons; the import-while-editing confirm reads "Replace").
 - **Touch targets** floored at the default type size on the page bar, review rows, sheet header and footer buttons, popups, chips, and the canvas resize handles.
@@ -30,12 +29,15 @@ The entries below follow the Keep-a-Changelog index format.
 - **Easier-to-read support text.** The home and verification screens render their explanatory text one size larger in a darker grey; the version line and the On-device / No tracking / Open source strip are no longer faint.
 - **Results screen layout.** The verdict title now leads the screen directly beneath the toolbar (the symbol slot above it is removed), the audit-scope note sits with the run's timing line at the foot of the screen, the top-left toolbar button is Home, and the home screen's Settings button uses the same neutral tint as the editor toolbar.
 - **Result navigation.** The Previous/Next result buttons now step through matches with the review sheet parked at its compact height, where the buttons and the position counter stay available; the current match is outlined on the page, and the list scrolls to it when the sheet is expanded.
-- **Result rows.** Search and scan matches now appear highlighted inside their surrounding text, with page labels carried by the section headers and the selection controls consolidated into the footer.
+- **Result rows.** Search and scan matches now appear highlighted inside their surrounding text, with page labels carried by the section headers and the selection count and Select All in the footer.
 
 ### Removed
 
 - Unreferenced code and assets across the app and engine (no behavior change; detection outputs unchanged).
 - **"Snap to Text Boxes" setting.** Rectangle edges align to other boxes and page guides; the text-row assist the setting described is not available in this release.
+- **The "Add to selection…" menu** in the review sheet's footer (select-where). Rows select one at a time or with Select All; Deselect All clears.
+- **The "Reason:" summary line** beneath an expanded result row. Details still opens the match rationale, which carries the detector's signals, the scores, and now that summary line.
+- **The confidence word on search and scan result rows.** The match confidence is read in the match rationale; each row's colored edge is unchanged.
 
 ### Fixed
 

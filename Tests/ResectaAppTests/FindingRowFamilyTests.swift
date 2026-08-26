@@ -99,7 +99,7 @@ struct FindingRowFamilyTests {
         )
     }
 
-    @Test("UXC-45 — search row a11y label: the adapter's page-only string, plus the spoken tier where the meta line shows one")
+    @Test("UXC-45 / UXC-46 — search row a11y label: the adapter's page-only string, plus the spoken tier where the row is graded (spoken, never written)")
     func searchRowAccessibilityLabel() {
         let literal = makeSearchResult(matchedText: "123-45-6789")
         #expect(SearchResultRow.accessibilityLabel(for: literal, tier: .high, showsTier: false)
@@ -113,12 +113,12 @@ struct FindingRowFamilyTests {
         #expect(!spoken.contains("Taxpayer"))
     }
 
-    @Test("UXC-45 (RB-108) — tier word shows on PII and OCR rows, hides on literal text/regex/custom text-layer rows")
+    @Test("UXC-45 (RB-108) / UXC-46 — the spoken tier gates on for PII and OCR rows, off for literal text/regex/custom text-layer rows")
     func tierWordSuppression() {
-        // PII (absolute bands) → shown, whichever source.
+        // PII (absolute bands) → spoken, whichever source.
         #expect(SearchResultRow.showsTierWord(for: makePIIResult()))
         #expect(SearchResultRow.showsTierWord(for: makePIIResult(source: .ocr(confidence: 0.8))))
-        // OCR source without a PII grade (floor-relative) → shown.
+        // OCR source without a PII grade (floor-relative) → spoken.
         let ocrLiteral = SearchResult(
             pageIndex: 0,
             normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
@@ -127,7 +127,7 @@ struct FindingRowFamilyTests {
         )
         #expect(SearchResultRow.showsTierWord(for: ocrLiteral))
         // Literal text / regex / custom text-layer hits are `.high` by
-        // construction → no tier word (the bar still renders green).
+        // construction → no spoken tier (the bar still renders green).
         #expect(!SearchResultRow.showsTierWord(for: makeSearchResult()))
         let custom = SearchResult(
             pageIndex: 0,
@@ -152,14 +152,6 @@ struct FindingRowFamilyTests {
             )
         )
         #expect(!SearchResultRow.showsTierWord(for: regex))
-    }
-
-    @Test("UXC-45 — ConfidenceTier.shortLabel is the meta-line word; the descriptor stays the spoken form")
-    func tierShortLabel() {
-        #expect(SearchResultRow.ConfidenceTier.high.shortLabel == "High")
-        #expect(SearchResultRow.ConfidenceTier.medium.shortLabel == "Medium")
-        #expect(SearchResultRow.ConfidenceTier.low.shortLabel == "Low")
-        #expect(SearchResultRow.ConfidenceTier.high.descriptor == "high confidence")
     }
 
     @Test("UXC-45 (RB-102) — attributed window from the engine range: mono semibold primary run on the wash, base footnote secondary")
