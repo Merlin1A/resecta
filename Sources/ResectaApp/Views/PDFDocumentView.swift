@@ -57,10 +57,12 @@ struct PDFDocumentView: UIViewRepresentable {
         return coordinator
     }
 
-    func makeUIView(context: Context) -> PDFView {
-        let pdfView = PDFView()
+    func makeUIView(context: Context) -> FitFlooredPDFView {
+        let pdfView = FitFlooredPDFView()
         // UI_UX §6.1: Opaque background prevents glass bleed-through
         pdfView.backgroundColor = .systemGroupedBackground
+        // UXC-48 (D-123): the zoom floor rides the subclass — a pinch
+        // out stops at this page's fit size (see `FitFlooredPDFView`).
         pdfView.autoScales = true
         pdfView.displayMode = .singlePage
         // ARCH §5.4: Enable touch routing to overlay views
@@ -81,7 +83,7 @@ struct PDFDocumentView: UIViewRepresentable {
         return pdfView
     }
 
-    func updateUIView(_ pdfView: PDFView, context: Context) {
+    func updateUIView(_ pdfView: FitFlooredPDFView, context: Context) {
         let coordinator = context.coordinator
 
         // Update document if changed (new import)
@@ -151,5 +153,92 @@ struct PDFDocumentView: UIViewRepresentable {
 
         // Refresh overlays only when regions or selection actually changed
         coordinator.refreshAllOverlaysIfNeeded()
+    }
+}
+
+// MARK: - Zoom floor (UXC-48, D-123)
+
+/// The app's `PDFView`: pinching out stops at the page's fit size.
+///
+/// PDFKit's own floor (`minScaleFactor`) sits far below fit, so a pinch
+/// can shrink the page into the canvas background. `autoScales` only
+/// picks the fit scale on load and on resize; the pinch range is governed
+/// by `minScaleFactor` / `maxScaleFactor` (PDFView.h). This subclass pins
+/// the floor to `scaleFactorForSizeToFit` — best fit in `.singlePage`,
+/// fit width in the continuous modes — after every layout and page
+/// change, so it follows the canvas bounds (the page bar and the parked
+/// search sheet change them) and the current page's size. The ceiling is
+/// left at PDFKit's default: zoom-in is unchanged. Pinching past the
+/// floor keeps the scroll view's rubber band; nothing here runs mid
+/// gesture because the fit does not move while the bounds hold still.
+final class FitFlooredPDFView: PDFView {
+
+    /// Relative tolerance for "the floor already matches fit" — narrower
+    /// than `PDFDocumentView.shouldRectScroll`'s 1% because a real fit
+    /// change must never be mistaken for float noise.
+    static let floorTolerance: CGFloat = 0.001
+
+    /// Set once the floor has been applied to a laid-out view. A later
+    /// page change re-fits only a view that sat at the old floor (a
+    /// zoomed-in view keeps its zoom, floor permitting); a resize still
+    /// re-fits through `autoScales`, as it did before the floor.
+    private var floorApplied = false
+
+    // nonisolated(unsafe): written once in init (main), read once in
+    // deinit (nonisolated) — the `PDFViewCoordinator` observer pattern.
+    private nonisolated(unsafe) var pageChangeObserver: Any?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        observePageChanges()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        observePageChanges()
+    }
+
+    deinit {
+        if let o = pageChangeObserver { NotificationCenter.default.removeObserver(o) }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        applyFitFloor()
+    }
+
+    /// Pin `minScaleFactor` to the current fit scale. A no-op while the
+    /// fit is unchanged, which is every layout pass a pinch triggers.
+    func applyFitFloor() {
+        guard document != nil, bounds.width > 0, bounds.height > 0 else { return }
+        let fit = scaleFactorForSizeToFit
+        guard fit > 0 else { return }
+        let previousFloor = minScaleFactor
+        guard abs(previousFloor - fit) > fit * Self.floorTolerance else { return }
+        let satAtFloor = floorApplied
+            && scaleFactor <= previousFloor * (1 + Self.floorTolerance)
+        minScaleFactor = fit
+        // The setter above turns `autoScales` off (PDFView.h); keep
+        // PDFKit's own resize re-fit alongside the floor.
+        autoScales = true
+        if !floorApplied || satAtFloor || scaleFactor < fit {
+            scaleFactor = fit
+        }
+        floorApplied = true
+    }
+
+    /// `.singlePage` fits each page on its own, so a differently sized
+    /// page moves the floor. Same isolation bridge as
+    /// `PDFViewCoordinator.setupObservers`.
+    private func observePageChanges() {
+        pageChangeObserver = NotificationCenter.default.addObserver(
+            forName: .PDFViewPageChanged,
+            object: self,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.applyFitFloor()
+            }
+        }
     }
 }

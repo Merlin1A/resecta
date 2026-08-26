@@ -132,8 +132,10 @@ struct RedactedPreviewView: View {
 private struct RedactedPDFView: UIViewRepresentable {
     let document: PDFDocument
 
-    func makeUIView(context: Context) -> PDFView {
-        let pdfView = PDFView()
+    func makeUIView(context: Context) -> FitFlooredPDFView {
+        // UXC-48 (D-123): the same zoom floor as the editor — a pinch
+        // out stops at fit width here (continuous mode).
+        let pdfView = FitFlooredPDFView()
         pdfView.autoScales = true
         // SA-3 rider (c), deliberately NOT aligned to the editor's
         // `.singlePage`: the preview is a read-only whole-document
@@ -148,7 +150,7 @@ private struct RedactedPDFView: UIViewRepresentable {
         return pdfView
     }
 
-    func updateUIView(_ pdfView: PDFView, context: Context) {
+    func updateUIView(_ pdfView: FitFlooredPDFView, context: Context) {
         // Swap the document if the parent reloaded a different one
         // (e.g., the user re-redacted and `outputURL` changed).
         if pdfView.document !== document {
