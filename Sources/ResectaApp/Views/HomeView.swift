@@ -52,6 +52,11 @@ struct HomeView: View {
                     Button("Settings", systemImage: "gearshape") {
                         showSettings = true
                     }
+                    // UXC-43: neutral, like the editor toolbar's Settings
+                    // (the UXC-32 rule) — `.primary` is black in light and
+                    // white in dark; scoped to the button, so the Settings
+                    // sheet's own tint is unaffected.
+                    .tint(.primary)
                 }
             }
             .fileImporter(

@@ -942,12 +942,15 @@ struct DocumentEditorView: View {
             .keyboardShortcut("f", modifiers: .command)
             .accessibilityIdentifier("searchRedact")
         case .verified:
-            // Done lives top-left on the verification results screen.
-            // Lifted from VerificationActionBar when the bottom bar was
-            // removed; the GATE-3 confirmation dialog (pinned by ARCH §1.3
-            // and VerificationActionBarDoneConfirmationTests) still gates
-            // sessions that carry drawn regions.
-            Button("Done", systemImage: "checkmark.circle") {
+            // Home lives top-left on the verification results screen
+            // (UXC-43: the former Done label/glyph became Home — the same
+            // `house` glyph as the editor's overflow entry). The action is
+            // the Done teardown, lifted from VerificationActionBar when the
+            // bottom bar was removed; the GATE-3 confirmation dialog (pinned
+            // by ARCH §1.3 and VerificationActionBarDoneConfirmationTests)
+            // still gates sessions that carry drawn regions. Identifier
+            // kept (plumbing).
+            Button("Home", systemImage: "house") {
                 if hasDrawnRegions {
                     showDoneConfirmation = true
                 } else {

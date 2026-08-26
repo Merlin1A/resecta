@@ -5,7 +5,8 @@ import RedactionEngine
 // (Phase 2 of i-want-you-to-declarative-sparkle): status masthead →
 // action choice stack (Share / Keep Editing / Preview HomeChoiceCards) →
 // chevron-disclosed details (page modes + per-layer rows) → trust strip
-// → timing footer. The segmented Picker and the prior contained status
+// → footer block (timing line + audit-scope disclaimer, UXC-43). The
+// segmented Picker and the prior contained status
 // card are gone; Preview is a NavigationLink push now (matches HomeView's
 // "tap card → go deeper" idiom). Action-bar and export dialogs are still
 // mounted by DocumentEditorView (Phase 1A C7 + Phase 3).
@@ -70,7 +71,6 @@ struct VerificationResultsView: View {
     @State private var detailsExpanded = false
     @State private var showPageModes = false
     @State private var didAutoExpand = false
-    @State private var animateIcon = false
 
     var body: some View {
         NavigationStack {
@@ -84,29 +84,37 @@ struct VerificationResultsView: View {
                     if Self.shouldShowRunBreakdown(report: report) {
                         detailsSection
                     }
-                    // REV-03 (RB-61/RB-68): the audit-scope disclaimer
-                    // mounts HERE on every verdict — beneath
-                    // "Verification Details", above the trust strip —
-                    // one site, no per-status placement branches
-                    // (supersedes RB-43's PASS-only top mount; the
-                    // UXC-16 visible limit line is removed entirely,
-                    // REV-02). On SKIPPED the details section does not
-                    // render, so the disclaimer sits directly above
-                    // the strip — accepted as-falls. The always-true
+                    trustStrip
+                    // UXC-43 (D-118; supersedes REV-03's placement,
+                    // RB-61/RB-68): the timing footer and the audit-scope
+                    // disclaimer close the page as ONE tight footer block
+                    // — the disclaimer is the LAST element on every
+                    // verdict, 8 pt beneath "Completed in … · N checks"
+                    // (the 1.0.0 position, now coupled to the timing
+                    // line). One gate-wrapped mount, no per-status
+                    // placement branches. On SKIPPED there is no timing
+                    // line (`layers.isEmpty`), so the block holds only
+                    // the disclaimer, one section gap under the trust
+                    // strip — accepted as-falls. The always-true
                     // `shouldShowHonestyDisclaimer` gate stays: its
                     // exhaustive switch forces a mount decision if a
                     // new verdict status is ever added.
-                    if Self.shouldShowHonestyDisclaimer(
-                        overallStatus: report.overallStatus) {
-                        honestyDisclaimer
-                    }
-                    trustStrip
-                    if Self.shouldShowRunBreakdown(report: report) {
-                        footer
+                    VStack(spacing: ResectaTokens.Spacing.sm) {
+                        if Self.shouldShowRunBreakdown(report: report) {
+                            footer
+                        }
+                        if Self.shouldShowHonestyDisclaimer(
+                            overallStatus: report.overallStatus) {
+                            honestyDisclaimer
+                        }
                     }
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.md)
-                .padding(.vertical, dynamicTypeSize.isAccessibilitySize
+                // UXC-43: the verdict title leads the page 24 pt under the
+                // bar at every Dynamic Type size; the bottom edge keeps
+                // its prior behavior.
+                .padding(.top, ResectaTokens.Spacing.lg)
+                .padding(.bottom, dynamicTypeSize.isAccessibilitySize
                     ? ResectaTokens.Spacing.lg : ResectaTokens.Spacing.xxl)
                 .frame(maxWidth: .infinity)
             }
@@ -116,7 +124,6 @@ struct VerificationResultsView: View {
             // on WARN, FAIL, or any mixed-mode page set. PASS + uniform
             // modes ships collapsed so the masthead leads the page.
             .onAppear {
-                animateIcon = true
                 guard !didAutoExpand else { return }
                 didAutoExpand = true
                 if Self.shouldAutoExpand(
@@ -183,21 +190,15 @@ struct VerificationResultsView: View {
 
     // MARK: - Status masthead
     //
-    // §4.1 + Phase 2 lock: neutral chrome — the 56pt SF Symbol carries
-    // status color; no card background. The masthead reads as part of the
-    // page (HomeView parity), not as a contained card. The 56pt symbol is
-    // .accessibilityHidden(true) — title + subtitle already convey the
-    // same information to VoiceOver.
+    // §4.1 + Phase 2 lock: neutral chrome — no card background; the
+    // masthead reads as part of the page, not as a contained card.
+    // UXC-43: title → subtitle, no glyph — the verdict is conveyed by the
+    // title/subtitle text and the combined accessibility label below (the
+    // former 56pt status-symbol slot above the title is removed; the
+    // per-layer status glyphs in `LayerResultRow` are unchanged).
 
     private var statusMasthead: some View {
         VStack(spacing: ResectaTokens.Spacing.sm) {
-            Image(systemName: report.overallStatus.symbolName)
-                .font(.system(size: 56))
-                .foregroundStyle(report.overallStatus.color)
-                .symbolRenderingMode(.hierarchical)
-                .symbolEffect(.appear, isActive: animateIcon)
-                .accessibilityHidden(true)
-
             Text(report.overallStatus.title)
                 .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(.primary)
@@ -970,10 +971,12 @@ struct VerificationResultsView: View {
     // The legally reviewed scope-limitation copy (`HonestyDisclaimer`,
     // `.redacted` profile) had zero production call sites — no surface named
     // the checks' epistemic limits at the point where the share decision is
-    // made. Since REV-03 (RB-61/RB-68) it mounts at ONE site on every
-    // verdict — beneath "Verification Details", above the trust strip. The
-    // component supplies its own caption styling, centered alignment, and
-    // accessibility label; Dynamic Type flows through `Text`.
+    // made. It mounts at ONE site on every verdict: since UXC-43 (D-118,
+    // superseding REV-03's placement under "Verification Details") it is
+    // the last element of the page, in the footer block 8 pt beneath the
+    // timing line. The component supplies its own caption styling,
+    // centered alignment, and accessibility label; the call site owns the
+    // spacing; Dynamic Type flows through `Text`.
 
     /// Disclaimer mount gate. Deliberately true for EVERY verdict state —
     /// the exhaustive switch (no `default`) forces a decision here if a new

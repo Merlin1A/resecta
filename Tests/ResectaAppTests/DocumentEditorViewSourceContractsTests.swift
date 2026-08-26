@@ -15,6 +15,8 @@ import Foundation
 //    the brand tint explicitly.
 //  - 1.1.0 Home swap (UXC-41): the iPhone overflow group leads with Home and the
 //    former file-import entry is gone from the editor.
+//  - UXC-43: the home screen's Settings gear renders neutral (the UXC-32
+//    rule applied to `HomeView.swift`).
 
 @Suite("DocumentEditorView source contracts (UXC-26 / UXC-32)")
 struct DocumentEditorViewSourceContractsTests {
@@ -90,6 +92,23 @@ struct DocumentEditorViewSourceContractsTests {
         }
         #expect(home.lowerBound < selection.lowerBound,
                 "Home must be the first of our items in the overflow group")
+    }
+
+    @Test("UXC-43 — HomeView's Settings button renders neutral, like the editor toolbar")
+    func homeSettingsButtonCarriesNeutralTint() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/Views/HomeView.swift")
+        guard let buttonRange = source.range(of: "Button(\"Settings\", systemImage: \"gearshape\")") else {
+            Issue.record("Could not locate HomeView's Settings button")
+            return
+        }
+        let windowEnd = source.index(
+            buttonRange.upperBound,
+            offsetBy: 600,
+            limitedBy: source.endIndex
+        ) ?? source.endIndex
+        let window = source[buttonRange.upperBound..<windowEnd]
+        #expect(window.contains(".tint(.primary)"),
+                "the home screen's Settings gear must carry the neutral tint (UXC-43, the UXC-32 rule)")
     }
 
     /// Mirrors `HonestySurfacesTests.loadRepoFile`.
