@@ -396,11 +396,10 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         // flow is verified correct by manual drive.
         field.typeText("Sample\n")
 
-        // One match in the bundled fixture. Review-first label family: results
-        // arrive deselected and the footer states the arrival default
-        // explicitly ("N found — none selected yet") in place of the
-        // former "0 of N selected".
-        let footerCount = app.staticTexts["1 found — none selected yet"]
+        // One match in the bundled fixture. Results arrive deselected and
+        // the footer states the count plainly ("0 of N selected" — UXC-45,
+        // one label family in every state).
+        let footerCount = app.staticTexts["0 of 1 selected"]
         XCTAssertTrue(
             footerCount.waitForExistence(timeout: 15),
             "Text search returned no results for the bundled fixture."
@@ -520,7 +519,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Next-result chevron never appeared — the seeded query returned nothing or the sheet never presented."
         )
         XCTAssertTrue(
-            app.staticTexts["151 found — none selected yet"].waitForExistence(timeout: 15),
+            app.staticTexts["0 of 151 selected"].waitForExistence(timeout: 15),
             "Seeded search did not return the fixture's 151 \"Amount\" hits."
         )
         XCTAssertTrue(next.isHittable, "Next-result chevron exists but is not hittable before the first step.")
@@ -575,7 +574,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(
-            app.staticTexts["6 found — none selected yet"].waitForExistence(timeout: 30),
+            app.staticTexts["0 of 6 selected"].waitForExistence(timeout: 30),
             "Seeded review never presented — check the --seedTriage launch hook."
         )
         XCTAssertTrue(
@@ -643,7 +642,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(
-            app.staticTexts["6 found — none selected yet"].waitForExistence(timeout: 30),
+            app.staticTexts["0 of 6 selected"].waitForExistence(timeout: 30),
             "Seeded review never presented — check the --seedTriage launch hook."
         )
         XCTAssertTrue(
@@ -696,7 +695,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(
-            app.staticTexts["6 found — none selected yet"].waitForExistence(timeout: 30),
+            app.staticTexts["0 of 6 selected"].waitForExistence(timeout: 30),
             "Seeded review never presented — check the --seedTriage launch hook."
         )
         XCTAssertTrue(
@@ -741,7 +740,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Compact handle is missing its interface title on the review origin."
         )
         XCTAssertFalse(
-            app.staticTexts["6 found — none selected yet"].exists,
+            app.staticTexts["0 of 6 selected"].exists,
             "The retired compact summary line rendered — compact is title-only (WA/D-75)."
         )
         attachScreenshot(named: "sa2-compact-chain-strip")
@@ -760,7 +759,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(
-            app.staticTexts["6 found — none selected yet"].waitForExistence(timeout: 30),
+            app.staticTexts["0 of 6 selected"].waitForExistence(timeout: 30),
             "Seeded review never presented — check the --seedTriage launch hook."
         )
         XCTAssertTrue(
@@ -796,7 +795,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Compact handle is missing its interface title after the row-body drop."
         )
         XCTAssertFalse(
-            app.staticTexts["6 found — none selected yet"].exists,
+            app.staticTexts["0 of 6 selected"].exists,
             "The retired compact summary line rendered — compact is title-only (WA/D-75)."
         )
         attachScreenshot(named: "sa2-review-rowtap-compact")
@@ -811,7 +810,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Review list did not return at medium after the grabber expand."
         )
         XCTAssertTrue(
-            app.staticTexts["6 found — none selected yet"].waitForExistence(timeout: 10),
+            app.staticTexts["0 of 6 selected"].waitForExistence(timeout: 10),
             "Row-body tap changed the selection count — the tap must navigate, not toggle selection."
         )
     }
@@ -841,7 +840,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         field.typeText("account\n")
 
         XCTAssertTrue(
-            app.staticTexts["23 found — none selected yet"].waitForExistence(timeout: 20),
+            app.staticTexts["0 of 23 selected"].waitForExistence(timeout: 20),
             "The multipage fixture's 'account' query did not land its 23 per-page matches."
         )
 

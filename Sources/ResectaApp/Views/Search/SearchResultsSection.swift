@@ -4,10 +4,11 @@ import RedactionEngine
 // Results list + empty / filtered-out states +
 // row helpers + live preview row + scope picker + keyboard shortcuts.
 // Lifted from `SearchAndRedactSheet.swift`; behavior unchanged.
-// "Add to selection…" Menu lands in the results-header zone;
-// predicate-driven attribute selection routes through
-// `SearchState.addToSelection(where:)` (RB-21/UXC-12: additive — never
-// deselects).
+// UXC-45 (RB-105/109): the "Add to selection" predicate Menu moved out
+// of the results-header zone into `SearchFooterSection`, the surface's
+// single selection authority; predicate-driven attribute selection
+// still routes through `SearchState.addToSelection(where:)` (RB-21/
+// UXC-12: additive — never deselects).
 
 struct SearchResultsSection: View {
     @Bindable var searchState: SearchState
@@ -218,95 +219,11 @@ struct SearchResultsSection: View {
             if SearchState.navigationScopeControlsEnabled {
                 scopeRow
             }
-
-            // "Add to selection…" Menu surfaces predicate-driven
-            // attribute selection.
-            selectWhereMenu
+            // UXC-45 (RB-105): the "Add to selection" Menu that closed
+            // this stack now rides the footer beside Select All — the
+            // freed full-width row returns to the results viewport.
         }
         .background(.background)
-    }
-
-    // MARK: - Add to Selection… Menu
-
-    /// Predicate-driven attribute selection. Each Section corresponds
-    /// to one predicate kind (confidence threshold, source, category,
-    /// applied state). Tapping an option routes through
-    /// `searchState.addToSelection(where:)` — RB-21/UXC-12: additive
-    /// (union), so a predicate ADDS every matching row to whatever is
-    /// already selected and never deselects anything. Narrowing to
-    /// exactly a predicate's matches is the footer "Deselect All" →
-    /// predicate two-step. By applying to `searchState.results` (not
-    /// `filteredResults`) the Menu remains useful when filters hide
-    /// candidates the user wants to operate on.
-    /// Every branch routes through `userSelectWhere` so the conditional-dismiss
-    /// touched tracker flips exactly once per user predicate pick.
-    @ViewBuilder
-    private var selectWhereMenu: some View {
-        if !searchState.results.isEmpty {
-            HStack {
-                Menu {
-                    Section("By confidence") {
-                        Button("\u{2265} 75%") {
-                            userSelectWhere { ($0.piiConfidence ?? 0) >= 0.75 }
-                        }
-                        Button("\u{2265} 90%") {
-                            userSelectWhere { ($0.piiConfidence ?? 0) >= 0.90 }
-                        }
-                    }
-                    Section("By source") {
-                        Button("Text") {
-                            userSelectWhere { $0.source == .textLayer }
-                        }
-                        Button("OCR") {
-                            userSelectWhere { $0.source != .textLayer }
-                        }
-                    }
-                    if searchState.searchModeType == .piiScan {
-                        let categories = searchState.categoryCounts.keys
-                            .sorted(by: { $0.rawValue < $1.rawValue })
-                        if !categories.isEmpty {
-                            Section("By category") {
-                                ForEach(categories, id: \.self) { category in
-                                    Button(category.rawValue) {
-                                        userSelectWhere { $0.piiCategory == category }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Section("By applied state") {
-                        Button("Applied") {
-                            let applied = searchState.appliedResultIDs
-                            userSelectWhere { applied.contains($0.id) }
-                        }
-                        Button("Unapplied") {
-                            let applied = searchState.appliedResultIDs
-                            userSelectWhere { !applied.contains($0.id) }
-                        }
-                    }
-                } label: {
-                    Label("Add to selection…", systemImage: "checkmark.circle")
-                        .font(.caption)
-                        // UXC-18: 106×14.3 measured (search-side twin
-                        // of ScanReviewSection's selectWhereRow).
-                        .frame(minHeight: ResectaTokens.TouchTarget.minimum)
-                        .contentShape(Rectangle())
-                }
-                .controlSize(.small)
-                .accessibilityLabel("Add results to the selection by attribute")
-                Spacer()
-            }
-            .padding(.horizontal, ResectaTokens.Spacing.md)
-            .padding(.vertical, ResectaTokens.Spacing.xxs)
-        }
-    }
-
-    /// Select-Where wrapper: the additive predicate union plus the
-    /// conditional-dismiss touched flip — predicate selection is user
-    /// selection work, so the sheet's Dismiss confirms from here forward.
-    private func userSelectWhere(_ predicate: (SearchResult) -> Bool) {
-        searchState.addToSelection(where: predicate)
-        searchState.userModifiedSelections = true
     }
 
     // MARK: - Live Preview Row
@@ -670,19 +587,26 @@ struct SearchResultsSection: View {
                         if let termResults = searchState.resultsByTerm[term] {
                             Section("\"\(term)\" — \(termResults.count) match\(termResults.count == 1 ? "" : "es")\(conjunctionSuffix)") {
                                 ForEach(termResults) { result in
-                                    resultRow(for: result, showTermLabel: false)
+                                    // UXC-45 (RB-103): by-term sections are
+                                    // the one page-UNSECTIONED list, so the
+                                    // rows carry the page label here.
+                                    resultRow(for: result, showTermLabel: false, showsPageLabel: true)
                                 }
                             }
                         }
                     }
                 } else {
-                    // Default: Group by page
+                    // Default: Group by page. Every `ResultSortOrder`
+                    // keeps these page sections (`resultsByPage` groups
+                    // the sorted list by page), so the section header
+                    // carries the page and no row shows `p.N` (UXC-45,
+                    // RB-99/103).
                     let pages = searchState.resultsByPage.keys.sorted()
                     ForEach(pages, id: \.self) { page in
                         Section("Page \(page + 1)") {
                             if let pageResults = searchState.resultsByPage[page] {
                                 ForEach(pageResults) { result in
-                                    resultRow(for: result, showTermLabel: isMultiTerm)
+                                    resultRow(for: result, showTermLabel: isMultiTerm, showsPageLabel: false)
                                 }
                             }
                         }
@@ -795,12 +719,17 @@ struct SearchResultsSection: View {
     }
 
     @ViewBuilder
-    private func resultRow(for result: SearchResult, showTermLabel: Bool) -> some View {
+    private func resultRow(
+        for result: SearchResult,
+        showTermLabel: Bool,
+        showsPageLabel: Bool
+    ) -> some View {
         let row = SearchResultRow(
             result: safeBinding(for: result.id, fallback: result),
             isCurrent: searchState.currentResult?.id == result.id,
             isApplied: searchState.appliedResultIDs.contains(result.id),
             showTermLabel: showTermLabel,
+            showsPageLabel: showsPageLabel,
             // OCR rows grade against the live OCR floor; PII rows use
             // the shared absolute bands (the dormant per-run threshold
             // input retired with the row-family unification).

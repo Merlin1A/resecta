@@ -1234,7 +1234,7 @@ public actor DocumentSearcher {
 
                 if let normalizedRect = boundingRect(for: matchRange, page: sendablePage.page) {
                     let matchedText = nsString.substring(with: matchRange)
-                    let snippet = contextSnippet(
+                    let window = contextSnippet(
                         text: searchText,
                         matchNSRange: matchRange
                     )
@@ -1243,9 +1243,10 @@ public actor DocumentSearcher {
                         pageIndex: pageIndex,
                         normalizedRect: normalizedRect,
                         matchedText: matchedText,
-                        contextSnippet: snippet,
+                        contextSnippet: window.snippet,
                         source: .textLayer,
-                        term: pattern
+                        term: pattern,
+                        matchRangeInSnippet: window.matchRange
                     ))
                     totalYielded += 1
                 }
@@ -1483,22 +1484,24 @@ public actor DocumentSearcher {
                         continue
                     }
                     // Sentinel-ranged assembly (zero length): the joined
-                    // block is its own context. Regex/detector matches always
-                    // carry a non-empty range and keep the ±20-char snippet.
-                    let snippet = match.range.length > 0
+                    // block is its own context, so the window is the whole
+                    // text. Regex/detector matches always carry a non-empty
+                    // range and take the canonical context window.
+                    let window = match.range.length > 0
                         ? contextSnippet(text: pageText, matchNSRange: match.range)
-                        : match.text
+                        : ContextWindow(snippet: match.text, matchRange: 0..<match.text.count)
 
                     continuation.yield(SearchResult(
                         pageIndex: pageIndex,
                         normalizedRect: normalizedRect,
                         matchedText: match.text,
-                        contextSnippet: snippet,
+                        contextSnippet: window.snippet,
                         source: .textLayer,
                         term: match.category?.rawValue ?? "PII",
                         piiCategory: match.category,
                         piiConfidence: match.confidence,
-                        rationale: match.rationale
+                        rationale: match.rationale,
+                        matchRangeInSnippet: window.matchRange
                     ))
                     totalYielded += 1
                 }
@@ -1519,14 +1522,14 @@ public actor DocumentSearcher {
                         guard let normalizedRect = boundingRect(for: hit.range, page: page) else { continue }
                         let ns = pageText as NSString
                         let matchedText = ns.substring(with: hit.range)
-                        let snippet = contextSnippet(
+                        let window = contextSnippet(
                             text: pageText, matchNSRange: hit.range
                         )
                         continuation.yield(SearchResult(
                             pageIndex: pageIndex,
                             normalizedRect: normalizedRect,
                             matchedText: matchedText,
-                            contextSnippet: snippet,
+                            contextSnippet: window.snippet,
                             source: .textLayer,
                             term: "Custom",
                             piiCategory: nil,
@@ -1537,7 +1540,8 @@ public actor DocumentSearcher {
                                 preThresholdScore: 1.0,
                                 finalScore: 1.0,
                                 appliedThreshold: nil
-                            )
+                            ),
+                            matchRangeInSnippet: window.matchRange
                         ))
                         totalYielded += 1
                     }
@@ -1718,7 +1722,7 @@ public actor DocumentSearcher {
         // the range, mirroring the existing `continue` behavior.
         func mapToOCR(
             _ range: NSRange
-        ) -> (rect: CGRect, snippet: String, ocrConfidence: Float)? {
+        ) -> (rect: CGRect, window: ContextWindow, ocrConfidence: Float)? {
             let matchStart = range.location
             let matchEnd = matchStart + range.length
 
@@ -1742,16 +1746,14 @@ public actor DocumentSearcher {
                 height: min(1, unionRect.height + padY * 2)
             )
 
-            let firstLineEnd = firstLine.start + firstLine.normalizedText.count
-            let snippet: String
-            if matchEnd <= firstLineEnd {
-                snippet = firstLine.normalizedText
-            } else {
-                snippet = String(concatenated.prefix(min(concatenated.count, matchEnd + 20)).suffix(60))
-            }
+            // UXC-45 (RB-101c): the canonical context window over the
+            // normalized concatenation the detector matched in — the same
+            // centered, word-trimmed, ellipsized shape as the text leg,
+            // with the match located inside it.
+            let window = contextSnippet(text: concatenated, matchNSRange: range)
 
             let ocrConfidence = overlappingLines.map(\.confidence).min() ?? firstLine.confidence
-            return (paddedRect, snippet, ocrConfidence)
+            return (paddedRect, window, ocrConfidence)
         }
 
         // RC-4 — geometry for assembled spatial survivors: the stored union
@@ -1763,19 +1765,23 @@ public actor DocumentSearcher {
         // flow through `mapToOCR` unchanged.
         func resolvedMapping(
             for match: PIIDetector.PIIMatch
-        ) -> (rect: CGRect, snippet: String, ocrConfidence: Float)? {
+        ) -> (rect: CGRect, window: ContextWindow, ocrConfidence: Float)? {
             guard let spatialRect =
                 (match.kind == .address ? spatialRectByText[match.text] : nil) else {
                 return mapToOCR(match.range)
             }
             if let mapped = mapToOCR(match.range) {
-                return (spatialRect, mapped.snippet, mapped.ocrConfidence)
+                return (spatialRect, mapped.window, mapped.ocrConfidence)
             }
             let coveredConfidence = lineOffsets
                 .filter { $0.normalizedRect.intersects(spatialRect) }
                 .map(\.confidence)
                 .min()
-            return (spatialRect, match.text, coveredConfidence ?? 1.0)
+            return (
+                spatialRect,
+                ContextWindow(snippet: match.text, matchRange: 0..<match.text.count),
+                coveredConfidence ?? 1.0
+            )
         }
 
         for match in matches {
@@ -1807,12 +1813,13 @@ public actor DocumentSearcher {
                 pageIndex: pageIndex,
                 normalizedRect: mapped.rect,
                 matchedText: match.text,
-                contextSnippet: mapped.snippet,
+                contextSnippet: mapped.window.snippet,
                 source: .ocr(confidence: mapped.ocrConfidence),
                 term: match.category?.rawValue ?? "PII",
                 piiCategory: match.category,
                 piiConfidence: match.confidence,
-                rationale: rationale
+                rationale: rationale,
+                matchRangeInSnippet: mapped.window.matchRange
             ))
         }
 
@@ -1832,7 +1839,7 @@ public actor DocumentSearcher {
                     pageIndex: pageIndex,
                     normalizedRect: mapped.rect,
                     matchedText: matchedText,
-                    contextSnippet: mapped.snippet,
+                    contextSnippet: mapped.window.snippet,
                     source: .ocr(confidence: mapped.ocrConfidence),
                     term: "Custom",
                     piiCategory: nil,
@@ -1846,7 +1853,8 @@ public actor DocumentSearcher {
                         preThresholdScore: 1.0,
                         finalScore: 1.0,
                         appliedThreshold: nil
-                    )
+                    ),
+                    matchRangeInSnippet: mapped.window.matchRange
                 ))
             }
             // Package C — surface per-(page, pattern) timeouts so the app
@@ -1989,6 +1997,7 @@ public actor DocumentSearcher {
                 }
                 return Array(display)
             }()
+            let displayLineText = String(displayLineChars)
 
             var searchStart = lineText.startIndex
             while searchStart < lineText.endIndex {
@@ -2053,14 +2062,36 @@ public actor DocumentSearcher {
                     displayChars: displayLineChars,
                     baseCount: ext.baseText.count,
                     fallback: normalizedSlice)
+                // UXC-45 (RB-101c): the canonical context window in place
+                // of the raw line. Built over the same case-preserved
+                // analog `displaySlice` re-sliced from, at the base span,
+                // so the window's match slice IS `matchedText`; when the
+                // display analog drifted (the `displaySlice` fallback) the
+                // window comes from the searched line at the searched
+                // offsets, matching that fallback slice instead.
+                let window: ContextWindow
+                if displayLineChars.count == ext.baseText.count,
+                   let span = Self.baseSpan(
+                       start: displayStart, length: displayLength, offsetMap: ext.offsetMap
+                   ),
+                   span.upperBound <= displayLineChars.count {
+                    window = contextSnippet(
+                        text: displayLineText, matchStart: span.lowerBound, matchLength: span.count
+                    )
+                } else {
+                    window = contextSnippet(
+                        text: lineText, matchStart: displayStart, matchLength: displayLength
+                    )
+                }
 
                 results.append(SearchResult(
                     pageIndex: pageIndex,
                     normalizedRect: paddedRect,
                     matchedText: matchedText,
-                    contextSnippet: line.text,
+                    contextSnippet: window.snippet,
                     source: .ocr(confidence: line.confidence),
-                    term: term
+                    term: term,
+                    matchRangeInSnippet: window.matchRange
                 ))
 
                 searchStart = matchRange.upperBound
@@ -2269,15 +2300,16 @@ public actor DocumentSearcher {
             ) else { return }
 
             let matchedText = nsString.substring(with: matchRange)
-            let snippet = contextSnippet(text: searchText, matchNSRange: matchRange)
+            let window = contextSnippet(text: searchText, matchNSRange: matchRange)
 
             results.append(SearchResult(
                 pageIndex: pageIndex,
                 normalizedRect: normalizedRect,
                 matchedText: matchedText,
-                contextSnippet: snippet,
+                contextSnippet: window.snippet,
                 source: .ocr(confidence: avgConfidence),
-                term: regex.pattern
+                term: regex.pattern,
+                matchRangeInSnippet: window.matchRange
             ))
         }
 
@@ -2366,6 +2398,7 @@ public actor DocumentSearcher {
             }
             return Array(display)
         }()
+        let displayBaseText = String(displayBaseChars)
 
         var results: [SearchResult] = []
         var searchStart = searchPageText.startIndex
@@ -2443,17 +2476,34 @@ public actor DocumentSearcher {
                     displayChars: displayBaseChars,
                     baseCount: ext.baseText.count,
                     fallback: normalizedSlice)
-                let snippet = contextSnippet(
-                    text: pageText, matchStart: baseStartOffset, matchLength: baseLength
-                )
+                // UXC-45 (RB-101b): the context window is built over the
+                // same case-preserved analog `displaySlice` re-sliced from,
+                // at the base span, so its match slice IS `matchedText`; on
+                // display drift (the `displaySlice` fallback) it comes from
+                // the searched text at the searched offsets instead.
+                let window: ContextWindow
+                if displayBaseChars.count == ext.baseText.count,
+                   let span = Self.baseSpan(
+                       start: baseStartOffset, length: baseLength, offsetMap: nil
+                   ),
+                   span.upperBound <= displayBaseChars.count {
+                    window = contextSnippet(
+                        text: displayBaseText, matchStart: span.lowerBound, matchLength: span.count
+                    )
+                } else {
+                    window = contextSnippet(
+                        text: searchPageText, matchStart: matchStartOffset, matchLength: matchLength
+                    )
+                }
 
                 results.append(SearchResult(
                     pageIndex: pageIndex,
                     normalizedRect: normalizedRect,
                     matchedText: matchedText,
-                    contextSnippet: snippet,
+                    contextSnippet: window.snippet,
                     source: .textLayer,
-                    term: term
+                    term: term,
+                    matchRangeInSnippet: window.matchRange
                 ))
             }
 
@@ -2497,6 +2547,18 @@ public actor DocumentSearcher {
             return fallback
         }
         return String(displayChars[baseStart..<baseEndExclusive])
+    }
+
+    /// UXC-45 — the base-coordinate span `displaySlice` re-slices, or nil
+    /// under the same bound guards, so the context-window builder and the
+    /// display slice agree on when the fallback is taken.
+    static func baseSpan(start: Int, length: Int, offsetMap: [Int]?) -> Range<Int>? {
+        guard length > 0, start >= 0 else { return nil }
+        if let map = offsetMap {
+            guard start < map.count, start + length - 1 < map.count else { return nil }
+            return map[start] ..< (map[start + length - 1] + 1)
+        }
+        return start ..< start + length
     }
 
     /// Word-boundary predicate in base-text coordinates, used when a
@@ -2608,36 +2670,131 @@ public actor DocumentSearcher {
 
     // MARK: - Context Snippet
 
-    /// Build a ±20 character context snippet around the match.
-    /// `matchStart` and `matchLength` are Character offsets (not UTF-16).
-    func contextSnippet(text: String, matchStart: Int, matchLength: Int) -> String {
-        let contextRadius = 20
+    /// UXC-45 (RB-101a/b) — one context window per match: the snippet
+    /// text plus the match's position inside it, in Character offsets
+    /// (a leading `…` counts as one). Every `SearchResult` builder path
+    /// routes through `contextSnippet` so the row can highlight the
+    /// match without re-searching.
+    struct ContextWindow: Equatable, Sendable {
+        let snippet: String
+        let matchRange: Range<Int>
+    }
+
+    /// Characters of context kept on each side of the match before a
+    /// cut side is trimmed back to a word boundary.
+    static let contextRadius = 44
+
+    /// Build the context window around the match. `matchStart` and
+    /// `matchLength` are Character offsets (not UTF-16).
+    ///
+    /// Shape: `contextRadius` characters each side of the match; a side
+    /// that cut the text mid-word is trimmed back to the nearest word
+    /// boundary (a whitespace/punctuation run) so the window never
+    /// starts or ends inside a word — except that the trim never moves
+    /// into the match itself: when the partial word adjoins the match,
+    /// that side keeps the raw cut. `…` is prepended/appended only on a
+    /// side where text was cut. Newlines flatten to spaces LAST, one
+    /// Character each, so the returned offsets stay valid.
+    func contextSnippet(text: String, matchStart: Int, matchLength: Int) -> ContextWindow {
         let textCount = text.count
+        let clampedStart = min(max(0, matchStart), textCount)
+        let clampedLength = min(max(0, matchLength), textCount - clampedStart)
+        let matchEnd = clampedStart + clampedLength
 
-        let snippetStart = max(0, matchStart - contextRadius)
-        let snippetEnd = min(textCount, matchStart + matchLength + contextRadius)
+        let rawStart = max(0, clampedStart - Self.contextRadius)
+        let rawEnd = min(textCount, matchEnd + Self.contextRadius)
+        let leftCut = rawStart > 0
+        let rightCut = rawEnd < textCount
 
-        let startIdx = text.index(text.startIndex, offsetBy: snippetStart)
-        let endIdx = text.index(text.startIndex, offsetBy: snippetEnd)
+        let matchStartIdx = text.index(text.startIndex, offsetBy: clampedStart)
+        let matchEndIdx = text.index(matchStartIdx, offsetBy: clampedLength)
+        var startIdx = text.index(matchStartIdx, offsetBy: rawStart - clampedStart)
+        var endIdx = text.index(matchEndIdx, offsetBy: rawEnd - matchEnd)
 
-        var snippet = String(text[startIdx..<endIdx])
+        if leftCut {
+            startIdx = Self.trimmedWindowStart(
+                in: text, rawStart: startIdx, matchStart: matchStartIdx
+            )
+        }
+        if rightCut {
+            endIdx = Self.trimmedWindowEnd(
+                in: text, rawEnd: endIdx, matchEnd: matchEndIdx
+            )
+        }
 
-        if snippetStart > 0 { snippet = "…" + snippet }
-        if snippetEnd < textCount { snippet = snippet + "…" }
-
-        snippet = snippet.replacingOccurrences(of: "\n", with: " ")
-
-        return snippet
+        let leading = leftCut ? "…" : ""
+        let trailing = rightCut ? "…" : ""
+        let matchOffset = leading.count + text.distance(from: startIdx, to: matchStartIdx)
+        // Flatten LAST, Character for Character (a "\r\n" grapheme is one
+        // Character before and after), so `matchOffset` stays valid.
+        let flattened = String((leading + text[startIdx..<endIdx] + trailing).map { ch -> Character in
+            ch.isNewline ? " " : ch
+        })
+        return ContextWindow(
+            snippet: flattened,
+            matchRange: matchOffset ..< matchOffset + clampedLength
+        )
     }
 
     /// NSRange-safe overload: converts UTF-16 range to Character offsets
-    /// before building the snippet. Use this when the range comes from
-    /// NSRegularExpression or PIIDetector (both use NSRange/UTF-16).
-    func contextSnippet(text: String, matchNSRange: NSRange) -> String {
-        guard let range = Range(matchNSRange, in: text) else { return "" }
+    /// before building the window. Use this when the range comes from
+    /// NSRegularExpression or PIIDetector (both use NSRange/UTF-16). An
+    /// unmappable range yields an empty window.
+    func contextSnippet(text: String, matchNSRange: NSRange) -> ContextWindow {
+        guard let range = Range(matchNSRange, in: text) else {
+            return ContextWindow(snippet: "", matchRange: 0..<0)
+        }
         let charStart = text.distance(from: text.startIndex, to: range.lowerBound)
         let charLength = text.distance(from: range.lowerBound, to: range.upperBound)
         return contextSnippet(text: text, matchStart: charStart, matchLength: charLength)
+    }
+
+    /// Word character for the window trim: letters and digits; every
+    /// other Character (whitespace, punctuation, symbols) is a boundary.
+    private static func isWordCharacter(_ ch: Character) -> Bool {
+        ch.isLetter || ch.isNumber
+    }
+
+    /// Left-side trim. Moves the window start forward past a partial
+    /// word and the separator run after it, stopping at the match: when
+    /// the partial word runs straight into the match there is no
+    /// boundary to trim to, and the raw cut stands.
+    private static func trimmedWindowStart(
+        in text: String, rawStart: String.Index, matchStart: String.Index
+    ) -> String.Index {
+        var cursor = rawStart
+        let before = text.index(before: rawStart)
+        if cursor < matchStart, isWordCharacter(text[before]), isWordCharacter(text[cursor]) {
+            while cursor < matchStart, isWordCharacter(text[cursor]) {
+                cursor = text.index(after: cursor)
+            }
+            if cursor == matchStart { return rawStart }
+        }
+        while cursor < matchStart, !isWordCharacter(text[cursor]) {
+            cursor = text.index(after: cursor)
+        }
+        return cursor
+    }
+
+    /// Right-side trim, the mirror of `trimmedWindowStart`: moves the
+    /// window end back over a partial word and the separator run before
+    /// it, never past the match end.
+    private static func trimmedWindowEnd(
+        in text: String, rawEnd: String.Index, matchEnd: String.Index
+    ) -> String.Index {
+        var cursor = rawEnd
+        if cursor > matchEnd,
+           isWordCharacter(text[text.index(before: cursor)]),
+           isWordCharacter(text[rawEnd]) {
+            while cursor > matchEnd, isWordCharacter(text[text.index(before: cursor)]) {
+                cursor = text.index(before: cursor)
+            }
+            if cursor == matchEnd { return rawEnd }
+        }
+        while cursor > matchEnd, !isWordCharacter(text[text.index(before: cursor)]) {
+            cursor = text.index(before: cursor)
+        }
+        return cursor
     }
 }
 

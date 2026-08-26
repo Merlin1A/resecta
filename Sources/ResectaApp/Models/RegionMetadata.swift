@@ -98,7 +98,7 @@ nonisolated struct RegionMetadata: Sendable {
             case .phone:          "Phone Number"
             case .ein:            "Employer ID Number"
             case .itin:           "Individual Taxpayer ID"
-            case .driversLicense: "Driver's License Number"
+            case .driversLicense: "Driver's License"
             case .passport:       "Passport Number"
             case .medicalRecord:  "Medical Record Number"
             case .dateOfBirth:    "Date of Birth"
