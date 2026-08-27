@@ -1498,7 +1498,10 @@ final class PipelineCoordinator: @unchecked Sendable {
                 //      `address_components.json` via `AddressSpatialAssembler`'s
                 //      `static let` cache. This load is NOT gated by signature
                 //      verification, so it runs on (the first) Auto-Detect per
-                //      process regardless of corpus state.
+                //      process regardless of corpus state. The diagnostics enum
+                //      classifies it as outside the manifest signature
+                //      (`GazetteerLoadDiagnostics.outsideManifestSignature`),
+                //      so a signature failure does not attribute it.
                 //
                 // Build both off the main actor — same remedy `firstPageText`
                 // uses for synchronous PDFKit reads. `PIIDetector`,

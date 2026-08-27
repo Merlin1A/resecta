@@ -59,10 +59,11 @@ public enum GazetteerLoader {
     }
 
     /// Boolean wrapper around `verifySignedManifest`. Returns `true` iff
-    /// verification succeeds. Used inside `PIIDetector.loadWithDiagnostics`
-    /// to short-circuit gazetteer loading when the manifest is unsigned or
-    /// tampered — the diagnostic surfaces via the existing SEC-7 banner /
-    /// toast path rather than throwing all the way out of the loader.
+    /// verification succeeds. Consumed through `GazetteerTrust`, the
+    /// memoized chokepoint behind `PIIDetector.loadWithDiagnostics` and the
+    /// public `PIIDetector.init` defaults — a failed verdict short-circuits
+    /// gazetteer loading and the diagnostic surfaces via the existing SEC-7
+    /// banner / toast path rather than throwing out of the loader.
     static func isManifestSignatureValid(bundle: Bundle) -> Bool {
         do {
             try performVerification(bundle: bundle)

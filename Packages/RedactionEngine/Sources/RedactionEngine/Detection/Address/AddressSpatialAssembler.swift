@@ -31,6 +31,8 @@ struct AddressSpatialAssembler: Sendable {
 
     /// Cached module-bundle load so repeated `AddressSpatialAssembler()`
     /// calls do not re-parse the 2 MB address_components.json.
+    /// Outside the manifest signature by design; a load failure reports via
+    /// the valid-path probe in `PIIDetector.loadWithDiagnostics`.
     private static let sharedAddressComponents: AddressComponentsGazetteer? =
         try? AddressComponentsGazetteer()
 

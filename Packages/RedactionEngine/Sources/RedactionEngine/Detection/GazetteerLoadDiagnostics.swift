@@ -65,6 +65,14 @@ public struct GazetteerLoadDiagnostics: Sendable, Equatable {
     static let outsideManifestSignature: Set<Gazetteer> = [
         .documentTypeClassifier, .nerNameModel,
         .contextScorerWeights, .doctypeTemperature, .presetThresholds,
+        // The three JSON reference tables load through ungated process-
+        // lifetime `static let`s (AddressSpatialAssembler.sharedAddressComponents,
+        // ZIPStateTable.loader, OCRCustomWordsBuilder.financialCustomWords) and
+        // `gazetteer-manifest.json` enumerates only the two Bloom filters
+        // (`GazetteerManifest.filters`) — a signature failure never withholds
+        // them, so attributing them to one would overstate the degradation.
+        // Their own load failures report on the valid-signature path probes.
+        .institutionGazetteer, .addressComponentsGazetteer, .zipStateTableLoader,
     ]
 
     /// Engine-facing names of every loader that failed to initialize.

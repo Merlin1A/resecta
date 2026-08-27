@@ -36,7 +36,7 @@ struct SignedManifestTests {
     // (`SECURITY_NEUTRAL_SANDBOX`) and use a one-time `Once`-style
     // initializer so the parent appears in the "before" snapshot whether
     // SignedManifestTests runs first or BackupExclusionTests runs first.
-    private static let sandboxRoot: URL = {
+    static let sandboxRoot: URL = {
         let root = FileManager.default.temporaryDirectory
             .appending(path: "RedactionEngineTests-SignedManifestTests-Sandbox", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -48,7 +48,7 @@ struct SignedManifestTests {
     /// Build a temp bundle containing the manifest, the detached signature,
     /// and the public key — all under a `Gazetteers/` subdirectory, matching
     /// the production resource layout.
-    private static func makeFixtureBundle(
+    static func makeFixtureBundle(
         manifestBytes: Data,
         signaturePEM: Data,
         publicKeyPEM: Data,
@@ -70,7 +70,7 @@ struct SignedManifestTests {
 
     /// Sample manifest payload — canonical-form JSON shape that matches
     /// the production manifest produced by the bloom builder.
-    private static let sampleManifestBytes: Data = Data("""
+    static let sampleManifestBytes: Data = Data("""
         {
           "filters": [],
           "hashAlgorithm": "MurmurHash3_x64_128",
@@ -83,7 +83,7 @@ struct SignedManifestTests {
     /// Encode an Ed25519 public key in the same SubjectPublicKeyInfo PEM
     /// envelope that the Python `cryptography` library produces. The DER
     /// prefix is fixed for Ed25519; we wrap the 32-byte raw key with it.
-    private static func encodePublicKeyPEM(_ key: Curve25519.Signing.PublicKey) -> Data {
+    static func encodePublicKeyPEM(_ key: Curve25519.Signing.PublicKey) -> Data {
         let der: [UInt8] = [
             0x30, 0x2A, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, 0x70, 0x03, 0x21, 0x00,
         ] + Array(key.rawRepresentation)
@@ -105,7 +105,7 @@ struct SignedManifestTests {
 
     /// Wrap a raw 64-byte Ed25519 signature in the same PEM envelope that
     /// the DataPipeline `manifest_signing.py` writes.
-    private static func encodeSignaturePEM(_ signature: Data) -> Data {
+    static func encodeSignaturePEM(_ signature: Data) -> Data {
         let base64 = signature.base64EncodedString()
         var wrapped = ""
         for chunk in stride(from: 0, to: base64.count, by: 64) {
@@ -121,7 +121,7 @@ struct SignedManifestTests {
             """.utf8)
     }
 
-    private enum FixtureError: Error {
+    enum FixtureError: Error {
         case bundleConstructionFailed
     }
 
@@ -251,10 +251,12 @@ struct SignedManifestTests {
         #expect(diagnostics.didDegrade)
         // The signature-fail short-circuit appends every SIGNATURE-COVERED loader.
         // Trackers NOT covered by the gazetteer-manifest signature —
-        // documentTypeClassifier (CAT-065, s17), nerNameModel
-        // (GAP-DEPTARGET-NER), and the three Classifier/ quality-asset
-        // trackers — are deliberately excluded from that loop, so they never
-        // appear on the signature-failure list. Membership is the enum's own
+        // documentTypeClassifier, nerNameModel, the three Classifier/
+        // quality-asset trackers, and the three JSON reference tables
+        // (institution / address-components / ZIP-state, whose ungated
+        // static loads a signature failure never reaches) — are deliberately
+        // excluded from that loop, so they never appear on the
+        // signature-failure list. Membership is the enum's own
         // `outsideManifestSignature` set, so this pin and the production loop
         // cannot drift apart.
         let signatureCovered = GazetteerLoadDiagnostics.Gazetteer.allCases.filter {
@@ -271,12 +273,19 @@ struct SignedManifestTests {
                 "expected signature-verification reason, got \(String(describing: reason))"
             )
         }
-        // The two non-signature-covered trackers must NOT be attributed to a
-        // signature failure.
+        // Non-signature-covered trackers must NOT be attributed to a
+        // signature failure — the classifier and NER trackers, and the three
+        // reference tables whose ungated static loads keep serving.
         #expect(!diagnostics.failedGazetteers.contains(
             GazetteerLoadDiagnostics.Gazetteer.documentTypeClassifier.rawValue))
         #expect(!diagnostics.failedGazetteers.contains(
             GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue))
+        #expect(!diagnostics.failedGazetteers.contains(
+            GazetteerLoadDiagnostics.Gazetteer.institutionGazetteer.rawValue))
+        #expect(!diagnostics.failedGazetteers.contains(
+            GazetteerLoadDiagnostics.Gazetteer.addressComponentsGazetteer.rawValue))
+        #expect(!diagnostics.failedGazetteers.contains(
+            GazetteerLoadDiagnostics.Gazetteer.zipStateTableLoader.rawValue))
 
         // Manual redaction tools remain available: regex-only detectors
         // still run against the constructed detector. Detector is

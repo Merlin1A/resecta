@@ -13,6 +13,8 @@ import Foundation
 
 enum ZIPStateTable {
 
+    // Outside the manifest signature by design; a load failure reports via
+    // the valid-path probe in `PIIDetector.loadWithDiagnostics`.
     private static let loader: ZIPStateTableLoader? = try? ZIPStateTableLoader()
 
     /// Map a 3-digit ZIP prefix string to a 2-letter state code.
