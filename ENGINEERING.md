@@ -267,6 +267,18 @@ assets. The contract between the two repos is enforced, not eyeballed:
   Extending the manifest to carry per-asset content hashes is on the post-1.0
   list. On any verification failure, detection degrades with a visible banner
   — never silently.
+- What that verdict governs, precisely: the manifest enumerates the two Bloom
+  filters, and one memoized verdict (`Detection/Gazetteer/GazetteerTrust.swift`,
+  computed once per process) is consulted by both loading paths — the
+  diagnostics loader and the public detector initializer's defaults. On a
+  failed verification, five loaders are withheld and reported by name: the
+  name Bloom filters, the driver's-license and passport pattern gazetteers,
+  the context-keywords loader, and the negative-context gazetteer. Three
+  reference tables load outside the signature by design and stay live —
+  the institution gazetteer, the address-components gazetteer, and the
+  ZIP-to-state table; their own load failures still report through the
+  valid-path diagnostics. The degraded-detection banner names exactly the
+  withheld set.
 - One asset additionally carries a load-time content check: the context-scorer
   weights file is SHA-256-hashed at load against a compiled-in constant, with
   an identity-scorer fallback on mismatch. That fallback — and the equivalent

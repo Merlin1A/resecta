@@ -13,21 +13,24 @@ import Foundation
 // run pipeline, observe banner + toast, observe pipeline completes without
 // crash.
 //
-// S3 §2.10: the SIGNATURE-COVERED loaders are the original 4 plus
-// negativeContextGazetteer, institutionGazetteer, addressComponentsGazetteer,
-// zipStateTableLoader = 8. Later trackers are NOT covered by the
-// gazetteer-manifest signature and are excluded from the signature-fail loop
-// (membership = `GazetteerLoadDiagnostics.outsideManifestSignature`):
-// documentTypeClassifier (CAT-065, s17), nerNameModel (GAP-DEPTARGET-NER /
-// D04-F3 == D11-F3), and the three Classifier/ quality-asset trackers
+// The SIGNATURE-COVERED loaders are the five the code actually withholds on
+// a failed manifest verification: nameGazetteer, dlPatternGazetteer,
+// passportPatternGazetteer, contextKeywordsLoader, negativeContextGazetteer.
+// Every other tracker is NOT covered by the gazetteer-manifest signature and
+// is excluded from the signature-fail loop (membership =
+// `GazetteerLoadDiagnostics.outsideManifestSignature`): documentTypeClassifier,
+// nerNameModel, the three Classifier/ quality-asset trackers
 // (contextScorerWeights / doctypeTemperature / presetThresholds — see
-// AssetLoadDiagnosticsTests). So the empty-bundle signature-fail failure
-// count stays 8 even though `Gazetteer.allCases.count` is larger.
+// AssetLoadDiagnosticsTests), and the three JSON reference tables
+// (institutionGazetteer / addressComponentsGazetteer / zipStateTableLoader),
+// which load through ungated process-lifetime statics a signature failure
+// never reaches. So the empty-bundle signature-fail failure count is 5 even
+// though `Gazetteer.allCases.count` is larger.
 
 @Suite("PIIDetector init degraded — SEC-7")
 struct PIIDetectorInitDegradedTests {
 
-    @Test("Empty bundle: every gazetteer fails, diagnostics list all eight by kind (S3 §2.10)")
+    @Test("Empty bundle: the five signature-gated loaders fail, listed by kind")
     func testCorruptedBloomFileDegradesAndReportsKind() {
         // An empty Bundle() has no `Gazetteers/` subdirectory, so every
         // loader hits `LoaderError.resourceMissing`. This stands in for the
@@ -43,11 +46,13 @@ struct PIIDetectorInitDegradedTests {
         #expect(diagnostics.failedGazetteers.contains("DLPatternGazetteer"))
         #expect(diagnostics.failedGazetteers.contains("PassportPatternGazetteer"))
         #expect(diagnostics.failedGazetteers.contains("ContextKeywordsLoader"))
-        // S3 §2.10: 4 new tracked loaders.
         #expect(diagnostics.failedGazetteers.contains("NegativeContextGazetteer"))
-        #expect(diagnostics.failedGazetteers.contains("InstitutionGazetteer"))
-        #expect(diagnostics.failedGazetteers.contains("AddressComponentsGazetteer"))
-        #expect(diagnostics.failedGazetteers.contains("ZIPStateTableLoader"))
+        // Reclassification: the three reference tables load OUTSIDE the
+        // manifest signature (ungated statics keep serving on a signature
+        // failure), so a signature-fail bundle must never attribute them.
+        #expect(!diagnostics.failedGazetteers.contains("InstitutionGazetteer"))
+        #expect(!diagnostics.failedGazetteers.contains("AddressComponentsGazetteer"))
+        #expect(!diagnostics.failedGazetteers.contains("ZIPStateTableLoader"))
 
         // Each failure carries a non-empty reason string. We do not assert
         // on the exact wording (the loaders' error types are independent),
@@ -68,12 +73,12 @@ struct PIIDetectorInitDegradedTests {
         // detector (no gazetteer). Credit card uses Luhn + prefix. Email
         // uses a static regex.
         let (detector, diagnostics) = PIIDetector.loadWithDiagnostics(bundle: Bundle())
-        // 8 SIGNATURE-COVERED loaders fail with an empty bundle. The two
-        // non-signature-covered trackers (documentTypeClassifier, nerNameModel)
-        // are excluded from the signature-fail loop, so this stays 8 even as
+        // The five SIGNATURE-COVERED loaders fail with an empty bundle.
+        // Non-signature-covered trackers are excluded from the
+        // signature-fail loop, so this stays 5 even as
         // `Gazetteer.allCases.count` grows.
-        #expect(diagnostics.failedGazetteers.count == 8,
-                "fixture precondition: the eight signature-covered loaders must fail with empty bundle")
+        #expect(diagnostics.failedGazetteers.count == 5,
+                "fixture precondition: the five signature-covered loaders must fail with empty bundle")
 
         let text = """
         Patient: Jane Doe

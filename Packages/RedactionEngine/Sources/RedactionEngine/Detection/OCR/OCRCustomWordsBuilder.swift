@@ -27,6 +27,9 @@ enum OCRCustomWordsBuilder {
     ]
 
     /// Process-lifetime cached vocabulary (thread-safe one-time init).
+    /// Outside the manifest signature by design; the institution and
+    /// context-keyword loads report via the valid-path probes in
+    /// `PIIDetector.loadWithDiagnostics`.
     static let financialCustomWords: [String] = assemble()
 
     private static func assemble() -> [String] {
