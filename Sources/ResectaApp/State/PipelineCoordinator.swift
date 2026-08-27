@@ -1924,8 +1924,8 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // MainActor — the real-doc crash backtrace shows it on
                 // com.apple.root.user-initiated-qos.cooperative — so hop back
                 // before touching MainActor-isolated state or the toast queue
-                // (whose MainActor.assumeIsolated would otherwise trap). The
-                // The run-ownership guard moves inside the hop so it, too,
+                // (both MainActor-isolated, enforced at compile time). The
+                // run-ownership guard moves inside the hop so it, too,
                 // reads MainActor state on the MainActor.
                 await MainActor.run {
                     guard coordinator.documentState.activeRunId == runId else { return }
@@ -2074,31 +2074,18 @@ final class PipelineCoordinator: @unchecked Sendable {
         )
     }
 
-    /// Enqueue a toast notification. Bridges from @Observable's nonisolated context
-    /// to ToastQueueManager's @MainActor isolation. Called from nonisolated(unsafe)
-    /// coordinator reference inside Task — the Task runs on MainActor but the
-    /// compiler can't verify that through the unsafe capture.
+    /// Enqueue a toast notification. Statically MainActor-isolated: the
+    /// coordinator is MainActor by the SE-0466 default, so every caller
+    /// already runs on the MainActor — the detection pipeline's degrade and
+    /// diagnostics paths hop through `MainActor.run` before they call in.
+    /// `ToastQueueManager.enqueue` drives `withAnimation`, a UIKit feedback
+    /// generator and a UIAccessibility post, all of which need the main
+    /// thread; the isolation proves that at compile time, where a runtime
+    /// thread check could only trap or hop. Synchronous, so a caller's
+    /// next statement observes the enqueued toast.
+    @MainActor
     func enqueueToast(_ message: String, severity: ToastSeverity) {
-        guard let manager = toastManager else { return }
-        // ToastQueueManager is @MainActor (Sendable); enqueue() drives
-        // `withAnimation` + a UIKit feedback generator + a UIAccessibility post —
-        // all of which require the main thread. Callers on the detection pipeline
-        // Task may not be on the MainActor: the Task continuation
-        // can resume on a cooperative background thread, so the sibling toast
-        // paths ("No items detected", auto-apply success) can reach here off-main.
-        // Off-main, `assumeIsolated` traps and
-        // `enqueue()`'s `withAnimation` deadlocks the SwiftUI transaction lock.
-        // Take the synchronous `assumeIsolated` fast-path only when already on the
-        // main thread; otherwise hop onto the MainActor so no caller can hang the UI.
-        if Thread.isMainThread {
-            MainActor.assumeIsolated {
-                manager.enqueue(message, severity: severity)
-            }
-        } else {
-            Task { @MainActor in
-                manager.enqueue(message, severity: severity)
-            }
-        }
+        toastManager?.enqueue(message, severity: severity)
     }
 
     // MARK: - Session-close protection downgrade

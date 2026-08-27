@@ -909,21 +909,33 @@ class RedactionState {
     /// search for the search origin, or the pipeline owns `regions`);
     /// otherwise an outcome whose counts feed the shared commit toast.
     ///
+    /// Serialization: applies run one at a time, in call order (see
+    /// `waitForApplyTurn()` below). A call that arrives while another
+    /// apply is in flight waits for that apply to commit — or to be
+    /// refused — before it reads any state, so the search origin's
+    /// overlap test always runs against the regions every earlier apply
+    /// created. Two overlapping applies of the same selection therefore
+    /// create each region once: the later one skips every match as
+    /// already covered.
+    ///
     /// Mutation guard: when `documentState` is passed, the call refuses
     /// to mutate `regions` / `regionMetadata` while the pipeline owns
-    /// them (`!canMutateRegions`) — re-checked HERE, inside the action,
-    /// so a caller racing a pipeline start cannot slip a mutation in
-    /// behind a button-level `.disabled` gate. The search origin checks
-    /// again after its detached prepare step resumes, closing the
-    /// window a pipeline start opens during that suspension. The
-    /// parameter stays optional for source compatibility and test
-    /// seams; the sheet entry points pass it.
+    /// them (`!canMutateRegions`) — re-checked HERE, inside the action
+    /// and after the wait for the apply turn, so a caller racing a
+    /// pipeline start cannot slip a mutation in behind a button-level
+    /// `.disabled` gate. The search origin checks again after its
+    /// detached prepare step resumes, closing the window a pipeline
+    /// start opens during that suspension. The parameter stays optional
+    /// for source compatibility and test seams; the sheet entry points
+    /// pass it.
     @discardableResult
     func applyFindings(
         _ origin: ApplyOrigin,
         undoManager: UndoManager?,
         documentState: DocumentState? = nil
     ) async -> ApplyOutcome? {
+        await waitForApplyTurn()
+        defer { endApplyTurn() }
         if let documentState, !documentState.canMutateRegions {
             return nil
         }
@@ -952,6 +964,58 @@ class RedactionState {
             return applyEntityGroupOrigin(group, undoManager: undoManager)
         case .detectionResults(let results):
             return applyDetectionMapOrigin(results, undoManager: undoManager)
+        }
+    }
+
+    // MARK: - Apply serialization
+
+    // The apply contract is snapshot → prepare → commit. The search
+    // origin snapshots the existing region rects on the MainActor,
+    // prepares its regions off the actor (`prepareApply`, a real
+    // suspension), then commits on the MainActor by appending the
+    // prepared set. The commit does not re-run the overlap test against
+    // the live `regions`, so two applies whose snapshot→commit windows
+    // overlapped would each commit the full prepared set — every match
+    // twice. The gate below closes that window: an apply owns the path
+    // from its first state read to the end of its commit, and every
+    // later caller waits its turn in arrival order. The other origins
+    // never suspend between their reads and their commit, so for them
+    // the gate only orders them behind an in-flight search-origin apply.
+    //
+    // An uncontended call takes the gate without suspending, which keeps
+    // the synchronous origins' timing unchanged. The sheet's `isApplying`
+    // flag still stops a second tap at the UI; this gate is the path's
+    // own contract, independent of any caller.
+
+    /// True while an `applyFindings` call owns the apply path. Handed
+    /// straight to the next waiter, so it stays true across a hand-off.
+    /// Not observed by any view.
+    @ObservationIgnored private var applyInProgress = false
+
+    /// Callers waiting for the apply path, in arrival order. Each is
+    /// resumed by `endApplyTurn()` with the path already handed over.
+    @ObservationIgnored private var applyWaiters: [CheckedContinuation<Void, Never>] = []
+
+    /// Take the apply path: at once when it is free, otherwise after
+    /// every earlier caller's apply has finished.
+    private func waitForApplyTurn() async {
+        if !applyInProgress {
+            applyInProgress = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            applyWaiters.append(continuation)
+        }
+        // Resumed by `endApplyTurn()`: the path is ours, and
+        // `applyInProgress` stayed true through the hand-off.
+    }
+
+    /// Release the apply path, handing it to the next waiter if any.
+    private func endApplyTurn() {
+        if applyWaiters.isEmpty {
+            applyInProgress = false
+        } else {
+            applyWaiters.removeFirst().resume()
         }
     }
 
