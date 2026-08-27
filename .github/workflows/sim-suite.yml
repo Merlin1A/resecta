@@ -57,6 +57,32 @@ jobs:
           fi
           xcrun simctl list devices available | /usr/bin/grep 'iPhone 17' || true
 
+      # A cold first boot on a 3-vCPU runner takes longer than the batched
+      # runner's 180-second no-output watchdog, which then kills the first
+      # invocation and erases the device; boot once here and wait for it.
+      - name: Boot the simulator
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, re, sys
+          best = None
+          for runtime, devs in json.load(sys.stdin)["devices"].items():
+              m = re.search(r"iOS-(\d+)-(\d+)$", runtime)
+              ver = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+              for d in devs:
+                  if d["name"] != "iPhone 17":
+                      continue
+                  if best is None or ver > best[0]:
+                      best = (ver, d["udid"], runtime)
+          if best is None:
+              sys.exit("no iPhone 17 simulator")
+          print(best[1])
+          ')
+          echo "booting $udid"
+          t0=$SECONDS
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          echo "boot: $((SECONDS - t0)) s"
+
       - name: Batched app suite
         run: |
           t0=$SECONDS
@@ -77,7 +103,7 @@ jobs:
             if [ -s "$run_dir/failures.txt" ]; then
               awk '{print $2}' "$run_dir/failures.txt" | sort -u | while read -r label; do
                 for xc in "$run_dir/$label".xcresult "$run_dir/$label"-r*.xcresult; do
-                  [ -d "$xc" ] && cp -R "$xc" upload/
+                  if [ -d "$xc" ]; then cp -R "$xc" upload/; fi
                 done
               done
             fi
