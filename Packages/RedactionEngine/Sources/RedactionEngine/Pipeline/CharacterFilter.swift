@@ -337,10 +337,12 @@ public func filterCharacters(
     var surviving: [CharacterInfo] = []
     var excludedCount = 0
 
-    // PERF-8 / CANCEL-004: per-character cooperative cancellation. The inner
-    // body is binary-search bounded (O(log m + k)); a per-iteration check is
-    // negligible overhead and matches the cancel-checkpoint cadence used by
-    // sibling per-character walks (verifySpatialExclusion, TextLayerExtractor).
+    // Per-character cooperative cancellation. The inner body is
+    // binary-search bounded (O(log m + k)), so a check on every iteration is
+    // negligible overhead here. The sibling per-character walks
+    // (`verifySpatialExclusion`, `TextLayerExtractor`) check once per
+    // 256-character band instead, because their per-character bodies cost
+    // more.
     for char in characters {
         try Task.checkCancellation()
         let charMinY = char.bounds.minY

@@ -42,6 +42,8 @@ The entries below follow the Keep-a-Changelog index format.
 
 ### Fixed
 
+- **Verification matches ligature and compatibility forms.** The verification pass now matches ligature and compatibility forms of a sensitive term — the same normalization the search path applies — so a residue the search can locate is never invisible to the verifier.
+- **A transient face-detection error no longer discards a page's other detections.**
 - **Truthful degraded-detection diagnostics.** On a gazetteer-manifest signature failure the diagnostics name only the signature-gated corpora; the three reference tables that load outside the signature are no longer attributed to it, and the public detector initializer now honours the same signature verdict.
 - **Drawing beneath the minimized review sheet.** With the Scan or Search sheet parked at its compact height, drawing, moving and resizing regions on the page now work; the sheet's drag gesture on iOS 26 no longer cancels the touch before the page receives it.
 - **The review sheet closes when Redact starts.** Tapping Redact closes the Scan or Search sheet before the run, so it no longer covers the progress card, the results screen or the preview; Keep Editing returns with Scan and Search available again.

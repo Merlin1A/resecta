@@ -166,13 +166,69 @@ struct AhoCorasickTests {
         // term; the 1 MB bound must count the actual emitted bytes. One
         // 100_000-character term → 3 variants × (100k UTF-8 + 200k UTF-16BE
         // + 200k UTF-16LE + 400k UTF-32BE + 400k UTF-32LE) = 3.9 MB > bound
-        // → degraded no-op automaton.
+        // → degraded no-op automaton. No ligature site, so the composed
+        // form adds nothing.
         let bigTerm = String(repeating: "a", count: 100_000)
         let patterns = AhoCorasick.encodeForSearch(bigTerm)
         let totalBytes = patterns.reduce(0) { $0 + $1.count }
         #expect(totalBytes == 3_900_000)
         let ac = AhoCorasick(patterns: patterns)
         #expect(ac.isDegraded)
+
+        // A ligature site adds the composed form's bytes to the count: only
+        // the lowercase variant composes ("fi" + 99_998 × "a" → ﬁ + …; the
+        // UPPERCASE and Title Case variants carry no lowercase site), so
+        // 3.9 MB + (100_001 UTF-8 + 2 × 199_998 UTF-16 + 2 × 399_996 UTF-32)
+        // = 5_199_989 bytes — still counted, still degraded.
+        let ligatureTerm = "fi" + String(repeating: "a", count: 99_998)
+        let ligaturePatterns = AhoCorasick.encodeForSearch(ligatureTerm)
+        let ligatureBytes = ligaturePatterns.reduce(0) { $0 + $1.count }
+        #expect(ligatureBytes == 5_199_989)
+        #expect(AhoCorasick(patterns: ligaturePatterns).isDegraded)
+    }
+
+    @Test("encodeForSearch adds the ligature-composed form of each case variant")
+    func encodeForSearchLigatureComposedForms() {
+        // "confidential": 3 distinct case variants × 5 distinct encodings =
+        // 15 as before, plus the composed forms of the two variants with a
+        // lowercase "fi" site ("conﬁdential", "Conﬁdential") × the 5
+        // encodings that can represent U+FB01 (UTF-8, UTF-16 ×2, UTF-32 ×2;
+        // ASCII and Latin-1 cannot) = 10 → 25. The ceiling for a term with a
+        // ligature site is 2 × 28 = 56.
+        let patterns = AhoCorasick.encodeForSearch("confidential")
+        #expect(patterns.count == 25)
+        #expect(patterns.count <= 56)
+        #expect(Set(patterns).count == patterns.count)
+        #expect(patterns.contains(Array("con\u{FB01}dential".utf8)))
+        #expect(patterns.contains(Array("Con\u{FB01}dential".utf8)))
+        #expect(patterns.contains(Array("con\u{FB01}dential".data(using: .utf16BigEndian)!)))
+        // No lowercase site in the UPPERCASE variant — no composed form.
+        #expect(!patterns.contains(Array("CON\u{FB01}DENTIAL".utf8)))
+        // A term with no ligature site is unchanged.
+        #expect(AhoCorasick.encodeForSearch("Hello").count == 15)
+    }
+
+    @Test("encodeForSearch adds the search-normalized form of a term typed with a ligature")
+    func encodeForSearchNormalizedFormOfLigatureTerm() {
+        // The term carries U+FB01 itself: its NFC form keeps the ligature,
+        // its search-normalized form is the plain spelling, and the composed
+        // form of that spelling is the ligature form again (deduplicated).
+        let patterns = AhoCorasick.encodeForSearch("con\u{FB01}dential")
+        #expect(patterns.contains(Array("con\u{FB01}dential".utf8)))
+        #expect(patterns.contains(Array("confidential".utf8)))
+        #expect(patterns.contains(Array("Confidential".utf8)))
+        #expect(patterns.count <= 56)
+    }
+
+    @Test("ligatureComposed replaces lowercase ligature sites, longest first")
+    func ligatureComposedGreedy() {
+        #expect(AhoCorasick.ligatureComposed("office") == "o\u{FB03}ce")
+        #expect(AhoCorasick.ligatureComposed("raffle") == "ra\u{FB04}e")
+        #expect(AhoCorasick.ligatureComposed("offer") == "o\u{FB00}er")
+        #expect(AhoCorasick.ligatureComposed("file") == "\u{FB01}le")
+        #expect(AhoCorasick.ligatureComposed("flow") == "\u{FB02}ow")
+        #expect(AhoCorasick.ligatureComposed("OFFICE") == "OFFICE")
+        #expect(AhoCorasick.ligatureComposed("12345") == "12345")
     }
 
     @Test("Data convenience search works correctly")

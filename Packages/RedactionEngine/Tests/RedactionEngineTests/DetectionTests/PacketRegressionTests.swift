@@ -28,11 +28,12 @@ import Testing
 // NON-financial, so `detectPage` runs the Vision face detector
 // (`shouldRunFaceDetection` is true for court/medical/foia/generic) which
 // deterministically throws `com.apple.Vision #9 "could not create inference
-// context"` on the simulator -- the S8-documented sim-fragility. (Note: the
-// barcode pass, step 6b, tolerates the IDENTICAL Vision #9; the face pass at
-// :462 rethrows -- an engine-robustness asymmetry flagged for maintainer review, NOT fixed
-// here per INV-1.) For those two pages this suite measures the PII path
-// face-free by calling the SAME building blocks `detectPage` calls
+// context"` on the simulator -- the S8-documented sim-fragility. Both the
+// face pass (step 6) and the barcode pass (step 6b) now tolerate that error:
+// a failed pass yields no boxes and the page's other detections stand. This
+// suite still measures the PII path face-free for those two pages, because
+// a tolerated failure yields no face boxes on the simulator either, by
+// calling the SAME building blocks `detectPage` calls
 // (`DocumentTypeClassifier().classify` at orchestrator :314 and
 // `PIIDetector().detect(...,documentHeader:nil)` at :339 -- nil is exactly
 // what the orchestrator passes for any page index > 0) and reconstructing the

@@ -1,7 +1,10 @@
 import Foundation
 
-// SEARCH-AND-REDACT §D5: Shared Unicode normalization for PDF text matching.
-// Used by: search engine, verifier PII scan (Feature 2), audit metadata (Feature 1).
+// Shared Unicode normalization for PDF text matching. Consumed by the search
+// path, by the verification engine (its text-space term checks, its decoded-
+// text pass, and the byte automaton's pattern expansion), and by the
+// gazetteer, surface-form and entity-clustering code that keys on normalized
+// text.
 
 /// Unicode normalization for PDF text matching.
 ///
