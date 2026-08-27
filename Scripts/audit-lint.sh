@@ -189,7 +189,10 @@ for path in "${STAGED[@]}"; do
     [ "$loc" -gt "$HUB_CAP" ] && violate "M-6 hub LOC cap exceeded: $path is $loc LOC (cap $HUB_CAP)"
 done
 
-for path in "${ADDED[@]}"; do
+# ${ADDED[@]+...}: expanding an empty array under `set -u` is fatal on
+# bash 3.2 (the runner's /bin/bash); the parameter-expansion guard makes
+# the loop a no-op instead when no files were added.
+for path in ${ADDED[@]+"${ADDED[@]}"}; do
     case "$path" in *.swift) ;; *) continue ;; esac
     [ -f "$path" ] || continue
     loc=$(wc -l < "$path" | tr -d ' ')
