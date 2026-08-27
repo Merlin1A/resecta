@@ -56,6 +56,7 @@ The entries below follow the Keep-a-Changelog index format.
 - Test-suite integrity: assertion-free and tautological tests replaced or removed; the Settings suites are isolated; the perf-isolation list is complete; the pre-push hook runs the batched test runner.
 - GitHub Actions: a pull-request gate (XcodeGen, app + test-bundle builds, audit and claims lints on the diff, shipped-asset hash fence); on-demand and release-tag workflows for the engine host suite and the batched simulator suite; `audit-lint.sh` gains a commit-range mode.
 - Toast enqueueing uses static main-actor isolation instead of a runtime thread check.
+- Regenerated gazetteer, context-keyword, adversarial and packet fixtures: provenance prose only, entry counts unchanged; fixture hash pins updated. Context assets per the approved change plans: the negative-context placeholder entry is `corp.`, the bare `ein`/`mbi` suppression tokens are label phrases (166 → 171 entries), labeled license plates carry their own context words, multi-word doctype keywords are single tokens, and the FOIA and generic doctype vocabularies are rebalanced.
 
 ## [1.0.0] — 2026-08-12
 

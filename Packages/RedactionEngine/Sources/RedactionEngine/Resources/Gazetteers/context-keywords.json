@@ -733,7 +733,10 @@
       "category": "dob",
       "confidence": "high",
       "detector_note": "F-52: engine windowed-matching must require birth head-noun within the window; do NOT fire on date of other (service/death/admission/discharge/injury/diagnosis).",
-      "doctypes": [],
+      "doctypes": [
+        "generic",
+        "medical"
+      ],
       "locale": "en",
       "polarity": "positive",
       "term": "member birth date"
@@ -766,7 +769,10 @@
       "category": "dob",
       "confidence": "high",
       "detector_note": "F-52: engine windowed-matching must require birth head-noun within the window; do NOT fire on date of other (service/death/admission/discharge/injury/diagnosis).",
-      "doctypes": [],
+      "doctypes": [
+        "generic",
+        "medical"
+      ],
       "locale": "en",
       "polarity": "positive",
       "term": "patient dob"
@@ -1233,6 +1239,22 @@
       "doctypes": [],
       "locale": "en",
       "polarity": "positive",
+      "term": "license plate"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "lp"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
       "term": "make"
     },
     {
@@ -1265,7 +1287,23 @@
       "doctypes": [],
       "locale": "en",
       "polarity": "positive",
+      "term": "plate"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
       "term": "registration"
+    },
+    {
+      "category": "licenseplate",
+      "confidence": "high",
+      "doctypes": [],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "tag"
     },
     {
       "category": "licenseplate",
@@ -1452,16 +1490,6 @@
       "locale": "en",
       "polarity": "positive",
       "term": "decedent"
-    },
-    {
-      "category": "name",
-      "confidence": "high",
-      "doctypes": [
-        "court"
-      ],
-      "locale": "en",
-      "polarity": "positive",
-      "term": "defendant"
     },
     {
       "category": "name",
@@ -1694,26 +1722,6 @@
       "category": "name",
       "confidence": "high",
       "doctypes": [
-        "court"
-      ],
-      "locale": "en",
-      "polarity": "positive",
-      "term": "petitioner"
-    },
-    {
-      "category": "name",
-      "confidence": "high",
-      "doctypes": [
-        "court"
-      ],
-      "locale": "en",
-      "polarity": "positive",
-      "term": "plaintiff"
-    },
-    {
-      "category": "name",
-      "confidence": "high",
-      "doctypes": [
         "court",
         "financial",
         "generic",
@@ -1733,16 +1741,6 @@
       "locale": "en",
       "polarity": "positive",
       "term": "recipient's name"
-    },
-    {
-      "category": "name",
-      "confidence": "high",
-      "doctypes": [
-        "court"
-      ],
-      "locale": "en",
-      "polarity": "positive",
-      "term": "respondent"
     },
     {
       "category": "name",

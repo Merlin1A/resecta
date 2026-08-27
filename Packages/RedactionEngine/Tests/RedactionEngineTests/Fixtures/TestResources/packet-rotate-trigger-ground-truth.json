@@ -4253,7 +4253,7 @@
         }
       ],
       "overlaps": [],
-      "justification": "Fires as licensePlate -- 'Tag No' is a plate-label synonym -> watch; Jesse decides must_fire vs engine-suppress.",
+      "justification": "Fires as licensePlate -- 'Tag No' is a plate-label synonym; watch tier: must-fire versus engine-suppress is undecided.",
       "source_range": "",
       "schema_version": 1
     }
@@ -4282,7 +4282,7 @@
       "count": 1,
       "measured_pending": true,
       "justification": "conf 0.90 (= occ_urlab_13 value -- consistent).",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4308,7 +4308,7 @@
       "count": 5,
       "measured_pending": true,
       "justification": "assembled address spans.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4333,7 +4333,7 @@
       "count": 3,
       "measured_pending": true,
       "justification": "Reg E, context-boosted 0.80.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4358,7 +4358,7 @@
       "count": 2,
       "measured_pending": true,
       "justification": "only NLTagger-tagged Hartwell form.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4384,7 +4384,7 @@
       "count": 2,
       "measured_pending": true,
       "justification": "NANP shape wins overlap vs account 0.75 (Probe B). last-4 3265 = occ_urlab_18 tie.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4409,7 +4409,7 @@
       "count": 1,
       "measured_pending": true,
       "justification": "OCR-concatenated date -> false account.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4434,7 +4434,7 @@
       "count": 1,
       "measured_pending": true,
       "justification": "OCR-concatenated date -> false account.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4459,7 +4459,7 @@
       "count": 1,
       "measured_pending": true,
       "justification": "OCR-concatenated date -> false account.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4485,7 +4485,7 @@
       "count": 1,
       "measured_pending": true,
       "justification": "detected 0.75 then overlap-suppressed to phone (aspirational should-fire-as-account).",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4511,7 +4511,7 @@
       "count": 4,
       "measured_pending": true,
       "justification": "NLTagger mis-tag, bloom-confirmed -> precision hazard.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4537,7 +4537,7 @@
       "count": 6,
       "measured_pending": true,
       "justification": "near ID:, no acct kw; sub-threshold phone 0.60 < 0.70.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4563,7 +4563,7 @@
       "count": 1,
       "measured_pending": true,
       "justification": "label-anchored-only gate holds (bare dates suppressed).",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4589,7 +4589,7 @@
       "count": 2,
       "measured_pending": true,
       "justification": "state-abbrev trap held silent (address aspect).",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4615,7 +4615,7 @@
       "count": 2,
       "measured_pending": true,
       "justification": "state-abbrev trap held silent (DL aspect).",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4641,7 +4641,7 @@
       "count": 6,
       "measured_pending": true,
       "justification": "NLTagger-limited miss (ALL-CAPS + INDN prefix).",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4667,7 +4667,7 @@
       "count": 1,
       "measured_pending": true,
       "justification": "middle-initial span break.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4693,7 +4693,7 @@
       "count": 3,
       "measured_pending": true,
       "justification": "first+initial NLTagger-limited.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4719,7 +4719,7 @@
       "count": 1,
       "measured_pending": true,
       "justification": "masked -> invisible.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4745,7 +4745,7 @@
       "count": 1,
       "measured_pending": true,
       "justification": "sub-threshold on page 0.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     },
     {
@@ -4771,7 +4771,7 @@
       "count": 1,
       "measured_pending": true,
       "justification": "sub-threshold CO-ID class.",
-      "source_range": "frozen statement; geometry resolved at draw time",
+      "source_range": "frozen statement; geometry not resolved (measured_pending)",
       "schema_version": 1
     }
   ],
