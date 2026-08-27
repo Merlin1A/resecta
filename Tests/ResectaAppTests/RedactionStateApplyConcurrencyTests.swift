@@ -72,11 +72,8 @@ struct RedactionStateApplyConcurrencyTests {
         search.results = results
         state.activeSearch = search
 
-        // Production serializes apply via the parent sheet's `isApplying`
-        // gate (Group 3, N-3). Mirror that here — back-to-back awaits on
-        // a MainActor-isolated state observe the same contract: the
-        // second call sees the first's regions and skips them as
-        // overlaps.
+        // Back-to-back awaits on a MainActor-isolated state: the second
+        // call sees the first's regions and skips them as overlaps.
         let resA = await state.applyFindings(.selectedSearchResults, undoManager: nil)
         let resB = await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
@@ -86,23 +83,12 @@ struct RedactionStateApplyConcurrencyTests {
         #expect(state.appliedMatchAudit.count == applied)
     }
 
-    // CAT-225: the suite lived in *ApplyConcurrencyTests* but every test ran a
-    // serial path. This is the missing concurrent guard: two `async let`
-    // applies of the same selected set. Production serializes apply via the
-    // Search & Redact sheet's `isApplying` gate (Group 3, N-3), so this is an
-    // ungated probe of the method's own concurrency contract. The deterministic
-    // invariants — conservation (both calls account for every selected match)
-    // and audit↔region consistency (one audit row per created region) — hold
-    // regardless of interleaving. The load-bearing property is no-duplication:
-    // a second apply must not re-add a match the first already committed.
-    @Test("Concurrent apply does not duplicate regions; audit stays consistent")
-    func concurrentApplyDoesNotDuplicateRegions() async {
-        let state = RedactionState()
-        let search = SearchState()
-        let total = 50
-        var results: [SearchResult] = []
-        for i in 0..<total {
-            results.append(SearchResult(
+    /// `total` selected text-layer results spread over ten pages, none
+    /// overlapping another, so a first apply creates one region per
+    /// result and any later apply over the same set skips every result.
+    private func selectedResults(total: Int) -> [SearchResult] {
+        (0..<total).map { i in
+            SearchResult(
                 pageIndex: i % 10,
                 normalizedRect: CGRect(
                     x: 0.1,
@@ -115,9 +101,26 @@ struct RedactionStateApplyConcurrencyTests {
                 source: .textLayer,
                 term: "needle",
                 isSelected: true
-            ))
+            )
         }
-        search.results = results
+    }
+
+    // The concurrent guard: two `async let` applies of the same selected
+    // set with no sheet-level gate in front of them, probing the method's
+    // own concurrency contract. `applyFindings` serializes its callers —
+    // an apply waits for the in-flight apply to commit before it reads
+    // `regions` — so the later apply's overlap test sees the earlier
+    // apply's regions and skips every match. Three invariants follow:
+    // conservation (both calls account for every selected match),
+    // audit↔region consistency (one audit row per created region), and
+    // no duplication (each match applied exactly once, by exactly one of
+    // the two calls).
+    @Test("Concurrent apply does not duplicate regions; audit stays consistent")
+    func concurrentApplyDoesNotDuplicateRegions() async {
+        let state = RedactionState()
+        let search = SearchState()
+        let total = 50
+        search.results = selectedResults(total: total)
         state.activeSearch = search
 
         // Launch both applies concurrently against the same activeSearch.
@@ -130,36 +133,58 @@ struct RedactionStateApplyConcurrencyTests {
         let regionCount = state.regions.values.flatMap { $0 }.count
 
         // Conservation: each of the two calls processed all `total` selected
-        // matches (applied or skipped-as-overlap). Holds under any interleaving.
+        // matches (applied or skipped-as-overlap).
         #expect(applied + skipped == 2 * total,
                 "both calls must account for every selected match")
         // Audit↔region consistency: exactly one audit row per created region
         // (no prior regions were seeded, so all regions are search-sourced),
-        // and the audit count equals the combined applied count. Both hold
-        // under any interleaving, including the duplicating one below.
+        // and the audit count equals the combined applied count.
         #expect(state.appliedMatchAudit.count == regionCount,
                 "appliedMatchAudit must have one entry per created region")
         #expect(state.appliedMatchAudit.count == applied,
                 "audit count must equal the combined applied count")
 
-        // No-duplication is the load-bearing property — and it does NOT hold
-        // today. Each apply snapshots existing regions on the MainActor
-        // *before* its off-main prepare step, and the shared commit
-        // appends the prepared set with no re-check against live
-        // regions. With two async-let applies the second snapshots
-        // before the first commits, so it re-adds every match → regionCount
-        // becomes 2*total. Production never reaches this: the Search & Redact
-        // sheet's `isApplying` gate serializes apply (Group 3, N-3). Per the
-        // F18 protocol a revealed race is logged as a deferred-work ledger entry
-        // (CAT-NEW-s18-1), not resolved here. isIntermittent because the
-        // duplicating interleaving is scheduler-dependent.
-        withKnownIssue(
-            "CAT-NEW-s18-1: ungated concurrent apply duplicates regions via a stale pre-commit snapshot; production serializes via isApplying. Deferred to REPLAN.",
-            isIntermittent: true
-        ) {
-            #expect(regionCount == total,
-                    "concurrent apply must not duplicate regions (each match applied once)")
-        }
+        // No duplication — the load-bearing property. Serialized applies
+        // give exactly one winner: whichever apply runs first creates every
+        // region; the other skips every match as already covered.
+        #expect(regionCount == total,
+                "concurrent apply must not duplicate regions (each match applied once)")
+        #expect([ra?.applied ?? 0, rb?.applied ?? 0].sorted() == [0, total],
+                "exactly one of the two applies creates the regions")
+        #expect([ra?.skippedOverlaps ?? 0, rb?.skippedOverlaps ?? 0].sorted() == [0, total],
+                "the other apply skips every match as an overlap")
+    }
+
+    // The same contract over three callers: the serialization is a queue,
+    // not a two-party hand-off, so one apply creates the regions and the
+    // other two skip every match.
+    @Test("Three concurrent applies — one creates the regions, two skip every match")
+    func threeConcurrentAppliesSerialize() async {
+        let state = RedactionState()
+        let search = SearchState()
+        let total = 40
+        search.results = selectedResults(total: total)
+        state.activeSearch = search
+
+        async let a = state.applyFindings(.selectedSearchResults, undoManager: nil)
+        async let b = state.applyFindings(.selectedSearchResults, undoManager: nil)
+        async let c = state.applyFindings(.selectedSearchResults, undoManager: nil)
+        let (ra, rb, rc) = await (a, b, c)
+        let outcomes = [ra, rb, rc].compactMap { $0 }
+        #expect(outcomes.count == 3, "no apply is refused")
+
+        let applied = outcomes.map(\.applied)
+        let skipped = outcomes.map(\.skippedOverlaps)
+        #expect(applied.reduce(0, +) + skipped.reduce(0, +) == 3 * total,
+                "all three calls must account for every selected match")
+        #expect(applied.sorted() == [0, 0, total],
+                "exactly one of the three applies creates the regions")
+        #expect(skipped.sorted() == [0, total, total],
+                "the other two skip every match as an overlap")
+        #expect(state.regions.values.flatMap { $0 }.count == total,
+                "each match is applied exactly once")
+        #expect(state.appliedMatchAudit.count == total,
+                "one audit row per created region")
     }
 }
 

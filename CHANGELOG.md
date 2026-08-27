@@ -49,11 +49,13 @@ The entries below follow the Keep-a-Changelog index format.
 - **The review sheet closes when Redact starts.** Tapping Redact closes the Scan or Search sheet before the run, so it no longer covers the progress card, the results screen or the preview; Keep Editing returns with Scan and Search available again.
 - **Zoom floor on the document view.** Pinching out stops at the page's fit size — the whole page in view — in the editor and in the redacted preview; the page no longer shrinks into the canvas background.
 - **Rectangle tool.** Drawing always starts a new box while the tool is on (existing boxes are moved or resized with the tool off); a box's starting corner stays put while its far edge aligns to guides; boxes stay within the page; the canvas redraws after every gesture (no lingering dashed box, size label, or guide lines); size and touch thresholds are measured on screen so they feel the same at any zoom; turning the tool on clears the selection and the Add-to-Selection toggle.
+- **Applying search results twice in quick succession can no longer duplicate regions.** Applies are serialized: a second apply waits for the first to commit and then skips every match the first already covered.
 
 ### Internal
 
 - Test-suite integrity: assertion-free and tautological tests replaced or removed; the Settings suites are isolated; the perf-isolation list is complete; the pre-push hook runs the batched test runner.
 - GitHub Actions: a pull-request gate (XcodeGen, app + test-bundle builds, audit and claims lints on the diff, shipped-asset hash fence); on-demand and release-tag workflows for the engine host suite and the batched simulator suite; `audit-lint.sh` gains a commit-range mode.
+- Toast enqueueing uses static main-actor isolation instead of a runtime thread check.
 
 ## [1.0.0] — 2026-08-12
 
