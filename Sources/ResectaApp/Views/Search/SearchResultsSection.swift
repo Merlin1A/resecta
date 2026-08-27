@@ -741,9 +741,12 @@ struct SearchResultsSection: View {
                 // SA-3 rider: rect-level half — the tapped match
                 // scrolls into view when the canvas is zoomed past
                 // fit (engine-canonical conversion at the consumer).
+                // UXC-50 (D-128, RB-123): the row tap parks the sheet,
+                // so it frames the match at the readability scale.
                 documentState.requestCanvasScroll(
                     toPageIndex: result.pageIndex,
-                    normalizedRect: result.normalizedRect
+                    normalizedRect: result.normalizedRect,
+                    zoom: .readability
                 )
                 // Tap-on-row drops to compact so the
                 // PDF gets max area. Since UXC-44 (D-116, RB-92) the

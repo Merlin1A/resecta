@@ -35,8 +35,11 @@ struct ScanReviewSection: View {
     let onRequestWhy: (ReverseRationaleRequest) -> Void
     /// SA-3 rider (B-3): row-body tap navigates the canvas to the
     /// finding's page — the search rows' shipped idiom (page write +
-    /// compact drop live on the hub, which owns the detent).
-    let onNavigateToPage: (Int) -> Void
+    /// compact drop live on the hub, which owns the detent). UXC-50
+    /// (D-128, RB-123 item 6): carries the detection's `normalizedRect`
+    /// (0–1, bottom-left — the `DetectionResult` convention) so the hub
+    /// can frame it.
+    let onNavigateToFinding: (Int, CGRect) -> Void
 
     @State private var viewMode: ReviewViewMode = .byPage
     // WP5b pattern carried: cached kind counts + filtered list so the
@@ -204,7 +207,7 @@ struct ScanReviewSection: View {
         // Buttons, so they keep winning their own hit regions; the
         // rest of the row navigates.
         .contentShape(Rectangle())
-        .onTapGesture { onNavigateToPage(page) }
+        .onTapGesture { onNavigateToFinding(page, detection.normalizedRect) }
         // The family row's `.ignore` merge hides the trailing W9 button
         // from VoiceOver (the retired triage row's `.combine` surfaced
         // it implicitly) — expose it as a named action so the detector-

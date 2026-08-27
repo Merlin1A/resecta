@@ -1239,6 +1239,24 @@ struct DocumentEditorView: View {
                         ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion),
                     value: inset
                 )
+        } else {
+            // UXC-50 (D-128, RB-123 item 5): the unified inset. With no
+            // page bar (single-page docs) the same safe-area slot still
+            // shrinks the canvas by the compact strip's hug while the
+            // sheet is parked, so zoomed content structurally cannot
+            // sit under the float — single-page docs re-centre up like
+            // multi-page docs already do.
+            let inset = Self.compactParkedCanvasInset(
+                sheetPresented: redactionState.activeSearch != nil,
+                detent: searchSheetDetent
+            )
+            Color.clear
+                .frame(height: inset)
+                .animation(
+                    ResectaTokens.Anim.resolved(
+                        ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion),
+                    value: inset
+                )
         }
     }
 
@@ -1298,6 +1316,18 @@ struct DocumentEditorView: View {
     ) -> CGFloat {
         guard sheetPresented, detent == .compactFloat else { return 0 }
         return CompactFloatDetent.hugHeight
+    }
+
+    /// UXC-50 (D-128, RB-123 item 5): bottom inset for the canvas when
+    /// NO page bar mounts — the same geometry as `pageBarCompactInset`
+    /// (reads `CompactFloatDetent.hugHeight` symbolically, so a strip
+    /// height change propagates), zero unless the sheet is parked at
+    /// the compact float.
+    static func compactParkedCanvasInset(
+        sheetPresented: Bool,
+        detent: PresentationDetent
+    ) -> CGFloat {
+        pageBarCompactInset(sheetPresented: sheetPresented, detent: detent)
     }
 
     // MARK: - WU-42 M-C.8 — Drawing-mode caption helpers
