@@ -11,6 +11,7 @@ import Foundation
 // after its start guard, and the purge re-run, `clearAll()` and
 // `clearForNewDocument()` use the same helper. Pinned here without a
 // SwiftUI host: the helper's behaviour and the seams that call it.
+@Suite("RedactionState dismissActiveSearch")
 @MainActor
 struct RedactionStateDismissActiveSearchTests {
 

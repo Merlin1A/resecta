@@ -150,7 +150,7 @@ struct SampleStatementSnapshotTests {
     /// OCR-leg detect with cold-start retries. The S8 exit notes document a
     /// transient Vision "Could not create inference context" (#9) on the FIRST
     /// 200-DPI call in a fresh process; an immediate retry warms the context
-    /// (`Vision200ColdStartProbeTests`). The extra attempts also absorb the
+    /// (measured with a one-off cold-start probe). The extra attempts also absorb the
     /// Vision / memory contention this OCR-heavy suite sees when it runs inside
     /// a parallel `xcodebuild` batch. The final attempt rethrows the real error.
     private func ocrLegDetect(

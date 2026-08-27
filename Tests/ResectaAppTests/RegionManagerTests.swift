@@ -392,19 +392,4 @@ struct RegionManagerTests {
     ) -> RedactionRegion {
         RedactionRegion(id: UUID(), normalizedRect: rect, source: .manual)
     }
-
-    /// UndoManager with groupsByEvent disabled for deterministic test behavior.
-    private func makeUndoManager() -> UndoManager {
-        let mgr = UndoManager()
-        mgr.groupsByEvent = false
-        return mgr
-    }
-
-    /// Wrap an operation in an explicit undo group so each operation
-    /// can be undone independently (no run loop grouping in tests).
-    private func withUndoGroup(_ mgr: UndoManager, _ body: () -> Void) {
-        mgr.beginUndoGrouping()
-        body()
-        mgr.endUndoGrouping()
-    }
 }

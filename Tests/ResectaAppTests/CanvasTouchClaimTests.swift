@@ -10,6 +10,7 @@ import UIKit
 // the overlay now makes such pans `require(toFail:)` its claim. Pinned
 // here without a sheet: the recognizer's contract, the pure predicate that
 // selects the pans, the reconcile bookkeeping, and the source seams.
+@Suite("Canvas touch claim")
 @MainActor
 struct CanvasTouchClaimTests {
 

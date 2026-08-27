@@ -76,9 +76,9 @@ struct PacketSnapshotTests {
         // Warm the Vision inference context on a SMALL synthetic image before
         // the measurement loop. The first Vision request in a fresh process can
         // return #9 "could not create inference context"; batched runs absorb
-        // this in a sibling suite, but an isolated run must warm Vision itself
-        // (Vision200ColdStartProbeTests). Immediate retries alone did not warm
-        // it -- a synthetic-image warm-up with backoff does.
+        // this in a sibling suite, but an isolated run must warm Vision itself.
+        // Immediate retries alone did not warm it (measured with a one-off
+        // cold-start probe) -- a synthetic-image warm-up with backoff does.
         await warmUpVision(orchestrator, rasterizer)
 
         var pageSnaps: [PacketPageSnap] = []

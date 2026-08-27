@@ -39,7 +39,7 @@ GREP=/usr/bin/grep
 # REPORT-ONLY (their reds never set the exit status — adjudicate per
 # verification.md §3). "Completely alone" is load-bearing: StressCorpusTests
 # has been red when paired with even one other suite.
-PERF_ALONE_RedactionEngine="CancellationLatencyTests PixelBufferZeroizeTests ReverseRationalePerformanceTests StressCorpusTests ApplyPhaseMemoryStressTests ParallelLayerExecutionTests"
+PERF_ALONE_RedactionEngine="CancellationLatencyTests PixelBufferZeroizeTests ReverseRationalePerformanceTests StressCorpusTests ApplyPhaseMemoryStressTests ParallelLayerExecutionTests DetectionRasterizeOverlapTests Layer2OCRParallelismTests"
 PERF_ALONE_ResectaApp="PageParallelRasterizationTests"
 
 # §3 exclusion list (suite granularity): reds here do not gate the exit
@@ -141,16 +141,23 @@ echo "simulator: ${SIM_LINE#*|} [$SIM_UDID]"
 DEST="id=$SIM_UDID"
 
 # ── Suite enumeration (runtime, from Tests sources) ──────────────────────
-# Top-level (column-0) @Suite-annotated types + XCTestCase subclasses.
-# Validated 2026-06-11 against the live trees: engine 157, app 121.
+# Every top-level (column-0) type whose body carries a `@Test` function — with
+# or without a `@Suite` attribute (Swift Testing runs a bare type holding
+# `@Test` functions as an implicit suite, and `-only-testing:` addresses it by
+# type name) — plus XCTestCase subclasses. Attribute-only detection used to
+# miss implicit suites and the multi-line `@Suite(` form, so their tests never
+# ran under this runner. Validated 2026-08-27 against the live trees:
+# engine 207, app 209.
 
 SUITES_FILE="$RUN_DIR/suites.txt"
 python3 - "$TEST_SRC" > "$SUITES_FILE" <<'PYEOF'
 import os, re, sys
 
-SUITE_ATTR = re.compile(r'^@Suite\b')
-TYPE_DECL = re.compile(r'^(?:final\s+)?(?:class|struct|enum|actor)\s+(\w+)')
-XCTEST_DECL = re.compile(r'^(?:final\s+)?class\s+(\w+)\s*:\s*[^{]*\bXCTestCase\b')
+ATTRS = re.compile(r'^(?:@\w+(?:\([^)]*\))?\s*)+')
+MODS = r'(?:(?:private|fileprivate|internal|public|final)\s+)*'
+TYPE_DECL = re.compile(r'^' + MODS + r'(?:class|struct|enum|actor)\s+(\w+)')
+XCTEST_DECL = re.compile(r'^' + MODS + r'class\s+(\w+)\s*:\s*[^{]*\bXCTestCase\b')
+TEST_ATTR = re.compile(r'^\s+@Test\b')
 
 suites = set()
 for dirpath, _, files in os.walk(sys.argv[1]):
@@ -159,24 +166,19 @@ for dirpath, _, files in os.walk(sys.argv[1]):
             continue
         lines = open(os.path.join(dirpath, fn), encoding='utf-8',
                      errors='replace').read().splitlines()
-        pending = False
+        current = None   # the column-0 type whose body the scan is inside
         for line in lines:
-            m = XCTEST_DECL.match(line)
+            decl = ATTRS.sub('', line) if line.startswith('@') else line
+            m = XCTEST_DECL.match(decl)
             if m:
-                suites.add(m.group(1)); pending = False; continue
-            if SUITE_ATTR.match(line):
-                pending = True
-                m = TYPE_DECL.match(re.sub(r'^@Suite(\([^)]*\))?\s*', '', line))
-                if m:
-                    suites.add(m.group(1)); pending = False
-                continue
-            if pending:
-                m = TYPE_DECL.match(line)
-                if m:
-                    suites.add(m.group(1)); pending = False
-                elif line.strip() and not line.strip().startswith('//') \
-                        and not line.strip().startswith('@'):
-                    pending = False
+                suites.add(m.group(1)); current = None; continue
+            m = TYPE_DECL.match(decl)
+            if m:
+                current = m.group(1); continue
+            if line.startswith('}'):
+                current = None; continue
+            if current and TEST_ATTR.match(line):
+                suites.add(current)
 for s in sorted(suites):
     print(s)
 PYEOF
