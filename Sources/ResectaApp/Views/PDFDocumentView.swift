@@ -45,6 +45,33 @@ struct PDFDocumentView: UIViewRepresentable {
         scaleFactor > fitScaleFactor * 1.01
     }
 
+    /// UXC-50 (D-128, RB-123 item 1): the readability formula. The
+    /// navigation scale that renders `rectInPage` (page points) at
+    /// `ReadabilityZoom.textHeightTarget` on screen, width-guarded so
+    /// the whole rect stays visible, clamped to
+    /// [fit … min(navZoomCap × fit, maxScale)]. A page-wide rect's
+    /// width fit lands at-or-below fit ⇒ clamps to fit = no zoom (no
+    /// special-casing); a taller united multi-line rect zooms LESS.
+    /// `nil` = leave the scale alone (degenerate rect or geometry).
+    /// The cap is a navigation target only — never written to
+    /// `maxScaleFactor` (RB-116's pinch ceiling stays PDFKit's).
+    nonisolated static func readabilityTargetScale(
+        rectInPage: CGRect,
+        viewportSize: CGSize,
+        fitScale: CGFloat,
+        maxScale: CGFloat
+    ) -> CGFloat? {
+        guard rectInPage.width > 0.001, rectInPage.height > 0.001,
+              fitScale > 0, viewportSize.width > 0, viewportSize.height > 0
+        else { return nil }
+        let heightRule = ReadabilityZoom.textHeightTarget / rectInPage.height
+        let widthFit = (viewportSize.width - 2 * ReadabilityZoom.horizontalMargin)
+            / rectInPage.width
+        let ceiling = min(ReadabilityZoom.navZoomCap * fitScale, maxScale)
+        let target = min(heightRule, widthFit)
+        return min(max(target, fitScale), max(ceiling, fitScale))
+    }
+
     func makeCoordinator() -> PDFViewCoordinator {
         let coordinator = PDFViewCoordinator()
         coordinator.documentState = documentState
@@ -111,7 +138,20 @@ struct PDFDocumentView: UIViewRepresentable {
         if let target = documentState.pendingCanvasScrollTarget,
            coordinator.lastHandledCanvasScrollToken != target.token {
             coordinator.lastHandledCanvasScrollToken = target.token
-            if let doc = pdfView.document,
+            // UXC-50 (D-128, RB-123 items 1–2, 7): `.readability`
+            // normalizes the scale to the readability target FIRST
+            // (in or out, never below the UXC-48 floor), then rect-
+            // scrolls through the same `shouldRectScroll` gate below
+            // — instant, no animation. The `.none` path is untouched.
+            if target.zoom == .readability,
+               let doc = pdfView.document,
+               let page = doc.page(at: target.pageIndex) {
+                let pageRect = normalizedToPDFPageCoordinates(
+                    target.normalizedRect,
+                    pageRect: page.bounds(for: pdfView.displayBox)
+                )
+                pdfView.frameForReadability(rectInPage: pageRect, on: page)
+            } else if let doc = pdfView.document,
                let page = doc.page(at: target.pageIndex),
                Self.shouldRectScroll(
                    scaleFactor: pdfView.scaleFactor,
@@ -154,6 +194,24 @@ struct PDFDocumentView: UIViewRepresentable {
         // Refresh overlays only when regions or selection actually changed
         coordinator.refreshAllOverlaysIfNeeded()
     }
+}
+
+// MARK: - Readability zoom constants (UXC-50, D-128, RB-123)
+
+/// The RB-123 tuning surface — the ONE home for the readability
+/// formula's numbers (`PDFDocumentView.readabilityTargetScale`). The
+/// SHAPE is ruled; the exact values are tuned on-sim and at Jesse's
+/// device pass. `navZoomCap` is a navigation target only — it never
+/// touches `maxScaleFactor` (RB-116's pinch ceiling stays PDFKit's).
+nonisolated enum ReadabilityZoom {
+    /// On-screen height (points) the matched text is framed to.
+    static let textHeightTarget: CGFloat = 20
+    /// Horizontal breathing room (points, each side) in the width guard.
+    static let horizontalMargin: CGFloat = 16
+    /// Ceiling as a multiple of the fit scale.
+    static let navZoomCap: CGFloat = 3.5
+    /// Relative dead band (× fit) below which the scale is left alone.
+    static let scaleEpsilon: CGFloat = 0.01
 }
 
 // MARK: - Zoom floor (UXC-48, D-123)
@@ -205,6 +263,75 @@ final class FitFlooredPDFView: PDFView {
     override func layoutSubviews() {
         super.layoutSubviews()
         applyFitFloor()
+        reassertReadabilityFramingIfNeeded()
+    }
+
+    // MARK: - Readability framing (UXC-50, D-128, RB-123)
+
+    /// The one-shot re-assert store. Trap T1 (mini-toolbar packet):
+    /// PDFKit with `autoScales` re-fits even a zoomed-in view when
+    /// the canvas bounds change (`CanvasZoomFloorTests.
+    /// floorTracksACanvasResize` pins it). The first chevron tap from
+    /// medium/large PARKS the sheet, and the compact inset (RB-42 +
+    /// the UXC-50 single-page inset) shrinks the bounds AFTER the
+    /// consumption in `updateUIView` — a naively applied zoom is thrown
+    /// away. Contract: every `.readability` consumption replaces this
+    /// store; `layoutSubviews`, after `applyFitFloor()`, re-applies the
+    /// framing exactly ONCE when the bounds differ from those at
+    /// consumption, then clears it. A tap with stable bounds (already
+    /// parked) applies once at consumption and the store simply
+    /// expires on the next replacement. Never more than one re-assert
+    /// per request token.
+    private struct ReadabilityFramingTarget {
+        let page: PDFPage
+        let rectInPage: CGRect
+        let boundsAtConsumption: CGRect
+    }
+
+    private var pendingReadabilityFraming: ReadabilityFramingTarget?
+
+    /// Consume a `.readability` scroll target: normalize + rect-scroll
+    /// now, and arm the post-layout re-assert.
+    func frameForReadability(rectInPage: CGRect, on page: PDFPage) {
+        applyReadabilityFraming(rectInPage: rectInPage, on: page)
+        pendingReadabilityFraming = ReadabilityFramingTarget(
+            page: page, rectInPage: rectInPage, boundsAtConsumption: bounds
+        )
+    }
+
+    private func reassertReadabilityFramingIfNeeded() {
+        guard let pending = pendingReadabilityFraming,
+              pending.boundsAtConsumption != bounds
+        else { return }
+        pendingReadabilityFraming = nil
+        applyReadabilityFraming(rectInPage: pending.rectInPage, on: pending.page)
+    }
+
+    /// NORMALIZE (RB-123 item 2): write the computed scale up OR down
+    /// when it differs meaningfully from the current one — the UXC-48
+    /// floor rules out below-fit; a page-wide item from a
+    /// pinched state returns to fit by design. Then rect-scroll through
+    /// the existing `shouldRectScroll` gate: at fit it self-refuses and
+    /// the page write alone suffices, exactly today's behaviour.
+    private func applyReadabilityFraming(rectInPage: CGRect, on page: PDFPage) {
+        let fit = scaleFactorForSizeToFit
+        if let target = PDFDocumentView.readabilityTargetScale(
+            rectInPage: rectInPage,
+            viewportSize: bounds.size,
+            fitScale: fit,
+            maxScale: maxScaleFactor
+        ), abs(target - scaleFactor) > ReadabilityZoom.scaleEpsilon * fit {
+            scaleFactor = target
+        }
+        guard PDFDocumentView.shouldRectScroll(
+            scaleFactor: scaleFactor, fitScaleFactor: scaleFactorForSizeToFit
+        ) else { return }
+        // The 8-pt page-unit pad keeps the RB-93 ring off the viewport edge.
+        let padded = rectInPage
+            .insetBy(dx: -8, dy: -8)
+            .intersection(page.bounds(for: displayBox))
+        guard !padded.isNull else { return }
+        go(to: padded, on: page)
     }
 
     /// Pin `minScaleFactor` to the current fit scale. A no-op while the

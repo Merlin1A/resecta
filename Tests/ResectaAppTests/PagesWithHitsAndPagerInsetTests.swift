@@ -77,3 +77,30 @@ struct PageBarCompactInsetTests {
             sheetPresented: true, detent: .compactFloat) == CompactFloatDetent.hugHeight)
     }
 }
+
+// UXC-50 (D-128, RB-123 item 5): the unified inset for the no-page-bar
+// case (single-page documents) — same geometry, same symbolic hug.
+@Suite("Compact-parked canvas inset with no page bar (UXC-50)")
+@MainActor
+struct CompactParkedCanvasInsetTests {
+
+    @Test("Zero whenever the search sheet is not presented")
+    func zeroWhenNotPresented() {
+        #expect(DocumentEditorView.compactParkedCanvasInset(
+            sheetPresented: false, detent: .compactFloat) == 0)
+    }
+
+    @Test("Zero when presented at medium or large")
+    func zeroAtTallerDetent() {
+        #expect(DocumentEditorView.compactParkedCanvasInset(
+            sheetPresented: true, detent: .medium) == 0)
+        #expect(DocumentEditorView.compactParkedCanvasInset(
+            sheetPresented: true, detent: .large) == 0)
+    }
+
+    @Test("Hug height at compact-parked with NO bar — reads CompactFloatDetent.hugHeight symbolically")
+    func hugHeightAtCompactFloatWithoutBar() {
+        #expect(DocumentEditorView.compactParkedCanvasInset(
+            sheetPresented: true, detent: .compactFloat) == CompactFloatDetent.hugHeight)
+    }
+}

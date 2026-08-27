@@ -121,7 +121,21 @@ class DocumentState {
         /// convention; converted at the consumer via the engine's
         /// canonical `normalizedToPDFPageCoordinates`.
         let normalizedRect: CGRect
+        /// UXC-50 (D-128, RB-123): the zoom intent riding the one
+        /// seam (SA-3 kept). `.none` = today's page write + past-fit
+        /// rect scroll; `.readability` = the consumer normalizes the
+        /// scale to `PDFDocumentView.readabilityTargetScale` first.
+        let zoom: CanvasZoomIntent
         let token: UUID
+    }
+
+    /// UXC-50 (D-128, RB-123 items 1–2): what a canvas scroll request
+    /// asks of the scale. Only the sheet-parking writers (chevrons,
+    /// ⌘G/⇧⌘G, row taps, review-row taps) pass `.readability`; J/K
+    /// stays `.none` (RB-92 semantics untouched).
+    enum CanvasZoomIntent: Equatable {
+        case none
+        case readability
     }
 
     var pendingCanvasScrollTarget: CanvasScrollTarget?
@@ -129,10 +143,15 @@ class DocumentState {
     /// Request the canvas scroll a match rect into view. Callers keep
     /// writing `currentPageIndex` themselves — this adds the
     /// rect-level half only.
-    func requestCanvasScroll(toPageIndex pageIndex: Int, normalizedRect: CGRect) {
+    func requestCanvasScroll(
+        toPageIndex pageIndex: Int,
+        normalizedRect: CGRect,
+        zoom: CanvasZoomIntent = .none
+    ) {
         pendingCanvasScrollTarget = CanvasScrollTarget(
             pageIndex: pageIndex,
             normalizedRect: normalizedRect,
+            zoom: zoom,
             token: UUID()
         )
     }

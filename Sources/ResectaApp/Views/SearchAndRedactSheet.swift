@@ -215,11 +215,19 @@ struct SearchAndRedactSheet: View {
                         },
                         // SA-3 rider (B-3): review rows navigate the
                         // canvas with the search rows' shipped idiom —
-                        // page write + compact drop (page-granular by
-                        // ruling; ST-105 keeps the canvas interactive
-                        // behind the compact float).
-                        onNavigateToPage: { page in
+                        // page write + compact drop (ST-105 keeps the
+                        // canvas interactive behind the compact float).
+                        // UXC-50 (D-128, RB-123 item 6): the detection's
+                        // rect rides along so the row tap frames the
+                        // detection like a search-row tap; the review
+                        // chevron WALK stays 1.2.
+                        onNavigateToFinding: { page, normalizedRect in
                             documentState.currentPageIndex = page
+                            documentState.requestCanvasScroll(
+                                toPageIndex: page,
+                                normalizedRect: normalizedRect,
+                                zoom: .readability
+                            )
                             if selectedDetent != .compactFloat {
                                 selectedDetent = .compactFloat
                             }
@@ -1121,9 +1129,13 @@ struct SearchAndRedactSheet: View {
         // zoomed past fit, the page write alone can leave the match
         // off-screen; the canvas consumes this with the engine's
         // canonical rect conversion.
+        // UXC-50 (D-128, RB-123): the sheet-parking walk (chevrons,
+        // ⌘G/⇧⌘G) frames the item at the readability scale; J/K keeps
+        // today's page-only intent (RB-92 semantics untouched).
         documentState.requestCanvasScroll(
             toPageIndex: result.pageIndex,
-            normalizedRect: result.normalizedRect
+            normalizedRect: result.normalizedRect,
+            zoom: dropToCompact ? .readability : .none
         )
         if dropToCompact {
             // RB-92: the chevron walk parks the sheet (the row-tap

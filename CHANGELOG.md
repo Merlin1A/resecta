@@ -30,6 +30,7 @@ The entries below follow the Keep-a-Changelog index format.
 - **Results screen layout.** The verdict title now leads the screen directly beneath the toolbar (the symbol slot above it is removed), and a passing run shows the title alone (the "All N verification checks completed" line beneath it is gone; the check count stays in the Verification Details row). The audit-scope note closes the screen well beneath the run's timing line, the top-left toolbar button is Home, and the home screen's Settings button uses the same neutral tint as the editor toolbar.
 - **Result navigation.** The Previous/Next result buttons now step through matches with the review sheet parked at its compact height, where the buttons and the position counter stay available; the current match is outlined on the page, and the list scrolls to it when the sheet is expanded.
 - **Result rows.** Search and scan matches now appear highlighted inside their surrounding text, with page labels carried by the section headers and the selection count and Select All in the footer.
+- **Stepping through results now zooms small matches to a readable size** and returns to the full page for large ones; on single-page documents the page stays clear of the parked search strip.
 
 ### Removed
 
