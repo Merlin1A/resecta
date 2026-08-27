@@ -783,12 +783,18 @@ final class SearchState: Identifiable {
     var selectionFullyApplied: Bool {
         let selected = results.filter(\.isSelected)
         guard !selected.isEmpty else { return false }
-        // BH-A-03 — dedup-covered counts as applied for the graying
-        // gate: a fully covered selection has nothing left to apply.
-        return selected.allSatisfy {
-            appliedResultIDs.contains($0.id)
-                || coveredResultIDs.contains($0.id)
-        }
+        return selected.allSatisfy { isAppliedOrCovered($0.id) }
+    }
+
+    /// The one Apply-graying predicate for a single result: the apply
+    /// path has nothing left to do for it — it produced a region
+    /// (`appliedResultIDs`) or was dedup-skipped as already covered
+    /// (`coveredResultIDs`; BH-A-03 — a covered result counts as
+    /// applied for graying, though it earns no badge). Folded over the
+    /// selection by `selectionFullyApplied`; read for the current
+    /// result by the compact handle's per-item Apply (UXC-51).
+    func isAppliedOrCovered(_ id: UUID) -> Bool {
+        appliedResultIDs.contains(id) || coveredResultIDs.contains(id)
     }
 
     /// D06-F2 Part 2 — count of results the user left un-checked in triage

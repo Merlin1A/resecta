@@ -10,7 +10,7 @@ import RedactionEngine
 // `MatchAuditSnapshot` with `regionID` populated — with one two-leg
 // undo implementation underneath.
 //
-// Four contract families pinned here:
+// Five contract families pinned here:
 //   1. Search-origin preservation — the outputs the pre-seam search
 //      apply produced, produced identically by the seam.
 //   2. Detection-origin audit parity — the records the detection side
@@ -22,6 +22,9 @@ import RedactionEngine
 //      re-inserts all three without re-recording decisions.
 //   4. The mutation re-guard — every origin refuses to mutate while
 //      the pipeline owns `regions`, re-checked inside the action.
+//   5. The single-result origin (UXC-51) — the compact handle's
+//      per-item Apply: one result by id, the bulk origin's artifacts
+//      and bookkeeping one at a time, refusals with zero mutations.
 
 // MARK: - Shared fixtures
 
@@ -560,5 +563,290 @@ struct ApplySeamReGuardTests {
         let outcome = await state.applyFindings(
             .stagedDetections, undoManager: nil, documentState: doc)
         #expect(outcome?.applied == 1)
+    }
+}
+
+// MARK: - 5. Single-result origin (UXC-51)
+
+@Suite("Apply seam — single-result origin (UXC-51)")
+@MainActor
+struct ApplySeamSingleResultOriginTests {
+
+    @Test("Applies exactly the addressed result — the other checked row stays un-applied")
+    func appliesOnlyTheAddressedResult() async {
+        let state = RedactionState()
+        let search = SearchState()
+        let other = makeSearchResult(y: 0.1)
+        let target = makeSearchResult(
+            y: 0.6, matchedText: "987-65-4321",
+            source: .ocr(confidence: 0.87),
+            rationale: MatchRationale(
+                ruleID: "ssn.pattern",
+                signals: [.presetThresholdPass(raw: 0.91, cutoff: 0.7)],
+                preThresholdScore: 0.91,
+                finalScore: 0.91,
+                appliedThreshold: 0.7
+            )
+        )
+        search.results = [other, target]   // both checked
+        state.activeSearch = search
+
+        let outcome = await state.applyFindings(.searchResult(id: target.id), undoManager: nil)
+
+        #expect(outcome?.applied == 1)
+        #expect(outcome?.skippedOverlaps == 0)
+        #expect(outcome?.appliedResultIDs == [target.id])
+        #expect(outcome?.coveredResultIDs.isEmpty == true)
+        let regions = state.regions.values.flatMap { $0 }
+        #expect(regions.count == 1, "exactly ONE region — the checked sibling stays un-applied")
+        guard let region = regions.first else {
+            Issue.record("no region created")
+            return
+        }
+        #expect(region.normalizedRect == target.normalizedRect)
+        #expect(region.source == .searchMatch(term: target.term, rationale: target.rationale))
+        let meta = state.regionMetadata[region.id]
+        #expect(meta?.piiKind == .pii(.ssn))
+        #expect(meta?.matchedText == target.matchedText)
+        let audit = state.appliedMatchAudit[region.id]
+        #expect(audit?.origin == .search)
+        #expect(audit?.regionID == region.id)
+        #expect(audit?.resultID == target.id)
+        #expect(audit?.source == .ocr(confidence: 0.87))
+        #expect(audit?.rationale?.ruleID == "ssn.pattern")
+        #expect(state.regionMetadata.count == 1)
+        #expect(state.appliedMatchAudit.count == 1)
+        #expect(state.lastAppliedSearchRegionVersion == state.regionVersion,
+                "the single origin records the search apply-version marker like the bulk origin (D06-F1)")
+    }
+
+    @Test("The single and bulk origins build identical artifacts for the same result")
+    func mirrorsTheBulkOriginPerResult() async {
+        let result = makeSearchResult(
+            source: .ocr(confidence: 0.87),
+            rationale: MatchRationale(
+                ruleID: "ssn.pattern",
+                signals: [.presetThresholdPass(raw: 0.91, cutoff: 0.7)],
+                preThresholdScore: 0.91,
+                finalScore: 0.91,
+                appliedThreshold: 0.7
+            )
+        )
+
+        let bulkState = RedactionState()
+        let bulkSearch = SearchState()
+        bulkSearch.results = [result]
+        bulkState.activeSearch = bulkSearch
+        _ = await bulkState.applyFindings(.selectedSearchResults, undoManager: nil)
+
+        let singleState = RedactionState()
+        let singleSearch = SearchState()
+        singleSearch.results = [result]
+        singleState.activeSearch = singleSearch
+        _ = await singleState.applyFindings(.searchResult(id: result.id), undoManager: nil)
+
+        guard let bulkRegion = bulkState.regions[0]?.first,
+              let singleRegion = singleState.regions[0]?.first else {
+            Issue.record("both origins must create a region")
+            return
+        }
+        #expect(singleRegion.normalizedRect == bulkRegion.normalizedRect)
+        #expect(singleRegion.source == bulkRegion.source)
+        let bulkMeta = bulkState.regionMetadata[bulkRegion.id]
+        let singleMeta = singleState.regionMetadata[singleRegion.id]
+        #expect(singleMeta?.piiKind == bulkMeta?.piiKind)
+        #expect(singleMeta?.confidence == bulkMeta?.confidence)
+        #expect(singleMeta?.matchedText == bulkMeta?.matchedText)
+        #expect(singleMeta?.recognitionLevel == bulkMeta?.recognitionLevel)
+        let bulkAudit = bulkState.appliedMatchAudit[bulkRegion.id]
+        let singleAudit = singleState.appliedMatchAudit[singleRegion.id]
+        #expect(singleAudit?.origin == bulkAudit?.origin)
+        #expect(singleAudit?.resultID == bulkAudit?.resultID)
+        #expect(singleAudit?.pageIndex == bulkAudit?.pageIndex)
+        #expect(singleAudit?.matchedText == bulkAudit?.matchedText)
+        #expect(singleAudit?.source == bulkAudit?.source)
+        #expect(singleAudit?.piiCategory == bulkAudit?.piiCategory)
+        #expect(singleAudit?.piiConfidence == bulkAudit?.piiConfidence)
+        #expect(singleAudit?.rationale?.ruleID == bulkAudit?.rationale?.ruleID)
+        #expect(singleAudit?.term == bulkAudit?.term)
+        #expect(singleState.lastAppliedSearchRegionVersion == singleState.regionVersion)
+        #expect(bulkState.lastAppliedSearchRegionVersion == bulkState.regionVersion)
+    }
+
+    @Test("The checkbox neither gates nor is required — an unchecked current result applies")
+    func checkboxDoesNotGate() async {
+        let state = RedactionState()
+        let search = SearchState()
+        let unchecked = makeSearchResult(isSelected: false)
+        search.results = [unchecked]
+        state.activeSearch = search
+
+        let outcome = await state.applyFindings(.searchResult(id: unchecked.id), undoManager: nil)
+
+        #expect(outcome?.applied == 1)
+        #expect(outcome?.appliedResultIDs == [unchecked.id])
+        #expect(state.regions[0]?.count == 1)
+        #expect(search.results.first?.isSelected == false,
+                "the tap is the accept — the checkbox is not touched")
+    }
+
+    @Test("A covered result is inert: reported as covered, nothing created, no version bump")
+    func coveredResultIsInert() async {
+        let state = RedactionState()
+        let prior = RedactionRegion(
+            id: UUID(),
+            normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.04),
+            source: .manual
+        )
+        state.regions[0] = [prior]
+        let search = SearchState()
+        let covered = makeSearchResult(y: 0.1)
+        search.results = [covered]
+        state.activeSearch = search
+        let versionBefore = state.regionVersion
+
+        let outcome = await state.applyFindings(.searchResult(id: covered.id), undoManager: nil)
+
+        #expect(outcome?.applied == 0)
+        #expect(outcome?.skippedOverlaps == 1)
+        #expect(outcome?.appliedResultIDs.isEmpty == true, "no badge for a covered result (QW-1)")
+        #expect(outcome?.coveredResultIDs == [covered.id], "the graying set learns it (BH-A-03)")
+        #expect(state.regions[0]?.count == 1, "no duplicate region over the prior")
+        #expect(state.appliedMatchAudit.isEmpty)
+        #expect(state.regionVersion == versionBefore,
+                "an inert apply must not signal a region mutation")
+        #expect(state.lastAppliedSearchRegionVersion == -1)
+    }
+
+    @Test("Undo removes the region, metadata, audit and marker in one step; redo restores all three")
+    func undoRedoLockstep() async {
+        let state = RedactionState()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        let search = SearchState()
+        let result = makeSearchResult()
+        search.results = [result]
+        state.activeSearch = search
+
+        undo.beginUndoGrouping()
+        _ = await state.applyFindings(.searchResult(id: result.id), undoManager: undo)
+        undo.endUndoGrouping()
+        #expect(undo.undoActionName == "Redact 1 Instance of 'PII Scan'",
+                "the singular form of the search origins' one action-name construction")
+
+        guard let regionID = state.regions[0]?.first?.id else {
+            Issue.record("no region created")
+            return
+        }
+        #expect(state.regionMetadata[regionID] != nil)
+        #expect(state.appliedMatchAudit[regionID] != nil)
+        let versionAfterApply = state.regionVersion
+        #expect(state.lastAppliedSearchRegionVersion == versionAfterApply)
+
+        undo.undo()
+        #expect(state.regions[0]?.isEmpty ?? true)
+        #expect(state.regionMetadata[regionID] == nil)
+        #expect(state.appliedMatchAudit[regionID] == nil)
+        #expect(state.regionVersion > versionAfterApply)
+        #expect(state.regionVersion != state.lastAppliedSearchRegionVersion,
+                "the sheet's marker handler reads this bump as a real undo and drops the applied marker")
+
+        let versionAfterUndo = state.regionVersion
+        undo.redo()
+        #expect(state.regions[0]?.count == 1)
+        #expect(state.regionMetadata[regionID] != nil)
+        #expect(state.appliedMatchAudit[regionID] != nil)
+        #expect(state.regionVersion > versionAfterUndo)
+    }
+
+    @Test("The bulk origin reads the same construction: plural above one, singular at one")
+    func bulkActionNameGrammar() async {
+        let plural = RedactionState()
+        let pluralUndo = UndoManager()
+        pluralUndo.groupsByEvent = false
+        let pluralSearch = SearchState()
+        pluralSearch.results = [makeSearchResult(y: 0.1), makeSearchResult(y: 0.6)]
+        plural.activeSearch = pluralSearch
+        pluralUndo.beginUndoGrouping()
+        _ = await plural.applyFindings(.selectedSearchResults, undoManager: pluralUndo)
+        pluralUndo.endUndoGrouping()
+        #expect(pluralUndo.undoActionName == "Redact 2 Instances of 'PII Scan'")
+
+        let singular = RedactionState()
+        let singularUndo = UndoManager()
+        singularUndo.groupsByEvent = false
+        let singularSearch = SearchState()
+        singularSearch.results = [makeSearchResult()]
+        singular.activeSearch = singularSearch
+        singularUndo.beginUndoGrouping()
+        _ = await singular.applyFindings(.selectedSearchResults, undoManager: singularUndo)
+        singularUndo.endUndoGrouping()
+        #expect(singularUndo.undoActionName == "Redact 1 Instance of 'PII Scan'")
+    }
+
+    @Test("Refuses while the pipeline owns regions, with zero mutations")
+    func refusesDuringPipelinePhase() async {
+        let doc = pipelineOwnedDocumentState()
+        let state = RedactionState()
+        let search = SearchState()
+        let result = makeSearchResult()
+        search.results = [result]
+        state.activeSearch = search
+        let versionBefore = state.regionVersion
+
+        let outcome = await state.applyFindings(
+            .searchResult(id: result.id), undoManager: nil, documentState: doc)
+
+        #expect(outcome == nil)
+        #expect(state.regions.isEmpty)
+        #expect(state.appliedMatchAudit.isEmpty)
+        #expect(state.regionVersion == versionBefore)
+        #expect(state.lastAppliedSearchRegionVersion == -1)
+    }
+
+    @Test("A stale id — a result no longer on board — refuses with zero mutations")
+    func staleIDRefuses() async {
+        let state = RedactionState()
+        let search = SearchState()
+        search.results = [makeSearchResult()]
+        search.userModifiedSelections = true
+        state.activeSearch = search
+        let versionBefore = state.regionVersion
+
+        let outcome = await state.applyFindings(.searchResult(id: UUID()), undoManager: nil)
+
+        #expect(outcome == nil)
+        #expect(state.regions.isEmpty)
+        #expect(state.regionMetadata.isEmpty)
+        #expect(state.appliedMatchAudit.isEmpty)
+        #expect(state.regionVersion == versionBefore)
+        #expect(search.userModifiedSelections == true, "a refusal touches no session state")
+    }
+
+    @Test("No active search refuses")
+    func noActiveSearchRefuses() async {
+        let state = RedactionState()
+        let outcome = await state.applyFindings(.searchResult(id: UUID()), undoManager: nil)
+        #expect(outcome == nil)
+        #expect(state.regions.isEmpty)
+    }
+
+    @Test("A partial commit keeps the conditional-dismiss tracker set (the entity-group rule)")
+    func partialCommitKeepsTracker() async {
+        let state = RedactionState()
+        let search = SearchState()
+        let first = makeSearchResult(y: 0.1)
+        let second = makeSearchResult(y: 0.6, matchedText: "987-65-4321")
+        search.results = [first, second]
+        search.userModifiedSelections = true
+        search.hasUnreviewedPreselection = true
+        state.activeSearch = search
+
+        let outcome = await state.applyFindings(.searchResult(id: first.id), undoManager: nil)
+
+        #expect(outcome?.applied == 1)
+        #expect(search.userModifiedSelections == true,
+                "the other selections are still live work — the tracker stays set")
+        #expect(search.hasUnreviewedPreselection == true)
     }
 }
