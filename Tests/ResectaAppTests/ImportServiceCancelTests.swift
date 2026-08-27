@@ -82,13 +82,20 @@ struct ImportServiceCancelTests {
         task.cancel()
         await task.value
 
-        // Either the cancel landed before any state mutation (preferred)
-        // or the import completed before the cancel was observed (rare
-        // on a 100-page fixture, but a hot CI box may race). In the
-        // cancelled case we expect no half-loaded state.
+        // The race falls one of two ways and each way has a contract.
+        // Cancel observed first (the usual outcome): no half-loaded state —
+        // the document never received a source and the phase never reached
+        // .editing. Import completed first (rare on a 100-page fixture; a hot
+        // machine may race): the document is fully loaded — the source is
+        // set with every page present and the phase is .editing.
         if doc.sourceDocument == nil {
             #expect(doc.phaseKind == .importing || doc.phaseKind == .empty,
                     "Cancelled import should not transition to .editing")
+        } else {
+            #expect(doc.sourceDocument?.pageCount == 100,
+                    "A completed import carries every page of the fixture")
+            #expect(doc.phaseKind == .editing,
+                    "A completed import lands on .editing")
         }
     }
 

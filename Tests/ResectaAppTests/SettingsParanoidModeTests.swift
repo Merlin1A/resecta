@@ -25,37 +25,39 @@ import CoreGraphics
 
 @Suite("SettingsState.paranoidMode (SEC-8)")
 @MainActor
-struct SettingsParanoidModeTests {
+final class SettingsParanoidModeTests {
 
-    /// Remove SEC-8 + adjacent keys before each test for isolation.
-    private func cleanDefaults() {
-        let keys = [
-            "paranoidMode", "autoVerify", "pipelineMode.v2",
-            "exportDPI", "fillColor"
-        ]
-        for key in keys {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
+    /// Every test instance gets its own defaults domain, so nothing this
+    /// suite writes reaches `defaults` or a suite running in
+    /// parallel (`SettingsStateTests` writes the same keys); the domain is
+    /// removed when the instance goes away.
+    private let suiteName = "settings-paranoid-tests-\(UUID().uuidString)"
+    private let defaults: UserDefaults
+
+    init() {
+        defaults = UserDefaults(suiteName: suiteName)!
+    }
+
+    isolated deinit {
+        defaults.removePersistentDomain(forName: suiteName)
     }
 
     // MARK: - Default + persistence
 
     @Test("Paranoid mode is off in a fresh SettingsState (locked default)")
     func testParanoidModeOffByDefault() {
-        cleanDefaults()
-        let state = SettingsState()
+        let state = SettingsState(defaults: defaults)
         #expect(state.paranoidMode == false)
     }
 
     @Test("Paranoid mode persists across a fresh init")
     func testParanoidModePersists() {
-        cleanDefaults()
-        let first = SettingsState()
+        let first = SettingsState(defaults: defaults)
         first.paranoidMode = true
-        #expect(UserDefaults.standard.bool(forKey: "paranoidMode") == true)
+        #expect(defaults.bool(forKey: "paranoidMode") == true)
 
         // Re-initialize and confirm the stored value is read back.
-        let second = SettingsState()
+        let second = SettingsState(defaults: defaults)
         #expect(second.paranoidMode == true)
     }
 
@@ -63,8 +65,7 @@ struct SettingsParanoidModeTests {
 
     @Test("Paranoid mode forces .secureRasterization regardless of stored pipelineMode or per-document override")
     func testParanoidModeForcesSecureRasterization() {
-        cleanDefaults()
-        let settings = SettingsState()
+        let settings = SettingsState(defaults: defaults)
         // Worst-case setup: the user stored `.searchableRedaction` and
         // a per-document override of `.searchableRedaction` is also in
         // flight. The paranoid override must still pick rasterization.
@@ -83,8 +84,7 @@ struct SettingsParanoidModeTests {
 
     @Test("Paranoid mode forces verification-on regardless of stored autoVerify; UI toggle reads disabled")
     func testParanoidModeForcesAutoVerify() {
-        cleanDefaults()
-        let settings = SettingsState()
+        let settings = SettingsState(defaults: defaults)
         // User has the auto-verify pref off; paranoid must override it.
         settings.autoVerify = false
         settings.paranoidMode = true
@@ -127,8 +127,7 @@ struct SettingsParanoidModeTests {
 
     @Test("With paranoid OFF, none of the remaining overrides apply (mode, autoVerify, aux strip gate)")
     func testParanoidModeOffPreservesNormalBehavior() {
-        cleanDefaults()
-        let settings = SettingsState()
+        let settings = SettingsState(defaults: defaults)
         settings.paranoidMode = false
         settings.pipelineMode = .searchableRedaction
         settings.autoVerify = false

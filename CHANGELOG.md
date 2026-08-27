@@ -46,6 +46,10 @@ The entries below follow the Keep-a-Changelog index format.
 - **Zoom floor on the document view.** Pinching out stops at the page's fit size — the whole page in view — in the editor and in the redacted preview; the page no longer shrinks into the canvas background.
 - **Rectangle tool.** Drawing always starts a new box while the tool is on (existing boxes are moved or resized with the tool off); a box's starting corner stays put while its far edge aligns to guides; boxes stay within the page; the canvas redraws after every gesture (no lingering dashed box, size label, or guide lines); size and touch thresholds are measured on screen so they feel the same at any zoom; turning the tool on clears the selection and the Add-to-Selection toggle.
 
+### Internal
+
+- Test-suite integrity: assertion-free and tautological tests replaced or removed; the Settings suites are isolated; the perf-isolation list is complete; the pre-push hook runs the batched test runner.
+
 ## [1.0.0] — 2026-08-12
 
 Initial public release.

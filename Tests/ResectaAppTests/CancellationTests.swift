@@ -170,21 +170,22 @@ struct CancellationTests {
                 "Cancel-from-verifying must land on the .skipped sentinel report")
     }
 
-    // CAT-046 (C-J1, D-08): the three pipeline CancellationError handlers
-    // (runFullPipeline / runDetectionPipeline / verifyDocument) now wrap their
-    // @Observable state mutation in
-    // `await MainActor.run { MainActor.assertIsolated(); … }`. A thrown
-    // CancellationError can resume the error handler OFF the MainActor (a
-    // Task.detached intermediate breaks actor inheritance — the
-    // runDetectionPipeline general-error handler sibling carries the real-doc
-    // crash backtrace for the same mechanism). That off-main resume is a
-    // device-timing race not injectable at the unit level without a
-    // cooperative-thread harness, so per D-08 the runtime
-    // `MainActor.assertIsolated()` canary IS the guard: it traps in CI if the
-    // hop is ever removed. This proxy asserts the canary is satisfied in the
-    // MainActor context the hop provides and pins the recovery BEHAVIOR each
-    // hopped handler produces (so a regression in the transition outcome shows up).
-    @Test("CancellationError handler recovery is MainActor-isolated and lands on the documented phase (CAT-046)")
+    // The three pipeline CancellationError handlers (runFullPipeline /
+    // runDetectionPipeline / verifyDocument) wrap their @Observable state
+    // mutation in `await MainActor.run { MainActor.assertIsolated(); … }`,
+    // because a thrown CancellationError can resume a handler OFF the
+    // MainActor (a Task.detached intermediate breaks actor inheritance).
+    // That off-main resume is a device-timing race a unit test cannot
+    // inject, and this test does NOT drive the real handlers: the runtime
+    // `MainActor.assertIsolated()` canary inside each hop is the guard for
+    // the hop itself. What this test pins is narrower — (1) the canary is a
+    // no-op in the MainActor context the hop provides (the same call, made
+    // here from a @MainActor suite), and (2) the recovery TRANSITION each
+    // handler performs is legal from the phase it recovers from (detecting →
+    // editing, redacting → editing, verifying → verified with the skipped
+    // report), so a change to the transition table or to a recovery target
+    // shows up here.
+    @Test("CancellationError recovery transitions are legal from each cancellable phase; the MainActor canary is a no-op on the MainActor")
     func detectionCancellationHopsToMainActor() {
         // The canary the production hop runs at each `MainActor.run` closure
         // entry: a no-op on the MainActor (this suite is @MainActor), a trap

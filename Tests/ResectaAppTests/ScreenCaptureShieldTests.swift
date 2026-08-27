@@ -64,8 +64,6 @@ struct ScreenCaptureShieldTests {
     @Test("Either trigger alone flips the derived shield flag")
     func testDerivedShieldFromEitherTrigger() {
         let monitor = ScreenCaptureMonitor()
-        #expect(monitor.isShielded == false || monitor.isShielded == true)
-        // ^ seed from platform; either value is acceptable. Now drive.
 
         monitor._setForTesting(isCaptured: false, isMirroring: false)
         #expect(monitor.isShielded == false)

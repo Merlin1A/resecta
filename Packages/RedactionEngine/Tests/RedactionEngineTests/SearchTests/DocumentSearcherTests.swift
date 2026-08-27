@@ -527,10 +527,17 @@ struct DocumentSearcherTests {
         #expect(pages.contains(1))
     }
 
-    @Test("Unicode ligature matching via normalization")
+    @Test("Ligature-authored text layer yields one match for the decomposed query")
     func ligatureMatching() async {
-        // PDF with fi ligature — search for "find" should match
-        let data = TestFixtures.textLayerPDF(text: "\u{FB01}nd something")
+        // The fixture is authored with U+FB01 ("\u{FB01}le cabinet"). PDFKit's
+        // text layer for the generated PDF already carries the decomposed
+        // pair — measured 2026-08-27 on the macOS 26 host and the iOS 26.4
+        // simulator: `PDFPage.string` reads "file cabinet" — so this match is
+        // produced by the plain text-layer path, and the ligature expansion
+        // itself is pinned directly in TextNormalizerTests. What this test
+        // pins: a ligature-authored fixture yields exactly one match for the
+        // decomposed query with normalization on, whichever path serves it.
+        let data = TestFixtures.textLayerPDF(text: "\u{FB01}le cabinet")
         guard let doc = PDFDocument(data: data) else {
             Issue.record("Failed to create PDFDocument")
             return
@@ -538,7 +545,7 @@ struct DocumentSearcherTests {
 
         let searcher = DocumentSearcher()
         let options = SearchOptions(normalizeUnicode: true)
-        let mode = SearchMode.text("find", options: options)
+        let mode = SearchMode.text("file", options: options)
         let stream = searcher.search(
             SendablePDFDocument(doc), mode: mode,
             progress: { _, _ in }
@@ -549,11 +556,8 @@ struct DocumentSearcherTests {
             results.append(result)
         }
 
-        // NOTE: This test may not find the match if PDFKit's text layer
-        // doesn't preserve the ligature character. The normalization handles
-        // the comparison, but PDFPage.string may already decompose it.
-        // Either way, the test validates the normalization path runs correctly.
-        #expect(results.count >= 0) // At minimum, doesn't crash
+        #expect(results.count == 1)
+        #expect(results.first?.matchedText == "file")
     }
 
     @Test("Multi-term search finds matches for each term")

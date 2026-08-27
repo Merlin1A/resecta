@@ -14,7 +14,7 @@ Resecta is open-source and AI-assisted. External contributors file a PR against 
 After cloning the repo:
 
 ```sh
-./Scripts/install-hooks.sh   # symlink the audit-lint pre-commit hook
+./Scripts/install-hooks.sh   # symlink the pre-commit (audit-lint) and pre-push (batched tests) hooks
 ./regenerate.sh              # generate ResectaApp.xcodeproj from project.yml
 ```
 
@@ -136,6 +136,8 @@ cd Packages/RedactionEngine && swift test --no-parallel
 ```
 
 The batched runner builds once, then runs the app suites in serial batches (performance-budget suites run separately, report-only) to avoid simulator parallel-run flakiness — do not substitute a full-parallel `xcodebuild test` pass. It prints one `state=… tests=… passed=… failed=…` line per batch and ends with a `VERDICT:` line: `PASS` (exit 0) when no gating suite is red, `FAIL` (exit 1) listing the offending suites, or `INCOMPLETE` (exit 2) when an invocation had to be killed and its suites went unverified — re-run those. Full logs and per-batch `.xcresult` bundles land under `/tmp/test-batched-ResectaApp-<timestamp>/`. The engine run is serial by design (`--no-parallel`) and must end in a passing `Test run with N tests …` summary with exit 0.
+
+The pre-push hook that `install-hooks.sh` installs runs both schemes on the simulator through the same batched runner before any push and blocks the push on a gating red (exit 1) or an incomplete run (exit 2); `SKIP_TESTS=1 git push` skips the gate and logs the skip to stderr.
 
 Name and search tests exercise the system on-device name-recognition model (`NLTagger` `.nameType`), delivered as an on-demand OS asset. For the app suites, use a current iOS 26.x simulator runtime where that model is present (the runner picks an available iPhone 17 simulator automatically); where the asset has not downloaded, those tests skip or report different counts rather than failing the build.
 

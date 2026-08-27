@@ -784,9 +784,10 @@ struct SavedSearchStoreTests {
 
     @Test("H-74: add rejects an exact-name duplicate and appends nothing")
     func testAddRejectsDuplicateName() {
-        let store = SavedSearchStore(
-            fileURL: FileManager.default.temporaryDirectory
-                .appendingPathComponent("h74-add-\(UUID().uuidString).json"))
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("saved-search-add-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = SavedSearchStore(fileURL: url)
         #expect(store.add(SavedSearch(name: "Payroll sweep", mode: .text, queryText: "acct")))
         #expect(store.add(SavedSearch(name: "Payroll sweep", mode: .regex, queryText: "\\d+")) == false)
         #expect(store.savedSearches.count == 1)
@@ -797,9 +798,10 @@ struct SavedSearchStoreTests {
 
     @Test("H-74: rename rejects another entry's name; own name stays a success")
     func testRenameCollisionGuard() {
-        let store = SavedSearchStore(
-            fileURL: FileManager.default.temporaryDirectory
-                .appendingPathComponent("h74-rename-\(UUID().uuidString).json"))
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("saved-search-rename-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = SavedSearchStore(fileURL: url)
         let a = SavedSearch(name: "Alpha", mode: .text, queryText: "a")
         let b = SavedSearch(name: "Beta", mode: .text, queryText: "b")
         store.add(a)

@@ -20,7 +20,7 @@ import PDFKit
 // covered by VerificationEngineTests' Layer-2 suite), order-independence + a
 // rotated page in the set, downsample keeps leaked text detectable, and the
 // on-demand wall-clock gate that records the serial-vs-parallel p50 pair.
-@Suite("Layer-2 OCR parallelism + downsample (CAT-370)", .serialized)
+@Suite("Layer-2 OCR parallelism + downsample", .tags(.performance), .serialized)
 struct Layer2OCRParallelismTests {
 
     private enum TestError: Error { case failed }

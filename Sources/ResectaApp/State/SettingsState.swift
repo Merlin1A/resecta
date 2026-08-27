@@ -45,19 +45,24 @@ class SettingsState {
     /// Guards didSet during init to avoid redundant UserDefaults writes.
     private var isInitializing = true
 
+    /// The store every preference reads from and writes to. Production uses
+    /// `.standard`; a test passes its own suite so parallel suites never
+    /// share keys.
+    private let defaults: UserDefaults
+
     // MARK: - App-wide scalars
 
     var exportDPI: Int = 300 {
         didSet { guard !isInitializing else { return }
-                UserDefaults.standard.set(exportDPI, forKey: "exportDPI") }
+                defaults.set(exportDPI, forKey: "exportDPI") }
     }
     var fillColor: FillColor = .black {
         didSet { guard !isInitializing else { return }
-                UserDefaults.standard.set(fillColor.rawValue, forKey: "fillColor") }
+                defaults.set(fillColor.rawValue, forKey: "fillColor") }
     }
     var autoVerify: Bool = true {
         didSet { guard !isInitializing else { return }
-                UserDefaults.standard.set(autoVerify, forKey: "autoVerify") }
+                defaults.set(autoVerify, forKey: "autoVerify") }
     }
 
     /// Count of successful exports. Used to trigger the App Store review
@@ -65,14 +70,14 @@ class SettingsState {
     /// (the property-wrapper alternative is banned inside @Observable).
     var successfulExportCount: Int = 0 {
         didSet { guard !isInitializing else { return }
-                UserDefaults.standard.set(successfulExportCount, forKey: "successfulExportCount") }
+                defaults.set(successfulExportCount, forKey: "successfulExportCount") }
     }
 
     /// App-wide pipeline preference read at scan kickoff and export.
     /// `.secureRasterization` is the default fallback.
     var pipelineMode: PipelineMode = .secureRasterization {
         didSet { guard !isInitializing else { return }
-                UserDefaults.standard.set(pipelineMode.rawValue, forKey: "pipelineMode.v2") }
+                defaults.set(pipelineMode.rawValue, forKey: "pipelineMode.v2") }
     }
 
     /// When true, the rectangle-draw tool snaps the in-progress
@@ -83,7 +88,7 @@ class SettingsState {
     /// to OCR text-block boundaries; alignment is best-effort.
     var snapToTextEnabled: Bool = true {
         didSet { guard !isInitializing else { return }
-                UserDefaults.standard.set(snapToTextEnabled, forKey: "snapToTextEnabled") }
+                defaults.set(snapToTextEnabled, forKey: "snapToTextEnabled") }
     }
 
     /// Opt-in paranoid-mode toggle.
@@ -98,7 +103,7 @@ class SettingsState {
     /// behavior is best-effort.
     var paranoidMode: Bool = false {
         didSet { guard !isInitializing else { return }
-                UserDefaults.standard.set(paranoidMode, forKey: "paranoidMode") }
+                defaults.set(paranoidMode, forKey: "paranoidMode") }
     }
 
     /// Appearance preference. Drives SwiftUI .preferredColorScheme at the
@@ -106,7 +111,7 @@ class SettingsState {
     /// OS-level setting honored. Persists via the file-header pattern.
     var appearancePreference: AppearancePreference = .system {
         didSet { guard !isInitializing else { return }
-                UserDefaults.standard.set(appearancePreference.rawValue, forKey: "appearancePreference.v1") }
+                defaults.set(appearancePreference.rawValue, forKey: "appearancePreference.v1") }
     }
 
     // MARK: - Detection preset + threshold vector
@@ -116,7 +121,7 @@ class SettingsState {
     /// vectors, it never edits threshold values.
     var detectionPreset: SettingsPreset = .balanced {
         didSet { guard !isInitializing else { return }
-                UserDefaults.standard.set(detectionPreset.rawValue, forKey: "detectionPreset.v1") }
+                defaults.set(detectionPreset.rawValue, forKey: "detectionPreset.v1") }
     }
 
     /// Engine preset bundle, parsed once per app lifetime (the bundled
@@ -146,14 +151,15 @@ class SettingsState {
 
     /// DPI clamped to [150, 200, 300] with 300 default.
     /// Invalid stored values fall through to defaults safely.
-    init() {
-        let raw = UserDefaults.standard.object(forKey: "exportDPI") as? Int ?? 300
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        let raw = defaults.object(forKey: "exportDPI") as? Int ?? 300
         self.exportDPI = [150, 200, 300].contains(raw) ? raw : 300
         self.fillColor = FillColor(rawValue:
-            UserDefaults.standard.string(forKey: "fillColor") ?? "black") ?? .black
-        self.autoVerify = UserDefaults.standard.object(forKey: "autoVerify") as? Bool ?? true
-        self.successfulExportCount = UserDefaults.standard.object(forKey: "successfulExportCount") as? Int ?? 0
-        let storedMode = UserDefaults.standard.string(forKey: "pipelineMode.v2")
+            defaults.string(forKey: "fillColor") ?? "black") ?? .black
+        self.autoVerify = defaults.object(forKey: "autoVerify") as? Bool ?? true
+        self.successfulExportCount = defaults.object(forKey: "successfulExportCount") as? Int ?? 0
+        let storedMode = defaults.string(forKey: "pipelineMode.v2")
         self.pipelineMode = storedMode
             .flatMap(PipelineMode.init(rawValue:)) ?? .secureRasterization
         // One-time cleanup of the retired auto-apply preference.
@@ -161,13 +167,13 @@ class SettingsState {
         // so the persisted key is removed rather than hydrated.
         // Idempotent removeObject-on-init (nothing writes this key
         // anymore), mirroring `SavedSearchStore.legacyDefaultsKey`.
-        UserDefaults.standard.removeObject(forKey: "autoApplyDetections")
-        self.snapToTextEnabled = UserDefaults.standard.object(forKey: "snapToTextEnabled") as? Bool ?? true
-        self.paranoidMode = UserDefaults.standard.object(forKey: "paranoidMode") as? Bool ?? false
-        let storedAppearance = UserDefaults.standard.string(forKey: "appearancePreference.v1")
+        defaults.removeObject(forKey: "autoApplyDetections")
+        self.snapToTextEnabled = defaults.object(forKey: "snapToTextEnabled") as? Bool ?? true
+        self.paranoidMode = defaults.object(forKey: "paranoidMode") as? Bool ?? false
+        let storedAppearance = defaults.string(forKey: "appearancePreference.v1")
         self.appearancePreference = storedAppearance
             .flatMap(AppearancePreference.init(rawValue:)) ?? .system
-        let storedPreset = UserDefaults.standard.string(forKey: "detectionPreset.v1")
+        let storedPreset = defaults.string(forKey: "detectionPreset.v1")
         self.detectionPreset = storedPreset
             .flatMap(SettingsPreset.init(rawValue:)) ?? .balanced
         isInitializing = false

@@ -10,39 +10,6 @@ import CoreText
 @Suite("Verification Engine")
 struct VerificationEngineTests {
 
-    // MARK: - Overall Status Derivation (ENGINE §6.7)
-
-    @Test("aggregateStatus: any FAIL → overall FAIL")
-    func failDominates() {
-        let engine = VerificationEngine()
-        let layers = [
-            makeResult(.pass), makeResult(.warn("w")), makeResult(.fail("critical"))
-        ]
-        #expect(engine.aggregateStatus(layers) == .fail(""))
-    }
-
-    @Test("aggregateStatus: no FAIL, any WARN → overall WARN")
-    func warnWithoutFail() {
-        let engine = VerificationEngine()
-        let layers = [
-            makeResult(.pass), makeResult(.warn("minor")), makeResult(.pass)
-        ]
-        #expect(engine.aggregateStatus(layers) == .warn(""))
-    }
-
-    @Test("aggregateStatus: all PASS → overall PASS")
-    func allPass() {
-        let engine = VerificationEngine()
-        let layers = [makeResult(.pass), makeResult(.pass), makeResult(.pass)]
-        #expect(engine.aggregateStatus(layers) == .pass)
-    }
-
-    @Test("aggregateStatus: empty layers → vacuous PASS")
-    func emptyLayers() {
-        let engine = VerificationEngine()
-        #expect(engine.aggregateStatus([]) == .pass)
-    }
-
     // MARK: - Layer Count (R4: never hardcoded)
 
     @Test("Secure Rasterization has 5 layers, Searchable has 10")
