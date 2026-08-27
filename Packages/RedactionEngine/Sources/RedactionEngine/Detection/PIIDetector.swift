@@ -358,24 +358,24 @@ public struct PIIDetector: Sendable {
         return (detector, diagnostics)
     }
 
-    // MARK: - ReDoS guard (plan Phase 1 / SEARCH_AND_REDACT.md §9.4)
+    // MARK: - Per-detector elapsed-time telemetry
 
     /// Mirror of `DocumentSearcher.perPageRegexTimeout`. The search path
-    /// enforces this inside `enumerateMatches`; the detection path's regex
-    /// detectors bypass that machinery because they use
-    /// `pattern.matches(in:range:)` all-at-once. This wrapper measures
-    /// per-detector elapsed time and logs mechanism-only violations
-    /// (ARCHITECTURE.md §12.2 — no document content).
-    ///
-    /// Phase-1 scope: post-hoc measurement. Phase-3 detectors that switch
-    /// to `pattern.enumerateMatches(...)` can compare `ContinuousClock.now`
-    /// against this value inside the stop-block, mirroring
-    /// `DocumentSearcher.swift:281–290`.
+    /// enforces its budget inside `enumerateMatches`; the detection path's
+    /// regex detectors use `pattern.matches(in:range:)` all at once, which
+    /// cannot be interrupted mid-match. `withPerPageTimeout` therefore
+    /// measures each detector after `matches()` returns and logs a
+    /// mechanism-only warning (detector name and elapsed time, never
+    /// document content) when the elapsed time exceeds this value — it is
+    /// telemetry, not a pre-emptive guard. A detector that moves to
+    /// `pattern.enumerateMatches(...)` can compare `ContinuousClock.now`
+    /// against this value inside the stop block, as the search path does.
     public static let perPageRegexTimeout: Duration = .seconds(5)
 
-    /// Wrap a detector body with per-call timeout measurement. The body runs
-    /// synchronously; elapsed time is recorded via `ContinuousClock` and
-    /// logged at warning level if it exceeds `perPageRegexTimeout`. No
+    /// Wrap a detector body with elapsed-time measurement. The body runs
+    /// synchronously to completion; the elapsed time is recorded via
+    /// `ContinuousClock` and logged at warning level if it exceeds
+    /// `perPageRegexTimeout`. The measurement never interrupts a match. No
     /// document content is logged — only the detector name and elapsed
     /// duration.
     private func withPerPageTimeout(_ name: String, _ body: () -> [PIIMatch]) -> [PIIMatch] {

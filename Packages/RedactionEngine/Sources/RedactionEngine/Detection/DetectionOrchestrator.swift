@@ -226,6 +226,13 @@ public struct DetectionOrchestrator: Sendable {
     // splitting `.signatureCandidate` results into `pendingTriage`).
     private let signatureDetector = SignatureHeuristicDetector()
     private let recognitionLevel: VNRequestTextRecognitionLevel
+    /// The face pass. Production runs `FaceDetector`; a test replaces the
+    /// closure to make the pass throw, so the pass's error tolerance is
+    /// provable without a live Vision failure. Internal on purpose — the
+    /// public initializers are unchanged.
+    var faceDetection: @Sendable (CGImage) async throws -> [DetectionResult] = { image in
+        try await FaceDetector().detect(in: image)
+    }
 
     // Package H — defense-in-depth pixel caps for `runOCR`. Mirrors the
     // search-OCR path at `DocumentSearcher.swift:38-44`. Per-axis cap blocks
@@ -567,23 +574,43 @@ public struct DetectionOrchestrator: Sendable {
         // runs unconditionally on the skip path. Re-stamp the face results
         // with the page-level provenance so the audit story stays uniform:
         // "every result on a skipped page carries provenance.ocrSkipped".
+        //
+        // Vision-error tolerance: face detection is an opportunistic surface
+        // on top of the text-PII pass — a missed face is the weaker outcome,
+        // but the page's other detections must not be lost with it.
+        // `VNDetectFaceRectanglesRequest` can transiently fail with "Could
+        // not create inference context" under simulator load, the same
+        // failure the barcode pass below tolerates. The error handling
+        // intercepts a Vision error locally: the face result set for this
+        // page degrades to empty and stays silent, in parity with the
+        // barcode pass; the text-PII, barcode and signature results stand.
+        // Cancellation still propagates so cooperative cancellation works at
+        // the pipeline level.
         var faceResults: [DetectionResult] = []
         if Self.shouldRunFaceDetection(for: effectiveDoctype) {
-            let raw = try await runFaceDetection(on: image)
-            if provenance.ocrSkipped {
-                faceResults = raw.map { face in
-                    DetectionResult(
-                        id: face.id,
-                        normalizedRect: face.normalizedRect,
-                        kind: face.kind,
-                        confidence: face.confidence,
-                        matchedText: face.matchedText,
-                        recognitionLevel: face.recognitionLevel,
-                        provenance: provenance
-                    )
+            do {
+                let raw = try await runFaceDetection(on: image)
+                if provenance.ocrSkipped {
+                    faceResults = raw.map { face in
+                        DetectionResult(
+                            id: face.id,
+                            normalizedRect: face.normalizedRect,
+                            kind: face.kind,
+                            confidence: face.confidence,
+                            matchedText: face.matchedText,
+                            recognitionLevel: face.recognitionLevel,
+                            provenance: provenance
+                        )
+                    }
+                } else {
+                    faceResults = raw
                 }
-            } else {
-                faceResults = raw
+            } catch is CancellationError { // LegalPhrases:safe
+                throw CancellationError()
+            } catch { // LegalPhrases:safe
+                // Vision / inference-context error → degrade to empty result
+                // set on this page; the rest of the page's detections stand.
+                faceResults = []
             }
         }
         detections.append(contentsOf: faceResults)
@@ -945,7 +972,7 @@ public struct DetectionOrchestrator: Sendable {
     // MARK: - Face Detection (ENGINE §4.8)
 
     private func runFaceDetection(on image: CGImage) async throws -> [DetectionResult] {
-        try await FaceDetector().detect(in: image)
+        try await faceDetection(image)
     }
 
     // MARK: - Barcode Detection (DRAW-2, ENGINE §4.19)

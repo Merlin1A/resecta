@@ -72,7 +72,9 @@ Details a reviewer should know exist:
 - The byte-level sweep (Layer 3) is a from-scratch, byte-oriented Aho–Corasick
   multi-pattern matcher (`Verification/AhoCorasick.swift`): breadth-first
   failure links, each term expanded across case variants × seven encodings
-  (UTF-8, UTF-16BE, UTF-16LE, ASCII, Latin-1), and a hard memory bound. If a
+  (UTF-8, UTF-16BE, UTF-16LE, UTF-32BE, UTF-32LE, ASCII, Latin-1) — each
+  variant also in its ligature-composed form, so a term whose glyphs were
+  emitted as ligatures is matched too — and a hard memory bound. If a
   pathological term set exceeds the bound, the automaton degrades to a no-op
   **and reports itself degraded** so the layer surfaces incomplete coverage —
   it does not silently pass.

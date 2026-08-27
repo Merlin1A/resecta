@@ -2,8 +2,8 @@ import Foundation
 
 public enum RegexSentinelCheck {
 
-    // W6-b §ReDoS sentinel — 200 ms leaves headroom for legitimate complex
-    // patterns on older hardware; ratified in merry-hammock §ReDoS sentinel.
+    // The sentinel budget: 200 ms leaves headroom for legitimate complex
+    // patterns on older hardware.
     static let validationBudget: Duration = .milliseconds(200)
 
     static let sentinelPayload: String = {
@@ -23,10 +23,10 @@ public enum RegexSentinelCheck {
 
     @concurrent
     public static func validate(_ pattern: String) async -> Bool {
-        // L-17 pre-compile ReDoS heuristic — reject obvious catastrophic
-        // shapes synchronously, before detaching the enumerateMatches task
-        // whose regex engine spins inside a non-cancellable C call. Also
-        // covers ProfileImportExportService (single entry point).
+        // Pre-compile heuristic — reject obvious catastrophic shapes
+        // synchronously, before detaching the enumerateMatches task whose
+        // regex engine spins inside a non-cancellable C call. Also covers
+        // ProfileImportExportService (single entry point).
         if RegexSafetyPrecheck.isLikelyPathological(pattern) { return false }
 
         guard DocumentSearcher.validateRegexPattern(pattern) != nil else { return false }
@@ -35,7 +35,15 @@ public enum RegexSentinelCheck {
         return await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
             let resolver = ResumedFlag()
 
-            // Orphans on catastrophic patterns; bounded by 200-char cap + OS finalization.
+            // The sentinel races this detached `enumerateMatches` task against
+            // the budget sleep below and resumes the continuation once,
+            // whichever arrives first. The LOSING task is not cancelled:
+            // `enumerateMatches` is a non-cancellable C call, so a
+            // catastrophic pattern keeps running until the regex engine
+            // returns (the stop block only runs between matches) — bounded
+            // only by the 200-character pattern cap and the 10 KiB payload.
+            // Repeated adversarial submissions can accumulate such orphaned
+            // tasks.
             Task.detached {
                 guard let regex = try? NSRegularExpression(pattern: capturedPattern) else {
                     if resolver.setIfUnset() { cont.resume(returning: false) }

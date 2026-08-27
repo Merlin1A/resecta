@@ -162,13 +162,30 @@ public struct AhoCorasick: Sendable {
     /// the term the user typed need not match the document's casing (a
     /// lowercase query redacts a Title Case occurrence). Arbitrary mixed case
     /// (e.g. "aCmE") is out of scope for byte search; Layer 2's OCR gate is
-    /// fully case-insensitive. Each variant is emitted in all 7 encodings
-    /// (UTF-8, UTF-16BE, UTF-16LE, UTF-32BE, UTF-32LE, ASCII, Latin-1),
-    /// skipping encodings where it cannot be represented, and the whole set is
-    /// deduplicated by byte equality (UTF-8 ≡ ASCII ≡ Latin-1 for ASCII text;
-    /// case variants of a caseless term collapse) so one physical occurrence
-    /// registers one pattern, keeping user-facing match counts honest.
-    /// Order-stable. See ENGINE §6.3.
+    /// fully case-insensitive.
+    ///
+    /// Each case variant is then widened to the search path's normalization
+    /// family, because the automaton cannot normalize raw bytes at search
+    /// time either: its search-normalized form (`TextNormalizer.normalize`
+    /// — ligature expansion + NFKC) when a compatibility character makes
+    /// that differ, and the ligature-composed form of that normalized text
+    /// (every lowercase `ffi` / `ffl` / `ff` / `fi` / `fl` site replaced by
+    /// its ligature scalar, greedy, longest first — the shape a PDF producer
+    /// emits for a ligature glyph). A variant with no ligature site and no
+    /// compatibility character contributes nothing beyond itself.
+    ///
+    /// Every form is emitted in all 7 encodings (UTF-8, UTF-16BE, UTF-16LE,
+    /// UTF-32BE, UTF-32LE, ASCII, Latin-1), skipping encodings where it
+    /// cannot be represented, and the whole set is deduplicated by byte
+    /// equality (UTF-8 ≡ ASCII ≡ Latin-1 for ASCII text; case variants of a
+    /// caseless term collapse) so one physical occurrence registers one
+    /// pattern, keeping user-facing match counts honest. Bound: 4 case
+    /// variants × 7 encodings = 28 patterns for a term with no ligature site
+    /// and no compatibility character; up to 56 for a term with a ligature
+    /// site; up to 84 only for a term that itself carries a compatibility
+    /// character AND a ligature site (its normalized form and the composed
+    /// form both differ from the variant). The 1 MB memory bound counts the
+    /// emitted bytes of every form. Order-stable.
     public static func encodeForSearch(_ term: String) -> [[UInt8]] {
         let nfc = term.precomposedStringWithCanonicalMapping
         // lowercased()/uppercased() are the locale-independent String methods
@@ -187,15 +204,34 @@ public struct AhoCorasick: Sendable {
         var seen = Set<[UInt8]>()
         var patterns: [[UInt8]] = []
         for variant in caseVariants {
-            for encoding in encodings {
-                guard let data = variant.data(using: encoding) else { continue }
-                let bytes = Array(data)
-                if seen.insert(bytes).inserted {
-                    patterns.append(bytes)
+            // Equal forms collapse in the byte-level dedupe below.
+            let normalized = TextNormalizer.normalize(variant)
+            let forms = [variant, normalized, ligatureComposed(normalized)]
+            for form in forms {
+                for encoding in encodings {
+                    guard let data = form.data(using: encoding) else { continue }
+                    let bytes = Array(data)
+                    if seen.insert(bytes).inserted {
+                        patterns.append(bytes)
+                    }
                 }
             }
         }
         return patterns
+    }
+
+    /// The ligature-composed form of `text`: every lowercase `ffi`, `ffl`,
+    /// `ff`, `fi` and `fl` letter run replaced by its single ligature scalar,
+    /// greedy and longest first (`ffi` composes before `ff` + `i`). The
+    /// inverse of `TextNormalizer.normalize`'s expansion, for byte search
+    /// over output that kept its ligature glyphs.
+    static func ligatureComposed(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "ffi", with: "\u{FB03}")
+            .replacingOccurrences(of: "ffl", with: "\u{FB04}")
+            .replacingOccurrences(of: "ff", with: "\u{FB00}")
+            .replacingOccurrences(of: "fi", with: "\u{FB01}")
+            .replacingOccurrences(of: "fl", with: "\u{FB02}")
     }
 
     /// True when a sensitive term is long enough for byte search (ENGINE

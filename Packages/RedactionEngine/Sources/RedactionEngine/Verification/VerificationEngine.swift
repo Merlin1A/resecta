@@ -655,14 +655,23 @@ public struct VerificationEngine: Sendable {
         return .none
     }
 
-    /// Case-insensitive term containment pinned to en_US_POSIX. Replaces
+    /// Case-insensitive term containment pinned to en_US_POSIX, over both
+    /// strings in the search path's normalized form (`TextNormalizer.normalize`
+    /// — ligature expansion + NFKC), so a compatibility form of a term that
+    /// the search can locate (a fullwidth spelling, a ligature glyph read
+    /// off a raster) is never invisible to the text-space checks. Foundation's
+    /// case-insensitive search folds the Latin ligatures on its own (Unicode
+    /// full case folding); the explicit normalization covers the rest of the
+    /// compatibility family and keeps this check aligned with the search
+    /// path rather than with the folding table. Replaces
     /// `localizedCaseInsensitiveContains`, whose fold follows the device
     /// locale — under Turkish casing rules a dotless-I term can silently
-    /// fail to match. Case-only by design: diacritic-insensitivity would
-    /// false-match distinct names.
+    /// fail to match. Beyond that, case-only by design: diacritic-insensitivity
+    /// would false-match distinct names, and NFKC keeps diacritics.
     static func containsTermCaseInsensitive(_ text: String, _ term: String) -> Bool {
-        text.range(of: term, options: .caseInsensitive,
-                   locale: Locale(identifier: "en_US_POSIX")) != nil
+        TextNormalizer.normalize(text).range(
+            of: TextNormalizer.normalize(term), options: .caseInsensitive,
+            locale: Locale(identifier: "en_US_POSIX")) != nil
     }
 
     /// Term containment with the model's boundary discipline — the
@@ -675,6 +684,10 @@ public struct VerificationEngine: Sendable {
         guard term.requiresTokenBoundary else {
             return containsTermCaseInsensitive(text, term.text)
         }
+        // The same normalization as the substring check above, applied
+        // before the walk so the adjacency test reads the normalized text.
+        let text = TextNormalizer.normalize(text)
+        let termText = TextNormalizer.normalize(term.text)
         func embedsToken(_ character: Character) -> Bool {
             guard character.unicodeScalars.count == 1,
                   let scalar = character.unicodeScalars.first, scalar.isASCII
@@ -685,7 +698,7 @@ public struct VerificationEngine: Sendable {
         }
         var searchRange = text.startIndex..<text.endIndex
         while let match = text.range(
-            of: term.text, options: .caseInsensitive, range: searchRange,
+            of: termText, options: .caseInsensitive, range: searchRange,
             locale: Locale(identifier: "en_US_POSIX")) {
             let boundedBefore = match.lowerBound == text.startIndex
                 || !embedsToken(text[text.index(before: match.lowerBound)])
@@ -1847,12 +1860,23 @@ public struct VerificationEngine: Sendable {
             guard let page = doc.page(at: i),
                   let pageText = page.string,
                   !pageText.isEmpty else { continue }
-            let decoded = Data(pageText.utf8)
-            let decodedMatches = termAutomaton.tokenFilteredMatches(in: decoded)
-            if !decodedMatches.isEmpty {
+            // The decoded text is scanned as extracted and, when the search
+            // path's normalizer changes it (a ligature or another
+            // compatibility form in the text layer), in that normalized form
+            // as well, so a residue the search can locate is never invisible
+            // here. A page counts once; its instance count is the larger of
+            // the two scans, so one occurrence never double-counts.
+            let decodedMatches = termAutomaton.tokenFilteredMatches(in: Data(pageText.utf8))
+            let normalizedText = TextNormalizer.normalize(pageText)
+            let normalizedMatches = normalizedText == pageText
+                ? []
+                : termAutomaton.tokenFilteredMatches(in: Data(normalizedText.utf8))
+            if !decodedMatches.isEmpty || !normalizedMatches.isEmpty {
                 decodedHitPages.append(i)
-                decodedMatchCount += AhoCorasick.uniqueOccurrenceCount(decodedMatches)
-                for text in termAutomaton.matchedTermTexts(decodedMatches)
+                decodedMatchCount += max(
+                    AhoCorasick.uniqueOccurrenceCount(decodedMatches),
+                    AhoCorasick.uniqueOccurrenceCount(normalizedMatches))
+                for text in termAutomaton.matchedTermTexts(decodedMatches + normalizedMatches)
                 where decodedTermsSeen.insert(text).inserted {
                     decodedTermTexts.append(text)
                 }
