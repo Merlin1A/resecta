@@ -1,0 +1,111 @@
+# The full engine host suite: `swift test` in Packages/RedactionEngine on a
+# hosted macos-26 runner. Runs on demand and on release tags; it is not part
+# of the pull-request gate (the suite exceeds ninety minutes on a 3-vCPU
+# runner). StressCorpusTests is skipped (the multi-minute stress leg runs
+# alone via `make stress-baseline`). FileProtectionTests is skipped because
+# a macOS host filesystem cannot exercise the iOS file-protection classes
+# (four of its five tests fail there with NSCocoaErrorDomain 256); the
+# simulator suite covers them.
+name: engine-suite
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_heavy:
+        description: Also skip the heavy suites (stress, perf, probe and corpus legs)
+        type: boolean
+        default: false
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-suite-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+    working-directory: Packages/RedactionEngine
+
+env:
+  HEAVY_SUITES: >-
+    CancellationLatencyTests PixelBufferZeroizeTests
+    ReverseRationalePerformanceTests ApplyPhaseMemoryStressTests
+    ParallelLayerExecutionTests DetectionRasterizeOverlapTests
+    Layer2OCRParallelismTests PDFKitConcurrencyStressTests
+    AhoCorasickStressTests SearchPerformanceTests RealDocOCRQualityTests
+    OCRQualityProgramTests PacketOCRQualityRoleTests G6SyntheticRecallTests
+    G8CorpusIngestionTests G8BaselineHarnessTests G8SearchParityHarnessTests
+    NegativeCorpusScoreTests NegativeContextBeforeAfterGateTests
+    PacketNegativeContextRoleTests PacketSnapshotTests
+    SampleStatementSnapshotTests PacketSearchableProbeTests
+    RotatedPacketDetectionProbeTests SearchableMergeProbeTests
+    ToUnicodeEmissionProbeTests ToUnicodeEncodingProbeTests
+
+jobs:
+  engine-host-tests:
+    runs-on: macos-26
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Build the tests
+        run: |
+          t0=$SECONDS
+          swift build --build-tests 2>&1 | tee build.log
+          echo "BUILD_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
+
+      - name: Test inventory
+        run: |
+          n=$(swift test --skip-build list | wc -l | tr -d ' ')
+          echo "TEST_COUNT=$n" >> "$GITHUB_ENV"
+          echo "inventory: $n tests"
+
+      - name: Run the suite
+        env:
+          SKIP_HEAVY: ${{ inputs.skip_heavy }}
+        run: |
+          skips=(--skip StressCorpusTests --skip FileProtectionTests)
+          if [ "$SKIP_HEAVY" = "true" ]; then
+            for s in $HEAVY_SUITES; do skips+=(--skip "$s"); done
+          fi
+          echo "skips: ${skips[*]}"
+          t0=$SECONDS
+          rc=0
+          swift test --skip-build "${skips[@]}" 2>&1 | tee swift-test.log || rc=$?
+          echo "TEST_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
+          echo "TEST_RC=$rc" >> "$GITHUB_ENV"
+          exit "$rc"
+
+      - name: Failure census
+        if: always()
+        run: |
+          {
+            echo "## engine-host-tests"
+            echo
+            echo "- inventory: ${TEST_COUNT:-—} tests"
+            echo "- build: ${BUILD_SECS:-—} s · run: ${TEST_SECS:-—} s · rc: ${TEST_RC:-—}"
+            echo "- skipped: StressCorpusTests, FileProtectionTests${{ inputs.skip_heavy == true && ', the heavy suites' || '' }}"
+            echo
+            if [ -f swift-test.log ]; then
+              echo '```'
+              /usr/bin/grep -E 'failed after|recorded an issue|Test run with|Executed ' swift-test.log | tail -n 60 || echo "(no failure lines)"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: engine-suite-logs
+          path: |
+            Packages/RedactionEngine/build.log
+            Packages/RedactionEngine/swift-test.log
+          retention-days: 30
+          if-no-files-found: warn

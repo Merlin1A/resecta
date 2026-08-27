@@ -72,7 +72,7 @@ Resecta does not use a Contributor License Agreement (CLA); DCO is the contribut
 
 ## Audit checklist
 
-The audit checklist has two halves: mechanical checks the local pre-commit hook runs automatically, and manual checks that sessions self-verify before each commit. There is no remote CI runner. The local pre-commit hook is the only automated gate; everything else is session discipline plus the local test runs in the "Tests" section below.
+The audit checklist has two halves: mechanical checks the local pre-commit hook runs automatically, and manual checks that sessions self-verify before each commit. The local pre-commit hook is the developer gate; the pull-request gate on GitHub Actions (`.github/workflows/ci.yml`) re-runs the same mechanical checks over the lines a pull request adds (`Scripts/audit-lint.sh --range base..HEAD`), alongside the claims lint, the app and test-bundle builds and the shipped-asset hash fence, and must be green before a merge to `main`. Everything else is session discipline plus the local test runs in the "Tests" section below.
 
 ### Mechanical checks (hook-enforced, local)
 
@@ -123,7 +123,7 @@ Vulnerability disclosure goes through [`SECURITY.md`](./SECURITY.md), not the pu
 
 ## Tests
 
-There is no remote CI runner. Tests run locally before opening a PR and before any merge to `master`. The two suites:
+Tests run locally before opening a PR and before any merge to `main`: the pre-push hook runs both suites through the batched runner, and the pull-request gate builds the app and both test bundles without running them. The full suites also run on GitHub Actions on demand and on release tags — `engine-suite.yml` (the engine package on the macOS host; `FileProtectionTests` is skipped there because a macOS host filesystem cannot exercise the iOS file-protection classes, which the simulator suite covers) and `sim-suite.yml` (the batched app suite on a hosted simulator) — neither is required for a merge. The two suites:
 
 - `ResectaApp` — app-target tests, on the iPhone 17 simulator via the batched runner.
 - `RedactionEngine` — engine package tests, via SwiftPM on the Mac host.

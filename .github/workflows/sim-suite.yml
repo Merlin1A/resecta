@@ -1,0 +1,102 @@
+# The batched app-target simulator suite (Scripts/test-batched.sh
+# ResectaApp) on a hosted macos-26 runner: build once, then serial
+# suite-level batches on an iPhone 17 simulator under a watchdog, perf
+# suites alone and report-only. About thirty minutes. Runs on demand and on
+# release tags; it is not part of the pull-request gate.
+name: sim-suite
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sim-suite-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  XCODEGEN_VERSION: 2.45.3
+  XCODEGEN_SHA256: 0c90f4d28ca57335f9fa78cf5bf6dabfe20a232036dabe36de2eef79cb7c0878
+
+jobs:
+  app-sim-suite:
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: XcodeGen (pinned release, digest-checked)
+        run: |
+          curl -fsSL -o xcodegen.zip \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
+          echo "${XCODEGEN_SHA256}  xcodegen.zip" | shasum -a 256 -c -
+          unzip -q xcodegen.zip -d "${RUNNER_TEMP}/xcodegen"
+          echo "${RUNNER_TEMP}/xcodegen/xcodegen/bin" >> "$GITHUB_PATH"
+
+      - name: Generate the project
+        run: ./regenerate.sh
+
+      - name: iOS 26 simulator runtime
+        run: |
+          xcrun simctl list runtimes
+          if xcrun simctl list runtimes | /usr/bin/grep -q 'iOS 26'; then
+            echo "iOS 26 runtime present; no download"
+          else
+            echo "no iOS 26 runtime on this image; downloading"
+            t0=$SECONDS
+            xcodebuild -downloadPlatform iOS
+            echo "runtime download: $((SECONDS - t0)) s"
+            xcrun simctl list runtimes
+          fi
+          xcrun simctl list devices available | /usr/bin/grep 'iPhone 17' || true
+
+      - name: Batched app suite
+        run: |
+          t0=$SECONDS
+          rc=0
+          Scripts/test-batched.sh ResectaApp --timeout-mins 25 2>&1 | tee batched.log || rc=$?
+          echo "SUITE_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
+          echo "SUITE_RC=$rc" >> "$GITHUB_ENV"
+          exit "$rc"
+
+      - name: Collect logs and failing result bundles
+        if: always()
+        run: |
+          run_dir=$(ls -d /tmp/test-batched-ResectaApp-* 2>/dev/null | tail -n 1 || true)
+          mkdir -p upload
+          cp batched.log upload/ 2>/dev/null || true
+          if [ -n "$run_dir" ]; then
+            cp "$run_dir"/*.log "$run_dir"/*.txt upload/ 2>/dev/null || true
+            if [ -s "$run_dir/failures.txt" ]; then
+              awk '{print $2}' "$run_dir/failures.txt" | sort -u | while read -r label; do
+                for xc in "$run_dir/$label".xcresult "$run_dir/$label"-r*.xcresult; do
+                  [ -d "$xc" ] && cp -R "$xc" upload/
+                done
+              done
+            fi
+          fi
+          du -sh upload
+          {
+            echo "## app-sim-suite"
+            echo
+            echo "- wall: ${SUITE_SECS:-—} s · rc: ${SUITE_RC:-—}"
+            echo
+            echo '```'
+            /usr/bin/grep -E '^simulator:|^VERDICT:|^totals:|^OFFENDERS:|non-gating reds' batched.log || echo "(no verdict line)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: sim-suite-logs
+          path: upload
+          retention-days: 14
+          if-no-files-found: warn
