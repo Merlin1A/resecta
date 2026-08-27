@@ -2,16 +2,19 @@ import SwiftUI
 
 // Compact float detent for the Search & Redact sheet.
 //
-// WA/D-75 (as AMENDED by UXC-44 / D-116 / RB-94): the compact detent
-// hugs the glanceable handle — the grabber capsule plus the centered
-// interface title with the result-nav cluster (‹ › + k/N) overlaid
-// at its trailing edge (`compactFloatStrip`) — so the document stays
-// the primary surface while the sheet is parked and the result walk
-// continues from the handle. Height is a fixed hug clamped to the
-// available height. The prior max(110pt, 15%-of-screen) contract
-// sized a control strip (search bar + nav controls + first result
-// row) that no longer renders at compact; the D-75 title-only hug
-// (60) pre-dates the cluster's 46-pt layout floors.
+// WA/D-75 (as AMENDED by UXC-44 / D-116 / RB-94, and again by UXC-51 /
+// D-128 / RB-123): the compact detent hugs the glanceable handle — the
+// grabber capsule plus one row carrying the per-item Apply at the
+// leading edge, the centered interface title, and the result-nav
+// cluster (‹ › + k/N) at the trailing edge (`compactFloatStrip`) — so
+// the document stays the primary surface while the sheet is parked
+// and the result walk, with its one-tap mark, continues from the
+// handle. Height is a fixed hug clamped to the available height. The
+// prior max(110pt, 15%-of-screen) contract sized a control strip
+// (search bar + nav controls + first result row) that no longer
+// renders at compact; the D-75 title-only hug (60) pre-dates the
+// cluster's 46-pt layout floors, the UXC-44 hug (72) the per-item
+// Apply.
 //
 // The pure-function `compactHeight(maxDetentValue:)` helper isolates
 // the math from the SwiftUI runtime so tests can verify the hug +
@@ -28,13 +31,18 @@ struct CompactFloatDetent: CustomPresentationDetent {
         min(hugHeight, maxDetentValue)
     }
 
-    /// Grabber inset (6+5+4 = 15pt) + the result-nav cluster's 46-pt
-    /// layout floor (RB-54/RB-67 — the title rides inside that row) +
-    /// breathing room — tuned live on the iPhone 17 and the 390-pt
-    /// iPhone 17e sims (UXC-44, FB-3): grabber, title, chevrons and
-    /// counter fully visible, no clip, canvas exposed behind. Was 60
-    /// under the D-75 title-only handle (WA-IMPL-2, B-1).
-    static let hugHeight: CGFloat = 72
+    /// Grabber inset (6+5+4 = 15pt) + the handle row's 46-pt layout
+    /// floor (RB-54/RB-67 — the per-item Apply, the title and the
+    /// result-nav cluster all ride inside that one row) + breathing
+    /// room. UXC-51 (D-128, RB-123 item 8; REV-18): the handle grows
+    /// slightly with the Apply on board — 72 → 80, tuned live on the
+    /// iPhone 17 and the 390-pt iPhone 17e sims: grabber, Apply, title,
+    /// chevrons and counter fully visible, no clip, canvas exposed
+    /// behind; the title font is unchanged. The page bar and the
+    /// parked-canvas inset read this symbolically (RB-42). Was 60 under
+    /// the D-75 title-only handle (WA-IMPL-2, B-1) and 72 under the
+    /// UXC-44 cluster handle (FB-3).
+    static let hugHeight: CGFloat = 80
 }
 
 extension PresentationDetent {

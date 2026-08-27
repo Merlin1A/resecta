@@ -872,6 +872,14 @@ class RedactionState {
         /// No production caller — the absorbed shape of the former
         /// direct-apply entry, retained until a pipeline path needs it.
         case detectionResults([Int: [DetectionResult]])
+        /// One result of `activeSearch.results`, addressed by id — the
+        /// compact handle's per-item Apply (UXC-51, D-128 / RB-123
+        /// item 3). Selection state is not consulted: the tap IS the
+        /// accept for that one result. Resolved against the live
+        /// results at call time, so a result the search has since
+        /// re-flushed (REV-09) refuses with zero mutations instead of
+        /// applying by index.
+        case searchResult(id: UUID)
     }
 
     /// What one `applyFindings` call did. Counts feed the shared
@@ -906,7 +914,8 @@ class RedactionState {
     /// `MatchAuditSnapshot` with `regionID` populated — through the one
     /// commit transaction, with one undo implementation
     /// (`commitApply`). Returns nil when the call is refused (no active
-    /// search for the search origin, or the pipeline owns `regions`);
+    /// search for the search origins, a single-result apply whose
+    /// result is no longer on board, or the pipeline owns `regions`);
     /// otherwise an outcome whose counts feed the shared commit toast.
     ///
     /// Serialization: applies run one at a time, in call order (see
@@ -944,7 +953,8 @@ class RedactionState {
         // non-refused outcome (they resolve the session's whole
         // selection context); a group promotion is a partial commit —
         // the remaining review selections are still live work, so the
-        // tracker stays set for them. Each branch resets the session it
+        // tracker stays set for them — and so is a single-result apply
+        // from the compact handle. Each branch resets the session it
         // actually applied against.
         switch origin {
         case .selectedSearchResults:
@@ -964,6 +974,8 @@ class RedactionState {
             return applyEntityGroupOrigin(group, undoManager: undoManager)
         case .detectionResults(let results):
             return applyDetectionMapOrigin(results, undoManager: undoManager)
+        case .searchResult(let id):
+            return applySearchResultOrigin(id: id, undoManager: undoManager)
         }
     }
 
@@ -1067,7 +1079,7 @@ class RedactionState {
             createdRegions: prepared.createdRegions,
             createdMetadata: prepared.createdMetadata,
             createdAudit: prepared.createdAudit,
-            actionName: "Redact \(count) Instances of '\(termDescription)'",
+            actionName: Self.searchApplyActionName(count: count, term: termDescription),
             priorsRestore: nil,
             recordsSearchApplyVersion: true,
             undoManager: undoManager
@@ -1098,6 +1110,80 @@ class RedactionState {
             coveredResultIDs: prepared.coveredResultIDs,
             signatureCandidates: 0
         )
+    }
+
+    /// The search origins' undo action name — "Redact N Instances of
+    /// 'term'", singular at one. One construction for both origins
+    /// (UXC-51 added the grammar branch; the bulk origin reads the
+    /// singular for a single selected result too).
+    private static func searchApplyActionName(count: Int, term: String) -> String {
+        count == 1
+            ? "Redact 1 Instance of '\(term)'"
+            : "Redact \(count) Instances of '\(term)'"
+    }
+
+    /// Single-result search origin (UXC-51, D-128 / RB-123 item 3): the
+    /// compact handle's per-item Apply. One result of the active search,
+    /// addressed by id and resolved against `results` HERE — never by
+    /// index, never from a value captured at the tap (REV-09: a search
+    /// still running re-flushes the array in batches, so the id can be
+    /// gone by the time the apply turn arrives; a missing id refuses
+    /// with zero mutations, and the handle's button state re-derives on
+    /// the next render). Selection state is not consulted — the tap IS
+    /// the accept for that one result (the wand / nudge precedent), so
+    /// a result the user left unchecked still applies.
+    ///
+    /// Everything else is the bulk search origin, one result at a time:
+    /// the same `prepareApply` builds the region + `RegionMetadata` +
+    /// `MatchAuditSnapshot` trio (same `.searchMatch(term:rationale:)`
+    /// source, same rationale handoff, same overlap test — a result an
+    /// existing region already covers is dedup-skipped as covered: no
+    /// badge, no audit entry, QW-1 / BH-A-03), the same `commitApply`
+    /// transaction recording the search apply-version marker (D06-F1),
+    /// the same action-name construction in its singular form, and the
+    /// same post-commit deselection snapshot (UXC-01, last apply wins).
+    /// One result needs no detached prepare, so nothing suspends between
+    /// the mutation guard in `applyFindings` and the commit — the
+    /// post-suspension re-check the bulk origin needs has no window
+    /// here. Two differences by design: a covered result creates
+    /// nothing, so it commits nothing (no version bump, no empty undo
+    /// step — an inert apply must not signal a region mutation); and
+    /// this is a PARTIAL commit — the remaining selections are still
+    /// live work — so the conditional-dismiss tracker stays set (the
+    /// entity-group rule).
+    private func applySearchResultOrigin(
+        id: UUID,
+        undoManager: UndoManager?
+    ) -> ApplyOutcome? {
+        guard let search = activeSearch else { return nil }
+        guard let result = search.results.first(where: { $0.id == id }) else { return nil }
+
+        let existingRectsByPage: [Int: [CGRect]] = regions.mapValues { $0.map(\.normalizedRect) }
+        let prepared = prepareApply(
+            selected: [result],
+            existingRectsByPage: existingRectsByPage,
+            appliedAt: Date()
+        )
+        let outcome = ApplyOutcome(
+            applied: prepared.appliedCount,
+            skippedOverlaps: prepared.skippedOverlaps,
+            appliedResultIDs: prepared.appliedResultIDs,
+            coveredResultIDs: prepared.coveredResultIDs,
+            signatureCandidates: 0
+        )
+        guard prepared.appliedCount > 0 else { return outcome }
+
+        commitApply(
+            createdRegions: prepared.createdRegions,
+            createdMetadata: prepared.createdMetadata,
+            createdAudit: prepared.createdAudit,
+            actionName: Self.searchApplyActionName(count: 1, term: result.term),
+            priorsRestore: nil,
+            recordsSearchApplyVersion: true,
+            undoManager: undoManager
+        )
+        pendingRunDeselection = search.deselectionSnapshotForRun()
+        return outcome
     }
 
     // MARK: - Detection origins (staged review, entity group, raw map)

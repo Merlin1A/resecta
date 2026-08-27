@@ -61,7 +61,9 @@ struct ContentView: View {
                         .onTapGesture { toastManager.dismiss(item) }
                 }
             }
-            .padding(.bottom, ResectaTokens.Spacing.xl) // Clear page nav bar
+            // Clear page nav bar — and the Search/Scan sheet parked at
+            // the compact float (`bottomClearance`, UXC-51).
+            .padding(.bottom, ResectaTokens.Spacing.xl + toastManager.bottomClearance)
             .animation(
                 ResectaTokens.Anim.resolved(ResectaTokens.Anim.toastIn, reduceMotion: reduceMotion),
                 value: toastManager.toastVersion

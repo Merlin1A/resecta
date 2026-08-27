@@ -323,12 +323,13 @@ struct SearchAndRedactSheet: View {
 
     var body: some View {
         // Compact composition branch (BH-B-01 origin; WA/D-75 shape,
-        // AMENDED by UXC-44 / D-116 / RB-92/94): at the compact detent
-        // the sheet renders ONLY the glanceable handle
-        // (`compactFloatStrip`) — the interface title plus the
-        // result-nav cluster (‹ › + k/N) so the result walk continues
-        // while the sheet is parked. Every OTHER control lives at
-        // medium/large, and the canvas owns interaction below the
+        // AMENDED by UXC-44 / D-116 / RB-92/94 and again by UXC-51 /
+        // D-128 / RB-123): at the compact detent the sheet renders ONLY
+        // the glanceable handle (`compactFloatStrip`) — the interface
+        // title, the result-nav cluster (‹ › + k/N) so the result walk
+        // continues while the sheet is parked, and the per-item Apply
+        // that marks just the current match. Every OTHER control lives
+        // at medium/large, and the canvas owns interaction below the
         // sheet (BH-A-04 grant). The full chrome returns at medium+.
         Group {
             if selectedDetent == .compactFloat {
@@ -507,6 +508,7 @@ struct SearchAndRedactSheet: View {
             #endif
         }
         .onDisappear {
+            toastManager.bottomClearance = 0 // UXC-51: nothing to clear
             // Cancel the in-flight debounce task on sheet
             // dismissal. Without this, a search debounce sleep that was
             // started just before `.onDisappear` fires would still resolve
@@ -659,6 +661,8 @@ struct SearchAndRedactSheet: View {
             if newDetent == .compactFloat {
                 isSearchFieldFocused = false
             }
+            // UXC-51: ContentView's toast host clears the parked float.
+            toastManager.bottomClearance = Self.toastBottomClearance(for: newDetent)
         }
         // Observed on-sim: the app's single toast host
         // lives on ContentView, which renders BEHIND this presented
@@ -669,8 +673,12 @@ struct SearchAndRedactSheet: View {
         // Mount a sheet-local bottom host so this sheet's own toasts
         // render in the presented layer. ContentView's copy stays —
         // it is covered while the sheet is up and takes over if the
-        // toast outlives the sheet (e.g. the UXF-27 dismissal toast).
+        // toast outlives the sheet (e.g. the UXF-27 dismissal toast) —
+        // and at the compact float, where this host yields (UXC-51: the
+        // 80-pt float has no room, and the uncovered ContentView copy
+        // lifts by `bottomClearance` to clear it).
         .overlay(alignment: .bottom) {
+            if selectedDetent != .compactFloat {
             VStack(spacing: ResectaTokens.Spacing.sm) {
                 ForEach(toastManager.activeBottomToasts) { item in
                     ToastView(item: item, toastManager: toastManager)
@@ -691,6 +699,7 @@ struct SearchAndRedactSheet: View {
                 ResectaTokens.Anim.resolved(ResectaTokens.Anim.toastIn, reduceMotion: reduceMotion),
                 value: toastManager.toastVersion
             )
+            }
         }
         // This sheet presents modally ABOVE the
         // editor's shield swap, so it needs its own. Outermost modifier so
@@ -698,36 +707,30 @@ struct SearchAndRedactSheet: View {
         .shieldedSheetContent(monitor: captureMonitor)
     }
 
-    // MARK: - compactFloat Strip (WA/D-75, amended by UXC-44)
+    // MARK: - compactFloat Strip (WA/D-75, amended by UXC-44 and UXC-51)
 
-    /// The compact detent's WHOLE composition: the centered interface
-    /// title with the result-nav cluster (‹ › + k/N) overlaid at the
-    /// trailing edge. CONSTRAINT (WA/D-75 as AMENDED by UXC-44 /
-    /// D-116 / RB-92/94, superseding the BH-B-01 control strip):
-    /// compact is a glanceable handle — title + result-nav cluster;
-    /// every OTHER control lives at medium+, and the canvas owns
-    /// interaction below the sheet (BH-A-04 grant). The cluster is
-    /// the SAME builder the medium+ search bar mounts
-    /// (`resultNavCluster`) — the two sites are never co-mounted
-    /// (`body` switches on the detent), so the ids stay unique in
-    /// the live tree. It renders only with results on board and no
-    /// review pending (`showsResultNavCluster`). RB-94 rider, tuned
-    /// by measurement (FB-2/FB-9): the counter hides from the XXXL
-    /// Dynamic Type size up (both chevrons stay) — at XXXL the
-    /// headline already met the counter-widened cluster on the
-    /// 390-pt iPhone 17e — and at accessibility sizes the row falls
-    /// back from the centred overlay to a plain HStack (title centred
-    /// in the leading space, chevrons trailing) because the headline
-    /// alone reaches the pair there (AX5: "Search" ≈143 pt). So the
-    /// title never collides with the cluster at any size.
-    /// Identifier kept: the detent-layout pins assert strip presence
-    /// by id; `.accessibilityElement(children: .contain)` scopes it
-    /// so the cluster's own ids survive (the D-75 cascade rider).
+    /// The compact detent's WHOLE composition: one row — per-item Apply
+    /// leading, centred interface title, result-nav cluster (‹ › + k/N)
+    /// trailing. CONSTRAINT (WA/D-75 as AMENDED by UXC-44 / D-116 /
+    /// RB-92/94 and again by UXC-51 / D-128 / RB-123): compact is a
+    /// glanceable handle — title + cluster + per-item Apply; every OTHER
+    /// control lives at medium+; the canvas owns interaction below the
+    /// sheet (BH-A-04). The cluster is the medium+ search bar's builder
+    /// (`resultNavCluster`; never co-mounted, ids unique); cluster and
+    /// Apply render only with results and no review pending
+    /// (`showsResultNavCluster`). RB-94 rider (FB-2/FB-9): the counter
+    /// hides from XXXL up; at accessibility sizes the row is a plain
+    /// HStack (Apply · title · chevrons) so the headline never collides.
+    /// Identifier kept for the detent-layout pins; `children: .contain`
+    /// keeps the inner ids. The Apply's contract: `+CompactApply.swift`.
     private var compactFloatStrip: some View {
         VStack(spacing: 0) {
             Group {
                 if dynamicTypeSize.isAccessibilitySize {
                     HStack(spacing: ResectaTokens.Spacing.sm) {
+                        if showsResultNavCluster {
+                            applyCurrentResultButton
+                        }
                         Spacer(minLength: 0)
                         compactStripTitle
                         Spacer(minLength: 0)
@@ -737,20 +740,24 @@ struct SearchAndRedactSheet: View {
                         }
                     }
                 } else {
-                    ZStack(alignment: .trailing) {
+                    // Overlays: title centred full-width, Apply leading, cluster trailing.
+                    ZStack {
                         compactStripTitle
                             .frame(maxWidth: .infinity)
                         if showsResultNavCluster {
+                            applyCurrentResultButton
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             resultNavCluster(hidesCounterAtLargeTypeSizes: true)
                                 .padding(.trailing, ResectaTokens.Spacing.md)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
                         }
                     }
                 }
             }
-            // The row is always the cluster's 46-pt layout height so
-            // the title sits on the same line whether or not the
-            // cluster renders (no jump between results / no results /
-            // review; measured on-sim, FB-2).
+            // The row is always the 46-pt layout height of its controls
+            // so the title sits on the same line whether or not the
+            // cluster and the Apply render (no jump between results /
+            // no results / review; measured on-sim, FB-2).
             .frame(minHeight: ResectaTokens.TouchTarget.minimum)
             Spacer(minLength: 0)
         }
@@ -1017,6 +1024,7 @@ struct SearchAndRedactSheet: View {
     /// at EITHER site only with search results on board and no
     /// pipeline review pending — stale sheet-scan results must not
     /// show a walk over a detections list, which has no "current".
+    /// UXC-51: the compact handle's per-item Apply rides the same gate.
     private var showsResultNavCluster: Bool {
         !searchState.results.isEmpty && !isReviewActive
     }

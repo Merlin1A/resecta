@@ -17,6 +17,7 @@ The entries below follow the Keep-a-Changelog index format.
 - **Review orientation line.** "N pages · M with hits" beneath the sheet header after a completed run; the page bar stays reachable while the sheet is parked at its compact height.
 - **Zero-result guidance.** The zero-result state reads "No items flagged" with a calibration line and pointers to the existing controls.
 - **Home from the editor.** The iPhone editor's overflow menu offers Home, which closes the open document and returns to the home screen (it replaces the menu's Open Document entry; opening a file is done from the home screen).
+- **Apply from the minimized bar.** The minimized Search/Scan bar now includes an Apply button that marks just the result you are viewing; the bar is slightly taller.
 
 ### Changed
 

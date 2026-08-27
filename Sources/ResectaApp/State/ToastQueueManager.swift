@@ -108,6 +108,15 @@ final class ToastQueueManager {
     /// activeToasts.map(\.id) on every render cycle.
     private(set) var toastVersion: Int = 0
 
+    /// UXC-51 (D-128, RB-123): extra bottom inset ContentView's bottom
+    /// host applies so a toast clears a Search/Scan sheet parked at the
+    /// compact float. The sheet's own host yields there (an 80-pt float
+    /// has no room for a toast), and the app-level copy — no longer
+    /// covered by the sheet — would otherwise sit beneath it. Set by
+    /// the sheet on detent changes, reset when it disappears; zero at
+    /// every other detent and whenever no sheet is up.
+    var bottomClearance: CGFloat = 0
+
     /// Pre-filtered active toasts by position — avoids per-render .filter allocations.
     var activeTopToasts: [ToastItem] {
         activeToasts.filter { $0.severity.position == .top }

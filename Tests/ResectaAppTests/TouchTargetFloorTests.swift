@@ -56,6 +56,9 @@ struct TouchTargetFloorTests {
             // Select All floor, listed below).
             "Sources/ResectaApp/Views/Search/SearchToolbarSection.swift",
             "Sources/ResectaApp/Views/SearchAndRedactSheet.swift",
+            // UXC-51 (D-128, RB-123): the compact handle's per-item
+            // Apply — its builder split out under the M-6 hub cap.
+            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift",
             "Sources/ResectaApp/Views/Search/SearchSheetHeaderSection.swift",
             "Sources/ResectaApp/Views/Search/SearchFooterSection.swift",
             "Sources/ResectaApp/Overlay/RedactionOverlayView.swift",

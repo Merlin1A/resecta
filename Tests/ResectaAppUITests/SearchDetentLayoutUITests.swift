@@ -558,6 +558,117 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         attachScreenshot(named: "uxc44-result-walk")
     }
 
+    // MARK: - Per-item Apply on the compact handle (UXC-51)
+
+    /// UXC-51 (D-128, RB-123 items 3/4; REV-17): the compact handle
+    /// carries a leading Apply that marks ONLY the current match — one
+    /// `commitApply` step on the editor's per-window UndoManager, the
+    /// same stack the toolbar Undo/Redo pair drives. AX-only
+    /// assertions on the UXC-44 leg's fixture and recipe: absent at
+    /// medium, present and hittable once the walk parks the sheet; the
+    /// tap disables it (applied) and the page bar's region count for
+    /// the current page steps to one; the editor toolbar's Undo
+    /// removes the region and re-enables the button. RB-91 family —
+    /// run isolated on a quiet host.
+    func testCompactHandle_applyMarksCurrentMatchAndUndoReEnables() {
+        app.launchArguments = [
+            "--uitesting", "--loadTestDocument", "--multipageDoc",
+            "--openSearchSheet", "--searchQuery=Amount", "--searchDetent=medium",
+        ]
+        app.launch()
+
+        let next = app.buttons["resultNavNext"]
+        XCTAssertTrue(
+            next.waitForExistence(timeout: 30),
+            "Search sheet never presented with results — check the --searchQuery launch hook."
+        )
+        // Count-agnostic on purpose: the fixture's "Amount" total varies
+        // by simulator runtime (OCR assets), so the premise is "results
+        // landed", never a pinned N.
+        let footerCount = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@ AND label ENDSWITH %@", "0 of ", " selected")
+        ).firstMatch
+        XCTAssertTrue(
+            footerCount.waitForExistence(timeout: 20),
+            "The multipage fixture's 'Amount' query landed no results (no '0 of N selected' footer)."
+        )
+        let apply = app.buttons["applyCurrentResultButton"]
+        XCTAssertFalse(
+            apply.exists,
+            "The per-item Apply is compact-only chrome — it must not render at the medium detent."
+        )
+
+        // The first step parks the sheet: the handle's Apply pops up
+        // with the cluster, live for result 1.
+        next.tap()
+        let strip = app.descendants(matching: .any)
+            .matching(identifier: "compactFloatStrip").firstMatch
+        XCTAssertTrue(
+            strip.waitForExistence(timeout: 10),
+            "The chevron tap did not park the sheet at the compact float."
+        )
+        let resultOne = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Result 1 of ")
+        ).firstMatch
+        XCTAssertTrue(
+            resultOne.waitForExistence(timeout: 10),
+            "The walk did not land on result 1 after the first step."
+        )
+        XCTAssertTrue(
+            apply.waitForExistence(timeout: 5),
+            "The per-item Apply is missing from the compact handle (UXC-51)."
+        )
+        XCTAssertTrue(apply.isHittable, "The per-item Apply exists but is not hittable on the compact handle.")
+        XCTAssertTrue(apply.isEnabled, "The per-item Apply must be enabled for an un-applied current result.")
+        XCTAssertFalse(
+            app.staticTexts["1 region"].exists,
+            "The current page already carries a region — the fixture premise (no regions on arrival) no longer holds."
+        )
+
+        // Tap: one region on the current page, the button reads applied,
+        // the walk position is untouched (apply and stay put).
+        apply.tap()
+        XCTAssertTrue(
+            app.staticTexts["1 region"].waitForExistence(timeout: 10),
+            "The page bar did not report the applied region — the per-item Apply created nothing on the current page."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 5) { !apply.isEnabled },
+            "The per-item Apply stayed enabled after applying the current result."
+        )
+        XCTAssertTrue(
+            resultOne.exists,
+            "The apply moved the walk — apply-and-stay-put means the current result must not change."
+        )
+
+        // The editor toolbar's Undo takes the region back and the
+        // button re-enables — the undo-integration proof.
+        let undo = app.buttons["Undo"].firstMatch
+        XCTAssertTrue(undo.waitForExistence(timeout: 5), "The editor toolbar's Undo button is missing.")
+        XCTAssertTrue(undo.isHittable, "The editor toolbar's Undo is not hittable beneath the parked sheet.")
+        undo.tap()
+        XCTAssertTrue(
+            waitUntil(timeout: 10) { !app.staticTexts["1 region"].exists },
+            "Undo did not remove the applied region — the page bar still reports it."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 5) { apply.isEnabled },
+            "The per-item Apply did not re-enable after Undo removed its region."
+        )
+        attachScreenshot(named: "uxc51-compact-apply-undo")
+    }
+
+    /// Poll a condition for up to `timeout` seconds — AX state such as
+    /// `isEnabled` has no `waitForExistence` analogue.
+    private func waitUntil(timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            usleep(250_000)
+        }
+        return condition()
+    }
+
     // MARK: - Cooperative arbitration (D-70/SA-2)
 
     // Reshaped from the D-68-era
