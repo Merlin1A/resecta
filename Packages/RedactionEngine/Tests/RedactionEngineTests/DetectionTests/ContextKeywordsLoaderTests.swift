@@ -24,8 +24,8 @@ struct ContextKeywordsLoaderTests {
         // exposes 192.
         let loader = try ContextKeywordsLoader()
         let perCategory: [(PIICategory, Int)] = [
-            (.ssn, 15), (.medicalRecord, 13), (.licensePlate, 11),
-            (.dea, 29), (.dateOfBirth, 26), (.itin, 28), (.name, 35), (.npi, 29),
+            (.ssn, 15), (.medicalRecord, 13), (.licensePlate, 15),
+            (.dea, 29), (.dateOfBirth, 26), (.itin, 28), (.name, 31), (.npi, 29),
             (.ein, 6),
         ]
         var total = 0
@@ -153,13 +153,13 @@ struct ContextKeywordsLoaderTests {
             a5.entries.filter { $0.categoryScope == "ssn" }
                 .map { $0.keyword.lowercased() }
         )
-        // S3 (2026-06-11): the bundled file is now the maintainer-reviewed
-        // 166-entry rebuild (§2.2 review in-session; reviewed_version
-        // fdaf6ab9…) — A5 SSN-scoped keywords total 68, down from the
-        // pre-audit 108. The invariant is the upstream contract; the cap
-        // that matters for W-N is the overlap below.
-        #expect(a5SSN.count == 68,
-                "A5 SSN-scoped count drifted off 68 (got \(a5SSN.count)); revisit cap before reading further")
+        // The bundled file is the reviewed 171-entry gazetteer: A5 SSN-scoped
+        // keywords total 73 (the 2026-08-27 change plan replaced the bare
+        // ein/mbi tokens with seven label phrases; before that 68, and 108
+        // before the source review). The invariant is the upstream contract;
+        // the cap that matters is the overlap below.
+        #expect(a5SSN.count == 73,
+                "A5 SSN-scoped count drifted off 73 (got \(a5SSN.count)); revisit cap before reading further")
 
         let swiftSSNNegatives = SSNContextKeywords.profile.negativeKeywords
             .map { $0.lowercased() }

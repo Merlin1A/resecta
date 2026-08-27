@@ -6,7 +6,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "suppress",
       "id": "fp_000",
-      "source_plan_ref": "REDACTION_ENGINE.md 4.3",
+      "source_plan_ref": "detector-shape false positive: phone number shaped like an SSN",
       "text": "Call 555-12-3456 for support."
     },
     {
@@ -14,7 +14,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "suppress",
       "id": "fp_001",
-      "source_plan_ref": "REDACTION_ENGINE.md 4.3",
+      "source_plan_ref": "detector-shape false positive: phone number shaped like an SSN",
       "text": "Our office phone is 800-55-1212."
     },
     {
@@ -22,7 +22,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "suppress",
       "id": "fp_002",
-      "source_plan_ref": "REDACTION_ENGINE.md 4.3",
+      "source_plan_ref": "detector-shape false positive: account number in a currency context shaped like an SSN",
       "text": "Account 123456789 credit $1,200.00 posted."
     },
     {
@@ -30,7 +30,7 @@
       "expected_detector": "npi",
       "expected_outcome": "suppress",
       "id": "fp_003",
-      "source_plan_ref": "REDACTION_ENGINE.md 4.4",
+      "source_plan_ref": "detector-shape false positive: ten-digit phone number shaped like an NPI",
       "text": "Please call (206) 555-0199 for questions."
     },
     {
@@ -38,7 +38,7 @@
       "expected_detector": "npi",
       "expected_outcome": "suppress",
       "id": "fp_004",
-      "source_plan_ref": "REDACTION_ENGINE.md 4.4",
+      "source_plan_ref": "detector-shape false positive: ten-digit phone number shaped like an NPI",
       "text": "Fax: 4155551234 (no dashes)."
     },
     {
@@ -46,7 +46,7 @@
       "expected_detector": "dea",
       "expected_outcome": "suppress",
       "id": "fp_005",
-      "source_plan_ref": "REDACTION_ENGINE.md 4.5",
+      "source_plan_ref": "detector-shape false positive: license plate shaped like a DEA number",
       "text": "Vehicle plate AB1234567 impounded at lot 4."
     },
     {
@@ -54,7 +54,7 @@
       "expected_detector": "dea",
       "expected_outcome": "suppress",
       "id": "fp_006",
-      "source_plan_ref": "REDACTION_ENGINE.md 4.5",
+      "source_plan_ref": "detector-shape false positive: tracking number shaped like a DEA number",
       "text": "Tracking number US9876543 in transit."
     },
     {
@@ -62,7 +62,7 @@
       "expected_detector": "address",
       "expected_outcome": "suppress",
       "id": "fp_007",
-      "source_plan_ref": "REDACTION_ENGINE.md 4.6",
+      "source_plan_ref": "detector-shape false positive: ZIP-shaped five-digit number inside an order total",
       "text": "Order total 49201 items, ready to ship."
     },
     {
@@ -70,7 +70,7 @@
       "expected_detector": "address",
       "expected_outcome": "suppress",
       "id": "fp_008",
-      "source_plan_ref": "REDACTION_ENGINE.md 4.6",
+      "source_plan_ref": "detector-shape false positive: five-digit unit number shaped like a ZIP",
       "text": "Unit 12345 reporting: all clear."
     },
     {
@@ -78,7 +78,7 @@
       "expected_detector": "none",
       "expected_outcome": "suppress",
       "id": "fp_009",
-      "source_plan_ref": "REDACTION_ENGINE.md 4.0",
+      "source_plan_ref": "detector-shape false positive: hexadecimal color identifier",
       "text": "Theme color: #A1B2C3 across the dashboard."
     },
     {
@@ -86,7 +86,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "flag",
       "id": "fp_010",
-      "source_plan_ref": "REDACTION_ENGINE.md 4.3",
+      "source_plan_ref": "docket number shaped like an SSN in a legal context; route to review",
       "text": "Case 078-05-1120 docket entry 42."
     },
     {
@@ -94,7 +94,7 @@
       "expected_detector": "none",
       "expected_outcome": "flag",
       "id": "stuff_000",
-      "source_plan_ref": "G5",
+      "source_plan_ref": "classifier keyword-stuffing stanza: keyword-dense text aimed at one class",
       "text": "docket plaintiff case docket docket docket court filing docket docket plaintiff case plaintiff docket motion docket plaintiff case docket plaintiff docket plaintiff case docket plaintiff"
     },
     {
@@ -102,7 +102,7 @@
       "expected_detector": "none",
       "expected_outcome": "flag",
       "id": "stuff_001",
-      "source_plan_ref": "G5",
+      "source_plan_ref": "classifier keyword-stuffing stanza: keyword-dense text aimed at one class",
       "text": "patient diagnosis mrn patient diagnosis mrn patient diagnosis mrn patient diagnosis mrn patient diagnosis mrn patient diagnosis mrn patient patient patient diagnosis diagnosis diagnosis mrn mrn mrn"
     },
     {
@@ -110,7 +110,7 @@
       "expected_detector": "none",
       "expected_outcome": "flag",
       "id": "stuff_002",
-      "source_plan_ref": "G5",
+      "source_plan_ref": "classifier keyword-stuffing stanza: keyword-dense text aimed at one class",
       "text": "invoice account balance invoice account balance invoice account balance invoice account balance invoice account balance invoice account balance transaction transaction transaction invoice"
     },
     {
@@ -118,7 +118,7 @@
       "expected_detector": "none",
       "expected_outcome": "flag",
       "id": "stuff_003",
-      "source_plan_ref": "G5",
+      "source_plan_ref": "classifier keyword-stuffing stanza: keyword-dense text aimed at one class",
       "text": "foia request foia request foia request foia request foia request document released document released document released foia request foia request foia request redacted exemption foia request document"
     },
     {
@@ -126,7 +126,7 @@
       "expected_detector": "none",
       "expected_outcome": "flag",
       "id": "stuff_004",
-      "source_plan_ref": "G5",
+      "source_plan_ref": "classifier keyword-stuffing stanza: keyword-dense text aimed at one class",
       "text": "patient docket invoice foia patient docket invoice foia patient docket invoice foia patient docket invoice foia patient docket invoice foia patient docket invoice foia patient docket invoice"
     },
     {
@@ -134,7 +134,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "redact",
       "id": "homo_000",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "homoglyph fragment: label or digits laced with look-alike non-ASCII codepoints",
       "text": "SSN: １２３-４５-６７８９"
     },
     {
@@ -142,7 +142,7 @@
       "expected_detector": "npi",
       "expected_outcome": "redact",
       "id": "homo_001",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "homoglyph fragment: label or digits laced with look-alike non-ASCII codepoints",
       "text": "NPI: １２３４５６７８９０ registered."
     },
     {
@@ -150,7 +150,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "redact",
       "id": "homo_002",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "homoglyph fragment: label or digits laced with look-alike non-ASCII codepoints",
       "text": "Member SSN 𝟏𝟐𝟑-𝟒𝟓-𝟔𝟕𝟖𝟗 on file."
     },
     {
@@ -158,7 +158,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "suppress",
       "id": "homo_003",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "homoglyph fragment: label or digits laced with look-alike non-ASCII codepoints",
       "text": "SЅN: 555-00-1234 entry"
     },
     {
@@ -166,7 +166,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "redact",
       "id": "homo_004",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "homoglyph fragment: label or digits laced with look-alike non-ASCII codepoints",
       "text": "ITIN аccount 9XX-82-1234 closed."
     },
     {
@@ -174,7 +174,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "flag",
       "id": "homo_005",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "homoglyph fragment: label or digits laced with look-alike non-ASCII codepoints",
       "text": "Greek Ι-label 078-05-1120 noted."
     },
     {
@@ -182,7 +182,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "redact",
       "id": "homo_006",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "homoglyph fragment: label or digits laced with look-alike non-ASCII codepoints",
       "text": "SSN: 1‍23-45-6789 (ZWJ in digits)"
     },
     {
@@ -190,7 +190,7 @@
       "expected_detector": "dea",
       "expected_outcome": "redact",
       "id": "homo_007",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "homoglyph fragment: label or digits laced with look-alike non-ASCII codepoints",
       "text": "DEA #: AB1‌234567 (ZWNJ in license)"
     },
     {
@@ -198,7 +198,7 @@
       "expected_detector": "npi",
       "expected_outcome": "redact",
       "id": "homo_008",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "homoglyph fragment: label or digits laced with look-alike non-ASCII codepoints",
       "text": "NPI 12​3456789​0 registered."
     },
     {
@@ -206,7 +206,7 @@
       "expected_detector": "dea",
       "expected_outcome": "suppress",
       "id": "homo_009",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "homoglyph fragment: label or digits laced with look-alike non-ASCII codepoints",
       "text": "Reference Аb1234567 logged."
     },
     {
@@ -214,7 +214,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "redact",
       "id": "inv_000",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "invisible-style fragment: PII text visually suppressed by styling but present as text",
       "text": "<span style=\"color:#ffffff\">SSN: 123-45-6789</span>"
     },
     {
@@ -222,7 +222,7 @@
       "expected_detector": "npi",
       "expected_outcome": "redact",
       "id": "inv_001",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "invisible-style fragment: PII text visually suppressed by styling but present as text",
       "text": "<div style=\"color: white; background: white\">NPI: 1234567890</div>"
     },
     {
@@ -230,7 +230,7 @@
       "expected_detector": "dea",
       "expected_outcome": "redact",
       "id": "inv_002",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "invisible-style fragment: PII text visually suppressed by styling but present as text",
       "text": "<p style=\"font-size:0.5pt\">DEA AB1234567 pending.</p>"
     },
     {
@@ -238,7 +238,7 @@
       "expected_detector": "none",
       "expected_outcome": "flag",
       "id": "inv_003",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "invisible-style fragment: PII text visually suppressed by styling but present as text",
       "text": "<span style=\"opacity:0\">Card 4111 1111 1111 1111 queued.</span>"
     },
     {
@@ -246,7 +246,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "redact",
       "id": "ws_000",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "whitespace-injection fragment: zero-width Unicode whitespace inside a digit run",
       "text": "SSN 1​23-45-6789 on record."
     },
     {
@@ -254,7 +254,7 @@
       "expected_detector": "npi",
       "expected_outcome": "redact",
       "id": "ws_001",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "whitespace-injection fragment: zero-width Unicode whitespace inside a digit run",
       "text": "NPI 12345​67890 billed."
     },
     {
@@ -262,7 +262,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "flag",
       "id": "ws_002",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "whitespace-injection fragment: zero-width Unicode whitespace inside a digit run",
       "text": "Account 078​-05-1120 on ledger."
     },
     {
@@ -270,7 +270,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "suppress",
       "id": "ws_003",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "whitespace-injection fragment: zero-width Unicode whitespace inside a digit run",
       "text": "Phone 800-55​-1212 no redact."
     },
     {
@@ -278,7 +278,7 @@
       "expected_detector": "none",
       "expected_outcome": "flag",
       "id": "date_000",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "multi-line date collision: adjacent date lines with matching MM/DD next to a DOB label",
       "text": "Filed: 03/15/2024\nDOB: 03/15/1984"
     },
     {
@@ -286,7 +286,7 @@
       "expected_detector": "none",
       "expected_outcome": "flag",
       "id": "date_001",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "multi-line date collision: adjacent date lines with matching MM/DD next to a DOB label",
       "text": "Application received 2024-01-15\nDate of Birth: 2024-01-15"
     },
     {
@@ -294,7 +294,7 @@
       "expected_detector": "none",
       "expected_outcome": "flag",
       "id": "date_002",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "multi-line date collision: adjacent date lines with matching MM/DD next to a DOB label",
       "text": "Signed 12/31/2023\nBirth 12/31/1955\nExpires 12/31/2028"
     },
     {
@@ -302,7 +302,7 @@
       "expected_detector": "none",
       "expected_outcome": "flag",
       "id": "date_003",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "multi-line date collision: adjacent date lines with matching MM/DD next to a DOB label",
       "text": "Order date 01/01/2025\nDOB 01/01/2000\nDue 02/01/2025"
     },
     {
@@ -310,7 +310,7 @@
       "expected_detector": "none",
       "expected_outcome": "flag",
       "id": "date_004",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "multi-line date collision: adjacent date lines with matching MM/DD next to a DOB label",
       "text": "Filing stamp 06-15-24\nPatient DOB 06-15-1960"
     },
     {
@@ -334,7 +334,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "redact",
       "id": "col_000",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "column-header-label fragment: a table header row paired with data-row bounding boxes",
       "text": "SSN\n123-45-6789"
     },
     {
@@ -358,7 +358,7 @@
       "expected_detector": "npi",
       "expected_outcome": "redact",
       "id": "col_001",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "column-header-label fragment: a table header row paired with data-row bounding boxes",
       "text": "NPI\n1234567890"
     },
     {
@@ -382,7 +382,7 @@
       "expected_detector": "dea",
       "expected_outcome": "redact",
       "id": "col_002",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "column-header-label fragment: a table header row paired with data-row bounding boxes",
       "text": "DEA\nAB1234567"
     },
     {
@@ -406,7 +406,7 @@
       "expected_detector": "address",
       "expected_outcome": "redact",
       "id": "col_003",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "column-header-label fragment: a table header row paired with data-row bounding boxes",
       "text": "ZIP\n94103"
     },
     {
@@ -430,7 +430,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "suppress",
       "id": "col_004",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "column-header-label fragment: a table header row paired with data-row bounding boxes",
       "text": "Amount\n123-45-6789"
     },
     {
@@ -461,7 +461,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "redact",
       "id": "col_005",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "column-header-label fragment: a table header row paired with data-row bounding boxes",
       "text": "Patient SSN\n123-45-6789\n987-65-4321"
     },
     {
@@ -485,7 +485,7 @@
       "expected_detector": "ssn",
       "expected_outcome": "flag",
       "id": "col_006",
-      "source_plan_ref": "G10",
+      "source_plan_ref": "column-header-label fragment: a table header row paired with data-row bounding boxes",
       "text": "SSN\n078-05-1120"
     }
   ],

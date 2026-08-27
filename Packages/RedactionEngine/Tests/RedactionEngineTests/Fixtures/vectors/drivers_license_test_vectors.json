@@ -412,7 +412,7 @@
     },
     {
       "license_number": "49",
-      "notes": "L-02 widened the floor to 6 digits for pure-numeric DLs.",
+      "notes": "The floor was widened to 6 digits for pure-numeric DLs.",
       "rejection_reason": "pure_digits_too_short",
       "shape": "pure_digits",
       "text": "Driver License 49",
@@ -420,7 +420,7 @@
     },
     {
       "license_number": "68875",
-      "notes": "L-02 widened the floor to 6 digits for pure-numeric DLs.",
+      "notes": "The floor was widened to 6 digits for pure-numeric DLs.",
       "rejection_reason": "pure_digits_too_short",
       "shape": "pure_digits",
       "text": "DL 68875",
@@ -428,7 +428,7 @@
     },
     {
       "license_number": "40669",
-      "notes": "L-02 widened the floor to 6 digits for pure-numeric DLs.",
+      "notes": "The floor was widened to 6 digits for pure-numeric DLs.",
       "rejection_reason": "pure_digits_too_short",
       "shape": "pure_digits",
       "text": "DL. 40669",
@@ -436,7 +436,7 @@
     },
     {
       "license_number": "4316",
-      "notes": "L-02 widened the floor to 6 digits for pure-numeric DLs.",
+      "notes": "The floor was widened to 6 digits for pure-numeric DLs.",
       "rejection_reason": "pure_digits_too_short",
       "shape": "pure_digits",
       "text": "DL. 4316",
@@ -444,7 +444,7 @@
     },
     {
       "license_number": "709",
-      "notes": "L-02 widened the floor to 6 digits for pure-numeric DLs.",
+      "notes": "The floor was widened to 6 digits for pure-numeric DLs.",
       "rejection_reason": "pure_digits_too_short",
       "shape": "pure_digits",
       "text": "DL 709",
@@ -452,7 +452,7 @@
     },
     {
       "license_number": "88",
-      "notes": "L-02 widened the floor to 6 digits for pure-numeric DLs.",
+      "notes": "The floor was widened to 6 digits for pure-numeric DLs.",
       "rejection_reason": "pure_digits_too_short",
       "shape": "pure_digits",
       "text": "Driver's Lic 88",

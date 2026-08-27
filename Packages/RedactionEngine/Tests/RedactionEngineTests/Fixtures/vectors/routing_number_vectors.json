@@ -197,7 +197,7 @@
     {
       "context_keyword": null,
       "has_context": false,
-      "notes": "Valid ABA (prefix 26, checksum 0) with no routing context keyword: the detector emits base confidence 0.50; the balanced preset's W4 gate (0.60) is what withholds it.",
+      "notes": "Valid ABA (prefix 26, checksum 0) with no routing context keyword: the detector emits base confidence 0.50; the balanced preset's threshold (0.60) is what withholds it.",
       "rejection_reason": null,
       "routing_number": "265135192",
       "valid": true
@@ -205,7 +205,7 @@
     {
       "context_keyword": null,
       "has_context": false,
-      "notes": "Valid ABA (prefix 02, checksum 0) with no routing context keyword: the detector emits base confidence 0.50; the balanced preset's W4 gate (0.60) is what withholds it.",
+      "notes": "Valid ABA (prefix 02, checksum 0) with no routing context keyword: the detector emits base confidence 0.50; the balanced preset's threshold (0.60) is what withholds it.",
       "rejection_reason": null,
       "routing_number": "027361146",
       "valid": true
@@ -213,7 +213,7 @@
     {
       "context_keyword": null,
       "has_context": false,
-      "notes": "Valid ABA (prefix 08, checksum 0) with no routing context keyword: the detector emits base confidence 0.50; the balanced preset's W4 gate (0.60) is what withholds it.",
+      "notes": "Valid ABA (prefix 08, checksum 0) with no routing context keyword: the detector emits base confidence 0.50; the balanced preset's threshold (0.60) is what withholds it.",
       "rejection_reason": null,
       "routing_number": "083561032",
       "valid": true
@@ -221,7 +221,7 @@
     {
       "context_keyword": null,
       "has_context": false,
-      "notes": "Valid ABA (prefix 02, checksum 0) with no routing context keyword: the detector emits base confidence 0.50; the balanced preset's W4 gate (0.60) is what withholds it.",
+      "notes": "Valid ABA (prefix 02, checksum 0) with no routing context keyword: the detector emits base confidence 0.50; the balanced preset's threshold (0.60) is what withholds it.",
       "rejection_reason": null,
       "routing_number": "026249874",
       "valid": true
