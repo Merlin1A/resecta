@@ -1,0 +1,8 @@
+# Weekly pull requests that move the SHA-pinned actions in .github/workflows
+# forward; the pull-request gate checks each one.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

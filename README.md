@@ -1,10 +1,14 @@
 # Resecta
 
+[![ci](https://github.com/Merlin1A/resecta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Merlin1A/resecta/actions/workflows/ci.yml)
+
 On-device iOS 26 PDF and image redaction. Free, open-source, zero data collection — all processing happens on your device.
 
 **License:** [Apache License 2.0](./LICENSE)
 
 **Version:** 1.0 — see the [CHANGELOG](./CHANGELOG.md).
+
+Every pull request builds the app and both test bundles, runs the audit and claims lints on the diff, and checks the shipped-asset hashes; the full engine suite and the simulator suite run on demand and on release tags.
 
 ---
 

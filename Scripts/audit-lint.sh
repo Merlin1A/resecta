@@ -11,6 +11,15 @@
 # staged Swift file as a state machine. M-6 is a whole-file LOC count on
 # staged files.
 #
+# Range mode (CI): `--range A..B` (or the env AUDIT_LINT_RANGE=A..B) swaps
+# the staged diff for the commit range A..B — the same rules over the lines
+# the range adds, with the file list, the added-line scan and the new-file
+# list all read from `git diff A..B`. M-7 (pbxproj freshness) is skipped in
+# range mode: the pbxproj is gitignored and CI regenerates it first.
+#
+# Usage: Scripts/audit-lint.sh                 (staged mode; the pre-commit hook)
+#        Scripts/audit-lint.sh --range A..B    (range mode; the pull-request gate)
+#
 # Override markers (substring on the same line):
 #   LegalPhrases:safe          → exempts a forbidden-phrase hit (M-1)
 #   Networking:exempt SafariView → exempts a banned-symbol hit (M-3)
@@ -22,10 +31,47 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
+RANGE="${AUDIT_LINT_RANGE:-}"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --range)
+            [ $# -ge 2 ] || { echo "audit-lint: --range needs A..B" >&2; exit 64; }
+            RANGE="$2"; shift 2 ;;
+        --range=*) RANGE="${1#--range=}"; shift ;;
+        -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+        *) echo "audit-lint: unknown option: $1" >&2; exit 64 ;;
+    esac
+done
+if [ -n "$RANGE" ]; then
+    case "$RANGE" in *..*) ;; *) echo "audit-lint: --range wants A..B, got '$RANGE'" >&2; exit 64 ;; esac
+    RANGE_BASE="${RANGE%%..*}"
+    git rev-parse --verify --quiet "${RANGE_BASE}^{commit}" >/dev/null \
+        || { echo "audit-lint: range base '$RANGE_BASE' is not a commit" >&2; exit 64; }
+fi
+
+# The three git sources of truth, staged (hook) or ranged (CI).
+diff_names() { # diff-filter
+    if [ -n "$RANGE" ]; then git diff --name-only --diff-filter="$1" "$RANGE"
+    else git diff --cached --name-only --diff-filter="$1"; fi
+}
+diff_added_hunks() { # path
+    if [ -n "$RANGE" ]; then git diff -U0 --no-color "$RANGE" -- "$1"
+    else git diff --cached -U0 --no-color -- "$1"; fi
+}
+# The pre-change and post-change copies of a file (M-8).
+show_before() { # path
+    if [ -n "$RANGE" ]; then git show "${RANGE_BASE}:$1" 2>/dev/null
+    else git show "HEAD:$1" 2>/dev/null; fi
+}
+show_after() { # path
+    if [ -n "$RANGE" ]; then git show "${RANGE##*..}:$1" 2>/dev/null
+    else git show ":$1"; fi
+}
+
 STAGED=()
 while IFS= read -r path; do
     [ -n "$path" ] && STAGED+=("$path")
-done < <(git diff --cached --name-only --diff-filter=AM)
+done < <(diff_names AM)
 
 [ "${#STAGED[@]}" -eq 0 ] && exit 0
 
@@ -36,7 +82,7 @@ violate() { printf '%s\n' "$1" >&2; FAIL=$((FAIL + 1)); }
 # skip lines containing override marker $3 (empty disables override).
 scan_added() {
     local path="$1" pattern="$2" override="$3"
-    git diff --cached -U0 --no-color -- "$path" \
+    diff_added_hunks "$path" \
         | PATTERN="$pattern" OVERRIDE="$override" perl -e '
         my $line = 0;
         my $re   = qr/$ENV{PATTERN}/i;
@@ -134,7 +180,7 @@ NEW_CAP=700
 ADDED=()
 while IFS= read -r path; do
     [ -n "$path" ] && ADDED+=("$path")
-done < <(git diff --cached --name-only --diff-filter=A)
+done < <(diff_names A)
 
 for path in "${STAGED[@]}"; do
     [ "$path" = "$HUB" ] || continue
@@ -160,6 +206,10 @@ done
 PBXPROJ="ResectaApp.xcodeproj/project.pbxproj"
 for path in "${STAGED[@]}"; do
     [ "$path" = "project.yml" ] || continue
+    if [ -n "$RANGE" ]; then
+        echo "M-7 skipped in range mode: the pbxproj is gitignored and regenerated from project.yml before the lint runs"
+        break
+    fi
     if git ls-files --error-unmatch "$PBXPROJ" >/dev/null 2>&1; then
         # Tracked pbxproj: the regenerated file must land in the same commit.
         pbx_staged=0
@@ -213,8 +263,8 @@ resource_entry_known() {
 
 for path in "${STAGED[@]}"; do
     [ "$path" = "project.yml" ] || continue
-    head_resources=$(git show HEAD:project.yml 2>/dev/null | list_app_target_resources || true)
-    staged_resources=$(git show :project.yml | list_app_target_resources || true)
+    head_resources=$(show_before project.yml | list_app_target_resources || true)
+    staged_resources=$(show_after project.yml | list_app_target_resources || true)
     while IFS= read -r entry; do
         [ -n "$entry" ] || continue
         resource_entry_known "$entry" "$head_resources" \

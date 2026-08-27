@@ -1,0 +1,105 @@
+# Pull-request gate. Builds the app and both test bundles, runs the two
+# lints over the lines the change adds, and checks the shipped-asset
+# hashes. About five minutes on a hosted macos-26 runner. The engine host
+# suite (engine-suite.yml) and the simulator suite (sim-suite.yml) run on
+# demand and on release tags, not here.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  XCODEGEN_VERSION: 2.45.3
+  XCODEGEN_SHA256: 0c90f4d28ca57335f9fa78cf5bf6dabfe20a232036dabe36de2eef79cb7c0878
+
+jobs:
+  pr-gate:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: XcodeGen (pinned release, digest-checked)
+        run: |
+          curl -fsSL -o xcodegen.zip \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
+          echo "${XCODEGEN_SHA256}  xcodegen.zip" | shasum -a 256 -c -
+          unzip -q xcodegen.zip -d "${RUNNER_TEMP}/xcodegen"
+          echo "${RUNNER_TEMP}/xcodegen/xcodegen/bin" >> "$GITHUB_PATH"
+          "${RUNNER_TEMP}/xcodegen/xcodegen/bin/xcodegen" --version
+
+      - name: Generate the project
+        run: ./regenerate.sh
+
+      - name: Build the app
+        run: |
+          t0=$SECONDS
+          xcodebuild build \
+            -project ResectaApp.xcodeproj -scheme ResectaApp \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "${RUNNER_TEMP}/dd" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO -quiet
+          echo "BUILD_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
+
+      - name: Build the test bundles
+        run: |
+          t0=$SECONDS
+          xcodebuild build-for-testing \
+            -project ResectaApp.xcodeproj -scheme ResectaApp \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "${RUNNER_TEMP}/dd" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO -quiet
+          echo "BFT_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
+
+      - name: Claims lint
+        run: |
+          t0=$SECONDS
+          Scripts/claims-lint.sh
+          echo "CLAIMS_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
+
+      - name: Audit lint over the change
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          t0=$SECONDS
+          base="${PR_BASE:-$PUSH_BEFORE}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="$(git rev-parse HEAD~1)"
+            echo "no event base (first push or unknown event); using HEAD~1 = $base"
+          fi
+          echo "audit-lint range: ${base}..HEAD"
+          Scripts/audit-lint.sh --range "${base}..HEAD"
+          echo "AUDIT_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
+
+      - name: Shipped-asset hash fence
+        run: Scripts/verify-shipped-asset-hashes.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## pr-gate"
+            echo
+            echo "| step | seconds |"
+            echo "|---|---|"
+            echo "| xcodebuild build | ${BUILD_SECS:-—} |"
+            echo "| xcodebuild build-for-testing | ${BFT_SECS:-—} |"
+            echo "| claims-lint | ${CLAIMS_SECS:-—} |"
+            echo "| audit-lint (range) | ${AUDIT_SECS:-—} |"
+          } >> "$GITHUB_STEP_SUMMARY"

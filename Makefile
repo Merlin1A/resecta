@@ -56,9 +56,10 @@ stress-smoke:
 		-destination '$(SIM_DEST)' \
 		-only-testing:RedactionEngineTests/StressCorpusTests/testFixtureHas500Pages\(\)
 
-# Advisory line-coverage report. The coverage targets are
-# aspirational and NOT CI-enforced (remote CI is
-# disabled at the repo level); this target makes them measurable on demand.
+# Advisory line-coverage report. The coverage targets are advisory and
+# not enforced by the pull-request gate (which builds the app and test
+# bundles and runs the lints, not the suites); this target makes them
+# measurable on demand.
 # Excludes the 500-page stress suite the same way the developer gate does
 # (the `-skip-testing` convention; no xctestplan exists). xccov emits the
 # per-target line coverage as JSON; the summary grep uses /usr/bin/grep because
