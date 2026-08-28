@@ -8,7 +8,7 @@ The entries below follow the Keep-a-Changelog index format.
 
 ## [Unreleased]
 
-## [1.1.0] — YYYY-MM-DD
+## [1.1.0] — 2026-08-28
 
 ### Added
 
@@ -89,5 +89,6 @@ Initial public release.
 - **Pixel-destruction core shared by both modes.** Each affected page is rasterized; vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer from marked regions.
 - **Searchable Redaction text-layer design.** The reconstructed text layer uses a fresh monospace font with uniform spacing, designed to remove the glyph-positioning side channels identified in academic research on sandwich PDFs.
 
-[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Merlin1A/resecta/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Merlin1A/resecta/releases/tag/v1.0.0
