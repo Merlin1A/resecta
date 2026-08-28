@@ -940,7 +940,7 @@ struct VerificationResultsView: View {
 
     // MARK: - Trust strip
     //
-    // Mirrors HomeView's strip exactly ("On-device · No tracking · Open
+    // Mirrors HomeView's strip exactly ("On device · No tracking · Open
     // source") and is status-independent: the strip states standing facts
     // about the app, while the run's outcome lives in the status banner and
     // the footer. The former PASS/INFO-gated "Verification complete" item is
@@ -948,7 +948,7 @@ struct VerificationResultsView: View {
 
     private var trustStrip: some View {
         FlowLayout(spacing: ResectaTokens.Spacing.sm, alignment: .center) {
-            TrustItem(label: "On-device")
+            TrustItem(label: "On device")
             Text("·").foregroundStyle(.tertiary).font(.footnote)
             TrustItem(label: "No tracking")
             Text("·").foregroundStyle(.tertiary).font(.footnote)
