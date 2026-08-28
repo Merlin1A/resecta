@@ -8,7 +8,7 @@ import PDFKit
 // `shouldAutoReturnHome` returns true only when the editor is genuinely
 // idle on `.empty` with no source document; the `sourceDocument == nil`
 // half defends against a future bootstrap that mounts a document before
-// flipping phase. See the Phase 1 redesign "Race analysis".
+// flipping phase.
 
 @Suite("Document editor auto-return-home gate (Phase 1)")
 @MainActor
@@ -56,7 +56,7 @@ struct DocumentEditorAutoReturnHomeTests {
         )
     }
 
-    // MARK: - CAT-401: window UndoManager cleared on editor close
+    // MARK: - Window UndoManager cleared on editor close
 
     /// The per-window UndoManager outlives a closed document, so its stack must
     /// be emptied on close — otherwise the next document opened in the same
@@ -65,7 +65,7 @@ struct DocumentEditorAutoReturnHomeTests {
     /// `clearUndoStackOnClose` static; this pins that it empties a populated
     /// stack. groupsByEvent is disabled so the registration is observable
     /// without a run-loop tick.
-    @Test("clearUndoStackOnClose empties a populated undo stack (CAT-401)")
+    @Test("clearUndoStackOnClose empties a populated undo stack")
     func testOnDisappearClearsUndoStack() {
         final class UndoCanary { var tripped = false }
         let canary = UndoCanary()
@@ -78,7 +78,7 @@ struct DocumentEditorAutoReturnHomeTests {
 
         DocumentEditorView.clearUndoStackOnClose(undoManager)
 
-        #expect(undoManager.canUndo == false)  // CAT-401: stack emptied on close
+        #expect(undoManager.canUndo == false)  // Stack emptied on close
         #expect(undoManager.canRedo == false)
     }
 }

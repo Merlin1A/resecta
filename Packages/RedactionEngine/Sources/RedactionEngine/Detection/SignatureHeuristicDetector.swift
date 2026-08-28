@@ -24,7 +24,7 @@ import Foundation
 //      - Emit a `DetectionResult(kind: .pii(.signatureCandidate))` iff both
 //        density and curvature exceed empirically-tuned thresholds.
 //
-// I7 escape hatch: This adds NO new `PipelineError` cases and NO new
+// This detector adds NO new `PipelineError` cases and NO new
 // dependency. Accelerate / vImage is intentionally avoided to keep the
 // implementation inline; the working raster is 128×64 = 8 192 pixels so the
 // pure-Swift Sobel pass is ~µs per region. The "skip the Sobel pass entirely
@@ -90,7 +90,7 @@ public struct SignatureHeuristicDetector: Sendable {
         in image: CGImage,
         ocrBlocks: [OCREngine.TextLine]
     ) async throws -> [DetectionResult] {
-        // PERF-8 / CANCEL-012: entry-level cooperative cancellation.
+        // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         // Step 1: short-circuit when no OCR is available — without text
         // labels the heuristic has no candidate regions to score.
@@ -356,7 +356,7 @@ public struct SignatureHeuristicDetector: Sendable {
         var middleBandEdges = 0
         var bottomBandEdges = 0
 
-        // PERF-8 / CANCEL-012: 256-row band counter over the Sobel pass.
+        // 256-row band counter over the Sobel pass.
         // Working buffer is workingWidth x workingHeight; the cancel check
         // amortizes to roughly one check per row-band of pixel work.
         var bandCounter = 0
@@ -425,7 +425,7 @@ public struct SignatureHeuristicDetector: Sendable {
             )
         }
         let totalWindows = cwMax * chMax
-        // PERF-8 / CANCEL-012: 256-row band counter over the windowed pass.
+        // 256-row band counter over the windowed pass.
         var windowBandCounter = 0
         for wy in 0..<chMax {
             if windowBandCounter & 0xFF == 0 { try Task.checkCancellation() }

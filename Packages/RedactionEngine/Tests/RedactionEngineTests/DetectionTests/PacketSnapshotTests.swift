@@ -5,40 +5,37 @@ import Testing
 import CryptoKit
 @testable import RedactionEngine
 
-// S05 / Step A -- Resecta sample/test-document packet series.
-//
 // Dual-leg Stage-1 detection SNAPSHOT of the synthetic Hartwell loan packet
-// (`~/resecta-sample-doc` generator -> engine fixture
+// (the resecta-sample-doc generator -> engine fixture
 // `TestResources/packet.pdf`, SHA 362375692b8c..., 12 pp). This is the FIRST
 // session that runs the detection engine on the packet; it is the measurement
 // the P/R harness (PacketPRHarnessTests) and the must-fire freeze consume.
 //
-// Mirrors `SampleStatementSnapshotTests` (S01): for each of the 12 pages it runs
+// Mirrors `SampleStatementSnapshotTests`: for each of the 12 pages it runs
 // BOTH legs -- text-extraction (the production path for a born-digital page) and
 // OCR (the scan-sim path) -- with `thresholdVector=nil` (every detection
 // surfaces), then dumps a committed JSON + an [OCRQ]-style console summary plus
-// the per-page doctype / overlap-suppression data that answer the S05 questions
+// the per-page doctype / overlap-suppression data that answer questions about
 // (VEH .generic; account->phone collision; per-leg text coverage).
 //
 // MEASUREMENT HARNESS, not a regression guard. The ONLY hard assertions are
 // mechanism facts: fixture identity (SHA + page count) and the per-leg
 // OCR-invocation contract (text bypasses Vision; OCR runs it). NO Stage-2
 // detection-count / fire-miss assertion is frozen here -- that freeze is the
-// must-fire smoke suite (S05 Step C), gated on this snapshot's measurement.
+// must-fire smoke suite, gated on this snapshot's measurement.
 //
-// SCHEMA: a forward-compatible SUPERSET of the S01 snapshot schema --
-// identical keys, plus a per-leg `overlapSuppressedByCategory` map
-// (plan A.3) so the account->phone collision (Sec 1.5#2) is
-// machine-readable by the P/R harness.
+// SCHEMA: a forward-compatible SUPERSET of the prior snapshot schema --
+// identical keys, plus a per-leg `overlapSuppressedByCategory` map so the
+// account->phone collision is machine-readable by the P/R harness.
 //
-// MATCHED-TEXT LOGGING (D31): this fixture is fully synthetic with a public
-// values manifest, so matched text is logged here (same exemption as the
-// sample statement). Production logging rules (ARCH 12.2) are untouched.
+// MATCHED-TEXT LOGGING: this fixture is fully synthetic with a public values
+// manifest, so matched text is logged here (same exemption as the sample
+// statement). Production logging rules remain untouched.
 
-@Suite("Hartwell loan-packet Stage-1 snapshot (S05/A)", .serialized)
+@Suite("Hartwell loan-packet Stage-1 snapshot", .serialized)
 struct PacketSnapshotTests {
 
-    // MARK: - Fixture identity (dual of the S01 guard)
+    // MARK: - Fixture identity
 
     /// A silent fixture substitution must be loud. The packet is byte-
     /// deterministic (a committed fixture must match a fresh generator run),
@@ -104,7 +101,7 @@ struct PacketSnapshotTests {
                         embeddedText: embedded)
                     // Per-leg OCR-invocation contract asserted DETERMINISTICALLY
                     // via per-detection provenance, NOT the process-global counter
-                    // (sibling suites mutate it in a batched run -- S01 b6 lesson).
+                    // (sibling suites mutate it in a batched run).
                     #expect(textResult.detections.allSatisfy { $0.provenance.ocrSkipped },
                             "every text-leg detection must carry provenance.ocrSkipped (OCR bypassed)")
                     textSnap = Self.legSnap(
@@ -154,11 +151,11 @@ struct PacketSnapshotTests {
                 name: "packet.pdf",
                 sha256: TestFixtures.loanPacketSHA256,
                 pageCount: TestFixtures.loanPacketPageCount),
-            generatedBy: "PacketSnapshotTests (S05/A, resecta-sample-packet-2026-06-12)",
+            generatedBy: "PacketSnapshotTests",
             note: "Dual-leg Stage-1 snapshot of the synthetic Hartwell loan packet. "
                 + "thresholdVector=nil -> every detection surfaces; `aboveBalanced` applies the "
                 + "calibrated balanced preset (preset-thresholds.json) in post. `confidence` is the "
-                + "post-posterior score (empty priors). Forward-compatible SUPERSET of the S01 schema: "
+                + "post-posterior score (empty priors). Forward-compatible SUPERSET of the original schema: "
                 + "adds per-leg `overlapSuppressedByCategory`. Ground truth bbox is CORNER form "
                 + "[x0,y0,x1,y1]; `normalizedRect` here is origin+size [x,y,w,h] (same coordinate "
                 + "system, different encoding -- the P/R harness converts). MEASUREMENT ONLY -- no "
@@ -177,10 +174,10 @@ struct PacketSnapshotTests {
         Self.printSummary(pageSnaps)
     }
 
-    /// detectPage with cold-start retries (S8 / S01 lesson: a transient Vision
-    /// "could not create inference context" #9 on the first Vision request in a
-    /// fresh process; an immediate retry warms it). Used for BOTH legs -- the
-    /// text leg still runs the Vision barcode pass, so it is not immune. The
+    /// detectPage with cold-start retries: a transient Vision "could not
+    /// create inference context" #9 on the first Vision request in a fresh
+    /// process; an immediate retry warms it. Used for BOTH legs -- the text
+    /// leg still runs the Vision barcode pass, so it is not immune. The
     /// final attempt rethrows. `embeddedText` nil => OCR leg; non-nil => text leg.
     private func detectWithRetry(
         _ orchestrator: DetectionOrchestrator, image: CGImage, pageIndex: Int,
@@ -241,7 +238,7 @@ struct PacketSnapshotTests {
         }
     }
 
-    // MARK: - Snapshot model (forward-compatible superset of the S01 schema)
+    // MARK: - Snapshot model (forward-compatible superset of the prior snapshot schema)
 
     struct PacketSnapshotDoc: Codable {
         let schemaVersion: Int
@@ -379,7 +376,7 @@ struct PacketSnapshotTests {
 
     static func r4(_ d: Double) -> Double { (d * 10_000).rounded() / 10_000 }
 
-    // MARK: - Console summary (raw material for the S05 questions)
+    // MARK: - Console summary
 
     static func printSummary(_ pages: [PacketPageSnap]) {
         let names = ["URLA-B", "URLA-B", "URLA-A", "STMT", "STMT", "STMT",
@@ -404,7 +401,7 @@ struct PacketSnapshotTests {
                 }
             }
         }
-        // S05-Q1 VEH .generic: page 11 doctype on both legs.
+        // VEH .generic: page 11 doctype on both legs.
         if pages.count > 11 {
             let veh = pages[11]
             print("[OCRQ-pkt] Q-VEH p11 text doctype=\(veh.textLeg.doctype.primary)"
@@ -415,7 +412,7 @@ struct PacketSnapshotTests {
             print("[OCRQ-pkt] Q-VEH p11 licensePlate detections=\(lp.count) "
                 + "matched=\(lp.compactMap { $0.matchedText })")
         }
-        // S05-Q2 account vs phone: every page's account/phone counts + overlap.
+        // Account vs phone: every page's account/phone counts + overlap.
         print("[OCRQ-pkt] Q-acct/phone (per page, both legs):")
         for p in pages {
             for leg in [p.textLeg, p.ocrLeg] {
@@ -428,7 +425,7 @@ struct PacketSnapshotTests {
                 }
             }
         }
-        // S05-Q3 per-leg text coverage (does each born-digital form page clear >0.95?).
+        // Per-leg text coverage (does each born-digital form page clear >0.95?).
         print("[OCRQ-pkt] Q-coverage (text leg, >0.95 => text fast path):")
         for p in pages {
             let label = p.pageIndex < names.count ? names[p.pageIndex] : "?"

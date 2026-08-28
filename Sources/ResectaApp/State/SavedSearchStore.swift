@@ -29,8 +29,7 @@ private struct AnyCodingKey: CodingKey {
 // — `init(from:)` walks the keyed container's `allKeys` against an
 // explicit whitelist and throws `DecodingError.dataCorruptedError` on
 // any mismatch. The forbidden-key list is enumerated for exhaustive
-// positive coverage in `SavedSearchStoreTests.decoderRejectsForbiddenKeys`
-// per [RR-43](RISK_REGISTER.md#rr-43).
+// positive coverage in `SavedSearchStoreTests.decoderRejectsForbiddenKeys`.
 //
 // The consuming UI shipped in V1.0: `SavedSearchListSheet`
 // lists / recalls / renames / deletes entries and carries the save
@@ -41,7 +40,7 @@ private struct AnyCodingKey: CodingKey {
 
 // nonisolated: a pure persisted value type (query *shape* only — see the file
 // header) whose `Equatable` conformance is compared element-wise inside the
-// `nonisolated SavedSearchEnvelope`. Under the s04 SE-0466 MainActor-default flip
+// `nonisolated SavedSearchEnvelope`. Under the SE-0466 MainActor-default flip
 // an unannotated app-target type's conformance becomes MainActor-isolated and
 // cannot be used from the nonisolated envelope; pin the type nonisolated (the
 // engine's sibling `SavedRegex` is already nonisolated as an SPM-package type).
@@ -49,8 +48,7 @@ nonisolated struct SavedSearch: Codable, Identifiable, Sendable, Equatable {
     /// 200-char cap on the user-visible name. Mirrored across the
     /// memberwise init, `SavedSearchStore.rename(id:to:)`, and the
     /// `init(from:)` decoder so a tampered or out-of-band-edited
-    /// payload cannot smuggle an oversize name past the schema floor
-    /// (Pkg G.2 — TRUST-savedsearch-name-no-cap).
+    /// payload cannot smuggle an oversize name past the schema floor.
     static let nameLengthCap = 200
 
     let id: UUID
@@ -141,13 +139,13 @@ nonisolated struct SavedSearch: Codable, Identifiable, Sendable, Equatable {
                 throw DecodingError.dataCorruptedError(
                     forKey: key,
                     in: rawContainer,
-                    debugDescription: "SavedSearch unknown key '\(key.stringValue)' per [D-25]"
+                    debugDescription: "SavedSearch unknown key '\(key.stringValue)'"
                 )
             }
         }
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(UUID.self, forKey: .id)
-        // Pkg G.2 — TRUST-savedsearch-name-no-cap. Mirrors the
+        // Mirrors the
         // memberwise init's `.prefix(nameLengthCap)` clamp so a
         // tampered persisted blob can't bypass the 200-char floor.
         let rawName = try container.decode(String.self, forKey: .name)
@@ -161,7 +159,7 @@ nonisolated struct SavedSearch: Codable, Identifiable, Sendable, Equatable {
         self.sourceFilter = try container.decode(SourceFilter.self, forKey: .sourceFilter)
         self.minimumOCRConfidence = try container.decode(Float.self, forKey: .minimumOCRConfidence)
         self.minimumPIIConfidence = try container.decode(Double.self, forKey: .minimumPIIConfidence)
-        // S7 — absent in pre-S7 blobs; fall back to the engine defaults.
+        // Absent in blobs written before this field existed; fall back to the engine defaults.
         self.stripDigitSeparators = try container.decodeIfPresent(Bool.self, forKey: .stripDigitSeparators) ?? false
         self.normalizeSmartPunctuation = try container.decodeIfPresent(Bool.self, forKey: .normalizeSmartPunctuation) ?? true
         self.foldDiacritics = try container.decodeIfPresent(Bool.self, forKey: .foldDiacritics) ?? false
@@ -180,7 +178,7 @@ nonisolated struct SavedSearch: Codable, Identifiable, Sendable, Equatable {
 /// `FileJSONBlob`.
 // nonisolated: persisted via `FileJSONBlob<T: Codable & Sendable>` and
 // read off-MainActor; keep its Codable conformance nonisolated under
-// the s04 SE-0466 MainActor-default flip (mirrors UserTermsBlob).
+// the SE-0466 MainActor-default flip (mirrors UserTermsBlob).
 nonisolated struct SavedSearchEnvelope: Codable, Sendable, Equatable {
     let schemaVersion: Int
     let savedSearches: [SavedSearch]
@@ -260,7 +258,7 @@ nonisolated private struct FailableSavedSearch: Decodable {
 }
 
 // nonisolated: a Sendable Logger referenced from the nonisolated envelope
-// decoder. Globals default to MainActor under the s04 flip.
+// decoder. Globals default to MainActor under the SE-0466 flip.
 nonisolated private let envelopeLogger = Logger(subsystem: "app.resecta", category: "SavedSearchStore")
 
 // MARK: - SavedSearchStore
@@ -343,7 +341,7 @@ final class SavedSearchStore {
 
     // MARK: - Mutate
 
-    /// H-74 — duplicate-save collision check per the in-repo
+    /// Duplicate-save collision check per the in-repo
     /// `SavedRegexStore.add` pattern: an exact-name duplicate is
     /// rejected (`false`; the UI re-presents the prompt), so a repeated
     /// Save can no longer append indistinguishable byte-identical rows.
@@ -362,9 +360,8 @@ final class SavedSearchStore {
         persist()
     }
 
-    /// Rename only — other fields are immutable in V1.x. The UI for
-    /// in-place edit lives in [WU-26](WORK_UNITS.md#wu-26).
-    /// H-74 sibling guard: renaming onto ANOTHER entry's name would
+    /// Rename only — other fields are immutable in V1.x.
+    /// Renaming onto ANOTHER entry's name would
     /// recreate the indistinguishable-rows state the add guard closes;
     /// renaming an entry to its own current name stays a success.
     @discardableResult

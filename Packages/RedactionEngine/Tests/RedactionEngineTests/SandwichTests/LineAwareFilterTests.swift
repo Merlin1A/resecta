@@ -9,22 +9,23 @@ import AppKit
 #endif
 @testable import RedactionEngine
 
-// SV-4 — PD-7 line-aware character filter, PD-8 writer↔verifier spatial
-// contract, and the VH-1 Layer-7 count domain.
+// The line-aware character filter, writer↔verifier spatial
+// contract, and the Layer-7 count domain.
 //
 // The filter's safety-margin halo (±3pt) is larger than the inter-line gap
 // of dense tabular layouts (measured 0.22–0.25pt on the sample statement),
 // so a single-line region used to reach into neighboring lines it never
 // touched — blanking spans there and swallowing whole label blocks at block
-// scale (RC-2). PD-7 gates the halo on the region's un-expanded rect
+// scale. The filter gates the halo on the region's un-expanded rect
 // intersecting the character's LINE BAND while keeping an unconditional 0pt
 // floor; within a region's own lines the halo is unchanged. Layer 6 enforces
 // the same two tiers on read-back characters, skipping synthesized
-// whitespace (PD-8), and Layer 7 counts non-whitespace on both sides (VH-1).
+// whitespace, and Layer 7 counts non-whitespace on both sides.
 //
 // The sample-statement fixture is FULLY SYNTHETIC with a public value set
-// (see TestHelpers), so test diagnostics MAY reference matched text (the W2
-// logging exemption). Production logging rules (ARCH §12.2) are unchanged.
+// (see TestHelpers), so test diagnostics MAY reference matched text (the
+// synthetic-fixture logging exemption). Production logging rules (never
+// document content, file paths, or redaction coordinates) are unchanged.
 
 @Suite("Line-aware filter and verifier lockstep", .tags(.sandwich), .serialized)
 struct LineAwareFilterTests {
@@ -60,7 +61,7 @@ struct LineAwareFilterTests {
     /// 0.25pt gap into line B (y-expanded to 413).
     private let lineARegion = CGRect(x: 131, y: 400, width: 28, height: 10)
 
-    // MARK: - PD-7: rect overload
+    // MARK: - Line-aware filter: rect overload
 
     @Test("Halo does not cross a sub-point line gap (rect)")
     func haloDoesNotCrossLineGapRect() async throws {
@@ -142,7 +143,7 @@ struct LineAwareFilterTests {
                 "line-B region must exclude B6–B8 only; got \(lineBIndexes.sorted())")
     }
 
-    // MARK: - PD-7: polygon overload
+    // MARK: - Line-aware filter: polygon overload
 
     /// RegionShape for a rectangle-shaped polygon over `rect`.
     private func polygonShape(_ rect: CGRect) -> RegionShape {
@@ -267,7 +268,7 @@ struct LineAwareFilterTests {
                 "every mid-page separator must advance the partition (max \(maxLine), separators \(separators))")
     }
 
-    // MARK: - PD-8: sample-doc writer↔verifier contract
+    // MARK: - Sample-doc writer↔verifier contract
 
     /// Region rects for the two uppercase DELIA HARTWELL row occurrences on
     /// sample page 1, derived from the fixture's own glyph bounds (the same
@@ -339,7 +340,7 @@ struct LineAwareFilterTests {
         #expect(outText.contains("ID:9100004821"),
                 "same-line content outside the halo must survive")
         // The neighbor line 0.22pt above the region — blanked by the
-        // whole-page halo before PD-7 — is present in full.
+        // whole-page halo before the line-aware fix — is present in full.
         #expect(outText.contains("NORTHLINE LOGISTICS DIRECT DEP"),
                 "neighbor-line content must survive a single-line region")
         // The holder-block name row (mixed case, different lines) is intact.
@@ -369,7 +370,7 @@ struct LineAwareFilterTests {
         // Direct floor assertion (the written contract's first clause): no
         // non-whitespace read-back character's GLYPH-CORE box intersects a
         // region rect at 0pt. The core box is the selection box vertically
-        // inset by the read-back font's descent fraction (PD-12) — the
+        // inset by the read-back font's descent fraction — the
         // same derivation Layer 6 applies.
         let nsOut = outText as NSString
         var offset = 0
@@ -418,7 +419,7 @@ struct LineAwareFilterTests {
         #expect(layer9 == .pass, "Layer 9 must pass; got \(layer9)")
     }
 
-    // MARK: - VH-1: Layer 7 count-domain parity
+    // MARK: - Layer 7 count-domain parity
 
     /// Non-whitespace, non-zero-bounds composed count of an output page —
     /// the Layer 7 output-side domain, recomputed independently here.

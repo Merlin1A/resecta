@@ -3,7 +3,7 @@ import Foundation
 import PDFKit
 @testable import RedactionEngine
 
-// TEST §3.2 — Fake redaction detection (Manafort/Calipari attack).
+// Fake redaction detection (Manafort/Calipari attack).
 // Verifies that text hidden under opaque annotations is destroyed
 // after processing through the pipeline.
 

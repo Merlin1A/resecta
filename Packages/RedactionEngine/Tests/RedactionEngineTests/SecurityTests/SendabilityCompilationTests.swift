@@ -5,8 +5,7 @@ import PDFKit
 import UIKit
 #endif
 
-// EXP-013 migrated: Sendability Compilation
-// Audit: CC-3-1 (High), CC-4-1 (High)
+// Sendability Compilation.
 // Tests @unchecked Sendable wrappers for PDFDocument/PDFPage under strict concurrency.
 
 private struct SendablePDFDocument: @unchecked Sendable { let document: PDFDocument }
@@ -29,7 +28,7 @@ private func simulatedDetectPII(page: SendablePDFPage) -> [String] {
 @Suite("Sendability Compilation", .tags(.critical))
 struct SendabilityCompilationTests {
 
-    // --- CC-3-1: @unchecked Sendable wrapper compiles and works ---
+    // --- @unchecked Sendable wrapper compiles and works ---
     @Test("SendablePDFDocument wrapper compiles and wraps correctly")
     func sendableWrapperCompiles() {
         let data = TestFixtures.blankPage()
@@ -38,7 +37,7 @@ struct SendabilityCompilationTests {
         #expect(wrapped.document.pageCount == 1)
     }
 
-    // --- CC-3-1: Can pass wrapper across concurrency boundaries ---
+    // --- Can pass wrapper across concurrency boundaries ---
     @Test("SendablePDFDocument can cross concurrency boundaries")
     func concurrentRunLayerWithWrapper() async {
         let data = TestFixtures.blankPage()
@@ -47,7 +46,7 @@ struct SendabilityCompilationTests {
         #expect(!result.isEmpty)
     }
 
-    // --- CC-4-1: PII detection with SendablePDFPage ---
+    // --- PII detection with SendablePDFPage ---
     @Test("SendablePDFPage enables concurrent PII detection")
     func concurrentPIIDetectionWithWrapper() async {
         let data = TestFixtures.documentWithPII(terms: ["123-45-6789"])
@@ -57,7 +56,7 @@ struct SendabilityCompilationTests {
         #expect(results.contains("123-45-6789"))
     }
 
-    // --- CC-4-1: Sequential access pattern safety ---
+    // --- Sequential access pattern safety ---
     @Test("Sequential page access through Sendable wrapper is safe")
     func sequentialAccessPatternSafety() async {
         let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)

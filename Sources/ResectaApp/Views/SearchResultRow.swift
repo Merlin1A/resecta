@@ -1,25 +1,24 @@
 import SwiftUI
 import RedactionEngine
 
-// Search-origin result row. UXC-45 (D-117, RB-98..105): context-first —
-// the row's one text block is the engine's context window with the
-// match itself set semibold-monospaced on a soft brand-teal wash inside
-// proportional context (the engine windows the text so the match can
-// never truncate; `SearchResult.matchRangeInSnippet` locates it). A
-// small meta line above it carries the source badge and the page label
-// only when the visible list is not sectioned by page. UXC-46 (D-121):
-// confidence is not spelled out on the row — no tier word, no rationale
-// line; the leading bar stays as the family's quiet cue and the spoken
-// tier stays in the merged a11y label for parity with it, while the
+// Search-origin result row. Context-first — the row's one text block
+// is the engine's context window with the match itself set
+// semibold-monospaced on a soft brand-teal wash inside proportional
+// context (the engine windows the text so the match can never
+// truncate; `SearchResult.matchRangeInSnippet` locates it). A small
+// meta line above it carries the source badge and the page label only
+// when the visible list is not sectioned by page. Confidence is not
+// spelled out on the row — no tier word, no rationale line; the
+// leading bar stays as the family's quiet cue and the spoken tier
+// stays in the merged a11y label for parity with it, while the
 // quantities themselves live in `MatchRationaleSheet`, reached through
 // the Details button the chevron expansion reveals beneath the full
 // window. The leading confidence bar, the applied marker, and the 46-pt
 // selection circle keep the shared-family idiom of `FindingRow`, which
 // this row no longer mounts: the scan-review origin still renders
-// through `FindingRow` unchanged (RB-100 — that surface is frozen this
-// release; its unification with this row is the 1.2 rider). The pure
-// display contracts (badges, tiers, tooltips, rationale summaries) other
-// surfaces and tests consume stay in this file.
+// through `FindingRow` unchanged — that surface is frozen this release.
+// The pure display contracts (badges, tiers, tooltips, rationale
+// summaries) other surfaces and tests consume stay in this file.
 //
 // Bar grading: PII and detection rows grade on the shared absolute
 // bands (`absoluteConfidenceTier`); OCR rows grade against `ocrFloor`
@@ -36,10 +35,10 @@ struct SearchResultRow: View {
     var isApplied: Bool = false
     /// Show the search term label (multi-term mode, page grouping).
     var showTermLabel: Bool = false
-    /// UXC-45 (RB-99/103) — the adaptive page label. The section passes
-    /// `true` only when the visible list is NOT sectioned by page
-    /// (multi-term's by-term grouping today); under page sections the
-    /// header carries the page and the row shows no `p.N`.
+    /// The adaptive page label. The section passes `true` only when
+    /// the visible list is NOT sectioned by page (multi-term's by-term
+    /// grouping today); under page sections the header carries the
+    /// page and the row shows no `p.N`.
     var showsPageLabel: Bool = false
     /// Active OCR confidence floor from `SearchState.minimumOCRConfidence`.
     /// Drives the confidence-bar tier on OCR rows. `Float` mirrors the
@@ -63,15 +62,15 @@ struct SearchResultRow: View {
     /// uses. Default is a no-op so prior callers and previews compile.
     var onShowRationale: () -> Void = {}
 
-    /// Per-row toggle for the expanded state (UXC-45, RB-104): the full
-    /// context window un-clamped plus the inline rationale line when
-    /// the result carries one. The name predates the context expansion
-    /// and stays — renaming a private state var is churn.
+    /// Per-row toggle for the expanded state: the full context window
+    /// un-clamped plus the inline rationale line when the result
+    /// carries one. The name predates the context expansion and stays
+    /// — renaming a private state var is churn.
     @State private var isRationaleExpanded: Bool = false
 
-    /// RB-113 (the UXC-45 nod): the collapsed clamp grows from XXXL up
-    /// so a long match the 44-character lead-in pushes past line 2 at
-    /// large type still shows whole in the collapsed row.
+    /// The collapsed clamp grows from XXXL up so a long match the
+    /// 44-character lead-in pushes past line 2 at large type still
+    /// shows whole in the collapsed row.
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// Width of the applied-marker slot between the bar and the circle.
@@ -91,9 +90,9 @@ struct SearchResultRow: View {
     }
 
     var body: some View {
-        // SA-1 (D-71) micro-fix: signal-derived display inputs are
-        // computed once per row build — `badgeView` / `confidenceTier`
-        // / `confidenceBarTooltip` each re-scanned `rationale.signals`
+        // Signal-derived display inputs are computed once per row
+        // build — `badgeView` / `confidenceTier` /
+        // `confidenceBarTooltip` each re-scanned `rationale.signals`
         // for the same predicates on every body evaluation.
         let isCustomHit = Self.isCustomTermHit(result)
         let isRegexHit = Self.isRegexHit(result, searchMode: searchMode)
@@ -156,10 +155,10 @@ struct SearchResultRow: View {
                         }
                     }
                     .padding(.leading, ResectaTokens.Spacing.xs)
-                    // F-7 (LAW): ONE merged element that names the page
-                    // (and the spoken tier where the row is graded —
-                    // the bar's non-visual twin, UXC-46) — never the
-                    // matched text, never the window.
+                    // ONE merged element that names the page (and the
+                    // spoken tier where the row is graded — the bar's
+                    // non-visual twin) — never the matched text, never
+                    // the window.
                     // The `.ignore` merge hides the inner selection
                     // circle; the named action keeps non-visual
                     // selection first-class.
@@ -185,8 +184,8 @@ struct SearchResultRow: View {
 
             // Details line (PII / Custom rows carry a rationale), in the
             // expanded state only, beneath the un-clamped window — the
-            // row's one path into `MatchRationaleSheet` (UXC-46: the
-            // former "Reason:" one-liner is gone; the sheet carries it).
+            // row's one path into `MatchRationaleSheet` (the former
+            // "Reason:" one-liner is gone; the sheet carries it).
             if isRationaleExpanded, result.rationale != nil {
                 detailsLine
             }
@@ -204,8 +203,8 @@ struct SearchResultRow: View {
     }
 
     /// The one selection circle the family shares — the `FindingRow`
-    /// chassis idiom verbatim: UXC-18 46-pt floor on BOTH axes framed on
-    /// the whole button plus `contentShape`, haptic on toggle (§4.6).
+    /// chassis idiom verbatim: a 46-pt floor on BOTH axes framed on
+    /// the whole button plus `contentShape`, haptic on toggle.
     private var selectionCircle: some View {
         Button {
             result.isSelected.toggle()
@@ -224,10 +223,10 @@ struct SearchResultRow: View {
         .sensoryFeedback(.selection, trigger: result.isSelected)
     }
 
-    /// UXC-45 meta line: source badge · adaptive page label (RB-103) ·
-    /// spacer · term label (multi-term under page grouping). UXC-46
-    /// (D-121) retired the tier word that used to follow the badge —
-    /// confidence is not spelled out on the row.
+    /// Meta line: source badge · adaptive page label · spacer · term
+    /// label (multi-term under page grouping). The tier word that used
+    /// to follow the badge is retired — confidence is not spelled out
+    /// on the row.
     private func metaLine(
         isCustomHit: Bool,
         isRegexHit: Bool,
@@ -258,13 +257,13 @@ struct SearchResultRow: View {
         }
     }
 
-    /// The expand/collapse control (UXC-45, RB-104): always visible —
-    /// every row has context to reveal — and outside the row's a11y
-    /// merge so it stays a reachable control. Id FROZEN
+    /// The expand/collapse control: always visible — every row has
+    /// context to reveal — and outside the row's a11y merge so it
+    /// stays a reachable control. Id FROZEN
     /// (`rationaleDisclosureButton`). Expanded = the full context window
     /// un-clamped + the "Details" button into `MatchRationaleSheet`
-    /// (rows that carry a rationale; UXC-46 retired the one-line
-    /// rationale summary that used to sit beside it). Per the long-press
+    /// (rows that carry a rationale; the one-line rationale summary
+    /// that used to sit beside it is retired). Per the long-press
     /// density cap the row keeps a single tap-target affordance for
     /// rationale (this chevron); the contextMenu's "Why this match?"
     /// path opens the broader `ReverseRationalePopover` and is unchanged.
@@ -275,8 +274,8 @@ struct SearchResultRow: View {
             Image(systemName: isRationaleExpanded ? "chevron.up" : "chevron.down")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                // UXC-18: floored to the HIG minimum (46-pt layout
-                // frame, RB-54/67). Same contentShape idiom.
+                // Floored to the HIG minimum (46-pt layout frame).
+                // Same contentShape idiom.
                 .frame(
                     width: ResectaTokens.TouchTarget.minimum,
                     height: ResectaTokens.TouchTarget.minimum
@@ -292,13 +291,13 @@ struct SearchResultRow: View {
     }
 
     /// The Details line rendered below the un-clamped window when the
-    /// row is expanded (UXC-46, D-121): a single trailing "Details"
-    /// button into `MatchRationaleSheet`, where the detector's signals,
-    /// the scores, and the match confidence live. It keeps the position
-    /// the retired "Reason:" summary's button had — leading inset to the
-    /// content column, trailing-aligned — so the expansion reads as the
-    /// window plus one action; now that it stands alone it carries the
-    /// UXC-18 46-pt layout floor (RB-54/67) the text beside it used to
+    /// row is expanded: a single trailing "Details" button into
+    /// `MatchRationaleSheet`, where the detector's signals, the
+    /// scores, and the match confidence live. It keeps the position
+    /// the retired "Reason:" summary's button had — leading inset to
+    /// the content column, trailing-aligned — so the expansion reads
+    /// as the window plus one action; now that it stands alone it
+    /// carries the 46-pt layout floor the text beside it used to
     /// excuse.
     private var detailsLine: some View {
         HStack(spacing: ResectaTokens.Spacing.xs) {
@@ -324,9 +323,9 @@ struct SearchResultRow: View {
     /// Single-capsule renderer for the source badge. Branch order
     /// Custom → Regex → category/source. This two-parameter signature
     /// stays the public/test contract; it computes the signal flags and
-    /// delegates to the flag-taking canonical implementation below
-    /// (SA-1 — the row build precomputes the flags once and calls the
-    /// canonical form directly).
+    /// delegates to the flag-taking canonical implementation below —
+    /// the row build precomputes the flags once and calls the
+    /// canonical form directly.
     @ViewBuilder
     static func badgeView(
         for result: SearchResult,
@@ -349,8 +348,8 @@ struct SearchResultRow: View {
     /// Canonical badge renderer over precomputed signal flags. The
     /// flags fully determine the branch together with `result` itself
     /// (`searchMode` participates only through `isRegexHit`). `tier` is
-    /// the row's already-computed floor-relative tier (UXC-22) — only
-    /// the OCR leg of the standard source-badge branch reads it, for the
+    /// the row's already-computed floor-relative tier — only the OCR
+    /// leg of the standard source-badge branch reads it, for the
     /// capsule's accessibility label.
     @ViewBuilder
     static func badgeView(
@@ -393,10 +392,10 @@ struct SearchResultRow: View {
                     .background(Color(uiColor: .systemGreen), in: Capsule())
             case .ocr(let confidence):
                 // The capsule itself renders the flat "OCR" label — see
-                // `ocrCapsuleLabel` (UXC-35 rider: this comment used to
-                // claim the capsule was "percent-bearing", which was
-                // already false — it always rendered flat "OCR"). The
-                // confidence tier descriptor (UXC-22) surfaces via the
+                // `ocrCapsuleLabel` (this comment used to claim the
+                // capsule was "percent-bearing", which was already
+                // false — it always rendered flat "OCR"). The
+                // confidence tier descriptor surfaces via the
                 // accessibility label below and via color on the
                 // leading-edge confidence bar, not via capsule text.
                 Text(Self.ocrCapsuleLabel(confidence: confidence))
@@ -529,7 +528,7 @@ extension SearchResultRow {
     /// `nonisolated`: under the SE-0466 MainActor-default flip this pure
     /// value type (no MainActor state) would otherwise become
     /// MainActor-isolated, which breaks `RegionMetadata`'s nonisolated
-    /// init (UXC-22) reading `.descriptor` off `absoluteConfidenceTier`'s
+    /// init reading `.descriptor` off `absoluteConfidenceTier`'s
     /// result. Mirrors `ResectaTokens.SemanticColor`'s same-rationale pin.
     nonisolated enum ConfidenceTier: Equatable {
         case high
@@ -544,9 +543,9 @@ extension SearchResultRow {
             }
         }
 
-        /// UXC-22 (RB-44 / RC-1 leg a) — qualitative descriptor replacing
-        /// the retired "N% confidence" copy. Lowercase, for mid-sentence /
-        /// spoken use (e.g. "Social Security Number, high confidence").
+        /// Qualitative descriptor replacing the retired "N% confidence"
+        /// copy. Lowercase, for mid-sentence / spoken use (e.g. "Social
+        /// Security Number, high confidence").
         /// Thresholds live ONLY on `absoluteConfidenceTier` /
         /// `confidenceTier(for:ocrFloor:)` — this is a pure label over an
         /// already-computed tier, never a second threshold source.
@@ -558,8 +557,8 @@ extension SearchResultRow {
             }
         }
 
-        /// UXC-22 — sentence-position form: first letter capitalized, for
-        /// a standalone visible line (e.g. detection-row secondary text)
+        /// Sentence-position form: first letter capitalized, for a
+        /// standalone visible line (e.g. detection-row secondary text)
         /// or a sentence-final accessibility clause (e.g. "Page 2. High
         /// confidence.").
         var descriptorLabel: String {
@@ -582,8 +581,8 @@ extension SearchResultRow {
     /// ≥ 0.7 medium, else low.
     /// `nonisolated`: under the SE-0466 MainActor-default flip this pure
     /// function would otherwise become MainActor-isolated, which breaks
-    /// `RegionMetadata`'s nonisolated init (UXC-22), the one other
-    /// non-View call site.
+    /// `RegionMetadata`'s nonisolated init, the one other non-View
+    /// call site.
     nonisolated static func absoluteConfidenceTier(_ confidence: Double) -> ConfidenceTier {
         if confidence >= 0.9 { return .high }
         if confidence >= 0.7 { return .medium }
@@ -598,7 +597,7 @@ extension SearchResultRow {
     /// Confidence slider retired — grading against it described a
     /// control that no longer exists. This two-parameter signature
     /// stays the public/test contract and delegates to the flag-taking
-    /// canonical form (SA-1).
+    /// canonical form.
     static func confidenceTier(
         for result: SearchResult,
         ocrFloor: Double
@@ -638,7 +637,7 @@ extension SearchResultRow {
     /// literal-match tooltip on the bar; PII/OCR rows return empty
     /// (their confidence is rendered inline on the source badge).
     /// SAFE — mechanism description, no outcome promise. Public/test
-    /// contract signature; delegates to the flag-taking form (SA-1).
+    /// contract signature; delegates to the flag-taking form.
     static func confidenceBarTooltip(for result: SearchResult) -> String {
         confidenceBarTooltip(for: result, isCustomHit: Self.isCustomTermHit(result))
     }
@@ -665,7 +664,7 @@ extension SearchResultRow {
         "OCR"
     }
 
-    /// UXC-22 — OCR source-badge accessibility label. Takes the row's
+    /// OCR source-badge accessibility label. Takes the row's
     /// already-computed floor-relative `tier` (not a raw confidence) so
     /// the spoken label matches what the leading-edge confidence bar
     /// shows, and so no percent threshold is duplicated here.
@@ -674,28 +673,27 @@ extension SearchResultRow {
     }
 }
 
-// MARK: - UXC-45 Context-first row contracts
+// MARK: - Context-first row contracts
 
 extension SearchResultRow {
-    /// UXC-45 (RB-108) — true where the tier is graded: PII rows
-    /// (absolute bands) and OCR-source rows (floor-relative). Literal
-    /// text / regex / custom text-layer hits grade `.high` by
-    /// construction, so a spoken tier would be noise; their bar still
-    /// renders the literal-match green. UXC-46 (D-121): the meta line no
-    /// longer renders a tier word, so this predicate gates ONLY the
-    /// spoken tier in the merged a11y label (the bar's non-visual twin);
-    /// the name is kept for the pins that reference it.
+    /// True where the tier is graded: PII rows (absolute bands) and
+    /// OCR-source rows (floor-relative). Literal text / regex / custom
+    /// text-layer hits grade `.high` by construction, so a spoken tier
+    /// would be noise; their bar still renders the literal-match
+    /// green. The meta line no longer renders a tier word, so this
+    /// predicate gates ONLY the spoken tier in the merged a11y label
+    /// (the bar's non-visual twin); the name is kept for the pins that
+    /// reference it.
     nonisolated static func showsTierWord(for result: SearchResult) -> Bool {
         if result.piiConfidence != nil { return true }
         if case .ocr = result.source { return true }
         return false
     }
 
-    /// UXC-45 — the merged row element's spoken label: the family
-    /// adapter's page-only string (F-7 LAW: never matched text, never
-    /// the window) plus the tier descriptor where the row is graded
-    /// (UXC-46: spoken for parity with the bar, no longer mirrored by
-    /// a visible word).
+    /// The merged row element's spoken label: the family adapter's
+    /// page-only string (never matched text, never the window) plus
+    /// the tier descriptor where the row is graded (spoken for parity
+    /// with the bar, no longer mirrored by a visible word).
     static func accessibilityLabel(
         for result: SearchResult,
         tier: ConfidenceTier,
@@ -705,20 +703,19 @@ extension SearchResultRow {
         return showsTier ? "\(base), \(tier.descriptor)" : base
     }
 
-    /// RB-113 — the collapsed window's line clamp: two lines through
-    /// XXL, three from XXXL up (the same threshold the compact strip's
-    /// counter uses, D-119) so a long match the lead-in pushes past
-    /// line 2 at large type still shows whole while collapsed.
+    /// The collapsed window's line clamp: two lines through XXL, three
+    /// from XXXL up (the same threshold the compact strip's counter
+    /// uses) so a long match the lead-in pushes past line 2 at large
+    /// type still shows whole while collapsed.
     nonisolated static func collapsedLineLimit(for size: DynamicTypeSize) -> Int {
         size >= .xxxLarge ? 3 : 2
     }
 
     /// Brand-teal wash opacity under the match run. Tuned on-sim in
-    /// both appearances at the UXC-45 visual pass (value recorded in
-    /// the evidence MANIFEST).
+    /// both appearances.
     nonisolated static let matchWashOpacity: Double = 0.16
 
-    /// UXC-45 (RB-102) — the row's one text block: the context window
+    /// The row's one text block: the context window
     /// in proportional secondary text with the match run set
     /// semibold-monospaced in primary on the brand-teal wash. Mono stays
     /// the exclusive signature of detected content. `matchRange` is the
@@ -809,9 +806,9 @@ extension SearchResultRow {
         }
     }
 
-    /// One-line rationale summary. Since UXC-46 (D-121) it renders as
-    /// the Signals footer of `MatchRationaleSheet` (it used to sit in
-    /// the row-expansion area). Format: `"Reason: <signals> (detector
+    /// One-line rationale summary. It renders as the Signals footer of
+    /// `MatchRationaleSheet` (it used to sit in the row-expansion
+    /// area). Format: `"Reason: <signals> (detector
     /// score <score>)."` —
     /// signals join with `+` (deduped, preserving first-encounter order),
     /// score formats to two decimal places. The number carries the
@@ -838,7 +835,7 @@ extension SearchResultRow {
 }
 
 /// Recreates the press dim that the outer Button previously
-/// provided on `SearchResultRow`. SA-1 (D-71): press tracking rides a
+/// provided on `SearchResultRow`. Press tracking rides a
 /// never-completing long press (`minimumDuration: .infinity`) instead
 /// of the former `DragGesture(minimumDistance: 0)` — the zero-distance
 /// drag entered gesture arbitration against the List's pan on every
@@ -864,11 +861,11 @@ struct PressHighlightModifier: ViewModifier {
     }
 }
 
-// MARK: - SA-1 Equatable accessory wrappers
+// MARK: - Equatable accessory wrappers
 //
 // The Equatable-value halves of the row extracted so `.equatable()`
 // can skip their bodies on section-wide invalidations that leave the
-// row's data unchanged (B-3: value content inside the equality,
+// row's data unchanged (value content inside the equality,
 // closures/bindings outside).
 
 /// Leading-edge confidence bar. Mode-meaningful
@@ -902,9 +899,9 @@ struct SearchRowSourceBadge: View, Equatable {
     let result: SearchResult
     let isCustomHit: Bool
     let isRegexHit: Bool
-    /// The row's already-computed floor-relative tier (UXC-22) — an
-    /// Equatable value type, so `.equatable()` at the call site keeps
-    /// working off value content only.
+    /// The row's already-computed floor-relative tier — an Equatable
+    /// value type, so `.equatable()` at the call site keeps working
+    /// off value content only.
     let tier: SearchResultRow.ConfidenceTier
 
     var body: some View {

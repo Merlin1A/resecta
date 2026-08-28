@@ -1,7 +1,7 @@
 import Foundation
 import CoreGraphics
 
-// Plan §4 / §G6 — multi-line address assembly on Vision line boxes.
+// Multi-line address assembly on Vision line boxes.
 // Replaces the inline PIIDetector.addressPattern regex when OCR lines are
 // available. Strategy:
 //
@@ -16,17 +16,17 @@ import CoreGraphics
 //
 // The regex-only path inside PIIDetector stays available as a fallback for
 // callers without line-level data. Line-level callers run assembly ALONGSIDE
-// the regex arms: DetectionOrchestrator Phase 3 (WS1 item 1.6) and — since
-// RC-4 — both DocumentSearcher PII-scan legs (`searchPII` over
+// the regex arms: DetectionOrchestrator Phase 3 and both
+// DocumentSearcher PII-scan legs (`searchPII` over
 // `EmbeddedTextSource` lines; `scanPagePIIViaOCR` over its normalized OCR
-// line records, completing the rewire this note used to defer).
+// line records).
 
 struct AddressSpatialAssembler: Sendable {
 
     /// Optional city/county gazetteer. If absent (JSON missing or decode
     /// failed), assembler behavior is unchanged; if present, an extracted
     /// city token that the gazetteer rejects downgrades the assembly
-    /// confidence (L6 / C12 cross-check).
+    /// confidence.
     private let addressComponents: AddressComponentsGazetteer?
 
     /// Cached module-bundle load so repeated `AddressSpatialAssembler()`
@@ -183,7 +183,7 @@ struct AddressSpatialAssembler: Sendable {
             }
             var baseConfidence: Double = state != nil && streetLineFound ? 0.80 :
                                          state != nil ? 0.65 : 0.55
-            // L6 / C12 — city cross-check. Present-gazetteer + extractable
+            // City cross-check. Present-gazetteer + extractable
             // city + gazetteer-rejects → downweight; absent-gazetteer or
             // non-extractable city → unchanged (back-compat).
             if let gazetteer = addressComponents,

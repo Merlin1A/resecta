@@ -2,13 +2,13 @@ import Testing
 import SwiftUI
 @testable import ResectaApp
 
-// WU-52 — pins the AX5 line-limit predicate that
+// Pins the AX5 line-limit predicate that
 // `InlineWarningBanner` reads via `@Environment(\.dynamicTypeSize)`. The
 // predicate lifts the warning text from `.lineLimit(2)` to `.lineLimit(3)`
 // at `.accessibility5` so the message stays readable at the largest
-// accessibility text size (ACCESSIBILITY.md §9.3).
+// accessibility text size.
 
-@Suite("InlineWarningBanner AX5 line-limit predicate (WU-52)")
+@Suite("InlineWarningBanner AX5 line-limit predicate")
 struct InlineWarningLineLimitTests {
 
     @Test("AX5 lifts the line cap to 3")

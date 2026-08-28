@@ -1,7 +1,7 @@
 import Testing
 @testable import RedactionEngine
 
-// Plan Phase 3 / §2 / G10 — PerCategoryPriors invariants.
+// PerCategoryPriors invariants.
 
 @Suite("PerCategoryPriors (G10 hardening)")
 struct PerCategoryPriorsTests {

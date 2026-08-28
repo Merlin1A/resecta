@@ -1,14 +1,11 @@
 import Foundation
 
-// See ARCH §4.1 for PipelineError definition.
-// See ARCH §1.3 for mechanism-description language rules.
-
 /// Error type for pipeline failures. Used as the associated value in
 /// DocumentState.Phase.failed(error:returnPhase:).
 ///
 /// Each case corresponds to a pipeline stage and carries only non-sensitive
 /// metadata (page indices, step names). Document content, file names, and
-/// paths are NEVER included in error values (ARCH §12.2).
+/// paths are NEVER included in error values.
 public enum PipelineError: Sendable, LocalizedError {
     case importError(ImportFailure)
     case detectionError(DetectionFailure)
@@ -30,11 +27,11 @@ public enum PipelineError: Sendable, LocalizedError {
         case ocrUnavailable
         case timeout(pageIndex: Int)
         case visionError(pageIndex: Int)
-        // SEC-6 — Signed gazetteer manifest verification failed. The bundled
+        // Signed gazetteer manifest verification failed. The bundled
         // `gazetteer_manifest.json` did not match its Ed25519 signature, the
         // signature file is missing, the public key is malformed, or the
         // verification primitive rejected the signature. Engine degrades to
-        // manual-redaction-only for the session (SEC-7 banner / toast).
+        // manual-redaction-only for the session (banner / toast).
         case detectionCorpusInvalid
     }
 
@@ -43,8 +40,8 @@ public enum PipelineError: Sendable, LocalizedError {
         case bitmapCreationFailed(pageIndex: Int)
         case fillVerificationFailed(pageIndex: Int)
         case renderTimeout(pageIndex: Int)
-        // L-19: Pre-flight reject before CGContextDrawPDFPage, which is a
-        // synchronous C call with no cancellation points (§2.7).
+        // Pre-flight reject before CGContextDrawPDFPage, which is a
+        // synchronous C call with no cancellation points.
         case pageTooLarge(pageIndex: Int)
         case reconstructionFailed
     }
@@ -56,10 +53,10 @@ public enum PipelineError: Sendable, LocalizedError {
     public enum ExportFailure: Sendable {
         case diskFull
         case writeFailed
-        case filePurged  // IE-1-1: Output file purged by iOS while app was backgrounded
+        case filePurged  // Output file purged by iOS while app was backgrounded
     }
 
-    // MARK: - LocalizedError (mechanism-description language per ARCH §1.3)
+    // MARK: - LocalizedError (mechanism-description language)
 
     public var errorDescription: String? {
         switch self {
@@ -76,7 +73,7 @@ public enum PipelineError: Sendable, LocalizedError {
             case .ocrUnavailable: "Text recognition is not available on this device."
             case .timeout(let p): "Page \(p + 1) took too long to process and was skipped."
             case .visionError(let p): "Text recognition could not process page \(p + 1)."
-            // SEC-6 — mechanism-description language per ARCH §1.3 / I6.
+            // Mechanism-description language — no outcome-promise wording.
             case .detectionCorpusInvalid: "Auto-detection is unavailable because the detection corpus failed signature verification. Manual redaction tools remain available."
             }
         case .redactionError(let f):

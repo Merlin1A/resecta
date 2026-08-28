@@ -1,7 +1,5 @@
 import Foundation
 
-// See ARCH §2.3 for DetectionResult definition.
-
 /// Output from the PII/face detection pipeline for a single detected item.
 /// Produced by Detection/ components, consumed by the app target to create
 /// RedactionRegions.
@@ -14,7 +12,7 @@ public struct DetectionResult: Sendable, Identifiable {
     /// Detection confidence (0.0–1.0). Used for UI display and filtering.
     public let confidence: Double
 
-    // --- GAP §2.1: New fields for triage support ---
+    // --- New fields for triage support ---
 
     /// The matched text string (e.g., "123-45-6789" for SSN, "John Smith" for name).
     /// Nil for face detections (no text match). Populated by the detection orchestration
@@ -26,7 +24,7 @@ public struct DetectionResult: Sendable, Identifiable {
     /// quick scan (.fast) or an enhanced scan (.accurate).
     public let recognitionLevel: RecognitionLevel
 
-    /// PERF-4 — Audit record describing how this detection was produced.
+    /// Audit record describing how this detection was produced.
     /// Records whether Vision OCR was skipped in favor of the embedded text
     /// layer (with the reason) so the triage UI / logs can explain the
     /// detection's lineage. Defaulted so existing constructors stay valid.
@@ -53,7 +51,7 @@ public struct DetectionResult: Sendable, Identifiable {
     public enum Kind: Sendable, Equatable, Hashable {
         case pii(PIIKind)
         case face
-        case searchMatch(term: String)  // SEARCH-AND-REDACT §D3
+        case searchMatch(term: String)
     }
 
     public enum RecognitionLevel: String, Sendable {
@@ -61,9 +59,9 @@ public struct DetectionResult: Sendable, Identifiable {
         case accurate
     }
 
-    // MARK: - PERF-4 — Detection provenance
+    // MARK: - Detection provenance
 
-    /// Records how a detection was produced. For PERF-4 the audit field of
+    /// Records how a detection was produced. The audit field of
     /// interest is whether Vision OCR was skipped in favor of the embedded
     /// text layer; the reason enum captures the trigger condition so the
     /// triage UI / audit export can describe the branch decision.
@@ -89,12 +87,12 @@ public struct DetectionResult: Sendable, Identifiable {
         /// Why Vision OCR was skipped on this detection's page.
         public enum OCRSkipReason: String, Sendable, Equatable, Hashable {
             /// Selectable-text coverage exceeded the locked 0.95 threshold
-            /// in `.searchableRedaction` mode (PERF-4 fast path).
+            /// in `.searchableRedaction` mode (fast path).
             case coverageHighEnough
             /// The pipeline mode treats embedded text as authoritative.
             /// Reserved; not emitted by the current gate.
             case modeForcesEmbeddedText
-            /// ST-83 — the page's raster exceeded the OCR pixel caps
+            /// The page's raster exceeded the OCR pixel caps
             /// (`maxOCRPixelDimension` / `maxOCRPixelCount`), so Vision
             /// OCR never ran and the page's image content was not
             /// text-scanned. Surfaced to the user via the triage banner.
@@ -108,7 +106,6 @@ public struct DetectionResult: Sendable, Identifiable {
     /// Convert to a RedactionRegion for storage in RedactionState.regions.
     /// The detection result's coordinate system matches the region's coordinate
     /// system (both normalized, bottom-left origin), so no conversion is needed.
-    /// See ARCH §2.3.
     public func toRegion() -> RedactionRegion {
         let source: RedactionRegion.Source = switch kind {
         case .pii(let piiKind): .detectedPII(kind: piiKind)

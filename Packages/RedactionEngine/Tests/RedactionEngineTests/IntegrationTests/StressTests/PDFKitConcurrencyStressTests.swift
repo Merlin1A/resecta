@@ -5,14 +5,14 @@ import Testing
 import os
 @testable import RedactionEngine
 
-// C-F (CAT-127 / CAT-363) — PDFKit concurrency runtime stress harness.
+// PDFKit concurrency runtime stress harness.
 //
-// This suite is the `needs_runtime_check` resolver for CAT-127 and CAT-363.
+// This suite is the `needs_runtime_check` resolver for the CG-only
+// concurrent-render and shared-doc parallel-layers fixes below.
 // The structural guards (G1/G1b/G2/G3 in ParallelVerificationDocumentTests +
 // PageRasterizerTests) carry the failing-then-green half of the proof bar;
 // this harness is the corroborating runtime evidence — it provokes the
-// concurrency hazards by design and is run under ThreadSanitizer per
-// the deep-plan §5.3 protocol.
+// concurrency hazards by design and is run under ThreadSanitizer.
 //
 // Gating: the suite is SKIPPED unless `RUN_CONCURRENCY_STRESS` is present in
 // the environment (forwarded into the test-runner process via
@@ -25,11 +25,11 @@ import os
 // TSan note: these tests run on the iOS simulator ONLY (never a physical
 // device). TSan does not instrument system frameworks, so a race living wholly
 // inside PDFKit/CG internals surfaces only as a crash or value divergence, not
-// a TSan report (deep-plan §6). A clean T4/T5 is therefore strong-but-partial
+// a TSan report. A clean T4/T5 is therefore strong-but-partial
 // evidence; the structural fix confines that residual to the surviving
 // read-only `extractCharacters` / OCG-walk / `validatePage` paths.
 //
-// ARCH §12.2: fixtures carry synthetic tokens only; no document content,
+// Fixtures carry synthetic tokens only; no document content,
 // file paths, or coordinates are logged.
 
 @Suite(
@@ -89,7 +89,7 @@ struct PDFKitConcurrencyStressTests {
         return url
     }
 
-    /// OCG-hidden-layer fixture (A2-12): exercises the concurrent
+    /// OCG-hidden-layer fixture: exercises the concurrent
     /// `pageReferencesHiddenOCG` pageRef/dictionary walk inside
     /// `extractCharacters(hasHiddenOCG: true)`.
     private func writeOCGFixture() throws -> URL {
@@ -114,7 +114,7 @@ struct PDFKitConcurrencyStressTests {
         )
     }
 
-    // MARK: - T0 — CGPDFPage lifetime probe (deep-plan §1.2 charge b)
+    // MARK: - T0 — CGPDFPage lifetime probe
 
     @Test("T0 — CGPDFPage outlives its source PDFDocument", .tags(.stress))
     func cgPageOutlivesSourceDocument() async throws {
@@ -139,7 +139,7 @@ struct PDFKitConcurrencyStressTests {
         #expect(image.width > 0 && image.height > 0)
         // Contingency if this ever fails: document "PDFPageData must not outlive
         // its source document" on the struct + a Debug assertion — NOT a
-        // redesign (deep-plan §1.2 charge b).
+        // redesign.
     }
 
     // MARK: - T1 — shared-doc concurrent reads (characterization)
@@ -159,7 +159,7 @@ struct PDFKitConcurrencyStressTests {
 
         // 20 iterations × 10 tasks reading page(at:)+bounds+string on the
         // SAME shared document. This access pattern is exactly the one the
-        // CAT-363 fix removes from production; surfacing it under TSan
+        // shared-doc fix removes from production; surfacing it under TSan
         // retroactively justifies the fix (informational — not a gate).
         for _ in 0..<20 {
             let barrier = StartBarrier(expected: 10)
@@ -226,14 +226,13 @@ struct PDFKitConcurrencyStressTests {
     // MARK: - T3 — pre-fix shared-doc parallel layers (RUN-ONCE, then DELETED)
     //
     // T3 (`sharedDocParallelLayersCharacterization`) reconstructed the pre-fix
-    // CAT-363 configuration in-test (3 verification layers racing ONE shared
-    // SendablePDFDocument) to capture the "before" TSan evidence. Per deep-plan
-    // §5.3(3) it was run once under TSan on 2026-06-13 (passed, value-stable,
-    // ZERO ThreadSanitizer reports — the shared-doc race lives inside PDFKit's
-    // uninstrumented internals, §6 blind spot) and then DELETED, because
-    // post-fix it exercises a dead configuration and the structural guard G1
-    // (ParallelVerificationDocumentTests, red→green) carries the regression.
-    // Evidence: sessions/cf-stress-evidence/T3-prefix-tsan-evidence.md.
+    // shared-doc configuration in-test (3 verification layers racing ONE shared
+    // SendablePDFDocument) to capture the "before" TSan evidence. It was run
+    // once under TSan on 2026-06-13 (passed, value-stable, ZERO ThreadSanitizer
+    // reports — the shared-doc race lives inside PDFKit's uninstrumented
+    // internals) and then DELETED, because post-fix it exercises a dead
+    // configuration and the structural guard G1 (ParallelVerificationDocumentTests,
+    // red→green) carries the regression.
 
     // MARK: - T4 — distinct-doc parallel layers (GATE)
 
@@ -244,7 +243,7 @@ struct PDFKitConcurrencyStressTests {
         let verifier = VerificationEngine()
         let params = layerParams(pageCount: 10)
         // Layers 0/1/2 + the layer-9 operator re-extraction path — the four
-        // PERF-6 base layers, each on its OWN PDFDocument(url:) instance.
+        // base layers, each on its OWN PDFDocument(url:) instance.
         let layers = [0, 1, 2, 9]
 
         let reference = try await serialLayerReference(
@@ -281,7 +280,7 @@ struct PDFKitConcurrencyStressTests {
             }
             peakDelta = max(peakDelta, max(0, startMemory - os_proc_available_memory()))
         }
-        // Informational only (deep-plan §5.2 T4 "Log os_proc_available_memory delta").
+        // Informational only — logs the peak os_proc_available_memory delta.
         print("[stress T4] peak os_proc_available_memory delta over 30 iters: \(peakDelta) bytes")
     }
 
@@ -334,12 +333,12 @@ struct PDFKitConcurrencyStressTests {
             }
         }
 
-        // A2-12 — OCG branch coverage. The hidden-OCG fixture drives the
+        // OCG branch coverage. The hidden-OCG fixture drives the
         // concurrent `pageReferencesHiddenOCG` pageRef/dictionary walk inside
         // extractCharacters(hasHiddenOCG: true), which throws
-        // `.reconstructionFailed` per page (AD-2-1). Racing it across iterations
+        // `.reconstructionFailed` per page. Racing it across iterations
         // exercises that CG-dictionary walk under TSan — the second surviving
-        // concurrent PDFKit surface named in the §1.2-C.7 comment.
+        // concurrent PDFKit surface.
         let ocgURL = try writeOCGFixture()
         defer { try? FileManager.default.removeItem(at: ocgURL) }
         let ocgDoc = SendablePDFDocument(try #require(PDFDocument(url: ocgURL)))
@@ -369,15 +368,15 @@ struct PDFKitConcurrencyStressTests {
 
     // MARK: - T5b — validatePage concurrent shared-source (characterization)
     //
-    // Post-F05 discovery (CAT-NEW-s06-1, deferred): `rasterize` calls
+    // A later discovery (deferred): `rasterize` calls
     // `validatePage(page.page, …)` (PixelOperations.swift) before render — a
     // SECOND read-only concurrent `page.page` access (page.bounds + page.pageRef
-    // dictionary) the C-F memo (pinned pre-F05) did not enumerate. It is the same
+    // dictionary) the original design review did not enumerate. It is the same
     // read-only risk class as `extractCharacters`, not a new hazard, but the
     // harness should actually exercise it rather than only name it. This probe is
     // informational — the proper fix (feed validatePage the pre-extracted
-    // cropBoxBounds, off the shared object graph) touches C-E's signature and is
-    // deferred.
+    // cropBoxBounds, off the shared object graph) touches the rasterizer's
+    // signature and is deferred.
 
     @Test("T5b — concurrent validatePage on shared source (characterization)", .tags(.stress))
     func validatePageConcurrentSharedSourceCharacterization() async throws {
@@ -450,16 +449,16 @@ struct PDFKitConcurrencyStressTests {
         let extractSec = seconds(extractElapsed)
         let rasterSec = seconds(rasterElapsed)
         let share = rasterSec > 0 ? extractSec / rasterSec : 0
-        // No assertion — feeds the §1.3 Fallback-1-vs-2 rule (escalate to a
+        // No assertion — feeds the Fallback-1-vs-2 rule (escalate to a
         // per-worker doc pool only if share > ~25%).
         print(String(
             format: "[stress T6] extraction share = %.1f%% (extract=%.3fs raster=%.3fs over %d pages)",
             share * 100, extractSec, rasterSec, pageCount))
     }
 
-    // MARK: - T7 — D10-F1 per-consumer search copy isolates the background scan
+    // MARK: - T7 — per-consumer search copy isolates the background scan
 
-    // SEARCH D10-F1 — the background search reads its OWN copy while the
+    // The background search reads its OWN copy while the
     // on-screen instance is read concurrently (in production the PDFView /
     // MainActor rect resolution). Two DISTINCT PDFDocument instances ⇒ no
     // shared PDFKit object graph, so neither perturbs the other and nothing

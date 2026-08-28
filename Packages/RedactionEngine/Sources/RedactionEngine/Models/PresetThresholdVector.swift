@@ -47,8 +47,8 @@ public struct PresetThresholdVector: Sendable, Equatable {
         case .dea:            "dea"
         case .account:        "account"
         case .routingNumber:  "routingNumber"
-        // S3 §1.7: 8 previously ungated categories now have wire names so the
-        // W4 preset gate applies. The threshold values are hand-set (not swept)
+        // Eight previously ungated categories now have wire names so the
+        // posterior threshold gate applies. The threshold values are hand-set (not swept)
         // because these detectors are not in the score-dump _CATEGORIES list.
         case .ein:            "ein"
         case .itin:           "itin"
@@ -61,7 +61,7 @@ public struct PresetThresholdVector: Sendable, Equatable {
         }
     }
 
-    // W4 — per-category overrides layered on top of the preset vector.
+    // Per-category overrides layered on top of the preset vector.
     // Non-calibration categories (no wire-name) are silently dropped — they
     // have no threshold to override. Values clamped to [0, 1] defensively
     // even though the UI slider enforces the range.
@@ -98,7 +98,7 @@ public struct PresetThresholdBundle: Sendable, Equatable {
         loadWithDiagnostics(from: bundle).bundle
     }
 
-    /// SEC-7 diagnostics variant: the bundle plus, on any fallback to
+    /// Diagnostics variant: the bundle plus, on any fallback to
     /// `.builtInDefaults`, a mechanism-only reason string.
     /// `PIIDetector.loadWithDiagnostics(bundle:)` folds the reason into
     /// `GazetteerLoadDiagnostics` so the fallback surfaces through the existing
@@ -126,15 +126,15 @@ public struct PresetThresholdBundle: Sendable, Equatable {
     }
 
     /// Phase-1 placeholder values — flat across calibrated categories per preset;
-    /// hand-set values for the 8 previously-ungated categories (S3 §1.7).
+    /// hand-set values for the 8 previously-ungated categories.
     /// Phase 3b G9 sweep produces per-category calibrated vectors for the swept set.
     public static let builtInDefaults: PresetThresholdBundle = {
-        // routingNumber included so the degrade path still gates it — the W4
-        // gate passes nil-threshold categories through unfiltered (S2 §4c).
+        // routingNumber included so the degrade path still gates it — the
+        // posterior threshold gate passes nil-threshold categories through unfiltered.
         let calibratedCategories: [String] = ["ssn", "npi", "dea", "dob",
                                               "address", "account", "mrn", "name",
                                               "routingNumber"]
-        // S3 §1.7: 8 ungated categories with hand-set thresholds matching
+        // Eight ungated categories with hand-set thresholds matching
         // the committed preset-thresholds.json (aggressive/balanced/conservative).
         // RECALL NOTE for ein: balanced 0.55 is above base 0.50; an unlabeled
         // EIN without context context will be suppressed at balanced. Intentional:

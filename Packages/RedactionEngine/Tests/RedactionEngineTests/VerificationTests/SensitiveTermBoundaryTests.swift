@@ -3,7 +3,7 @@ import Foundation
 import PDFKit
 @testable import RedactionEngine
 
-// PD-3 (SV-5): token-boundary matching for boundary-required sensitive
+// Token-boundary matching for boundary-required sensitive
 // terms, the two-sided complete-token rule in Layer 3's structural pass,
 // and the Layer 3 structural/decoded combined verdict.
 
@@ -13,7 +13,7 @@ extension VerificationStatus {
     fileprivate var isPass: Bool { if case .pass = self { true } else { false } }
 }
 
-@Suite("SensitiveTermAutomaton token boundaries (PD-3)")
+@Suite("SensitiveTermAutomaton token boundaries")
 struct SensitiveTermAutomatonTests {
 
     private func matches(
@@ -100,7 +100,7 @@ struct SensitiveTermAutomatonTests {
     }
 }
 
-@Suite("Layer 10 boundary-aware term search (PD-3)")
+@Suite("Layer 10 boundary-aware term search")
 struct Layer10BoundaryTests {
     private let verifier = SandwichVerification()
 
@@ -162,7 +162,7 @@ struct Layer10BoundaryTests {
     }
 }
 
-@Suite("Layer 3 two-sided token rule + combined verdict (PD-3)")
+@Suite("Layer 3 two-sided token rule + combined verdict")
 struct Layer3BoundaryAndMaskingTests {
     private let engine = VerificationEngine()
 
@@ -234,7 +234,7 @@ struct Layer3BoundaryAndMaskingTests {
         // One document carrying BOTH surfaces: an Info-dict literal (outside
         // any stream → structural pass) and drawn page text (inside the
         // content stream → excluded from the structural pass, surfaced by
-        // the PDFKit-decoded SVT-3 pass).
+        // the PDFKit-decoded pass).
         let stream = "BT /F1 12 Tf 100 700 Td (Delia Hartwell) Tj ET"
         let data = buildRawPDF(objects: [
             PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),

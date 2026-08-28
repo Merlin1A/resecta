@@ -2,17 +2,17 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// B02 — Site-B (Search-and-Redact) BEFORE twin for the M10 divergence number.
-// B06 — extended into a BEFORE/AFTER leg now that the search path composes the
-// posterior (see `searchParitySiteBBeforeAfter` below).
+// Site-B (Search-and-Redact) BEFORE twin for the per-family divergence
+// measurement, extended into a BEFORE/AFTER leg now that the search path
+// composes the posterior (see `searchParitySiteBBeforeAfter` below).
 //
-// Plan 04 §5.5 / D-13: Site B (DocumentSearcher) gated RAW match.confidence via
+// Site B (DocumentSearcher) gates RAW match.confidence via
 // `ThresholdFilter.applyingCountingDrops(thresholdVector:)` (DocumentSearcher.swift:1146 /
 // :1338 → ThresholdFilter.swift:28-44) with NO posterior, NO prior, NO learned
 // term. Site A (DetectionOrchestrator.swift:432-446) composes the posterior
-// before its cutoff. B02 measured the C1 scorer reaching none of the five
-// families at Site B (M10 = 0 per family — the scorer's value is at the
-// posterior, not at the raw gate). B06 routes the five scored families at Site B
+// before its cutoff. Measurement showed the context scorer reaching none of the five
+// families at Site B (the divergence is 0 per family — the scorer's value is at the
+// posterior, not at the raw gate). This suite routes the five scored families at Site B
 // through that SAME composition (DocumentSearcher.composedSurvivors), so Site B
 // surfaces on the composed posterior rather than the raw gate. The search path is
 // doctype-blind (no classifier output), so the feature builder is fed `.generic`:
@@ -20,7 +20,7 @@ import Foundation
 // approximate for `phone` (its trained doctype one-hots are non-zero, so a phone
 // match on a court/medical/foia document composes a different posterior at Site B).
 //
-// Methodology (the faithful mirror, plan §5.5 step 1):
+// Methodology (the faithful mirror):
 //   - SAME detector matches as the Site-A baseline (detect(in:doctype:) over the
 //     same 1,100 G8 docs, same gateDoctypeClass doctype).
 //   - Site-B surfacing: route those matches through
@@ -29,12 +29,12 @@ import Foundation
 //   - Aggregate the IDENTICAL BaselineCell schema, keyed <cat>_<doctype>_<bucket>.
 //   - Site-A surfacing (for the delta): match.confidence >= balancedCutoff —
 //     the existing baseline `surfaced` rule.
-//   - M10 = per-family (Site-B FP − Site-A FP) for {account, phone, mrn, ein, itin}.
+//   - The divergence is per-family (Site-B FP − Site-A FP) for {account, phone, mrn, ein, itin}.
 //
-// Privacy (ARCH §12.2): offset-only — overlap arithmetic on NSRange locations;
+// Offset-only: overlap arithmetic on NSRange locations;
 // no document text, no PII value, no coordinate is read or emitted.
 
-@Suite("G8 Site-B parity twin (M10, standing emitter)", .serialized)
+@Suite("G8 Site-B parity twin (standing emitter)", .serialized)
 struct G8SearchParityHarnessTests {
 
     // Reuse the baseline suite's cell schema by reference.
@@ -57,9 +57,9 @@ struct G8SearchParityHarnessTests {
         PresetThresholdBundle.loadFromEngineBundle().presets[.balanced]
     }
 
-    // MARK: - B06 BEFORE/AFTER leg (Site-B parity)
+    // MARK: - BEFORE/AFTER leg (Site-B parity)
 
-    /// Per-family Site-B tallies for the predicate + the C3 Search recall floor.
+    /// Per-family Site-B tallies for the predicate + the Search recall floor.
     private struct FamilyTally {
         var falsePositives = 0
         var truePositives = 0   // positive GT covered by a surviving detection
@@ -73,7 +73,7 @@ struct G8SearchParityHarnessTests {
     ///     Site-B gate; the literal BEFORE).
     ///   - `.identity`  → the production `composedSurvivors` core driven with
     ///     `ContextScorerWeights.identity` (the w=0 control — composed == raw).
-    ///   - `.installed` → the same core with the installed (B05) calibrated
+    ///   - `.installed` → the same core with the installed calibrated
     ///     scorer (the AFTER).
     /// In every variant, NON-scored families flow through
     /// `applyingCountingDrops(...)` untouched, so the recombined survivor SET differs only by the scored
@@ -113,7 +113,7 @@ struct G8SearchParityHarnessTests {
 
             // Site-B survivors under the requested variant: partition, gate, recombine.
             // `zeroedFamilies` are forced back onto the raw path (the per-family
-            // C3 kill switch) regardless of variant.
+            // recall kill switch) regardless of variant.
             let (scoredAll, rest) = matches.partitionedByScoredFamily()
             let scored: [PIIDetector.PIIMatch]
             switch variant {
@@ -121,7 +121,7 @@ struct G8SearchParityHarnessTests {
                 scored = scoredAll.applyingCountingDrops(thresholdVector: vector).survivors
             case .identity, .installed:
                 let scorer: ContextScorerWeights = (variant == .identity) ? .identity : installedScorer
-                // Split off any C3-zeroed family → raw path; the rest → composed.
+                // Split off any recall-zeroed family → raw path; the rest → composed.
                 var composedInput: [PIIDetector.PIIMatch] = []
                 var rawInput: [PIIDetector.PIIMatch] = []
                 for m in scoredAll {
@@ -202,7 +202,7 @@ struct G8SearchParityHarnessTests {
         return try encoder.encode(report)
     }
 
-    /// B06 — Site-B BEFORE/AFTER. Drives the PRODUCTION composition
+    /// Site-B BEFORE/AFTER. Drives the PRODUCTION composition
     /// (`DocumentSearcher.composedSurvivors`, via the observation-only
     /// `_testComposeSiteB` seam) over the same 1,100-doc G8 corpus:
     ///
@@ -212,29 +212,29 @@ struct G8SearchParityHarnessTests {
     ///      and the composed Site-B gate MUST reproduce today's raw-gated Site-B
     ///      cells BYTE-FOR-BYTE. This is the literal Site-B BEFORE and the
     ///      non-destructive proof the rewiring is correct.
-    ///   2. AFTER — compose with the installed (B05) calibrated scorer; emit
+    ///   2. AFTER — compose with the installed calibrated scorer; emit
     ///      `<base>_siteb_cells_after.json` and the per-family FP BEFORE→AFTER +
     ///      the Search recall.
-    ///   3. C3 RECALL FLOOR at Search — recomputed independently (Search has no
+    ///   3. RECALL FLOOR at Search — recomputed independently (Search has no
     ///      second pass, so the over-suppression risk is higher). Any family
     ///      whose AFTER Search recall regresses beyond ε=1pt is ZEROED at Site B
     ///      (routed raw) and the AFTER is re-derived; the report names it.
     ///
     /// Tests-only, additive; never touches the frozen Site-A baseline files.
-    @Test("Site-B BEFORE/AFTER: w=0 identity control + composed AFTER + C3 floor")
+    @Test("Site-B BEFORE/AFTER: w=0 identity control + composed AFTER + recall floor")
     func searchParitySiteBBeforeAfter() async throws {
         guard let corpus = try G8BaselineHarnessTests.loadBaselineCorpus() else {
-            print("[B06] g8_corpus.json not bundled; Site-B BEFORE/AFTER skipped.")
+            print("[site-b-before-after] g8_corpus.json not bundled; Site-B BEFORE/AFTER skipped.")
             return
         }
         guard let vector = Self.balancedVector() else {
-            print("[B06] balanced preset vector unavailable; skipped.")
+            print("[site-b-before-after] balanced preset vector unavailable; skipped.")
             return
         }
         let sortedDocs = corpus.documents.sorted { $0.id < $1.id }
         let installed = ContextScorerWeights.loadFromEngineBundle()
         let families = ContextFeatureContract.scoredFamilies.sorted()
-        let epsilon = 0.01  // §3 recall floor ε = 1pt.
+        let epsilon = 0.01  // Recall floor ε = 1pt.
 
         // (1) Raw BEFORE + identity control.
         let (rawCells, rawByFamily) = await runSiteB(
@@ -257,10 +257,10 @@ struct G8SearchParityHarnessTests {
 
         let base = G8BaselineHarnessTests.baselineOutBase()
         try identityData.write(to: URL(fileURLWithPath: "\(base)_siteb_cells_identity.json"), options: .atomic)
-        print("[B06] identity-control cells → \(base)_siteb_cells_identity.json")
+        print("[site-b-before-after] identity-control cells → \(base)_siteb_cells_identity.json")
 
         let identityMatchesRaw = identityData == rawData
-        print("[B06] w=0 IDENTITY CONTROL (composed-at-identity == raw Site-B cells): " +
+        print("[site-b-before-after] w=0 IDENTITY CONTROL (composed-at-identity == raw Site-B cells): " +
               (identityMatchesRaw ? "MATCH (byte-for-byte)" : "MISMATCH"))
         #expect(identityMatchesRaw,
                 "Site-B w=0 identity control must reproduce the raw-gated Site-B cells byte-for-byte")
@@ -271,14 +271,14 @@ struct G8SearchParityHarnessTests {
             installedScorer: installed, zeroedFamilies: []
         )
 
-        // (3) C3 recall floor at Search — zero any family that regresses recall.
+        // (3) Recall floor at Search — zero any family that regresses recall.
         var zeroed: Set<String> = []
         for family in families {
             let before = rawByFamily[family]?.recall ?? 1.0
             let after = afterByFamily[family]?.recall ?? 1.0
             if after < before - epsilon {
                 zeroed.insert(family)
-                print("[B06] C3 FLOOR: family \(family) Search recall \(before) → \(after) " +
+                print("[site-b-before-after] RECALL FLOOR: family \(family) Search recall \(before) → \(after) " +
                       "regresses beyond ε=\(epsilon); ZEROING at Site B (route raw).")
             }
         }
@@ -293,12 +293,12 @@ struct G8SearchParityHarnessTests {
             for family in zeroed.sorted() {
                 let rawFP = rawByFamily[family]?.falsePositives ?? 0
                 let zFP = afterByFamily[family]?.falsePositives ?? 0
-                print("[B06]   zeroed \(family): raw_FP=\(rawFP) zeroed_AFTER_FP=\(zFP) " +
+                print("[site-b-before-after]   zeroed \(family): raw_FP=\(rawFP) zeroed_AFTER_FP=\(zFP) " +
                       (rawFP == zFP ? "(reproduces BEFORE)" : "(DOES NOT reproduce BEFORE)"))
                 #expect(rawFP == zFP, "zeroed family \(family) must reproduce the raw Site-B FP")
             }
         } else {
-            print("[B06] C3 FLOOR: no family regressed Search recall beyond ε=\(epsilon); none zeroed.")
+            print("[site-b-before-after] RECALL FLOOR: no family regressed Search recall beyond ε=\(epsilon); none zeroed.")
         }
 
         // Emit the AFTER cells.
@@ -313,16 +313,16 @@ struct G8SearchParityHarnessTests {
             cells: afterCells
         )
         try G8BaselineHarnessTests.writeJSON(afterReport, to: "\(base)_siteb_cells_after.json")
-        print("[B06] AFTER cells → \(base)_siteb_cells_after.json (\(afterCells.count) cells)")
+        print("[site-b-before-after] AFTER cells → \(base)_siteb_cells_after.json (\(afterCells.count) cells)")
 
         // Per-family FP BEFORE→AFTER + the recomputed Search recall.
-        print("[B06] per-family Site-B FP BEFORE(raw) → AFTER(composed) + Search recall:")
+        print("[site-b-before-after] per-family Site-B FP BEFORE(raw) → AFTER(composed) + Search recall:")
         for family in families {
             let b = rawByFamily[family] ?? FamilyTally()
             let a = afterByFamily[family] ?? FamilyTally()
             let zeroedTag = zeroed.contains(family) ? " [ZEROED@SiteB]" : ""
             print(String(
-                format: "[B06]   %@: FP %d → %d (cut %d) · recall %.4f → %.4f%@",
+                format: "[site-b-before-after]   %@: FP %d → %d (cut %d) · recall %.4f → %.4f%@",
                 family, b.falsePositives, a.falsePositives,
                 b.falsePositives - a.falsePositives, b.recall, a.recall, zeroedTag
             ))

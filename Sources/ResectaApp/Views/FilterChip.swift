@@ -1,6 +1,6 @@
 import SwiftUI
 
-// GAP §4.4: Reusable filter/selection chip — the one chip component for
+// Reusable filter/selection chip — the one chip component for
 // the unified review surface's chip rows (pre-scan detector selection,
 // post-scan category filters, review-mode kind filters).
 
@@ -61,7 +61,7 @@ struct FilterChip: View {
                     Text("\(count)")
                         .font(.caption2.monospacedDigit().weight(.medium))
                         .foregroundStyle(isSelected && tint == nil
-                            // CD-4: ambient accent measures 4.01 as small text
+                            // Ambient accent measures 4.01 as small text
                             // on the selected wash - below the 4.5 small-text
                             // floor; the text tier holds 6.18 worst. The
                             // teal text tier is validated against the ambient
@@ -71,14 +71,14 @@ struct FilterChip: View {
                             : AnyShapeStyle(.secondary))
                 }
             }
-            // REV-01 (packet §7.2 item 1, RB-66): compact drawn
+            // Compact drawn
             // capsule — 36pt drawn height (a minimum: Dynamic Type
             // text growth raises it), 12pt horizontal padding (the
             // board's one proportion change from the old 8), natural
-            // width. RB-67: the UXC-18 46pt floor moves AFTER the
+            // width. The 46pt floor moves AFTER the
             // background chain as a pure LAYOUT frame + contentShape —
             // the hit area still clears the HIG effective minimum
-            // (RB-54 held) while the capsule draws at chip scale. Hit
+            // while the capsule draws at chip scale. Hit
             // expansion beyond the layout frame is banned, so sibling
             // hit zones can never overlap.
             .padding(.horizontal, 12)
@@ -98,6 +98,6 @@ struct FilterChip: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .sensoryFeedback(.selection, trigger: isSelected) // §4.6: haptic on filter toggle
+        .sensoryFeedback(.selection, trigger: isSelected) // Haptic on filter toggle
     }
 }

@@ -6,8 +6,7 @@ import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// PERF-1 — Per-page verification retry tests (KI-1).
-// See plan.md §5 PERF-1 + §0.7 (retry placement).
+// Per-page verification retry tests (KNOWN_ISSUES.md KI-1).
 //
 // The retry wrapper lives in `PipelineCoordinator.rasterizeWithRetry`
 // (called inside `processDocument`'s page loop). Tests drive
@@ -15,7 +14,7 @@ import CoreGraphics
 // counter on a per-test `PageRasterizerTestSeam.Recorder`, not the
 // surrounding pipeline machinery.
 
-@Suite("Per-Page Verification Retry (PERF-1)", .tags(.coordination))
+@Suite("Per-Page Verification Retry", .tags(.coordination))
 @MainActor
 struct PerPageRetryTests {
 
@@ -175,7 +174,7 @@ struct PerPageRetryTests {
     }
 
     /// Build a coordinator backed by a multi-page PDF with a small redaction
-    /// region on every page (so AD-4-1 sub-threshold filtering keeps the
+    /// region on every page (so sub-threshold filtering keeps the
     /// page in `buildPDFPageData`).
     private func makeCoordinatorWithMultiPagePDF(pages: Int, regions: Bool) -> PipelineCoordinator {
         let coord = makeCoordinator()

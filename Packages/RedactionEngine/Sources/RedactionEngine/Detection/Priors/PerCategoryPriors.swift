@@ -1,11 +1,11 @@
 import Foundation
 
-// Plan §2 / G10 — per-category Beta priors threaded into detection scoring.
+// Per-category Beta priors threaded into detection scoring.
 // Sendable value type. Priors update on triage accept/reject (never during
 // detection). Passed by value into @concurrent `detectPage`.
 //
 // G10 hardening invariants (defend against prior poisoning on adversarial
-// streams — see plan §C):
+// streams):
 //   • α ≥ 1.0 floor (never let the accept arm collapse to zero).
 //   • α + β ≤ 50 ESS cap (scaled proportionally when exceeded; prevents a
 //     long session from making priors unmoveable).

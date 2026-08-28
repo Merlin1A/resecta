@@ -7,19 +7,19 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// Tests for ENGINE §5C — invisible text layer reconstruction.
-// J-12 layout contract (2026-06-09): each Y-sweep band draws at ONE pitch —
-// sum-matched to the band's source glyph widths, capped at the band's
-// median glyph height, quantized to 0.5pt — with same-band groups bridged
-// into one CTLine by whole-cell spaces (never across a redaction rect) and
-// an assembled-line fit clamp. The 12pt-era grid model (`groupIntoRuns`,
-// `snappedOrigin`, `cellWidth`) remains the shared run definition and is
-// pinned below as the legacy view.
+// Tests for invisible text layer reconstruction.
+// Layout contract: each Y-sweep band draws at ONE pitch — sum-matched to the
+// band's source glyph widths, capped at the band's median glyph height,
+// quantized to 0.5pt — with same-band groups bridged into one CTLine by
+// whole-cell spaces (never across a redaction rect) and an assembled-line
+// fit clamp. The 12pt-era grid model (`groupIntoRuns`, `snappedOrigin`,
+// `cellWidth`) remains the shared run definition and is pinned below as the
+// legacy view.
 
 @Suite("Text Layer Reconstruction")
 struct TextLayerReconstructorTests {
 
-    // MARK: - groupIntoRuns (ENGINE §5C.1 — shared run definition)
+    // MARK: - groupIntoRuns (shared run definition)
 
     @Test("Single character produces single run with grid-snapped origin")
     func singleCharacterRun() {
@@ -101,14 +101,14 @@ struct TextLayerReconstructorTests {
             [], pageWidth: 612, redactionRects: []).isEmpty)
     }
 
-    // MARK: - runMemberGroups: symmetric per-pair line height (CAT-375)
+    // MARK: - runMemberGroups: symmetric per-pair line height
 
     /// Index of the group containing `member`, or nil.
     private func groupIndex(of member: Int, in groups: [[Int]]) -> Int? {
         groups.firstIndex { $0.contains(member) }
     }
 
-    @Test("CAT-375: a tall heading glyph does not over-merge the small lines beneath it")
+    @Test("a tall heading glyph does not over-merge the small lines beneath it")
     func mixedFontSizeGroupingSeparatesSmallLines() {
         // A 24pt heading glyph sits well above two 8pt body glyphs that are on
         // adjacent (8pt-spaced) lines. The old grouping loop took its
@@ -116,7 +116,7 @@ struct TextLayerReconstructorTests {
         // sorted glyph, here the tall heading — so `24 × 0.5 = 12` swallowed
         // the `8`-pt gap between the two small lines and merged them into one
         // group. The symmetric per-pair `min(height) × 0.5 = 4` keeps them
-        // apart. CAT-375.
+        // apart.
         let heading = CharacterInfo(
             character: "H", bounds: CGRect(x: 10, y: 200, width: 14, height: 24),
             stringIndex: 0)
@@ -136,12 +136,12 @@ struct TextLayerReconstructorTests {
                 "the two small-line glyphs must land in different groups")
     }
 
-    @Test("CAT-375: a genuine mixed-size same-line pair still groups together")
+    @Test("a genuine mixed-size same-line pair still groups together")
     func mixedFontSizeGroupingKeepsSameLineTogether() {
         // A large cap and a smaller following glyph share a baseline (midY gap
         // 4 pt). The per-pair `min(18, 10) × 0.5 = 5` threshold still admits
         // them as one line, so the symmetric form does not over-split genuine
-        // same-line runs. CAT-375.
+        // same-line runs.
         let big = CharacterInfo(
             character: "B", bounds: CGRect(x: 10, y: 100, width: 14, height: 18),
             stringIndex: 0)
@@ -154,9 +154,9 @@ struct TextLayerReconstructorTests {
                 "an adjacent mixed-size pair on the same baseline stays one group")
     }
 
-    // MARK: - CAT-366: CropBox-local extraction (D-34 canonical coordinate contract)
+    // MARK: - CropBox-local extraction (canonical coordinate contract)
 
-    @Test("CAT-366: extractCharacters returns cropBox-local bounds on a non-zero-origin page")
+    @Test("extractCharacters returns cropBox-local bounds on a non-zero-origin page")
     func nonZeroCropBoxOriginCorrection() async throws {
         let data = TestFixtures.nonZeroOriginDiscriminatingPDF()
         let doc = try #require(PDFDocument(data: data))
@@ -190,13 +190,13 @@ struct TextLayerReconstructorTests {
         let expected = SandwichVerification.courierAdvancePerPoint
             * TextLayerReconstructor.baseFontSize
         #expect(TextLayerReconstructor.cellWidth == expected)
-        // Plan §3.1 anchor value at 12pt base.
+        // Anchor value at 12pt base.
         #expect(abs(TextLayerReconstructor.cellWidth - 7.20117_1875) < 0.0001)
     }
 
-    @Test("Base font size is the 12pt REFERENCE constant (J-12 derives band sizes)")
+    @Test("Base font size is the 12pt REFERENCE constant (band sizes are derived)")
     func baseFontSizeIsConstant() {
-        // [J-12 flip, 2026-06-09] The constant no longer pins the drawn
+        // The constant no longer pins the drawn
         // size — `layoutLines` derives one quantized pitch per band — but
         // it anchors the verifier's linear tolerance scaling
         // (`advanceWidthTolerancePerPoint × pointSize` == 0.25 at 12pt).
@@ -217,7 +217,7 @@ struct TextLayerReconstructorTests {
         #expect(TextLayerReconstructor.snappedOrigin(onGrid) == onGrid)
     }
 
-    // MARK: - layoutLines (ENGINE §5C.1/§5C.2, J-12)
+    // MARK: - layoutLines
 
     @Test("layoutLines: band size is sum-matched, height-capped, quantized")
     func layoutLinesDerivedSizeLaw() {
@@ -316,7 +316,7 @@ struct TextLayerReconstructorTests {
         }
     }
 
-    // MARK: - drawInvisibleTextLayer (ENGINE §5C.1)
+    // MARK: - drawInvisibleTextLayer
 
     @Test("Drawing invisible text layer into PDF context produces selectable text",
           .timeLimit(.minutes(1)))
@@ -370,7 +370,7 @@ struct TextLayerReconstructorTests {
     @Test("Per-character UIFont pointSize in the output equals the band's derived size",
           .timeLimit(.minutes(1)))
     func outputFontPointSizeMatchesDerivedBandSize() throws {
-        // [J-12 flip, 2026-06-09] Was: pointSize == the pinned 12pt
+        // Was: pointSize == the pinned 12pt
         // constant. Now: pointSize == the band's derived quantized size —
         // for these 14pt-wide / 20pt-high glyphs the height cap binds and
         // the drawn (and PDFKit-reported) size is 20pt.
@@ -429,6 +429,6 @@ struct TextLayerReconstructorTests {
         )
         #expect(expectedSize == 20.0)
         #expect(font.pointSize == expectedSize,
-                "Output font size equals the band's derived quantized size (J-12)")
+                "Output font size equals the band's derived quantized size")
     }
 }

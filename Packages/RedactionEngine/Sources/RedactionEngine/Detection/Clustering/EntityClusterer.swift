@@ -1,6 +1,6 @@
 import Foundation
 
-// Plan §5 / A5 — entity clustering on name detections. Compound blocking
+// Entity clustering on name detections. Compound blocking
 // on (surname, first-initial); pairwise similarity compared with
 // JaroWinkler.combinedSimilarity; union if ≥ 0.70. Clusters size ≥ 15
 // without a disambiguating first-initial get flagged — the UI surfaces

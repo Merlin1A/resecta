@@ -19,8 +19,7 @@ public struct CalibratedScorer: Sendable {
     private static let logger = Logger(subsystem: "resecta.engine", category: "calibrated-scorer")
 
     /// Single scalar temperature applied to all five classes. Future work
-    /// (per DataPipeline CLAUDE.md §2.4) may move to per-class vector
-    /// temperature; schema leaves room.
+    /// may move to per-class vector temperature; schema leaves room.
     private let temperature: Double
 
     public init() {
@@ -30,7 +29,7 @@ public struct CalibratedScorer: Sendable {
     /// Posterior = σ(logit(raw) + logit(prior) + contextLogit). A calibrated
     /// Bayesian update that preserves the raw detector signal while anchoring
     /// toward what the user's history says about this category. `contextLogit`
-    /// is the C1 augment term (the learned context log-odds); it defaults to 0,
+    /// is the learned context log-odds; it defaults to 0,
     /// so every existing caller and the w=0 placeholder path are unchanged.
     public func posterior(raw: Double, priorMean: Double, contextLogit: Double = 0) -> Double {
         let combined = Logit.logit(raw) + Logit.logit(priorMean) + contextLogit
@@ -43,7 +42,7 @@ public struct CalibratedScorer: Sendable {
         loadTemperatureWithDiagnostics(from: bundle).temperature
     }
 
-    /// SEC-7 diagnostics variant: the temperature plus, on any fallback to the
+    /// Diagnostics variant: the temperature plus, on any fallback to the
     /// identity T=1.0, a mechanism-only reason string.
     /// `PIIDetector.loadWithDiagnostics(bundle:)` folds the reason into
     /// `GazetteerLoadDiagnostics` so the fallback surfaces through the existing

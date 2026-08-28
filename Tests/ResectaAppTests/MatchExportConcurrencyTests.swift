@@ -3,7 +3,7 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// CAT-242: the test below drives the PRODUCTION
+// The test below drives the PRODUCTION
 // `MatchExportService.writeTriageExport` (CSV/JSON serialization + two atomic
 // file writes inside a Task.detached(.utility)) on a 5,000-record audit, rather
 // than re-wrapping the serializers in a test-owned detached task. It confirms
@@ -15,7 +15,7 @@ struct MatchExportConcurrencyTests {
 
     @Test("writeTriageExport writes real CSV/JSON files off-main; CSV carries a line per record")
     @MainActor
-    func largeExportSerializesOffMain() async throws {  // throws — Pkg C made json() throws
+    func largeExportSerializesOffMain() async throws {  // throws — json() throws
         let records = (0..<5000).map { i in
             MatchAuditRecord(
                 id: UUID(),
@@ -55,14 +55,14 @@ struct MatchExportConcurrencyTests {
             records: records, metadata: metadata, includeSensitive: false,
             documentName: "document", into: dir, toastManager: ToastQueueManager()
         )
-        // CAT-242: exercise the production Task.detached + atomic-write path. If
+        // Exercise the production Task.detached + atomic-write path. If
         // the off-main dispatch or the file write regresses, the result is nil
         // or the files are absent/short.
         let urls = try #require(result, "writeTriageExport must produce output files")
         #expect(FileManager.default.fileExists(atPath: urls.csv.path), "CSV export file must exist on disk")
         #expect(FileManager.default.fileExists(atPath: urls.json.path), "JSON export file must exist on disk")
 
-        // CAT-253: line-count + 100k-byte floors. The old `> 5000` byte floor was
+        // Line-count + 100k-byte floors. The old `> 5000` byte floor was
         // trivial (a degenerate one-char-per-record serializer would clear it).
         // A line per record (header + 5000 rows) flags an empty/collapsed CSV;
         // 100k bytes flags a row-collapse that still emits newlines.

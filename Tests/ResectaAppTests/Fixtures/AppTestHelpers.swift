@@ -101,7 +101,7 @@ func makeTextPDFData(text: String) -> Data {
     }
 }
 
-/// CAT-227 memory-stress fixture (C-E deep plan §5). A multi-page PDF whose
+/// Memory-stress fixture. A multi-page PDF whose
 /// lower `noiseFraction` of each page is filled with a deterministic
 /// pseudo-random grayscale pattern; the upper portion is white with an index
 /// stamp.
@@ -193,7 +193,7 @@ func makePNGImageData() -> Data {
     }
 }
 
-// MARK: - Mock Factories (GAP §2, F-9, F2-5)
+// MARK: - Mock Factories
 
 extension DetectionResult {
     /// Create a mock detection result for app-target tests.

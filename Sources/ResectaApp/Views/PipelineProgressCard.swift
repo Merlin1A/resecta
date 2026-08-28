@@ -1,9 +1,9 @@
 import SwiftUI
 
-// §A4.2: Floating progress card — replaces PipelineProgressOverlay (§5.3).
+// Floating progress card — replaces PipelineProgressOverlay.
 // Handles .detecting, .redacting, .exporting phases with scrim + dimensioned card.
 // .verifying is NOT handled here — VerificationProgressView owns that phase.
-// §4.2: Uses .regularMaterial (not .glassEffect) for consistency with verification surfaces.
+// Uses .regularMaterial (not .glassEffect) for consistency with verification surfaces.
 
 struct PipelineProgressCard: View {
     @Environment(DocumentState.self) private var documentState
@@ -21,14 +21,14 @@ struct PipelineProgressCard: View {
             }
             .padding(ResectaTokens.Spacing.lg)
             .containerRelativeFrame(.horizontal) { length, _ in
-                // WP8: Adaptive width — wider on iPad landscape
+                // Adaptive width — wider on iPad landscape
                 if length > 700 { min(length * 0.5, 480) }
                 else { min(length * 0.85, 320) }
             }
             .background(.regularMaterial, in: RoundedRectangle(
                 cornerRadius: ResectaTokens.CornerRadius.sheet, style: .continuous))
-            // Research Area 5: Uses .sheet (24pt) — scrim-backed floating overlay.
-            // §4.2: .regularMaterial for consistency with verification content surfaces.
+            // Uses .sheet (24pt) — scrim-backed floating overlay.
+            // .regularMaterial for consistency with verification content surfaces.
         }
     }
 
@@ -45,7 +45,7 @@ struct PipelineProgressCard: View {
             VStack(spacing: ResectaTokens.Spacing.sm) {
                 Text("Detecting\u{2026}")
                     .font(.headline)
-                // FLOW-3 (Pkg N): only render the page-progress Text once
+                // Only render the page-progress Text once
                 // `pipelineProgress` has been populated. The card briefly
                 // mounts before the first transition syncs progress, and
                 // the previous `progress?.current ?? 0 / progress?.total ?? 0`
@@ -69,7 +69,7 @@ struct PipelineProgressCard: View {
             VStack(spacing: ResectaTokens.Spacing.sm) {
                 Text(progress?.stepDescription ?? "Processing\u{2026}")
                     .font(.headline)
-                // FLOW-3 (Pkg N): same gating as the .detecting branch
+                // Same gating as the .detecting branch
                 // above — suppress the "Page 0 of 0" flash before the
                 // first progress tick lands.
                 if let progress {
@@ -86,7 +86,7 @@ struct PipelineProgressCard: View {
             }
 
         // .verifying is NOT handled by this card — it uses VerificationProgressView
-        // (§4.3) for layer-by-layer trust communication. See §A4.5.
+        // for layer-by-layer trust communication.
 
         case .exporting:
             VStack(spacing: ResectaTokens.Spacing.sm) {

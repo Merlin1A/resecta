@@ -8,7 +8,7 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// S06 — pipeline measurement helpers for `PacketSearchableProbeTests`.
+// Pipeline measurement helpers for `PacketSearchableProbeTests`.
 //
 // Operates on a committed synthetic fixture (the parameterized
 // fixture-plus-regions pipeline probe; the fixture payload is `Data`).
@@ -16,8 +16,9 @@ import UIKit
 // Unicode scalar values (hex), UTF-16 offsets, bounds/geometry, font and
 // subset names, page numbers. NEVER running text (words/lines/sentences).
 // Content strings are held internally for sequence alignment; everything
-// printed goes through `scalarHex`, counts, or geometry. Production code
-// rules (ARCH §12.2) are untouched — this file is test-only measurement.
+// printed goes through `scalarHex`, counts, or geometry. Production code's
+// logging rules (never document content, file paths, or redaction
+// coordinates) are untouched — this file is test-only measurement.
 
 // MARK: - Records
 

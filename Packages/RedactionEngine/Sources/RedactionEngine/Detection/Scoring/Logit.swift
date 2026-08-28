@@ -1,6 +1,6 @@
 import Foundation
 
-// Plan §6 — logit / sigmoid helpers. Used by CalibratedScorer to compose
+// Logit / sigmoid helpers. Used by CalibratedScorer to compose
 // `posterior = σ(logit(raw) + logit(prior))`. Clamped away from {0, 1} to
 // avoid ±∞.
 

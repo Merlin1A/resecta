@@ -5,7 +5,7 @@ import CoreGraphics
 @testable import RedactionEngine
 
 // Conditional dismiss: the sheet-level Dismiss rule, generalized from the retired
-// triage sheet's donor contract (GATE-5): Dismiss is CONDITIONAL on
+// triage sheet's donor contract: Dismiss is CONDITIONAL on
 // whether the USER has modified selections this sheet session, for
 // either result origin. Untouched → one tap (no friction; machine-made
 // selections drop silently as before). Touched → a confirmation dialog.
@@ -91,7 +91,7 @@ struct SearchSheetDismissRuleTests {
                 "a programmatic restore is not user selection work")
     }
 
-    // MARK: - UXC-39: the arm-on-preselect tracker
+    // MARK: - The arm-on-preselect tracker
 
     @Test("Magic-wand preselect consumption arms hasUnreviewedPreselection")
     func magicWandPreselectArmsUnreviewedTracker() {
@@ -225,14 +225,14 @@ struct SearchSheetDismissRuleTests {
         #expect(message.contains("Selected matches"))
     }
 
-    // CAT-395 (C-J1, the "F10 deferral pattern"): the `.sheet(item:)` set:
+    // The `.sheet(item:)` set:
     // closure in DocumentEditorView defers each @Observable teardown one
     // runloop turn via `Task { @MainActor }` with an in-Task re-check
     // guard. Under the absorbed review, the search arm's deferred clear
     // ALSO discards a pending review (a system-initiated dismissal with
     // staged findings would otherwise strand them behind a closed sheet).
     // This mirrors the production closure against real state.
-    @Test("Sheet-binding teardown defers the clear and discards a pending review with it (CAT-395)")
+    @Test("Sheet-binding teardown defers the clear and discards a pending review with it")
     func sheetBindingTeardownIsDeferredAndClearsReview() async {
         let redactionState = RedactionState()
         redactionState.activeSearch = SearchState()

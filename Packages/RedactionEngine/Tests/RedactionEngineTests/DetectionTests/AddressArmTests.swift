@@ -2,18 +2,18 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// WS1 design 01 §10 — PO Box / rural-route / APO address arms (item 1.14, 2026-06-10).
+// PO Box / rural-route / APO address arms.
 //
 // Three new regex arms appended to detectAddresses() at fixed 0.70 confidence,
 // matching the existing street-address arm's confidence.
-// Design doc location: DetectionOrchestratorTests.swift (address suite) or
-// a new sibling file. Using a sibling (AddressArmTests.swift) here because
-// the new tests exercise only PIIDetector.detectAddresses directly, without
-// Vision/orchestrator machinery — keeping them in DetectionOrchestratorTests
-// (which is .serialized for Vision) would unnecessarily serialize fast
-// unit tests. Noted in report per spec.
+//
+// These tests live in a sibling file (AddressArmTests.swift) rather than
+// DetectionOrchestratorTests.swift because they exercise only
+// PIIDetector.detectAddresses directly, without Vision/orchestrator
+// machinery — keeping them in DetectionOrchestratorTests (which is
+// .serialized for Vision) would unnecessarily serialize fast unit tests.
 
-@Suite("Address PO Box / rural-route / APO arms (design 01 §10, item 1.14)")
+@Suite("Address PO Box / rural-route / APO arms")
 struct AddressArmTests {
 
     private func addressMatches(in text: String) -> [PIIDetector.PIIMatch] {
@@ -135,7 +135,7 @@ struct AddressArmTests {
     func existingArm_stillWorks() {
         // Verify the restructure did not break the original arm.
         let matches = addressMatches(in: "123 Main St, Anytown, CA 90210")
-        #expect(matches.count >= 1, "Street-address arm must still work after §10 restructure")
+        #expect(matches.count >= 1, "Street-address arm must still work after the restructure")
         if let m = matches.first {
             #expect(m.confidence == 0.70)
         }

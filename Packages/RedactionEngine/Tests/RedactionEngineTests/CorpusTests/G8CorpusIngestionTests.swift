@@ -2,8 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Plan Phase 2 / §G8 exit criterion — "Fixtures/corpus/g8_corpus.json
-// ingestable by Swift tests." This suite decodes against the schema at
+// This suite decodes "Fixtures/corpus/g8_corpus.json" against the schema at
 // DataPipeline/schemas/g8_corpus.schema.json and validates counts.
 //
 // Gated on fixture presence. Skipped cleanly when the maintainer has not yet run
@@ -66,8 +65,7 @@ struct G8CorpusIngestionTests {
             return
         }
 
-        // Per plan §G8 as amended by calibration design 03 §3.2 (S4):
-        // 1 100 documents split 300/250/300/150/100 — financial grew
+        // Counts: 1 100 documents split 300/250/300/150/100 — financial grew
         // 200 → 300 with the W-2 (`financial_tax`) sub-template third.
         #expect(corpus.counts_by_doctype.court == 300)
         #expect(corpus.counts_by_doctype.medical == 250)

@@ -4,7 +4,7 @@ import CoreGraphics
 import PDFKit
 @testable import RedactionEngine
 
-// ENGINE §5 — PDF reconstruction tests.
+// PDF reconstruction tests.
 
 @Suite("PDF Stream Reconstruction")
 struct ReconstructionTests {
@@ -69,7 +69,7 @@ struct ReconstructionTests {
         #expect(abs(bounds.height - 792) < 1)
     }
 
-    // MARK: - Metadata Stripping (ENGINE §5.4)
+    // MARK: - Metadata Stripping
 
     @Test("Output PDF has no /Author, /Title, /Creator, /Subject, /Keywords")
     func metadataStripped() async throws {
@@ -96,10 +96,10 @@ struct ReconstructionTests {
         // /Creator may or may not appear (Apple behavior)
 
         // /Producer is auto-injected by CGPDFContext, then rewritten to the
-        // fixed value by finalize() (§5.4) — pinned by the tests below.
+        // fixed value by finalize() — pinned by the tests below.
     }
 
-    // MARK: - Producer rewrite (ENGINE §5.4)
+    // MARK: - Producer rewrite
 
     @Test("Finalized output carries the fixed /Producer value and the expected /Info keys")
     func outputProducerCarriesFixedValue() async throws {
@@ -242,7 +242,7 @@ struct ReconstructionTests {
         await recon.finalize()
 
         let fileSize = try FileManager.default.attributesOfItem(atPath: tempURL.path)[.size] as? Int ?? 0
-        // CAT-253: raised 100 → 5_000. A 100×100 two-color JPEG page in a PDF
+        // Raised 100 → 5_000. A 100×100 two-color JPEG page in a PDF
         // container always clears 5 KB; the old 100-byte floor could not flag a
         // JPEG-compression collapse or an empty-page reconstruction.
         #expect(fileSize > 5_000, "Output PDF should have substantial content (got \(fileSize) bytes)")
@@ -382,9 +382,9 @@ struct ReconstructionTests {
                 "61-minute-old file should be removed (over 1-hour threshold)")
     }
 
-    // MARK: - RES-02: Broadened resecta_* prefix sweep
+    // MARK: - Broadened resecta_* prefix sweep
 
-    /// RES-02 — the sweep used to match only `recon_*` and `redacted_*`,
+    /// The sweep used to match only `recon_*` and `redacted_*`,
     /// which left `resecta_audit_*` and `resecta_coverage_*` share-sheet
     /// temp files orphaned if the app was killed mid-dismiss. Verifies that
     /// every `resecta_*` prefix is now reaped under the same 1-hour TTL,
@@ -463,7 +463,7 @@ struct ReconstructionTests {
         #expect(doc?.pageCount == 1)
     }
 
-    // MARK: - CND-11 (launch-fix-v2 S5) draw-on-append color + order
+    // MARK: - Draw-on-append color + order
 
     /// Draw-on-append (K=0) draws each page into the PDF context as it arrives
     /// rather than from a retained buffer. This pins that the streaming path

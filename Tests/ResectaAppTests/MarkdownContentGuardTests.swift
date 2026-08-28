@@ -1,10 +1,10 @@
 import Testing
 import Foundation
 
-// CND-06 (launch-fix-v2 · S2) — legal-doc content-readiness gate.
+// Legal-doc content-readiness gate.
 //
 // PRIVACY.md and EULA.md ship to the public resecta.app/privacy and /eula
-// pages (CND-03). They currently carry a `DRAFT-FOR-JESSE-APPROVAL` banner and
+// pages. They currently carry a draft banner and
 // an `_TBD …_` effective-date placeholder. This suite is fail-closed over that
 // readiness: it lands RED on purpose and turns green only once the maintainer / counsel
 // strip the banner and set a real effective date. It is tracked as a gate (not
@@ -15,17 +15,17 @@ import Foundation
 // read only `Legal.xcstrings` — none of them can see these Markdown files. The
 // loader mirrors the `#filePath` repo-root posture of `TransparencyClaimsTests`.
 
-@Suite("Legal-doc content readiness (CND-06)")
+@Suite("Legal-doc content readiness")
 struct MarkdownContentGuardTests {
 
     // nonisolated for the same reason as `LegalKeyExistenceTests.eulaKeys`:
     // consumed by `@Test(arguments:)`, which the Swift Testing macro hoists into
-    // a nonisolated peer. Under the s04 SE-0466 MainActor-default flip an
+    // a nonisolated peer. Under the SE-0466 MainActor-default flip an
     // unannotated static would be MainActor-isolated and unreadable there.
     nonisolated static let legalDocs = ["PRIVACY.md", "EULA.md"]
 
     /// Draft-banner marker. Uppercase literal so the assertion targets the
-    /// banner (`DRAFT-FOR-JESSE-APPROVAL`, `This is a DRAFT`) and not the
+    /// draft banner text (e.g. `This is a DRAFT`) and not the
     /// lowercase verb "drafted" inside it.
     nonisolated static let draftMarker = "DRAFT"
 
@@ -34,7 +34,7 @@ struct MarkdownContentGuardTests {
         let contents = try loadRepoFile(name)
         #expect(
             !contents.contains(Self.draftMarker),
-            "\(name) still contains a '\(Self.draftMarker)' banner — strip the DRAFT-FOR-JESSE-APPROVAL block before the resecta.app page goes live (CND-06).")
+            "\(name) still contains a '\(Self.draftMarker)' banner — strip the draft-approval block before the resecta.app page goes live.")
     }
 
     @Test("Effective-date line is set, not TBD", arguments: legalDocs)
@@ -50,7 +50,7 @@ struct MarkdownContentGuardTests {
         // not, since `_` is a regex word character.
         #expect(
             dateLine.range(of: "(?<![A-Za-z])TBD(?![A-Za-z])", options: .regularExpression) == nil,
-            "\(name) effective-date line still reads TBD — set the date at the V1.0 tag (CND-06): \(dateLine)")
+            "\(name) effective-date line still reads TBD — set the date at the V1.0 tag: \(dateLine)")
 
         // … and a real date must be positively present. An absence-only check
         // would go false-green the moment TBD is deleted with no replacement.
@@ -61,7 +61,7 @@ struct MarkdownContentGuardTests {
             + "\\s+\\d{1,2},?\\s+\\d{4}|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}/\\d{1,2}/\\d{4}"
         #expect(
             dateLine.range(of: datePattern, options: .regularExpression) != nil,
-            "\(name) effective-date line has no recognizable date — expected e.g. 'June 23, 2026' or '2026-06-23' (CND-06): \(dateLine)")
+            "\(name) effective-date line has no recognizable date — expected e.g. 'June 23, 2026' or '2026-06-23': \(dateLine)")
     }
 
     // MARK: - Helpers
@@ -75,7 +75,7 @@ struct MarkdownContentGuardTests {
     }
 
     /// Reads a repo-root file via `#filePath`, mirroring the
-    /// `TransparencyClaimsTests` / D-12 loader posture.
+    /// `TransparencyClaimsTests` loader posture.
     private func loadRepoFile(_ relativePath: String, file: StaticString = #filePath) throws -> String {
         let repoRoot = URL(fileURLWithPath: "\(file)")
             .deletingLastPathComponent()   // Tests/ResectaAppTests

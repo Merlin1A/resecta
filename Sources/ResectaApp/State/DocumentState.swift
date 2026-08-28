@@ -4,10 +4,7 @@ import os
 import RedactionEngine
 import Vision  // VNRequestTextRecognitionLevel for lastUsedRecognitionLevel
 
-// See ARCH §4.1 for canonical definition.
-// See UI_UX §1.2 for transition table, §1.3 for transition engine.
-
-// ARCH §12.2: Log only phase kind (enum case names) as .public.
+// Log only phase kind (enum case names) as .public.
 // Never log document content, file paths, or redaction coordinates.
 private let logger = Logger(subsystem: "com.resecta.app", category: "state")
 
@@ -43,7 +40,7 @@ class DocumentState {
 
     struct VerificationProgress: Sendable {
         var currentLayer: Int       // 1-based layer index
-        var totalLayers: Int        // Mode-dependent: 5 or 8 (NEVER hardcoded — R4)
+        var totalLayers: Int        // Mode-dependent: 5 or 8 (never hardcoded)
         var layerName: String
         var completedLayers: [LayerResult]
         var subPhase: SubPhase = .verifying
@@ -108,7 +105,7 @@ class DocumentState {
     var currentPageIndex: Int = 0
     var pageCount: Int { sourceDocument?.pageCount ?? 0 }
 
-    // SA-3 rider (D-70): rect-level scroll-to-match. Page-granular
+    // Rect-level scroll-to-match. Page-granular
     // navigation leaves a match off-screen when the canvas is zoomed
     // past fit; result-navigation writers hand the canvas the match
     // rect alongside the page write. The token makes every request
@@ -121,18 +118,18 @@ class DocumentState {
         /// convention; converted at the consumer via the engine's
         /// canonical `normalizedToPDFPageCoordinates`.
         let normalizedRect: CGRect
-        /// UXC-50 (D-128, RB-123): the zoom intent riding the one
-        /// seam (SA-3 kept). `.none` = today's page write + past-fit
+        /// The zoom intent riding the one
+        /// seam. `.none` = today's page write + past-fit
         /// rect scroll; `.readability` = the consumer normalizes the
         /// scale to `PDFDocumentView.readabilityTargetScale` first.
         let zoom: CanvasZoomIntent
         let token: UUID
     }
 
-    /// UXC-50 (D-128, RB-123 items 1–2): what a canvas scroll request
+    /// What a canvas scroll request
     /// asks of the scale. Only the sheet-parking writers (chevrons,
     /// ⌘G/⇧⌘G, row taps, review-row taps) pass `.readability`; J/K
-    /// stays `.none` (RB-92 semantics untouched).
+    /// stays `.none` (existing semantics untouched).
     enum CanvasZoomIntent: Equatable {
         case none
         case readability
@@ -156,7 +153,7 @@ class DocumentState {
         )
     }
 
-    // SEARCH D10-F1 — per-consumer PDFDocument copy. PDFDocument/PDFPage are
+    // Per-consumer PDFDocument copy. PDFDocument/PDFPage are
     // not thread-safe for concurrent read while the main-thread PDFView renders
     // the live instance, so the background search and the off-main live-preview
     // text-walk each read their OWN copy (per-consumer discipline, here
@@ -171,11 +168,11 @@ class DocumentState {
         return SendablePDFDocument(copy)
     }
 
-    /// Active pipeline task — stored for cancellation support (UI_UX §1.4).
+    /// Active pipeline task — stored for cancellation support.
     var activePipelineTask: Task<Void, Never>?
 
     /// Active import task — stored for cancellation support. Parallels
-    /// `activePipelineTask`. CANCEL-006: the import path has its own
+    /// `activePipelineTask`. The import path has its own
     /// MainActor entry point in `ImportService` and runs CPU-bound
     /// per-page validation off MainActor via `Task.detached`; tracking
     /// the import task separately lets `cancelActivePipeline` reach the
@@ -183,7 +180,7 @@ class DocumentState {
     /// checks at the top of each per-page loop.
     var activeImportTask: Task<Void, Never>?
 
-    /// STATE-2 (Pkg E): UUID stamp owned by the active pipeline Task.
+    /// UUID stamp owned by the active pipeline Task.
     /// Set at Task dispatch in `runFullPipeline` / `runDetectionPipeline`,
     /// nilled in the Task's defer/error-recovery blocks only when it matches.
     /// This guards against the cancel-then-restart race where an older
@@ -191,7 +188,7 @@ class DocumentState {
     /// activePipelineTask.
     var activeRunId: UUID?
 
-    /// STATE-8 (Pkg N): cancellation-in-progress sentinel. Set true while
+    /// Cancellation-in-progress sentinel. Set true while
     /// `cancelActivePipeline` is unwinding the active pipeline / import
     /// Task; cleared once cancellation has propagated to the chosen exit
     /// phase. While true, `transition()` refuses to re-enter the active
@@ -203,7 +200,7 @@ class DocumentState {
     /// of it.
     var isCancelling: Bool = false
 
-    /// Set when pipeline was paused by app backgrounding (ARCH §11).
+    /// Set when pipeline was paused by app backgrounding.
     var wasPausedByBackground: Bool = false
 
     /// The phase the pipeline was cancelled from when
@@ -219,7 +216,7 @@ class DocumentState {
     var textLayerStatus: [Int: TextLayerStatus] = [:]
 
     /// Doc-level OCG hidden-layer presence, precomputed at import time.
-    /// M1: `PDFDocument(data:)` (every production import path) returns a
+    /// `PDFDocument(data:)` (every production import path) returns a
     /// document with `documentURL == nil`, so the engine could not reach
     /// the catalog at extraction time. The flag is computed from the raw
     /// bytes in `ImportService.validatePDFOffMainActor` and propagated into
@@ -258,7 +255,7 @@ class DocumentState {
         kindOf(phase)
     }
 
-    // MARK: - Phase Gating Predicates (Pkg D — STATE-1, STATE-3, STATE-7)
+    // MARK: - Phase Gating Predicates
 
     /// True when a new document import (drop / file picker / photos) is a
     /// permitted transition from the current phase. False during phases
@@ -284,7 +281,7 @@ class DocumentState {
     /// detection-review sheet belongs to the CURRENT document; admitting a
     /// replacement underneath it would let an Accept stamp the prior document's
     /// page-coordinate regions onto the new one (data integrity). The drag-drop
-    /// path is the sole importer that bypasses the D12 import-while-editing
+    /// path is the sole importer that bypasses the import-while-editing
     /// confirmation, so it consults this composed gate directly.
     func canStartImport(with redactionState: RedactionState) -> Bool {
         canStartImport && redactionState.pendingTriage == nil
@@ -292,7 +289,7 @@ class DocumentState {
 
     /// True when the full Redact-pipeline can be initiated. Requires
     /// `.editing` phase with no active pipeline task already running.
-    /// The triage-sheet half of STATE-3 lives in `canStartPipeline(with:)`
+    /// The triage-sheet half of this predicate lives in `canStartPipeline(with:)`
     /// because the triage-pending flag lives on `RedactionState`; this
     /// computed property is the document-only half so call sites that
     /// already hold both states can compose the full predicate.
@@ -301,7 +298,7 @@ class DocumentState {
     }
 
     /// Full Redact-pipeline gate combining the document-only predicate
-    /// with the `RedactionState.pendingTriage` check. STATE-3 — Redact
+    /// with the `RedactionState.pendingTriage` check. The Redact
     /// button is disabled while the triage sheet is up.
     func canStartPipeline(with redactionState: RedactionState) -> Bool {
         canStartPipeline && redactionState.pendingTriage == nil
@@ -311,7 +308,7 @@ class DocumentState {
     /// `redactionState.regionMetadata` are a safe transition. False during
     /// phases that the pipeline owns (`.detecting`, `.redacting`,
     /// `.verifying`); the `applyFindings` write-back transaction
-    /// must not interleave with those. STATE-7 — Apply during pipeline.
+    /// must not interleave with those (the Apply write-back during a pipeline run).
     var canMutateRegions: Bool {
         switch phaseKind {
         case .empty, .editing, .importing, .verified, .failed:
@@ -322,20 +319,20 @@ class DocumentState {
     }
 
     /// Toast copy for drop/file/photo rejection while the pipeline is
-    /// active. Mechanism-description language (ARCH §1.3 / MASTER_LEGAL
-    /// §19) — names what the app declined to do plus a recovery hint.
+    /// active. Mechanism-description language — names what the app
+    /// declined to do plus a recovery hint.
     static let importBlockedDuringPipelineMessage =
         "Cannot import while processing. Try again after the current step finishes."
 
     /// Toast copy for a drag-drop import declined because a detection
-    /// review is open for the current document (the drop path bypasses the D12
+    /// review is open for the current document (the drop path bypasses the
     /// import-while-editing confirmation that the file/photo pickers stage).
-    /// Mechanism-description language (ARCH §1.3 / MASTER_LEGAL §19) — names
+    /// Mechanism-description language — names
     /// what the app declined to do plus a recovery hint.
     static let importBlockedDuringTriageMessage =
         "Cannot import while reviewing detections. Apply or dismiss them first."
 
-    /// UXC-13 (RB-22 + RB-45) / UXC-14: one-time acknowledgement shadows
+    /// One-time acknowledgement shadows
     /// for the three share-risk confirm families. `failShareAcknowledged`
     /// and `skippedShareAcknowledged` generalize the shape
     /// `incompleteWarnShareAcknowledged` already had: `overrideVerificationFailure()`
@@ -349,12 +346,12 @@ class DocumentState {
     /// (via each predicate's `acknowledged:` parameter). Without an
     /// app-side shadow the report field stayed set across export
     /// attempts, so backing out of the share sheet without sending left a
-    /// later Share tap for the SAME report exporting with no re-confirm
-    /// (GAP-12). `incompleteWarnShareAcknowledged` has no report-side
+    /// later Share tap for the SAME report exporting with no re-confirm.
+    /// `incompleteWarnShareAcknowledged` has no report-side
     /// field to mirror — `VerificationReport` is declared in
-    /// Packages/RedactionEngine, which is C-5-fenced for this sprint, so
-    /// a third field there was never an option; it has lived here since
-    /// UXC-14. `transition(to:)` below resets all three whenever a
+    /// Packages/RedactionEngine, which is fenced for this sprint, so
+    /// a third field there was never an option; it has lived here
+    /// since the shadow was introduced. `transition(to:)` below resets all three whenever a
     /// genuinely fresh report lands; `rearmShareRiskConfirms()` further
     /// down additionally re-arms them (and the two mirrors) when the user
     /// backs out of the share sheet without sending.
@@ -362,7 +359,7 @@ class DocumentState {
     private(set) var skippedShareAcknowledged: Bool = false
     private(set) var incompleteWarnShareAcknowledged: Bool = false
 
-    /// Mark the current verification report as user-overridden (§3.4 FAIL
+    /// Mark the current verification report as user-overridden (FAIL
     /// override). Sets `failShareAcknowledged` — the shadow
     /// `shareNeedsFailConfirm` actually reads — then mirrors the
     /// acknowledgement onto the live `.verified` report's
@@ -398,11 +395,11 @@ class DocumentState {
         incompleteWarnShareAcknowledged = true
     }
 
-    /// UXC-13 (RB-22 + RB-45): re-arm all three share-risk confirms.
+    /// Re-arm all three share-risk confirms.
     /// Called when the user backs out of the share sheet without sending
     /// — the acknowledgement given was scoped to that one send attempt,
     /// not to the report forever, so the NEXT Share tap for the same
-    /// report must confirm again (GAP-12). A completed send leaves the
+    /// report must confirm again. A completed send leaves the
     /// shadows spent for that report by design; a genuinely fresh report
     /// re-arms them via `transition(to:)`'s reset instead of this
     /// function. Clears all three shadows unconditionally, then — under
@@ -422,16 +419,15 @@ class DocumentState {
         phase = .verified(report: report)
     }
 
-    // MARK: - Transition Engine (UI_UX §1.3)
+    // MARK: - Transition Engine
 
     /// All legal transitions as (from-kind, to-kind) pairs.
-    /// See UI_UX §1.2 for the full transition table.
     /// Internal (not private) for testability via @testable import.
     static let legalTransitions: Set<TransitionPair> = [
         .init(.empty, .importing),
         .init(.importing, .editing),
         .init(.importing, .failed),
-        .init(.importing, .empty),          // CANCEL-006: user-initiated cancel
+        .init(.importing, .empty),          // User-initiated cancel
         .init(.editing, .detecting),
         .init(.editing, .redacting),
         .init(.editing, .importing),
@@ -451,7 +447,7 @@ class DocumentState {
         .init(.verified, .exporting),
         .init(.verified, .editing),
         .init(.verified, .empty),
-        .init(.verified, .verifying),       // OCR post-processing re-verification (§5.7)
+        .init(.verified, .verifying),       // OCR post-processing re-verification
         .init(.exporting, .verified),
         .init(.exporting, .failed),
         .init(.failed, .editing),
@@ -476,7 +472,7 @@ class DocumentState {
         let newKind = kindOf(newPhase)
         let pair = TransitionPair(phaseKind, newKind)
 
-        // STATE-8 (Pkg N): drop progress-tick (self-transition) and re-entry
+        // Drop progress-tick (self-transition) and re-entry
         // attempts into the active pipeline phases while a cancel is in
         // flight. The cancelled Task's `Task.checkCancellation()` surrender
         // can race the user's Stop tap; without this guard a final progress
@@ -508,7 +504,7 @@ class DocumentState {
             logger.info("Phase: \(self.phaseKind, privacy: .public) → \(newKind, privacy: .public)")
             let oldKind = phaseKind
             phase = newPhase
-            // UXC-13/UXC-14: a genuinely fresh verification report just
+            // A genuinely fresh verification report just
             // landed — re-arm all three share-risk confirm shadows
             // (fail/attention, skipped, incomplete-WARN).
             // `.redacting → .verified` (autoVerify-off skip path) and
@@ -569,7 +565,7 @@ class DocumentState {
 
     // MARK: - Start Over Teardown
 
-    /// STATE-6 (Pkg I): teardown for Start Over, extracted from
+    /// Teardown for Start Over, extracted from
     /// `FailedStateView.performStartOver()` so the teardown postcondition is
     /// unit-testable. The previous inline body lived on a private
     /// SwiftUI View method that no test could call; its copy in
@@ -580,7 +576,7 @@ class DocumentState {
     /// path doesn't leave PII (matchedText, regions, sourceDocument) in
     /// memory: session fields are reset before the phase transition.
     ///
-    /// The SEC-1 session-close protection downgrade runs FIRST
+    /// The session-close protection downgrade runs FIRST
     /// (matching `performDoneCloseSession()` order), recursing the session
     /// subtree via `TempFileHardening.downgradeTree`. The downgrade
     /// is carried into the extraction so the production teardown — including
@@ -604,10 +600,10 @@ class DocumentState {
         transition(to: .empty)
     }
 
-    // MARK: - Cancellation (UI_UX §1.4)
+    // MARK: - Cancellation
 
     /// Cancel the active pipeline or import task and return to a safe phase.
-    /// CANCEL-006 (Pkg B): `.importing` is now cancellable. The import
+    /// `.importing` is cancellable too. The import
     /// task is tracked separately on `activeImportTask` because the
     /// import path runs its CPU-bound per-page validation on a detached
     /// `Task`, distinct from the structured pipeline `Task` that owns
@@ -615,7 +611,7 @@ class DocumentState {
     /// through the `Task.checkCancellation()` calls at the top of
     /// `ImportService.validatePDFOffMainActor`'s per-page loops.
     ///
-    /// CANCEL-011 (Pkg N): `isCancelling = true` for the duration of the
+    /// `isCancelling = true` for the duration of the
     /// transition so the cancelled Task's racing progress-tick is dropped
     /// by `transition()`. A detached MainActor awaiter waits on each
     /// cancelled Task's `.value` so the Task's `defer` block — which
@@ -624,7 +620,7 @@ class DocumentState {
     /// from the same workspace. The sync signature is preserved; callers
     /// from button-tap and `RedactWorkspace.tearDown()` need no change.
     func cancelActivePipeline(redactionState: RedactionState) {
-        // CANCEL-011: capture references before nilling so the awaiter
+        // Capture references before nilling so the awaiter
         // below can observe each cancelled Task's `defer` complete.
         let pipelineCaptured = activePipelineTask
         let importCaptured = activeImportTask
@@ -634,7 +630,7 @@ class DocumentState {
         activeImportTask?.cancel()
         activeImportTask = nil
 
-        // STATE-8: gate the cancelled Task's racing progress-tick out of
+        // Gate the cancelled Task's racing progress-tick out of
         // the active pipeline phases. Cleared at the end of this function
         // — once `transition()` has driven phase to the chosen safe state
         // the gate is no longer required.
@@ -643,7 +639,7 @@ class DocumentState {
 
         switch phaseKind {
         case .importing:
-            // CANCEL-006: no `sourceDocument` mutation here — the import
+            // No `sourceDocument` mutation here — the import
             // path applies state only after validation succeeds (see
             // `ImportService.validateAndLoad`), so cancellation leaves
             // any prior document untouched. Returning to `.empty` matches
@@ -655,9 +651,9 @@ class DocumentState {
             redactionState.clearOutput()
             transition(to: .editing)
         case .verifying:
-            // Pkg L (CANCEL-009): preserve `outputURL` and the
+            // Preserve `outputURL` and the
             // `regionsModifiedSinceVerification` flag. The redacted output
-            // is valid even if verification was interrupted (SER-6), so we
+            // is valid even if verification was interrupted, so we
             // transition to `.verified(report: .skipped)` rather than
             // `.editing`. The DocumentEditorView background-resume banner
             // reads the flag to choose between Re-verify (when output is
@@ -675,13 +671,13 @@ class DocumentState {
             break
         }
 
-        // CANCEL-011: drain the cancelled Tasks in a detached MainActor
+        // Drain the cancelled Tasks in a detached MainActor
         // awaiter. The awaiter has no observable side-effect on the
         // current call (this function returns immediately), but its
         // existence makes the cleanup ordering test-pinnable: a unit
         // test can `await Task.yield()` until the cancelled Task's
         // `.value` resolves and assert that `activePipelineTask` /
-        // `activeRunId` have settled. STATE-2's UUID guard inside each
+        // `activeRunId` have settled. The per-run UUID guard inside each
         // Task's defer prevents stomping a newer run's state — the
         // awaiter does not interact with that guard, only observes it.
         if pipelineCaptured != nil || importCaptured != nil {
@@ -693,7 +689,7 @@ class DocumentState {
     }
 }
 
-// MARK: - PhaseKind convenience (UI_UX §1.5)
+// MARK: - PhaseKind convenience
 
 extension DocumentState.PhaseKind {
     /// True when a pipeline is actively running.
@@ -704,8 +700,8 @@ extension DocumentState.PhaseKind {
         }
     }
 
-    /// Phases that support user-initiated cancellation (UI_UX §1.2).
-    /// CANCEL-006 (Pkg B): `.importing` joined the cancellable set so
+    /// Phases that support user-initiated cancellation.
+    /// `.importing` is in the cancellable set so
     /// the scene-phase observer in `ContentView` and the in-card Cancel
     /// button in `DocumentEditorView` route through the same predicate.
     var isCancellable: Bool {

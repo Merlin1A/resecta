@@ -1,6 +1,6 @@
 import SwiftUI
 
-// SEC-4: App-snapshot privacy overlay.
+// App-snapshot privacy overlay.
 //
 // Extracted from ContentView's inline `appSwitcherPlaceholder` and promoted to
 // the `WindowGroup` root as a `ZStack` peer of the main content. Promoting it
@@ -8,7 +8,7 @@ import SwiftUI
 // split-view, where overlays nested inside ContentView's layout could leave
 // gaps in the system snapshot.
 //
-// Behavior contract (UI_UX §7.1):
+// Behavior contract:
 // - Opaque `Color(uiColor: .systemBackground)` fill (no transparency).
 // - Branded placeholder: `doc.text.redact` SF Symbol + "Resecta" label.
 // - No taps, no gestures, no interactivity — the overlay must not race with
@@ -16,7 +16,7 @@ import SwiftUI
 // - Reveal animation lives in the call site (ResectaApp) so this view stays
 //   purely declarative.
 //
-// See also SEC-4 and §0.1 (no animation change to the obscure path).
+// No animation change to the obscure path.
 struct SnapshotPrivacyOverlay: View {
     var body: some View {
         ZStack {
@@ -42,7 +42,7 @@ struct SnapshotPrivacyOverlay: View {
 
 /// Pure-function decision helper for the snapshot-privacy overlay's
 /// scene-phase response. Extracted so tests can pin the synchronous-obscure
-/// invariant (§0.1) without instantiating a SwiftUI scene.
+/// invariant without instantiating a SwiftUI scene.
 enum SnapshotPrivacyPolicy {
     /// How the overlay should respond to a scene-phase transition.
     enum Action: Equatable {

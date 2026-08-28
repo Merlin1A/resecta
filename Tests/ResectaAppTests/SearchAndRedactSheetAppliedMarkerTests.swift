@@ -1,7 +1,7 @@
 import Testing
 @testable import ResectaApp
 
-// D06-F1 — the pure decision behind the Search & Redact sheet's
+// The pure decision behind the Search & Redact sheet's
 // `regionVersion` onChange handler. Exercised directly so the apply-vs-undo/redo
 // disambiguation is pinned without driving the SwiftUI render cycle.
 //
@@ -10,7 +10,7 @@ import Testing
 // value as `lastAppliedSearchRegionVersion`. The handler must keep markers when
 // the incoming bump equals that recorded value (the apply's own bump), and drop
 // them on any other (larger) bump — a real undo/redo — when markers are present.
-@Suite("SearchAndRedactSheet applied-marker decision (D06-F1)", .tags(.search))
+@Suite("SearchAndRedactSheet applied-marker decision", .tags(.search))
 @MainActor
 struct SearchAndRedactSheetAppliedMarkerTests {
 

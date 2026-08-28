@@ -22,7 +22,7 @@ import RedactionEngine
 //      re-inserts all three without re-recording decisions.
 //   4. The mutation re-guard — every origin refuses to mutate while
 //      the pipeline owns `regions`, re-checked inside the action.
-//   5. The single-result origin (UXC-51) — the compact handle's
+//   5. The single-result origin — the compact handle's
 //      per-item Apply: one result by id, the bulk origin's artifacts
 //      and bookkeeping one at a time, refusals with zero mutations.
 
@@ -566,9 +566,9 @@ struct ApplySeamReGuardTests {
     }
 }
 
-// MARK: - 5. Single-result origin (UXC-51)
+// MARK: - 5. Single-result origin
 
-@Suite("Apply seam — single-result origin (UXC-51)")
+@Suite("Apply seam — single-result origin")
 @MainActor
 struct ApplySeamSingleResultOriginTests {
 
@@ -617,7 +617,7 @@ struct ApplySeamSingleResultOriginTests {
         #expect(state.regionMetadata.count == 1)
         #expect(state.appliedMatchAudit.count == 1)
         #expect(state.lastAppliedSearchRegionVersion == state.regionVersion,
-                "the single origin records the search apply-version marker like the bulk origin (D06-F1)")
+                "the single origin records the search apply-version marker like the bulk origin")
     }
 
     @Test("The single and bulk origins build identical artifacts for the same result")
@@ -709,8 +709,8 @@ struct ApplySeamSingleResultOriginTests {
 
         #expect(outcome?.applied == 0)
         #expect(outcome?.skippedOverlaps == 1)
-        #expect(outcome?.appliedResultIDs.isEmpty == true, "no badge for a covered result (QW-1)")
-        #expect(outcome?.coveredResultIDs == [covered.id], "the graying set learns it (BH-A-03)")
+        #expect(outcome?.appliedResultIDs.isEmpty == true, "no badge for a covered result")
+        #expect(outcome?.coveredResultIDs == [covered.id], "the graying set learns it")
         #expect(state.regions[0]?.count == 1, "no duplicate region over the prior")
         #expect(state.appliedMatchAudit.isEmpty)
         #expect(state.regionVersion == versionBefore,

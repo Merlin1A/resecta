@@ -2,7 +2,7 @@ import Foundation
 import OSLog
 
 // Plan A6 / G4 — per-category, per-doctype negative-context keyword gazetteer.
-// Schema at DataPipeline/schemas/negative_context.schema.json. Entries have
+// Schema at resecta-datapipeline/schemas/negative_context.schema.json. Entries have
 // four fields: keyword, category_scope, doctype_scope, precedence_weight
 // (floor 0.25 per A1 — context alone never fully suppresses a structurally
 // valid match).
@@ -44,7 +44,7 @@ public struct NegativeContextGazetteer: Sendable {
 
     /// Testing init — inject a custom bundle and (optionally) a pre-built
     /// institution gazetteer. Passing `nil` for `institutions` leaves the
-    /// L4 anchor paths inert, which is the right default for unit tests
+    /// institution anchor paths inert, which is the right default for unit tests
     /// that aren't exercising the anchor.
     init(bundle: Bundle, institutions: InstitutionGazetteer? = nil) throws {
         self.byScope = try Self.load(from: bundle)
@@ -72,7 +72,7 @@ public struct NegativeContextGazetteer: Sendable {
         let key = ScopeKey(category: wire, doctype: doctype.rawValue)
         guard let entry = byScope[key] else { return 1.0 }
         let lowered = context.lowercased()
-        // Per-matched-keyword semantics (S3 semantics fix, design §1):
+        // Per-matched-keyword semantics:
         // collect the weights of every keyword actually found in the context
         // window and use the MAX matched weight — not the bucket max.
         // Rationale: the bucket max was precomputed at index time and made
@@ -118,7 +118,7 @@ public struct NegativeContextGazetteer: Sendable {
         return (max(0.25, 1.0 - matched * 0.75), keyword, matched)
     }
 
-    // MARK: - L4 institution anchoring
+    // MARK: - Institution anchoring
 
     /// Overload of `suppressionScore(...)` that additionally consults the
     /// document header for a known institution (via `InstitutionGazetteer`).

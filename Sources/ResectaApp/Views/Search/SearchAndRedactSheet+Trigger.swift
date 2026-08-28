@@ -23,7 +23,7 @@ extension SearchAndRedactSheet {
             }
             return
         }
-        // Short terms require explicit trigger. BH-B-06 — the floor
+        // Short terms require explicit trigger. The floor
         // counts TRIMMED characters (mirroring multi-term's validator
         // trim), so whitespace-only input never auto-runs a real
         // engine pass under a visually-empty field.
@@ -85,7 +85,7 @@ extension SearchAndRedactSheet {
                 do {
                     _ = try DocumentSearcher.validateRegexPatternWithError(searchState.queryText)
                 } catch { // LegalPhrases:safe (Swift keyword)
-                    // UXF-18: lead with a human hint for the common
+                    // Lead with a human hint for the common
                     // failure shapes; the engine's original error text
                     // stays available after it. No hint matched → the
                     // original text alone, as before.
@@ -196,14 +196,14 @@ extension SearchAndRedactSheet {
             let enabledCategories = searchState.effectiveScanCategories
             let scanStartedAt = Date()
 
-            // BH-A-06 — freeze the executed detector count for the
+            // Freeze the executed detector count for the
             // zero-state completion copy, beside the engine query's own
             // category snapshot above.
             if isPIIScan {
                 searchState.lastRunDetectorCount = enabledCategories.count
             }
 
-            // H-201 — SEC-7 degrade surface for the LIVE scan path. The
+            // Degrade surface for the LIVE scan path. The
             // legacy detection pipeline surfaced its loader diagnostics via
             // `PipelineCoordinator.surfaceGazetteerLoadDiagnostics`, but the
             // Scan interface runs through `DocumentSearcher`, whose shared
@@ -236,7 +236,7 @@ extension SearchAndRedactSheet {
             // Reset the regex-timeout page set before kickoff so
             // the banner only reflects pages affected by THIS scan.
             searchState.resetRegexTimeoutPages()
-            // ST-83 — reset the OCR-skip page set for the same reason.
+            // Reset the OCR-skip page set for the same reason.
             searchState.resetOCRSkippedPages()
 
             searchState.activeSearchTask = Task {
@@ -269,7 +269,7 @@ extension SearchAndRedactSheet {
                         searchState?.recordRegexTimeout(page: page)
                     }
                 })
-                // ST-83 — install the oversized-OCR-skip sink mirroring
+                // Install the oversized-OCR-skip sink mirroring
                 // the regex-timeout sink. `DocumentSearcher` calls this
                 // once per OCR attempt on a page whose render exceeds the
                 // OCR pixel caps; the banner tells the user those pages'
@@ -412,7 +412,7 @@ extension SearchAndRedactSheet {
         }
     }
 
-    /// BH-B-06 — debounce auto-run floor on the trimmed length. The
+    /// Debounce auto-run floor on the trimmed length. The
     /// query still runs VERBATIM (trailing spaces are meaningful to a
     /// literal search); trimming here only gates whether typing alone
     /// starts a run.
@@ -420,7 +420,7 @@ extension SearchAndRedactSheet {
         query.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3
     }
 
-    // MARK: - Regex error hints (UXF-18)
+    // MARK: - Regex error hints
 
     /// Map the common NSRegularExpression failure shapes to a one-line
     /// human hint by inspecting the PATTERN (the NSError text is opaque
@@ -589,18 +589,18 @@ extension SearchAndRedactSheet {
                 // transient refusal.
                 return
             }
-            // QW-1 (D06-F3) — union only the results that
+            // Union only the results that
             // produced a region. Overlap-skipped members of
             // the selection get no audit entry, so they must
             // not earn the "applied" badge either. The
             // conditional-dismiss tracker reset is owned by
             // the apply path.
             searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
-            // BH-A-03 — dedup-covered IDs feed the Apply-graying
-            // gate (no badge, per QW-1 above).
+            // Dedup-covered IDs feed the Apply-graying
+            // gate (no badge, per the union above).
             searchState.coveredResultIDs.formUnion(result.coveredResultIDs)
             // Non-modal success toast via the shared
-            // UXF-11 copy builder (`CommitFeedback`) so
+            // copy builder (`CommitFeedback`) so
             // the count stays in lockstep with the
             // review-apply toasts. `toastManager.enqueue`
             // coalesces duplicates so repeated taps can't
@@ -638,15 +638,15 @@ extension SearchAndRedactSheet {
             ) else {
                 return
             }
-            // QW-1 (D06-F3) — survivors only, mirroring the
+            // Survivors only, mirroring the
             // toolbar Apply path above. The conditional-dismiss
             // tracker reset is owned by the apply path.
             searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
-            // BH-A-03 — mirror of the toolbar path's covered union.
+            // Mirror of the toolbar path's covered union.
             searchState.coveredResultIDs.formUnion(result.coveredResultIDs)
             // Keyboard-shortcut path
             // mirrors the toolbar Apply path — non-modal toast via
-            // the shared UXF-11 copy builder, which returns nil for a
+            // the shared copy builder, which returns nil for a
             // no-op apply so a held shortcut against an all-overlap
             // selection still emits no "Marked 0" message.
             if let message = CommitFeedback.markedMessage(
@@ -693,7 +693,7 @@ extension SearchAndRedactSheet {
 
     /// Notice for a recall that drops live unapplied matches. Returns
     /// nil when nothing unapplied is lost so the common recall stays
-    /// toast-free. Sibling of `dismissClearedMessage` (UXF-27) and the
+    /// toast-free. Sibling of `dismissClearedMessage` and the
     /// review-arrival notice — the family that keeps every
     /// results-dropping transition named. Pinned by
     /// `InterfaceSwitchClearTests`.

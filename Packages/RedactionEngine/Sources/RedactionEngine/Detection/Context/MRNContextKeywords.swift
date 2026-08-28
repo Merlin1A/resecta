@@ -1,6 +1,6 @@
 import Foundation
 
-// W10: MRN-specific keyword profile for ContextWindowScorer.
+// MRN-specific keyword profile for ContextWindowScorer.
 // Mirrors SSNContextKeywords shape — scoped per-category per G4.
 
 /// Medical Record Number context keyword configuration.

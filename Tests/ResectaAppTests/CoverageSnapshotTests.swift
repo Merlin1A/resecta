@@ -3,17 +3,17 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// WU-16 — Coverage Report auto-open + Snapshot share. The disclosure
+// Coverage Report auto-open + Snapshot share. The disclosure
 // inside `CoverageReportView` defaults to expanded; the auto-open gate
 // at `SearchResultsSection.swift:26-31` already conditions the view on
 // a completed scan, so the disclosure surfaces the moment a coverage
 // report exists. The "Share Snapshot" button hands off to
 // `MatchExportService.shareCoverageSnapshot`, which serializes
 // counts-only CSV+JSON via `coverageSnapshotCSV` /
-// `coverageSnapshotJSON`. Per [D-06] / [RR-25]-adjacent — matched text
+// `coverageSnapshotJSON` — matched text
 // MUST never appear in the snapshot payload.
 
-@Suite("Coverage snapshot CSV+JSON + auto-open (WU-16)")
+@Suite("Coverage snapshot CSV+JSON + auto-open")
 struct CoverageSnapshotTests {
 
     // MARK: - Static contracts
@@ -105,7 +105,7 @@ struct CoverageSnapshotTests {
         #expect(csv.hasPrefix("# Resecta — Scan coverage snapshot"))
     }
 
-    // MARK: - D06-F2 Part 2 — folded applied/deselected counts
+    // MARK: - Folded applied/deselected counts
 
     @Test("CSV serializes the folded applied + deselected counts, not the scan-time base")
     func csvSerializesFoldedAppliedDeselected() {

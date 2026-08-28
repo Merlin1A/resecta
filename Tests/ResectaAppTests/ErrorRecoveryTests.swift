@@ -3,7 +3,7 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// UI_UX §3.3: Pipeline error recovery and .failed state transition tests.
+// Pipeline error recovery and .failed state transition tests.
 
 @Suite("Pipeline Error Recovery")
 @MainActor

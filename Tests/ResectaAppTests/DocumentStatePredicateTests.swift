@@ -4,7 +4,7 @@ import PDFKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// Pkg D — uniform phase-gating predicates.
+// Uniform phase-gating predicates.
 // Covers `canStartImport`, `canStartPipeline(_:)`, and `canMutateRegions`
 // across every PhaseKind, plus the entry-point gates that read them.
 
@@ -127,10 +127,10 @@ struct DocumentStatePredicateTests {
 
     // MARK: - Toast Copy
 
-    @Test("Import-blocked toast copy matches the locked S2 string")
+    @Test("Import-blocked toast copy matches the locked string")
     func importBlockedToastCopyIsLocked() {
-        // The exact string is part of the user-facing contract documented
-        // in `04-implementer-handoff.md`. If this fails, update the spec.
+        // The exact string is part of the user-facing contract; if this
+        // fails, update the spec that documents it.
         #expect(DocumentState.importBlockedDuringPipelineMessage
                 == "Cannot import while processing. Try again after the current step finishes.")
     }

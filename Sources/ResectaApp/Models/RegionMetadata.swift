@@ -1,14 +1,14 @@
 import Foundation
 import RedactionEngine
 
-// GAP §2.3: Metadata about a detected region, preserved separately from
+// Metadata about a detected region, preserved separately from
 // RedactionRegion to avoid leaking UI concerns into the RedactionEngine
 // SPM package. Keyed by RedactionRegion.id in RedactionState.regionMetadata.
 
 // nonisolated: a pure Sendable value type (kind/confidence/labels — no region
 // geometry) constructed off MainActor inside `prepareApply` and carried back in
 // the Sendable `PreparedApply`. Its explicit `init` (and the static label helpers
-// it calls) would otherwise become MainActor-isolated under the s04 SE-0466
+// it calls) would otherwise become MainActor-isolated under the SE-0466
 // MainActor-default flip, breaking the detached apply-prepare path; pin the type
 // nonisolated to restore its pre-flip status (mirrors UserTermsBlob et al.).
 nonisolated struct RegionMetadata: Sendable {
@@ -21,7 +21,7 @@ nonisolated struct RegionMetadata: Sendable {
     /// The OCR recognition level used for this detection.
     let recognitionLevel: DetectionResult.RecognitionLevel
 
-    /// Phase 3 §A5: set to true when this region is part of an ambiguous
+    /// Set to true when this region is part of an ambiguous
     /// bare-surname cluster (≥15 entities, no disambiguating first-initial).
     /// Populated post-clustering in PipelineCoordinator.runDetectionPipeline.
     var isAmbiguousSurname: Bool = false
@@ -31,7 +31,7 @@ nonisolated struct RegionMetadata: Sendable {
     let badgeLabel: String
 
     /// Full description for accessibility and hover tooltip.
-    /// F2-1: Labels MUST match `DetectionResult.Kind.fullName`
+    /// Labels MUST match `DetectionResult.Kind.fullName`
     /// (Extensions/DetectionKind+Display.swift) exactly — VoiceOver
     /// users encounter both surfaces for the same detection.
     let accessibilityDescription: String
@@ -47,7 +47,7 @@ nonisolated struct RegionMetadata: Sendable {
 
         self.badgeLabel = Self.computeKindLabel(piiKind)
 
-        // UXC-22 (RB-44) — qualitative descriptor replaces the raw
+        // A qualitative descriptor replaces the raw
         // percent. `SearchResultRow.absoluteConfidenceTier` is the one
         // threshold source (same-target reference; acceptable — the
         // thresholds themselves must not be duplicated here).
@@ -77,7 +77,7 @@ nonisolated struct RegionMetadata: Sendable {
             case .routingNumber:  "RTN"
             case .licensePlate:   "LP"
             case .barcode:        "Code"
-            // DRAW-3 — heuristic signature suggestion (triage-only).
+            // Heuristic signature suggestion (triage-only).
             case .signatureCandidate: "Sig"
             case .other:          "PII"
             }
@@ -108,7 +108,7 @@ nonisolated struct RegionMetadata: Sendable {
             case .routingNumber:  "ABA Routing Number"
             case .licensePlate:   "License Plate"
             case .barcode:        "Barcode / QR"
-            // DRAW-3 — mechanism-description copy (I6): describes what the
+            // Mechanism-description copy: describes what the
             // heuristic suggests, no outcome promise.
             case .signatureCandidate: "Possible Signature"
             case .other:          "Personal Information"

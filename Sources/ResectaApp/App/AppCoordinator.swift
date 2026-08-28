@@ -11,7 +11,7 @@ final class AppCoordinator {
         case home
         case redact(RedactWorkspace)
 
-        // Design Spec §8.2: Lightweight Equatable discriminator for cross-dissolve animation.
+        // Lightweight Equatable discriminator for cross-dissolve animation.
         // Avoids making workspace objects Equatable.
         enum Kind { case home, redact }
         var kind: Kind {
@@ -41,8 +41,7 @@ final class AppCoordinator {
         tearDownCurrentWorkspace()
         let workspace = RedactWorkspace(settingsState: settingsState)
         activeWorkspace = .redact(workspace)
-        // SEC-8 override #4 (plan §3, escalation §1.3): paranoid mode
-        // enables the LivePhotoAuxStripper hook on the import path.
+        // Paranoid mode enables the LivePhotoAuxStripper hook on the import path.
         await ImportService.importDocument(
             from: url,
             documentState: workspace.documentState,

@@ -4,8 +4,7 @@ import PDFKit
 import CoreGraphics
 @testable import RedactionEngine
 
-// EXP-009 migrated: Rotated & Non-Zero-Origin Coordinates
-// Audit: PD-5-1 (High), AA-12-1 (High), TL-1-1 (High), AA-13-1 (High)
+// Rotated & Non-Zero-Origin Coordinates.
 // Security-critical: wrong coordinates = data leakage.
 
 @Suite("Rotated Page Coordinates", .tags(.security, .critical))
@@ -62,8 +61,8 @@ struct RotatedPageCoordinateTests {
         return ctx.makeImage()!
     }
 
-    // --- PD-5-1: Overlay bounds match post-rotation ---
-    @Test("Overlay bounds match post-rotation dimensions (PD-5-1)",
+    // --- Overlay bounds match post-rotation ---
+    @Test("Overlay bounds match post-rotation dimensions",
           arguments: [0, 90, 180, 270])
     func overlayBoundsMatchPostRotation(rotation: Int) {
         let doc = makePDFDocument(rotation: rotation)
@@ -77,8 +76,8 @@ struct RotatedPageCoordinateTests {
         }
     }
 
-    // --- AA-12-1: Rendered bitmap correctness for rotated pages ---
-    @Test("Rendered bitmap dimensions correct for /Rotate 90 (AA-12-1)")
+    // --- Rendered bitmap correctness for rotated pages ---
+    @Test("Rendered bitmap dimensions correct for /Rotate 90")
     func rotatedPageRenderCorrectness() {
         let cgDoc = makeCGPDFDocument(rotation: 90)
         let page = cgDoc.page(at: 1)!
@@ -111,8 +110,8 @@ struct RotatedPageCoordinateTests {
         #expect(nonWhite > 0, "Rendered bitmap must contain visible content")
     }
 
-    // --- TL-1-1: PDFSelection.bounds coordinate frame with /Rotate ---
-    @Test("PDFSelection bounds in correct coordinate frame with /Rotate (TL-1-1)")
+    // --- PDFSelection.bounds coordinate frame with /Rotate ---
+    @Test("PDFSelection bounds in correct coordinate frame with /Rotate")
     func pdfSelectionBoundsCoordinateFrame() {
         let doc = makeTextPDFDocument(rotation: 90)
         let page = doc.page(at: 0)!
@@ -129,8 +128,8 @@ struct RotatedPageCoordinateTests {
         }
     }
 
-    // --- AA-13-1: PDFSelection.bounds with non-zero cropBox origin ---
-    @Test("PDFSelection bounds with non-zero cropBox origin (AA-13-1)")
+    // --- PDFSelection.bounds with non-zero cropBox origin ---
+    @Test("PDFSelection bounds with non-zero cropBox origin")
     func pdfSelectionBoundsWithNonZeroOrigin() {
         let data = TestFixtures.nonZeroOriginPDF()
         let doc = PDFDocument(data: data)!
@@ -152,15 +151,14 @@ struct RotatedPageCoordinateTests {
         }
     }
 
-    // --- S15 E1: PDFKit selection frame under /Rotate (pins T_rot direction) ---
-    // C-C deep-plan §5/§6 + ADV-2 A2-7 §0: BEFORE any T_rot production code, pin
-    // whether `PDFSelection.bounds(for:)` returns UNROTATED source-page space (so
-    // CAT-353's T_rot must apply the rotation mapping) or already-rotation-applied
-    // DISPLAYED space (T_rot collapses to identity-plus-translation). The single
-    // highest risk in the cluster — the direction must rest on measurement, not
-    // assumption. Synthetic fixture only; coordinates are safe to log (no PII,
-    // not a real document — protocol §10). The memo (A2-7) predicts UNROTATED/invariant.
-    @Test("E1: PDFSelection.bounds(for:) frame under /Rotate (CAT-353 direction probe)")
+    // --- E1: PDFKit selection frame under /Rotate (pins T_rot direction) ---
+    // Before any T_rot production code, pin whether `PDFSelection.bounds(for:)`
+    // returns UNROTATED source-page space (so T_rot must apply the rotation
+    // mapping) or already-rotation-applied DISPLAYED space (T_rot collapses to
+    // identity-plus-translation). The single highest risk in the cluster — the
+    // direction must rest on measurement, not assumption. Synthetic fixture
+    // only; coordinates are safe to log (no PII, not a real document).
+    @Test("E1: PDFSelection.bounds(for:) frame under /Rotate (direction probe)")
     func e1SelectionFrameUnderRotation() throws {
         var anchorByRot: [Int: CGRect] = [:]
         var markerByRot: [Int: CGRect] = [:]
@@ -189,13 +187,13 @@ struct RotatedPageCoordinateTests {
                 if word == "ANCHOR" { anchorByRot[rotation] = b } else { markerByRot[rotation] = b }
             }
         }
-        // PINNED RESULT (S15, iOS 26 sim): a word's bounds are INVARIANT across
+        // PINNED RESULT (iOS 26 sim): a word's bounds are INVARIANT across
         // all four rotations — PDFKit reports UNROTATED source-page space and
-        // treats /Rotate as a pure display attribute. Therefore CAT-353's T_rot
-        // MUST map cropBox-local bounds into displayed space (the four-case
-        // mapping), and does NOT collapse to identity-plus-translation. This is a
+        // treats /Rotate as a pure display attribute. Therefore T_rot MUST map
+        // cropBox-local bounds into displayed space (the four-case mapping),
+        // and does NOT collapse to identity-plus-translation. This is a
         // standing guard: if a future SDK makes bounds rotation-applied, this
-        // flips red and T_rot must be revisited (cf. KI-2 / CAT-364).
+        // flips red and T_rot must be revisited (see KNOWN_ISSUES.md KI-2).
         for (label, byRot) in [("ANCHOR", anchorByRot), ("MARKER", markerByRot)] {
             guard let b0 = byRot[0] else { continue }
             for r in [90, 180, 270] {
@@ -209,12 +207,12 @@ struct RotatedPageCoordinateTests {
         }
     }
 
-    // --- S15 CAT-353: T_rot four-case transform (ADV-2 A2-7 cross-check) ---
-    // Hand-verified concrete values from ADV-2 A2-7: page 612×792, local rect
+    // --- T_rot four-case transform (cross-check) ---
+    // Hand-verified concrete values: page 612×792, local rect
     // (0,0,10,10) at the bottom-left of the unrotated sheet. Non-circular — the
     // expected outputs are the reviewer's independent corner-checked derivation,
     // not a re-run of the production formula.
-    @Test("T_rot maps the four rotations per the canonical contract (CAT-353)")
+    @Test("T_rot maps the four rotations per the canonical contract")
     func tRotFourCaseTransform() {
         let size = CGSize(width: 612, height: 792)
         let local = CGRect(x: 0, y: 0, width: 10, height: 10)
@@ -232,13 +230,13 @@ struct RotatedPageCoordinateTests {
         #expect(asym == CGRect(x: 700, y: 612 - 100 - 40, width: 12, height: 40))
     }
 
-    // --- S15 CAT-353: rotated extraction lands in DISPLAYED space (red→green) ---
+    // --- Rotated extraction lands in DISPLAYED space (red→green) ---
     // Integration guard through extractCharacters. BEFORE T_rot, a rotated page's
     // bounds were merely origin-subtracted (cropBox-local, unrotated), so a glyph
     // at unrotated y≈694 falls OUTSIDE the /Rotate 90 displayed height (612) —
     // RED. AFTER T_rot every glyph maps inside the displayed (effective) page —
     // GREEN. Covers zero and offset CropBox origins (local-first-then-rotate).
-    @Test("Extracted bounds lie within the displayed page after T_rot (CAT-353)",
+    @Test("Extracted bounds lie within the displayed page after T_rot",
           arguments: [0, 90, 180, 270])
     func rotatedExtractionLandsInDisplayedSpace(rotation: Int) async throws {
         for origin in [CGPoint.zero, CGPoint(x: 200, y: 150)] {
@@ -259,16 +257,17 @@ struct RotatedPageCoordinateTests {
         }
     }
 
-    // --- F13/CAT-366: origin-frame probe (ADV-2 A2-6) ---
-    // AA-13-1 above cannot tell the absolute and cropBox-local frames apart:
-    // its fixture (origin 50, text at user-space 100) clears `minX ≥ 49` in
-    // BOTH frames (absolute 100, local 50). This probe uses the discriminating
-    // fixture (origin 200, text at user-space 220) to PIN that
-    // `PDFSelection.bounds(for:)` returns coordinates in the source page's
-    // ABSOLUTE (MediaBox / user) space — the premise the CAT-366 CropBox-local
-    // subtraction is written against. It reads the raw PDFKit API only, so it
-    // stays valid (and green) before and after the extractor-side correction.
-    @Test("PDFSelection bounds are MediaBox-absolute on a non-zero-origin page (CAT-366 probe)")
+    // --- Origin-frame probe ---
+    // The non-zero-cropBox-origin test above cannot tell the absolute and
+    // cropBox-local frames apart: its fixture (origin 50, text at user-space
+    // 100) clears `minX ≥ 49` in BOTH frames (absolute 100, local 50). This
+    // probe uses the discriminating fixture (origin 200, text at user-space
+    // 220) to PIN that `PDFSelection.bounds(for:)` returns coordinates in the
+    // source page's ABSOLUTE (MediaBox / user) space — the premise the
+    // CropBox-local subtraction is written against. It reads the raw PDFKit
+    // API only, so it stays valid (and green) before and after the
+    // extractor-side correction.
+    @Test("PDFSelection bounds are MediaBox-absolute on a non-zero-origin page")
     func nonZeroCropBoxSelectionFrameProbe() throws {
         let data = TestFixtures.nonZeroOriginDiscriminatingPDF()
         let doc = try #require(PDFDocument(data: data))
@@ -283,21 +282,21 @@ struct RotatedPageCoordinateTests {
         let bounds = sel.bounds(for: page)
         // Absolute frame: minX ≈ 220 (≥ origin.x 200). A cropBox-local frame
         // would put minX ≈ 20 (< origin.x). The assertion discriminates the two
-        // and records the measured frame the CAT-366 subtraction rests on.
+        // and records the measured frame the CropBox-local subtraction rests on.
         #expect(bounds.minX >= cropBox.origin.x,
                 "selection bounds must be absolute-space (minX ≈ 220, not local ≈ 20)")
     }
 
     // ====================================================================
-    // S15 CAT-353 — D-35 redaction-correctness matrix
+    // Redaction-correctness matrix
     // 4 rotations × {zero, offset} CropBox origin. Per case: (i) the filter
     // excludes text under the region and keeps text away from it; (ii) the
     // full pipeline (rasterize → reconstruct → verify) passes Layers 6–10;
     // (iii) a tamper variant (text NOT excluded, claimed redacted) → Layer 6
     // FAILs; HARD GATE: checkFallbackTriggers == nil so the page genuinely
-    // takes searchable mode and the Layers-6-10 asserts are not vacuous
-    // (L3-14). The redaction REGION is positioned by a TEST-LOCAL copy of the
-    // A2-7 transform (independent of production T_rot) so the matrix stays
+    // takes searchable mode and the Layers-6-10 asserts are not vacuous.
+    // The redaction REGION is positioned by a TEST-LOCAL copy of the
+    // rotation transform (independent of production T_rot) so the matrix stays
     // red when T_rot is wrong/absent: at the pin (no rotation mapping) MARKER's
     // glyphs sit at unrotated coords, the displayed region is elsewhere, and
     // excludedCount == 0 ≠ markerCount. Green only when production T_rot lands
@@ -306,7 +305,7 @@ struct RotatedPageCoordinateTests {
 
     private let engine = VerificationEngine()
 
-    /// Test-local, independent A2-7 transform — used only to position the
+    /// Test-local, independent rotation transform — used only to position the
     /// redaction region; deliberately NOT the production `rotateRectIntoOutputSpace`.
     private func displayedRect(_ r: CGRect, sourceSize s: CGSize, rotation: Int) -> CGRect {
         let x = r.minX, y = r.minY, wr = r.width, hr = r.height
@@ -325,7 +324,7 @@ struct RotatedPageCoordinateTests {
         return u
     }
 
-    @Test("redactionCorrectForRotation matrix (D-35): filter + Layers 6–10 + tamper",
+    @Test("redactionCorrectForRotation matrix: filter + Layers 6–10 + tamper",
           .tags(.security, .critical),
           arguments: [0, 90, 180, 270], [CGPoint.zero, CGPoint(x: 200, y: 150)])
     func redactionCorrectForRotation(rotation: Int, origin: CGPoint) async throws {
@@ -363,7 +362,7 @@ struct RotatedPageCoordinateTests {
         let doc = try #require(PDFDocument(data: data))
         let page = try #require(doc.page(at: 0))
 
-        // HARD GATE (L3-14): the page must qualify for searchable mode.
+        // HARD GATE: the page must qualify for searchable mode.
         #expect(TextLayerDetector.checkFallbackTriggers(page) == nil,
                 "\(label): fixture must take searchable mode (no fallback) or the matrix is vacuous")
 
@@ -418,23 +417,23 @@ struct RotatedPageCoordinateTests {
                 "\(label): Layer 6 must FAIL when un-excluded MARKER text overlaps the claimed region")
     }
 
-    // --- CND-02: EmbeddedTextSource.make lands in DISPLAYED space (red→green) ---
-    // make() is the third coordinate producer (PERF-4 fast path). CAT-353/
-    // CAT-366 migrated extractCharacters and DocumentSearcher to the zero-origin
-    // displayed output frame but NOT make(), so before this fix its word/line
-    // rects stayed cropBox-local-unrotated: on /Rotate{90,180,270} the detection
+    // --- EmbeddedTextSource.make lands in DISPLAYED space (red→green) ---
+    // make() is the third coordinate producer (fast path). extractCharacters
+    // and DocumentSearcher were migrated to the zero-origin displayed output
+    // frame but not make(), so before this fix its word/line rects stayed
+    // cropBox-local-unrotated: on /Rotate{90,180,270} the detection
     // centroid maps to the wrong displayed pixel and the burn-in under-redacts
     // (a live production leak once the rotated-rich Secure-Raster stopgap was
     // removed). This guard pins make()'s MARKER word centroid to the displayed-
     // marker location, derived two ways that never re-run production make():
-    //   (1) a TEST-LOCAL A2-7 transform over the reference LOCAL MARKER bounds
+    //   (1) a TEST-LOCAL rotation transform over the reference LOCAL MARKER bounds
     //       (RED when make lacks T_rot) — the load-bearing assertion; and
     //   (2) cross-producer agreement with extractCharacters, the validated
     //       displayed-space producer, on the same rotated page (Vision OCR can't
     //       run deterministically on this sim/host, so the text-layer producer
     //       stands in for the OCR sub-path whose displayed frame it shares).
     // Synthetic fixture; coordinates are safe to log (no PII, not a real document).
-    @Test("EmbeddedTextSource.make word centroid is displayed-space (CND-02)",
+    @Test("EmbeddedTextSource.make word centroid is displayed-space",
           .tags(.security, .critical),
           arguments: [0, 90, 180, 270], [CGPoint.zero, CGPoint(x: 200, y: 150)])
     func embeddedMakeCentroidIsDisplayedSpace(rotation: Int, origin: CGPoint) async throws {

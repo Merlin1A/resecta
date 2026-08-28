@@ -3,13 +3,13 @@ import Foundation
 import CoreGraphics
 @testable import ResectaApp
 
-// SA-3 rider (D-70): rect-level scroll-to-match seams.
+// Rect-level scroll-to-match seams.
 // `DocumentState.requestCanvasScroll` is the writer contract every
 // result-navigation site shares; `PDFDocumentView.shouldRectScroll`
 // is the consumer's zoom gate. The normalized→page-space conversion
 // is deliberately NOT re-pinned here — the consumer reuses the
-// engine's canonical `normalizedToPDFPageCoordinates` (ENGINE
-// §5B.1a), which the engine suite owns.
+// engine's canonical `normalizedToPDFPageCoordinates`,
+// which the engine suite owns.
 
 @Suite("Canvas scroll-to-match target")
 @MainActor
@@ -52,7 +52,7 @@ struct CanvasScrollTargetTests {
         #expect(PDFDocumentView.shouldRectScroll(scaleFactor: 2.0, fitScaleFactor: 1.0))
     }
 
-    // UXC-50 (D-128, RB-123): the zoom intent rides the same seam.
+    // The zoom intent rides the same seam.
 
     @Test("zoom intent defaults to .none — every existing writer is source-compatible")
     func zoomIntentDefaultsToNone() {
@@ -72,12 +72,12 @@ struct CanvasScrollTargetTests {
     }
 }
 
-// UXC-50 (D-128, RB-123 item 1): the readability formula is pure and
+// The readability formula is pure and
 // pinned here — text ≈`textHeightTarget` on screen, width-guarded,
 // clamped to [fit … min(navZoomCap × fit, maxScale)]. Constants live in
 // `ReadabilityZoom` (the tuning surface); the pins read them
 // symbolically so a tune does not rewrite arithmetic.
-@Suite("Readability zoom policy (UXC-50)")
+@Suite("Readability zoom policy")
 struct ReadabilityZoomPolicyTests {
 
     private let viewport = CGSize(width: 400, height: 800)

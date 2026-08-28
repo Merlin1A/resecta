@@ -2,12 +2,12 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// q16/UXF-18 — human hints for common NSRegularExpression failure
+// Human hints for common NSRegularExpression failure
 // shapes. The hint comes from a shape scan of the PATTERN (the NSError
 // text is opaque boilerplate); the engine's original description is
-// preserved after the hint. No new parsing dependency (C-9).
+// preserved after the hint. No new parsing dependency.
 
-@Suite("Regex error hints (UXF-18)", .tags(.search))
+@Suite("Regex error hints", .tags(.search))
 @MainActor
 struct RegexErrorHintTests {
 

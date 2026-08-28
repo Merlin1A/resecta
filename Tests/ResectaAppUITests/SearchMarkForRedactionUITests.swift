@@ -1,7 +1,7 @@
 import XCTest
 
-/// UI tests for the Search & Redact toolbar apply path (q10 / UXF-01;
-/// direct apply — the "Mark for Redaction" confirm dialog is gone).
+/// UI tests for the Search & Redact toolbar apply path (direct
+/// apply — the "Mark for Redaction" confirm dialog is gone).
 ///
 /// Regression guard for the SearchState cache-in-getter observation crash:
 /// the apply ran `appliedResultIDs.formUnion`, whose
@@ -104,7 +104,7 @@ nonisolated final class SearchMarkForRedactionUITests: XCTestCase {
         byTerm.tap()
 
         // Both terms searched: the footer states the count plainly —
-        // "0 of 2 selected" (UXC-45: one "M of N selected" family in
+        // "0 of 2 selected" (one "M of N selected" family in
         // every state). (The term-grouped SECTION
         // HEADERS are lazily materialized and sit offscreen at this
         // detent — the results list viewport is ~18 pt tall on the 26.4
@@ -121,15 +121,15 @@ nonisolated final class SearchMarkForRedactionUITests: XCTestCase {
         selectAllAndApply()
     }
 
-    /// UXC-45 (D-117, RB-104) + UXC-46 (D-121): the row's chevron expands
-    /// the context window and reveals the Details button into the Match
-    /// rationale sheet, and collapses both again. Driven on the multipage
-    /// fixture's Scan interface — its pages carry SSN / email / phone /
-    /// card text, so every row has a rationale — and witnessed through AX
-    /// only: the Details button exists ONLY while the row is expanded (the
-    /// highlighted window itself is pixel-only and, per F-7, never
-    /// spoken), the retired "Reason:" summary renders in NEITHER state,
-    /// and the chevron's own label flips.
+    /// The row's chevron expands the context window and reveals the
+    /// Details button into the Match rationale sheet, and collapses
+    /// both again. Driven on the multipage fixture's Scan interface —
+    /// its pages carry SSN / email / phone / card text, so every row
+    /// has a rationale — and witnessed through AX only: the Details
+    /// button exists ONLY while the row is expanded (the highlighted
+    /// window itself is pixel-only and never spoken), the retired
+    /// "Reason:" summary renders in NEITHER state, and the chevron's
+    /// own label flips.
     func testContextRow_chevronExpandsAndCollapsesTheDetailsButton() {
         app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
         app.launch()

@@ -2,10 +2,10 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// WU-47 — verify EULA `Legal.xcstrings` key existence.
+// Verify EULA `Legal.xcstrings` key existence.
 //
-// Per ACTION-WU-47 / D-32 / OQ-03: EULA copy is treated as final and
-// authoritative; this WU is read-only over content. Loads the raw
+// EULA copy is treated as final and
+// authoritative; this suite is read-only over content. Loads the raw
 // `.xcstrings` JSON from the source tree via `#filePath` (mirroring the
 // `LegalPhraseLintTests` loader posture) and asserts that the three
 // keys consumed by `EULAGateView.swift` (`eula_title`, `eula_body`,
@@ -15,19 +15,19 @@ import Foundation
 // Failure paths:
 // - Missing key, missing `en` localization, missing `stringUnit.value`,
 //   empty value, or value containing "todo" / "placeholder" / "fixme"
-//   (case-insensitive substring) → fail. Per ACTION-WU-47, a true
-//   miss is launch-blocking and re-escalates to D-16.
+//   (case-insensitive substring) → fail. A true
+//   miss is launch-blocking.
 
 @Suite("Legal.xcstrings EULA key existence")
 struct LegalKeyExistenceTests {
 
     // nonisolated: consumed by `@Test(arguments: eulaKeys)`, which the Swift Testing
-    // macro hoists into a nonisolated peer. Under the s04 SE-0466 MainActor-default
+    // macro hoists into a nonisolated peer. Under the SE-0466 MainActor-default
     // flip this static (in an unannotated suite) would be MainActor-isolated and
     // unreadable from that peer. These are localization-key identifiers, not legal
     // text — the annotation is pure isolation, no content change.
-    // q17 (UXF-08) extended the original three EULAGateView keys with the
-    // gate's document-link labels and LegalDocumentView's chrome strings.
+    // The gate's document-link labels and LegalDocumentView's chrome strings
+    // extended the original three EULAGateView keys.
     nonisolated static let eulaKeys = [
         "eula_title", "eula_body", "eula_agree",
         "eula_view_eula", "eula_view_privacy",
@@ -60,7 +60,7 @@ struct LegalKeyExistenceTests {
         }
     }
 
-    // MARK: - Helpers (mirror LegalPhraseLintTests loader; D-12 parity)
+    // MARK: - Helpers (mirror LegalPhraseLintTests loader)
 
     private struct XCStringsCatalog: Decodable {
         let strings: [String: Entry]
@@ -91,22 +91,22 @@ struct LegalKeyExistenceTests {
     }
 }
 
-// CND-03 / CND-05 (launch-fix-v2 · S2) — in-app outbound links.
+// In-app outbound links.
 //
-// CND-03: `SettingsView.Links.privacyPolicy` / `.eula` point at the hosted
+// `SettingsView.Links.privacyPolicy` / `.eula` point at the hosted
 // resecta.app pages (`/privacy`, `/eula`), moved off the prior
-// `github.com/.../blob/master/…` form. CND-05: `.sourceCode` / `.reportIssue`
+// `github.com/.../blob/master/…` form. `.sourceCode` / `.reportIssue`
 // point at the canonical public org `Merlin1A/resecta`, not the pre-launch
 // `resecta/resecta-app` placeholder. These guards pin both halves at the
 // `Links` source of truth. Operator gates — the resecta.app pages going live
 // and the repo going public — are tracked separately, not here.
-@Suite("In-app outbound links (CND-03 / CND-05)")
+@Suite("In-app outbound links")
 struct LegalLinkExistenceTests {
 
     /// The pre-launch placeholder org left in the Source-Code / Report-an-Issue
-    /// URLs before CND-05.
+    /// URLs before the rename.
     static let wrongOrgPath = "resecta/resecta-app"
-    /// The canonical public org/repo those links now use (CND-05).
+    /// The canonical public org/repo those links now use.
     static let correctOrgPath = "Merlin1A/resecta"
 
     @Test("Privacy Policy + EULA point at the resecta.app hosted pages")

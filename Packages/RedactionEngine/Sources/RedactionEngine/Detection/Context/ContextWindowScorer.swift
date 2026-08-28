@@ -64,7 +64,7 @@ public struct ContextWindowScorer: Sendable {
     /// structurally valid match). When not supplied, the scorer behaves
     /// exactly as before for backward compatibility with existing SSN tests.
     ///
-    /// S5 §2.7: when `documentHeader` is non-nil and the
+    /// When `documentHeader` is non-nil and the
     /// `gazetteer`/`category`/`doctype` trio is present, the
     /// `suppressionScore(documentHeader:)` overload is called instead of the
     /// 3-arg overload so the document-level institution anchor fires.
@@ -118,7 +118,7 @@ public struct ContextWindowScorer: Sendable {
             baseScore = profile.baseConfidence
         }
 
-        // Phase 1 / S5: layer scoped gazetteer suppression on top. The
+        // Layer scoped gazetteer suppression on top. The
         // gazetteer returns a factor in [0.25, 1.0] (1.0 = no suppression).
         // We floor the final score at profile.floor so the A1 invariant
         // survives.
@@ -155,7 +155,7 @@ public struct ContextWindowScorer: Sendable {
     /// after reading the numeric confidence so the band-decision logic lives
     /// in one place. Returns nil for the neutral band.
     ///
-    /// S5 §2.7: `documentHeader` is forwarded to `score(...)` so the band
+    /// `documentHeader` is forwarded to `score(...)` so the band
     /// classification reflects any institution-anchor suppression that fired.
     /// Note: the header-anchor path has no associated keyword to attach to a
     /// `negativeContextSuppressed` signal — that signal is emitted separately
@@ -187,9 +187,9 @@ public struct ContextWindowScorer: Sendable {
         return nil
     }
 
-    /// WU-76 / [P4] — per-keyword breakdown emitted alongside the scalar
+    /// Per-keyword breakdown emitted alongside the scalar
     /// `signal(...)`. Returns the matched keywords from the profile's
-    /// positive or negative sets (NEVER page-extracted text — RR-31
+    /// positive or negative sets (NEVER page-extracted text — the
     /// closed-vocabulary invariant). Each contribution is an even share
     /// of the band-adjustment so consumers can render compact per-key
     /// summaries without re-running the scorer.
@@ -238,13 +238,13 @@ public struct ContextWindowScorer: Sendable {
         return nil
     }
 
-    /// S3 / WS2 §1.2 — returns a `negativeContextSuppressed` signal when the
+    /// Returns a `negativeContextSuppressed` signal when the
     /// gazetteer actually fires, carrying the matched keyword and its weight.
     /// Detectors call this alongside `signal(...)` and append the result when
     /// non-nil. Uses `suppressionDetail` (internal API on the gazetteer) so
     /// the keyword scan runs only once per call site.
     ///
-    /// Header-anchor path is deliberately NOT included here (deferred to S5).
+    /// Header-anchor path is deliberately NOT included here (deferred).
     public func gazetteerSignal(
         text: String,
         matchRange: NSRange,

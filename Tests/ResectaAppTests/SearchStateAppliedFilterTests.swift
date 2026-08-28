@@ -3,16 +3,15 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-18 — Applied-only / unapplied-only filter chip. `SearchState`
+// Applied-only / unapplied-only filter chip. `SearchState`
 // gains a new post-scan filter that hides applied or unapplied results
-// from `filteredResults`. Field participates in `_FilterCacheKey` per
-// RR-01; resets to `.all` in both clear paths
-// per D-28 / RR-26.
+// from `filteredResults`. Field participates in `_FilterCacheKey`;
+// resets to `.all` in both clear paths.
 // Symmetric clear-paths assertions are pinned by
 // `SearchStateClearTests`; this suite covers correctness, default,
 // cache-invalidation wiring, Codable shape, and the chip a11y label.
 
-@Suite("SearchState applied filter (WU-18)", .tags(.search))
+@Suite("SearchState applied filter", .tags(.search))
 @MainActor
 struct SearchStateAppliedFilterTests {
 
@@ -124,10 +123,10 @@ struct SearchStateAppliedFilterTests {
         }
     }
 
-    @Test("AppliedFilter rawValues stay locked — case renames are migration events per RR-05")
+    @Test("AppliedFilter rawValues stay locked — case renames are migration events")
     func rawValuesAreContractStrings() {
         // Pinning prevents accidental rename — `SavedSearchStore`
-        // (post-WU-26) decodes against these strings.
+        // decodes against these strings.
         #expect(AppliedFilter.all.rawValue == "All")
         #expect(AppliedFilter.applied.rawValue == "Applied")
         #expect(AppliedFilter.unapplied.rawValue == "Unapplied")
@@ -149,7 +148,7 @@ struct SearchStateAppliedFilterTests {
         )
     }
 
-    @Test("UP-8 — applied-state chip shows only post-apply or with a non-default filter active")
+    @Test("Applied-state chip shows only post-apply or with a non-default filter active")
     func chipVisibilityGate() {
         // Pre-apply, default filter: hidden (the chip would filter a set
         // with no applied members — every option shows the same list).
@@ -187,7 +186,7 @@ struct SearchStateAppliedFilterTests {
         #expect(kept == [appliedSSN.id])
     }
 
-    // MARK: - §4.3 Navigation with appliedFilter active
+    // MARK: - Navigation with appliedFilter active
 
     @Test("J/K navigation skips unapplied results when appliedFilter is .applied")
     func jkSkipsUnappliedWhenAppliedFilterActive() {

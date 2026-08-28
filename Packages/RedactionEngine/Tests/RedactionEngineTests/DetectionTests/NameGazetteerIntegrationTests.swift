@@ -3,13 +3,13 @@ import Foundation
 import NaturalLanguage
 @testable import RedactionEngine
 
-// W2 — NameGazetteer wired into the NLTagger name path.
+// NameGazetteer wired into the NLTagger name path.
 // Verifies per-candidate boost + strict-on-ALL-CAPS suppression + rationale
 // signal emission. Tests that need the real bundled Bloom filters gate on
 // `NameGazetteer.init?()` and skip cleanly when resources are stripped
 // (same pattern as G8CorpusIngestionTests).
 
-@Suite("NameGazetteer integration (W2)")
+@Suite("NameGazetteer integration")
 struct NameGazetteerIntegrationTests {
 
     // MARK: - Bundled-gazetteer tests (gated)
@@ -18,11 +18,11 @@ struct NameGazetteerIntegrationTests {
     func knownSurnameGetsBoostAndSignal() async throws {
         guard Self.nlTaggerNamesAvailable() else {
             print("[NLTagger gate] .nameType scheme unavailable on this build; "
-                  + "skipping (REDACTION_ENGINE.md §4.5 'Experiment L3').")
+                  + "skipping.")
             return
         }
         guard let gazetteer = NameGazetteer() else {
-            print("[W2 gate] NameGazetteer bundle missing; skipping bundled test.")
+            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
             return
         }
         let detector = PIIDetector(nameGazetteer: gazetteer)
@@ -42,7 +42,7 @@ struct NameGazetteerIntegrationTests {
     @Test("Given + surname on bundled gazetteer produces max boost (direct queryBoosted)")
     func bundledGazetteer_givenAndSurnameBoost() throws {
         guard let gazetteer = NameGazetteer() else {
-            print("[W2 gate] NameGazetteer bundle missing; skipping bundled test.")
+            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
             return
         }
         // queryBoosted skips the NLTagger tokenization variability — the
@@ -60,7 +60,7 @@ struct NameGazetteerIntegrationTests {
     @Test("Unknown candidate keeps baseline 0.70 and emits no bloom signals")
     func unknownCandidateKeepsBaseline() async throws {
         guard let gazetteer = NameGazetteer() else {
-            print("[W2 gate] NameGazetteer bundle missing; skipping bundled test.")
+            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
             return
         }
         let detector = PIIDetector(nameGazetteer: gazetteer)
@@ -83,7 +83,7 @@ struct NameGazetteerIntegrationTests {
     @Test("ALL-CAPS strict pass suppresses gibberish candidates")
     func allCapsStrictPassSuppressesUnknown() async throws {
         guard let gazetteer = NameGazetteer() else {
-            print("[W2 gate] NameGazetteer bundle missing; skipping bundled test.")
+            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
             return
         }
         let detector = PIIDetector(nameGazetteer: gazetteer)
@@ -171,7 +171,7 @@ struct NameGazetteerIntegrationTests {
     func nilGazetteerBackCompat() async throws {
         guard Self.nlTaggerNamesAvailable() else {
             print("[NLTagger gate] .nameType scheme unavailable on this build; "
-                  + "skipping (REDACTION_ENGINE.md §4.5 'Experiment L3').")
+                  + "skipping.")
             return
         }
         let detector = PIIDetector(nameGazetteer: nil)
@@ -187,7 +187,7 @@ struct NameGazetteerIntegrationTests {
                 "nil gazetteer must keep the 0.70 baseline confidence")
         #expect(!rationale.signals.contains(.bloomSurnameHit))
         #expect(!rationale.signals.contains(.bloomGivenHit))
-        // The W1 baseline signal is still present.
+        // The regex baseline signal is still present.
         #expect(rationale.signals.contains(.regexPattern(name: "name.nltagger")))
     }
 
@@ -215,13 +215,12 @@ struct NameGazetteerIntegrationTests {
         case notFound
     }
 
-    /// REDACTION_ENGINE.md §4.5 "Experiment L3" — the .nameType scheme is
-    /// asset-gated on iOS 26 and is absent from the iPhone simulator's
-    /// available schemes, so any test that needs NLTagger to emit a
-    /// personalName candidate would observe an empty stream rather than
-    /// the intended W2 wiring. Skipping here matches the bundle-missing
-    /// gate above; on physical devices the scheme returns true and the
-    /// assertions run normally.
+    /// The .nameType scheme is asset-gated on iOS 26 and is absent from the
+    /// iPhone simulator's available schemes, so any test that needs NLTagger
+    /// to emit a personalName candidate would observe an empty stream rather
+    /// than the intended gazetteer wiring. Skipping here matches the
+    /// bundle-missing gate above; on physical devices the scheme returns
+    /// true and the assertions run normally.
     private static func nlTaggerNamesAvailable() -> Bool {
         NLTagger.availableTagSchemes(for: .word, language: .english)
             .contains(.nameType)

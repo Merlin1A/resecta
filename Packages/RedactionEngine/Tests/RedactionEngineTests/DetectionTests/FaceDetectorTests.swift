@@ -4,7 +4,7 @@ import CoreGraphics
 import ImageIO
 @testable import RedactionEngine
 
-// .serialized: VNImageRequestHandler.perform() blocks cooperative pool threads (F2-8).
+// .serialized: VNImageRequestHandler.perform() blocks cooperative pool threads.
 @Suite("Face Detector", .serialized)
 struct FaceDetectorTests {
 
@@ -23,10 +23,10 @@ struct FaceDetectorTests {
             let results = try await detector.detect(in: image)
             #expect(results.isEmpty, "Solid color should have no faces")
         } catch {
-            // CAT-218: surface a Vision failure as a recorded known issue
-            // instead of a silent swallow. The #expect above still runs (and is
-            // enforced) when Vision is available; only a thrown Vision error —
-            // expected on a simulator without a Neural Engine — lands here.
+            // Surface a Vision failure as a recorded known issue instead of
+            // a silent swallow. The #expect above still runs (and is
+            // enforced) when Vision is available; only a thrown Vision error
+            // — expected on a simulator without a Neural Engine — lands here.
             withKnownIssue("Vision face detection unavailable on this simulator (no Neural Engine)") {
                 throw error
             }
@@ -41,7 +41,7 @@ struct FaceDetectorTests {
         do {
             _ = try await detector.detect(in: image)
         } catch {
-            // CAT-218: record the Vision failure as a known issue rather than
+            // Record the Vision failure as a known issue rather than
             // swallowing it — a total Vision outage now surfaces in the run.
             withKnownIssue("Vision face detection unavailable on this simulator (no Neural Engine)") {
                 throw error
@@ -74,7 +74,7 @@ struct FaceDetectorTests {
                 }
             }
         } catch {
-            // CAT-218: record the Vision failure as a known issue rather than
+            // Record the Vision failure as a known issue rather than
             // swallowing it.
             withKnownIssue("Vision face detection unavailable on this simulator (no Neural Engine)") {
                 throw error
@@ -103,46 +103,46 @@ struct FaceDetectorTests {
         #expect(abs(clamped.height - 0.56) < 0.01)
     }
 
-    // MARK: - CAT-068 confidence floor
+    // MARK: - Confidence floor
 
-    @Test("Below-floor confidence observations are dropped (CAT-068)")
+    @Test("Below-floor confidence observations are dropped")
     func lowConfidenceFiltered() {
         let box = CGRect(x: 0.3, y: 0.3, width: 0.4, height: 0.4)
         // Below the 0.3 floor → dropped before any geometry.
         #expect(FaceDetector.normalizedPaddedRect(confidence: 0.2, boundingBox: box) == nil)
-        // At the floor → retained, still carrying the §4.8 padding.
+        // At the floor → retained, still carrying the expansion padding.
         let kept = FaceDetector.normalizedPaddedRect(confidence: 0.3, boundingBox: box)
         #expect(kept != nil)
-        #expect((kept?.width ?? 0) > box.width, "Retained observation keeps the §4.8 padding")
+        #expect((kept?.width ?? 0) > box.width, "Retained observation keeps the expansion padding")
     }
 
-    @Test("Confidence floor constant is 0.3 (CAT-068)")
+    @Test("Confidence floor constant is 0.3")
     func floorConstantValue() {
         #expect(FaceDetector.minimumFaceConfidence == 0.3)
     }
 
-    // MARK: - CAT-218 real-face positive path
+    // MARK: - Real-face positive path
 
     // The detector suite has no positive-recall guard: every detect() call runs
     // on a solid-color or tiny synthetic image, so FaceDetector could regress to
     // returning zero faces on a real face and stay green (face redaction is a
     // marketed HIPAA-identifier-17 differentiator). This is that guard.
     //
-    // BLOCKED-ON-ASSET: awaiting the maintainer's photo (D-19). VNDetectFaceRectanglesRequest
-    // is trained on real faces — synthetic ovals/dots do not trigger it (§2.7),
-    // so the fixture must be a real photo. Per D-19 it is the maintainer's OWN photo (no
+    // BLOCKED-ON-ASSET: awaiting the maintainer's photo. VNDetectFaceRectanglesRequest
+    // is trained on real faces — synthetic ovals/dots do not trigger it, so the
+    // fixture must be a real photo. It is the maintainer's own photo (no
     // third-party CC0 sourcing — that alternative was not selected). Until
     // Fixtures/TestResources/face_source.jpg is committed this test is .disabled;
     // the asset-independent half (the swallowing error blocks above, now
     // recorded via withKnownIssue) already landed. To enable: commit the photo,
     // drop the `.disabled` trait.
-    @Test("Real face image produces at least one detection (CAT-218)",
-          .disabled("BLOCKED-ON-ASSET: awaiting Jesse photo (D-19) — face_source.jpg not committed"))
+    @Test("Real face image produces at least one detection",
+          .disabled("face_source.jpg is not committed to Fixtures/TestResources"))
     func testFaceDetectedInRealFaceImage() async throws {
         let url = try #require(
             Bundle.module.url(forResource: "face_source", withExtension: "jpg",
                               subdirectory: "TestResources"),
-            "face_source.jpg must be committed to Fixtures/TestResources (D-19)")
+            "face_source.jpg must be committed to Fixtures/TestResources")
         let data = try Data(contentsOf: url)
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {

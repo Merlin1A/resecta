@@ -1,6 +1,6 @@
 import Foundation
 
-// Plan §2 — the wrapper a single page's detection output threads through.
+// The wrapper a single page's detection output threads through.
 // Carries raw detections + the doctype that gated them + an optional
 // classification diagnostic for the G5 triage panel.
 
@@ -8,14 +8,14 @@ public struct PageDetectionResult: Sendable {
     public let detections: [DetectionResult]
     public let doctype: DoctypeResult
     public let classificationDiagnostic: ClassificationDiagnostic?
-    /// W10 — per-category count of pre-threshold detections that lost
+    /// Per-category count of pre-threshold detections that lost
     /// an overlap group inside `DetectionOrchestrator.resolveOverlaps`.
     /// Populated per page by the detection orchestrator; the app's scan-path
     /// coordinator does not read or aggregate this field today (the search
     /// path's `CoverageReport.overlapSuppressedCountByCategory` is computed
     /// independently). Consumed by engine snapshot tests for parity checks.
     public let overlapSuppressedCountByCategory: [PIICategory: Int]
-    /// ST-83 — PAGE-level OCR provenance. Per-detection provenance cannot
+    /// PAGE-level OCR provenance. Per-detection provenance cannot
     /// carry the oversized-page skip on a page that produced zero
     /// detections (nothing to attach it to), so the page result records
     /// it directly. The coordinator reads `.pixelCapExceeded` pages and
@@ -39,7 +39,7 @@ public struct PageDetectionResult: Sendable {
 }
 
 // G5 "Why this classification?" diagnostic. In-memory only — never logged,
-// never persisted (ARCHITECTURE.md §12.2). Released on `clearAll()`.
+// never persisted. Released on `clearAll()`.
 
 public struct ClassificationDiagnostic: Sendable, Equatable {
     public let primary: DoctypeClass

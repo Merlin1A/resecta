@@ -2,17 +2,16 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// WU-75 / [P3] / D-30 — reverse-rationale doctype-gate parity extended
+// Reverse-rationale doctype-gate parity extended
 // from 4 (DOB / NPI / DEA / Account) to 6 (+ MRN / License Plate).
 // The reverse-rationale popover renders `.doctypeGated` rows so the user
 // understands why a flagged-looking string didn't match — without this
 // parity fix, the popover would show `.noMatch` for the three added
 // categories even when the engine actually skipped them by gate.
 //
-// Sign-off: D-31 codification round 2 captures the D-11 escalation gate
-// for this engine surface.
+// This codification captures the escalation gate for this engine surface.
 
-@Suite("Doctype-gate parity (WU-75)")
+@Suite("Doctype-gate parity")
 struct DoctypeGateParityTests {
 
     private var balancedVector: PresetThresholdVector {

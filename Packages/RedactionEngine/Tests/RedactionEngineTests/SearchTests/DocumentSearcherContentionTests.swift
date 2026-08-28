@@ -76,7 +76,7 @@ struct DocumentSearcherContentionTests {
         #expect(results.isEmpty, "Oversized page produced \(results.count) OCR results — pixel-count cap did not reject")
     }
 
-    // MARK: - D10-F2 per-page yield (text + multi-term arms)
+    // MARK: - Per-page yield (text + multi-term arms)
 
     /// #6 — the text-layer fast path holds no `await` other than the new
     /// per-page yield; without it a 60-page scan would pin the actor and a
@@ -177,11 +177,11 @@ struct DocumentSearcherContentionTests {
         #expect(elapsed < .milliseconds(3000), "cancelled scan took \(elapsed)")
     }
 
-    // MARK: - D10-F1 copy coordinate equivalence / D10-F3 preview scope
+    // MARK: - Copy coordinate equivalence / preview scope
 
     /// #5 — the per-consumer copy changes WHICH instance produces bounds, never
     /// the values. For a non-rotated page `boundingRect` is byte-equal on the
-    /// copy and the source for the same NSRange (so S1's CropBox-origin fix is
+    /// copy and the source for the same NSRange (so the CropBox-origin fix is
     /// untouched by the copy).
     @Test("boundingRect is identical on a per-consumer copy and the source page")
     func boundingRectEquivalentOnCopy() throws {

@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// D-19 fixture-driven test for license-plate detection. The DataPipeline-
+// Fixture-driven test for license-plate detection. The DataPipeline-
 // generated vectors at Fixtures/vectors/license_plate_test_vectors.json
 // carry labeled-prefix plate values whose `text` field reproduces the
 // original document context (e.g. "Tag Number# U79YMJ"). This test
@@ -10,7 +10,7 @@ import Foundation
 // text. LicensePlateDetectorTests.swift covers other surfaces; this file
 // is fixture-driven specifically.
 
-@Suite("License-plate fixture-driven vector tests (D-19)")
+@Suite("License-plate fixture-driven vector tests")
 struct LicensePlateVectorTests {
 
     struct Vectors: Decodable {
@@ -33,7 +33,7 @@ struct LicensePlateVectorTests {
         return try JSONDecoder().decode(Vectors.self, from: data).vectors
     }
 
-    @Test("D-19 fixture loads with rows")
+    @Test("Fixture loads with rows")
     func fixtureLoads() throws {
         guard let vectors = try loadVectors() else {
             Issue.record("license_plate_test_vectors.json not bundled")

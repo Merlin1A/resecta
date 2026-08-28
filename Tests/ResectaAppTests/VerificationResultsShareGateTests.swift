@@ -3,12 +3,12 @@ import Foundation
 @testable import ResectaApp
 import RedactionEngine
 
-// Pins the §3.4 Share gate on the verification-results Share card.
+// Pins the Share gate on the verification-results Share card.
 //
 // Source-of-truth helpers:
 //   • VerificationResultsView.shareDisabled(canExport:) — the card's
 //     enabled/disabled mapping (Share enabled exactly when canExport is true).
-//   • DocumentEditorView.shareNeedsFailConfirm(report:acknowledged:) — §3.4
+//   • DocumentEditorView.shareNeedsFailConfirm(report:acknowledged:) —
 //     FAIL override "Option B": a standing FAIL verdict (not yet
 //     acknowledged) routes the Share tap through a one-time "Share Anyway"
 //     confirm before export. canExport(report:) no longer folds this in — a
@@ -20,7 +20,7 @@ import RedactionEngine
 //     never ran) not yet acknowledged routes the Share tap through its own
 //     confirm (SkippedShareGateTests below).
 //
-// UXC-13 (RB-22 + RB-45): the `acknowledged` conjunct is what makes each
+// The `acknowledged` conjunct is what makes each
 // confirm one-time — sourced from an app-side DocumentState shadow
 // (`failShareAcknowledged` / `skippedShareAcknowledged`), NOT from the
 // report's own `userOverrodeFailure` / `userAcknowledgedSkippedShare`
@@ -29,9 +29,9 @@ import RedactionEngine
 // override pin) but the predicates below no longer read them — the shadow
 // re-arms independently of the report whenever the user backs out of the
 // share sheet without sending (`DocumentState.rearmShareRiskConfirms()`),
-// which a report-scoped flag alone could never express (GAP-12).
+// which a report-scoped flag alone could never express.
 
-@Suite("Verification results Share gate (§4.4a)")
+@Suite("Verification results Share gate")
 @MainActor
 struct VerificationResultsShareGateTests {
 
@@ -40,7 +40,7 @@ struct VerificationResultsShareGateTests {
         #expect(VerificationResultsView.shareDisabled(canExport: true) == false)
     }
 
-    @Test("No exportable output → Share disabled (§4.4a gate holds)")
+    @Test("No exportable output → Share disabled")
     func notExportableDisablesShare() {
         #expect(VerificationResultsView.shareDisabled(canExport: false) == true)
     }
@@ -95,16 +95,16 @@ struct ShareDisabledReasonTests {
     }
 }
 
-// §3.4 FAIL override / "Option B" — the Share gate after a FAIL. Tests target
+// FAIL override "Option B" — the Share gate after a FAIL. Tests target
 // the pure static predicate shareNeedsFailConfirm(report:acknowledged:):
 // canExport(report:) no longer hard-blocks on it, and handleExportTap consults
 // it to decide whether to present the one-time "Share Anyway" confirm before
 // beginExport. Building a SwiftUI host is neither possible nor needed on this
-// machine; the predicate is the single source of truth. UXC-13: `acknowledged`
+// machine; the predicate is the single source of truth. `acknowledged`
 // is the app-side shadow (`DocumentState.failShareAcknowledged`) — the
 // report's own `userOverrodeFailure` is a write-only mirror the predicate no
 // longer reads (see `engineFlagAloneDoesNotSuppressConfirm` below).
-@Suite("§3.4 Share-after-FAIL confirm gate (Option B)")
+@Suite("Share-after-FAIL confirm gate (Option B)")
 @MainActor
 struct FailExportGateTests {
 
@@ -132,9 +132,9 @@ struct FailExportGateTests {
             report: report(.fail("x"), overridden: true), acknowledged: true) == false)
     }
 
-    @Test("UXC-13: engine flag alone no longer matters — userOverrodeFailure == true but acknowledged: false still needs the confirm")
+    @Test("Engine flag alone no longer matters — userOverrodeFailure == true but acknowledged: false still needs the confirm")
     func engineFlagAloneDoesNotSuppressConfirm() {
-        // GAP-12: a report-scoped flag alone could not be re-armed when the
+        // A report-scoped flag alone could not be re-armed when the
         // user backed out of the share sheet without sending, so the
         // predicate now reads only the app-side shadow via `acknowledged`.
         #expect(DocumentEditorView.shareNeedsFailConfirm(
@@ -153,7 +153,7 @@ struct FailExportGateTests {
         #expect(DocumentEditorView.shareNeedsFailConfirm(report: report(.skipped), acknowledged: false) == false)
     }
 
-    // PD-17 residual tier: ATTENTION keeps the one-time confirm — the tier
+    // Residual tier: ATTENTION keeps the one-time confirm — the tier
     // re-class changes presentation, not the share-time acknowledgment.
     @Test("ATTENTION (not acknowledged) needs the one-time confirm before sharing")
     func attentionNeedsConfirm() {
@@ -167,7 +167,7 @@ struct FailExportGateTests {
             report: report(.attention("a"), overridden: true), acknowledged: true) == false)
     }
 
-    @Test("UXC-14: ATTENTION confirm's at-risk item list quotes the layer's shortDescription")
+    @Test("ATTENTION confirm's at-risk item list quotes the layer's shortDescription")
     func attentionAtRiskItemQuotesDiagnostic() {
         let attentionReport = VerificationReport(
             layers: [
@@ -184,15 +184,15 @@ struct FailExportGateTests {
         )
         let lines = DocumentEditorView.atRiskItemLines(report: attentionReport)
         #expect(lines == ["Text matching your redactions is still readable on page 2."])
-        // Content-free (ARCH §12.2): the item list never surfaces
+        // Content-free: the item list never surfaces
         // reviewTermTexts (the matched term text), only shortDescription.
         #expect(!lines.joined().contains("redacted-term"))
     }
 
-    // VE-8-1 (F07) emits a synthetic single-layer "Page Count Check" FAIL when
+    // A synthetic single-layer "Page Count Check" FAIL emits when
     // a truncated output is detected on the verify-only resume path. Under
     // Option B that FAIL report now NEEDS the one-time confirm (no hard block).
-    @Test("Integration: truncated-output (VE-8-1) FAIL report → needs confirm")
+    @Test("Integration: truncated-output FAIL report → needs confirm")
     func truncatedOutputFailReportNeedsConfirm() {
         let pageCountFail = VerificationReport(
             layers: [
@@ -213,10 +213,10 @@ struct FailExportGateTests {
             report: pageCountFail, acknowledged: false) == true)
     }
 
-    // D08-F2 (search pre-launch S1): the Secure-Rasterization in-region
+    // The Secure-Rasterization in-region
     // readable-text FAIL aggregates to overall .fail. Under Option B it routes
     // through the SAME one-time confirm as any other FAIL — no separate gate.
-    @Test("Integration: D08-F2 secure-raster in-region FAIL report → needs confirm")
+    @Test("Integration: secure-raster in-region FAIL report → needs confirm")
     func secureRasterInRegionFailReportNeedsConfirm() {
         let ocrFail = VerificationReport(
             layers: [
@@ -241,13 +241,13 @@ struct FailExportGateTests {
         #expect(VerificationResultsView.shareDisabled(canExport: false) == true)
     }
 
-    // ERR-06 (dossier §4): a FAIL-without-override Share tap routes through the
+    // A FAIL-without-override Share tap routes through the
     // one-time confirm BEFORE beginExport(). handleExportTap returns early on a
     // true predicate (presenting the confirm) and reaches its only beginExport()
     // call on the open paths (override / non-FAIL); the `.exporting` transition
     // lives only inside beginExport(), so for a FAIL it is reached exactly when
     // the user has confirmed (override set) or the verdict is not FAIL.
-    @Test("ERR-06: FAIL-without-override routes through the confirm before beginExport")
+    @Test("FAIL-without-override routes through the confirm before beginExport")
     func err06FailWithoutOverrideRoutesThroughConfirm() {
         // handleExportTap presents the confirm (returns early) on this:
         #expect(DocumentEditorView.shareNeedsFailConfirm(
@@ -259,7 +259,7 @@ struct FailExportGateTests {
             report: report(.pass), acknowledged: false) == false)
     }
 
-    // UXC-14: the confirm sheet's at-risk item list is derived from EVERY
+    // The confirm sheet's at-risk item list is derived from EVERY
     // FAIL/ATTENTION layer's shortDescription (`atRiskItemLines`), not a
     // single quoted-and-fallback sentence — the retired
     // `shareAnywayConfirmMessage` / `shareAnywayConfirmFallbackMessage`
@@ -352,7 +352,7 @@ struct FailExportGateTests {
         // The mirror is still written (LegalGateTests.overrideStoresFlag
         // pins this directly)...
         #expect(overridden.userOverrodeFailure == true)
-        // ...but UXC-13: the app-side shadow is what the predicate reads.
+        // ...but the app-side shadow is what the predicate reads.
         #expect(doc.failShareAcknowledged == true)
         #expect(DocumentEditorView.shareNeedsFailConfirm(
             report: overridden, acknowledged: doc.failShareAcknowledged) == false)
@@ -364,7 +364,7 @@ struct FailExportGateTests {
 // shared with zero friction: a skipped output carries no verification result,
 // so sharing it now asks once, naming the state. Mirrors the FAIL confirm's
 // machinery: pure static predicate shareNeedsSkippedConfirm(report:acknowledged:),
-// an app-side skippedShareAcknowledged shadow (UXC-13) set by
+// an app-side skippedShareAcknowledged shadow set by
 // DocumentState.acknowledgeSkippedShare() and cleared by
 // DocumentState.rearmShareRiskConfirms(), and handleExportTap routing (after
 // the FAIL branch — mutually exclusive by overallStatus). WARN friction is
@@ -397,7 +397,7 @@ struct SkippedShareGateTests {
             report: report(.skipped, acknowledged: true), acknowledged: true) == false)
     }
 
-    @Test("UXC-13: engine flag alone no longer matters — userAcknowledgedSkippedShare == true but acknowledged: false still needs the confirm")
+    @Test("Engine flag alone no longer matters — userAcknowledgedSkippedShare == true but acknowledged: false still needs the confirm")
     func engineFlagAloneDoesNotSuppressConfirm() {
         #expect(DocumentEditorView.shareNeedsSkippedConfirm(
             report: report(.skipped, acknowledged: true), acknowledged: false) == true)
@@ -425,7 +425,7 @@ struct SkippedShareGateTests {
         #expect(DocumentEditorView.shareNeedsSkippedConfirm(report: report(.fail("x")), acknowledged: false) == false)
     }
 
-    /// The narrow incomplete-WARN shape (UXC-14 / GAP-14): overallStatus
+    /// The narrow incomplete-WARN shape: overallStatus
     /// `.warn` with zero real WARN layers and ≥1 skipped layer. Needs actual
     /// layers, unlike this suite's zero-layer `report(_:)` fixture helper.
     private func incompleteWarnReport() -> VerificationReport {
@@ -458,7 +458,7 @@ struct SkippedShareGateTests {
     }
 
     // Friction ladder (predicate-level): FAIL > SKIPPED == incomplete-WARN >
-    // WARN == PASS (RB-34 D8). Score = confirms required + red Share tint.
+    // WARN == PASS. Score = confirms required + red Share tint.
     // FAIL scores 2 (confirm + red tint), SKIPPED and incomplete-WARN each
     // score 1 (confirm, default tint), routine WARN and PASS score 0. Pins
     // the deliberate shape: turning verification off, or sharing a run whose
@@ -499,24 +499,24 @@ struct SkippedShareGateTests {
         }
         // The mirror is still written...
         #expect(acknowledged.userAcknowledgedSkippedShare == true)
-        // ...but UXC-13: the app-side shadow is what the predicate reads.
+        // ...but the app-side shadow is what the predicate reads.
         #expect(doc.skippedShareAcknowledged == true)
         #expect(DocumentEditorView.shareNeedsSkippedConfirm(
             report: acknowledged, acknowledged: doc.skippedShareAcknowledged) == false)
     }
 
-    @Test("Skip-fact line names the state (mechanism description) — new UXC-14 sheet copy")
+    @Test("Skip-fact line names the state (mechanism description)")
     func skipFactLineNamesState() {
         #expect(DocumentEditorView.shareRiskConfirmSkipFactLine
             == "Verification did not run on this output.")
     }
 }
 
-// UXC-14 — the bespoke share-risk confirm sheet's copy builders and haptic
+// The bespoke share-risk confirm sheet's copy builders and haptic
 // seam, replacing the two retired `.alert`s. Predicate-level suites above
 // (FailExportGateTests, SkippedShareGateTests) cover the gate; this suite
 // covers the sheet's own content derivation.
-@Suite("Share-risk confirm sheet (UXC-14)")
+@Suite("Share-risk confirm sheet")
 @MainActor
 struct ShareRiskConfirmSheetTests {
 
@@ -570,7 +570,7 @@ struct ShareRiskConfirmSheetTests {
             "Output has 2 pages; source has 3.",
             "Unredacted text remains on page 2.",
         ])
-        // Content-free (ARCH §12.2): never the matched text
+        // Content-free: never the matched text
         // (reviewTermTexts) or the detailDescription — shortDescription only.
         let joined = lines.joined()
         #expect(!joined.contains("a-matched-secret"))
@@ -604,9 +604,9 @@ struct ShareRiskConfirmSheetTests {
             == "shareIncompleteWarnConfirm")
     }
 
-    // MARK: - Hidden completion Button geometry (RB-55 source pin)
+    // MARK: - Hidden completion Button geometry
 
-    /// RB-55: a 1×1-pt hidden Button proved unreliable for a
+    /// A 1×1-pt hidden Button proved unreliable for a
     /// coordinate-driven `.tap()` on a re-presented sheet. Source-scan
     /// pin (mirrors `HonestySurfacesTests.loadRepoFile`) proving
     /// `SlideToShareControl`'s hidden completion Button is sized by the
@@ -743,17 +743,17 @@ struct ShareRiskConfirmSheetTests {
     }
 }
 
-// Incomplete-WARN share confirm gate (UXC-14 / GAP-14). Tests target the
+// Incomplete-WARN share confirm gate. Tests target the
 // pure static predicate shareNeedsIncompleteWarnConfirm(report:acknowledged:):
 // a WARN report whose aggregate carries zero real WARN layers but ≥1 skipped
 // layer — the exact condition VerificationResultsView.mastheadSubtitle's
 // skip-induced-WARN branch renders on — routes the Share tap through the
 // same confirm sheet as FAIL/ATTENTION/SKIPPED. Unlike its two siblings the
 // acknowledgement flag is NOT on VerificationReport (Packages/RedactionEngine
-// is C-5-fenced) — it lives on DocumentState instead
+// is a separate package) — it lives on DocumentState instead
 // (`incompleteWarnShareAcknowledged` / `acknowledgeIncompleteWarnShare()`),
 // so the predicate takes `acknowledged` as an explicit parameter.
-@Suite("Incomplete-WARN share confirm gate (UXC-14 / GAP-14)")
+@Suite("Incomplete-WARN share confirm gate")
 @MainActor
 struct IncompleteWarnShareGateTests {
 
@@ -856,15 +856,15 @@ struct ShareTintAndPreviewDecouplingTests {
     }
 }
 
-// UXC-13 (RB-22 + RB-45) — re-arming the share-risk confirms per send
-// attempt, and UXC-36 (RB-41) — the post-share acknowledgment toast.
+// Re-arming the share-risk confirms per send
+// attempt, and the post-share acknowledgment toast.
 // `DocumentState.rearmShareRiskConfirms()` and
 // `DocumentEditorView.handleShareSheetCompletion(completed:...)` are the two
 // pure/near-pure seams: the share sheet's `completionWithItemsHandler` itself
 // is not unit-hostable (real UIActivityViewController + presented view
 // controller), so these tests exercise the extracted logic directly, mirroring
 // the `completeShareRiskConfirm` spy pattern already used above.
-@Suite("Share-risk re-arm (UXC-13) + post-share acknowledgment (UXC-36)")
+@Suite("Share-risk re-arm + post-share acknowledgment")
 @MainActor
 struct ShareRiskRearmAndAcknowledgmentTests {
 
@@ -953,12 +953,12 @@ struct ShareRiskRearmAndAcknowledgmentTests {
         #expect(DocumentEditorView.sharedAcknowledgmentToast == "Shared.")
     }
 
-    // RB-22 sequence: confirm → the presented share sheet is dismissed
+    // Sequence: confirm → the presented share sheet is dismissed
     // without sending → the NEXT Share tap for the same report must confirm
     // again. Uses the existing completeShareRiskConfirm spy pattern
     // (ShareRiskConfirmSheetTests above) for the confirm half, and
     // handleShareSheetCompletion for the cancel half.
-    @Test("RB-22: confirm, then cancel the share sheet, then Share again — re-confirms")
+    @Test("Confirm, then cancel the share sheet, then Share again — re-confirms")
     func completionThenCancelThenShareReConfirms() {
         let savedHaptic = DocumentEditorView.shareRiskConfirmHaptic
         DocumentEditorView.shareRiskConfirmHaptic = { }
@@ -990,7 +990,7 @@ struct ShareRiskRearmAndAcknowledgmentTests {
             report: exportedReports[0], acknowledged: doc.failShareAcknowledged) == false)
 
         // ...but the user backs out of the presented share sheet without
-        // sending (`completed == false`) — RB-22: this re-arms the confirm
+        // sending (`completed == false`) — this re-arms the confirm
         // for the NEXT Share tap on the same report.
         DocumentEditorView.handleShareSheetCompletion(
             completed: false,

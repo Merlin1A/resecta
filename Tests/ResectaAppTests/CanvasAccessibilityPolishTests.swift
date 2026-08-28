@@ -3,21 +3,21 @@ import Foundation
 import CoreGraphics
 @testable import ResectaApp
 
-// WU-43 — canvas a11y polish bundle. Three sub-fixes pinned by token-value
+// Canvas a11y polish bundle. Three sub-fixes pinned by token-value
 // / predicate / shape tests so each can fail in isolation if a future
 // tweak drifts a duration, a stroke width, or the Reduce-Motion gate.
 //
-// M-D.3 — badge outer stroke width (dark-mode contrast)
-// M-D.4 — resize-handle outer stroke width (selection visibility)
-// M-D.5 — handle in/out durations sourced from `ResectaTokens.Anim`.
+// Badge outer stroke width (dark-mode contrast)
+// Resize-handle outer stroke width (selection visibility)
+// Handle in/out durations sourced from `ResectaTokens.Anim`.
 
-@Suite("Canvas accessibility polish (WU-43)")
+@Suite("Canvas accessibility polish")
 @MainActor
 struct CanvasAccessibilityPolishTests {
 
-    // MARK: - M-D.3 — Badge outer stroke
+    // MARK: - Badge outer stroke
 
-    @Test("Badge outer stroke is a 0.5pt hairline (M-D.3)")
+    @Test("Badge outer stroke is a 0.5pt hairline")
     func badgeOuterStrokeIsHairline() {
         // 0.5pt sub-pixel on 2× / 3× retina. Wide enough to register as a
         // perimeter line without bulking up the badge, so the badge color
@@ -25,9 +25,9 @@ struct CanvasAccessibilityPolishTests {
         #expect(RedactionOverlayView.badgeOuterStrokeWidth == 0.5)
     }
 
-    // MARK: - M-D.4 — Resize-handle outer stroke
+    // MARK: - Resize-handle outer stroke
 
-    @Test("Resize-handle outer ring is a 1pt mid-gray stroke (M-D.4)")
+    @Test("Resize-handle outer ring is a 1pt mid-gray stroke")
     func selectionHandleOuterStrokeIsOnePoint() {
         // 1pt mid-gray ring drawn beneath the white-fill / blue-stroke
         // handle disc. Visible against white page margins where the
@@ -35,7 +35,7 @@ struct CanvasAccessibilityPolishTests {
         #expect(RedactionOverlayView.selectionHandleOuterStrokeWidth == 1.0)
     }
 
-    // MARK: - M-D.5 — Handle animation tokens
+    // MARK: - Handle animation tokens
 
     @Test("Handle-in duration matches the SwiftUI selectionIn timing")
     func selectionInDurationMatchesToken() {

@@ -4,7 +4,7 @@ import PDFKit
 import os
 @testable import RedactionEngine
 
-// ENGINE §2.6 — Input validation tests.
+// Input validation tests.
 
 @Suite("Page Validation", .tags(.security))
 struct ValidatePageTests {
@@ -41,7 +41,7 @@ struct ValidatePageTests {
         let scale: CGFloat = 150.0 / 72.0
         let bytes = Int(ceil(bounds.width * scale)) * Int(ceil(bounds.height * scale)) * 4
         let available = os_proc_available_memory()
-        // Only assert pass if we know memory is sufficient (the §2.6
+        // Only assert pass if we know memory is sufficient (the
         // three-bitmap estimate the gate itself applies).
         if pageMemoryEstimateFits(oneBitmapBytes: bytes, available: Int(available)) {
             #expect(validatePage(page, effectiveDPI: 150) == true)
@@ -51,14 +51,14 @@ struct ValidatePageTests {
                 "Standard page should pass dimension check")
     }
 
-    @Test("Accepts standard page at full DPI when availability is unreadable (CAT-138 / D-34)")
+    @Test("Accepts standard page at full DPI when availability is unreadable")
     func acceptsStandardPageAtFullDPIDespiteUnreadableAvailability() throws {
-        // D-34 (measured 2026-06-13): on the simulator
+        // Measured 2026-06-13: on the simulator
         // `os_proc_available_memory()` reports an unusable value (well under
         // 67 MB) regardless of real headroom, so the raw half-available clause
-        // would refuse a standard 612×792 page's 300-DPI raster (~33.7 MB) and
-        // CAT-138's wire-up would then reject every page. The guard defers such
-        // unusable readings (≤ the §2.5 150 MB headroom) to the runtime DPI cap
+        // would refuse a standard 612×792 page's 300-DPI raster (~33.7 MB),
+        // rejecting every page. The guard defers such
+        // unusable readings (≤ the 150 MB headroom) to the runtime DPI cap
         // / `selectDPI`, accepting the page on dimension grounds. On real
         // hardware the reading is accurate and a standard page needs far less
         // than half of available memory, so the clause also returns true — the
@@ -93,7 +93,7 @@ struct ValidatePageTests {
                 "Page smaller than 10pt should be rejected")
     }
 
-    @Test("Memory admission predicate matches the app layer's three-bitmap estimate (§2.6)")
+    @Test("Memory admission predicate matches the app layer's three-bitmap estimate")
     func memoryEstimatePredicateArithmetic() {
         // The predicate admits a page only when three bitmaps' worth of its
         // raster fit in available memory — the same per-page estimate the

@@ -1,10 +1,10 @@
 import SwiftUI
 import RedactionEngine
 
-// W9 — "Scan coverage" disclosure shown above the results list after a
+// "Scan coverage" disclosure shown above the results list after a
 // PII scan. Read-only summary of what the scan evaluated and what passed.
 //
-// WU-16 (session-8): Disclosure auto-opens when the view appears
+// Disclosure auto-opens when the view appears
 // (`@State isExpanded = true`) — the auto-open gate at
 // `SearchResultsSection.swift:26-31` already conditions the view on a
 // completed scan, so the disclosure shows summaries the moment the scan
@@ -30,12 +30,11 @@ struct CoverageReportView: View {
     /// histogram. The PII Scan call site at
     /// `SearchResultsSection.swift:84` threads `searchState.results`.
     let results: [SearchResult]
-    /// WU-67 (session-19): intra-session result diff from
+    /// Intra-session result diff from
     /// `SearchState.diffSinceLastScan()`. nil on the first scan of a
     /// session (no prior snapshot to compare against) — the diff line
-    /// is hidden in that case. The 3-tuple shape matches ACTION-WU-67;
-    /// the rendered string is mechanism-description ("+N above
-    /// threshold, −N below threshold") and classified SAFE under §19.
+    /// is hidden in that case. The rendered string is mechanism-description
+    /// ("+N above threshold, −N below threshold").
     let diff: (added: Int, removed: Int, unchanged: Int)?
     let onShareSnapshot: (() -> Void)?
 
@@ -79,11 +78,11 @@ struct CoverageReportView: View {
                     }
                 }
 
-                // WU-67 (session-19): intra-session diff line. Rendered only
+                // Intra-session diff line. Rendered only
                 // when `diff != nil` (a prior snapshot exists in this session
                 // and a re-scan completed). String is mechanism-description
                 // ("+N above threshold, −N below threshold") with no outcome
-                // promise — SAFE under §19. Per-category suffix
+                // promise. Per-category suffix
                 // ("(N <category> newly suppressed)") is deferred to V1.1+
                 // per the 3-tuple API in `SearchState.diffSinceLastScan()`.
                 if let diff {
@@ -143,7 +142,7 @@ struct CoverageReportView: View {
             .map { ($0.key, $0.value) }
     }
 
-    // QRC-14: every `coverageReport.*` key lives in the "Legal" strings
+    // Every `coverageReport.*` key lives in the "Legal" strings
     // table — a defaulted-table lookup resolves against Localizable and
     // renders the raw key.
     @ViewBuilder
@@ -158,7 +157,7 @@ struct CoverageReportView: View {
         }
     }
 
-    // WU-36 (session-19): per-category row — category name + (optional)
+    // Per-category row — category name + (optional)
     // confidence histogram + total count. Histogram only renders when at
     // least one binned result exists, so categories whose candidates lack
     // `piiConfidence` (or are otherwise excluded from binning) don't push
@@ -182,15 +181,15 @@ struct CoverageReportView: View {
     }
 }
 
-// MARK: - WU-36 Histogram Row
+// MARK: - Histogram Row
 
-// WU-36 (session-19): private SwiftUI view for the inline 5-band
+// Private SwiftUI view for the inline 5-band
 // confidence histogram inside the per-category sub-disclosure. Each band
 // renders as a thin Rectangle with height proportional to its bin count
 // against the per-category maximum. Empty bands render a 1pt floor so
 // the bar chart stays visually contiguous. Accessibility label is
 // mechanism-description ("confidence distribution, N results across M
-// bands") and classified SAFE under §19.
+// bands").
 private struct ConfidenceHistogramRow: View {
     let bins: [Int]
     let categoryRawValue: String
@@ -224,11 +223,11 @@ private struct ConfidenceHistogramRow: View {
     }
 }
 
-// MARK: - WU-16 / WU-36 Pure-Function Contracts
+// MARK: - Pure-Function Contracts
 
 extension CoverageReportView {
-    /// Per WU-16 / [TOKEN_ADDITIONS]: Share Snapshot button label.
-    /// Classified SAFE under §19 — standard share affordance.
+    /// Share Snapshot button label.
+    /// Standard share affordance.
     static let shareSnapshotButtonLabel: String = "Share Snapshot"
 
     /// Number of bands in the confidence histogram.
@@ -247,8 +246,8 @@ extension CoverageReportView {
     /// defensively. Performance: pinned <100ms for 10k synthetic results
     /// on the simulator host by
     /// `CoverageHistogramTests.binsTenThousandResultsUnderHundredMs`
-    /// (acceptance target <50ms per `WORK_UNITS.md#wu-36`; budget widened
-    /// for simulator host variance per session-19 flake-watch posture).
+    /// (acceptance target <50ms; budget widened
+    /// for simulator host variance).
     static func confidenceBinCounts(
         results: [SearchResult],
         category: PIICategory,
@@ -267,29 +266,29 @@ extension CoverageReportView {
         return counts
     }
 
-    /// WU-36: VoiceOver label for the per-category histogram row.
+    /// VoiceOver label for the per-category histogram row.
     /// Mechanism-description — names the category, total binned count,
-    /// and band count. No outcome promise. Classified SAFE under §19.
+    /// and band count. No outcome promise.
     static func histogramAccessibilityLabel(category: String, bins: [Int]) -> String {
         let total = bins.reduce(0, +)
         return "\(category) confidence distribution, \(total) results across \(bins.count) bands"
     }
 
-    /// WU-67 (session-19): rendered label for the intra-session diff
+    /// Rendered label for the intra-session diff
     /// line. Format: `"+<added> above threshold, −<removed> below
     /// threshold"`. Uses the U+2212 MINUS SIGN (`−`) per the action
     /// spec's typographic convention. Mechanism-description — no
-    /// outcome promise; classified SAFE under §19.
+    /// outcome promise.
     /// `static` so the helper is callable from tests without hosting
     /// the SwiftUI runtime.
     static func diffLabel(diff: (added: Int, removed: Int, unchanged: Int)) -> String {
         return "+\(diff.added) above threshold, −\(diff.removed) below threshold"
     }
 
-    /// WU-67: VoiceOver label for the diff line. Spells out the symbols
+    /// VoiceOver label for the diff line. Spells out the symbols
     /// (`+` / `−`) into words for natural speech and includes the
     /// `unchanged` count, which is otherwise implicit from the rendered
-    /// string. Mechanism-description; classified SAFE under §19.
+    /// string. Mechanism-description.
     static func diffAccessibilityLabel(diff: (added: Int, removed: Int, unchanged: Int)) -> String {
         return "Diff since last scan: \(diff.added) added above threshold, \(diff.removed) removed below threshold, \(diff.unchanged) unchanged"
     }

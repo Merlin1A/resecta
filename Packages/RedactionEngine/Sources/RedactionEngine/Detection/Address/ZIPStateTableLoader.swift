@@ -1,8 +1,8 @@
 import Foundation
 import OSLog
 
-// L6 / C12 — JSON-backed ZIP → state loader. Consumes `zip_scf_states.json`
-// produced by DataPipeline's src/resecta_data/gazetteers/zip_scf/ (C11). The
+// JSON-backed ZIP → state loader. Consumes `zip_scf_states.json`
+// produced by DataPipeline's src/resecta_data/gazetteers/zip_scf/. The
 // JSON carries two tables:
 //
 //   * `scf_table` — 3-digit SCF prefix → 2-letter state code. Primary lookup.

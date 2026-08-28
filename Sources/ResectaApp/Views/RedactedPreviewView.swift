@@ -5,10 +5,10 @@ import RedactionEngine
 // Post-redaction preview: read-only PDFView of the redacted output.
 // Shown in the "Preview" tab of VerificationResultsView.
 //
-// Package H (BUG-mainactor-pdf-preview). `PDFDocument(url:)` is CPU-bound
+// `PDFDocument(url:)` is CPU-bound
 // on multi-hundred-page outputs and previously ran inside `makeUIView` on
 // MainActor, stuttering the sheet transition. The parse now runs via
-// `Task.detached` (mirrors the F-002 / pkg-f shape used by
+// `Task.detached` (mirrors the shape used by
 // `PipelineCoordinator.runVerification`); the inner UIViewRepresentable
 // receives the already-loaded `PDFDocument` and renders synchronously.
 
@@ -86,7 +86,7 @@ struct RedactedPreviewView: View {
 
     @ViewBuilder
     private func verdictCapsule(text: String) -> some View {
-        // UXC-27 (GAP-36) — this is small `.caption` TEXT (plus its 12%
+        // This is small `.caption` TEXT (plus its 12%
         // wash background riding the same variable, mirroring
         // ToastSeverity's text/fill pairing), not a glyph — routed
         // through the WCAG-AA text tier rather than `.color`'s system
@@ -133,11 +133,11 @@ private struct RedactedPDFView: UIViewRepresentable {
     let document: PDFDocument
 
     func makeUIView(context: Context) -> FitFlooredPDFView {
-        // UXC-48 (D-123): the same zoom floor as the editor — a pinch
+        // The same zoom floor as the editor — a pinch
         // out stops at fit width here (continuous mode).
         let pdfView = FitFlooredPDFView()
         pdfView.autoScales = true
-        // SA-3 rider (c), deliberately NOT aligned to the editor's
+        // Deliberately NOT aligned to the editor's
         // `.singlePage`: the preview is a read-only whole-document
         // verification surface with no page-navigation chrome —
         // continuous is the only mode that keeps every page reachable

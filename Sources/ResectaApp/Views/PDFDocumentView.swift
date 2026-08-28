@@ -2,59 +2,58 @@ import SwiftUI
 import PDFKit
 import RedactionEngine
 
-// ARCH §5.2, §5.4: PDFView wrapped in UIViewRepresentable.
-// UI_UX §2.1: Coordinator serves as PDFPageOverlayViewProvider.
-// UI_UX §6.1: Opaque background — no glass interference with PDF color accuracy.
+// PDFView wrapped in UIViewRepresentable.
+// Coordinator serves as PDFPageOverlayViewProvider.
+// Opaque background — no glass interference with PDF color accuracy.
 
 struct PDFDocumentView: UIViewRepresentable {
     @Environment(DocumentState.self) private var documentState
     @Environment(RedactionState.self) private var redactionState
     @Environment(ToastQueueManager.self) private var toastManager
-    // DRAW-1: needed to register the PDFViewCoordinator back-pointer
-    // so SwiftUI buttons on PipelineCoordinator (Cancel / Close polygon
-    // in the bottom hint capsule) can reach the polygon commit / cancel
-    // hooks that live on the UIKit-side coordinator.
+    // Registers the PDFViewCoordinator back-pointer so SwiftUI buttons
+    // on PipelineCoordinator (Cancel / Close polygon in the bottom hint
+    // capsule) can reach the polygon commit / cancel hooks that live on
+    // the UIKit-side coordinator.
     @Environment(PipelineCoordinator.self) private var pipelineCoordinator
 
     /// Whether any drawing tool is active. Controls new-region creation.
     var isDrawingMode: Bool
 
-    /// DRAW-1: which shape the active drawing tool produces (rectangle,
+    /// Which shape the active drawing tool produces (rectangle,
     /// polygon, freeform). Ignored when `isDrawingMode == false`.
     var activeShapeTool: RedactionOverlayView.ShapeTool = .rectangle
 
-    /// WU-38: iPhone "Select More" toolbar toggle. While on, a tap on a
+    /// iPhone "Select More" toolbar toggle. While on, a tap on a
     /// region adds to selection instead of replacing it. iPad Shift+tap
     /// continues to work whether the toggle is on or off.
     var isMultiSelectActive: Bool
 
-    /// DRAW-7: rectangle-draw snap-to-text-box assist toggle. Propagated
-    /// to every active overlay so the in-progress rectangle drag is
+    /// Rectangle-draw snap-to-text-box assist toggle. Propagated to
+    /// every active overlay so the in-progress rectangle drag is
     /// nudged to align with OCR text-block edges within tolerance.
     /// Defaults to true; opt-out lives in Settings
     /// (`SettingsState.snapToTextEnabled`).
     var snapToTextEnabled: Bool = true
 
-    /// SA-3 rider (D-70): rect-level scroll fires only when the view
-    /// is zoomed meaningfully past fit — at (or under) fit scale the
-    /// whole page is on screen and the page write alone suffices. The
-    /// 1% epsilon absorbs autoScales float noise.
+    /// Rect-level scroll fires only when the view is zoomed meaningfully
+    /// past fit — at (or under) fit scale the whole page is on screen
+    /// and the page write alone suffices. The 1% epsilon absorbs
+    /// autoScales float noise.
     nonisolated static func shouldRectScroll(
         scaleFactor: CGFloat, fitScaleFactor: CGFloat
     ) -> Bool {
         scaleFactor > fitScaleFactor * 1.01
     }
 
-    /// UXC-50 (D-128, RB-123 item 1): the readability formula. The
-    /// navigation scale that renders `rectInPage` (page points) at
-    /// `ReadabilityZoom.textHeightTarget` on screen, width-guarded so
-    /// the whole rect stays visible, clamped to
-    /// [fit … min(navZoomCap × fit, maxScale)]. A page-wide rect's
+    /// The readability formula. The navigation scale that renders
+    /// `rectInPage` (page points) at `ReadabilityZoom.textHeightTarget`
+    /// on screen, width-guarded so the whole rect stays visible, clamped
+    /// to [fit … min(navZoomCap × fit, maxScale)]. A page-wide rect's
     /// width fit lands at-or-below fit ⇒ clamps to fit = no zoom (no
     /// special-casing); a taller united multi-line rect zooms LESS.
     /// `nil` = leave the scale alone (degenerate rect or geometry).
     /// The cap is a navigation target only — never written to
-    /// `maxScaleFactor` (RB-116's pinch ceiling stays PDFKit's).
+    /// `maxScaleFactor` (the pinch ceiling stays PDFKit's).
     nonisolated static func readabilityTargetScale(
         rectInPage: CGRect,
         viewportSize: CGSize,
@@ -77,8 +76,8 @@ struct PDFDocumentView: UIViewRepresentable {
         coordinator.documentState = documentState
         coordinator.redactionState = redactionState
         coordinator.toastManager = toastManager
-        // DRAW-1: hand the PDFViewCoordinator up to PipelineCoordinator
-        // so SwiftUI polygon Cancel / Close buttons can forward through
+        // Hands the PDFViewCoordinator up to PipelineCoordinator so
+        // SwiftUI polygon Cancel / Close buttons can forward through
         // the existing `@Environment(PipelineCoordinator.self)` handle.
         pipelineCoordinator.pdfViewCoordinator = coordinator
         return coordinator
@@ -86,16 +85,16 @@ struct PDFDocumentView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> FitFlooredPDFView {
         let pdfView = FitFlooredPDFView()
-        // UI_UX §6.1: Opaque background prevents glass bleed-through
+        // Opaque background prevents glass bleed-through
         pdfView.backgroundColor = .systemGroupedBackground
-        // UXC-48 (D-123): the zoom floor rides the subclass — a pinch
-        // out stops at this page's fit size (see `FitFlooredPDFView`).
+        // The zoom floor rides the subclass — a pinch out stops at
+        // this page's fit size (see `FitFlooredPDFView`).
         pdfView.autoScales = true
         pdfView.displayMode = .singlePage
-        // ARCH §5.4: Enable touch routing to overlay views
+        // Enable touch routing to overlay views
         pdfView.isInMarkupMode = true
 
-        // ARCH §5.4: Set overlay provider BEFORE assigning document
+        // Set overlay provider BEFORE assigning document
         pdfView.pageOverlayViewProvider = context.coordinator
 
         pdfView.document = documentState.sourceDocument
@@ -125,24 +124,24 @@ struct PDFDocumentView: UIViewRepresentable {
             pdfView.go(to: targetPage)
         }
 
-        // SA-3 rider (D-70): rect-level scroll-to-match. Consume the
-        // pending target exactly once (token guard on the
-        // coordinator — no state write during the update pass), and
-        // only when the view is zoomed past fit: at fit scale the
-        // whole page is visible, page-granular navigation suffices,
-        // and an unconditional `go(to:on:)` would zoom unexpectedly.
-        // The rect converts through the engine's canonical
-        // `normalizedToPDFPageCoordinates` (ENGINE §5B.1a) — the same
-        // mapping the burn path uses, so the scroll target and the
-        // drawn redaction agree by construction.
+        // Rect-level scroll-to-match. Consume the pending target
+        // exactly once (token guard on the coordinator — no state
+        // write during the update pass), and only when the view is
+        // zoomed past fit: at fit scale the whole page is visible,
+        // page-granular navigation suffices, and an unconditional
+        // `go(to:on:)` would zoom unexpectedly. The rect converts
+        // through the engine's canonical
+        // `normalizedToPDFPageCoordinates` — the same mapping the burn
+        // path uses, so the scroll target and the drawn redaction
+        // agree by construction.
         if let target = documentState.pendingCanvasScrollTarget,
            coordinator.lastHandledCanvasScrollToken != target.token {
             coordinator.lastHandledCanvasScrollToken = target.token
-            // UXC-50 (D-128, RB-123 items 1–2, 7): `.readability`
-            // normalizes the scale to the readability target FIRST
-            // (in or out, never below the UXC-48 floor), then rect-
-            // scrolls through the same `shouldRectScroll` gate below
-            // — instant, no animation. The `.none` path is untouched.
+            // `.readability` normalizes the scale to the readability
+            // target FIRST (in or out, never below the zoom floor),
+            // then rect-scrolls through the same `shouldRectScroll`
+            // gate below — instant, no animation. The `.none` path is
+            // untouched.
             if target.zoom == .readability,
                let doc = pdfView.document,
                let page = doc.page(at: target.pageIndex) {
@@ -165,28 +164,28 @@ struct PDFDocumentView: UIViewRepresentable {
             }
         }
 
-        // UI_UX §9.1: VoiceOver label for the document editor
+        // VoiceOver label for the document editor
         pdfView.accessibilityLabel = "Document editor, page \(documentState.currentPageIndex + 1) of \(documentState.pageCount)"
 
         // Propagate state to coordinator
         coordinator.redactionState = redactionState
         coordinator.toastManager = toastManager
-        // DRAW-1: re-stamp the back-pointer in case PipelineCoordinator
-        // outlived a prior PDFViewCoordinator and the bridge needs to
-        // re-bind to the current one (defensive — the weak ref otherwise
-        // nils through reassignment).
+        // Re-stamp the back-pointer in case PipelineCoordinator outlived
+        // a prior PDFViewCoordinator and the bridge needs to re-bind to
+        // the current one (defensive — the weak ref otherwise nils
+        // through reassignment).
         pipelineCoordinator.pdfViewCoordinator = coordinator
         let isEditing = documentState.phaseKind == .editing
         coordinator.updateDrawingMode(isEditing, isDrawing: isEditing && isDrawingMode)
-        // DRAW-1: propagate the active shape tool. Reset to .rectangle
-        // when drawing is off so the overlay does not retain stale state
+        // Propagate the active shape tool. Reset to .rectangle when
+        // drawing is off so the overlay does not retain stale state
         // (e.g., polygon vertices) after the toolbar tool deactivates.
         coordinator.updateActiveShapeTool(
             isEditing && isDrawingMode ? activeShapeTool : .rectangle
         )
-        // WU-38: propagate "Select More" toggle state to overlays.
+        // Propagate "Select More" toggle state to overlays.
         coordinator.updateMultiSelectMode(isEditing && isMultiSelectActive)
-        // DRAW-7: propagate snap-to-text-box toggle to overlays so the
+        // Propagate snap-to-text-box toggle to overlays so the
         // rectangle drag handler observes the current Settings value
         // even when toggled mid-session.
         coordinator.updateSnapToTextEnabled(snapToTextEnabled)
@@ -196,13 +195,13 @@ struct PDFDocumentView: UIViewRepresentable {
     }
 }
 
-// MARK: - Readability zoom constants (UXC-50, D-128, RB-123)
+// MARK: - Readability zoom constants
 
-/// The RB-123 tuning surface — the ONE home for the readability
-/// formula's numbers (`PDFDocumentView.readabilityTargetScale`). The
-/// SHAPE is ruled; the exact values are tuned on-sim and at Jesse's
-/// device pass. `navZoomCap` is a navigation target only — it never
-/// touches `maxScaleFactor` (RB-116's pinch ceiling stays PDFKit's).
+/// The tuning surface — the one home for the readability formula's
+/// numbers (`PDFDocumentView.readabilityTargetScale`). The shape is
+/// fixed; the exact values are tuned on-sim and during a device pass.
+/// `navZoomCap` is a navigation target only — it never touches
+/// `maxScaleFactor` (the pinch ceiling stays PDFKit's).
 nonisolated enum ReadabilityZoom {
     /// On-screen height (points) the matched text is framed to.
     static let textHeightTarget: CGFloat = 20
@@ -214,7 +213,7 @@ nonisolated enum ReadabilityZoom {
     static let scaleEpsilon: CGFloat = 0.01
 }
 
-// MARK: - Zoom floor (UXC-48, D-123)
+// MARK: - Zoom floor
 
 /// The app's `PDFView`: pinching out stops at the page's fit size.
 ///
@@ -266,22 +265,21 @@ final class FitFlooredPDFView: PDFView {
         reassertReadabilityFramingIfNeeded()
     }
 
-    // MARK: - Readability framing (UXC-50, D-128, RB-123)
+    // MARK: - Readability framing
 
-    /// The one-shot re-assert store. Trap T1 (mini-toolbar packet):
-    /// PDFKit with `autoScales` re-fits even a zoomed-in view when
-    /// the canvas bounds change (`CanvasZoomFloorTests.
-    /// floorTracksACanvasResize` pins it). The first chevron tap from
-    /// medium/large PARKS the sheet, and the compact inset (RB-42 +
-    /// the UXC-50 single-page inset) shrinks the bounds AFTER the
-    /// consumption in `updateUIView` — a naively applied zoom is thrown
-    /// away. Contract: every `.readability` consumption replaces this
-    /// store; `layoutSubviews`, after `applyFitFloor()`, re-applies the
-    /// framing exactly ONCE when the bounds differ from those at
-    /// consumption, then clears it. A tap with stable bounds (already
-    /// parked) applies once at consumption and the store simply
-    /// expires on the next replacement. Never more than one re-assert
-    /// per request token.
+    /// The one-shot re-assert store. PDFKit with `autoScales` re-fits
+    /// even a zoomed-in view when the canvas bounds change
+    /// (`CanvasZoomFloorTests.floorTracksACanvasResize` pins it). The
+    /// first chevron tap from medium/large PARKS the sheet, and the
+    /// compact inset (plus the single-page inset) shrinks the bounds
+    /// AFTER the consumption in `updateUIView` — a naively applied zoom
+    /// is thrown away. Contract: every `.readability` consumption
+    /// replaces this store; `layoutSubviews`, after `applyFitFloor()`,
+    /// re-applies the framing exactly once when the bounds differ from
+    /// those at consumption, then clears it. A tap with stable bounds
+    /// (already parked) applies once at consumption and the store
+    /// simply expires on the next replacement. Never more than one
+    /// re-assert per request token.
     private struct ReadabilityFramingTarget {
         let page: PDFPage
         let rectInPage: CGRect
@@ -307,12 +305,12 @@ final class FitFlooredPDFView: PDFView {
         applyReadabilityFraming(rectInPage: pending.rectInPage, on: pending.page)
     }
 
-    /// NORMALIZE (RB-123 item 2): write the computed scale up OR down
-    /// when it differs meaningfully from the current one — the UXC-48
-    /// floor rules out below-fit; a page-wide item from a
-    /// pinched state returns to fit by design. Then rect-scroll through
-    /// the existing `shouldRectScroll` gate: at fit it self-refuses and
-    /// the page write alone suffices, exactly today's behaviour.
+    /// Write the computed scale up or down when it differs meaningfully
+    /// from the current one — the zoom floor rules out below-fit; a
+    /// page-wide item from a pinched state returns to fit by design.
+    /// Then rect-scroll through the existing `shouldRectScroll` gate:
+    /// at fit it self-refuses and the page write alone suffices,
+    /// exactly today's behaviour.
     private func applyReadabilityFraming(rectInPage: CGRect, on page: PDFPage) {
         let fit = scaleFactorForSizeToFit
         if let target = PDFDocumentView.readabilityTargetScale(
@@ -326,7 +324,7 @@ final class FitFlooredPDFView: PDFView {
         guard PDFDocumentView.shouldRectScroll(
             scaleFactor: scaleFactor, fitScaleFactor: scaleFactorForSizeToFit
         ) else { return }
-        // The 8-pt page-unit pad keeps the RB-93 ring off the viewport edge.
+        // The 8-pt page-unit pad keeps the selection ring off the viewport edge.
         let padded = rectInPage
             .insetBy(dx: -8, dy: -8)
             .intersection(page.bounds(for: displayBox))

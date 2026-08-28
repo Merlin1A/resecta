@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import RedactionEngine
 
-// W3 — power-user always-flag / never-flag custom keyword screen.
+// Power-user always-flag / never-flag custom keyword screen.
 //
 // Presented via NavigationLink from `SettingsView.workflowSection`, below
 // the existing Advanced Thresholds link. Two sections (Always Flag and
@@ -24,12 +24,12 @@ struct CustomTermsView: View {
 
     @State private var showingTemplatePicker = false
 
-    // GATE-2 destructive-action confirmation symmetry (mirrors the
+    // Destructive-action confirmation symmetry (mirrors the
     // Settings Reset-to-Defaults dialog): the delete-all row confirms
     // before dropping both lists.
     @State private var showClearAllConfirmation = false
 
-    /// CL-QP1-02 (approved at QCP-P 2026-07-03) — V1.0 ships without the
+    /// V1.0 ships without the
     /// template-picker entry point; the browse button is gated off behind
     /// this flag. Flip it to `true` to re-enable the UI — the picker view,
     /// import machinery, template JSON, and their test suites are
@@ -54,7 +54,7 @@ struct CustomTermsView: View {
             CustomTermsTemplatePicker(isPresented: $showingTemplatePicker)
                 .environment(userTermsStore)
         }
-        // GATE-2: destructive confirm mirroring the Settings
+        // Destructive confirm mirroring the Settings
         // Reset-to-Defaults dialog. Copy names exactly what is cleared:
         // both lists in this store, nothing else.
         .confirmationDialog(
@@ -93,7 +93,7 @@ struct CustomTermsView: View {
         }
     }
 
-    // MARK: - Templates (W-B)
+    // MARK: - Templates
 
     private var templatesSection: some View {
         Section {
@@ -139,14 +139,13 @@ struct CustomTermsView: View {
                 isAtCap: userTermsStore.blob.alwaysFlag.count
                     >= UserTermsStore.perListCap
             ) { term in
-                // Q-UX-customterms-error-generic / V1.0-safe (Pkg N):
-                // view-side duplicate detection BEFORE calling
+                // View-side duplicate detection BEFORE calling
                 // `addAlwaysFlag`. The store still rejects duplicates on
                 // its own (and stays the authoritative gate), but the
                 // pre-check lets us surface a specific reason — duplicate
                 // vs. invalid-regex — without expanding the store API to
-                // return an enum result (HARD-STOP guard per CLAUDE.md;
-                // store API surface unchanged in this package).
+                // return an enum result (the store API surface stays
+                // unchanged in this package).
                 let isDuplicate = userTermsStore.blob.alwaysFlag.contains(where: {
                     $0.pattern == term.pattern && $0.isRegex == term.isRegex
                 })
@@ -198,10 +197,9 @@ struct CustomTermsView: View {
                 isAtCap: userTermsStore.blob.neverFlag.count
                     >= UserTermsStore.perListCap
             ) { term in
-                // Q-UX-customterms-error-generic / V1.0-safe (Pkg N):
-                // view-side duplicate detection BEFORE calling
+                // View-side duplicate detection BEFORE calling
                 // `addNeverFlag`. See the always-flag analogue above
-                // for the rationale and HARD-STOP guard.
+                // for the rationale.
                 let isDuplicate = userTermsStore.blob.neverFlag.contains(where: {
                     $0.pattern == term.pattern && $0.isRegex == term.isRegex
                 })
@@ -266,7 +264,7 @@ struct AddTermRow: View {
 
     @FocusState private var isFocused: Bool
 
-    /// Pkg G.3 / TRUST-customterms-no-async-sentinel: in-flight gate
+    /// In-flight gate
     /// for the async `RegexSentinelCheck.validate` call. Mirrors the
     /// sibling sites (`SavedRegexLibraryView.commitAdd`,
     /// `SearchToolbarSection.saveCurrentRegex`) so the user can't queue
@@ -301,7 +299,7 @@ struct AddTermRow: View {
                     .accessibilityLabel("Add term to \(listName) list")
                 }
             }
-            // GAP-41 — small error text routes through the measured text
+            // Small error text routes through the measured text
             // tier (both branches below).
             if let error {
                 Text(error)
@@ -319,7 +317,7 @@ struct AddTermRow: View {
         }
     }
 
-    /// Pkg G.3 / TRUST-customterms-no-async-sentinel: regex submissions
+    /// Regex submissions
     /// now route through `RegexSentinelCheck.validate` ahead of the
     /// commit step, mirroring `SavedRegexLibraryView.commitAdd` and
     /// `SearchToolbarSection.saveCurrentRegex`. Literal (non-regex)
@@ -350,7 +348,7 @@ struct AddTermRow: View {
         }
     }
 
-    /// Pkg G.3 / TRUST-customterms-no-async-sentinel: pure-output
+    /// Pure-output
     /// representation of every path the `submit` flow can take. The
     /// view wires each case to the appropriate UI side-effect (error
     /// banner + haptic, or `onAdd`); unit tests pin the case + message
@@ -363,7 +361,7 @@ struct AddTermRow: View {
         case accepted(UserTerm)
     }
 
-    /// Pkg G.3 / TRUST-customterms-no-async-sentinel: static
+    /// Static
     /// validation chain mirroring `SavedRegexLibraryView.commitAdd`.
     /// For regex submissions: sync `validateRegexPattern` is the
     /// fast-fail (200-char cap, nested-quantifier heuristic, NSRegex

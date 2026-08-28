@@ -21,7 +21,7 @@ import Foundation
 //      points; the arrival now owns the transition programmatically
 //      and names the drop with a plain notice instead.
 //
-// Keep-results-across-switch stays DECLINED (PB-17): both closures
+// Keep-results-across-switch stays DECLINED: both closures
 // name the drop; neither preserves the cleared session.
 
 @Suite("Interface-switch clear notices (silent transitions closed)")

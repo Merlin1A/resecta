@@ -2,14 +2,14 @@ import Testing
 import PDFKit
 @testable import RedactionEngine
 
-// design 04 §1.4 Gap A — tests that OCRTextNormalizer confusable correction
+// Tests that OCRTextNormalizer confusable correction
 // is applied inside searchPageViaOCR before the TextNormalizer.normalizeForSearch
 // step. The seam: _testSeedOCRLines plants confusable-corrupted OCR output;
 // a text-mode search with the clean query should still resolve the match.
 //
 // Privacy rule: test names use locate/match/resolve vocabulary (audit-lint M-1).
 
-@Suite("searchPageViaOCR normalizer parity (design 04 §1.4 Gap A)", .tags(.search))
+@Suite("searchPageViaOCR normalizer parity", .tags(.search))
 struct SearchPageViaOCRNormalizerTests {
 
     @Test("Confusable-corrected OCR text resolves to clean query via text-mode search")

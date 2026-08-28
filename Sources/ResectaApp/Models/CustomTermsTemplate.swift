@@ -5,7 +5,7 @@ import RedactionEngine
 // Decodes the JSON template at
 // `Resources/CustomTermsTemplates/license_plate_us_50_state_starter.json`
 // into a list of UserTerms ready to import into the active profile's
-// alwaysFlagTerms list. F-4 disposition: copying a row makes it
+// alwaysFlagTerms list. Copying a row makes it
 // user-owned; no template-lineage tracking. The shipped per-state
 // regex is a permissive shape default — users tighten per row.
 

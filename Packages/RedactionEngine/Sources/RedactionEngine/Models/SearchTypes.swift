@@ -1,6 +1,6 @@
 import Foundation
 
-// SEARCH-AND-REDACT §2.1: Engine-layer types for document search.
+// Engine-layer types for document search.
 // All types are Sendable value types for safe cross-isolation transfer.
 
 /// PII category for search-level filtering. Maps to RedactionRegion.PIIKind
@@ -68,8 +68,8 @@ public enum PIICategory: String, CaseIterable, Sendable, Equatable, Hashable, Co
         case .account: self = .account
         case .routingNumber: self = .routingNumber
         case .licensePlate: self = .licensePlate
-        case .barcode: return nil  // DRAW-2 — barcodes are detected via Vision, not text search.
-        // DRAW-3 — `.signatureCandidate` is a heuristic visual suggestion, not
+        case .barcode: return nil  // Barcodes are detected via Vision, not text search.
+        // `.signatureCandidate` is a heuristic visual suggestion, not
         // a text-search category, so it has no PIICategory. The triage sheet
         // still surfaces it; calibrated scoring / preset thresholds / search
         // are intentionally out of scope.
@@ -112,9 +112,9 @@ public enum SearchMode: Sendable {
     case piiScan(categories: Set<PIICategory>, options: SearchOptions)
 }
 
-// MARK: - W7 Live Preview / Scope-Aware Navigation
+// MARK: - Live Preview / Scope-Aware Navigation
 
-/// W7 — scope of a live-preview pass. Controls how many pages
+/// Scope of a live-preview pass. Controls how many pages
 /// `DocumentSearcher.previewMatches` walks while still scoping the
 /// per-page highlight ranges to the visible page.
 public enum SearchPreviewScope: Sendable, Equatable {
@@ -122,7 +122,7 @@ public enum SearchPreviewScope: Sendable, Equatable {
     case wholeDocument
 }
 
-/// W7 — result of a live-preview pass. `currentPageMatches` is always
+/// Result of a live-preview pass. `currentPageMatches` is always
 /// scoped to the visible page so the overlay can highlight without
 /// rescanning, while `totalCount` reflects the requested scope.
 public struct SearchPreviewResult: Sendable, Equatable {
@@ -155,7 +155,7 @@ public struct SearchPreviewResult: Sendable, Equatable {
     }
 }
 
-/// W7 — session-scoped scope for Cmd+G / J / K traversal.
+/// Session-scoped scope for Cmd+G / J / K traversal.
 public enum SearchNavigationScope: String, CaseIterable, Sendable, Equatable {
     case currentPage
     case wholeDocument
@@ -167,7 +167,7 @@ public struct SearchOptions: Sendable, Equatable {
     public var wholeWord: Bool = false
     public var includeOCR: Bool = true
     public var normalizeUnicode: Bool = true
-    /// DRAW-5 — magic-wand select-by-similar-text. When `true`, the
+    /// Magic-wand select-by-similar-text. When `true`, the
     /// text-search runtime applies word-boundary semantics around every
     /// candidate match (alphanumeric / underscore on either side
     /// disqualifies it), so a query for "Doe" matches "Doe" but not
@@ -183,7 +183,7 @@ public struct SearchOptions: Sendable, Equatable {
     ///
     /// Semantically equivalent to `wholeWord = true` on the text /
     /// multi-term / OCR paths; kept as a distinct flag so the magic-wand
-    /// call site reads self-documentingly (plan §0.4 / §4 DRAW-5).
+    /// call site reads self-documentingly.
     public var exactMatch: Bool = false
 
     // Search-recall normalization extensions.
@@ -211,7 +211,7 @@ public struct SearchOptions: Sendable, Equatable {
     /// scripts and many name databases are accent-significant.
     public var foldDiacritics: Bool = false
 
-    // Design 04 §4.5 — AND mode for multi-term search.
+    // AND mode for multi-term search.
     // When true, `searchMultiTerm` retains only pages where EVERY term
     // has at least one result (page-level conjunction). When false (the
     // default), results from all terms are OR-joined — the historical
@@ -256,7 +256,7 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
     public let id: UUID
     public let pageIndex: Int
     /// Bounding box in normalized coordinates (0–1, bottom-left origin),
-    /// matching RedactionRegion.normalizedRect. See CANVAS_OVERLAY §S2.3.
+    /// matching RedactionRegion.normalizedRect.
     public let normalizedRect: CGRect
     public let matchedText: String
     /// Surrounding text for context display: the engine's centered
@@ -275,11 +275,11 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
     public let piiCategory: PIICategory?
     /// PII detection confidence (nil for text/regex/multi-term results).
     public let piiConfidence: Double?
-    /// W1 — why the detector emitted this hit. nil for text/regex/multi-term
+    /// Why the detector emitted this hit. nil for text/regex/multi-term
     /// rows (no inferred rule to explain). Used by MatchRationaleSheet and
-    /// by W5 audit export.
+    /// by the audit export.
     public let rationale: MatchRationale?
-    /// UXC-45 — where `matchedText` sits inside `contextSnippet`, as
+    /// Where `matchedText` sits inside `contextSnippet`, as
     /// Character offsets into the snippet (the leading `…`, when
     /// present, counts as one). Populated by every engine builder path
     /// so the row can highlight the match without re-searching; nil only
@@ -316,10 +316,10 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
     }
 }
 
-// MARK: - W1 MatchRationale
+// MARK: - MatchRationale
 //
 // Explainability record attached to PII detector hits. Drives the
-// MatchRationaleSheet power-user disclosure and feeds W5's audit export.
+// MatchRationaleSheet power-user disclosure and feeds the audit export.
 // Designed to be cheap (value type, nil for non-PII rows) and stable enough
 // that snapshot tests don't churn on every detector tweak.
 
@@ -357,9 +357,9 @@ public struct MatchRationale: Sendable, Equatable, Hashable, Codable {
         self.appliedThreshold = appliedThreshold
     }
 
-    /// W4 — return a copy carrying the applied threshold and an extra
+    /// Return a copy carrying the applied threshold and an extra
     /// signal (typically `.presetThresholdPass(raw:cutoff:)`). Keeps all
-    /// existing fields `let` so W1 invariants are preserved.
+    /// existing fields `let` so the struct's invariants are preserved.
     public func with(appliedThreshold: Double, addingSignal signal: Signal) -> MatchRationale {
         var appended = signals
         appended.append(signal)
@@ -374,7 +374,7 @@ public struct MatchRationale: Sendable, Equatable, Hashable, Codable {
 
     /// Evidence types recorded during detection. Stable set — adding a case
     /// is additive (old rationale blobs decode fine) but renaming a case is
-    /// a W5 audit-log break.
+    /// an audit-log break.
     public enum Signal: Sendable, Equatable, Hashable, Codable {
         /// A named regex pattern matched (e.g. "ssn.sep", "mrn.prefix").
         case regexPattern(name: String)
@@ -398,50 +398,50 @@ public struct MatchRationale: Sendable, Equatable, Hashable, Codable {
         case presetThresholdPass(raw: Double, cutoff: Double)
         /// OCR confidence folded in when the hit came from the OCR path.
         case ocrConfidence(value: Double)
-        /// A user-defined always-flag term matched (W3).
+        /// A user-defined always-flag term matched.
         case userAlwaysFlag(pattern: String)
-        /// A user-defined never-flag term matched (W3).
+        /// A user-defined never-flag term matched.
         case userNeverFlag(pattern: String)
-        /// W10 — the overlap resolver picked a winner in this match's range;
+        /// The overlap resolver picked a winner in this match's range;
         /// the associated `winnerCategory` is the surviving match's category.
         /// Mirrors `ConsiderationResult.overlapWinner` for the `MatchRationale`
         /// consumer.
         ///
-        /// QW-5 (SRCH-ACCT-PHONE) — `loserCategory` is the suppressed
+        /// `loserCategory` is the suppressed
         /// match's OWN category, carried in the signal so audit/rationale
         /// surfaces can label the loser as itself ("Account, suppressed
         /// via Phone overlap") rather than showing only the winner's
         /// label. Optional: `.other` / non-text kinds have no
         /// `PIICategory`. Optional associated values decode as `nil` when
-        /// absent, so pre-QW-5 rationale blobs still decode.
+        /// absent, so rationale blobs recorded before this field existed still decode.
         case suppressedByOverlap(winnerCategory: PIICategory, loserCategory: PIICategory?)
-        /// WU-76 / [P4] — per-keyword breakdown of the positive context
+        /// Per-keyword breakdown of the positive context
         /// contribution. Emitted alongside the existing scalar
         /// `.contextPositive(score:)` so consumers can render which
         /// specific gazetteer keywords drove the score. Each
         /// `KeywordContribution.keywordKey` is sourced from the
-        /// gazetteer/profile — NEVER from page-extracted text. RR-31
-        /// closed-vocabulary invariant; pinned by
+        /// gazetteer/profile — NEVER from page-extracted text. Closed-vocabulary
+        /// invariant; pinned by
         /// `KeywordContributionTests.keywordsClosedVocab`.
         case contextPositiveDetail(keywords: [KeywordContribution])
-        /// WU-76 / [P4] — negative-context counterpart of
+        /// Negative-context counterpart of
         /// `contextPositiveDetail`. Same closed-vocabulary invariant.
         case contextNegativeDetail(keywords: [KeywordContribution])
-        /// S3 / WS2 §1.2 — the NegativeContextGazetteer fired and suppressed
+        /// The NegativeContextGazetteer fired and suppressed
         /// this hit. Carries the matched keyword (gazetteer data, closed
-        /// vocabulary per RR-31 — not document content) and its
-        /// `precedence_weight` (the per-MATCHED-keyword value from the S3
-        /// semantics fix, not the bucket max). The `ContextWindowScorer`
+        /// vocabulary — not document content) and its
+        /// `precedence_weight` (the per-matched-keyword value from the
+        /// current context-scoring semantics, not the bucket max). The `ContextWindowScorer`
         /// attaches this signal when `suppressionDetail` returns a non-nil
-        /// keyword. Header-anchor path is deferred to S5.
+        /// keyword. The header-anchor path is deferred.
         case negativeContextSuppressed(keyword: String, weight: Double)
     }
 }
 
-/// WU-76 / [P4] — a single keyword's contribution to a context-scoring pass.
-/// `keywordKey` is sourced from the closed gazetteer/profile vocabulary
-/// (RR-31); `contribution` is a scalar in [0, 1] representing this
-/// keyword's share of the band-adjustment. Codable so the W5 audit
+/// A single keyword's contribution to a context-scoring pass.
+/// `keywordKey` is sourced from the closed gazetteer/profile vocabulary;
+/// `contribution` is a scalar in [0, 1] representing this
+/// keyword's share of the band-adjustment. Codable so the audit
 /// path can round-trip the new detail signals.
 public struct KeywordContribution: Sendable, Equatable, Hashable, Codable {
     public let keywordKey: String
@@ -453,9 +453,9 @@ public struct KeywordContribution: Sendable, Equatable, Hashable, Codable {
     }
 }
 
-// MARK: - W9 Reverse Rationale / Coverage Report
+// MARK: - Reverse Rationale / Coverage Report
 
-/// W9 — evaluation summary for a single snippet across every detector
+/// Evaluation summary for a single snippet across every detector
 /// category. Produced by `PIIDetector.reverseRationale(for:fullContext:...)`
 /// and shown in the "Why this match?" popover.
 ///
@@ -483,7 +483,7 @@ public struct ReverseRationale: Sendable, Equatable {
     }
 }
 
-/// W9 — per-category evaluation. Populated for every `PIICategory` even
+/// Per-category evaluation. Populated for every `PIICategory` even
 /// when the detector does not run (doctypeGated / snippetNotInContext) so
 /// the UI can render a stable row list.
 public struct ConsiderationResult: Sendable, Equatable {
@@ -494,7 +494,7 @@ public struct ConsiderationResult: Sendable, Equatable {
     public let threshold: Double?
     public let reason: Reason
     /// Winner category when `reason == .suppressedByOverlap`. Always nil
-    /// in W9 — W10's overlap resolver populates this field.
+    /// here — the overlap resolver populates this field only during live detection.
     public let overlapWinner: PIICategory?
 
     public init(
@@ -527,7 +527,7 @@ public struct ConsiderationResult: Sendable, Equatable {
     }
 }
 
-/// W9 — per-scan coverage summary. Produced by `DetectionOrchestrator`
+/// Per-scan coverage summary. Produced by `DetectionOrchestrator`
 /// alongside the audit export and surfaced in the "Scan coverage" panel.
 /// `deselectedCount` is the only field the UI layer fills in (from
 /// `triageSelections`); the orchestrator leaves it at 0.
@@ -580,10 +580,10 @@ public struct CoverageReport: Sendable, Equatable {
         )
     }
 
-    /// D06-F2 Part 2 (Session 7 consumer) — return a copy with `appliedCount`
+    /// Return a copy with `appliedCount`
     /// replaced. Pure value-type copy-with sibling to `withDeselectedCount`; the
     /// UI layer will fold in the applied-result count from view state. Added now
-    /// so Session 7's panel/export wiring has the API; no call site this session.
+    /// so the panel/export wiring has the API; no call site yet.
     public func withAppliedCount(_ count: Int) -> CoverageReport {
         CoverageReport(
             scannedPageCount: scannedPageCount,

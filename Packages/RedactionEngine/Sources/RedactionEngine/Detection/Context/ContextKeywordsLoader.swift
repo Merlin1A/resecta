@@ -1,15 +1,15 @@
 import Foundation
 
-// W-N — A21 (`Resources/Gazetteers/context-keywords.json`) loader.
+// A21 (`Resources/Gazetteers/context-keywords.json`) loader.
 // Replaces the positive-keyword arrays in the four hardcoded
 // `*ContextKeywords.swift` files. Schema:
-// `~/resecta-datapipeline/schemas/context_keywords.schema.json` v1.
+// `resecta-datapipeline/schemas/context_keywords.schema.json` v1.
 //
-// V1 scope (per STRAT §1.5 row 14 / Q3 DECIDED 2026-04-30): positive-only
+// V1 scope is positive-only
 // lift. The 4 retired Swift files KEEP their `negativeKeywords:` arrays +
 // threshold constants engine-side; only `positiveKeywords:` becomes
 // loader-driven. Full file retirement is V1.1+ once A5 absorbs the label-
-// style negatives via the §2.2 hand-review path.
+// style negatives through manual review.
 //
 // `confidence` enum (`high / medium-high / medium / medium (flag) / low`)
 // is preserved on the entry struct but NOT consumed at scoring time — the
@@ -18,9 +18,9 @@ import Foundation
 // maps the enum to numeric values for V1.1+ soft-gating; no production
 // caller in V1.
 //
-// Loader-version fence aligned with W-O policy
-// (`FORMAT_CONTRACTS.md §12`). Bump `supportedVersions` when the A21
-// shape changes in a way the Swift decoder must observe.
+// Loader-version fence aligned with the datapipeline's asset versioning:
+// bump `supportedVersions` when the A21 shape changes in a way the Swift
+// decoder must observe.
 
 public struct ContextKeywordsLoader: Sendable {
 
@@ -47,8 +47,7 @@ public struct ContextKeywordsLoader: Sendable {
         }
     }
 
-    /// Aligned with W-O loader-version-fence policy
-    /// (`FORMAT_CONTRACTS.md §12`). Bump when A21 shape changes.
+    /// The loader-version fence: bump when the A21 shape changes.
     public static let supportedVersions: ClosedRange<Int> = 1...1
 
     private let entriesByCategory: [PIICategory: [Entry]]
@@ -112,10 +111,9 @@ public struct ContextKeywordsLoader: Sendable {
     }
 
     /// Numeric weight per `confidence` enum. **V1.1+ helper** — the V1
-    /// scorer ignores it; reserved for future soft-gating. The F-50/F-51
-    /// disposition keeps the five-case enum intact (don't coerce to numeric
-    /// per STRAT §5.1 stop-condition); the values below are illustrative
-    /// scaffolding only.
+    /// scorer ignores it; reserved for future soft-gating. The disposition
+    /// keeps the five-case enum intact (don't coerce to numeric); the values
+    /// below are illustrative scaffolding only.
     public static func weight(for confidence: String) -> Double {
         switch confidence {
         case "high":           return 1.0
@@ -142,7 +140,7 @@ public struct ContextKeywordsLoader: Sendable {
         case "itin":         return .itin
         case "name":         return .name
         case "npi":          return .npi
-        // S3 §2.6: EIN context-keyword category infrastructure. Paired with
+        // EIN context-keyword category infrastructure. Paired with
         // pipeline schema enum addition (schemas/context_keywords.schema.json).
         // smokeFullEntries count stays at 176 until the pipeline PR ships the
         // 6 EIN rows (+ 5 ssn + 5 name additions) — the count gate is in the
@@ -152,7 +150,7 @@ public struct ContextKeywordsLoader: Sendable {
         }
     }
 
-    /// Test seam: source-target bundle accessor. The W-N parity test
+    /// Test seam: source-target bundle accessor. The parity test
     /// ("axis 2 overlap cap") needs to read A5 (`negative-context.json`)
     /// — which lives in the same `Resources/Gazetteers/` directory as
     /// A21 — to count how many SSN-scoped negatives in A5 overlap the

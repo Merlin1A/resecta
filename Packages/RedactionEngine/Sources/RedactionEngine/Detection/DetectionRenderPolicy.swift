@@ -4,17 +4,17 @@ import CoreGraphics
 // (doctype-conditional hook).
 //
 // The design's hook point, shipped with measured values: .financial pages
-// render at 200 DPI (the program's target — tax-form recall; the S8 A/B
+// render at 200 DPI (the program's target — tax-form recall; an on-device A/B
 // measured SSN/Account/DOB/EIN categories appearing on the packet OCR leg
 // at 200 that are invisible at 150), everything else keeps the shipped
 // 150 (the A/B also surfaced a Vision face-detection inference-context
 // failure on cover-page content at 200 when a classification flip stops
 // the financial doctype gate from skipping the face pass — financial
 // doctypes never run face detection, so the 200-DPI cohort never feeds
-// the fragile leg; see S8 exit notes for the sim-vs-device caveat).
+// the fragile leg).
 //
 // Engine-side (deviation from the design's PipelineCoordinator snippet) so
-// the app pipeline and the S8 measurement harness consume the SAME policy
+// the app pipeline and the on-device measurement harness consume the SAME policy
 // — the cap arithmetic cannot drift between production and instrument.
 
 public enum DetectionRenderPolicy {
@@ -45,7 +45,7 @@ public enum DetectionRenderPolicy {
         capped(targetDPI: detectionDPI(for: doctype), effectiveSize: effectiveSize)
     }
 
-    /// Cap arithmetic for an explicit target (the S8 measurement harness
+    /// Cap arithmetic for an explicit target (the on-device measurement harness
     /// uses this for forced-DPI A/B runs so its cap cannot drift from
     /// production's).
     public static func capped(

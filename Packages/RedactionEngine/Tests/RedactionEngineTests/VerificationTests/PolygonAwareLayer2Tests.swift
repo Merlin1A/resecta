@@ -3,9 +3,9 @@ import Foundation
 import CoreGraphics
 @testable import RedactionEngine
 
-// VF-02 — polygon-aware Layer-2 classifier and fill calibration.
+// Polygon-aware Layer-2 classifier and fill calibration.
 //
-// A polygon region's `normalizedRect` is only its bounding box. Before VF-02
+// A polygon region's `normalizedRect` is only its bounding box. Before this fix
 // the classifier treated everything inside the bbox as redacted, so text the
 // user deliberately preserved inside bbox-minus-polygon (an L-shape's notch)
 // classified as an in-region leak, and the fill-calibration probe averaged
@@ -13,10 +13,10 @@ import CoreGraphics
 //   1. notch text is OUT of region (classifier), for plain text and terms;
 //   2. readable text INSIDE the polygon still classifies in-region (the fix
 //      must not weaken real-leak detection);
-//   3. rect-only regions are byte-identical to the pre-VF-02 behaviour;
+//   3. rect-only regions are byte-identical to the pre-fix behaviour;
 //   4. the calibration probe anchors inside the polygon, with a fail-safe
 //      bbox fallback when no interior rect emerges.
-@Suite("Polygon-aware Layer 2 (VF-02)")
+@Suite("Polygon-aware Layer 2")
 struct PolygonAwareLayer2Tests {
 
     // MARK: - Shared fixture geometry (normalized, bottom-left origin)
@@ -228,7 +228,7 @@ struct PolygonAwareLayer2Tests {
         #expect(max(polygonFill.r, polygonFill.g, polygonFill.b) < 0.05,
                 "polygon-anchored probe must read the black bar, got \(polygonFill)")
         // The bbox-inset probe overlaps the white notch, so its average is
-        // visibly lighter — the miscalibration VF-02 removes for polygons.
+        // visibly lighter — the miscalibration this fix removes for polygons.
         let bboxFill = try #require(bboxOnly)
         #expect(bboxFill.r > 0.15,
                 "bbox probe over the mixed interior reads lighter, got \(bboxFill)")

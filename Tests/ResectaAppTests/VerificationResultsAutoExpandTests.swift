@@ -107,7 +107,7 @@ struct VerificationResultsAutoExpandTests {
         )
     }
 
-    // MARK: - UXC-02: deselection also forces expansion
+    // MARK: - Deselection also forces expansion
 
     @Test("PASS + deselection → auto-expand (was the collapsed gap)")
     func passWithDeselectionExpands() {
@@ -130,7 +130,7 @@ struct VerificationResultsAutoExpandTests {
             ) == false
         )
         // Omitting the parameter defaults to false — source-compatible
-        // with every pre-UXC-02 call site.
+        // with every prior call site.
         #expect(
             VerificationResultsView.shouldAutoExpand(
                 status: .pass,

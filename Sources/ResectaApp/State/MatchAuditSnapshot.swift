@@ -1,7 +1,7 @@
 import Foundation
 import RedactionEngine
 
-// W5 — captured at apply time so the `MatchRationale`, `piiCategory`,
+// Captured at apply time so the `MatchRationale`, `piiCategory`,
 // and source context survive even after the Search sheet closes and
 // `SearchState.results` is cleared. Keyed into
 // `RedactionState.appliedMatchAudit` by the RedactionRegion UUID; undo /
@@ -22,7 +22,7 @@ import RedactionEngine
 // nonisolated: a pure Sendable value type constructed off MainActor
 // inside `prepareApply` and carried back in the Sendable
 // `PreparedApply`. Its explicit inits would otherwise become
-// MainActor-isolated under the s04 SE-0466 MainActor-default flip,
+// MainActor-isolated under the SE-0466 MainActor-default flip,
 // breaking the detached apply-prepare path; pin the type nonisolated
 // (mirrors RegionMetadata).
 nonisolated struct MatchAuditSnapshot: Sendable, Equatable {

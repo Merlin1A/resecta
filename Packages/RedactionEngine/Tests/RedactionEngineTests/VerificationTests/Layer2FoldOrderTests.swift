@@ -2,13 +2,13 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// ENGINE §6 — Cross-page Layer-2 fold precedence.
+// Cross-page Layer-2 fold precedence.
 // The warnable out-of-region arm (unmappable coordinates) returns ahead of
 // the Part-A fill-artifact note, so a multi-signal document folds to the
 // warning. Within the note tier the order stays specificity (fill artifact >
 // generic outside text); the unchecked arm keeps its long-standing position
 // below the expected-state notes. The dedicated sensitive-term-outside WARN
-// arm is de-escalated (D-86 / RW-F-002(b)): `pageBucket(for:effectiveMode:)`
+// arm is de-escalated: `pageBucket(for:effectiveMode:)`
 // folds that finding to the generic outside bucket on both page modes, so the
 // secure-raster informational is the record surface for it (mapping matrix +
 // record string pinned below).
@@ -71,7 +71,7 @@ struct Layer2FoldOrderTests {
         // The warnable out-of-region arm returns ahead of the fill-artifact
         // note: a multi-signal document folds to the warning. (The dedicated
         // sensitive-term-outside arm that once sat here is de-escalated —
-        // D-86 / RW-F-002(b) — see the mapping-matrix pin below.)
+        // see the mapping-matrix pin below.)
         outcomes.removeAll { $0.bucket == .textInRegionSearchable }
         r = fold(outcomes)
         #expect(r.status.isWarn, "unmappable WARN returns ahead of the fill note — got \(r.status)")
@@ -104,7 +104,7 @@ struct Layer2FoldOrderTests {
         #expect(r.pages == nil)
     }
 
-    /// D-86 / RW-F-002(b): the A18 record shape, byte-exact. Term-outside
+    /// The record shape is byte-exact: term-outside
     /// pages reach the fold already de-escalated into the generic outside
     /// bucket (pages 2–3 here beside page 1's ordinary readable content), so
     /// a secure-raster document with regions folds to the record
@@ -164,12 +164,12 @@ struct Layer2FoldOrderTests {
         #expect(r.pages == [0, 1, 2])
     }
 
-    /// D-86 / RW-F-002(b): the finding→bucket mapping matrix. The
+    /// The signal→bucket mapping matrix. The
     /// de-escalation lives in this seam: `.sensitiveTermOutsideRegions` folds
     /// to the generic outside bucket on BOTH page modes, while in-region
-    /// findings keep their mode-keyed buckets. Red→green pinned with a
-    /// stashed-fix negative control at RW-FIX-1 (the pre-fix engine returned
-    /// the dedicated WARN on the secure-raster leg).
+    /// findings keep their mode-keyed buckets. Red→green pinned against the
+    /// pre-fix behaviour (the earlier engine returned the dedicated WARN on
+    /// the secure-raster leg).
     @Test("finding→bucket mapping: term-outside de-escalates on both modes; in-region stays mode-keyed")
     func pageBucketMapping() {
         typealias Finding = VerificationEngine.PageOCRFinding
@@ -180,7 +180,7 @@ struct Layer2FoldOrderTests {
             #expect(bucket(.sensitiveTermInRegion, mode) == .sensitiveTermInRegion)
             #expect(bucket(.fillArtifactInRegion, mode) == .fillArtifactInRegion)
             #expect(bucket(.sensitiveTermOutsideRegions, mode) == .textOutsideRegionsOnly,
-                    "D-86: the term-outside signal folds generic on \(mode)")
+                    "the term-outside signal folds generic on \(mode)")
             #expect(bucket(.textOutsideRegionsOnly, mode) == .textOutsideRegionsOnly)
             #expect(bucket(Finding.none, mode) == .clean)
         }

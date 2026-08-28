@@ -3,11 +3,11 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// SEC-7 — verify the app-side surfaces driven by
+// Verify the app-side surfaces driven by
 // `GazetteerLoadDiagnostics`:
 //
 // 1. On the first gazetteer-load failure of a session, the coordinator
-//    posts exactly one warning toast (mechanism-description copy per I6)
+//    posts exactly one warning toast (mechanism-description copy)
 //    and flips `RedactionState.autoDetectionDegraded = true`.
 // 2. Subsequent calls observing the same failure do NOT re-toast — the
 //    persistent banner on the search sheet's Scan interface carries
@@ -15,10 +15,8 @@ import Foundation
 //    a scan-class capability degrades the current action).
 // 3. The banner is gated purely by `autoDetectionDegraded`; flipping it
 //    back to false hides the banner without any additional plumbing.
-//
-// SEC-7 surface.
 
-@Suite("Degraded auto-detection banner — SEC-7")
+@Suite("Degraded auto-detection banner")
 @MainActor
 struct DegradedBannerTests {
 
@@ -53,8 +51,8 @@ struct DegradedBannerTests {
                 "first failure must enqueue exactly one warning toast")
         let posted = toast.activeTopToasts.first
         #expect(posted?.severity == .warning)
-        // Mechanism-description copy per I6 — no banned outcome-promise
-        // words. Anchor on a stable fragment of the locked plan copy.
+        // Mechanism-description copy — no banned outcome-promise
+        // words. Anchor on a stable fragment of the shipped copy.
         #expect(posted?.message.contains("detection corpus failed to load") == true,
                 "toast copy must match the locked plan text")
         #expect(posted?.message.contains("Manual redaction tools remain available") == true,
@@ -149,7 +147,7 @@ struct DegradedBannerTests {
                 "four loader failures must still produce a single coalesced toast")
     }
 
-    @Test("GAP-DEPTARGET-NER: NER-absent diagnostic drives the SEC-7 degraded banner flag")
+    @Test("NER-absent diagnostic drives the degraded banner flag")
     func testNERAbsentDrivesDegradedBanner() {
         // A NER-model-absent diagnostic carries the new .nerNameModel loader id —
         // the artifact `PIIDetector.loadWithDiagnostics` produces when the OS NER
@@ -171,12 +169,12 @@ struct DegradedBannerTests {
         )
         coordinator.surfaceGazetteerLoadDiagnostics(diagnostics)
         #expect(coordinator.redactionState.autoDetectionDegraded,
-                "NER-absent diagnostic must flip the SEC-7 degraded banner flag")
+                "NER-absent diagnostic must flip the degraded banner flag")
     }
 
-    // MARK: - H-201: copy branch + failure recording
+    // MARK: - Copy branch + failure recording
 
-    @Test("H-201: NER-only degrade gets the OS-model copy, not the corpus copy")
+    @Test("NER-only degrade gets the OS-model copy, not the corpus copy")
     func testNEROnlyCopyBranch() {
         let nerOnly = [GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue]
         #expect(DetectionDegradeCopy.isNEROnly(nerOnly))
@@ -190,7 +188,7 @@ struct DegradedBannerTests {
         #expect(banner.contains("name model"))
     }
 
-    @Test("H-201: any corpus failure — including mixed with NER — keeps the corpus copy")
+    @Test("Any corpus failure — including mixed with NER — keeps the corpus copy")
     func testCorpusAndMixedCopyBranch() {
         let corpusOnly = ["NameGazetteer"]
         let mixed = [
@@ -206,7 +204,7 @@ struct DegradedBannerTests {
         }
     }
 
-    @Test("H-201: coordinator surface records the failure list and posts branch copy")
+    @Test("Coordinator surface records the failure list and posts branch copy")
     func testCoordinatorRecordsFailuresAndBranchesToast() {
         let (coordinator, toast) = makeWiredCoordinator()
         let nerOnly = GazetteerLoadDiagnostics(
@@ -221,7 +219,7 @@ struct DegradedBannerTests {
                 "NER-only degrade must post the OS-model toast")
     }
 
-    @Test("H-201: clearForNewDocument resets the recorded failure list")
+    @Test("clearForNewDocument resets the recorded failure list")
     func testFailureListResetsWithFlag() {
         let (coordinator, _) = makeWiredCoordinator()
         coordinator.surfaceGazetteerLoadDiagnostics(GazetteerLoadDiagnostics(

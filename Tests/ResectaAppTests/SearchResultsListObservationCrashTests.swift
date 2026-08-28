@@ -4,7 +4,7 @@ import UIKit
 import RedactionEngine
 @testable import ResectaApp
 
-// q10 / UXF-01 — in-process regression guards for the SearchState
+// In-process regression guards for the SearchState
 // cache-in-getter observation crash, hosted over the REAL results List.
 //
 // The crash: the search-sheet apply runs
@@ -31,18 +31,17 @@ import RedactionEngine
 // crash itself is pinned red-on-old by `SearchMarkForRedactionUITests`
 // (page + term branches through the real app flow). What THIS suite adds:
 // grouping-consistency checks across the List's branches, and the
-// cache-hit dependency-registration contract below. (s07's state-level
-// SearchRedactIntegrationTests stayed green under the bug — a state-level
-// test cannot pin it; these at least put a live hosted List body over the
-// getters.)
+// cache-hit dependency-registration contract below. (SearchRedactIntegrationTests
+// stayed green under the bug — a state-level test cannot pin it; these at
+// least put a live hosted List body over the getters.)
 //
-// UP-5 deleted the category-grouped List branch (and its `.category` case
+// A prior change deleted the category-grouped List branch (and its `.category` case
 // here); piiScan results always group by page now. `resultsByCategory`
 // itself stays (the category chips consume it) — its cache vars keep
 // the same @ObservationIgnored treatment, exercised through the surviving
 // branches' shared invalidation path.
 
-@Suite("Search results List observation crash (q10)", .tags(.search))
+@Suite("Search results List observation crash", .tags(.search))
 @MainActor
 struct SearchResultsListObservationCrashTests {
 
@@ -137,7 +136,7 @@ struct SearchResultsListObservationCrashTests {
             onRequestShowRationale: { _ in },
             onTriggerSearch: {},
             onShowSavedSearches: {},
-            // UXC-44: the seam takes `dropToCompact`; inert here.
+            // The seam takes `dropToCompact`; inert here.
             onNavigateToCurrentResult: { _ in }
         )
         .environment(DocumentState())

@@ -5,25 +5,25 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// Rectangle draw tool — S2 of the 1.1.0 draw-tool program (D-109; RB-75, RB-77).
+// Rectangle draw tool.
 //
-//   S2-a  DRAW WINS: with the Rectangle tool on, a touch-down ALWAYS starts a
-//         draw — over a region body (DT-04), over a selected region's handle
-//         box (DT-05), with the Add-to-Selection toggle left on (DT-07) — and
-//         the context menu is suppressed. With the tool off, the old ladder
-//         (handle → region → marquee) is unchanged (regression pins).
-//   S2-b  SCREEN-POINT THRESHOLDS (DT-06): every finger tolerance is divided
-//         by the live zoom (`fingerScale`), pinned through the
-//         `snapZoomScaleOverride` seam.
-//   S2-c  the inert "Snap to Text Boxes" Settings toggle is gone (DT-09);
-//         the machinery stays (`SnapToTextBoxTests`).
+//   DRAW WINS: with the Rectangle tool on, a touch-down ALWAYS starts a
+//   draw — over a region body, over a selected region's handle
+//   box, with the Add-to-Selection toggle left on — and
+//   the context menu is suppressed. With the tool off, the old ladder
+//   (handle → region → marquee) is unchanged (regression pins).
+//   SCREEN-POINT THRESHOLDS: every finger tolerance is divided
+//   by the live zoom (`fingerScale`), pinned through the
+//   `snapZoomScaleOverride` seam.
+//   The inert "Snap to Text Boxes" Settings toggle is gone;
+//   the machinery stays (`SnapToTextBoxTests`).
 //
 // Geometry: a 400×400 overlay, so 1 overlay pt = 0.0025 normalized. The
 // fixture region is the centred 200×200 square (overlay 100…300 × 100…300);
 // its corners are ≥ 77 pt from the page-centre snap lines and the page
 // margins so no snap alters the numbers below.
 
-@Suite("Draw wins + screen-point thresholds (S2)")
+@Suite("Draw wins + screen-point thresholds")
 @MainActor
 struct DrawWinsTests {
 
@@ -66,9 +66,9 @@ struct DrawWinsTests {
         overlay.touchesEnded([touch], with: nil)
     }
 
-    // MARK: - S2-a draw wins
+    // MARK: - Draw wins
 
-    @Test("S2-a: draw mode + touch-down on a region body draws a NEW region; the old one is unmoved and unselected (DT-04)")
+    @Test("Draw mode + touch-down on a region body draws a NEW region; the old one is unmoved and unselected")
     func testDrawOverRegionBody() {
         let region = Self.centredRegion()
         let (overlay, coordinator) = makeOverlay(
@@ -84,7 +84,7 @@ struct DrawWinsTests {
                 "the tapped body is never selected in draw mode")
     }
 
-    @Test("S2-a: draw mode + touch-down inside the selected region's handle box draws, never resizes (DT-05)")
+    @Test("Draw mode + touch-down inside the selected region's handle box draws, never resizes")
     func testDrawOverHandleBox() {
         let region = Self.centredRegion()
         let (overlay, coordinator) = makeOverlay(
@@ -97,7 +97,7 @@ struct DrawWinsTests {
         #expect(coordinator.movedRegions.isEmpty)
     }
 
-    @Test("S2-a: draw mode + Add to Selection on draws, no lasso commit (DT-07, S1-f carried)")
+    @Test("Draw mode + Add to Selection on draws, no lasso commit")
     func testDrawWithMultiSelectOn() {
         let region = Self.centredRegion()
         let (overlay, coordinator) = makeOverlay(drawing: true, regions: [region])
@@ -109,7 +109,7 @@ struct DrawWinsTests {
                 "no toggle-select of the body underneath")
     }
 
-    @Test("S2-a regression: tool OFF — body tap selects, handle-box drag resizes, marquee runs with the toggle on")
+    @Test("Regression: tool OFF — body tap selects, handle-box drag resizes, marquee runs with the toggle on")
     func testToolOffLadderUnchanged() {
         let region = Self.centredRegion()
 
@@ -134,7 +134,7 @@ struct DrawWinsTests {
         #expect(marqueeCoordinator.addedRegions.isEmpty)
     }
 
-    @Test("S2-a: the context menu is suppressed in draw mode and served on a region with the tool off")
+    @Test("The context menu is suppressed in draw mode and served on a region with the tool off")
     func testContextMenuSuppressedInDrawMode() {
         let region = Self.centredRegion()
         let (drawOverlay, _) = makeOverlay(drawing: true, regions: [region])
@@ -150,9 +150,9 @@ struct DrawWinsTests {
         ) != nil, "tool off: the region menu is served")
     }
 
-    // MARK: - S2-b screen-point thresholds
+    // MARK: - Screen-point thresholds
 
-    @Test("S2-b: at zoom 2.0 a 12×12 overlay-pt drag (24 screen pt) commits; the start gate opens at 4 overlay pt")
+    @Test("At zoom 2.0 a 12×12 overlay-pt drag (24 screen pt) commits; the start gate opens at 4 overlay pt")
     func testZoomedInThresholdsShrink() {
         let (overlay, coordinator) = makeOverlay(drawing: true, zoom: 2.0)
         let touch = StubTouch(location: CGPoint(x: 60, y: 60), view: overlay)
@@ -176,7 +176,7 @@ struct DrawWinsTests {
         #expect(unitOverlay.currentDragRect == nil, "5 pt at 1.0× is inside the 8-pt gate")
     }
 
-    @Test("S2-b: at zoom 0.5 a 30×30 overlay-pt drag (15 screen pt) is rejected")
+    @Test("At zoom 0.5 a 30×30 overlay-pt drag (15 screen pt) is rejected")
     func testZoomedOutFloorGrows() {
         let (overlay, coordinator) = makeOverlay(drawing: true, zoom: 0.5)
         drag(overlay, from: CGPoint(x: 60, y: 60), through: [CGPoint(x: 90, y: 90)])
@@ -188,7 +188,7 @@ struct DrawWinsTests {
         #expect(unitCoordinator.addedRegions.count == 1, "the same drag commits at 1.0×")
     }
 
-    @Test("S2-b: the handle box shrinks with zoom — 20 pt inside the corner resizes at 1.0× and moves at 2.0×; 40 pt resizes at 0.5×")
+    @Test("The handle box shrinks with zoom — 20 pt inside the corner resizes at 1.0× and moves at 2.0×; 40 pt resizes at 0.5×")
     func testHandleBoxScalesWithZoom() {
         let region = Self.centredRegion()
 
@@ -217,7 +217,7 @@ struct DrawWinsTests {
         #expect(wideCoordinator.movedRegions.isEmpty)
     }
 
-    @Test("S2-b: the region hit inset scales — 12 pt outside the body selects at 0.5× and not at 1.0×")
+    @Test("The region hit inset scales — 12 pt outside the body selects at 0.5× and not at 1.0×")
     func testRegionHitInsetScalesWithZoom() {
         let region = Self.centredRegion()
         let (wide, wideCoordinator) = makeOverlay(drawing: false, regions: [region], zoom: 0.5)
@@ -233,7 +233,7 @@ struct DrawWinsTests {
         #expect(unitCoordinator.selections.isEmpty, "8-pt inset at 1.0×")
     }
 
-    @Test("S2-b: resolveResizeHandle's minimumHandleSize parameter clamps the small-region floor")
+    @Test("resolveResizeHandle's minimumHandleSize parameter clamps the small-region floor")
     func testMinimumHandleSizeParameter() {
         // 30×30 region: half the short side = 15 → default floor 22 wins.
         let rect = CGRect(x: 100, y: 100, width: 30, height: 30)
@@ -246,9 +246,9 @@ struct DrawWinsTests {
         ) == nil, "zoom-2.0 floor 11 → half 5.5 misses 10.5 pt")
     }
 
-    // MARK: - S2-a editor statics
+    // MARK: - Editor statics
 
-    @Test("S2-a: drawToolEntryEffects — entering clears the selection and the toggle; exiting changes nothing else")
+    @Test("drawToolEntryEffects — entering clears the selection and the toggle; exiting changes nothing else")
     func testDrawToolEntryEffects() {
         let entering = DocumentEditorView.drawToolEntryEffects(entering: true)
         #expect(entering.clearSelection && entering.disableMultiSelect)
@@ -256,7 +256,7 @@ struct DrawWinsTests {
         #expect(!exiting.clearSelection && !exiting.disableMultiSelect)
     }
 
-    @Test("S2-d: nudgeDelta is one PDF point per axis (Letter → 1/612, 1/792); nil/degenerate → 0.0025")
+    @Test("nudgeDelta is one PDF point per axis (Letter → 1/612, 1/792); nil/degenerate → 0.0025")
     func testNudgeDelta() {
         let letter = DocumentEditorView.nudgeDelta(pageSize: CGSize(width: 612, height: 792))
         #expect(abs(letter.dx - 1 / 612) < 1e-12 && abs(letter.dy - 1 / 792) < 1e-12)
@@ -266,27 +266,27 @@ struct DrawWinsTests {
         #expect(zero.dx == 0.0025 && zero.dy == 0.0025)
     }
 
-    // MARK: - S2-c source contract
+    // MARK: - Source contract
 
-    @Test("S2-c: the inert Snap to Text Boxes toggle is gone from SettingsView (DT-09 / RB-77)")
+    @Test("The inert Snap to Text Boxes toggle is gone from SettingsView")
     func testSnapToggleRemovedFromSettings() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/SettingsView.swift")
         #expect(!source.contains("Snap to Text Boxes"), "the toggle title must not appear")
         #expect(!source.contains("settingsState.snapToTextEnabled"),
                 "no Settings binding to the dark snap-to-text flag")
-        #expect(source.contains("DRAW-7 UI removed 1.1.0"), "the revival note stays at the site")
+        #expect(source.contains("snap-to-text UI was removed in 1.1.0"), "the revival note stays at the site")
     }
 
-    @Test("S2-a: the editor's Add to Selection toggle exits the Rectangle tool and tool entry clears the toggle (source pin)")
+    @Test("The editor's Add to Selection toggle exits the Rectangle tool and tool entry clears the toggle (source pin)")
     func testEditorMutualExclusionSourcePin() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
         #expect(source.contains("if isMultiSelectActive { activeTool = nil }"))
         #expect(source.contains("DocumentEditorView.drawToolEntryEffects(entering: entering)"))
     }
 
-    // MARK: - S3 source contract (packet §7.7)
+    // MARK: - Source contract
 
-    @Test("S3 (§7.7): applyResizeSnapping posts the 'Aligned to guide' VoiceOver announcement like applySnapping — the draw path snaps through it since S1-b (source pin)")
+    @Test("applyResizeSnapping posts the 'Aligned to guide' VoiceOver announcement like applySnapping — the draw path snaps through it too (source pin)")
     func testResizeSnapAnnouncesGuideAlignment() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Overlay/RedactionOverlayView.swift")
         guard let start = source.range(of: "private func applyResizeSnapping("),

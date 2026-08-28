@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Design 04 §4.2 — per-pattern positive/negative vector tests for the
+// Per-pattern positive/negative vector tests for the
 // five financial-identity built-in SavedRegex patterns. Each test
 // compiles the pattern via `DocumentSearcher.validateRegexPattern` and
 // asserts match / no-match on the design's named example vectors.
@@ -27,7 +27,7 @@ private func matches(_ re: NSRegularExpression, in haystack: String) -> Bool {
 
 // MARK: - SSN
 
-@Suite("Built-in SSN regex vectors (design 04 §4.2)", .tags(.search))
+@Suite("Built-in SSN regex vectors", .tags(.search))
 struct BuiltInSSNRegexTests {
 
     @Test("SSN positive: hyphen-separated 123-45-6789")
@@ -69,7 +69,7 @@ struct BuiltInSSNRegexTests {
 
 // MARK: - EIN
 
-@Suite("Built-in EIN regex vectors (design 04 §4.2)", .tags(.search))
+@Suite("Built-in EIN regex vectors", .tags(.search))
 struct BuiltInEINRegexTests {
 
     @Test("EIN positive: hyphen-separated 12-3456789")
@@ -111,7 +111,7 @@ struct BuiltInEINRegexTests {
 
 // MARK: - ITIN
 
-@Suite("Built-in ITIN regex vectors (design 04 §4.2)", .tags(.search))
+@Suite("Built-in ITIN regex vectors", .tags(.search))
 struct BuiltInITINRegexTests {
 
     @Test("ITIN positive: 912-70-1234 (group 70 in bucket 70-88)")
@@ -153,7 +153,7 @@ struct BuiltInITINRegexTests {
 
 // MARK: - ABA Routing Number
 
-@Suite("Built-in ABA routing regex vectors (design 04 §4.2)", .tags(.search))
+@Suite("Built-in ABA routing regex vectors", .tags(.search))
 struct BuiltInABARoutingRegexTests {
 
     @Test("ABA positive: 021000021 (prefix 02 in 01-12 range)")
@@ -197,7 +197,7 @@ struct BuiltInABARoutingRegexTests {
 
 // MARK: - Account Number (generic)
 
-@Suite("Built-in account number regex vectors (design 04 §4.2)", .tags(.search))
+@Suite("Built-in account number regex vectors", .tags(.search))
 struct BuiltInAccountNumberRegexTests {
 
     @Test("Account number positive: pure 9-digit sequence 123456789")

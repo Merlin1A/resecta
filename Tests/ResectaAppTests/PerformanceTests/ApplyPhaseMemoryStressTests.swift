@@ -6,15 +6,15 @@ import os
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// CAT-227 — Apply-phase memory-stress harness (C-E deep plan §5, amended by
-// the ADV-1 streaming-design attack: headless/fable-adv-1-output.md).
+// Apply-phase memory-stress harness, amended after an adversarial review of
+// the streaming design.
 //
-// This suite proves that the streaming ordered append (CAT-125 / D-32) bounds
+// This suite proves that the streaming ordered append bounds
 // the apply-phase resident footprint independently of page count, superseding
-// the PERF-2 collect-then-drain mechanism that held all N full-res CGImages
+// the collect-then-drain mechanism that held all N full-res CGImages
 // resident at the end of the parallel phase (the P0 jetsam cliff).
 //
-// Proof bar (deep plan §5):
+// Proof bar:
 //   * `testResidentRasterCountBounded` is THE deterministic merge gate — no
 //     memory measurement, immune to the compressor, host cores, and CI
 //     variance. The superseded architecture drives the counter to N+1, so the
@@ -31,16 +31,16 @@ import os
 //
 // Privacy: the noise fixture is synthetic; tests read only the process's own
 // memory accounting (MemoryFootprint), never document content or coordinates.
-@Suite("CAT-227 Apply-Phase Memory Stress", .serialized, .tags(.coordination))
+@Suite("Apply-Phase Memory Stress", .serialized, .tags(.coordination))
 @MainActor
 struct ApplyPhaseMemoryStressTests {
 
-    /// Apply-phase footprint ceiling (bytes). Deep plan §5 / ADV-1 A1-6:
+    /// Apply-phase footprint ceiling (bytes):
     /// the realistic fixed-run upper at override=4 is ≈ 823 MB (≈3·inFlight +
     /// pending + 1 pagefuls of residency + the ~250 MB JPEG floor + ≤135 MB
     /// pool); the unfixed compressed-worst-case floor at 100 pages is ≈
     /// 1.68 GB. 1.1 GB sits below the fixed upper with margin and well under
-    /// the unfixed floor. Per the deep plan's relax-once protocol this may be
+    /// the unfixed floor. This may be
     /// raised to 1.4 GB if host variance bites — test 1 remains the gate.
     static let footprintCeiling: Int64 = 1_100_000_000
 
@@ -68,7 +68,7 @@ struct ApplyPhaseMemoryStressTests {
         #expect(pageData.count == pageCount)
 
         // Real reconstructor so the callback exercises the true append path.
-        // ADV-1 A1-7: begin(firstPageSize:) MUST run before appendPage or it
+        // begin(firstPageSize:) MUST run before appendPage or it
         // throws .reconstructionFailed.
         let reconstructor = try await makeStartedReconstructor()
         let rasterizer = PageRasterizer()
@@ -79,7 +79,7 @@ struct ApplyPhaseMemoryStressTests {
         }
         await reconstructor.recon.finalize()
 
-        // Limitation (ADV-1 A1-7): without an engine-side per-page delay seam
+        // Limitation: without an engine-side per-page delay seam
         // (the engine package is untouched this session) the natural
         // out-of-order depth on a uniform fixture is shallow, so this asserts
         // the bound holds on a well-behaved run rather than adversarially
@@ -129,7 +129,7 @@ struct ApplyPhaseMemoryStressTests {
             // Sample every 10th page at the deterministic hook.
             if idx % 10 == 0 {
                 let fp = MemoryFootprint.physFootprint()
-                let avail = MemoryFootprint.osProcAvailableMemory()  // D-1 probe, logged only
+                let avail = MemoryFootprint.osProcAvailableMemory()  // probe, logged only
                 os_signpost(.event, log: log, name: "CAT227StreamingFootprint",
                             "page=%d footprintBytes=%lld availBytes=%lld",
                             idx, fp, avail)
@@ -142,7 +142,7 @@ struct ApplyPhaseMemoryStressTests {
 
         guard baseline > 0, peakDelta > 0 else {
             // phys_footprint unavailable on this host → cannot measure. Surface
-            // the skip; test 1 is the deterministic gate. (CAT-230 idiom: never
+            // the skip; test 1 is the deterministic gate. (Idiom: never
             // a silent zero-assertion pass.)
             withKnownIssue(
                 "phys_footprint unavailable on this host; streaming footprint not asserted (test 1 is the gate)"
@@ -153,8 +153,8 @@ struct ApplyPhaseMemoryStressTests {
         }
 
         // Self-documenting measured value (process-memory bytes only — no
-        // document content; ARCH §12.2). Appears in the test log on pass.
-        print("[CAT-227] streaming append peak delta = \(peakDelta) B (\(peakDelta / 1_000_000) MB), ceiling \(Self.footprintCeiling) B, override=4, \(pageCount) pages")
+        // document content). Appears in the test log on pass.
+        print("[apply-phase-memory] streaming append peak delta = \(peakDelta) B (\(peakDelta / 1_000_000) MB), ceiling \(Self.footprintCeiling) B, override=4, \(pageCount) pages")
         #expect(
             peakDelta <= Self.footprintCeiling,
             "streaming apply-phase footprint delta \(peakDelta) B exceeded ceiling \(Self.footprintCeiling) B (override=4, \(pageCount) pages)"
@@ -168,7 +168,7 @@ struct ApplyPhaseMemoryStressTests {
         .timeLimit(.minutes(5))
     )
     func testEndToEndApplyPhasePeakFootprint() async throws {
-        let pageCount = 100  // ADV-1 edit 1: 100, not 60 — the 60-page compressed
+        let pageCount = 100  // 100, not 60 — the 60-page compressed
                              // floor (~1.01 GB) can fall under the 1.1 GB ceiling.
         let url = try makeNoiseBandMultiPagePDF(pages: pageCount)
         defer { try? FileManager.default.removeItem(at: url) }
@@ -178,7 +178,7 @@ struct ApplyPhaseMemoryStressTests {
 
         let coord = makeLoadedCoordinator(document: doc)
         addRegionToAllPages(coord, pageCount: pageCount)
-        // ADV-1 edit 1: pin parallelism (property exists pre-fix, so the RED
+        // Pin parallelism (property exists pre-fix, so the RED
         // run on the collect-then-drain base still compiles) and turn verify
         // OFF so the sampler covers the redact/apply phase only (autoVerify
         // defaults to true; paranoidMode defaults to false).
@@ -225,9 +225,9 @@ struct ApplyPhaseMemoryStressTests {
                     delta, baseline, peak, pageCount)
 
         // Self-documenting measured value (process-memory bytes only — no
-        // document content; ARCH §12.2). Appears in the test log on pass and
+        // document content). Appears in the test log on pass and
         // in the assertion message on the pre-fix RED run.
-        print("[CAT-227] end-to-end peak delta = \(delta) B (\(delta / 1_000_000) MB), ceiling \(Self.footprintCeiling) B, override=4, \(pageCount) pages, verify off")
+        print("[apply-phase-memory] end-to-end peak delta = \(delta) B (\(delta / 1_000_000) MB), ceiling \(Self.footprintCeiling) B, override=4, \(pageCount) pages, verify off")
         // Expected RED (pre-fix collect-then-drain) ≈ ≥ 1.68 GB; expected GREEN
         // (streaming) ≈ ≤ 0.85 GB. See PR body for both measured runs.
         #expect(
@@ -236,7 +236,7 @@ struct ApplyPhaseMemoryStressTests {
         )
     }
 
-    // MARK: - Test 4 — residency bound survives a mid-run memory warning (L3-9)
+    // MARK: - Test 4 — residency bound survives a mid-run memory warning
 
     @Test(
         "residency accounting bound holds across a mid-run memory warning",
@@ -327,7 +327,7 @@ struct ApplyPhaseMemoryStressTests {
         deinit { try? FileManager.default.removeItem(at: tempURL) }
     }
 
-    /// Build a reconstructor and run `begin(firstPageSize:)` (ADV-1 A1-7:
+    /// Build a reconstructor and run `begin(firstPageSize:)` (
     /// `appendPage` throws unless `begin` ran first). Standard US-Letter size.
     private func makeStartedReconstructor() async throws -> StartedReconstructor {
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(

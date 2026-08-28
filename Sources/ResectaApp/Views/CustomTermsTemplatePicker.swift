@@ -1,9 +1,8 @@
 import SwiftUI
 import RedactionEngine
 
-// W-B (e) — Template picker sheet for Custom Terms. Confirmation-
-// gated; user retains control; mechanism-description copy only
-// (CLAUDE.md Hard Rules).
+// Template picker sheet for Custom Terms. Confirmation-
+// gated; user retains control; mechanism-description copy only.
 
 struct CustomTermsTemplatePicker: View {
     @Environment(UserTermsStore.self) private var userTermsStore
@@ -13,7 +12,7 @@ struct CustomTermsTemplatePicker: View {
     @State private var loadError: String?
     @State private var showingConfirmation = false
     @State private var importPreview: ImportPreview?
-    /// QW-2 (D07-F2) — in-flight gate for the async
+    /// In-flight gate for the async
     /// `RegexSentinelCheck.validate` probes that now run at preview
     /// time. Mirrors the sibling add-sites (`AddTermRow.submit`,
     /// `SavedRegexLibraryView.commitAdd`,
@@ -24,8 +23,7 @@ struct CustomTermsTemplatePicker: View {
     private struct ImportPreview {
         let toImport: [UserTerm]
         let skipped: [UserTerm]
-        /// Pkg G.3 / TRUST-template-preview-count-mismatch +
-        /// UX-template-preview-precount: template entries that fail
+        /// Template entries that fail
         /// `UserTermsStore.isValidUserTerm` (empty pattern, > 200 chars,
         /// or unsafe regex) are excluded from `toImport` at preview
         /// build time so the confirmation dialog's "Add N entries"
@@ -106,7 +104,7 @@ struct CustomTermsTemplatePicker: View {
         )
     }
 
-    /// UXC-31 (RB-40): dialog-grammar normalization — sentence-case
+    /// Dialog-grammar normalization — sentence-case
     /// question title when under cap, a distinct title (not a
     /// question — there's nothing to confirm) when the cap is
     /// exceeded.
@@ -131,7 +129,7 @@ struct CustomTermsTemplatePicker: View {
         if !preview.skipped.isEmpty {
             lines.append("\(preview.skipped.count) entries already present and will be skipped.")
         }
-        // Pkg G.3 / UX-template-preview-precount: surface invalid
+        // Surface invalid
         // entries excluded by the pre-filter so the user knows why the
         // displayed N may be smaller than the template's raw entry count.
         if !preview.skippedInvalid.isEmpty {
@@ -153,13 +151,13 @@ struct CustomTermsTemplatePicker: View {
         defer { previewInFlight = false }
         let candidates = CustomTermsTemplateLoader.userTerms(from: template)
         let existing = userTermsStore.blob.alwaysFlag
-        // Pkg G.3 / TRUST-template-preview-count-mismatch: split the
+        // Split the
         // candidate list into entries that pass
         // `UserTermsStore.isValidUserTerm` and those that do not.
         // `performImport` would skip the invalid set on commit, so
         // dropping them BEFORE the dedup pass keeps the preview's "Add
         // N" count and the actual import count in lockstep.
-        // QW-2 (D07-F2) — the partition now also runs the async
+        // The partition now also runs the async
         // `RegexSentinelCheck.validate` probe on each regex candidate,
         // matching the three interactive add-sites, so a pathological
         // template pattern is rejected here instead of stalling scans
@@ -178,14 +176,14 @@ struct CustomTermsTemplatePicker: View {
         showingConfirmation = true
     }
 
-    /// Pkg G.3 / TRUST-template-preview-count-mismatch: partition a
+    /// Partition a
     /// candidate list into entries `UserTermsStore.isValidUserTerm`
     /// accepts and entries it rejects. Pure-data helper so the gating
     /// contract can be pinned in unit tests without driving the view.
     /// `@MainActor` because `UserTermsStore.isValidUserTerm` inherits
     /// the store's actor isolation.
     ///
-    /// QW-2 (D07-F2) — regex candidates that pass the static heuristic
+    /// Regex candidates that pass the static heuristic
     /// additionally run the async `RegexSentinelCheck.validate` ReDoS
     /// probe, the same gate the three interactive add-sites apply
     /// (`AddTermRow`, `SavedRegexLibraryView`, `SearchToolbarSection`).

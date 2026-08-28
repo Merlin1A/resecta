@@ -2,18 +2,18 @@ import SwiftUI
 import PhotosUI
 import PDFKit
 
-// Phase 0: Redact workspace container — extracted from ContentView.
+// Redact workspace container — extracted from ContentView.
 // Owns the navigation container, import handlers, and import-related state.
 // Injects workspace-scoped state into the environment for downstream views.
-// ARCH §5.2: NavigationSplitView (iPad) / NavigationStack (iPhone).
-// UI_UX §5.1: Import sources (Files, Photos, drag-and-drop).
+// NavigationSplitView on iPad, NavigationStack on iPhone.
+// Import sources: Files, Photos, drag-and-drop.
 
 struct RedactWorkspaceView: View {
     let workspace: RedactWorkspace
     @Environment(SettingsState.self) private var settingsState
     @Environment(ToastQueueManager.self) private var toastManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    // SEC-3: Capture/mirroring privacy shield gates the iPad page-thumbnail
+    // The capture/mirroring privacy shield gates the iPad page-thumbnail
     // sidebar. Thumbnails are derived from page bitmaps, so they leak the
     // same content the canvas does and must be covered alongside the editor.
     @Environment(ScreenCaptureMonitor.self) private var captureMonitor
@@ -24,7 +24,7 @@ struct RedactWorkspaceView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
 
-    /// RES-06 (Pkg N): handle for the in-flight import dispatch. Each
+    /// Handle for the in-flight import dispatch. Each
     /// dispatch site (drop, file picker, photo picker, pending-import
     /// after confirmation) cancels the prior task before launching a
     /// new one. Without this, a rapid double-input (e.g., two drops in
@@ -36,17 +36,17 @@ struct RedactWorkspaceView: View {
     /// Cancelling the prior dispatch at the view layer closes the gap.
     @State private var activeImportDispatch: Task<Void, Never>?
 
-    // ARCH §7: Settings sheet
+    // Settings sheet
     @State private var showSettings = false
 
-    // D12: Import-while-editing confirmation
+    // Import-while-editing confirmation
     @State private var showImportWhileEditingConfirmation = false
     @State private var pendingImportURL: URL?
     @State private var pendingImportData: Data?
 
     var body: some View {
         navigationContainer
-            // UI_UX §5.1: File importer
+            // File importer
             .fileImporter(
                 isPresented: $showFilePicker,
                 allowedContentTypes: [.pdf, .image],
@@ -54,7 +54,7 @@ struct RedactWorkspaceView: View {
             ) { result in
                 handleFileImportResult(result)
             }
-            // UI_UX §5.1: Photos picker
+            // Photos picker
             .photosPicker(
                 isPresented: $showPhotoPicker,
                 selection: $selectedPhoto,
@@ -74,12 +74,12 @@ struct RedactWorkspaceView: View {
                     checkTextLayerToast()
                 }
             }
-            // ARCH §5.6: Drag and drop (iPad)
+            // Drag and drop (iPad)
             .dropDestination(for: Data.self) { items, _ in
                 guard let data = items.first else { return false }
                 // Reject drops while the pipeline is
                 // active OR a detection review is open. The drag-drop path is
-                // the sole importer that bypasses the D12 import-while-editing
+                // the sole importer that bypasses the import-while-editing
                 // confirmation the file/photo pickers stage, so it consults the
                 // composed `canStartImport(with:)` gate directly — a stranded
                 // triage sheet over a replacement document could stamp the prior
@@ -95,20 +95,20 @@ struct RedactWorkspaceView: View {
                     }
                     return true
                 }
-                // Pkg G.1 / TRUST-import-drop-image-deadcode: sniff magic
-                // bytes BEFORE dispatch. The previous hardcoded
-                // `suggestedType: "pdf"` forced every drop through the
-                // PDF branch, making the image branch dead code on this
-                // entry point. Phase admission (Pkg D) has already passed
-                // by this point; only the routing label is being chosen.
+                // Magic bytes are sniffed BEFORE dispatch. The previous
+                // hardcoded `suggestedType: "pdf"` forced every drop
+                // through the PDF branch, making the image branch dead
+                // code on this entry point. Phase admission has already
+                // passed by this point; only the routing label is being
+                // chosen.
                 let suggestedType = ImportService.detectPayloadKind(from: data).suggestedType
-                // RES-06 (Pkg N): cancel any prior in-flight import
+                // Cancel any prior in-flight import
                 // dispatch so a rapid double-drop doesn't race two
                 // ImportService.importDocument calls.
                 activeImportDispatch?.cancel()
                 activeImportDispatch = Task {
-                    // SEC-8 override #4: paranoid mode enables the
-                    // LivePhotoAuxStripper hook on the import path.
+                    // Paranoid mode enables the LivePhotoAuxStripper
+                    // hook on the import path.
                     await ImportService.importDocument(
                         data: data, suggestedType: suggestedType,
                         documentState: workspace.documentState,
@@ -118,7 +118,7 @@ struct RedactWorkspaceView: View {
                 }
                 return true
             }
-            // ARCH §7: Settings sheet
+            // Settings sheet
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .environment(settingsState)
@@ -128,9 +128,9 @@ struct RedactWorkspaceView: View {
                     // sheet does not depend on inheriting the outer
                     // workspace environment.
                     .environment(workspace.redactionState)
-                    .presentationDetents([.medium, .large]) // §A4g
+                    .presentationDetents([.medium, .large])
             }
-            // D12: Import-while-editing confirmation dialog
+            // Import-while-editing confirmation dialog
             .confirmationDialog(
                 RedactWorkspaceView.importWhileEditingTitle,
                 isPresented: $showImportWhileEditingConfirmation,
@@ -155,15 +155,15 @@ struct RedactWorkspaceView: View {
             .environment(workspace.coordinator)
     }
 
-    // MARK: - Navigation Container (UI_UX §10)
+    // MARK: - Navigation Container
 
     @ViewBuilder
     private var navigationContainer: some View {
         if horizontalSizeClass == .regular {
             // iPad: NavigationSplitView with page thumbnail sidebar
             NavigationSplitView(columnVisibility: $columnVisibility) {
-                // SEC-3: cover the thumbnail strip with the same opaque
-                // shield as the canvas while capture/mirroring is active.
+                // Cover the thumbnail strip with the same opaque shield
+                // as the canvas while capture/mirroring is active.
                 if captureMonitor.isShielded {
                     PrivacyShieldView()
                 } else if workspace.documentState.sourceDocument != nil {
@@ -188,7 +188,7 @@ struct RedactWorkspaceView: View {
 
     // MARK: - Detail Content
 
-    /// §A2: DocumentEditorView handles all phases via its phase router.
+    /// DocumentEditorView handles all phases via its phase router.
     @ViewBuilder
     private var detailContent: some View {
         DocumentEditorView(
@@ -204,23 +204,23 @@ struct RedactWorkspaceView: View {
         switch result {
         case .success(let urls):
             guard let url = urls.first else { return }
-            // Pkg D / STATE-1: file-importer cannot stage a new
+            // File-importer cannot stage a new
             // document while the pipeline holds in-flight state.
             guard workspace.documentState.canStartImport else {
                 enqueueImportBlockedToast()
                 return
             }
-            // D12: Confirm if a document is already open
+            // Confirm if a document is already open
             if workspace.documentState.sourceDocument != nil {
                 pendingImportURL = url
                 showImportWhileEditingConfirmation = true
             } else {
-                // RES-06 (Pkg N): cancel any prior in-flight import
+                // Cancel any prior in-flight import
                 // dispatch — see `activeImportDispatch` doc-comment.
                 activeImportDispatch?.cancel()
                 activeImportDispatch = Task {
-                    // SEC-8 override #4: paranoid mode enables the
-                    // LivePhotoAuxStripper hook on the import path.
+                    // Paranoid mode enables the LivePhotoAuxStripper
+                    // hook on the import path.
                     await ImportService.importDocument(
                         from: url,
                         documentState: workspace.documentState,
@@ -237,25 +237,24 @@ struct RedactWorkspaceView: View {
 
     private func handlePhotoSelection(_ item: PhotosPickerItem?) {
         guard let item else { return }
-        // Pkg D / STATE-1: photos picker cannot stage a new document
+        // Photos picker cannot stage a new document
         // while the pipeline holds in-flight state.
         guard workspace.documentState.canStartImport else {
             enqueueImportBlockedToast()
             selectedPhoto = nil
             return
         }
-        // RES-06 (Pkg N): cancel any prior in-flight import dispatch —
+        // Cancel any prior in-flight import dispatch —
         // see `activeImportDispatch` doc-comment.
         activeImportDispatch?.cancel()
         activeImportDispatch = Task {
-            // Pkg C / ERR-04 + UX-import-photoselection-silent-nil: the
-            // prior `try? await item.loadTransferable(...)` swallowed both
+            // The prior `try? await item.loadTransferable(...)` swallowed both
             // throws and nil (e.g., iCloud-not-downloaded photo, transferable
             // decode error). The `if let` then fell through with no
-            // user-visible signal — indistinguishable from a UI bug. Per
-            // S2 §L.4 the preferred routing is the existing Tier 2
-            // `FailedStateView` via `.importError(.corrupt)`, so the user
-            // lands on the same recovery surface as a corrupt-PDF import.
+            // user-visible signal — indistinguishable from a UI bug. The
+            // preferred routing is the existing Tier 2 `FailedStateView`
+            // via `.importError(.corrupt)`, so the user lands on the same
+            // recovery surface as a corrupt-PDF import.
             let loaded: Data?
             do {
                 loaded = try await item.loadTransferable(type: Data.self)
@@ -270,13 +269,13 @@ struct RedactWorkspaceView: View {
                 ))
                 return
             }
-            // D12: Confirm if a document is already open
+            // Confirm if a document is already open
             if workspace.documentState.sourceDocument != nil {
                 pendingImportData = data
                 showImportWhileEditingConfirmation = true
             } else {
-                // SEC-8 override #4: paranoid mode enables the
-                // LivePhotoAuxStripper hook on the import path.
+                // Paranoid mode enables the LivePhotoAuxStripper hook
+                // on the import path.
                 await ImportService.importDocument(
                     data: data, suggestedType: "image",
                     documentState: workspace.documentState,
@@ -289,21 +288,21 @@ struct RedactWorkspaceView: View {
         selectedPhoto = nil
     }
 
-    /// UXC-31 (RB-40): dialog-grammar normalization — sentence-case
-    /// question title, bare-verb destructive button.
+    /// Dialog-grammar normalization — sentence-case question title,
+    /// bare-verb destructive button.
     static let importWhileEditingTitle = "Replace the open document?"
     static let importWhileEditingConfirmButton = "Replace"
 
-    /// D12: Execute the pending import after user confirms replacement.
+    /// Execute the pending import after user confirms replacement.
     private func performPendingImport() {
-        // RES-06 (Pkg N): cancel any prior in-flight import dispatch —
+        // Cancel any prior in-flight import dispatch —
         // see `activeImportDispatch` doc-comment.
         activeImportDispatch?.cancel()
         activeImportDispatch = Task {
             if let url = pendingImportURL {
                 pendingImportURL = nil
-                // SEC-8 override #4: paranoid mode enables the
-                // LivePhotoAuxStripper hook on the import path.
+                // Paranoid mode enables the LivePhotoAuxStripper hook
+                // on the import path.
                 await ImportService.importDocument(
                     from: url,
                     documentState: workspace.documentState,
@@ -312,8 +311,8 @@ struct RedactWorkspaceView: View {
                 )
             } else if let data = pendingImportData {
                 pendingImportData = nil
-                // SEC-8 override #4: paranoid mode enables the
-                // LivePhotoAuxStripper hook on the import path.
+                // Paranoid mode enables the LivePhotoAuxStripper hook
+                // on the import path.
                 await ImportService.importDocument(
                     data: data, suggestedType: "image",
                     documentState: workspace.documentState,
@@ -341,7 +340,7 @@ struct RedactWorkspaceView: View {
         oldPhase == .importing && newPhase == .editing
     }
 
-    /// §5.2: Notify user when text layer detected after import.
+    /// Notify user when text layer detected after import.
     private func checkTextLayerToast() {
         if workspace.documentState.hasAnyTextLayer,
            workspace.documentState.phaseKind == .editing {
@@ -352,7 +351,7 @@ struct RedactWorkspaceView: View {
         }
     }
 
-    /// Pkg D / STATE-1: surface the rejection when a drop, file picker,
+    /// Surface the rejection when a drop, file picker,
     /// or photos picker invocation arrives while the pipeline owns
     /// in-flight state. Mechanism-description copy lives on
     /// `DocumentState.importBlockedDuringPipelineMessage` so unit tests

@@ -2,7 +2,7 @@ import Testing
 import UIKit
 @testable import ResectaApp
 
-// UXC-49 (D-124 / REV-13): the canvas claim recognizer and the window-pan
+// The canvas claim recognizer and the window-pan
 // deference it anchors. Beneath the compact float, iOS 26's sheet installs
 // a window-level pan (`cancelsTouchesInView`) that cancelled every moving
 // canvas touch before PDFKit's delayed content touches reached the

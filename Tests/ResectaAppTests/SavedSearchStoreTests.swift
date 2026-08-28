@@ -3,13 +3,13 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-03 — `SavedSearchStore` schema + reject-unknown-keys decoder
-// per D-25. The decoder fails closed on any
+// `SavedSearchStore` schema + reject-unknown-keys decoder.
+// The decoder fails closed on any
 // non-whitelisted key; this corpus pins exhaustive positive coverage
-// of the V1.x forbidden-key list per RR-43.
-// UI ships in [WU-26](WORK_UNITS.md#wu-26) (V1.1+ defer).
+// of the V1.x forbidden-key list.
+// UI for managing saved searches ships in a later release.
 
-@Suite("SavedSearchStore schema + decoder (WU-03)", .tags(.search))
+@Suite("SavedSearchStore schema + decoder", .tags(.search))
 @MainActor
 struct SavedSearchStoreTests {
 
@@ -66,7 +66,7 @@ struct SavedSearchStoreTests {
         #expect(decoded == original)
     }
 
-    // MARK: - S7 / design 04 §4.4 — normalization-extension keys (11 → 14)
+    // MARK: - Normalization-extension keys (11 → 14)
 
     @Test("Round-trip preserves the three normalization-extension flags")
     func roundTripNormalizationFlags() throws {
@@ -172,7 +172,7 @@ struct SavedSearchStoreTests {
         #expect(renamed?.multiTermConjunction == true)
     }
 
-    // MARK: - Reject unknown keys ([D-25])
+    // MARK: - Reject unknown keys
 
     @Test("Decoder rejects unknown keys")
     func decoderRejectsUnknownKeys() {
@@ -197,15 +197,15 @@ struct SavedSearchStoreTests {
     @Test(
         "Decoder rejects every forbidden V1.x runtime/document-derived key",
         arguments: [
-            // Original [D-25] forbidden seeds:
+            // Original forbidden seeds:
             "matchedText", "contextSnippet", "pageIndex", "normalizedRect",
             "appliedResultIDs", "priorScanFingerprints", "ocrConfidence",
-            // Engine-derived runtime fields ([RR-43] extension):
+            // Engine-derived runtime fields (extension):
             "regexTimeoutPages", "multiTermFilter",
             "livePreview", "livePreviewRects",
             "lastDoctypeExplanation", "lastCoverageReport",
             "pendingOverlapSuppressed", "results",
-            // q13 (ST-83 / QW-12) runtime fields — document-derived:
+            // Runtime fields — document-derived:
             "ocrSkippedPages", "capUnscannedPageCount",
             // Legacy Compose-mode key — removed from the whitelist
             // when Compose mode was dropped; surviving payloads must
@@ -232,7 +232,7 @@ struct SavedSearchStoreTests {
         }
     }
 
-    // MARK: - S7 / design 04 §4.1 — recall application + capture seams
+    // MARK: - Recall application + capture seams
 
     @Test("Recall applies the full saved shape to SearchState")
     func recallAppliesSavedShape() {
@@ -268,7 +268,7 @@ struct SavedSearchStoreTests {
         #expect(searchState.minimumOCRConfidence == 0.7)
         #expect(searchState.minimumPIIConfidence == 0.8)
         // Mode changed → the programmatic flag is armed for the hub's
-        // onChange handler ([D-10]).
+        // onChange handler.
         #expect(searchState.isProgrammaticModeChange)
     }
 
@@ -356,7 +356,7 @@ struct SavedSearchStoreTests {
         #expect(restored.queryText == original.queryText)
         #expect(restored.searchTerms == original.searchTerms)
         if mode == .piiScan {
-            // D-63/UT-05: the categories PERSIST (the wire field is
+            // The categories PERSIST (the wire field is
             // pinned intact by the `decoded == captured` leg above)
             // but restore does not apply them while the chips strip
             // is dark — recall must not silently narrow detectors
@@ -446,7 +446,7 @@ struct SavedSearchStoreTests {
         #expect(summary?.contains("Source: OCR") == true)
     }
 
-    // MARK: - Privacy floor ([D-02] / spec §S7)
+    // MARK: - Privacy floor
 
     @Test("Persisted shape contains no document-derived fields")
     func privacyFloor() throws {
@@ -571,7 +571,7 @@ struct SavedSearchStoreTests {
             defaults.removePersistentDomain(forName: suiteName)
         }
 
-        // A future-version row: unknown key → the [D-25] fail-closed row
+        // A future-version row: unknown key → the fail-closed row
         // decoder throws, so the row parks in `unrecognized`.
         let good = Self.validRowJSON(id: "00000000-0000-0000-0000-000000000011", name: "good row")
         let future = #"{"id": "00000000-0000-0000-0000-000000000012", "name": "future", "mode": "text", "queryText": "q", "caseSensitive": false, "wholeWord": false, "sourceFilter": "All", "minimumOCRConfidence": 0.0, "minimumPIIConfidence": 0.5, "futureKey": true}"#
@@ -706,7 +706,7 @@ struct SavedSearchStoreTests {
         #expect(defaults.object(forKey: SavedSearchStore.legacyDefaultsKey) == nil)
     }
 
-    // MARK: - Name length clamp (Pkg G.2 — TRUST-savedsearch-name-no-cap)
+    // MARK: - Name length clamp
 
     /// Builds a minimal whitelisted `SavedSearch` JSON payload with a
     /// caller-supplied `name`. Used by the decoder-clamp tests to
@@ -733,9 +733,9 @@ struct SavedSearchStoreTests {
         let data = Self.makeSavedSearchJSON(name: oversize)
         let decoded = try JSONDecoder().decode(SavedSearch.self, from: data)
         #expect(decoded.name.count == SavedSearch.nameLengthCap,
-                "Decoder must clamp name to nameLengthCap (200) per Pkg G.2")
+                "Decoder must clamp name to nameLengthCap (200)")
         #expect(SavedSearch.nameLengthCap == 200,
-                "Cap is locked at 200 per Jesse Q6")
+                "Cap is locked at 200")
     }
 
     @Test("Rename clamps a 300-char name to nameLengthCap, matching decoder")
@@ -780,9 +780,9 @@ struct SavedSearchStoreTests {
         #expect(decoded.name == "Tiny")
     }
 
-    // MARK: - H-74 duplicate-name collision guards
+    // MARK: - Duplicate-name collision guards
 
-    @Test("H-74: add rejects an exact-name duplicate and appends nothing")
+    @Test("Add rejects an exact-name duplicate and appends nothing")
     func testAddRejectsDuplicateName() {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("saved-search-add-\(UUID().uuidString).json")
@@ -796,7 +796,7 @@ struct SavedSearchStoreTests {
         #expect(store.savedSearches.count == 2)
     }
 
-    @Test("H-74: rename rejects another entry's name; own name stays a success")
+    @Test("Rename rejects another entry's name; own name stays a success")
     func testRenameCollisionGuard() {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("saved-search-rename-\(UUID().uuidString).json")

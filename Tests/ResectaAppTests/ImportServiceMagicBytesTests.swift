@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// Pkg G.1 / TRUST-import-drop-image-deadcode: drop handler routing was
+// Drop handler routing was
 // hardcoded to `suggestedType: "pdf"`, leaving the image branch dead on
 // the drag-and-drop entry point. These tests pin the magic-byte sniffer
 // (`ImportService.detectPayloadKind(from:)`) used by the drop handler to

@@ -121,8 +121,8 @@ struct ContextWindowScorerSignalTests {
 
     // MARK: - W-N regression guard
     //
-    // Aggregate-recall delta surrogate for the impl-plan §W-N `Done =`
-    // row 5 ("G8 recall on SSN / MRN / LP unchanged ± 1 pt"). G8 carries
+    // Aggregate-recall delta surrogate for the recall-parity target
+    // ("G8 recall on SSN / MRN / LP unchanged ± 1 pt"). G8 carries
     // no licenseplate documents (`G8CorpusIngestionTests` declares the
     // 10-category set: ssn, npi, dea, dob, address, account, mrn, name,
     // phone, email — LP is out of corpus), so a true corpus-level recall

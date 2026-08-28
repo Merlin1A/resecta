@@ -5,7 +5,7 @@ import PDFKit
 import UIKit
 #endif
 
-// PERF-7 — Programmatic PDFKit stress-fixture builder.
+// Programmatic PDFKit stress-fixture builder.
 //
 // Produces a deterministic, seed-reproducible synthetic PDF for the
 // 500-page stress corpus. Each page renders a form-template-like layout
@@ -37,10 +37,10 @@ enum StressFixtureBuilder {
     /// Build a deterministic synthetic stress-test PDF.
     ///
     /// - Parameters:
-    ///   - pageCount: number of pages (default 500 per the PERF-7 plan).
+    ///   - pageCount: number of pages (default 500).
     ///   - seed: LCG seed; identical seeds produce identical bytes
-    ///     within the same Swift runtime. Default 42 matches the
-    ///     plan body's reproducibility target.
+    ///     within the same Swift runtime. Default 42 keeps fixture
+    ///     output reproducible.
     /// - Returns: file URL of the generated fixture, under a per-call UUID
     ///   subdirectory of the test bundle's temporary path. The caller owns
     ///   cleanup; tests typically `removeItem(at:)` in a `defer` block.

@@ -2,32 +2,33 @@ import SwiftUI
 import SafariServices
 import RedactionEngine
 
-// §A4h / E2: Dedicated error recovery view for .failed(error, returnPhase) phase.
-// All copy uses mechanism-description language per ARCH §1.3.
+// Dedicated error recovery view for .failed(error, returnPhase) phase.
+// All copy uses mechanism-description language.
 
 struct FailedStateView: View {
     let error: PipelineError
     let returnPhase: DocumentState.ReturnPhase
 
     @Environment(DocumentState.self) private var documentState
-    // STATE-6 (Pkg I): Start Over previously only walked the phase
+    // Start Over previously only walked the phase
     // back to .empty, leaving drawn regions and sourceDocument in
     // memory — a PII-in-memory regression. The action now mirrors
     // `VerificationActionBar` Done semantics: clear regions, drop the
     // sourceDocument reference, then transition. Pulling
     // RedactionState in here is the wiring for that.
     @Environment(RedactionState.self) private var redactionState
-    // HISTORY: Start Over once skipped the SEC-1 session-close protection
-    // downgrade — FailedStateView lacked coordinator access, so a failed
-    // session's temp subtree stayed at `.complete`. The coordinator is
-    // injected upstream at `RedactWorkspaceView` via
-    // `.environment(workspace.coordinator)`; pull it and run the downgrade in
-    // `performStartOver()`, mirroring `DocumentEditorView.performDoneCloseSession()`.
+    // Start Over once skipped the session-close protection downgrade —
+    // FailedStateView lacked coordinator access, so a failed session's
+    // temp subtree stayed at `.complete`. The coordinator is injected
+    // upstream at `RedactWorkspaceView` via
+    // `.environment(workspace.coordinator)`; pull it and run the
+    // downgrade in `performStartOver()`, mirroring
+    // `DocumentEditorView.performDoneCloseSession()`.
     @Environment(PipelineCoordinator.self) private var coordinator
 
     @State private var safariURL: URL?
-    // STATE-6 (Pkg I): confirmation gates Start Over when drawn regions
-    // are present, mirroring GATE-3 (Done in VerificationActionBar).
+    // Confirmation gates Start Over when drawn regions
+    // are present, mirroring Done in VerificationActionBar.
     // When no regions exist there is nothing to lose, so the dialog
     // would only add friction — Start Over runs directly in that case.
     @State private var showStartOverConfirmation = false
@@ -52,7 +53,7 @@ struct FailedStateView: View {
         VStack(spacing: ResectaTokens.Spacing.lg) {
             Spacer()
 
-            // Phase 3B: Error status card
+            // Error status card
             VStack(spacing: ResectaTokens.Spacing.md) {
                 // Severity-appropriate SF Symbol
                 Image(systemName: error.severitySymbol)
@@ -72,7 +73,7 @@ struct FailedStateView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
 
-                // Reassurance line — always shown (§A4h)
+                // Reassurance line — always shown
                 Text("Your original file is unaffected.")
                     .font(.subheadline)
                     .foregroundStyle(.tertiary)
@@ -106,7 +107,7 @@ struct FailedStateView: View {
                     // Already at empty — no "Start Over" button
                 } else {
                     Button("Start Over") {
-                        // STATE-6 (Pkg I): gate on confirmation when
+                        // Gate on confirmation when
                         // there is content to lose. No-regions path
                         // runs directly so the dialog doesn't add
                         // friction in the empty case.
@@ -122,10 +123,10 @@ struct FailedStateView: View {
                 }
 
                 // Tertiary: report issue (GitHub deep link)
-                // WU-46: routes via SafariView, matching the SettingsView
+                // Routes via SafariView, matching the SettingsView
                 // Support-section pattern. Reuses the shared `SettingsView.Links`
                 // source of truth (the canonical org lives there) instead of a
-                // second inline literal. R3 — networking runs in Safari's
+                // second inline literal. Networking runs in Safari's
                 // process, not our binary.
                 Button("Report an Issue") {
                     safariURL = SettingsView.Links.reportIssue
@@ -141,9 +142,9 @@ struct FailedStateView: View {
             SafariView(url: url)
                 .ignoresSafeArea()
         }
-        // STATE-6 (Pkg I): destructive-action confirmation symmetry.
-        // Same shape as GATE-3 (Done) — copy describes the action
-        // without an outcome promise (ARCH §1.3).
+        // Destructive-action confirmation symmetry.
+        // Same shape as Done — copy describes the action
+        // without an outcome promise.
         .confirmationDialog(
             Self.startOverTitle,
             isPresented: $showStartOverConfirmation,
@@ -161,9 +162,9 @@ struct FailedStateView: View {
 
     // MARK: - Start Over
 
-    /// STATE-6 (Pkg I): teardown for Start Over. Delegates to
+    /// Teardown for Start Over. Delegates to
     /// `DocumentState.resetForStartOver(redactionState:coordinator:)`
-    /// so the whole teardown — the SEC-1 session-close downgrade, the
+    /// so the whole teardown — the session-close downgrade, the
     /// PII-in-memory clears, and the `.empty` phase transition — is exercised
     /// by a unit test rather than an inline copy that no test could invoke.
     private func performStartOver() {

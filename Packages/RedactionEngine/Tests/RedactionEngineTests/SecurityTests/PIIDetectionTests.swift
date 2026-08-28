@@ -3,7 +3,7 @@ import Foundation
 import CoreGraphics
 @testable import RedactionEngine
 
-// TEST §7 — PII detection test cases.
+// PII detection test cases.
 
 @Suite("PII Detection")
 struct PIIDetectionTests {
@@ -18,7 +18,7 @@ struct PIIDetectionTests {
         #expect(ssnResults.first!.confidence >= 0.90)
     }
 
-    // MARK: - Luhn Checksum (TEST §7.2)
+    // MARK: - Luhn Checksum
 
     @Test("Luhn check validates known card numbers", arguments: [
         ("4111111111111111", true),   // Visa test
@@ -69,7 +69,7 @@ struct PIIDetectionTests {
         #expect(emailResults.first?.text == "john.doe@example.com")
     }
 
-    // L-01: Email regex tightening
+    // Email regex tightening
 
     @Test("Email regex still accepts valid addresses", arguments: [
         "john.doe@example.com",
@@ -165,7 +165,7 @@ struct PIIDetectionTests {
                 "Without context keywords, confidence should be lower")
     }
 
-    // L-04: Phone regex tightening
+    // Phone regex tightening
 
     @Test("Phone regex accepts balanced parens `(###) ###-####`", arguments: [
         "(555) 123-4567",
@@ -418,8 +418,8 @@ struct PIIDetectionTests {
     }
 
     // MARK: - Driver's License Detection
-    // Dedicated coverage lives in DetectionTests/DriversLicenseDetectorTests.swift
-    // (L-15): labeled-format recall, L-02 numeric-floor regression, doctype
+    // Dedicated coverage lives in DetectionTests/DriversLicenseDetectorTests.swift:
+    // labeled-format recall, numeric-floor regression, doctype
     // agnostic behavior, confidence calibration, synthetic recall/precision.
 
     // MARK: - Address Regex Improvements
@@ -499,13 +499,13 @@ struct PIIDetectionTests {
     // MARK: - Regex Pattern Compilation Safety
 
     // MARK: - Passport Detection
-    // Dedicated coverage lives in DetectionTests/PassportDetectorTests.swift
-    // (L-15): labeled-format recall, doctype-agnostic behavior, confidence
+    // Dedicated coverage lives in DetectionTests/PassportDetectorTests.swift:
+    // labeled-format recall, doctype-agnostic behavior, confidence
     // calibration, synthetic recall/precision.
 
     // MARK: - Medical Record Number Detection
 
-    @Test("MRN detector finds labeled medical record numbers (W10)", arguments: [
+    @Test("MRN detector locates labeled medical record numbers", arguments: [
         ("MRN: 12345678", PIIDetector.mrnPatternLabeled),
         ("Patient ID: AB12345", PIIDetector.mrnPatternPatientID),
         ("Community Hospital ABC-1234567 discharge",
@@ -534,7 +534,7 @@ struct PIIDetectionTests {
         let results = await detector.detect(in: text, doctype: .medical)
         let mrnResults = results.filter { $0.kind == .medicalRecord }
         #expect(!mrnResults.isEmpty, "Should detect medical record number")
-        // W10: context-scored confidence; the `patient` keyword pushes it
+        // Context-scored confidence; the `patient` keyword pushes it
         // into the boosted band (no more flat 0.75).
         let conf = try! #require(mrnResults.first?.confidence)
         #expect(conf >= 0.85)

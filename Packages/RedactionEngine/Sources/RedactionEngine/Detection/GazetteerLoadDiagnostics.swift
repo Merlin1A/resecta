@@ -1,6 +1,6 @@
 import Foundation
 
-// SEC-7 — Explicit-degrade gazetteer loader diagnostics.
+// Explicit-degrade gazetteer loader diagnostics.
 //
 // Promotes the previous `try? NameGazetteer()` / `try? DLPatternGazetteer()`
 // / `try? PassportPatternGazetteer()` / `try? ContextKeywordsLoader()` swallow-
@@ -24,7 +24,7 @@ public struct GazetteerLoadDiagnostics: Sendable, Equatable {
         case dlPatternGazetteer = "DLPatternGazetteer"
         case passportPatternGazetteer = "PassportPatternGazetteer"
         case contextKeywordsLoader = "ContextKeywordsLoader"
-        // S3 §2.10: four new tracked loaders (all four added here in one
+        // Four new tracked loaders (all four added here in one
         // extension to prevent a double-add compile error if added piecemeal;
         // `allCases` enumeration in the signature-fail loop picks them up
         // automatically — no additional wiring required).
@@ -39,18 +39,18 @@ public struct GazetteerLoadDiagnostics: Sendable, Equatable {
         // signature, so the signature-fail path in
         // `PIIDetector.loadWithDiagnostics(bundle:)` deliberately excludes it.
         case documentTypeClassifier = "DocumentTypeClassifier"
-        // GAP-DEPTARGET-NER / D04-F3 == D11-F3 — the NLTagger `.personalName`
+        // The NLTagger `.personalName`
         // MobileAsset is an OS-provisioned model, NOT a bundled corpus and NOT
         // covered by the gazetteer-manifest signature. Tracked here so a device
         // on which the asset has not downloaded degrades VISIBLY through the same
-        // SEC-7 banner instead of silently dropping all NER-sourced name matches.
+        // degraded-detection banner instead of silently dropping all NER-sourced name matches.
         // Excluded from the signature-fail loop for the same reason as
         // documentTypeClassifier (it is not signature-covered).
         case nerNameModel = "NERNameModel"
         // The three detection-quality assets under `Classifier/` that fall back
         // (identity scorer / T=1.0 / built-in thresholds) when missing or
-        // invalid. Tracked so those fallbacks surface through the same SEC-7
-        // banner the corpus loaders use — reporting only; the fallback values
+        // invalid. Tracked so those fallbacks surface through the same
+        // degraded-detection banner the corpus loaders use — reporting only; the fallback values
         // themselves are unchanged. Not covered by the gazetteer-manifest
         // signature, so all three are excluded from the signature-fail loop.
         case contextScorerWeights = "ContextScorerWeights"
@@ -84,7 +84,7 @@ public struct GazetteerLoadDiagnostics: Sendable, Equatable {
     /// Values are mechanism descriptions captured via
     /// `String(describing:)` on the thrown Error (or "init returned nil"
     /// for the `NameGazetteer.init?()` legacy path). Never contains document
-    /// content, file paths, or coordinates — ARCH §12.2 invariant.
+    /// content, file paths, or coordinates.
     public let failureReasons: [String: String]
 
     /// True iff at least one loader failed. Drives the app-side

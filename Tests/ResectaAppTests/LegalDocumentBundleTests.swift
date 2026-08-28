@@ -2,25 +2,25 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// q17 (UXF-08) — gate-viewable legal documents ship in the app bundle and
+// Gate-viewable legal documents ship in the app bundle and
 // stay byte-identical to the repo-root sources.
 //
 // EULA.md and PRIVACY.md are repo-root files (published to resecta.app and
-// pinned by MarkdownContentGuardTests); q17 additionally bundles them so the
-// first-launch gate can present them read-only in-app (LegalDocumentView)
-// with no egress. That creates a dual-copy hazard of the SampleDocument.pdf
-// kind — except here BOTH copies are reachable from one test (app bundle +
-// #filePath repo root), so the identity check is a direct byte compare, not
-// a shared-SHA convention. A drift between what a user reads at the gate and
-// what resecta.app publishes is a legal-surface bug (C-7 territory); this
-// suite is the tripwire.
-@Suite("Gate legal-document bundling (q17 / UXF-08)")
+// pinned by MarkdownContentGuardTests); this suite additionally bundles them
+// so the first-launch gate can present them read-only in-app
+// (LegalDocumentView) with no egress. That creates a dual-copy hazard of the
+// SampleDocument.pdf kind — except here BOTH copies are reachable from one
+// test (app bundle + #filePath repo root), so the identity check is a direct
+// byte compare, not a shared-SHA convention. A drift between what a user
+// reads at the gate and what resecta.app publishes is a legal-surface bug;
+// this suite is the tripwire.
+@Suite("Gate legal-document bundling")
 struct LegalDocumentBundleTests {
 
     private var appBundle: Bundle { Bundle(for: AppCoordinator.self) }
 
     // nonisolated: consumed by `@Test(arguments:)` (hoisted nonisolated peer
-    // under the s04 SE-0466 MainActor default — same posture as
+    // under the SE-0466 MainActor default — same posture as
     // MarkdownContentGuardTests.legalDocs).
     nonisolated static let documents: [LegalDocument] = [.eula, .privacyPolicy]
 

@@ -3,8 +3,6 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// Pkg G.3 — TRUST-customterms-no-async-sentinel.
-//
 // `AddTermRow.submit` previously committed regex terms after the sync
 // `DocumentSearcher.validateRegexPattern` check, bypassing the async
 // `RegexSentinelCheck.validate` ReDoS sentinel that
@@ -13,7 +11,7 @@ import Foundation
 // tests pin the new chain: regex submissions route through the
 // sentinel before commit; literal submissions skip it.
 
-@Suite("AddTermRow — async sentinel validation (Pkg G.3)", .tags(.search))
+@Suite("AddTermRow — async sentinel validation", .tags(.search))
 @MainActor
 struct AddTermRowAsyncSentinelTests {
 

@@ -2,21 +2,19 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W-I2 — A22 catalog loader + engine-ruleID alias-map reconciliation
-// (path-(a) per Q1 / 2026-04-30 DECIDED).
+// RuleCatalog loader + engine-ruleID alias-map reconciliation.
 
-@Suite("W-I2 RuleCatalog (A22) loader + engine-rule-id reconciliation")
+@Suite("RuleCatalog loader + engine-rule-id reconciliation")
 struct RuleCatalogTests {
 
     @Test("Loader round-trips on shipped rule-catalog.json (21 entries)")
     func loaderRoundTrip() throws {
         let catalog = try RuleCatalog()
-        // 21 entries: 18 post Bates-removal (§B.1 row 5) + pii.routing_number.v1
-        // (search-impl S2, design 01 §4) + pii.barcode.vision.v1 and
-        // pii.signature.heuristic.v1 (speed-S01 rows; the S3 install
-        // 2026-06-11 reconciled the bundled copy with the pipeline's
-        // 21-row rule_catalog.json). If this count drifts further,
-        // surface to the maintainer.
+        // 21 entries: 18 post Bates-removal + pii.routing_number.v1,
+        // pii.barcode.vision.v1, and pii.signature.heuristic.v1
+        // (reconciled with the pipeline's 21-row rule_catalog.json
+        // on 2026-06-11). If this count drifts further, surface to
+        // the maintainer.
         #expect(catalog.entries.count == 21)
         // Top-level keys + entry shape are sanity-checked via the decoder
         // run above; spot-check a representative entry.
@@ -81,13 +79,13 @@ struct RuleCatalogTests {
             "dl.regex", "passport.regex", "mrn.regex", "npi.80840",
             "dea.letter-check", "account.regex", "name.nltagger",
             "licensePlate.labeled",
-            // Search-impl S2 (design 01 §4): emitted by RoutingNumberDetector
+            // Emitted by RoutingNumberDetector
             // and defaultRuleID(for: .routingNumber).
             "routingNumber.aba-checksum",
-            // Search-impl S2 (design 01 §6): ITIN scorer-migration rationale
+            // ITIN scorer-migration rationale
             // ruleID, folded onto pii.itin.v1 (SSN-style).
             "itin.yy-bucket",
-            // Speed-S01 catalog rows, aliased at the S3 21-row install:
+            // Catalog rows aliased at the 21-row install:
             // defaultRuleID(for: .barcode / .signatureCandidate) arms.
             "barcode.vision", "signature.heuristic",
             // explicit-emission overrides

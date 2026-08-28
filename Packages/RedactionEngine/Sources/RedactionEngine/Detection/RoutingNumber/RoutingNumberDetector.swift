@@ -8,7 +8,7 @@ import Foundation
 //   (c) confidence above base requires a routing/bank/ABA context keyword
 //       within ±8 whitespace tokens (a bare 9-digit number is too common —
 //       ZIP+4 runs, document control numbers — so no-context candidates stay
-//       at base 0.50, below the balanced 0.60 W4 cutoff).
+//       at base 0.50, below the balanced 0.60 preset cutoff).
 //
 // Checksum + prefix cites: ABA Routing Number Policy (Accredited Standards
 // Committee X9, administered by the American Bankers Association); Federal
@@ -43,7 +43,7 @@ struct RoutingNumberDetector: Sendable {
 
     private static let profile = KeywordProfile(
         positiveKeywords: positiveKeywords,
-        negativeKeywords: [],  // S3 negative-context wiring fills this slot.
+        negativeKeywords: [],  // Negative-context wiring fills this slot.
         windowRadius: 8,       // wider than SSN — routing often sits in table cells
         baseConfidence: 0.50,
         boostedConfidence: 0.88,
@@ -96,7 +96,7 @@ struct RoutingNumberDetector: Sendable {
             ) {
                 signals.append(ctxSignal)
             }
-            // WU-76 / [P4] — per-keyword breakdown alongside the scalar
+            // Per-keyword breakdown alongside the scalar
             // (mirrors DEADetector).
             if let ctxDetail = scorer.signalDetail(
                 text: fullText,

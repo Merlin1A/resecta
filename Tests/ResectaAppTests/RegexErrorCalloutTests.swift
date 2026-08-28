@@ -3,19 +3,19 @@ import Foundation
 import CoreGraphics
 @testable import ResectaApp
 
-// WU-31 — fixed-layout regex error callout.
+// Fixed-layout regex error callout.
 //
 // The toolbar's regex validation surface previously rendered via an
 // `if let regexError` conditional that toggled the entire HStack into
 // and out of layout, which reflowed the search field and chip row
 // above it whenever the engine flipped `regexError` between nil and a
-// string. WU-31 replaces that with an always-allocated, fixed-height
+// string. This replaces that with an always-allocated, fixed-height
 // container in regex mode whose contents fade via `.opacity`. The two
 // pure-function contracts on `SearchToolbarSection` pin the layout
 // floor and the visibility predicate so the no-reflow invariant is
 // testable without a SwiftUI host.
 
-@Suite("Regex error callout (WU-31)", .tags(.search))
+@Suite("Regex error callout", .tags(.search))
 @MainActor
 struct RegexErrorCalloutTests {
 

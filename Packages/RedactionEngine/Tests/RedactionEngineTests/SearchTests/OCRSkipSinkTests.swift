@@ -5,14 +5,14 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// ST-83 (q13) — the oversized-OCR-skip sink. Pages whose 300-DPI render
+// The oversized-OCR-skip sink. Pages whose 300-DPI render
 // exceeds the OCR pixel caps skip OCR entirely (pre-existing behavior,
 // unchanged); the sink now reports the page index so the app layer can
 // tell the user that page's image content was never text-scanned.
 // Reporting-only: the tests also pin that the skip still yields zero
 // results.
 
-@Suite("OCR skip sink (ST-83)", .tags(.search))
+@Suite("OCR skip sink", .tags(.search))
 struct OCRSkipSinkTests {
 
     private actor Collector {

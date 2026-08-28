@@ -4,12 +4,12 @@ import PDFKit
 import Testing
 @testable import RedactionEngine
 
-// S05 / Steps C + D -- Resecta sample/test-document packet series.
+// Resecta sample/test-document packet series.
 //
-// The BLOCKING regression freeze (D32) + the VEH `.generic` gating verification
-// (D24) for the synthetic Hartwell loan packet. Sibling of the measurement
-// suites: `PacketSnapshotTests` (S05/A -- the live dual-leg snapshot) and
-// `PacketPRHarnessTests` (S05/B -- the deterministic D22 Option-C report over
+// The BLOCKING regression freeze plus the VEH `.generic` gating verification
+// for the synthetic Hartwell loan packet. Sibling of the measurement
+// suites: `PacketSnapshotTests` (the live dual-leg snapshot) and
+// `PacketPRHarnessTests` (the deterministic precision/recall report over
 // the committed snapshot). This suite is the LIVE guard: it re-runs the engine
 // and asserts the reconciled tiers, so a future engine change that drops a
 // must-fire (or starts firing a must-not-fire) breaks CI.
@@ -19,7 +19,7 @@ import Testing
 // skip the face pass, and the barcode pass tolerates the simulator Vision #9
 // locally (DetectionOrchestrator step 6b). The OCR leg is Vision-dependent
 // (+-epsilon across runtimes) and is measured/reported by the snapshot + P/R
-// harness, not frozen here. (S01 design consequence #4: this packet's pages
+// harness, not frozen here. (This packet's pages
 // take the OCR path in production -- coverage < 0.95 -- but the text leg
 // exercises the same detectors/gates deterministically, which is what a
 // regression guard needs.)
@@ -28,7 +28,7 @@ import Testing
 // NON-financial, so `detectPage` runs the Vision face detector
 // (`shouldRunFaceDetection` is true for court/medical/foia/generic) which
 // deterministically throws `com.apple.Vision #9 "could not create inference
-// context"` on the simulator -- the S8-documented sim-fragility. Both the
+// context"` on the simulator. Both the
 // face pass (step 6) and the barcode pass (step 6b) now tolerate that error:
 // a failed pass yields no boxes and the page's other detections stand. This
 // suite still measures the PII path face-free for those two pages, because
@@ -44,12 +44,12 @@ import Testing
 // account/phone overlap collisions live there). The account/phone collisions
 // all sit on financial pages, which use the full `detectPage` pipeline.
 //
-// MATCHED-TEXT LOGGING (D31): synthetic, publicly-manifested fixture -- logged.
+// MATCHED-TEXT LOGGING: synthetic, publicly-manifested fixture -- logged.
 
-@Suite("Hartwell packet -- VEH .generic gating + must-fire/not-fire freeze (S05/C+D)", .serialized)
+@Suite("Hartwell packet -- VEH .generic gating + must-fire/not-fire freeze", .serialized)
 struct PacketRegressionTests {
 
-    // MARK: - Ground-truth model (subset of the D21 schema the freeze needs)
+    // MARK: - Ground-truth model (subset of the schema the freeze needs)
 
     struct GroundTruth: Codable {
         let occurrences: [Occ]
@@ -85,7 +85,7 @@ struct PacketRegressionTests {
     }
 
     /// Coverage = fraction of the GT VALUE area that sits under a detection box.
-    /// This is the D22 "redaction recall -- did any box COVER the PII (the
+    /// This is the "redaction recall -- did any box COVER the PII (the
     /// privacy outcome)" measure, and it is the right gate for a privacy
     /// regression freeze: the label-anchored detectors (driversLicense,
     /// licensePlate) match "<label>: <value>", so their box OVER-covers the
@@ -102,7 +102,7 @@ struct PacketRegressionTests {
 
     struct Det { let category: String; let rect: CGRect }
 
-    /// D22 region hard-gate (coverage form): is the occurrence value covered by
+    /// Region hard-gate (coverage form): is the occurrence value covered by
     /// some detection box (coverage >= threshold), with DetEval-style merge
     /// credit for a multi-line occurrence (each `spans[]` line individually
     /// covered). Returns the covering detection's category (for the ratchet).
@@ -211,18 +211,18 @@ struct PacketRegressionTests {
         return out
     }
 
-    // MARK: - Lens D: VEH `.generic` classification + licensePlate gate (D24)
+    // MARK: - Lens D: VEH `.generic` classification + licensePlate gate
 
-    @Test("VEH page 11 classifies .generic (D24 STOP if .financial)")
+    @Test("VEH page 11 classifies .generic (STOP if .financial)")
     func vehClassifiesGeneric() async throws {
         let document = try #require(PDFDocument(data: try TestFixtures.loanPacketPDF()))
         let page = try #require(document.page(at: 11))
         let text = try #require(EmbeddedTextSource.make(from: page)).text
         let result = await DocumentTypeClassifier().classify(pageText: text)
-        print("[OCRQ-pkt] D24 p11(VEH) doctype=\(result.primary.rawValue) "
+        print("[OCRQ-pkt] p11(VEH) doctype=\(result.primary.rawValue) "
             + "softmax=\(result.softmax.map { ($0.key.rawValue, ($0.value * 1000).rounded() / 1000) }.sorted { $0.0 < $1.0 })")
         #expect(result.primary == .generic,
-                "D24 STOP: VEH page must classify .generic for licensePlate to fire; got \(result.primary.rawValue). Fallback (engine-improvement track, do NOT self-decide): un-gate licensePlate for .financial.")
+                "STOP: VEH page must classify .generic for licensePlate to fire; got \(result.primary.rawValue). Un-gating licensePlate for .financial would be a policy change, not a tuning.")
     }
 
     @Test("VEH licensePlate gate: 7XYZ842 fires under .generic; VIN/Tag/cross-page negatives do not; .financial suppresses")
@@ -233,15 +233,15 @@ struct PacketRegressionTests {
 
         let generic = await PIIDetector().detect(in: text, doctype: .generic, documentHeader: nil)
         let plates = generic.filter { $0.kind == .licensePlate }.map { $0.text }
-        print("[OCRQ-pkt] D24 p11 licensePlate(.generic) matched=\(plates)")
-        // occ_veh_01 must fire as licensePlate (the D24 must-fire).
+        print("[OCRQ-pkt] p11 licensePlate(.generic) matched=\(plates)")
+        // occ_veh_01 must fire as licensePlate (the must-fire case).
         #expect(plates.contains { $0.contains("7XYZ842") }, "occ_veh_01 (7XYZ842) must fire as licensePlate on the .generic VEH page")
         // occ_veh_04 (VIN) must NOT fire as licensePlate (too long / not plate-shaped).
         #expect(!plates.contains { $0.contains("4S4BSANC1K3304412") }, "occ_veh_04 VIN must not fire as licensePlate")
-        // NOTE (S05 reconciliation): occ_veh_05 "Tag No: 88KJ2" DOES fire as
+        // NOTE: occ_veh_05 "Tag No: 88KJ2" DOES fire as
         // licensePlate -- "Tag No" is a plate-label synonym, so this is
         // defensible engine behavior. The manifest mis-tiered it as a negative;
-        // S05 re-tiers occ_veh_05 must_not_fire -> watch (flagged for maintainer review).
+        // this test treats it as a watch case rather than a must-not-fire.
 
         // Gate proof: under .financial the same page yields NO licensePlate.
         let financial = await PIIDetector().detect(in: text, doctype: .financial, documentHeader: nil)
@@ -249,9 +249,9 @@ struct PacketRegressionTests {
                 "licensePlate is doctype-gated OFF on .financial -- the gate that makes the VEH .generic page necessary")
     }
 
-    // MARK: - Lens C: must-fire region freeze + must-not-fire precision freeze (D32)
+    // MARK: - Lens C: must-fire region freeze + must-not-fire precision freeze
 
-    @Test("FREEZE: every must_fire is region-covered on the text leg (D32 region hard-gate)")
+    @Test("FREEZE: every must_fire is region-covered on the text leg (region hard-gate)")
     func mustFireRegionFreeze() async throws {
         let gt = try Self.loadGroundTruth()
         let want = gt.occurrences.filter { $0.expectation == "must_fire" }
@@ -264,13 +264,13 @@ struct PacketRegressionTests {
             if !hit { misses.append("\(occ.id) p\(page) \(occ.category) value=\(occ.value)") }
         }
         if !misses.isEmpty {
-            print("[OCRQ-pkt] must_fire REGION MISSES (demote these to should_fire in occurrences.py):")
+            print("[OCRQ-pkt] must_fire REGION MISSES (demote these to should_fire in resecta-sample-doc/packet/occurrences.py):")
             misses.forEach { print("[OCRQ-pkt]   \($0)") }
         }
         #expect(misses.isEmpty, "must_fire region misses (reconcile tiers before freezing): \(misses)")
     }
 
-    @Test("FREEZE: no must_not_fire fires as its own category on the text leg (D32 precision gate)")
+    @Test("FREEZE: no must_not_fire fires as its own category on the text leg (precision gate)")
     func mustNotFirePrecisionFreeze() async throws {
         let gt = try Self.loadGroundTruth()
         let want = gt.occurrences.filter { $0.expectation == "must_not_fire" }
@@ -286,7 +286,7 @@ struct PacketRegressionTests {
             if hit { violations.append("\(occ.id) p\(page) fires-as-\(wantCat) value=\(occ.value)") }
         }
         if !violations.isEmpty {
-            print("[OCRQ-pkt] must_not_fire PRECISION VIOLATIONS (re-tier to watch in occurrences.py):")
+            print("[OCRQ-pkt] must_not_fire PRECISION VIOLATIONS (re-tier to watch in resecta-sample-doc/packet/occurrences.py):")
             violations.forEach { print("[OCRQ-pkt]   \($0)") }
         }
         #expect(violations.isEmpty, "must_not_fire precision violations: \(violations)")

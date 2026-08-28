@@ -3,22 +3,22 @@ import SwiftUI
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-24: pin the per-Signal descriptor format that
+// Pins the per-Signal descriptor format that
 // `MatchRationaleSheet` renders in its "Signals" section. The
 // existing rendering already covers `.contextPositive(score:)` and
-// `.contextNegative(multiplier:)`; this WU lifts visibility from
-// `private` to `internal` so the format becomes a tested contract,
-// and adds an `@unknown default:` for forward-compat with WU-76's
-// future `.contextPositiveDetail` / `.contextNegativeDetail`
+// `.contextNegative(multiplier:)`; visibility is `internal` rather
+// than `private` so the format is a tested contract, and an
+// `@unknown default:` covers forward-compat with future
+// `.contextPositiveDetail` / `.contextNegativeDetail`
 // keyword-array variants.
 //
 // The reverse-rationale popover surface (`ReverseRationalePopover`)
 // renders `ConsiderationResult` rows, which do NOT carry the
 // `MatchRationale.Signal` array — surfacing per-signal context
 // scalars there is deferred until the engine widens
-// `ConsiderationResult` (likely WU-76 territory).
+// `ConsiderationResult`.
 
-@Suite("MatchRationaleSheet context-keyword scalar rendering (WU-24)")
+@Suite("MatchRationaleSheet context-keyword scalar rendering")
 struct MatchRationaleSheetContextKeywordTests {
     @Test("contextPositive renders as an upward arrow with score detail")
     func contextPositiveRendering() {

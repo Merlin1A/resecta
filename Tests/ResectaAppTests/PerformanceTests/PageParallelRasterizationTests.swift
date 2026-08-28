@@ -7,9 +7,9 @@ import os
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// PERF-2 — Page-parallel rasterization regression suite.
+// Page-parallel rasterization regression suite.
 //
-// Locked decisions (PERF-2):
+// Locked decisions:
 //
 //   * `withThrowingTaskGroup` bounded to
 //       max(1, min(cores - 1, dynamicMemoryBudgetPages))
@@ -19,16 +19,12 @@ import os
 //     rest of the run; no gradual re-raise.
 //
 // Why this lives in the App test target:
-// The PERF-2 agent body suggested `Packages/RedactionEngine/Tests/.../
-// PerformanceTests/PageParallelRasterizationTests.swift`, but the
-// orchestrating logic (`rasterizePagesInParallel`, `parallelismOverride`,
+// The orchestrating logic (`rasterizePagesInParallel`, `parallelismOverride`,
 // the memory-warning observer) is owned by `PipelineCoordinator` in the
-// app target, NOT the engine package. Per shared-context §13 ("when
-// reality contradicts the plan") the divergence is documented in the
-// PERF-2 handoff and the test file is placed where the coordinator's
-// `@testable import` works.
+// app target, not the engine package, so the test file is placed where
+// the coordinator's `@testable import` works.
 
-@Suite("PERF-2 Page-Parallel Rasterization", .tags(.critical, .coordination))
+@Suite("Page-Parallel Rasterization", .tags(.critical, .coordination))
 @MainActor
 struct PageParallelRasterizationTests {
 
@@ -68,9 +64,9 @@ struct PageParallelRasterizationTests {
         // ordering is asserted via the coordinator's
         // `lastReconstructorAppendOrder` test seam — the page indices in
         // the exact order their outputs were appended to the
-        // order-sensitive PDFStreamReconstructor (CAT-229).
+        // order-sensitive PDFStreamReconstructor.
         guard let outputURL = coord.redactionState.outputURL else {
-            // CAT-229: previously a bare return — the test passed with
+            // Previously a bare return — the test passed with
             // ZERO assertions whenever the pipeline failed to produce
             // output. Record the issue so this path is visible.
             Issue.record("outputURL was nil — pipeline did not complete; ordering was never asserted")
@@ -105,7 +101,7 @@ struct PageParallelRasterizationTests {
         let pageData = coord.buildPDFPageData(effectiveMode: .secureRasterization)
         #expect(pageData.count == pageCount)
 
-        // CAT-125 / D-32: the dict-return collect-then-drain is superseded by
+        // The dict-return collect-then-drain is superseded by
         // streaming ordered append. The property under test is inherited from
         // the replaced dict test (every index delivered, exactly once) and
         // strengthened: `onPageReady` must fire in strict 0..<n order, proving
@@ -130,10 +126,10 @@ struct PageParallelRasterizationTests {
         .timeLimit(.minutes(5))
     )
     func testParallelBeatSerialByMeasurableMargin() async throws {
-        // CAT-230: renamed from testWallClockHalvesOnTwoCores — the old
+        // Renamed from testWallClockHalvesOnTwoCores — the old
         // name promised a <= 0.50 ratio the test never required. This
         // test guards the "parallelism broken / measurably slower"
-        // regression only; PERF-7's stress-baseline.json (500-page
+        // regression only; the stress-baseline.json corpus (500-page
         // corpus, make stress-baseline) owns the strict speedup gate.
         // Only run on multi-core hosts; single-core simulators can't
         // exhibit any speedup and the test would be a coin flip.
@@ -145,9 +141,9 @@ struct PageParallelRasterizationTests {
         }
 
         // Use enough pages that scheduling overhead is small relative
-        // to per-page rasterize work. The committed PERF-7 baseline
+        // to per-page rasterize work. The committed stress-baseline
         // (500-page run, see stress-baseline.json) is the strict 60%
-        // acceptance gate for the plan §5 criterion; this unit test
+        // acceptance gate; this unit test
         // only verifies the mechanism wins clearly on a tractable
         // fixture (target: parallel < sequential by a substantive
         // margin, but with margin enough to absorb simulator noise).
@@ -185,8 +181,8 @@ struct PageParallelRasterizationTests {
 
         // Acceptance budget for the unit test: parallel must beat
         // sequential by a measurable margin on a multi-core host. The
-        // strict 60% acceptance bar from plan §5 lives in
-        // `stress-baseline.json` (PERF-7 corpus) where the per-run
+        // strict 60% acceptance bar lives in
+        // `stress-baseline.json` where the per-run
         // wall-clock is large enough to absorb scheduling jitter.
         // Skip-on-near-zero: if both runs landed under 50 ms, the
         // simulator is so fast on this fixture that ratio noise
@@ -198,11 +194,11 @@ struct PageParallelRasterizationTests {
         // the ~0.9s sequential / ~0.85s parallel band, where the
         // scheduler-jitter floor swallows most of the parallel win.
         // The 10% bar still flags the "no parallelism at all"
-        // regression (which would land at or above 1.0); PERF-7 is
-        // the venue for tighter speedup bars on larger fixtures.
+        // regression (which would land at or above 1.0); the stress-baseline
+        // corpus is the venue for tighter speedup bars on larger fixtures.
         let ratio = parSeconds / max(seqSeconds, 0.0001)
         if seqSeconds < 0.05 {
-            // CAT-230: previously a bare return — the skip was invisible
+            // Previously a bare return — the skip was invisible
             // and the test passed with zero assertions. Surface it as a
             // known issue so result bundles show WHY no ratio was asserted.
             withKnownIssue(
@@ -212,7 +208,7 @@ struct PageParallelRasterizationTests {
             }
             return
         }
-        // Floor assert (CAT-230): parallel slower than serial means the
+        // Floor assert: parallel slower than serial means the
         // parallel machinery is broken outright, regardless of how much
         // jitter the 0.90 margin absorbs.
         #expect(
@@ -221,7 +217,7 @@ struct PageParallelRasterizationTests {
         )
         #expect(
             ratio <= 0.90,
-            "Parallel run was \(Int(ratio * 100))% of sequential (unit-test threshold 90%; PERF-7 stress-baseline owns the strict speedup gate); seq=\(seqSeconds)s par=\(parSeconds)s cores=\(cores)"
+            "Parallel run was \(Int(ratio * 100))% of sequential (unit-test threshold 90%; the stress-baseline corpus owns the strict speedup gate); seq=\(seqSeconds)s par=\(parSeconds)s cores=\(cores)"
         )
     }
 
@@ -278,7 +274,7 @@ struct PageParallelRasterizationTests {
                 "Memory-warning override must clamp the bound to 1 (got \(postWarnBound))")
 
         // Also confirm dpiCap was simultaneously lowered to 150 — same
-        // observer (KI-5) wires both side effects.
+        // observer (KNOWN_ISSUES.md KI-5) wires both side effects.
         #expect(coord.dpiCap == 150,
                 "Memory-warning observer must also lower dpiCap to 150 (KI-5)")
     }
@@ -344,7 +340,7 @@ struct PageParallelRasterizationTests {
         let scale = CGFloat(effectiveDPI) / 72.0
         let pixelW = Int(ceil(effectiveSize.width * scale))
         let pixelH = Int(ceil(effectiveSize.height * scale))
-        // CAT-138: per-page byte factor corrected 2× → 3× (render + fill +
+        // Per-page byte factor corrected 2× → 3× (render + fill +
         // JPEG-encode buffer); kept in lockstep with
         // `dynamicMemoryBudgetPages` in PipelineCoordinator.
         let perPageBytes = max(1, pixelW * pixelH * 4 * 3)
@@ -380,11 +376,11 @@ struct PageParallelRasterizationTests {
     // MARK: - 5. Mid-run DPI cap takes effect for subsequent submissions
 
     @Test(
-        "A mid-run memory warning lowers the DPI cap for pages submitted after it (CAT-139)",
+        "A mid-run memory warning lowers the DPI cap for pages submitted after it",
         .timeLimit(.minutes(3))
     )
     func testDPICapUpdatedMidRunAffectsSubsequentSubmissions() async throws {
-        // CAT-139: `rasterizePagesInParallel` must read `dpiCap` fresh per
+        // `rasterizePagesInParallel` must read `dpiCap` fresh per
         // submission, not snapshot it once per run. A memory warning lowers
         // `dpiCap` to 150 mid-run; pages submitted afterward must rasterize at
         // 150. Pre-fix the run-level snapshot pins every page to the pre-warning
@@ -442,7 +438,7 @@ struct PageParallelRasterizationTests {
         }
 
         #expect(coord.dpiCap == 150,
-                "Memory-warning observer must lower dpiCap to 150 (KI-5)")
+                "Memory-warning observer must lower dpiCap to 150 (KNOWN_ISSUES.md KI-5)")
 
         let history = recorder.dpiCapHistory
         #expect(history.count == pageCount,

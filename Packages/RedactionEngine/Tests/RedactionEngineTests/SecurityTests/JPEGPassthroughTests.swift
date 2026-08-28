@@ -6,13 +6,12 @@ import UIKit
 #endif
 import ImageIO
 
-// EXP-010 migrated: JPEG Passthrough, Metadata, FileManager
-// Audit: AA-3, AA-7, MP-4-1 (Critical), AA-9-1 (Critical), AA-8
+// JPEG Passthrough, Metadata, FileManager.
 
 @Suite("JPEG Passthrough & File Operations", .tags(.security))
 struct JPEGPassthroughTests {
 
-    // --- AA-3: JPEG passthrough via CGImage(jpegDataProviderSource:) ---
+    // --- JPEG passthrough via CGImage(jpegDataProviderSource:) ---
     @Test("JPEG passes through as /DCTDecode — no re-encoding")
     func jpegPassthroughInCGPDFContext() throws {
         let bitmapCtx = CGContext(data: nil, width: 200, height: 200,
@@ -54,7 +53,7 @@ struct JPEGPassthroughTests {
                 "JPEG must pass through as /DCTDecode — no re-encoding")
     }
 
-    // --- AA-7: CGPDFContext metadata injection with empty aux dict ---
+    // --- CGPDFContext metadata injection with empty aux dict ---
     @Test("CGPDFContext auto-injects metadata with empty aux dict")
     func cgPDFContextMetadataWithEmptyAuxDict() {
         let outputURL = FileManager.default.temporaryDirectory
@@ -72,7 +71,7 @@ struct JPEGPassthroughTests {
 
         let pdfDoc = CGPDFDocument(outputURL as CFURL)!
         // CGPDFContext auto-injects /Producer even with empty aux dict —
-        // this is a known limitation documented in ENGINE §4.5.
+        // this is a known limitation.
         if let info = pdfDoc.info {
             var str: CGPDFStringRef?
             let hasProducer = CGPDFDictionaryGetString(info, "Producer", &str)
@@ -81,7 +80,7 @@ struct JPEGPassthroughTests {
         }
     }
 
-    // --- MP-4-1 / AA-9-1 (Critical): replaceItemAt when destination doesn't exist ---
+    // --- replaceItemAt when destination doesn't exist ---
     @Test("FileManager.replaceItemAt handles missing destination")
     func replaceItemAtDestinationNotExist() throws {
         let tmpDir = FileManager.default.temporaryDirectory
@@ -107,7 +106,7 @@ struct JPEGPassthroughTests {
         #expect(FileManager.default.fileExists(atPath: destinationURL.path))
     }
 
-    // --- AA-8: autoreleasepool rethrows ---
+    // --- autoreleasepool rethrows ---
     @Test("autoreleasepool rethrows errors correctly")
     func autoreleasepoolRethrows() throws {
         struct TestError: Error {}

@@ -26,40 +26,40 @@ final class SearchState: Identifiable {
 
     /// V1.0 ships without the audit-export / scan-coverage surfaces;
     /// the Export Audit button, the Scan Coverage report (incl. Share
-    /// Snapshot), and the verification-results "Review" hook are gated off
-    /// behind this flag per ~/resecta-ui-polish-planning/00-DIRECTION.md.
+    /// Snapshot), and the verification-results "Review" hook are gated
+    /// off behind this flag.
     /// All machinery (MatchAuditExporter, MatchExportService, coverage-report
     /// computation) stays compiled and unit-tested; restore = flip to `true`
-    /// + update the pin test. PB-75 revisits these surfaces for 1.1. Mirrors
+    /// + update the pin test. These surfaces are revisited for 1.1. Mirrors
     /// `CustomTermsView.templatePickerEnabled`.
     // nonisolated: Sendable constant read from nonisolated test contexts.
     nonisolated static let searchAuditSurfacesEnabled = false
 
     /// V1.0 ships without the doctype diagnostic surfaces; the
     /// doctype banner and the footer Document-profile disclosure (two
-    /// mounts of `DoctypeDiagnosticView`) are gated off behind this flag
-    /// per ~/resecta-ui-polish-planning/02-DIRECTION-UP4-declutter.md.
+    /// mounts of `DoctypeDiagnosticView`) are gated off behind this
+    /// flag.
     /// All machinery (doctype classifier, `lastDoctypeExplanation`,
     /// `WU07Strings`, `DoctypeBannerTests`) stays compiled and
     /// unit-tested; restore = flip to `true` + update the pin test.
-    /// SC/PB-75 revisits these surfaces for 1.1.
+    /// These surfaces are revisited for 1.1.
     // nonisolated: Sendable constant read from nonisolated test contexts.
     nonisolated static let searchDiagnosticSurfacesEnabled = false
 
     /// V1.0 ships without the Scan category-chips strip (per-run
     /// detector narrowing over `enabledPIICategories`, its in-row ↻,
-    /// and the "no categories selected" notice) per D-63: with the
+    /// and the "no categories selected" notice): with the
     /// strip dark the surface always scans the full detector set —
     /// already the untouched default — and the ↻ re-run affordance
     /// relocates to the sheet's search-bar row. All machinery (the
     /// chips views, `enabledPIICategories`, `effectiveScanCategories`,
-    /// the BH-A-06 kickoff snapshot) stays compiled and unit-tested;
+    /// the kickoff snapshot) stays compiled and unit-tested;
     /// revival = flip to `true`, or in DEBUG launch with
     /// `--showRetiredSheetControls` (which also re-hides the relocated
     /// ↻ so the surface never renders two run controls). The
     /// saved-search recall writer is gated on this flag too — recall
     /// must not silently narrow detectors the user can't see.
-    /// Cataloged DC-209/DC-212; post-launch revisit.
+    /// This is revisited post-launch.
     // nonisolated: Sendable constant read from nonisolated test contexts.
     nonisolated static let scanCategoryStripEnabled: Bool = {
         #if DEBUG
@@ -71,7 +71,7 @@ final class SearchState: Identifiable {
 
     /// V1.0 ships without the "This page | Whole document" navigation
     /// -scope picker (both interfaces) and the saturation banner's
-    /// "Scope to current page" shortcut per D-63: the control is
+    /// "Scope to current page" shortcut: the control is
     /// navigation-only by design (it scopes chevron/J/K/Cmd+G
     /// traversal, never the rendered list or counts), so its sole
     /// effect is imperceptible and the control reads as broken. With
@@ -80,7 +80,7 @@ final class SearchState: Identifiable {
     /// and `navigateToNext/Previous` stay live and unit-tested,
     /// degenerating to whole-document traversal. Revival = flip to
     /// `true`, or in DEBUG launch with `--showRetiredSheetControls`.
-    /// Cataloged DC-210/DC-211; post-launch revisit.
+    /// This is revisited post-launch.
     // nonisolated: Sendable constant read from nonisolated test contexts.
     nonisolated static let navigationScopeControlsEnabled: Bool = {
         #if DEBUG
@@ -166,7 +166,7 @@ final class SearchState: Identifiable {
     /// `clearResults()`. The empty-state discriminator uses it to
     /// distinguish "ran and found nothing" from "this query was never
     /// run in this mode" — a mode switch carries the query text but
-    /// deliberately does not re-run (UXF-16), and that carried state
+    /// deliberately does not re-run, and that carried state
     /// must not render as a definitive no-match verdict.
     var hasCompletedRunSinceClear = false
 
@@ -176,7 +176,7 @@ final class SearchState: Identifiable {
     /// `clearResults()` — every trigger clears before its guards run.
     var scanStartFailed = false
 
-    /// BH-A-06 — detector count of the category set the last Scan run
+    /// Detector count of the category set the last Scan run
     /// actually executed with (snapshotted at kickoff, mirroring the
     /// engine query's own `enabledCategories` snapshot). The zero-state
     /// completion copy renders from this, never from the live chip
@@ -188,8 +188,8 @@ final class SearchState: Identifiable {
     /// Search options (toggles in UI).
     var options: SearchOptions = SearchOptions()
 
-    /// B2: Regex validation error message, shown inline in options bar.
-    /// SO-03 — an arriving error clears any stale result list via
+    /// Regex validation error message, shown inline in options bar.
+    /// An arriving error clears any stale result list via
     /// `clearResultState()` (the same reset a run attempt performs):
     /// a standing list beneath a non-compiling pattern read as "the
     /// invalid pattern found N". Only the nil → message transition
@@ -204,9 +204,9 @@ final class SearchState: Identifiable {
         }
     }
 
-    // MARK: - Filters (U1, U2)
+    // MARK: - Filters
 
-    /// U1: Filter results by source type.
+    /// Filter results by source type.
     var sourceFilter: SourceFilter = .all {
         didSet {
             invalidateFilterCaches()
@@ -214,7 +214,7 @@ final class SearchState: Identifiable {
         }
     }
 
-    /// U2: Minimum OCR confidence threshold (0.0 = show all).
+    /// Minimum OCR confidence threshold (0.0 = show all).
     var minimumOCRConfidence: Float = 0.0 {
         didSet {
             invalidateFilterCaches()
@@ -222,7 +222,7 @@ final class SearchState: Identifiable {
         }
     }
 
-    /// U3: Group results by search term instead of by page (multi-term mode).
+    /// Group results by search term instead of by page (multi-term mode).
     var groupByTerm: Bool = false
 
     // MARK: - PII Scan Configuration
@@ -281,18 +281,18 @@ final class SearchState: Identifiable {
         _resultsByCategoryCache = nil
     }
 
-    // MARK: - W9 Diagnostics
+    // MARK: - Diagnostics
 
-    /// W9 — last classifier explanation for the first scanned page text.
+    /// Last classifier explanation for the first scanned page text.
     /// Session-scoped; cleared on mode switch and sheet dismiss. Populated
     /// at scan kickoff by `SearchAndRedactSheet.triggerSearch`.
     private(set) var lastDoctypeExplanation: DoctypeExplanation?
 
-    /// W9 — last scan coverage report. Populated when a PII scan completes.
+    /// Last scan coverage report. Populated when a PII scan completes.
     /// Session-scoped; cleared on mode switch and sheet dismiss.
     private(set) var lastCoverageReport: CoverageReport?
 
-    /// W10 — running tally of cross-category overlap-suppressed detector
+    /// Running tally of cross-category overlap-suppressed detector
     /// matches across pages, keyed by the losing category. Populated by
     /// DocumentSearcher's per-page sink during a PII scan. Drained into
     /// `CoverageReport.overlapSuppressedCountByCategory` when the scan
@@ -300,7 +300,7 @@ final class SearchState: Identifiable {
     /// `lastCoverageReport = nil` sites.
     private(set) var pendingOverlapSuppressed: [PIICategory: Int] = [:]
 
-    /// D06-F2 Part 1 — running total of matches dropped for falling below their
+    /// Running total of matches dropped for falling below their
     /// per-category preset threshold during a PII scan. Populated by
     /// `DocumentSearcher`'s per-page below-threshold sink; drained into
     /// `CoverageReport.belowThresholdSuppressedCount` when the scan completes.
@@ -308,17 +308,17 @@ final class SearchState: Identifiable {
     /// mirroring `pendingOverlapSuppressed`.
     private(set) var pendingBelowThresholdSuppressed: Int = 0
 
-    /// W9 — setter used by the scan orchestration in `SearchAndRedactSheet`.
+    /// Setter used by the scan orchestration in `SearchAndRedactSheet`.
     func setDoctypeExplanation(_ explanation: DoctypeExplanation?) {
         lastDoctypeExplanation = explanation
     }
 
-    /// W9 — setter used by the scan orchestration in `SearchAndRedactSheet`.
+    /// Setter used by the scan orchestration in `SearchAndRedactSheet`.
     func setCoverageReport(_ report: CoverageReport?) {
         lastCoverageReport = report
     }
 
-    /// D06-F2 Part 2 — the stored scan report with the two post-scan,
+    /// The stored scan report with the two post-scan,
     /// view-state counts folded in: `appliedCount` from `appliedResultIDs`
     /// and `deselectedCount` from triage selections. `makeCoverageReport`
     /// deliberately leaves both at 0 at scan completion — nothing is applied
@@ -356,7 +356,7 @@ final class SearchState: Identifiable {
             deselectedCount: deselectedCount, totalCount: totalCount)
     }
 
-    /// W10 — accumulate per-page overlap-suppressed counts. Invoked from
+    /// Accumulate per-page overlap-suppressed counts. Invoked from
     /// `DocumentSearcher.overlapSink` during scanning.
     func accumulateOverlapSuppression(_ counts: [PIICategory: Int]) {
         for (category, count) in counts {
@@ -364,19 +364,19 @@ final class SearchState: Identifiable {
         }
     }
 
-    /// W10 — reset the running overlap tally. Called before each scan
+    /// Reset the running overlap tally. Called before each scan
     /// kickoff by `SearchAndRedactSheet.triggerSearch`.
     func resetOverlapSuppression() {
         pendingOverlapSuppressed = [:]
     }
 
-    /// D06-F2 Part 1 — accumulate per-page below-threshold drop counts. Invoked
+    /// Accumulate per-page below-threshold drop counts. Invoked
     /// from `DocumentSearcher.belowThresholdSink` during scanning.
     func accumulateBelowThresholdSuppression(_ count: Int) {
         pendingBelowThresholdSuppressed += count
     }
 
-    /// D06-F2 Part 1 — reset the running below-threshold tally. Called before
+    /// Reset the running below-threshold tally. Called before
     /// each scan kickoff by `SearchAndRedactSheet.triggerSearch`.
     func resetBelowThresholdSuppression() {
         pendingBelowThresholdSuppressed = 0
@@ -406,7 +406,7 @@ final class SearchState: Identifiable {
         regexTimeoutPages = []
     }
 
-    /// ST-83 — page indices whose raster exceeded the OCR pixel caps, so
+    /// Page indices whose raster exceeded the OCR pixel caps, so
     /// OCR never ran on them during this scan. Populated by
     /// `DocumentSearcher`'s OCR-skip sink via
     /// `SearchAndRedactSheet+Trigger.triggerSearch`. Drives the OCR-skip
@@ -536,9 +536,9 @@ final class SearchState: Identifiable {
         didSet { invalidateFilterCaches() }
     }
 
-    /// BH-A-03 — result IDs the apply path dedup-SKIPPED because an
+    /// Result IDs the apply path dedup-SKIPPED because an
     /// existing region already covers them (>80% overlap). Distinct
-    /// from `appliedResultIDs` on purpose: QW-1 grants skipped results
+    /// from `appliedResultIDs` on purpose: skipped results get
     /// no applied badge and no audit entry, but a selection that is
     /// fully covered (applied ∪ covered) must still gray Apply — the
     /// button otherwise stays live forever and every press re-runs a
@@ -556,7 +556,7 @@ final class SearchState: Identifiable {
     /// Whether the result cap has been reached.
     var resultsAtCap: Bool = false
 
-    /// QW-12 — pages the cap-cancelled scan never reached. Snapshotted in
+    /// Pages the cap-cancelled scan never reached. Snapshotted in
     /// `appendResult` at the moment the cap fires (`totalPages` minus the
     /// engine's last-reported `currentSearchPage`; the current page itself
     /// may be partially scanned and is not counted). Drives the remainder
@@ -664,7 +664,7 @@ final class SearchState: Identifiable {
     @ObservationIgnored private var _resultsByCategoryCache: [PIICategory: [SearchResult]]?
     @ObservationIgnored private var _resultsByCategoryCacheKey: _FilterCacheKey?
 
-    // SA-1 (D-71): O(1) id→index map backing `result(for:)` — the
+    // O(1) id→index map backing `result(for:)` — the
     // results list's per-row binding get previously linear-scanned
     // `results` ~7-8× per row body, on every mounted row, on every
     // scroll-time section invalidation. Same memoization shape as the
@@ -723,7 +723,7 @@ final class SearchState: Identifiable {
 
     private func applyFilters(to results: [SearchResult]) -> [SearchResult] {
         var filtered = results.filter { result in
-            // U1: Source filter
+            // Source filter
             switch sourceFilter {
             case .all: break
             case .textOnly:
@@ -731,7 +731,7 @@ final class SearchState: Identifiable {
             case .ocrOnly:
                 guard result.source != .textLayer else { return false }
             }
-            // U2: OCR confidence filter
+            // OCR confidence filter
             if minimumOCRConfidence > 0, case .ocr(let conf) = result.source {
                 guard conf >= minimumOCRConfidence else { return false }
             }
@@ -743,7 +743,7 @@ final class SearchState: Identifiable {
             // per-run Confidence slider — every above-threshold result
             // the engine returns is listed; the confidence sort is the
             // one review-side confidence tool (the Select where… ≥75/≥90
-            // predicates retired under UXC-46).
+            // predicates are retired too).
             // Applied-state filter. `.all` no-ops; `.applied`
             // keeps only results whose IDs are in `appliedResultIDs`;
             // `.unapplied` keeps the complement.
@@ -789,15 +789,15 @@ final class SearchState: Identifiable {
     /// The one Apply-graying predicate for a single result: the apply
     /// path has nothing left to do for it — it produced a region
     /// (`appliedResultIDs`) or was dedup-skipped as already covered
-    /// (`coveredResultIDs`; BH-A-03 — a covered result counts as
+    /// (`coveredResultIDs`; a covered result counts as
     /// applied for graying, though it earns no badge). Folded over the
     /// selection by `selectionFullyApplied`; read for the current
-    /// result by the compact handle's per-item Apply (UXC-51).
+    /// result by the compact handle's per-item Apply.
     func isAppliedOrCovered(_ id: UUID) -> Bool {
         appliedResultIDs.contains(id) || coveredResultIDs.contains(id)
     }
 
-    /// D06-F2 Part 2 — count of results the user left un-checked in triage
+    /// Count of results the user left un-checked in triage
     /// (the complement of `selectedCount`). Folded into
     /// `CoverageReport.deselectedCount` at the panel + audit-export boundary
     /// by `coverageReportForDisplay()`. Derived from live `isSelected` state,
@@ -853,7 +853,7 @@ final class SearchState: Identifiable {
         }
     }
 
-    // MARK: - Retired recents purge (WA-01)
+    // MARK: - Retired recents purge
 
     /// The persisted text/regex recents feature is excised; only the
     /// in-memory multi-term ring above remains. This sweep removes the
@@ -934,7 +934,7 @@ final class SearchState: Identifiable {
     /// Time interval between automatic flushes.
     private static let flushInterval: Duration = .milliseconds(100)
 
-    // MARK: - Result Navigation (U1, W7)
+    // MARK: - Result Navigation
 
     /// Index of the currently focused result for prev/next navigation.
     var currentResultIndex: Int?
@@ -945,11 +945,11 @@ final class SearchState: Identifiable {
         return results[idx]
     }
 
-    /// W7 — session-scoped scope for J / K / Cmd+G traversal. Not persisted;
+    /// Session-scoped scope for J / K / Cmd+G traversal. Not persisted;
     /// every fresh document opens at `.wholeDocument`.
     var navigationScope: SearchNavigationScope = .wholeDocument
 
-    /// W7 — return only the results visible in the active navigation scope.
+    /// Return only the results visible in the active navigation scope.
     /// `.wholeDocument` returns all results; `.currentPage` filters to the
     /// page the caller currently has loaded.
     /// Sources from `filteredResults` so J/K navigation respects
@@ -994,9 +994,9 @@ final class SearchState: Identifiable {
         }
     }
 
-    // MARK: - W7 Review Shortcuts
+    // MARK: - Review Shortcuts
 
-    /// W7 — Space-key handler. Toggles `isSelected` on the focused result
+    /// Space-key handler. Toggles `isSelected` on the focused result
     /// (same field the checkbox drives), so the existing apply pipeline
     /// picks it up without parallel state.
     func toggleSelectionForCurrentMatch() {
@@ -1004,7 +1004,7 @@ final class SearchState: Identifiable {
         toggleSelection(for: id)
     }
 
-    /// W7 — Return-key prelude. If nothing is selected, mark the focused
+    /// Return-key prelude. If nothing is selected, mark the focused
     /// result so the caller can apply via the existing `RedactionState`
     /// path. Returns true when the apply path should run.
     @discardableResult
@@ -1015,13 +1015,13 @@ final class SearchState: Identifiable {
         return true
     }
 
-    // MARK: - W7 Live Preview
+    // MARK: - Live Preview
 
-    /// W7 — most recent live-preview snapshot (engine NSRanges + counts).
+    /// Most recent live-preview snapshot (engine NSRanges + counts).
     /// nil while no preview is in flight or after `clearLivePreview()`.
     private(set) var livePreview: SearchPreviewResult?
 
-    /// W7 — resolved bounding rects for the visible page's preview matches,
+    /// Resolved bounding rects for the visible page's preview matches,
     /// in normalized PDF coords. Filled by the sheet (which owns the
     /// `DocumentSearcher` reference for `boundingRect`) right after
     /// `livePreview` updates. Drawn by the per-page UIKit overlay.
@@ -1029,7 +1029,7 @@ final class SearchState: Identifiable {
 
     private var livePreviewTask: Task<Void, Never>?
 
-    /// W7 — debounce + run a live-preview pass. Each call cancels the
+    /// Debounce + run a live-preview pass. Each call cancels the
     /// previous task; only the last result is published. Independent
     /// from the sheet's existing 300 ms full-search debounce.
     func scheduleLivePreview(
@@ -1037,7 +1037,7 @@ final class SearchState: Identifiable {
         currentPageIndex: Int,
         totalPageCount: Int,
         pageTextProvider: @Sendable @escaping (Int) async -> String?,
-        // D10-F3 — match the full-search debounce (300 ms, see `debounceSearch`)
+        // Match the full-search debounce (300 ms, see `debounceSearch`)
         // so the preview does not issue an extra off-main page.string read ahead
         // of every keystroke; a still-typing user then produces no preview walk
         // at all.
@@ -1062,11 +1062,11 @@ final class SearchState: Identifiable {
             clearLivePreview(); return
         }
 
-        // D10-F3 — the live preview only renders the visible page's highlight
+        // The live preview only renders the visible page's highlight
         // rects; the whole-document total is owned by the full search that the
         // same keystroke kicks off. Always scope the preview to the current page
         // so it stops re-walking every page's `page.string` off-main against the
-        // freshly-copied PDFDocument (D10-F1 previewDoc reader).
+        // freshly-copied PDFDocument (the previewDoc copy).
         let scope: SearchPreviewScope = .currentPage(pageIndex: currentPageIndex)
 
         livePreviewTask = Task { [weak self] in
@@ -1080,7 +1080,7 @@ final class SearchState: Identifiable {
                 pageTextProvider: pageTextProvider
             )
             if Task.isCancelled { return }
-            // CONC-2 (Pkg N): the enclosing Task is MainActor-isolated
+            // The enclosing Task is MainActor-isolated
             // (SearchState is @MainActor by SE-0466 default and the Task
             // closure inherits the surrounding isolation), and
             // `searcher.previewMatches` returns to MainActor after the
@@ -1095,7 +1095,7 @@ final class SearchState: Identifiable {
         }
     }
 
-    /// W7 — caller-supplied resolved rects (normalized 0–1 PDF coords) for
+    /// Caller-supplied resolved rects (normalized 0–1 PDF coords) for
     /// the visible page. The view layer does the NSRange→CGRect conversion
     /// because the engine has no PDFPage context.
     func setLivePreviewRects(_ rects: [CGRect]) {
@@ -1103,7 +1103,7 @@ final class SearchState: Identifiable {
         resultVersion += 1
     }
 
-    /// W7 — cancel any in-flight preview and clear the published state.
+    /// Cancel any in-flight preview and clear the published state.
     func clearLivePreview() {
         livePreviewTask?.cancel()
         livePreviewTask = nil
@@ -1156,7 +1156,7 @@ final class SearchState: Identifiable {
         preselectIncomingResults = false
         // Conditional dismiss: the touched-selections tracker is per-sheet-session.
         userModifiedSelections = false
-        // UXC-39 — sibling tracker, same per-sheet-session lifetime.
+        // Sibling tracker, same per-sheet-session lifetime.
         hasUnreviewedPreselection = false
         // Defensive: an armed-but-unconsumed auto-run must not leak
         // into the next sheet session (the flag is normally consumed
@@ -1170,7 +1170,7 @@ final class SearchState: Identifiable {
         // Asymmetric with `clearResults()` by design — see
         // `priorScanFingerprints` docstring.
         priorScanFingerprints = nil
-        // W7 — drop any in-flight preview and reset session-scoped scope.
+        // Drop any in-flight preview and reset session-scoped scope.
         livePreviewTask?.cancel()
         livePreviewTask = nil
         livePreview = nil
@@ -1227,7 +1227,7 @@ final class SearchState: Identifiable {
     /// `predicate(result)` — predicates that match a subset deselect the
     /// rest. It is the footer Select All / Deselect All toggle's building
     /// block, where "deselect everything not in the target set" is
-    /// exactly the wanted behavior (UXC-46, D-121: the "Select where…"
+    /// exactly the wanted behavior (the "Select where…"
     /// predicate menu and its additive `addToSelection(where:)` sibling
     /// retired with the footer menu — this is the one predicate
     /// primitive left). Bumps `resultVersion` once for the full pass (no
@@ -1288,7 +1288,7 @@ final class SearchState: Identifiable {
     /// on session teardown.
     var userModifiedSelections: Bool = false
 
-    /// UXC-39 — whether this session actually received results that
+    /// Whether this session actually received results that
     /// arrived pre-selected (the magic-wand `preselectIncomingResults`
     /// flow, `appendResult` below) and the user has not yet resolved
     /// them one way or another. Deliberately a SEPARATE fact from
@@ -1310,7 +1310,7 @@ final class SearchState: Identifiable {
     /// teardown. See `requiresDismissConfirmation`.
     var hasUnreviewedPreselection: Bool = false
 
-    /// UXC-39 — the single predicate both dismiss-gate sites
+    /// The single predicate both dismiss-gate sites
     /// (`DocumentEditorView`'s `.interactiveDismissDisabled` and
     /// `SearchSheetHeaderSection`'s Dismiss handler) read: true when
     /// either the user touched selections, or an auto-selected set has
@@ -1326,7 +1326,7 @@ final class SearchState: Identifiable {
     func appendResult(_ result: SearchResult) {
         if results.count + pendingResults.count >= DocumentSearcher.maxResults {
             resultsAtCap = true
-            // QW-12 — snapshot how many pages the cancelled scan will
+            // Snapshot how many pages the cancelled scan will
             // never reach, so the footer can report the remainder rather
             // than presenting the first-N results as full coverage.
             capUnscannedPageCount = max(0, totalPages - currentSearchPage)
@@ -1341,7 +1341,7 @@ final class SearchState: Identifiable {
         // delivering the "all instances selected by default" UX.
         if preselectIncomingResults {
             stored.isSelected = true
-            // UXC-39 — this session actually received an auto-selected
+            // This session actually received an auto-selected
             // result; arm the dismiss-confirmation tracker so it cannot
             // be silently swiped away unreviewed.
             hasUnreviewedPreselection = true
@@ -1374,7 +1374,7 @@ final class SearchState: Identifiable {
         clearResultState()
     }
 
-    /// Result-state clear shared by `clearResults()` and the SO-03
+    /// Result-state clear shared by `clearResults()` and the
     /// `regexError` observer: everything a run attempt resets EXCEPT
     /// `regexError` itself, so the observer can wipe a stale list
     /// without nilling the error it is reacting to.
@@ -1401,7 +1401,7 @@ final class SearchState: Identifiable {
         hasCompletedRunSinceClear = false
         scanStartFailed = false
         lastRunDetectorCount = nil
-        // UXF-02 — scan-progress counters reset with results. Leaving
+        // Scan-progress counters reset with results. Leaving
         // `currentSearchPage` non-zero across a mode switch made the
         // piiScan empty state read as post-scan ("Scan complete … 0
         // candidates") before any scan ran: the empty-state context
@@ -1409,7 +1409,7 @@ final class SearchState: Identifiable {
         // scan-has-run signal.
         currentSearchPage = 0
         totalPages = 0
-        // W7 — full search supersedes live preview; drop the transient state
+        // Full search supersedes live preview; drop the transient state
         // so highlights don't briefly stack with full results during the
         // 100 ms gap before flushPendingResults fires.
         livePreviewTask?.cancel()
@@ -1471,7 +1471,7 @@ enum SearchInterface: Equatable, Sendable {
     }
 }
 
-/// U1: Source type filter for search results.
+/// Source type filter for search results.
 /// `Codable` conformance is consumed by `SavedSearchStore`.
 /// Case renames are migration events.
 enum SourceFilter: String, CaseIterable, Sendable, Codable {

@@ -1,6 +1,6 @@
 import PDFKit
 
-// ENGINE §5A — Text layer detection and per-page fallback triggers.
+// Text layer detection and per-page fallback triggers.
 // Determines whether Searchable Redaction is available per page.
 
 /// Stateless text layer detector. Analyzes PDF pages at import time
@@ -8,7 +8,7 @@ import PDFKit
 /// per-page fallback from Searchable Redaction to Secure Rasterization.
 public enum TextLayerDetector {
 
-    // MARK: - Text Layer Status Detection (ENGINE §5A)
+    // MARK: - Text Layer Status Detection
 
     /// Classify a page's text layer as .rich, .sparse, or .none.
     /// - .rich: Substantial text layer — sandwich candidate.
@@ -24,7 +24,7 @@ public enum TextLayerDetector {
         return .rich
     }
 
-    // MARK: - Fallback Trigger Detection (ENGINE §5A)
+    // MARK: - Fallback Trigger Detection
 
     /// Check whether a page requires fallback from Searchable Redaction
     /// to Secure Rasterization. Returns a FallbackReason if fallback is
@@ -37,7 +37,7 @@ public enum TextLayerDetector {
         }
 
         // CJK encoding failure: >1% U+FFFD in extracted text
-        // ENGINE §5A: M5 confirmed threshold validated at 0%, 1%, 5%, 6%, 50%.
+        // M5 confirmed threshold validated at 0%, 1%, 5%, 6%, 50%.
         // Tightened from 5% to 1% — at 5%, up to 95% of CJK text could survive
         // in the text layer. 1% is the safe direction (over-redacts, never under).
         let replacementCount = text.unicodeScalars.filter { $0 == "\u{FFFD}" }.count
@@ -50,7 +50,7 @@ public enum TextLayerDetector {
         }
 
         // RTL text: Arabic U+0600–06FF, Hebrew U+0590–05FF
-        // ENGINE §5A: M5 confirmed correct identification
+        // M5 confirmed correct identification
         if containsRTLText(text) {
             return .rtlText
         }
@@ -108,7 +108,7 @@ public enum TextLayerDetector {
     }
 
     /// Check for vertical writing mode (WMode=1) in page fonts.
-    /// ENGINE §5A: Horizontal Td positioning model does not apply to vertical text.
+    /// Horizontal Td positioning model does not apply to vertical text.
     private static func hasVerticalWritingMode(_ page: PDFPage) -> Bool {
         guard let pageRef = page.pageRef,
               let dict = pageRef.dictionary else { return false }
@@ -153,7 +153,7 @@ public enum TextLayerDetector {
     }
 
     /// Check if all PDFSelection bounds are zero-size (unusable bounding box data).
-    /// ENGINE §5A: Extraction produces zero-size bounds.
+    /// Extraction produces zero-size bounds.
     private static func allSelectionBoundsAreZero(_ page: PDFPage) -> Bool {
         let charCount = page.numberOfCharacters
         guard charCount > 0 else { return true }
@@ -185,7 +185,7 @@ public enum TextLayerDetector {
     /// around ~70. A ratio against total length cannot separate them — the
     /// distinct set stops growing while the total keeps climbing, so any
     /// fixed ratio eventually classifies every long normal page as
-    /// low-diversity (PD-5 part 1).
+    /// low-diversity.
     private static func hasLowCharacterDiversity(_ text: String) -> Bool {
         let meaningful = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard meaningful.count >= 50 else { return false } // Too short to assess

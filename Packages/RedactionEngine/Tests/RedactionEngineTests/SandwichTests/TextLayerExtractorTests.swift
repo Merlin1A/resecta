@@ -4,8 +4,7 @@ import PDFKit
 import CoreGraphics
 @testable import RedactionEngine
 
-// SV-3/SV-4 — extraction-domain regressions for `TextLayerExtractor`
-// (ENGINE §5B.1).
+// Extraction-domain regressions for `TextLayerExtractor`.
 //
 // `page.string` interleaves PDFKit-SYNTHESIZED separator characters (inter-run
 // newlines and spaces) between text runs. A synthesized separator has no glyph
@@ -17,7 +16,7 @@ import CoreGraphics
 // therefore skips a lineage-whitespace offset whose selection returns a
 // different character (the clamp signature).
 //
-// Matching-selection whitespace splits two ways (PD-11): an entry whose
+// Matching-selection whitespace splits two ways: an entry whose
 // selection box spans a whole inter-run gutter would sit gap-free against
 // BOTH flanking columns, so run grouping could never split there and the
 // drawn line would compress the gutter to one cell — glyph geometry far off
@@ -34,7 +33,8 @@ import CoreGraphics
 //
 // The fixture is FULLY SYNTHETIC with a public value set (see TestHelpers
 // `sampleStatementPDF`), so test diagnostics MAY reference matched text (the
-// W2 logging exemption). Production logging rules (ARCH §12.2) are unchanged.
+// synthetic-fixture logging exemption). Production logging rules (never
+// document content, file paths, or redaction coordinates) are unchanged.
 
 @Suite("Text Layer Extractor", .tags(.sandwich), .serialized)
 struct TextLayerExtractorTests {
@@ -149,7 +149,7 @@ struct TextLayerExtractorTests {
         }
     }
 
-    // MARK: 3 — gutter-whitespace invariant (extraction side, PD-11)
+    // MARK: 3 — gutter-whitespace invariant (extraction side)
 
     /// Every page of the committed sample statement: no whitespace entry is
     /// wide enough to bridge a run-grouping break — the direct restatement

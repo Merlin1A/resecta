@@ -1,6 +1,6 @@
 import Foundation
 
-// ENGINE §6.3a — Byte-oriented Aho-Corasick multi-pattern matcher for Layer 3.
+// Byte-oriented Aho-Corasick multi-pattern matcher for Layer 3.
 // Pure Swift on UnsafeBufferPointer. Length-prefixed patterns (null-byte safe).
 // Overlapping match support via output links.
 
@@ -17,7 +17,6 @@ public struct AhoCorasickMatch: Sendable {
 /// Byte-oriented Aho-Corasick automaton for multi-pattern string search.
 /// Operates on raw bytes, not Swift Strings. Each pattern is a `[UInt8]`
 /// array (length-prefixed, null-byte safe for UTF-16 encodings).
-/// See ENGINE §6.3a for requirements.
 public struct AhoCorasick: Sendable {
     private let goto: [[UInt8: Int]]     // goto function: state × byte → state
     private let fail: [Int]               // failure function
@@ -26,7 +25,7 @@ public struct AhoCorasick: Sendable {
 
     /// True when total pattern bytes exceeded maxTotalPatternBytes and the
     /// automaton was constructed as a no-op. Callers should treat matches
-    /// as incomplete when this is set. See ENGINE §6.3a.
+    /// as incomplete when this is set.
     public let isDegraded: Bool
 
     /// Maximum total pattern bytes before the automaton degrades to a no-op.
@@ -43,7 +42,7 @@ public struct AhoCorasick: Sendable {
     /// If total pattern bytes exceed maxTotalPatternBytes, produces an empty
     /// automaton (zero matches) to prevent unbounded memory allocation.
     public init(patterns: [[UInt8]]) {
-        // ENGINE §6.3a: Bounds check — prevent pathological automaton construction
+        // Bounds check — prevent pathological automaton construction
         let totalBytes = patterns.reduce(0) { $0 + $1.count }
         if totalBytes > Self.maxTotalPatternBytes {
             self.goto = [[:]]
@@ -234,8 +233,8 @@ public struct AhoCorasick: Sendable {
             .replacingOccurrences(of: "fl", with: "\u{FB02}")
     }
 
-    /// True when a sensitive term is long enough for byte search (ENGINE
-    /// §6.3): at least 3 Unicode scalars (supports 3-letter PII abbreviations
+    /// True when a sensitive term is long enough for byte search:
+    /// at least 3 Unicode scalars (supports 3-letter PII abbreviations
     /// like SSN, DOB, PHI), or exactly 2 scalars that are all CJK
     /// (≥ U+2E80) — a 2-character CJK/Korean full name is high-entropy where
     /// a 2-letter Latin fragment is noise. Counts scalars of the
@@ -263,7 +262,7 @@ public struct AhoCorasick: Sendable {
     }
 
     /// True for ASCII digits and letters — the byte class that CONTINUES a
-    /// token under the PD-3 boundary rule. Every other byte value (PDF
+    /// token under the boundary rule. Every other byte value (PDF
     /// delimiters, whitespace, punctuation, 0x1F separators, and any
     /// non-ASCII byte) terminates a token.
     static func isASCIIAlphanumeric(_ byte: UInt8) -> Bool {
@@ -276,8 +275,8 @@ public struct AhoCorasick: Sendable {
 /// Aho-Corasick automaton over a `SensitiveTerm` set that remembers, per
 /// encoded pattern, whether the source term requires token-boundary
 /// matching — so byte hits of a bare single-word term embedded inside a
-/// longer alphanumeric run can be discarded (PD-3). Shared by Layer 3
-/// (structural + SVT-3 decoded passes) and Layer 10.
+/// longer alphanumeric run can be discarded. Shared by Layer 3
+/// (structural and decoded passes) and Layer 10.
 struct SensitiveTermAutomaton {
     let automaton: AhoCorasick
     /// Aligned with the automaton's pattern order: true when the pattern
@@ -286,7 +285,7 @@ struct SensitiveTermAutomaton {
     /// Aligned with the automaton's pattern order: the source term's display
     /// text, so a match can be traced back to the term it derives from
     /// (every encoding variant of one term maps to the same text). Feeds
-    /// `LayerResult.reviewTermTexts` — display-only, never logged (ARCH §12.2:
+    /// `LayerResult.reviewTermTexts` — display-only, never logged (
     /// status messages themselves stay content-free).
     private let patternTermText: [String]
     /// True when at least one pattern was produced.

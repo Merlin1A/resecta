@@ -2,14 +2,14 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// CAT-065 — DocumentTypeClassifier load diagnostics. A missing or corrupt
+// DocumentTypeClassifier load diagnostics. A missing or corrupt
 // doctype-keywords.json previously degraded silently (the classifier returns
 // `.generic` for every page) with nothing surfaced to the user.
 // `loadWithDiagnostics` now folds the outcome into a `GazetteerLoadDiagnostics`
-// so the auto-detect-degraded banner can fire, mirroring the SEC-7
+// so the auto-detect-degraded banner can fire, mirroring the
 // gazetteer-loader diagnostics.
 
-@Suite("Doctype classifier load diagnostics (CAT-065)")
+@Suite("Doctype classifier load diagnostics")
 struct DoctypeLoadDiagnosticsTests {
 
     private static var classifierKey: String {

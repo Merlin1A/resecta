@@ -127,7 +127,7 @@ struct LegalDocumentView: View {
     /// HTML comments are stripped before parsing. The repo-root sources carry
     /// same-line `<!-- LegalPhrases:safe -->` audit-lint markers, and
     /// `.inlineOnlyPreservingWhitespace` passes inline HTML through as
-    /// literal text (verified on-sim, LR-6) — the markers must stay in the
+    /// literal text (verified on-sim) — the markers must stay in the
     /// .md files for the lint but never reach the sheet. Comments in the two
     /// known documents are always single-line.
     nonisolated static func inlineMarkdown(_ text: String) -> AttributedString {

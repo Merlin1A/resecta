@@ -2,11 +2,11 @@ import Foundation
 import Testing
 @testable import RedactionEngine
 
-// B03 — loader fail-open fallback (the rollback unit).
+// Loader fail-open fallback (the rollback unit).
 //
 // Any missing resource / decode / version / arity / scale / hash problem must
-// yield the WHOLE-SCORER identity (every learnedContextLogit 0 ⇒ exactly the S3
-// baseline), never a crash. Each case uses a w=1 "account" block that WOULD
+// yield the WHOLE-SCORER identity (every learnedContextLogit 0 ⇒ exactly the
+// pre-calibration baseline), never a crash. Each case uses a w=1 "account" block that WOULD
 // score 13.0 if loaded, so a 0 result proves the fallback actually fired (the
 // positive control below shows a clean payload does load and score 13.0).
 // `make(from:verifyingHash:)` is the testable core; `verifyingHash: nil` skips

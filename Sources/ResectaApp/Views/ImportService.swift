@@ -5,17 +5,17 @@ import ImageIO
 import CoreGraphics
 import RedactionEngine
 
-// UI_UX §5.1–§5.2: Import validation, loading, and image-to-PDF conversion.
+// Import validation, loading, and image-to-PDF conversion.
 
 enum ImportService {
 
-    // MARK: - Magic-Byte Format Detection (Pkg G.1)
+    // MARK: - Magic-Byte Format Detection
 
     /// Routing categories recognized by the drop handler. PDF and image
     /// payloads take different validation paths inside `importDocument`;
     /// `unknown` falls back to whatever the entry point can infer.
     ///
-    /// TRUST-import-drop-image-deadcode: drag-and-drop previously hardcoded
+    /// Drag-and-drop previously hardcoded
     /// `suggestedType: "pdf"` on every payload, making the image branch
     /// dead code on the drop entry point. Inspecting magic bytes first
     /// routes JPEG / PNG / HEIC / WEBP payloads to the image branch and
@@ -41,7 +41,7 @@ enum ImportService {
     /// Sniff the leading bytes of a dropped payload to decide which import
     /// branch it should take. See `DroppedPayloadKind` for routing rules.
     ///
-    /// Recognized signatures (TRUST-import-drop-image-deadcode):
+    /// Recognized signatures:
     /// - `%PDF` (`25 50 44 46`)             → `.pdf`
     /// - JPEG SOI (`FF D8 FF`)              → `.image`
     /// - PNG (`89 50 4E 47`)                → `.image`
@@ -98,7 +98,7 @@ enum ImportService {
     private struct PDFValidationResult: Sendable {
         let document: SendablePDFDocument
         let textLayerStatus: [Int: TextLayerStatus]
-        /// M1: doc-level OCG hidden-layer presence, walked from the CGPDFDocument
+        /// Doc-level OCG hidden-layer presence, walked from the CGPDFDocument
         /// built off the raw bytes (PDFDocument(data:) does not retain a
         /// documentURL). Drives `TextLayerExtractor.pageReferencesHiddenOCG`.
         let hasHiddenOCG: Bool
@@ -116,16 +116,16 @@ enum ImportService {
     /// Transitions: current → .importing → .editing (success) or .failed (error).
     /// Old document state is preserved until validation succeeds.
     /// Async: file I/O runs off MainActor to avoid blocking UI.
-    /// CANCEL-006 (Pkg B): the work is wrapped in a stored Task so the
-    /// Cancel affordance and scene-phase observer can reach the detached
-    /// per-page loops via `documentState.activeImportTask`.
+    /// The work is wrapped in a stored Task so the Cancel affordance and
+    /// scene-phase observer can reach the detached per-page loops via
+    /// `documentState.activeImportTask`.
     static func importDocument(
         from url: URL,
         documentState: DocumentState,
         redactionState: RedactionState,
         stripAuxData: Bool = false
     ) async {
-        // Pkg D / STATE-1: defensive precondition. The transition table
+        // Defensive precondition. The transition table
         // is the canonical authority for "may we enter `.importing` now".
         // If the entry-point view-layer gate was bypassed (programmatic
         // call, race against a pipeline start), refuse to mutate
@@ -149,7 +149,7 @@ enum ImportService {
 
         guard documentState.transition(to: .importing) else { return }
 
-        // CANCEL-006: register a child Task on `activeImportTask` so
+        // Registers a child Task on `activeImportTask` so
         // `cancelActivePipeline` reaches the detached per-page loops via
         // the `Task.checkCancellation()` calls in `validatePDFOffMainActor`.
         // `withTaskCancellationHandler` propagates the caller's cancellation
@@ -190,7 +190,7 @@ enum ImportService {
 
     /// Full import flow from in-memory data.
     /// Async for consistency with URL-based import; validation runs on MainActor.
-    /// CANCEL-006: same Task-registration pattern as the URL variant.
+    /// Same Task-registration pattern as the URL variant.
     static func importDocument(
         data: Data,
         suggestedType: String,
@@ -198,7 +198,7 @@ enum ImportService {
         redactionState: RedactionState,
         stripAuxData: Bool = false
     ) async {
-        // Pkg D / STATE-1: defensive precondition mirrors the URL-based
+        // Defensive precondition mirrors the URL-based
         // overload above. See comment there for the rationale.
         guard documentState.canStartImport else { return }
 
@@ -271,7 +271,7 @@ enum ImportService {
                 stripAuxData: stripAuxData
             )
         } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
-            // CANCEL-006: cooperative cancellation surrenders silently —
+            // Cooperative cancellation surrenders silently —
             // `cancelActivePipeline` has already transitioned the phase to
             // `.empty`. Adding a failed-transition here would duplicate
             // the user-initiated cancel.
@@ -291,7 +291,7 @@ enum ImportService {
         }
     }
 
-    // MARK: - Validation and Loading (UI_UX §5.2)
+    // MARK: - Validation and Loading
 
     /// Validate document data and load into state. Throws on validation failure.
     /// Old state is preserved until validation succeeds — clearing happens only
@@ -316,10 +316,10 @@ enum ImportService {
 
         if isPDF {
             // Offload all CPU-intensive PDF work off MainActor.
-            // CANCEL-006: cancellation propagates from the outer
-            // `activeImportTask` via `withTaskCancellationHandler` to the
-            // detached task, which observes it through the
-            // `Task.checkCancellation()` calls in `validatePDFOffMainActor`.
+            // Cancellation propagates from the outer `activeImportTask`
+            // via `withTaskCancellationHandler` to the detached task,
+            // which observes it through the `Task.checkCancellation()`
+            // calls in `validatePDFOffMainActor`.
             let detached = Task.detached {
                 try await validatePDFOffMainActor(data: data)
             }
@@ -329,9 +329,9 @@ enum ImportService {
                 detached.cancel()
             }
 
-            // CANCEL-006: re-check cancellation before mutating state —
-            // a cancel signal arriving between the detached task's return
-            // and this point should not produce a half-loaded document.
+            // Re-check cancellation before mutating state — a cancel
+            // signal arriving between the detached task's return and
+            // this point should not produce a half-loaded document.
             try Task.checkCancellation()
 
             // Back on MainActor — apply validated results to state
@@ -348,11 +348,11 @@ enum ImportService {
             documentState.transition(to: .editing)
         } else {
             // Offload image decode + PDF render off MainActor (matches PDF branch).
-            // SEC-8 prereq: when `stripAuxData` is true, the import path runs the
-            // Live Photo / Portrait depth aux-metadata stripper before the PDF
-            // render. Default is false (no behavior change in this PR); SEC-8
-            // flips the flag when paranoid mode is enabled.
-            // CANCEL-006: same cancellation propagation as the PDF branch.
+            // When `stripAuxData` is true, the import path runs the
+            // Live Photo / Portrait depth aux-metadata stripper before the
+            // PDF render. Default is false (no behavior change here);
+            // paranoid mode flips the flag when it is enabled.
+            // Same cancellation propagation as the PDF branch.
             let detached = Task.detached {
                 try loadImageOffMainActor(data: data, stripAuxData: stripAuxData)
             }
@@ -403,9 +403,9 @@ enum ImportService {
             throw PipelineError.importError(.tooLarge(bytesRead: data.count))
         }
 
-        // Per-page dimension validation (ENGINE §2.6).
-        // CANCEL-006 (Pkg B): per-iteration `Task.checkCancellation()` so a
-        // 500-page document surrenders cooperatively when the outer
+        // Per-page dimension validation.
+        // Per-iteration `Task.checkCancellation()` so a 500-page
+        // document surrenders cooperatively when the outer
         // `activeImportTask` is cancelled by the Cancel button or the
         // scene-phase observer's `cancelActivePipeline` call.
         // Each iteration body runs inside `autoreleasepool`: PDFKit page
@@ -421,7 +421,7 @@ enum ImportService {
                     throw PipelineError.importError(.corrupt)
                 }
                 let box = page.bounds(for: .cropBox)
-                // N3: CGRect auto-standardizes negative dimensions to positive.
+                // CGRect auto-standardizes negative dimensions to positive.
                 // PDFKit bounds(for:) always returns non-negative. Documented for awareness.
                 guard box.width > 0, box.height > 0,
                       box.width <= 5000, box.height <= 5000 else {
@@ -434,7 +434,7 @@ enum ImportService {
         // verification Layer 4, but PDFKit parses the document during import
         // so we reject upfront to avoid loading malicious payloads.
         //
-        // M1: while we have a CGPDFDocument open, also walk
+        // While we have a CGPDFDocument open, also walk
         // /OCProperties/D/OFF for hidden Optional Content Groups. The engine
         // cannot do this later because PDFDocument(data:) leaves
         // documentURL == nil; computing it here once threads through into
@@ -455,9 +455,9 @@ enum ImportService {
 
         // Detect text layers per page — can be slow for complex PDFs,
         // which is why this runs off MainActor.
-        // CANCEL-006: per-iteration `Task.checkCancellation()` mirrors the
-        // dimension-validation loop above; both contribute to the worst-case
-        // surrender latency on a multi-hundred-page document.
+        // Per-iteration `Task.checkCancellation()` mirrors the
+        // dimension-validation loop above; both contribute to the
+        // worst-case surrender latency on a multi-hundred-page document.
         // `autoreleasepool` per iteration for the same reason as the
         // dimension loop — `detectTextLayer` reads `page.string`, whose
         // autoreleased text machinery would otherwise accumulate across
@@ -492,7 +492,7 @@ enum ImportService {
     /// Decode an image blob and wrap it as a single-page PDFDocument off MainActor.
     /// nonisolated: explicitly opted out of SE-0466 MainActor default so the
     /// `UIImage(data:)` decode and `UIGraphicsPDFRenderer.pdfData` call do not
-    /// block the UI on large photos (ARCH §3.3).
+    /// block the UI on large photos.
     private nonisolated static func loadImageOffMainActor(
         data: Data,
         stripAuxData: Bool
@@ -500,16 +500,16 @@ enum ImportService {
         guard let image = UIImage(data: data) else {
             throw PipelineError.importError(.unsupportedFormat)
         }
-        // Cap at 5000×5000 to match PDF page dimension limits (ENGINE §2.6).
+        // Cap at 5000×5000 to match PDF page dimension limits.
         // A 50 MB JPEG can decompress to enormous bitmaps (e.g., 20000×20000 = 1.6 GB).
         //
-        // Pkg G.1 / TRUST-import-image-pixel-vs-point-cap: the cap is on the
-        // backing bitmap size, not the layout-point size. UIImage.size returns
-        // POINTS (size = pixels / scale). A `scale: 3.0` image at 4000×4000 pt
-        // is 12000×12000 px = 144 MP; the point check would let it through
-        // and the renderer would allocate ~575 MB to draw it. Prefer the
-        // cgImage's pixel dimensions; fall back to size × scale when the
-        // CIImage-backed path makes cgImage nil.
+        // The cap is on the backing bitmap size, not the layout-point
+        // size. UIImage.size returns POINTS (size = pixels / scale). A
+        // `scale: 3.0` image at 4000×4000 pt is 12000×12000 px = 144 MP;
+        // the point check would let it through and the renderer would
+        // allocate ~575 MB to draw it. Prefer the cgImage's pixel
+        // dimensions; fall back to size × scale when the CIImage-backed
+        // path makes cgImage nil.
         let pixelWidth: CGFloat
         let pixelHeight: CGFloat
         if let cgImage = image.cgImage {
@@ -523,13 +523,14 @@ enum ImportService {
             throw PipelineError.importError(.invalidPageDimensions(pageIndex: 0))
         }
 
-        // SEC-8 prereq hook (default off): when `stripAuxData` is true, run the
-        // LivePhotoAuxStripper across the image's property dictionary. V1 strips
-        // the dict only — the CGImage is returned unchanged. The PDF render
-        // below does not propagate ImageIO property dictionaries, so the V1
-        // contract here is "the helper executed and dropped aux keys" rather
-        // than "the output PDF would otherwise have contained them." SEC-8
-        // (unit 23) flips the gate when paranoid mode is enabled.
+        // Default off: when `stripAuxData` is true, run the
+        // LivePhotoAuxStripper across the image's property dictionary. V1
+        // strips the dict only — the CGImage is returned unchanged. The
+        // PDF render below does not propagate ImageIO property
+        // dictionaries, so the V1 contract here is "the helper executed
+        // and dropped aux keys" rather than "the output PDF would
+        // otherwise have contained them." Paranoid mode flips the gate
+        // when it is enabled.
         if stripAuxData, let cgImage = image.cgImage,
            let source = CGImageSourceCreateWithData(data as CFData, nil) {
             let rawProperties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil)
@@ -582,15 +583,15 @@ enum ImportService {
         }
     }
 
-    // MARK: - Sample Document Loading (ARCH §10.4)
+    // MARK: - Sample Document Loading
 
-    /// Load a bundled sample document. C11: Single SampleDocument.pdf in Resources/.
+    /// Load a bundled sample document. Single SampleDocument.pdf in Resources/.
     static func loadSampleDocument(
         named name: String = "SampleDocument",
         documentState: DocumentState,
         redactionState: RedactionState
     ) async {
-        // C11: v1.0 ships one sample document — no subdirectory needed.
+        // v1.0 ships one sample document — no subdirectory needed.
         guard let url = Bundle.main.url(
             forResource: name, withExtension: "pdf"
         ) else {

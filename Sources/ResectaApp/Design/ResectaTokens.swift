@@ -1,7 +1,7 @@
 import SwiftUI
 import CoreHaptics
 
-// §A1: Centralized design tokens for Resecta.
+// Centralized design tokens for Resecta.
 // All magic numbers in the UI should reference these constants.
 
 enum ResectaTokens {
@@ -70,7 +70,6 @@ enum ResectaTokens {
         /// Resting card, list cell. Dark-mode variant uses a faint white-tint
         /// shadow so elevated surfaces retain visible hierarchy against the
         /// dark background; light mode keeps the original 0.10 black tint.
-        /// 02-dark-mode-design.md §7.1.
         static let subtle = Elevation(
             color: Color(uiColor: UIColor { trait in
                 trait.userInterfaceStyle == .dark
@@ -89,7 +88,7 @@ enum ResectaTokens {
         /// Modal scrim behind sheets/overlays
         static let scrim: Double = 0.4
 
-        // Severity tint overlays (see §A6 Toast Severity)
+        // Severity tint overlays
         static let severityTint: Double = 0.10
     }
 
@@ -106,7 +105,7 @@ enum ResectaTokens {
     /// Wraps system colors into single-source-of-truth constants — change here
     /// to rebrand without hunting across views.
     // nonisolated: these are pure `Color` constants (Sendable design tokens), not
-    // actor state. Under the s04 SE-0466 MainActor-default flip the enum would become
+    // actor state. Under the SE-0466 MainActor-default flip the enum would become
     // MainActor-isolated, which breaks any nonisolated reader — e.g. a Swift Testing
     // `@Test(arguments:)` array, which the macro hoists into a nonisolated peer
     // (VerificationDisplayTests). Pin nonisolated so the tokens are usable from any
@@ -195,7 +194,7 @@ enum ResectaTokens {
             }
         )
 
-        /// SUPPORT-family text (neutral grey; UXC-42). Darker support tier
+        /// SUPPORT-family text (neutral grey). Darker support tier
         /// for the small explanatory text on Home and the verification
         /// screens (card bodies, subtitles, run facts, trust labels, the
         /// version and timing footers) — replaces system `.secondary`
@@ -224,14 +223,14 @@ enum ResectaTokens {
         static let warningTint: Color = .orange
 
         // Result-row source badges (search results list)
-        /// WU-06: purple capsule on rows whose rationale signals contain
+        /// Purple capsule on rows whose rationale signals contain
         /// `.userAlwaysFlag` — distinguishes user-defined always-flag
         /// term hits from detector matches and source badges.
         static let customTermBadge: Color = Color(uiColor: .systemPurple)
 
-        /// WU-63 / TOKEN_ADDITIONS.md: indigo capsule on rows produced
+        /// Indigo capsule on rows produced
         /// by a regex-mode search whose rationale signals contain
-        /// `.regexPattern(...)`. Distinct hue from OCR teal per [RR-19]
+        /// `.regexPattern(...)`. Distinct hue from OCR teal
         /// — the original proposal of `.systemTeal.opacity(0.85)` was
         /// flagged for visual confusion with OCR teal at small sizes /
         /// display calibration variance; the indigo fallback (already
@@ -240,7 +239,7 @@ enum ResectaTokens {
         static let regexBadge: Color = Color(uiColor: .systemIndigo)
     }
 
-    // MARK: - Snap Guides (§A7)
+    // MARK: - Snap Guides
 
     enum Snap {
         /// Distance (in overlay points) within which an edge snaps to a guide.
@@ -259,28 +258,28 @@ enum ResectaTokens {
         /// 22pt — Apple Pencil hit area
         static let pencil: CGFloat = 22
         /// 46pt — Apple HIG minimum EFFECTIVE (as-hit-tested) touch
-        /// target floor. UXC-18: the default-size floor for
+        /// target floor. The default-size floor for
         /// interactive controls whose visual glyph/label is smaller
         /// than this — enlarge the tappable frame/contentShape around
         /// the content, never the glyph or label itself.
         ///
-        /// RB-54: 46 = 44 ÷ 0.96 — the medium-detent inset sheet
+        /// 46 = 44 ÷ 0.96 — the medium-detent inset sheet
         /// renders its content at ~0.96 scale on iOS 26 (measured
         /// 2026-08-22 on the iPhone 17 Pro sim: a 44-pt frame lands at
         /// 42.2 pt effective), so a 46-pt layout frame yields ≥ 44pt
         /// effective inside the sheet and 46pt outside it (page bar,
-        /// canvas) — harmless. The ruled floor is the EFFECTIVE size,
+        /// canvas) — harmless. The floor is defined as the EFFECTIVE size,
         /// not the layout frame, hence 46 rather than 44 here.
         ///
-        /// Catalog note: DC-023 (2026-08-21) deleted a never-read
-        /// `TouchTarget.finger: CGFloat = 44` member from this enum as
-        /// dead code. This is a deliberate, register-noted
-        /// re-introduction of the same idea under a new name for a
-        /// new, now-referenced purpose — not a revert of DC-023.
+        /// This enum previously included a
+        /// `TouchTarget.finger: CGFloat = 44` member that was removed as
+        /// dead code (never read). This is a deliberate re-introduction
+        /// of the same idea under a new name for a new, now-referenced
+        /// purpose.
         static let minimum: CGFloat = 46
     }
 
-    // MARK: - Branded Surface (Design Spec §5)
+    // MARK: - Branded Surface
 
     enum BrandedSurface {
         /// Content panel max width — compact size class and default
@@ -291,7 +290,7 @@ enum ResectaTokens {
 
     }
 
-    // MARK: - Brand Teal (color initiative, CD-14/CD-15/CD-19)
+    // MARK: - Brand Teal
 
     /// Brand accent tokens — the redaction-teal pair that matches the marketing
     /// site. `tint` must stay component-equal to the AccentColor colorset in
@@ -325,9 +324,9 @@ enum ResectaTokens {
         )
     }
 
-    // MARK: - Animation Presets (§A2)
+    // MARK: - Animation Presets
 
-    /// Named animation presets. Replaces ad-hoc per-view values (UI_UX_SPEC_AMENDMENT §A2).
+    /// Named animation presets. Replaces ad-hoc per-view values.
     enum Anim {
         // MARK: State Changes
         /// Button/toolbar state changes, toggles
@@ -345,13 +344,13 @@ enum ResectaTokens {
         /// Toast exit (no bounce on dismissal)
         static let toastOut: Animation = .easeIn(duration: 0.2)
 
-        /// WU-43 M-D.5: Handle-appearance duration for the resize-handle
+        /// Handle-appearance duration for the resize-handle
         /// CADisplayLink path. `RedactionOverlayView` interpolates a custom
         /// `handleScale` CGFloat that SwiftUI's `Animation` value cannot
         /// drive — the duration is read by hand from this token.
         static let selectionInDuration: TimeInterval = 0.2
 
-        /// WU-43 M-D.5: Handle-disappearance duration, same CADisplayLink path.
+        /// Handle-disappearance duration, same CADisplayLink path.
         static let selectionOutDuration: TimeInterval = 0.15
 
         // MARK: Attention
@@ -369,7 +368,7 @@ enum ResectaTokens {
         /// Status color change (gray → green/red)
         static let colorTransition: Animation = .easeInOut(duration: 0.3)
 
-        // MARK: Reduced Motion (§A2.2)
+        // MARK: Reduced Motion
         /// Returns the reduced-motion equivalent of an animation if the user prefers it.
         /// Call site reads accessibilityReduceMotion from @Environment and passes it in.
         static func resolved(_ animation: Animation, reduceMotion: Bool) -> Animation? {
@@ -379,20 +378,18 @@ enum ResectaTokens {
             return animation
         }
 
-        // MARK: Reduced Motion (§A2.2) — partial revival of DC-023
+        // MARK: Reduced Motion — partial revival
         //
-        // DC-023 (registers/deadcode/05-REGISTER.md, W1, ref `0f9fc672`)
-        // removed `resolvedTransition(standard:reduceMotion:)` as
-        // never-read in the same sweep that took the `Haptics` enum
-        // above (DC-022) — even though RB-24 had already ruled "wire
-        // through the resolver". UXC-33 gives it its first real call
-        // sites: the eleven `.move(edge:)` transition sites under
+        // This transition helper was removed as dead code (never read)
+        // in the same sweep that removed the `Haptics` enum above. It
+        // has since gained its first real call sites: the eleven
+        // `.move(edge:)` transition sites under
         // `Sources/ResectaApp/Views`. This is a MINIMAL, deliberate
         // partial revival — only this one function is restored,
         // verbatim from `git show 09dd889a81af6091287d8e3819d05e608a2184ca`
-        // — none of DC-023's other removed members (Typography, the
+        // — the other removed members (Typography, the
         // never-read TouchTarget/CornerRadius/Shadow/Opacity/Border/Anim
-        // members) are brought back; they stay confirmed-dead.
+        // members) are not brought back; they stay confirmed-dead.
         /// Transition for reduced-motion contexts. Replaces spatial transitions
         /// (slide, scale) with opacity-only crossfade.
         static func resolvedTransition(
@@ -403,19 +400,19 @@ enum ResectaTokens {
         }
     }
 
-    // MARK: - Haptics (UXC-14 — partial revival of DC-022)
+    // MARK: - Haptics — partial revival
     //
-    // DC-022 (registers/deadcode/05-REGISTER.md, W1) removed the full
-    // `Haptics` enum — 13 string-constant "intended haptic" documentation
-    // entries plus this `playExportConfirmation()` CoreHaptics
-    // implementation — as confirmed-dead: zero readers/callers anywhere,
-    // export shipped with no haptic at all. UXC-14 gives
-    // `playExportConfirmation()` its first real call site (the share-risk
-    // confirm sheet's slide-to-confirm completion). RB-33: this is a
-    // MINIMAL, deliberate partial revival — only the empty `Haptics`
+    // This enum previously held the full `Haptics` implementation — 13
+    // string-constant "intended haptic" documentation entries plus this
+    // `playExportConfirmation()` CoreHaptics implementation — removed as
+    // confirmed-dead: zero readers/callers anywhere, export shipped
+    // with no haptic at all. `playExportConfirmation()` now has its
+    // first real call site (the share-risk confirm sheet's
+    // slide-to-confirm completion). This is a MINIMAL, deliberate
+    // partial revival — only the empty `Haptics`
     // namespace and this one function are restored, verbatim from
     // `git show 09dd889a81af6091287d8e3819d05e608a2184ca` — the other 12
-    // now-unused string constants DC-022 also removed are NOT brought
+    // now-unused string constants are NOT brought
     // back and stay confirmed-dead.
     enum Haptics {}
 }

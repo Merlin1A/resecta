@@ -2,13 +2,13 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// GATE-1 — Settings-during-pipeline UX.
+// Settings-during-pipeline UX.
 //
 // `SettingsView` renders a non-blocking banner ("A pipeline run is in
 // progress. Changes apply to the next run.") while
 // `documentState.phaseKind` is `.detecting / .redacting / .verifying`.
 // The four pipeline-affecting controls remain functional; the run-entry
-// STATE-5 snapshot in `PipelineCoordinator` already pins the active
+// snapshot in `PipelineCoordinator` already pins the active
 // run's behavior, so the banner is purely informational.
 //
 // These tests pin the predicate that drives banner visibility
@@ -16,7 +16,7 @@ import Foundation
 // transition table or phase enum surface here without needing a
 // SwiftUI-hosting harness.
 
-@Suite("SettingsView mid-run banner (GATE-1)")
+@Suite("SettingsView mid-run banner")
 @MainActor
 struct SettingsViewMidRunBannerTests {
 
@@ -74,8 +74,8 @@ struct SettingsViewMidRunBannerTests {
 
     @Test("Predicate is defined for every PhaseKind case (banner visibility table)")
     func testPredicateCoversAllPhaseKinds() {
-        // If a new phase is added to PhaseKind, this loop forces the
-        // GATE-1 author to revisit the banner-visibility contract.
+        // If a new phase is added to PhaseKind, this loop forces
+        // a revisit of the banner-visibility contract.
         let allCases: [DocumentState.PhaseKind] = [
             .empty, .importing, .editing, .detecting,
             .redacting, .verifying, .verified, .exporting, .failed

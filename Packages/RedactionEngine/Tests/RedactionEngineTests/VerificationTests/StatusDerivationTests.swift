@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// TEST §4.7 — Overall status derivation tests.
+// Overall status derivation tests.
 // Validates that aggregateStatus correctly prioritizes FAIL > WARN > PASS.
 
 @Suite("Verification Status Derivation")
@@ -142,7 +142,7 @@ struct StatusDerivationTests {
         #expect(verifier.aggregateStatus(layers) == .pass)
     }
 
-    // CAT-372: a skipped check is not a silent pass. Some-but-not-all skipped
+    // A skipped check is not a silent pass. Some-but-not-all skipped
     // → WARN ("results may be incomplete"); all skipped → the .skipped sentinel.
     // Replaces the prior `skippedLayersIgnored` test, which asserted the old
     // dishonest behavior (skipped folded into PASS).

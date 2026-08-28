@@ -3,17 +3,17 @@ import Foundation
 import ImageIO
 import OSLog
 
-// ENGINE §5.1–§5.4 — Streaming page-at-a-time PDF reconstruction.
+// Streaming page-at-a-time PDF reconstruction.
 
 /// Dedicated actor for PDF reconstruction. Serializes JPEG encoding and PDF
 /// writes so the rest of the pipeline can stay on its own actor.
 ///
-/// **Streaming model (CND-11, launch-fix-v2 S5).** Each `appendPage` JPEG-
+/// **Streaming model.** Each `appendPage` JPEG-
 /// encodes its page and draws it straight into a single `CGPDFContext`, then
 /// releases the bytes — so live memory is O(1) in page count rather than
 /// O(pages × JPEG). The context is opened lazily on the first appended page
 /// (its media box pinned to `firstPageSize`); `finalize` only closes it and
-/// applies file protection. This supersedes the earlier PERF-1 buffer-then-
+/// applies file protection. This supersedes the earlier buffer-then-
 /// write model, whose sole reason to retain every encoded page was the
 /// now-removed `replacePage(at:with:)` swap. The production per-page
 /// verification retry re-rasterizes and re-appends *before* a page is drawn,
@@ -25,7 +25,7 @@ import OSLog
 /// Atomicity: the temp file at `tempURL` is created on the first `appendPage`
 /// and completed by `finalize`. The caller performs an atomic rename via
 /// `FileManager.replaceItemAt` after `finalize()` returns; on any earlier
-/// error its `defer` removes the partial temp file. See ENGINE §5.1.
+/// error its `defer` removes the partial temp file.
 public actor PDFStreamReconstructor {
     private let tempURL: URL
     private var firstPageSize: CGSize?
@@ -77,7 +77,7 @@ public actor PDFStreamReconstructor {
     /// pages specify their own size per-page.
     /// Empty auxiliary dictionary omits /Author, /Title, /Subject,
     /// /Keywords, /Creator. /Producer, /CreationDate, /ModDate are
-    /// auto-injected by CGPDFContext (§5.4); `finalize()` then rewrites the
+    /// auto-injected by CGPDFContext; `finalize()` then rewrites the
     /// producer value to `fixedProducerValue`.
     public func begin(firstPageSize: CGSize) throws {
         guard !finalized else {
@@ -87,7 +87,7 @@ public actor PDFStreamReconstructor {
     }
 
     /// Append a single page: JPEG-encode the image at quality 0.92
-    /// (ENGINE §5.3), then draw it straight into the (lazily opened) PDF
+    /// then draw it straight into the (lazily opened) PDF
     /// context together with any invisible text-layer entries (Searchable
     /// Redaction). The encoded bytes are released as the draw returns, so
     /// nothing is retained between pages. Throws if `begin` has not run, the
@@ -131,7 +131,7 @@ public actor PDFStreamReconstructor {
         guard let ctx = CGContext(
             tempURL as CFURL,
             mediaBox: &box,
-            [:] as CFDictionary  // ENGINE §5.4: empty aux dict strips most metadata
+            [:] as CFDictionary  // Empty aux dict strips most metadata
         ) else { return nil }
         context = ctx
         return ctx
@@ -146,7 +146,7 @@ public actor PDFStreamReconstructor {
     private func drawBufferedPage(_ page: BufferedPage) {
         guard let ctx = openContextIfNeeded() else { return }
         let didWrite: Bool = autoreleasepool {
-            // Decode the buffered JPEG. EXP-010 (HW-REFUTED): CGPDFContext
+            // Decode the buffered JPEG. CGPDFContext
             // re-encodes any drawn image, so passthrough is not preserved in
             // the output stream — but the output bytes do not depend on when a
             // page is drawn, so draw-on-append matches the prior buffer-then-
@@ -174,9 +174,9 @@ public actor PDFStreamReconstructor {
 
             ctx.draw(jpegImage, in: pageBox)
 
-            // Invisible text layer for Searchable Redaction (ENGINE §5C).
+            // Invisible text layer for Searchable Redaction.
             // Drawing order: image first, then invisible text on top.
-            // Matches standard sandwich PDF structure (ISO 32000, §5C.3).
+            // Matches standard sandwich PDF structure (ISO 32000, clause 5C.3).
             if let entries = page.textLayerEntries, !entries.isEmpty {
                 TextLayerReconstructor.drawInvisibleTextLayer(
                     context: ctx,
@@ -207,7 +207,7 @@ public actor PDFStreamReconstructor {
         ctx.closePDF()
         context = nil
 
-        // §5.4 — the system writer auto-injects a `/Producer` literal naming
+        // The system writer auto-injects a `/Producer` literal naming
         // the OS version and build that wrote the file. CGPDFContext exposes
         // no producer key in its auxiliary dictionary, so the value is
         // rewritten here, after the context closes: a byte-length-preserving
@@ -217,7 +217,7 @@ public actor PDFStreamReconstructor {
         // file untouched — the export never fails on this step.
         Self.overwriteProducerLiteral(at: tempURL)
 
-        // SEC-1: apply `.complete` file protection to the finalized temp
+        // Apply `.complete` file protection to the finalized temp
         // file. PipelineCoordinator.downgradeTempProtectionOnSessionClose()
         // downgrades the whole session subtree to
         // `.completeUntilFirstUserAuthentication` on document close via
@@ -228,7 +228,7 @@ public actor PDFStreamReconstructor {
         try? TempFileHardening.applyProtection(tempURL, level: .complete)
     }
 
-    // MARK: - Producer rewrite (ENGINE §5.4)
+    // MARK: - Producer rewrite
 
     /// The fixed `/Producer` value written into finalized files. A constant —
     /// identical across devices, OS versions, and app versions — so the field
@@ -319,14 +319,14 @@ public actor PDFStreamReconstructor {
             try handle.seek(toOffset: valueStartOffset)
             try handle.write(contentsOf: patch)
         } catch {
-            // Mechanism-only logging (ARCH §12.2); the export proceeds with
+            // Mechanism-only logging; the export proceeds with
             // the writer's own value rather than failing.
             producerLogger.warning(
                 "producer rewrite skipped (metadata: \(error.localizedDescription, privacy: .public))")
         }
     }
 
-    // MARK: - JPEG Encoding (ENGINE §5.3, EXP-007)
+    // MARK: - JPEG Encoding
 
     /// Encode the page's `CGImage` to JPEG (q=0.92) and return a fully
     /// populated `BufferedPage`. Failure throws `reconstructionFailed`.
@@ -354,24 +354,24 @@ public actor PDFStreamReconstructor {
     }
 }
 
-// MARK: - Temp File Cleanup (ARCH §11, MP-5-1)
+// MARK: - Temp File Cleanup
 
 /// Clean orphaned temp files from prior sessions. Called once at app launch.
 /// Crash-loop scenarios can accumulate large temp files before iOS purges them.
 ///
 /// Known temp entry prefixes (keep in sync with producers):
 /// - `recon_`              : intermediate reconstruction temp (legacy path; still
-///                             created until SEC-2 routing is fully migrated)
+///                             created until routing is fully migrated)
 /// - `redacted_`           : pipeline output + export copies (legacy flat path)
-/// - `redacted_session_`   : SEC-2 per-session subdirectory (entire subtree
+/// - `redacted_session_`   : per-session subdirectory (entire subtree
 ///                             removed on session end; this sweep handles the
 ///                             crash-orphaned remainder)
-/// - `resecta_`            : RES-02 broadened sweep — also matches all
+/// - `resecta_`            : broadened sweep — also matches all
 ///                             `resecta_*` temp writes (e.g.
 ///                             `resecta_audit_*`, `resecta_coverage_*` from
 ///                             `MatchExportService`, and any future
 ///                             `resecta_verification_*` writes). Applies the
-///                             same 1-hour TTL and SEC-1 cleanup contract
+///                             same 1-hour TTL and cleanup contract
 ///                             uniformly so app-kill during a share-sheet
 ///                             dismiss does not leak orphans.
 public func cleanOrphanedTempFiles() {
@@ -379,7 +379,7 @@ public func cleanOrphanedTempFiles() {
     guard let contents = try? FileManager.default.contentsOfDirectory(
         at: tmp, includingPropertiesForKeys: [.creationDateKey]
     ) else { return }
-    let staleThreshold = Date().addingTimeInterval(-3600) // 1 hour (ARCH §11)
+    let staleThreshold = Date().addingTimeInterval(-3600) // 1 hour
     for url in contents where url.lastPathComponent.hasPrefix("recon_")
                             || url.lastPathComponent.hasPrefix("redacted_")
                             || url.lastPathComponent.hasPrefix("resecta_") {
@@ -387,7 +387,7 @@ public func cleanOrphanedTempFiles() {
         // `redacted_` prefix match above; removeItem handles both files
         // and directories recursively. The `resecta_` arm covers
         // `resecta_audit_*` and `resecta_coverage_*` share-sheet temp
-        // files written by `MatchExportService` (RES-02).
+        // files written by `MatchExportService`.
         if let date = try? url.resourceValues(forKeys: [.creationDateKey]).creationDate,
            date < staleThreshold {
             try? FileManager.default.removeItem(at: url)

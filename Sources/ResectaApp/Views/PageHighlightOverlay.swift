@@ -2,11 +2,11 @@ import Foundation
 import PDFKit
 import RedactionEngine
 
-// W7 — live-preview rect resolution.
+// Live-preview rect resolution.
 //
 // The engine returns NSRanges (it has no PDFPage context). The view needs
 // normalized rects to draw highlights. This helper bridges the two by
-// invoking `DocumentSearcher.boundingRect(for:page:)` (W7 promoted to
+// invoking `DocumentSearcher.boundingRect(for:page:)` (promoted to
 // `public nonisolated`) for each range on the visible page only.
 //
 // Rendering of the resolved rects happens inside `RedactionOverlayView`

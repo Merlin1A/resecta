@@ -1,6 +1,6 @@
 import Foundation
 
-/// A verifier sensitive term plus its matching discipline (PD-3).
+/// A verifier sensitive term plus its matching discipline.
 ///
 /// `text` is the byte-search subject for Layers 3 and 10 (and the plain-text
 /// subject for Layer 2's OCR gate, which reads `text` only).

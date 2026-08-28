@@ -1,6 +1,6 @@
 import Foundation
 
-// Plan §5 — string similarity metrics for entity clustering. All three
+// String similarity metrics for entity clustering. All three
 // metrics return values in [0.0, 1.0]; the cluster rule unions on
 // max(jaroWinkler, tokenSort, initialism) ≥ 0.70.
 

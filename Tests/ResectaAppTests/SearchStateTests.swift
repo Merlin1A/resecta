@@ -105,7 +105,7 @@ struct SearchStateTests {
         #expect(state.resultVersion > v1)
     }
 
-    // MARK: - D06-F2 Part 1: below-threshold suppression tally
+    // MARK: - Below-threshold suppression tally
 
     @Test("accumulateBelowThresholdSuppression sums per-page counts")
     func accumulatesBelowThresholdAcrossPages() {
@@ -141,7 +141,7 @@ struct SearchStateTests {
 
     @Test("makeCoverageReport threads the below-threshold tally into the report")
     func makeCoverageReportPropagatesBelowThreshold() {
-        // D06-F2 Part 1 report-wiring: the tally must land in
+        // Report-wiring: the tally must land in
         // `belowThresholdSuppressedCount` (no longer a hardcoded 0).
         let report = SearchAndRedactSheet.makeCoverageReport(
             scannedPages: 2,
@@ -159,7 +159,7 @@ struct SearchStateTests {
         #expect(report.deselectedCount == 0)
     }
 
-    // MARK: - D06-F2 Part 2 — applied/deselected coverage counts
+    // MARK: - Applied/deselected coverage counts
 
     @Test("deselectedCount counts results left un-checked (complement of selectedCount)")
     func deselectedCountReflectsSelection() {
@@ -240,32 +240,30 @@ struct SearchStateTests {
         )
     }
 
-    // MARK: - UP-2 — audit surfaces hidden for V1.0
+    // MARK: - Audit surfaces hidden for V1.0
 
-    @Test("Audit-export / scan-coverage surfaces are gated off for 1.0 (UP-2)")
+    @Test("Audit-export / scan-coverage surfaces are gated off for 1.0")
     func testAuditSurfacesHiddenForV1() {
         // Export Audit, the Scan Coverage report (incl. Share Snapshot), and
-        // the verification-results "Review" hook are behind this flag per
-        // ~/resecta-ui-polish-planning/00-DIRECTION.md. An accidental flip
-        // re-exposes all three surfaces — this pin makes that a loud CI red.
-        // Restore path (1.1, PB-75): flip the flag AND update this test.
+        // the verification-results "Review" hook are behind this flag.
+        // An accidental flip re-exposes all three surfaces — this pin makes
+        // that a loud CI red. Restoring these surfaces means flipping the
+        // flag and updating this test.
         #expect(SearchState.searchAuditSurfacesEnabled == false)
     }
 
-    // MARK: - UP-4 — doctype diagnostic surfaces hidden for V1.0
+    // MARK: - Doctype diagnostic surfaces hidden for V1.0
 
-    @Test("Doctype diagnostic surfaces are gated off for 1.0 (UP-4)")
+    @Test("Doctype diagnostic surfaces are gated off for 1.0")
     func testDiagnosticSurfacesHiddenForV1() {
         // The doctype banner and the footer Document-profile disclosure
-        // are behind this flag per
-        // ~/resecta-ui-polish-planning/02-DIRECTION-UP4-declutter.md. An
-        // accidental flip re-exposes both mounts — this pin makes that a
-        // loud CI red. Restore path (1.1, SC/PB-75): flip the flag AND
-        // update this test.
+        // are behind this flag. An accidental flip re-exposes both mounts —
+        // this pin makes that a loud CI red. Restoring these surfaces means
+        // flipping the flag and updating this test.
         #expect(SearchState.searchDiagnosticSurfacesEnabled == false)
     }
 
-    /// D06-F2 Part 2 — a scan-completion skeleton report. `makeCoverageReport`
+    /// A scan-completion skeleton report. `makeCoverageReport`
     /// leaves `appliedCount` / `deselectedCount` at 0; `coverageReportForDisplay()`
     /// folds the live counts in. `belowThresholdSuppressed: 3` pins a scan-time
     /// field so the fold can be shown to leave it untouched.

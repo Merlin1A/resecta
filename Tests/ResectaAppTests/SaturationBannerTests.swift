@@ -3,16 +3,16 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-23 — Saturation banner shortcut contracts. Each tap-shortcut
+// Saturation banner shortcut contracts. Each tap-shortcut
 // mutates the corresponding `searchState` field; the banner copy is
-// pinned per D-37. Re-trigger of the
+// pinned. Re-trigger of the
 // search after the mutation is wired through the `onTriggerSearch`
 // closure on `SearchResultsSection` (verified by handoff cell — not
 // re-tested here since it is a closure call without side effects on
 // `SearchState`; the trigger path itself is exercised by the broader
 // search test suite).
 
-@Suite("Saturation banner (WU-23)", .tags(.search))
+@Suite("Saturation banner", .tags(.search))
 @MainActor
 struct SaturationBannerTests {
 
@@ -70,7 +70,7 @@ struct SaturationBannerTests {
         #expect(state.options.caseSensitive == false)
     }
 
-    // MARK: - Scope to current page shortcut (WU-23 simple form)
+    // MARK: - Scope to current page shortcut (simple form)
 
     @Test("Scope to current page sets navigationScope = .currentPage")
     func scopeToCurrentPageMutatesScope() {
@@ -82,9 +82,9 @@ struct SaturationBannerTests {
         #expect(state.navigationScope == .currentPage)
     }
 
-    // MARK: - WU-65 scope-to-current-page action chain
+    // MARK: - Scope-to-current-page action chain
 
-    @Test("WU-65: scopeToCurrentPage drains pending buffer, cancels scan, sets scope")
+    @Test("scopeToCurrentPage drains pending buffer, cancels scan, sets scope")
     func scopeToCurrentPageActionChain() async {
         let state = SearchState()
         state.isSearching = true
@@ -92,7 +92,7 @@ struct SaturationBannerTests {
 
         // Populate the pending buffer via `appendResult` — under the
         // batchFlushSize threshold so it lands in `pendingResults` and
-        // not `results` directly. Per [RR-23] flush MUST run before
+        // not `results` directly. Flush MUST run before
         // cancel so this entry survives the re-target.
         let id = UUID()
         let pending = SearchResult(
@@ -117,7 +117,7 @@ struct SaturationBannerTests {
         #expect(state.navigationScope == .currentPage)
     }
 
-    @Test("WU-65: scopeToCurrentPage from .currentPage is idempotent")
+    @Test("scopeToCurrentPage from .currentPage is idempotent")
     func scopeToCurrentPageIdempotent() async {
         let state = SearchState()
         state.navigationScope = .currentPage

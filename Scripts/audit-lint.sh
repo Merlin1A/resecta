@@ -124,7 +124,7 @@ done
 # Walks each staged .swift file. Tracks @Observable class bodies via brace
 # depth; flags any @AppStorage declaration inside one. Note: synthesized
 # attributes on App/View structs are fine — only @Observable class bodies
-# are banned per CLAUDE.md "Hard Rules".
+# are banned (that is the M-4 rule).
 for path in "${STAGED[@]}"; do
     case "$path" in *.swift) ;; *) continue ;; esac
     [ -f "$path" ] || continue
@@ -199,10 +199,10 @@ for path in ${ADDED[@]+"${ADDED[@]}"}; do
     [ "$loc" -gt "$NEW_CAP" ] && violate "M-6 new-file LOC cap exceeded: $path is $loc LOC (cap $NEW_CAP)"
 done
 
-# ── M-7 XcodeGen sync (CAT-033) ────────────────────────
+# ── M-7 XcodeGen sync ──────────────────────────────────
 # project.pbxproj is GENERATED from project.yml; landing a project.yml
 # change without a regenerate means every local build/test ran against a
-# stale project (CAT-034 landmine). Script ids M-7/M-8 below are
+# stale project. Script ids M-7/M-8 below are
 # audit-lint check ids continuing M-1..M-6 above; M-9+ are reserved for
 # the merge-gate cluster. The manual session-discipline checks in
 # CONTRIBUTING "Audit checklist" are a separate pre-existing namespace.
@@ -222,7 +222,7 @@ for path in "${STAGED[@]}"; do
         [ "$pbx_staged" -eq 1 ] \
             || violate "M-7 project.yml staged but $PBXPROJ not staged — run ./regenerate.sh and stage it"
     else
-        # Gitignored-generated pbxproj (current policy, CAT-034): demand a
+        # Gitignored-generated pbxproj (current policy): demand a
         # regenerate after the last project.yml edit. mtime tripwire —
         # xcodegen always writes the pbxproj after reading project.yml.
         if [ ! -f "$PBXPROJ" ] || [ "$PBXPROJ" -ot "project.yml" ]; then
@@ -232,7 +232,7 @@ for path in "${STAGED[@]}"; do
 done
 
 # ── M-8 app-target resources: block is a silent no-op (warn-only) ──────
-# CAT-221. The ResectaApp target's resources: block
+# The ResectaApp target's resources: block
 # silently enumerates nothing; a new `- path:` entry there never reaches
 # the bundle. Route shipped resources through sources: instead (the
 # SampleDocument.pdf precedent; BundleContentsTests guards the critical
@@ -296,8 +296,8 @@ if [ "$sample_touched" -eq 1 ]; then
     fi
 fi
 
-# ── M-10 loan-packet dual-copy byte identity (S06, sample-packet series) ─
-# The Hartwell loan packet (the SECOND in-app sample, D2) lives in TWO repo
+# ── M-10 loan-packet dual-copy byte identity (sample-packet series) ──────
+# The Hartwell loan packet (the SECOND in-app sample) lives in TWO repo
 # locations that must stay byte-identical (one SHA): the app-bundle copy and
 # the engine test fixture. The SHA is pinned on both sides (BundleContentsTests
 # app-side, TestFixtures.loanPacketSHA256 engine-side, both against

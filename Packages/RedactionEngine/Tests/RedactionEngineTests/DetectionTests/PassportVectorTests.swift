@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// D-19 fixture-driven test for passport detection. The DataPipeline-
+// Fixture-driven test for passport detection. The DataPipeline-
 // generated vectors at Fixtures/vectors/passport_test_vectors.json carry
 // labeled-prefix passport numbers whose `text` field reproduces the
 // original document context (e.g. "Passport No TK8863248"). This test
@@ -10,7 +10,7 @@ import Foundation
 // PassportDetectorTests.swift covers other surfaces; this file is
 // fixture-driven specifically.
 
-@Suite("Passport fixture-driven vector tests (D-19)")
+@Suite("Passport fixture-driven vector tests")
 struct PassportVectorTests {
 
     struct Vectors: Decodable {
@@ -33,7 +33,7 @@ struct PassportVectorTests {
         return try JSONDecoder().decode(Vectors.self, from: data).vectors
     }
 
-    @Test("D-19 fixture loads with rows")
+    @Test("Fixture loads with rows")
     func fixtureLoads() throws {
         guard let vectors = try loadVectors() else {
             Issue.record("passport_test_vectors.json not bundled")

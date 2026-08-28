@@ -6,9 +6,9 @@ import UIKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// STATE-2 (Pkg E) — Cancel-restart UUID stamp.
+// Cancel-restart UUID stamp.
 //
-// Closes the high-priority STATE-2 issue: in the cancel-then-restart
+// In the cancel-then-restart
 // scenario, an older pipeline Task's error-recovery (or `defer`) could
 // fire AFTER the user started a fresh run, clearing the new run's
 // `outputURL` and nilling its `activePipelineTask`. Each `runFullPipeline`
@@ -53,7 +53,7 @@ struct PipelineCoordinatorRestartRaceTests {
     /// Detection-pipeline stamp parity check. We don't exercise the real
     /// `runDetectionPipeline` here because its bootstrap path can throw
     /// before transitioning to `.detecting`, exposing a pre-existing
-    /// `editing → failed` transition issue unrelated to STATE-2. Instead,
+    /// `editing → failed` transition issue outside this test's scope. Instead,
     /// we pin the stamping contract symmetrically: the field is settable
     /// and clearable on `DocumentState` exactly like `activePipelineTask`,
     /// so the detection-pipeline guard pattern (mirrors the full-pipeline
@@ -71,7 +71,7 @@ struct PipelineCoordinatorRestartRaceTests {
 
     // MARK: - The race (acceptance test)
 
-    /// STATE-2 acceptance scenario, simulated deterministically:
+    /// Cancel-then-restart acceptance scenario, simulated deterministically:
     ///   1. First run dispatches → stamps runId1.
     ///   2. User cancels (via `cancelActivePipeline`) → task cancelled,
     ///      outputURL cleared, transition to .editing. Note that
@@ -141,9 +141,9 @@ struct PipelineCoordinatorRestartRaceTests {
         #expect(captured != nil)
     }
 
-    // MARK: - Verify-only restart race (CAT-365)
+    // MARK: - Verify-only restart race
 
-    /// CAT-365 — `runVerifyOnly` must stamp `activeRunId` so its Task's defer
+    /// `runVerifyOnly` must stamp `activeRunId` so its Task's defer
     /// is ownership-guarded. Before the fix the defer was unconditional
     /// (`activePipelineTask = nil`), so an older verify-only Task firing its
     /// defer after a cancel → restart would nil the SUCCESSOR run's task,
@@ -158,7 +158,7 @@ struct PipelineCoordinatorRestartRaceTests {
     /// complete during the await below and nil `activePipelineTask` through its
     /// OWN defer, masking the bug; the sleeping stand-in cannot, so the
     /// post-await assertion is exact.
-    @Test("runVerifyOnly stamps activeRunId; its defer cannot nil a successor run's task (CAT-365)")
+    @Test("runVerifyOnly stamps activeRunId; its defer cannot nil a successor run's task")
     func testRunVerifyOnlyDeferDoesNotNilSuccessorTask() async throws {
         let coord = makeLoadedCoordinator()
 
@@ -184,12 +184,12 @@ struct PipelineCoordinatorRestartRaceTests {
         defer { verifyTask?.cancel() }
         let verifyRunId = coord.documentState.activeRunId
         #expect(verifyTask != nil, "Verify-only run installed its Task")
-        // CAT-365 core (RED before / GREEN after): the missing stamp IS the bug.
+        // RED before the fix, GREEN after: the missing stamp IS the bug.
         // `#require` so the successor observation below never runs against an
         // unstamped (pre-fix) task — that records a clean failure rather than
         // letting the unguarded late task crash on an illegal transition.
         try #require(verifyRunId != nil,
-                     "runVerifyOnly must stamp activeRunId (STATE-2) so its defer is ownership-guarded")
+                     "runVerifyOnly must stamp activeRunId so its defer is ownership-guarded")
 
         // --- User taps Stop: the verify Task is cancelled and dereferenced. ---
         coord.documentState.cancelActivePipeline(redactionState: coord.redactionState)

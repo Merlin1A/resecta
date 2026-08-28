@@ -2,14 +2,14 @@ import Testing
 import PDFKit
 @testable import RedactionEngine
 
-// W3 — end-to-end custom user keywords wired through DocumentSearcher.
+// End-to-end custom user keywords wired through DocumentSearcher.
 //
 // Confirms the UserTermMatcher installed via `setUserTerms(_:)` actually
 // (a) drops detector matches whose text equals a never-flag term,
 // (b) emits synthetic always-flag hits into the SearchResult stream, and
 // (c) leaves `.text` / `.regex` / `.multiTerm` modes untouched.
 
-@Suite("DocumentSearcher custom user terms (W3)", .tags(.search))
+@Suite("DocumentSearcher custom user terms", .tags(.search))
 struct DocumentSearcherUserTermsTests {
 
     private func runPIIScan(
@@ -23,7 +23,7 @@ struct DocumentSearcherUserTermsTests {
             return []
         }
         let searcher = DocumentSearcher()
-        // W-P — `setUserTerms(_:)` takes `UserTermsIndex?`; wrap the
+        // `setUserTerms(_:)` takes `UserTermsIndex?`; wrap the
         // legacy `UserTermMatcher` test fixture via the wrapping init.
         await searcher.setUserTerms(userTerms.map { UserTermsIndex(matcher: $0) })
         let mode = SearchMode.piiScan(categories: categories, options: SearchOptions())
@@ -92,7 +92,7 @@ struct DocumentSearcherUserTermsTests {
 
     @Test("Always-flag regex emits a synthetic hit")
     func alwaysFlagRegexEmits() async {
-        // Matches a project-code pattern like "PROJ-1234".
+        // Matches a project-code-shaped pattern (letters, a hyphen, digits).
         let matcher = UserTermMatcher.compile(
             alwaysFlag: [UserTerm(pattern: "PROJ-[0-9]{4}", isRegex: true)],
             neverFlag: []

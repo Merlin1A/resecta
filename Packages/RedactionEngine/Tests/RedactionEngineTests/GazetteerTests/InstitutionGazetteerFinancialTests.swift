@@ -2,14 +2,14 @@ import Foundation
 import Testing
 @testable import RedactionEngine
 
-// S5 §2.7 — InstitutionGazetteer + NegativeContextGazetteer tests for the
-// financial_institution and employer category expansion (design 02 §6).
+// InstitutionGazetteer + NegativeContextGazetteer tests for the
+// financial_institution and employer category expansion.
 //
 // Tests use InstitutionGazetteer(entries:) — no bundle fixtures — per spec.
 
 // MARK: - anchoredDoctype for new categories
 
-@Suite("InstitutionGazetteer financial anchoring (S5 §2.7)")
+@Suite("InstitutionGazetteer financial anchoring")
 struct InstitutionGazetteerFinancialTests {
 
     // MARK: - Deliverable 7: anchoredDoctype new cases
@@ -187,9 +187,9 @@ struct InstitutionGazetteerFinancialTests {
         #expect(factor == 1.0, "body-only institution mention with empty header → no suppression; got \(factor)")
     }
 
-    // MARK: - Foia guard: foia anchor + name still suppresses (design §6 intent)
+    // MARK: - Foia guard: foia anchor + name still suppresses
 
-    @Test("Foia anchor + .name category suppresses (widened guard per design 02 §6)")
+    @Test("Foia anchor + .name category suppresses")
     func testFoiaAnchorSuppressesName() throws {
         // This test verifies that the widened guard (now includes .name)
         // correctly applies to the .foia anchor class.
@@ -224,14 +224,16 @@ struct InstitutionGazetteerFinancialTests {
             category: .name, doctype: .foia, context: context,
             documentHeader: header)
 
-        // Design 02 §6: the guard was widened to include .name for BOTH .foia and .financial.
+        // The guard was widened to include .name for BOTH .foia and .financial.
         // SSA in header → federal_agency → foia anchor → category .name is now in guard.
         // base = 1.0; 1.0 * 0.6 = 0.6.
-        // FLAG FOR JESSE: this changes behavior from S3 where .name was NOT in the foia guard
-        // (S3 guard was ssn || npi only). The existing test in NegativeContextInstitutionAnchorTests
-        // "Anchor has no effect for categories outside {ssn, npi}" uses .creditCard which is
-        // still outside the guard. The .name widening is intentional per design 02 §6 lines 905-910.
-        #expect(factor < 1.0, "foia anchor must suppress .name after S5 widening; factor=\(factor)")
+        // Behaviour note: .name is now inside the foia anchor guard (it was
+        // not in the earlier revision, which gated on ssn || npi only). The
+        // existing test in NegativeContextInstitutionAnchorTests "Anchor has
+        // no effect for categories outside {ssn, npi}" uses .creditCard,
+        // which is still outside the guard. The .name widening is
+        // intentional.
+        #expect(factor < 1.0, "foia anchor must suppress .name after widening; factor=\(factor)")
         #expect(abs(factor - 0.6) < 0.001, "expected 0.6; got \(factor)")
     }
 }

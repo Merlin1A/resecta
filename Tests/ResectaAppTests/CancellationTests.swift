@@ -3,7 +3,7 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// UI_UX §1.4 — Cancellation and rollback tests.
+// Cancellation and rollback tests.
 
 @Suite("Pipeline Cancellation")
 @MainActor
@@ -31,9 +31,9 @@ struct CancellationTests {
         #expect(redaction.outputURL == nil, "Redacting cancel must clear outputURL")
     }
 
-    @Test("Cancel from verifying transitions to .verified(report: .skipped) (Pkg L)")
+    @Test("Cancel from verifying transitions to .verified(report: .skipped)")
     func cancelFromVerifyingPreservesOutput() {
-        // Pkg L (CANCEL-009): cancel-from-verifying now lands on
+        // Cancel-from-verifying now lands on
         // `.verified(report: .skipped)` instead of `.editing` so the
         // background-resume banner can offer a Re-verify shortcut against
         // the still-valid `outputURL`. The redacted output and the
@@ -86,23 +86,23 @@ struct CancellationTests {
         #expect(doc.activePipelineTask == nil)
     }
 
-    // CAT-214: cancelClearsTask above only injects an empty Task and checks the
-    // synchronous nil-out. This guards the CANCEL-011 in-flight-suspension path:
+    // cancelClearsTask above only injects an empty Task and checks the
+    // synchronous nil-out. This guards the in-flight-suspension path:
     // a Task suspended inside real work, cancelled mid-flight, whose
-    // STATE-2 UUID-guarded defer must settle `activeRunId`. cancelActivePipeline
+    // UUID-guarded defer must settle `activeRunId`. cancelActivePipeline
     // nils `activePipelineTask` synchronously but does NOT touch `activeRunId`
     // (that is the production pipeline Task's defer, PipelineCoordinator:357-361,
     // which nils it only when the run still owns the UUID). The injected Task
-    // mirrors that defer; the CANCEL-011 awaiter drains it. Yield-loop (not an
+    // mirrors that defer; the awaiter drains it. Yield-loop (not an
     // absolute sleep) until the run id settles.
-    @Test("Cancel drains the in-flight Task and settles activeRunId via the STATE-2 UUID guard (CAT-214)")
+    @Test("Cancel drains the in-flight Task and settles activeRunId via the UUID guard")
     func cancelRacesInFlightTask() async {
         let doc = DocumentState()
         let redaction = RedactionState()
         let runId = UUID()
         doc.activeRunId = runId
         doc.activePipelineTask = Task { @MainActor in
-            // Mirror the production run Task's STATE-2 defer: on unwind (here via
+            // Mirror the production run Task's defer: on unwind (here via
             // cancellation surrendering the sleep) clear the run id only if this
             // run still owns it.
             defer { if doc.activeRunId == runId { doc.activeRunId = nil } }
@@ -116,13 +116,13 @@ struct CancellationTests {
         #expect(doc.activePipelineTask == nil)
 
         // activeRunId settles asynchronously once the cancelled Task unwinds its
-        // UUID-guarded defer (drained by the CANCEL-011 MainActor awaiter). Poll.
+        // UUID-guarded defer (drained by the MainActor awaiter). Poll.
         for _ in 0..<200 where doc.activeRunId != nil {
             await Task.yield()
             try? await Task.sleep(for: .milliseconds(5))
         }
         #expect(doc.activeRunId == nil,
-                "CANCEL-011 awaiter must settle activeRunId to nil once the cancelled run's UUID-guarded defer unwinds")
+                "The awaiter must settle activeRunId to nil once the cancelled run's UUID-guarded defer unwinds")
         #expect(doc.phaseKind == .editing,
                 "cancel-from-detecting must still land on .editing")
     }
@@ -149,11 +149,11 @@ struct CancellationTests {
         #expect(doc.phaseKind == .editing)
     }
 
-    // CAT-240 / CAT-157 / D-05: the OQ-1 `ocrReturnReport` precedence contract
+    // The `ocrReturnReport` precedence contract
     // was removed (no production writer ever set the field). This is the
     // canonical successor guard — cancel from `.verifying` now unconditionally
     // yields `.verified(report: .skipped)`; there is no return-report path.
-    @Test("Cancel from verifying yields .skipped when there is no return report (CAT-240)")
+    @Test("Cancel from verifying yields .skipped when there is no return report")
     func cancelFromVerifyingYieldsSkippedWhenNoReturnReport() {
         let doc = DocumentState()
         let redaction = RedactionState()

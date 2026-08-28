@@ -3,10 +3,10 @@ import SwiftUI
 // Workspace router and app-level concerns.
 // Owns: toast manager, pipeline-cancel scene-phase handler.
 // Delegates workspace-specific UI to HomeView and RedactWorkspaceView.
-// C3: Scene phase handling reaches into active workspace for pipeline cancellation.
-// C4: ToastQueueManager injected above the workspace switch for all workspaces.
+// Scene phase handling reaches into active workspace for pipeline cancellation.
+// ToastQueueManager injected above the workspace switch for all workspaces.
 //
-// SEC-4: App-switcher snapshot obfuscation is owned by `ResectaApp` (the
+// App-switcher snapshot obfuscation is owned by `ResectaApp` (the
 // `WindowGroup` root) — see `SnapshotPrivacyOverlay.swift`. Lifting it out
 // of `ContentView` is intended to cover the full window on iPad Stage
 // Manager and split-view, where ContentView's layout would not span the
@@ -18,7 +18,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    // §A4f: Toast queue manager — injected into environment for child views
+    // Toast queue manager — injected into environment for child views
     @State private var toastManager = ToastQueueManager()
 
     var body: some View {
@@ -30,27 +30,26 @@ struct ContentView: View {
                 RedactWorkspaceView(workspace: ws)
             }
         }
-        // Design Spec §8.2: Cross-dissolve on workspace switch.
-        // UXC-33 (RB-24): folded the hand-rolled reduceMotion ternary
-        // into `Anim.resolved` — the one canonical §A2.2 seam every
+        // Cross-dissolve on workspace switch.
+        // Folded the hand-rolled reduceMotion ternary
+        // into `Anim.resolved` — the one canonical seam every
         // other animation site already routes through.
         .animation(
             ResectaTokens.Anim.resolved(.easeInOut(duration: 0.25), reduceMotion: reduceMotion),
             value: appCoordinator.activeWorkspace.kind
         )
-        .environment(toastManager) // §A4f: inject toast manager
-        // §A6.7: Bottom toasts (info, success) — above page navigation bar
-        // WU-48: container animation routed through `Anim.resolved` so
-        // the slide-in spring crossfades to the §A2.2 opacity-only
+        .environment(toastManager) // inject toast manager
+        // Bottom toasts (info, success) — above page navigation bar
+        // Container animation routed through `Anim.resolved` so
+        // the slide-in spring crossfades to the opacity-only
         // fallback when Reduce Motion is on. Full enum path is spelled
-        // out per session-15 shorthand pitfall (`.toastIn` shorthand
-        // cannot infer through `Anim.resolved`'s `Animation` parameter).
+        // out because `.toastIn` shorthand cannot infer through
+        // `Anim.resolved`'s `Animation` parameter.
         .overlay(alignment: .bottom) {
             VStack(spacing: ResectaTokens.Spacing.sm) {
                 ForEach(toastManager.activeBottomToasts) { item in
                     ToastView(item: item, toastManager: toastManager)
-                        // UXC-33 (RB-24, partial revival of DC-023):
-                        // routed through the resolver so Reduce Motion
+                        // Routed through the resolver so Reduce Motion
                         // swaps the slide for an opacity-only crossfade.
                         .transition(ResectaTokens.Anim.resolvedTransition(
                             standard: .asymmetric(
@@ -62,22 +61,21 @@ struct ContentView: View {
                 }
             }
             // Clear page nav bar — and the Search/Scan sheet parked at
-            // the compact float (`bottomClearance`, UXC-51).
+            // the compact float (`bottomClearance`).
             .padding(.bottom, ResectaTokens.Spacing.xl + toastManager.bottomClearance)
             .animation(
                 ResectaTokens.Anim.resolved(ResectaTokens.Anim.toastIn, reduceMotion: reduceMotion),
                 value: toastManager.toastVersion
             )
         }
-        // §A6.7: Top toasts (warning, error) — below the navigation bar
-        // WU-48: see bottom-overlay comment above; same Reduce-Motion
+        // Top toasts (warning, error) — below the navigation bar
+        // See bottom-overlay comment above; same Reduce-Motion
         // routing applies to the top toast stack.
         .overlay(alignment: .top) {
             VStack(spacing: ResectaTokens.Spacing.sm) {
                 ForEach(toastManager.activeTopToasts) { item in
                     ToastView(item: item, toastManager: toastManager)
-                        // UXC-33 (RB-24, partial revival of DC-023):
-                        // routed through the resolver so Reduce Motion
+                        // Routed through the resolver so Reduce Motion
                         // swaps the slide for an opacity-only crossfade.
                         .transition(ResectaTokens.Anim.resolvedTransition(
                             standard: .asymmetric(
@@ -94,13 +92,13 @@ struct ContentView: View {
                 value: toastManager.toastVersion
             )
         }
-        // ARCH §11: Cancel pipeline on .background.
-        // C9: wasPausedByBackground stays true — user dismisses via InlineWarningBanner.
-        // SEC-4: The .inactive/.active obscure-and-reveal flip lives at the
+        // Cancel pipeline on .background.
+        // wasPausedByBackground stays true — user dismisses via InlineWarningBanner.
+        // The .inactive/.active obscure-and-reveal flip lives at the
         // WindowGroup root (see ResectaApp.swift). This handler only owns
         // the cancellation side effect.
         .onChange(of: scenePhase) { _, newPhase in
-            // C3: Reach into active workspace for pipeline cancellation
+            // Reach into active workspace for pipeline cancellation
             if newPhase == .background,
                case .redact(let ws) = appCoordinator.activeWorkspace,
                ws.documentState.phaseKind.isCancellable {
@@ -112,10 +110,10 @@ struct ContentView: View {
                 ws.documentState.cancelActivePipeline(redactionState: ws.redactionState)
                 ws.documentState.wasPausedByBackground = true
             }
-            // C9: Do NOT clear wasPausedByBackground on .active here.
+            // Do NOT clear wasPausedByBackground on .active here.
             // The InlineWarningBanner in DocumentEditorView handles dismissal.
         }
-        // RES-03 (Pkg N): drain the toast queue on every workspace switch.
+        // Drain the toast queue on every workspace switch.
         // Workspace tear-down (AppCoordinator.tearDownCurrentWorkspace)
         // happens just before `activeWorkspace` flips, so by the time
         // this `.onChange` fires the old document context is gone — any

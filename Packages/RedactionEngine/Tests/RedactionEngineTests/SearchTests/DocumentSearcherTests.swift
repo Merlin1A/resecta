@@ -5,9 +5,9 @@ import PDFKit
 @Suite("DocumentSearcher", .tags(.search))
 struct DocumentSearcherTests {
 
-    // MARK: - CAT-054 process-shared PIIDetector
+    // MARK: - Process-shared PIIDetector
 
-    @Test("Two searchers share one process-level PIIDetector Bloom buffer (CAT-054)")
+    @Test("Two searchers share one process-level PIIDetector Bloom buffer")
     func sharedPIIDetectorIdentity() {
         let a = DocumentSearcher()
         let b = DocumentSearcher()
@@ -46,9 +46,9 @@ struct DocumentSearcherTests {
         }
 
         #expect(results.count >= 1)
-        // UXF-15: matchedText displays the original casing, re-sliced from
+        // matchedText displays the original casing, re-sliced from
         // the case-preserved base text. Matching itself still runs on the
-        // normalized form (REDACTION_ENGINE.md §9.6).
+        // normalized form.
         #expect(results.first?.matchedText == "John")
         #expect(results.first?.pageIndex == 0)
         #expect(results.first?.term == "John")
@@ -77,7 +77,7 @@ struct DocumentSearcherTests {
         }
 
         #expect(results.count >= 1)
-        // UXF-15: the case-insensitive match still displays the document's
+        // The case-insensitive match still displays the document's
         // original casing ("Hello"), not the case-folded search form.
         #expect(results.first?.matchedText == "Hello")
     }
@@ -210,7 +210,7 @@ struct DocumentSearcherTests {
         }
     }
 
-    // MARK: - Context window (UXC-45 / RB-101 — the contract these pin)
+    // MARK: - Context window
     //
     // `contextSnippet` returns the window text AND the match's Character
     // range inside it; every builder path threads that range onto
@@ -680,7 +680,7 @@ struct DocumentSearcherTests {
 
     // MARK: - B1: Per-Page CJK Detection
 
-    @Test("CJK detection is per-page for multilingual documents (§9.7)")
+    @Test("CJK detection is per-page for multilingual documents")
     func perPageCJKDetection() async {
         // Page 0: English text — whole-word should apply
         // Page 1: Japanese text — whole-word should be disabled
@@ -716,9 +716,9 @@ struct DocumentSearcherTests {
         #expect(page1Results.count >= 1, "CJK page should find 'art' without word-boundary restriction")
     }
 
-    // MARK: - S1: OCR Memory Guard
+    // MARK: - OCR memory guard
 
-    @Test("OCR skips oversized pages gracefully (ENGINE §2.5)")
+    @Test("OCR skips oversized pages gracefully")
     func ocrSkipsOversizedPages() async {
         // Create a PDF with a very large cropBox (5000×5000 points).
         // At 300/72 DPI scale = 4.167, this gives ~20833×20833 pixels,
@@ -774,7 +774,7 @@ struct DocumentSearcherTests {
         #expect(pixelH <= 10_000, "Letter page height at 300 DPI should be under cap")
     }
 
-    // MARK: - D06-F2 Part 1: belowThresholdSink
+    // MARK: - belowThresholdSink
 
     /// Thread-safe accumulator for the `@Sendable` below-threshold sink. The sink
     /// fires synchronously on the searcher actor during page processing, so by the
@@ -832,14 +832,14 @@ struct DocumentSearcherTests {
                 "fixture precondition: the SSN match (confidence < 1.0) drops at cutoff 1.0")
     }
 
-    // MARK: - UXF-15 display re-slice helper
+    // MARK: - Display re-slice helper
 
     @Test("displaySlice returns the fallback on Character-count drift")
     func displaySliceDriftFallback() {
         // Simulated drift: the case-preserved analog has a different
-        // Character count than the base text (the BUG-006-norm-drift
-        // trap). The helper must refuse the re-slice and return the
-        // normalized fallback rather than index with drifted offsets.
+        // Character count than the base text. The helper must refuse the
+        // re-slice and return the normalized fallback rather than index
+        // with drifted offsets.
         let result = DocumentSearcher.displaySlice(
             start: 0, length: 4, offsetMap: nil,
             displayChars: Array("file"), baseCount: 5, fallback: "fallback")

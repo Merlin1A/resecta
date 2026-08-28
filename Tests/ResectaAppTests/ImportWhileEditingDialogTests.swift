@@ -1,13 +1,13 @@
 import Testing
 @testable import ResectaApp
 
-// UXC-31 (RB-40) — dialog-grammar normalization. The D12
+// Dialog-grammar normalization. The
 // import-while-editing confirmation previously read as a statement
 // ("You have a document open") with a Title-Case destructive button
 // ("Import New"); this pins the app-wide dominant grammar instead:
 // sentence-case QUESTION title + bare-verb destructive button.
 
-@Suite("Import-while-editing dialog copy (UXC-31/RB-40)")
+@Suite("Import-while-editing dialog copy")
 @MainActor
 struct ImportWhileEditingDialogTests {
 

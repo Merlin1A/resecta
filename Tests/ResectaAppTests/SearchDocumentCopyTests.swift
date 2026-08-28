@@ -5,17 +5,17 @@ import UIKit
 import RedactionEngine
 @testable import ResectaApp
 
-// SEARCH D10-F1 — per-consumer PDFDocument copy (`DocumentState.makeSearchCopy`).
+// Per-consumer PDFDocument copy (`DocumentState.makeSearchCopy`).
 // These cover the COPY mechanism the background search and the live-preview
 // text-walk rely on so neither reads the on-screen instance the main-thread
-// PDFView renders. NEW app-target file → ran `./regenerate.sh` so XcodeGen
-// registers it (per the session plan testFiles note).
+// PDFView renders. New app-target files require running `./regenerate.sh` so
+// XcodeGen registers them.
 //
 // The view-level fail-closed wiring (trigger sets `isSearching = false` +
 // enqueues the toast; live preview calls `clearLivePreview()` when the copy is
 // nil) requires constructing the SwiftUI sheet + its environment, which is out
 // of unit-test scope without a production seam — that integration belongs to
-// the iOS 26.4 sim pass (JESSE-TRACK: J-COPY-VERIFY). The helper-level
+// the iOS 26.4 sim pass. The helper-level
 // nil-contract and the anti-shared-instance discipline ARE covered here.
 @Suite("Search per-consumer document copy", .tags(.search))
 @MainActor

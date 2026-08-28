@@ -4,14 +4,13 @@ import PDFKit
 import CoreGraphics
 @testable import RedactionEngine
 
-// EXP-012 migrated: Adversarial PDF Defense
-// Audit: AD-2-1 (High), AD-4-1 (High)
+// Adversarial PDF Defense.
 // Tests whether hidden OCG layers leak text and sub-threshold filtering works.
 
 @Suite("Adversarial PDF Defense", .tags(.security))
 struct AdversarialPDFDefenseTests {
 
-    // --- AD-2-1: PDFKit extracts text from hidden OCG layers ---
+    // --- PDFKit extracts text from hidden OCG layers ---
     @Test("OCG hidden text is extractable by PDFKit (AD-2-1)")
     func ocgHiddenTextExtraction() throws {
         let data = TestFixtures.ocgHiddenLayerPDF(hiddenText: "CONFIDENTIAL")
@@ -23,12 +22,12 @@ struct AdversarialPDFDefenseTests {
 
         // PDFKit extracts hidden OCG text regardless of visibility state.
         // This is the security finding: sandwich mode must detect OCG layers
-        // and strip hidden text. See ENGINE §6.4.
+        // and strip hidden text.
         #expect(pageText.contains("CONFIDENTIAL"),
                 "AD-2-1: PDFKit must extract hidden OCG text — if not, fixture is broken")
     }
 
-    // --- AD-4-1: Sub-threshold region filtering creates false security ---
+    // --- Sub-threshold region filtering creates false security ---
     @Test("Sub-threshold regions are filtered out (AD-4-1)")
     func subThresholdRegionFiltering() {
         let threshold: CGFloat = 0.001

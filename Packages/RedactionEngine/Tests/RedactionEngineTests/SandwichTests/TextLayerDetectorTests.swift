@@ -2,7 +2,7 @@ import Testing
 import PDFKit
 @testable import RedactionEngine
 
-// Tests for ENGINE §5A — text layer detection and fallback triggers.
+// Tests for text layer detection and fallback triggers.
 
 @Suite("Text Layer Detection")
 struct TextLayerDetectorTests {
@@ -73,7 +73,7 @@ struct TextLayerDetectorTests {
         #expect(reason == .noExtractableText)
     }
 
-    // MARK: - Character diversity floor (RC-9 / PD-5 part 1)
+    // MARK: - Character diversity floor
     //
     // The former unique/total < 0.05 ratio was length-confounded: the
     // distinct-character set saturates (~70 for Latin text) while the total

@@ -1,14 +1,14 @@
 import PDFKit
 import CoreGraphics
 
-// ENGINE §5B.1 — PDFSelection-based character extraction.
+// PDFSelection-based character extraction.
 // Uses composed-character-sequence iteration to handle surrogate pairs,
 // emoji, and other multi-codeunit characters correctly.
 // Avoids PDFPage.characterBounds(at:) due to iOS 18 regression (FB14843671, KI-2).
 
 /// Stateless text extractor for the Searchable Redaction pipeline.
 /// Extracts character positions from source PDF pages BEFORE rasterization
-/// to preserve text layer data. See ENGINE §5B for the full specification.
+/// to preserve text layer data.
 public struct TextLayerExtractor: Sendable {
 
     public init() {}
@@ -17,13 +17,13 @@ public struct TextLayerExtractor: Sendable {
     ///
     /// Uses PDFSelection-based workaround for character bounds (KI-2).
     /// Iterates using composed-character-sequence ranges to correctly
-    /// handle surrogate pairs, emoji, and composed characters (EXP-011).
+    /// handle surrogate pairs, emoji, and composed characters.
     /// Synthesized separator offsets whose selection clamps to a
     /// neighboring glyph produce no entry, and neither does a whitespace
     /// offset whose selection box spans an inter-run gutter (see the
     /// in-loop notes); word-spacing whitespace keeps its entry.
     /// Each entry carries `lineIndex` — the count of line-separator
-    /// offsets seen before it in `page.string` (PD-7); the line-aware
+    /// offsets seen before it in `page.string`; the line-aware
     /// character filter derives its per-line bands from this partition.
     ///
     /// - Parameter hasHiddenOCG: Doc-level OCG hidden-layer presence flag.
@@ -32,7 +32,7 @@ public struct TextLayerExtractor: Sendable {
     ///   which is nil for `PDFDocument(data:)`. Defaults to `false` for
     ///   call sites that load fixtures via URL.
     /// - Throws: `PipelineError.redactionError(.reconstructionFailed)` if the
-    ///   page references hidden OCG layers (AD-2-1 defense).
+    ///   page references hidden OCG layers.
     /// - Returns: Array of CharacterInfo in document order.
     @concurrent
     public func extractCharacters(
@@ -40,17 +40,16 @@ public struct TextLayerExtractor: Sendable {
     ) async throws -> [CharacterInfo] {
         try Task.checkCancellation()
 
-        // OCG hidden text defense (AD-2-1, EXP-012): page.string extracts ALL
+        // OCG hidden text defense: page.string extracts ALL
         // text including text in OCG layers marked /OFF. If hidden OCGs are
         // detected, throw to trigger per-page fallback to Secure Rasterization.
-        // See ENGINE §5B.1.
         if Self.pageReferencesHiddenOCG(page, hasHiddenOCG: hasHiddenOCG) {
             throw PipelineError.redactionError(.reconstructionFailed)
         }
 
         guard let pageText = page.string else { return [] }
         let nsText = pageText as NSString
-        let totalCodeUnits = page.numberOfCharacters  // UTF-16 count (Experiment F)
+        let totalCodeUnits = page.numberOfCharacters  // UTF-16 count
         var characters: [CharacterInfo] = []
         characters.reserveCapacity(totalCodeUnits)
 
@@ -80,17 +79,17 @@ public struct TextLayerExtractor: Sendable {
         let cropBox = page.bounds(for: .cropBox)
         let rotation = ((page.rotation % 360) + 360) % 360
 
-        // ENGINE §5B.1: composed-character-sequence iteration via NSString.
-        // PDFKit APIs use UTF-16 offsets (EXP-011).
-        // PERF-8 / CANCEL-003: 256-iteration band counter — a 10k-character
+        // Composed-character-sequence iteration via NSString.
+        // PDFKit APIs use UTF-16 offsets.
+        // 256-iteration band counter — a 10k-character
         // page otherwise exceeds the 50 ms p95 cancel→surrender budget.
         var utf16Offset = 0
         var bandCounter = 0
-        // PD-7 line partition: ticks at every line-separator source offset,
+        // Line partition: ticks at every line-separator source offset,
         // including offsets the guards below skip (nil selection, zero-size
         // bounds), so `lineIndex` is a property of the string alone.
         var lineIndex = 0
-        // RC-10 break reference: the previous appended entry's PRE-rotation
+        // Break reference: the previous appended entry's PRE-rotation
         // width. Pre-rotation because /Rotate 90/270 swaps the axes and the
         // gutter test below compares along the advance axis.
         var previousLocalWidth: CGFloat?
@@ -179,21 +178,21 @@ public struct TextLayerExtractor: Sendable {
 
     /// Map a cropBox-LOCAL rect (origin already subtracted) into OUTPUT-page
     /// space: zero-origin and rotation-applied (DISPLAYED). `/Rotate r` displays
-    /// the page rotated r° clockwise (ISO 32000 §8.3.2; PixelOperations.swift §8.3
+    /// the page rotated r° clockwise (ISO 32000, clause 8.3.2; PixelOperations.swift
     /// note); PDFKit clamps r to {0, 90, 180, 270}, and the caller pre-normalizes.
     ///
     /// `size` is the SOURCE cropBox size, PRE-swap — the same `(w, h)` whose swap
-    /// produces `effectiveSize`, never the effective/displayed dims (ADV-2 A2-7).
+    /// produces `effectiveSize`, never the effective/displayed dims.
     /// `page.bounds(for: .cropBox)` reports this unrotated size for all rotations
     /// (pinned by E1). The four-case derivation (independently re-derived and
-    /// corner-checked) is ADV-2 A2-7; with local rect `(x, y, wr, hr)`:
+    /// corner-checked) follows, with local rect `(x, y, wr, hr)`:
     ///   • r = 0:   identity.
     ///   • r = 90:  origin (y, w − x − wr), size (hr, wr).
     ///   • r = 180: origin (w − x − wr, h − y − hr), size (wr, hr) — double origin
     ///              mirror, NO dimension swap.
     ///   • r = 270: origin (h − y − hr, x), size (hr, wr).
     /// The region side needs no mirror (it is produced in displayed space by every
-    /// producer, ADV-2 A2-8), so both filter inputs end in one displayed frame.
+    /// producer), so both filter inputs end in one displayed frame.
     static func rotateRectIntoOutputSpace(
         _ rect: CGRect, sourceCropSize size: CGSize, rotation: Int
     ) -> CGRect {
@@ -211,7 +210,7 @@ public struct TextLayerExtractor: Sendable {
         }
     }
 
-    // MARK: - OCG Hidden Layer Defense (AD-2-1)
+    // MARK: - OCG Hidden Layer Defense
 
     /// Check if a page references Optional Content Groups with hidden layers.
     /// Conservative approach for v1.0: any hidden OCG triggers fallback.
@@ -219,9 +218,8 @@ public struct TextLayerExtractor: Sendable {
     /// page.string extracts text from ALL OCGs including those marked /OFF.
     /// If hidden text exists, the character filter could miss it (text is in
     /// page.string but not visually positioned), creating a leakage path.
-    /// See ENGINE §5B.1 and EXP-012.
     ///
-    /// M1: the doc-level walk (`/OCProperties → /D → /OFF`) is precomputed at
+    /// The doc-level walk (`/OCProperties → /D → /OFF`) is precomputed at
     /// import time and supplied via `hasHiddenOCG`. The previous in-engine
     /// walk went through `page.document?.documentURL`, which is nil for
     /// `PDFDocument(data:)` — i.e. every production import path — so the
@@ -252,8 +250,7 @@ public struct TextLayerExtractor: Sendable {
     /// `/OCProperties → /D → /OFF` and reports whether any OCGs are marked
     /// hidden by the default config. The page-level companion
     /// `pageReferencesHiddenOCG(_:hasHiddenOCG:)` consumes this flag and adds
-    /// the cheap per-page `/Resources /Properties` check. See ENGINE §5B.1
-    /// (M1 fix).
+    /// the cheap per-page `/Resources /Properties` check.
     public static func documentHasHiddenOCG(_ document: CGPDFDocument) -> Bool {
         guard let catalog = document.catalog else { return false }
 

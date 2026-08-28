@@ -6,7 +6,7 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// DRAW-3 — Heuristic signature detector tests. Triage-only — these tests
+// Heuristic signature detector tests. Triage-only — these tests
 // verify both the detector behavior and the engine-side invariant that the
 // detector emits `.pii(.signatureCandidate)` so the state-layer's
 // `applyDetectionResults` can route to triage rather than auto-applying.

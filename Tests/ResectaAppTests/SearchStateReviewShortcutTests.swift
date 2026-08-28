@@ -3,7 +3,7 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-@Suite("SearchState review shortcuts (W7)", .tags(.search))
+@Suite("SearchState review shortcuts", .tags(.search))
 @MainActor
 struct SearchStateReviewShortcutTests {
 

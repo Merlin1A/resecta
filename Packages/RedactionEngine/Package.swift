@@ -3,14 +3,12 @@ import PackageDescription
 
 let package = Package(
     name: "RedactionEngine",
-    // GAP-DEPTARGET-NER (D04-F3 == D11-F3) — deployment floor stays iOS 26.0 by
-    // design. The runtime `.nameType` NER name model is reliably provisioned only
-    // on iOS 26.4+ (per the detection harness pin), but the 26.0 floor is
-    // INTENTIONAL: non-NER detectors plus the SEC-7 auto-detect-degraded banner
-    // (which now also fires when the NER MobileAsset is absent) cover the 26.0–26.3
-    // gap. Do NOT raise to 26.4 here — that would drop 26.0–26.3 devices and is a
-    // Jesse decision (J-DEPTARGET / J-NER-ONDEVICE option B). On-device asset-absent
-    // confirmation is owned by GAP-REL-ONDEVICE / J-NER-ONDEVICE.
+    // The deployment floor stays iOS 26.0 by design. The runtime `.nameType` NER
+    // name model is reliably provisioned only on iOS 26.4+ (per the detection
+    // harness pin), but the 26.0 floor is intentional: non-NER detectors plus the
+    // auto-detect-degraded banner (which also fires when the NER MobileAsset is
+    // absent) cover the 26.0–26.3 gap. Do not raise it to 26.4 here — that would
+    // drop 26.0–26.3 devices.
     // macOS is a TOOLING destination only (lets `swift test` run on Mac hosts);
     // the shipping product is iOS. Platform seams are conditional-compilation
     // only — the iOS compilation path is unchanged.
@@ -41,14 +39,14 @@ let package = Package(
                 // `PacketSnapshotTests`) — bundled so `PacketPRHarnessTests`
                 // can load it.
                 .copy("Fixtures/snapshots"),
-                // DataPipeline-produced fixtures. Phase 2 adds `corpus`
-                // (awaits Jesse's `make install-assets` for real g8 corpus;
-                // empty placeholder README meanwhile).
+                // DataPipeline-produced fixtures. `corpus` is populated by the
+                // datapipeline's `make install-assets` (an empty placeholder
+                // README ships meanwhile).
                 .copy("Fixtures/corpus"),
                 .copy("Fixtures/fuzz"),
                 .copy("Fixtures/vectors"),
                 .copy("Fixtures/adversarial"),
-                // Package J — TEST-neg-ctx-test-target-wiring. The
+                // Test-target resource wiring. The
                 // `NegativeContextInstitutionAnchorTests` suite needs
                 // `negative_context.json` (and the rest of the gazetteer
                 // bundle) accessible from the test target's `Bundle.module`
@@ -56,7 +54,7 @@ let package = Package(
                 // the source target's `.module`. Path is relative to the
                 // test target's source dir (`Tests/RedactionEngineTests`).
                 .copy("../../Sources/RedactionEngine/Resources/Gazetteers"),
-                // SEC-7 asset-diagnostics tests need the canonical Classifier/
+                // The asset-diagnostics tests need the canonical Classifier/
                 // assets (context-scorer / doctype-temperature /
                 // preset-thresholds / doctype-keywords) reachable from the test
                 // target's `Bundle.module` to build scratch bundles with

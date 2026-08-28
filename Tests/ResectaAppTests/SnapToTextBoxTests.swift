@@ -5,16 +5,16 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// DRAW-7 — Snap-to-text-box assist tests.
+// Snap-to-text-box assist tests.
 //
 // While the user drags a rectangle in drawing mode, in-progress edges
 // within `snapToTextToleranceAtUnitZoom / zoomScale` overlay-space
 // points of an OCR text-block edge are nudged onto the text edge. The
 // assist is designed to align edges to recognized text rows; it does
 // not promise alignment for every drag (mechanism-description
-// language, I6).
+// language).
 //
-// DRAW-7 contract:
+// Contract:
 //   - Tolerance baseline: 8 pt at 1× zoom; scales by `1/zoomScale`.
 //   - Default on; opt-out via `SettingsState.snapToTextEnabled`.
 //   - Hook into `touchesMoved`, NOT `touchesEnded`.
@@ -28,7 +28,7 @@ import Foundation
 // (0.10, 0.10, 0.30, 0.05), and a candidate drag rect within 8 pt of
 // each edge in overlay coords.
 
-@Suite("Snap-to-Text-Box Assist (DRAW-7)")
+@Suite("Snap-to-Text-Box Assist")
 @MainActor
 struct SnapToTextBoxTests {
 
@@ -80,7 +80,7 @@ struct SnapToTextBoxTests {
         let movePoint = CGPoint(x: endOverlay.maxX, y: endOverlay.maxY)
 
         // ONE touch identity across began → moved → ended: the overlay
-        // keys the gesture on the primary `UITouch` instance (S1-d).
+        // keys the gesture on the primary `UITouch` instance.
         let touch = StubTouch(location: beginPoint, view: overlay)
         overlay.touchesBegan([touch], with: nil)
         touch.move(to: movePoint)
@@ -151,8 +151,8 @@ struct SnapToTextBoxTests {
     func testToleranceScalesWithZoom() {
         // At 1× the tolerance is 8 pt; at 2× it halves to 4 pt. A
         // 5 pt offset at 2× is beyond tolerance, so the snap must
-        // not fire. This pins the `1/zoomScale` math from the contract
-        // DRAW-7.
+        // not fire. This pins the `1/zoomScale` math from the tolerance
+        // contract.
         let overlay = makeOverlay(zoomOverride: 2.0)
 
         // 5 pt offset in overlay space → 5/400 in normalized space.
@@ -219,5 +219,5 @@ struct SnapToTextBoxTests {
 // MARK: - Test helpers
 
 // `RecordingCoordinator` + `StubTouch` live in the shared
-// `Fixtures/CanvasTouchHarness.swift` (one internal copy since the
-// 1.1.0 draw-tool S1 session).
+// `Fixtures/CanvasTouchHarness.swift` (one internal copy shared across
+// the draw-tool test suites).

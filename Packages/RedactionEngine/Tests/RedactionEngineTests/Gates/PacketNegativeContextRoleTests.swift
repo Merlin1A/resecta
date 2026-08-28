@@ -3,7 +3,7 @@ import Foundation
 import PDFKit
 @testable import RedactionEngine
 
-// S06 -- INV-2 retirement checklist, ROLE 3 of 3.
+// Retirement-checklist coverage for the negative-context gate.
 //
 // The packet successor to the full-document SWEEP half of
 // `NegativeContextBeforeAfterGateTests`. That suite sweeps a document twice --
@@ -11,15 +11,15 @@ import PDFKit
 // gazetteer (AFTER / suppression active) -- and emits per-category surfaced /
 // suppressed / dropped counts, asserting non-trivial output. This suite proves
 // the SAME role on the synthetic Hartwell packet so the retired fixture can be
-// dropped at F28 with no negative-context coverage gap.
+// dropped with no negative-context coverage gap.
 //
 // Scope (what transfers vs what stays): the predecessor test has TWO parts -- Part A
 // (the full-document sweep) and Part B (the G8 corpus TP/FP/FN scoring). Only Part A
 // is fixture-specific; the G8 corpus part is fixture-INDEPENDENT and survives
-// F28 untouched. This suite is the packet analog of Part A.
+// untouched. This suite is the packet analog of Part A.
 //
 // The negative program this exercises: the packet carries 31 must_not_fire
-// occurrences (post-S05 reconciliation) across categories ssn/routingNumber/
+// occurrences across categories ssn/routingNumber/
 // ein/itin/creditCard/account/phone/dob/driversLicense/licensePlate/passport --
 // the precision program. The LIVE per-occurrence freeze (no must_not_fire fires
 // as its own category) is `PacketRegressionTests.mustNotFirePrecisionFreeze`;
@@ -27,9 +27,9 @@ import PDFKit
 // cover, asserting the negative-context mechanism is suppress-only (monotonic).
 //
 // Deterministic TEXT leg (no Vision) -- `page.string` + `PIIDetector.detect`.
-// MATCHED-TEXT LOGGING (D31): synthetic fixture; this suite logs counts only.
+// MATCHED-TEXT LOGGING: synthetic fixture; this suite logs counts only.
 
-@Suite("Packet negative-context before/after role (S06 retirement checklist)", .serialized)
+@Suite("Packet negative-context before/after role", .serialized)
 struct PacketNegativeContextRoleTests {
 
     /// Per-category surfaced/suppressed/dropped accumulators for one config.
@@ -67,7 +67,7 @@ struct PacketNegativeContextRoleTests {
         return (s, document.pageCount)
     }
 
-    @Test("Packet before/after gazetteer sweep is suppress-only (realdoc ROLE 3 successor)")
+    @Test("Packet before/after gazetteer sweep is suppress-only")
     func packetNegativeContextSweep() async throws {
         // BEFORE: nil gazetteer (current production baseline).
         let (before, pageCount) = try await sweepPacket(gazetteer: nil)

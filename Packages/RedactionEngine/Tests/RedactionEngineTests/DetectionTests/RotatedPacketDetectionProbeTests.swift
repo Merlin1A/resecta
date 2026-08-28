@@ -4,13 +4,13 @@ import PDFKit
 import Testing
 @testable import RedactionEngine
 
-// q31 / QW-14 -- rotate-trigger probe: a REPORT-ONLY measured verdict on the
+// rotate-trigger probe: a REPORT-ONLY measured verdict on the
 // open rotated-coordinate question.
 //
-// The `~/resecta-sample-doc` generator builds a `rotate-trigger` packet variant:
+// The resecta-sample-doc generator builds a `rotate-trigger` packet variant:
 // the same 12-page Hartwell loan packet with `/Rotate 90` on every page and the
 // ground truth transformed into rotated DISPLAY space ((nx,ny) -> (ny, 1-nx)).
-// variants.py labels it "a deliberate TRIGGER for the open rotated-coordinate
+// resecta-sample-doc/packet/variants.py labels it "a deliberate TRIGGER for the open rotated-coordinate
 // P0 ... FAILS against the current engine until that fix lands" -- but until
 // this probe the variant had zero consumers, so the actual status of DETECTION
 // on a rotated source was unmeasured. (RECONSTRUCTION-side rotation is pinned
@@ -22,26 +22,27 @@ import Testing
 // (suite stays green) and the measured pass is also green. VERDICT (first
 // run, 2026-07-06): text-leg detection SURVIVES /Rotate 90 -- region recall
 // 1.000, strict 1.000, IoU>=0.5 0.935 over 46 measured must_fire -- so the
-// variants.py "FAILS until the fix lands" note is stale (upstream close
-// recommended; the sample-doc edit is not this PR).
+// resecta-sample-doc/packet/variants.py "FAILS until the fix lands" note is
+// stale (an upstream fix there is not part of this change).
 //
-// Scoring reuses the D22 Option-C P/R harness verbatim
+// Scoring reuses the precision/recall harness verbatim
 // (PacketPRHarnessTests.join: coverage >= 0.5 == region hit, DetEval span
 // merge credit) against the TRANSFORMED ground truth, over the 55 drawn
 // must_fire occurrences (carried_stmt entries have no bbox and are excluded,
 // as in the harness's region metrics).
 //
-// MATCHED-TEXT LOGGING: same D31 exemption as the packet suites -- fully
+// MATCHED-TEXT LOGGING: same exemption as the packet suites -- fully
 // synthetic fixture with a public values manifest (TestHelpers.swift
-// loan-packet note); production logging rules (ARCH 12.2) untouched.
+// loan-packet note); production logging rules are untouched.
 
-@Suite("Rotate-trigger packet -- detection probe (q31/QW-14)", .serialized)
+@Suite("Rotate-trigger packet -- detection probe", .serialized)
 struct RotatedPacketDetectionProbeTests {
 
     enum RotatedFixtureError: Error { case missingResource }
 
     // MARK: - Fixture loading (probe fixture: no SHA pin -- not a frozen
-    // contract; generation command + sample-doc SHA recorded in the PR body)
+    // contract; the generation command and sample-doc SHA are recorded
+    // separately)
 
     static func rotatedPacketPDF() throws -> Data {
         guard let url = Bundle.module.url(
@@ -109,7 +110,7 @@ struct RotatedPacketDetectionProbeTests {
         await Self.warmUpVision(orchestrator, rasterizer)
 
         // Per-page detections per leg, in the harness's Detection shape so the
-        // join verdict is bit-identical to the S05/B scoring.
+        // join verdict is bit-identical to the packet harness's scoring.
         var textDets: [Int: [PacketPRHarnessTests.Detection]] = [:]
         var ocrDets: [Int: [PacketPRHarnessTests.Detection]] = [:]
         var textBlocked: Set<Int> = []
@@ -165,17 +166,17 @@ struct RotatedPacketDetectionProbeTests {
         let ocrScore = Self.score(gt.occurrences, leg: "ocr", dets: ocrDets, blocked: ocrBlocked)
         for s in [textScore, ocrScore] { Self.printScore(s) }
 
-        // The measured verdict, report-only. MEASURED 2026-07-06 (q31, first
+        // The measured verdict, report-only. MEASURED 2026-07-06 (first
         // run of the probe): text-leg region recall 1.000 (46/46 must_fire
         // covered; strict 1.000; IoU>=0.5 0.935) -- rotated-source detection
-        // PASSED, contradicting the variants.py "FAILS until the fix lands"
-        // prediction. The strict withKnownIssue form was verified in both
+        // PASSED, contradicting the resecta-sample-doc/packet/variants.py
+        // "FAILS until the fix lands" prediction. The strict withKnownIssue form was verified in both
         // directions on that run (the unexpected pass flagged loudly);
         // `isIntermittent: true` now keeps the suite green on this measured
         // pass while a future regression below the bar is still RECORDED as a
         // known issue, not a gating red -- the probe stays report-only.
         let knownIssueNote = Comment(rawValue:
-            "QW-14 rotated-coordinate probe: measured PASS 2026-07-06 "
+            "rotated-coordinate probe: measured PASS 2026-07-06 "
             + "(text-leg region recall 1.000); a recorded issue here means "
             + "rotated-source detection recall has regressed below 0.5")
         let verdictNote = Comment(rawValue:
@@ -255,8 +256,8 @@ struct RotatedPacketDetectionProbeTests {
                 Double(d.normalizedRect.width), Double(d.normalizedRect.height)])
     }
 
-    /// detectPage with cold-start retries (S8/S01 lesson: transient Vision #9
-    /// "could not create inference context" on early requests; retry warms it).
+    /// detectPage with cold-start retries: a transient Vision #9
+    /// "could not create inference context" can occur on early requests; retry warms it.
     static func detectWithRetry(
         _ orchestrator: DetectionOrchestrator, image: CGImage, pageIndex: Int,
         embeddedText: EmbeddedTextSource?

@@ -3,9 +3,9 @@ import Foundation
 import CoreGraphics
 @testable import RedactionEngine
 
-// WS1 item 1.5 — Barcode payload PII-scan tests.
+// Barcode payload PII-scan tests.
 //
-// Exercises the orchestrator's payload-scan step (ENGINE §4.19) that runs
+// Exercises the orchestrator's payload-scan step that runs
 // PIIDetector over each barcode's matchedText and emits payload-PII detections
 // sharing the barcode's normalizedRect. Tests operate at the
 // PIIDetector/orchestrator layer (no Vision required) using synthetic
@@ -13,10 +13,10 @@ import CoreGraphics
 //
 // .serialized: tests call piiDetector.detect which is @concurrent; running
 // the suite serially prevents cooperative-pool starvation on the simulator.
-@Suite("Barcode Payload PII (WS1 item 1.5)", .serialized)
+@Suite("Barcode Payload PII", .serialized)
 struct BarcodePayloadPIITests {
 
-    // MARK: - §2 Required Tests
+    // MARK: - Required Tests
 
     // Verifies that a PIIDetector scan of an SSN-containing payload matches
     // the SSN. This validates the detection-layer contract (PIIDetector must
@@ -36,7 +36,7 @@ struct BarcodePayloadPIITests {
     // ADVERSARIAL: SSN embedded in a URL — the SSN pattern is structural
     // (digit groups, separator), not anchored to word boundaries that a URL
     // would suppress. The barcode payload path does not strip URLs.
-    // Design §2 test plan: payload "https://example.com/123-45-6789" → SSN still detected.
+    // Test plan: payload "https://example.com/123-45-6789" → SSN still detected.
     @Test("ADVERSARIAL: SSN embedded in URL payload is still detected by PIIDetector")
     func testSSNInURLPayloadStillDetected() async {
         // SSN pattern matches on digit groups regardless of URL context.
@@ -97,8 +97,7 @@ struct BarcodePayloadPIITests {
     // that is the minimum of the two inputs.
     @Test("min(barcode confidence, match confidence) formula enforces lower bound")
     func testMinConfidenceFormula() {
-        // Pure arithmetic test of the confidence formula used in
-        // ENGINE §4.19 payload scan.
+        // Pure arithmetic test of the confidence formula used in the payload scan.
         let barcodeConfidence: Double = 0.5
         let matchConfidence: Double = 0.9
         let result = min(barcodeConfidence, matchConfidence)

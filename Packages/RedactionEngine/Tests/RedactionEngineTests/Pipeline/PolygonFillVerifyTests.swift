@@ -3,7 +3,7 @@ import Foundation
 import CoreGraphics
 @testable import RedactionEngine
 
-// DRAW-1 — Polygon fill + scanline-mask verify.
+// Polygon fill + scanline-mask verify.
 //
 // Pins the polygon rendering path on `applyRedactionFills` (CGMutablePath
 // + .evenOdd) and the polygon-aware verify on `verifyPolygonFill`
@@ -18,7 +18,7 @@ import CoreGraphics
 // are excluded by `Layer 6` (sandwich spatial exclusion) rather than
 // pixel verify.
 
-@Suite("Polygon Fill + Verify (DRAW-1)")
+@Suite("Polygon Fill + Verify")
 struct PolygonFillVerifyTests {
 
     // MARK: - Helpers
@@ -250,9 +250,9 @@ struct PolygonFillVerifyTests {
         )
     }
 
-    // MARK: - Degenerate polygon early-exit (CAT-388)
+    // MARK: - Degenerate polygon early-exit
 
-    @Test("Degenerate collinear polygon verifies as a pass via the interior-pixel early-exit (CAT-388)")
+    @Test("Degenerate collinear polygon verifies as a pass via the interior-pixel early-exit")
     func testDegenerateCollinearPolygonVerifyPasses() throws {
         let size = 200
         let ctx = try Self.makeContext(size)
@@ -289,9 +289,9 @@ struct PolygonFillVerifyTests {
                 "degenerate (no-interior) polygon takes the early-exit pass")
     }
 
-    // MARK: - Unit-square clipping (CAT-360)
+    // MARK: - Unit-square clipping
 
-    @Test("CAT-360: clipPolygonToUnitRect replaces an out-of-bounds vertex with boundary crossings")
+    @Test("clipPolygonToUnitRect replaces an out-of-bounds vertex with boundary crossings")
     func clipPolygonToUnitRectReplacesClampWithCrossings() {
         // Triangle whose left apex sits just outside the unit square.
         let triangle = [
@@ -312,7 +312,7 @@ struct PolygonFillVerifyTests {
                 "the two crossings must straddle the apex's y")
     }
 
-    @Test("CAT-360: a vertex just outside the unit square fills the true edge span with no notch")
+    @Test("a vertex just outside the unit square fills the true edge span with no notch")
     func polygonVertexOutsideUnitRect_noNotch() throws {
         let size = 600
         let ctx = try Self.makeContext(size)
@@ -340,8 +340,8 @@ struct PolygonFillVerifyTests {
             return b == 0 && g == 0 && r == 0 && a == 255
         }
         #expect(isBlack(1, 300), "polygon centre row must be filled")
-        #expect(isBlack(1, 295), "row above centre must be filled — no notch (CAT-360)")
-        #expect(isBlack(1, 305), "row below centre must be filled — no notch (CAT-360)")
+        #expect(isBlack(1, 295), "row above centre must be filled — no notch")
+        #expect(isBlack(1, 305), "row below centre must be filled — no notch")
         // A pixel far from the triangle keeps the background, proving the
         // buffer is not uniformly filled.
         guard let (_, _, rFar, _) = Self.readPixel(ctx, x: 1, y: 80) else {

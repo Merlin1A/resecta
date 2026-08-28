@@ -4,12 +4,12 @@ import OSLog
 import PDFKit
 import Vision
 
-// GAP §3.1 — Detection orchestration wrapper.
+// Detection orchestration wrapper.
 
-// MARK: - PERF-4 — Embedded text source (used to bypass Vision OCR)
+// MARK: - Embedded text source (used to bypass Vision OCR)
 
 /// Sendable carrier for a page's embedded text layer, used to bypass Vision
-/// OCR on pages where the embedded text is authoritative (PERF-4 fast path).
+/// OCR on pages where the embedded text is authoritative (the fast path below).
 ///
 /// `PipelineCoordinator` builds an instance from `PDFPage` (which is not
 /// Sendable) via the static `make(from:cropBox:)` factory, then passes the
@@ -120,7 +120,7 @@ public struct EmbeddedTextSource: Sendable {
             guard bounds.width > 0, bounds.height > 0 else { return }
 
             areaSum += bounds.width * bounds.height
-            // CND-02: land the word rect in the zero-origin displayed frame the
+            // Land the word rect in the zero-origin displayed frame the
             // burn-in consumes (identity for an unrotated zero-origin page).
             let normalized = Self.displayedNormalizedRect(
                 bounds, cropBox: cropBox,
@@ -155,7 +155,7 @@ public struct EmbeddedTextSource: Sendable {
                 let unionRect = sortedWords
                     .map(\.rect)
                     .reduce(CGRect.null) { $0.union($1) }
-                // CND-02: same displayed-space transform as the word path; the
+                // Same displayed-space transform as the word path; the
                 // line union feeds AddressSpatialAssembler via the same consumer.
                 let normalized = unionRect == .null ? .zero
                     : Self.displayedNormalizedRect(
@@ -216,12 +216,12 @@ public struct DetectionOrchestrator: Sendable {
     private let piiDetector: PIIDetector
     private let classifier = DocumentTypeClassifier()
     private let calibratedScorer = CalibratedScorer()
-    // B03 — C1 augment context scorer, decoded once at init. Whole-scorer
+    // Context-scorer augment, decoded once at init. Whole-scorer
     // identity on any load problem; the shipped placeholder is all-w=0, so it
     // contributes 0 at the posterior seam (the w=0 byte-identity control).
     private let contextScorer = ContextScorerWeights.loadFromEngineBundle()
     private let addressAssembler = AddressSpatialAssembler()
-    // DRAW-3 — Heuristic signature detector. Triage-only; never auto-applied
+    // Heuristic signature detector. Triage-only; never auto-applied
     // (enforced at the state layer via `RedactionState.applyDetectionResults`
     // splitting `.signatureCandidate` results into `pendingTriage`).
     private let signatureDetector = SignatureHeuristicDetector()
@@ -234,14 +234,14 @@ public struct DetectionOrchestrator: Sendable {
         try await FaceDetector().detect(in: image)
     }
 
-    // Package H — defense-in-depth pixel caps for `runOCR`. Mirrors the
+    // Defense-in-depth pixel caps for `runOCR`. Mirrors the
     // search-OCR path at `DocumentSearcher.swift:38-44`. Per-axis cap blocks
     // axis-anomalous geometries (e.g., 10000×1); total-pixel cap blocks
     // near-axis-cap pages whose 4-byte RGBA buffer would still trip jetsam.
     fileprivate static let maxOCRPixelDimension = 10_000
     fileprivate static let maxOCRPixelCount = 36_000_000
 
-    /// ST-83 — shared pixel-cap predicate: the single condition `runOCR`
+    /// Shared pixel-cap predicate: the single condition `runOCR`
     /// skips Vision on, and the condition `detectPage` stamps
     /// `.pixelCapExceeded` provenance for. Internal so gate tests can
     /// exercise it without rebuilding the whole `detectPage` flow.
@@ -259,10 +259,10 @@ public struct DetectionOrchestrator: Sendable {
     /// and the Settings reset affordance can reference the shipped value.
     public static let absorbingStateFloor = 0.35
 
-    // MARK: - PERF-4 OCR invocation counter
+    // MARK: - OCR invocation counter
 
     /// Process-global counter incremented every time `runOCR` is invoked on
-    /// a page. Used by `OCRSkipFastPathTests` to assert that the PERF-4 fast
+    /// a page. Used by `OCRSkipFastPathTests` to assert that the fast
     /// path actually bypassed Vision. Mutated under a serial lock; safe to
     /// read from any actor. Test-only helpers live in
     /// `OCRInvocationCounter` below.
@@ -293,7 +293,7 @@ public struct DetectionOrchestrator: Sendable {
         ColdStartTimer.shared.markEngineLoaded()
     }
 
-    /// SEC-7 entry point. Constructs the orchestrator from a pre-built
+    /// Constructs the orchestrator from a pre-built
     /// `PIIDetector` + `GazetteerLoadDiagnostics` pair produced by
     /// `PIIDetector.loadWithDiagnostics(bundle:)`. The coordinator uses this
     /// path so the diagnostic value can be threaded into `RedactionState`
@@ -315,7 +315,7 @@ public struct DetectionOrchestrator: Sendable {
     /// document-level clustering (Stage 5 surfaces) happens in the coordinator
     /// once all pages yield.
     ///
-    /// PERF-4 fast path: when `embeddedText` is non-nil, Vision OCR is skipped
+    /// Fast path: when `embeddedText` is non-nil, Vision OCR is skipped
     /// and the orchestrator consumes the supplied embedded text layer instead.
     /// Every `DetectionResult` produced on a skipped page carries the matching
     /// `Provenance` so the audit/triage UI can describe the branch decision.
@@ -334,9 +334,9 @@ public struct DetectionOrchestrator: Sendable {
         embeddedText: EmbeddedTextSource? = nil,
         ocrSkipReason: DetectionResult.Provenance.OCRSkipReason? = nil
     ) async throws -> PageDetectionResult {
-        // PERF-8 / CANCEL-013: entry-level cooperative cancellation.
+        // Entry-level cooperative cancellation.
         try Task.checkCancellation()
-        // PERF-4 — Provenance stamp for every detection produced on this page.
+        // Provenance stamp for every detection produced on this page.
         // The provenance is page-level: if OCR is skipped, every PII/face
         // detection on this page is tagged accordingly.
         let provenance: DetectionResult.Provenance
@@ -355,7 +355,7 @@ public struct DetectionOrchestrator: Sendable {
         } else {
             // Default path: run Vision OCR.
             (text, characterBounds, lines) = try await runOCR(on: image)
-            // ST-83 — when the raster is over the OCR pixel caps, `runOCR`
+            // When the raster is over the OCR pixel caps, `runOCR`
             // skipped Vision (unchanged behavior) and returned empties;
             // the provenance now records that so the triage UI can tell
             // the user this page's image content was not text-scanned.
@@ -402,9 +402,9 @@ public struct DetectionOrchestrator: Sendable {
         // every subsequent page is a no-op, so no per-orchestrator flag.
         ColdStartTimer.shared.markFirstDetectionComplete()
 
-        // Step 3a (WS1 item 1.6): Spatial address assembly injected into rawMatches
-        // BEFORE resolveOverlaps so assembled candidates participate in overlap
-        // dedup, posterior scoring, and W4 gating. (WS1 item 1.6, 2026-06-10)
+        // Spatial address assembly injected into rawMatches
+        // before resolveOverlaps so assembled candidates participate in overlap
+        // dedup, posterior scoring, and the preset-threshold gate below.
         // Convert AddressSpatialAssembler.Assembled → PIIDetector.PIIMatch.
         // Overlap resolution uses character ranges; spatial matches carry no
         // character-level range, so we search for the assembled text in the page
@@ -434,16 +434,16 @@ public struct DetectionOrchestrator: Sendable {
             ))
         }
 
-        // Step 3b (W10): cross-category overlap resolution. Keeps the
+        // Cross-category overlap resolution. Keeps the
         // highest-confidence match within each overlap group and records
         // the losers by category so CoverageReport can surface the count.
         //
-        // D05-F2 — rank overlap winners by the same post-posterior, gate-aware
-        // score the W4 gate (Step 4) applies, so a raw-weaker but
+        // Overlap winners are ranked by the same post-posterior, gate-aware
+        // score the preset-threshold gate (Step 4) applies, so a raw-weaker but
         // better-surviving sibling is not discarded before the gate runs. The
-        // closure mirrors the per-match category branch + W4 gate below: it
+        // closure mirrors the per-match category branch + preset-threshold gate below: it
         // floors the posterior via `survivabilityPosterior(...)` (the same
-        // `ContextPosteriorFloor` seam S2 added) and reports whether that score
+        // `ContextPosteriorFloor` seam) and reports whether that score
         // clears the preset cutoff. A match with no category / no preset cutoff
         // is reported as surviving at its raw confidence, matching the gate's
         // pass-through for those kinds.
@@ -471,7 +471,7 @@ public struct DetectionOrchestrator: Sendable {
         var detections: [DetectionResult] = []
 
         for match in resolved.surviving {
-            // §A7 surface-form short-circuit: if the user has decided on this
+            // Surface-form short-circuit: if the user has decided on this
             // text before, honor the decision. Rejected → drop entirely;
             // accepted → bump confidence.
             var bypassScoring = false
@@ -503,7 +503,7 @@ public struct DetectionOrchestrator: Sendable {
                 // weakest category's raw max above every preset threshold
                 // (0.20 was shown insufficient — see the design's math).
                 // Applied at this call site, not inside CalibratedScorer.
-                // B03 — the C1 augment threads a learned context log-odds term
+                // The context-scorer augment threads a learned context log-odds term
                 // into posterior() at this same seam. posterior() takes a
                 // defaulted `contextLogit`; the shipped placeholder is all-w=0,
                 // so learnedContextLogit is 0 and finalConfidence is unchanged
@@ -520,12 +520,12 @@ public struct DetectionOrchestrator: Sendable {
                         pageText: text
                     )
                 )
-                // SRCH-S2 D02-scorer-posterior-F1/F2 — under-redaction posterior
+                // Under-redaction posterior
                 // floor. The learned context term can drive a keyword-confirmed
-                // account/phone below the W4 gate on a length/separator feature
+                // account/phone below the preset-threshold gate on a length/separator feature
                 // alone; re-floor it to the raw bar it already cleared (the
-                // preset-invariant conservative cutoff) before W4 consumes
-                // finalConfidence. Raw-bar form (DESIGN-DECISIONS DQ2); pure code,
+                // preset-invariant conservative cutoff) before the gate consumes
+                // finalConfidence. Pure code,
                 // no scorer/preset blob change. No-op for non-floored families and
                 // for sub-bar raws. See ContextPosteriorFloor.
                 let scored = calibratedScorer.posterior(
@@ -543,7 +543,7 @@ public struct DetectionOrchestrator: Sendable {
                 finalConfidence = match.confidence
             }
 
-            // W4 — gate against the per-category preset threshold using the
+            // Gate against the per-category preset threshold using the
             // post-posterior score. Non-calibration categories and missing
             // wire-names pass through. Bypass surface-form hits (already
             // approved by the user).
@@ -570,7 +570,7 @@ public struct DetectionOrchestrator: Sendable {
         // `shouldRunFaceDetection` forces a compile-time decision on any
         // future DoctypeClass addition.
         //
-        // PERF-4 — Face detection is not derived from the text layer, so it
+        // Face detection is not derived from the text layer, so it
         // runs unconditionally on the skip path. Re-stamp the face results
         // with the page-level provenance so the audit story stays uniform:
         // "every result on a skipped page carries provenance.ocrSkipped".
@@ -615,16 +615,16 @@ public struct DetectionOrchestrator: Sendable {
         }
         detections.append(contentsOf: faceResults)
 
-        // Step 6b (DRAW-2): Barcode / QR detection. Like face detection,
+        // Barcode / QR detection. Like face detection,
         // barcodes are not derived from the text layer, so the pass runs
-        // unconditionally on the PERF-4 OCR-skip path. The gate
+        // unconditionally on the OCR-skip path. The gate
         // `shouldRunBarcodeDetection(for:)` defaults to `true` for every
         // doctype today; the exhaustive switch is the compile-time forcing
         // point if a future DoctypeClass wants to skip the work.
         // Re-stamp provenance on the OCR-skip path so every detection on a
         // skipped page reports `provenance.ocrSkipped` uniformly.
         //
-        // Vision-error tolerance (DRAW-2): barcode detection is an
+        // Vision-error tolerance: barcode detection is an
         // opportunistic surface — a missed barcode is suboptimal but the
         // primary text-PII detection is unaffected. `VNDetectBarcodesRequest`
         // can transiently fail with "Could not create inference context"
@@ -662,16 +662,15 @@ public struct DetectionOrchestrator: Sendable {
         }
         detections.append(contentsOf: barcodeResults)
 
-        // ENGINE §4.19: Scan barcode payloads for embedded PII. Any PII found
+        // Scan barcode payloads for embedded PII. Any PII found
         // shares the barcode's normalizedRect so the redaction covers the physical
         // code region. Payload detections are appended AFTER resolveOverlaps and
-        // the W4/posterior loop — they intentionally do NOT participate in overlap
+        // the preset-threshold gate / posterior loop — they intentionally do NOT participate in overlap
         // resolution (the barcode rect is already authoritative; the payload scan
         // adds informational PII category labels to a region already marked for
         // redaction). Confidence = min(barcode confidence, match confidence).
         // Degradation: if piiDetector.detect times out, the per-detector timeout
         // degrades to empty — the barcode bounding-box detection in detections stands.
-        // (WS1 item 1.5, 2026-06-10)
         var barcodePayloadDetections: [DetectionResult] = []
         for barcode in barcodeResults {
             guard let payload = barcode.matchedText, !payload.isEmpty else { continue }
@@ -694,13 +693,13 @@ public struct DetectionOrchestrator: Sendable {
         }
         detections.append(contentsOf: barcodePayloadDetections)
 
-        // DRAW-3 — Heuristic signature detection. Parallel branch to the
+        // Heuristic signature detection. Parallel branch to the
         // face / barcode detectors above. Triage-only: results are tagged
         // `.pii(.signatureCandidate)` and the state-layer's
         // `applyDetectionResults` routes them to `pendingTriage` even when
         // the user has opted into auto-apply. The detector internally skips
         // the Sobel pass when no labeled OCR blocks are present, satisfying
-        // the cost-guardrail hard stop in plan §4 DRAW-3.
+        // the cost-guardrail hard stop.
         let signatureResults = try await signatureDetector.detect(
             in: image,
             ocrBlocks: lines
@@ -737,7 +736,7 @@ public struct DetectionOrchestrator: Sendable {
         )
     }
 
-    // MARK: - L-10: Face-detection doctype gate
+    // MARK: - Face-detection doctype gate
 
     /// Return true iff the doctype may plausibly contain faces. Financial
     /// documents (statements, invoices, receipts) are structurally faceless
@@ -754,10 +753,10 @@ public struct DetectionOrchestrator: Sendable {
         }
     }
 
-    // MARK: - DRAW-2: Barcode-detection doctype gate
+    // MARK: - Barcode-detection doctype gate
 
     /// Return true iff the doctype may plausibly contain barcodes / QR codes.
-    /// Locked decision (plan §4 DRAW-2): on by default for every doctype —
+    /// On by default for every doctype —
     /// barcodes and QR codes appear across all document classes (medical
     /// labels, court exhibits, FOIA cover sheets, financial check MICRs, and
     /// generic forms). Exhaustive switch over `DoctypeClass` with no
@@ -769,24 +768,23 @@ public struct DetectionOrchestrator: Sendable {
         }
     }
 
-    // MARK: - OCR (ENGINE §4.2, GAP §3.1)
+    // MARK: - OCR
 
     /// Run Vision OCR and return extracted text with per-word bounding boxes
     /// AND the full per-line TextLine array needed by spatial detectors
     /// (AddressSpatialAssembler).
     ///
-    /// F2-8: VNImageRequestHandler.perform() is synchronous and blocks the
+    /// VNImageRequestHandler.perform() is synchronous and blocks the
     /// cooperative thread pool thread (~181ms at .accurate). Acceptable for v1
     /// because the sequential page loop means only one perform() is active at a
     /// time. Post-v1 optimization: wrap in Task.detached to free the coop thread.
     // Internal (rather than private) so `@testable import RedactionEngine`
-    // tests can exercise the Package H pixel-cap gate without rebuilding
+    // tests can exercise the pixel-cap gate without rebuilding
     // the entire `detectPage` flow.
     internal func runOCR(on image: CGImage) async throws
         -> (String, [(NSRange, CGRect)], [OCREngine.TextLine])
     {
-        // Package H — PERF-ocr-engine-cap-only-upstream (`03-security-perf-audit.md
-        // §5.3.a`). Defense-in-depth: the only V1.0 caller
+        // Defense-in-depth: the only V1.0 caller
         // (`PipelineCoordinator.renderPageForDetection`, `maxDetectionPixels =
         // 4096`) already caps the image, but the engine-side OCR path has no
         // gate of its own. Mirrors `DocumentSearcher.swift:990-992` with the
@@ -800,7 +798,7 @@ public struct DetectionOrchestrator: Sendable {
             return ("", [], [])
         }
 
-        // PERF-4 — Test-observable counter. Incremented exactly once per
+        // Test-observable counter. Incremented exactly once per
         // Vision OCR invocation so `OCRSkipFastPathTests` can assert that
         // the skip path actually bypassed Vision (and that the non-skip
         // path still invokes it once per page).
@@ -905,7 +903,7 @@ public struct DetectionOrchestrator: Sendable {
         return results
     }
 
-    // MARK: - Bounding Rect Mapping (GAP §3.1)
+    // MARK: - Bounding Rect Mapping
 
     /// Map a PIIMatch NSRange to a normalized bounding CGRect by computing the
     /// union of all word bounding boxes that intersect the match range.
@@ -926,17 +924,17 @@ public struct DetectionOrchestrator: Sendable {
         return result
     }
 
-    // MARK: - Survivability Posterior (D05-F2)
+    // MARK: - Survivability Posterior
 
-    /// D05-F2 — the floored posterior for a categorized match, used to rank
-    /// overlap-resolution winners by the score the W4 gate will apply.
+    /// The floored posterior for a categorized match, used to rank
+    /// overlap-resolution winners by the score the preset-threshold gate will apply.
     ///
     /// This replicates the per-match category branch of `detectPage(...)` (the
     /// `priorMean` → `learnedContextLogit` → `posterior` →
-    /// `ContextPosteriorFloor.apply` chain, including S2's under-redaction
+    /// `ContextPosteriorFloor.apply` chain, including the under-redaction
     /// floor seam) so the resolver's `SurvivabilityKey` scores a match exactly
     /// as the Step 4 gate does. It is intentionally a faithful copy rather than
-    /// a shared call site so S2's just-landed gate seam stays byte-identical;
+    /// a shared call site so the gate seam stays byte-identical;
     /// the two MUST stay in sync — any change to the Step 4 category branch
     /// must be mirrored here (and vice-versa).
     private func survivabilityPosterior(
@@ -969,13 +967,13 @@ public struct DetectionOrchestrator: Sendable {
         )
     }
 
-    // MARK: - Face Detection (ENGINE §4.8)
+    // MARK: - Face Detection
 
     private func runFaceDetection(on image: CGImage) async throws -> [DetectionResult] {
         try await faceDetection(image)
     }
 
-    // MARK: - Barcode Detection (DRAW-2, ENGINE §4.19)
+    // MARK: - Barcode Detection
 
     private func runBarcodeDetection(on image: CGImage) async throws -> [DetectionResult] {
         try await BarcodeDetector().detect(in: image)

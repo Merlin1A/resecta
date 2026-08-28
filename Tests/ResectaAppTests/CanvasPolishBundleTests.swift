@@ -2,18 +2,18 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// WU-42 — canvas polish bundle. Three independently-scoped
+// Canvas polish bundle. Three independently-scoped
 // sub-fixes pinned by string-literal / predicate / shape tests so each
 // one can fail in isolation if a future tweak drifts the message or
 // the gating shape.
 
-@Suite("Canvas polish bundle (WU-42)")
+@Suite("Canvas polish bundle")
 @MainActor
 struct CanvasPolishBundleTests {
 
-    // MARK: - M-D.1 — Sub-threshold VoiceOver string
+    // MARK: - Sub-threshold VoiceOver string
 
-    @Test("Sub-threshold rejection VoiceOver names the 20pt floor (M-D.1)")
+    @Test("Sub-threshold rejection VoiceOver names the 20pt floor")
     func subThresholdAnnouncementNamesTheFloor() {
         // Mechanism-description string: tells the listener what the
         // minimum dimension is so the next attempt can target it. The
@@ -33,7 +33,7 @@ struct CanvasPolishBundleTests {
         #expect(RedactionOverlayView.subThresholdRejectionAnnouncement.contains("20"))
     }
 
-    // MARK: - M-D.2 — Batch-delete dialog page-span
+    // MARK: - Batch-delete dialog page-span
 
     @Test("Page count derives from unique pages spanned by the selection")
     func pageCountIsUniquePagesInSelection() {
@@ -86,7 +86,7 @@ struct CanvasPolishBundleTests {
         #expect(msg.contains("1 pages") == false)
     }
 
-    // MARK: - M-C.8 — Drawing-mode caption predicate
+    // MARK: - Drawing-mode caption predicate
 
     @Test("Caption is visible only with rectangle tool active in editing phase")
     func captionVisibleOnlyDuringRectangleEditing() {
@@ -120,7 +120,7 @@ struct CanvasPolishBundleTests {
 
     @Test("Caption copy names the gesture mechanism (no outcome verb)")
     func captionMechanismDescription() {
-        // §19: mechanism-description language — names the gesture, not
+        // Mechanism-description language — names the gesture, not
         // a promised outcome. "tap and drag" describes what the touch
         // does; the user supplies the intent.
         #expect(DocumentEditorView.drawingModeCaption == "Drawing — tap and drag")

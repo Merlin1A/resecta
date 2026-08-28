@@ -13,7 +13,7 @@ extension PipelineMode {
         }
     }
 
-    /// Custom mode glyph asset (VI, D-76). Replaces the stock symbols
+    /// Custom mode glyph asset. Replaces the stock symbols
     /// (`photo`/`doc.text`) at every mode-glyph site: editor picker menu,
     /// results legend, per-page badges. Monochrome template symbol sets in
     /// Resources/Assets.xcassets, tinted at the call site.

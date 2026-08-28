@@ -2,8 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// S3 §1.2 — NegativeContextGazetteer production wiring tests.
-// Design reference: design 02 §1 test plan.
+// NegativeContextGazetteer production wiring tests.
 //
 // These tests exercise the gazetteer in the full PIIDetector pipeline with
 // the real module bundle or injected fixtures. They are NOT in
@@ -54,7 +53,7 @@ private func makeEmptyBundle() throws -> (bundle: Bundle, base: URL) {
     return (bundle, tempBase)
 }
 
-@Suite("NegativeContextGazetteer production wiring (S3 §1.2)")
+@Suite("NegativeContextGazetteer production wiring")
 struct NegativeContextGazetteerWiringTests {
 
     // MARK: - testSSNScoreWithFinancialContext
@@ -63,7 +62,7 @@ struct NegativeContextGazetteerWiringTests {
     /// drops below the unmodified base (suppression fires).
     ///
     /// "invoice number" is a (ssn, financial) entry in the bundled 334-entry file
-    /// at weight 0.75. With the S3 per-matched-keyword semantics:
+    /// at weight 0.75. With the per-matched-keyword semantics:
     ///   factor = max(0.25, 1.0 - 0.75 * 0.75) = max(0.25, 0.4375) = 0.4375
     ///   SSN base = 0.75 (no positive context) → score 0.75 * 0.4375 = 0.328
     ///   floored at SSN profile floor 0.25 → ~0.328 (well below balanced 0.60).
@@ -110,7 +109,7 @@ struct NegativeContextGazetteerWiringTests {
     /// doctype. Use a keyword that is NOT in SSNContextKeywords.profile.negativeKeywords
     /// so the hardcoded profile doesn't confound the measurement.
     ///
-    /// Design §1 adversarial case: "case number" at weight 0.70 on court scope.
+    /// Adversarial case: "case number" at weight 0.70 on court scope.
     /// We use "invoice number" in court scope (not financial scope) to avoid the
     /// hardcoded SSN negative-keyword list interference.
     @Test("Gazetteer scope-keying: court-scoped keyword with .financial doctype → no gazetteer suppression")
@@ -228,7 +227,7 @@ struct NegativeContextGazetteerWiringTests {
     // MARK: - testEmployerEINSuppressesSSNNotEIN
 
     /// "employer's ein" suppresses SSN-category hits but NOT EIN-category hits.
-    /// This is the S3-new data row (not in the bundled file) — injected via
+    /// This is a new data row (not in the bundled file) — injected via
     /// fixture JSON.
     ///
     /// Mechanistic verification:

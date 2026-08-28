@@ -5,12 +5,10 @@ import PDFKit
 import Testing
 @testable import RedactionEngine
 
-// PART A — S3: the adversarial recall-safety battery for the Layer-2
+// PART A — the adversarial recall-safety battery for the Layer-2
 // fill-consistency guard (chroma-aware, box∩rect Option A, demote-never-silence).
-// See plans/resecta-partA-verifier-guard-2026-06-27/ (RUN-ORDER §2/§4/§6 and
-// session-03-*). The S1/S2 suite `Layer2FillHallucinationGuardTests` carries the
-// fixtures, builders, regression pair, and the guard's unit tests; this suite is
-// the S3 probe set:
+// `Layer2FillHallucinationGuardTests` carries the fixtures, builders, regression
+// pair, and the guard's unit tests; this suite is the probe set:
 //
 //   F-CHROMA-BLACK / F-CHROMA-FORMULA — coloured ink whose luminance ≈ the fill
 //   F-EDGE-STRADDLE — leak + hallucination variants (Option-A expectations)
@@ -22,13 +20,13 @@ import Testing
 //   F-STRADDLE-WIRING — demote-never-silence fold wiring (pure)
 //   F-PARTA-REPLAY — the real fixture demotes to the fill-artifact INFO note
 //   F-PROPERTY-RECALL-FLOOR — recall/outlier floors + band pins under sweeps
-//   + the two S2-reviewer residual probes (calibrated-subset region argmax;
+//   + two reviewer residual probes (calibrated-subset region argmax;
 //     2px sample inset on tiny strips)
 //   + the demotion-tier separation measurement (tier updated 2026-07-09:
 //     the demotion folds to an informational note; suppressing the note
 //     entirely is a maintainer decision).
 //
-// Probe philosophy (RUN-ORDER §4, the precision-only bar): every probe carrying
+// Probe philosophy (the precision-only bar): every probe carrying
 // genuinely readable PII asserts the leak is still SURFACED — FAIL for clear
 // in-region ink, at minimum WARN for the Option-A boundary cases. A clean PASS
 // on readable ink is the one unacceptable outcome. Vision-dependent probes
@@ -37,7 +35,7 @@ import Testing
 // level instead and reported `[S3-BATTERY] … e2e=UNREAD` (documented UNVERIFIED
 // in the PR body, never silently dropped). All on-device probes pin iOS 26.4.
 //
-// Synthetic-fixture logging exemption as in the S1/S2 suite: every fixture here
+// Synthetic-fixture logging exemption as in the sibling suite: every fixture here
 // is built at test time from fictional text; production logging rules unchanged.
 //
 // This file carries the ON-DEVICE (Vision) probes + the shared harness; the
@@ -45,10 +43,10 @@ import Testing
 // F-PROPERTY-RECALL-FLOOR, the two reviewer residuals) live in the sibling
 // `Layer2FillGuardBatteryPureTests` (new-file LOC cap, M-6).
 
-@Suite("Part A — S3 adversarial fill-guard battery", .serialized)
+@Suite("Part A — adversarial fill-guard battery", .serialized)
 struct Layer2FillGuardBatteryTests {
 
-    /// The S1/S2 suite hosts the fixture loaders + raster builders (TestHelpers
+    /// The sibling suite hosts the fixture loaders + raster builders (TestHelpers
     /// on the fixture side; `makeSecureRasterPage` and the OCR probes there).
     typealias Host = Layer2FillHallucinationGuardTests
 
@@ -241,8 +239,8 @@ struct Layer2FillGuardBatteryTests {
         // Rec.601 luma of (0,0,b): 0.114·(b/255) — 0.051 / 0.080 / 0.114, all
         // inside the fill band (< 0.16) on a black fill; blue-channel deviation
         // 0.451 / 0.706 / 1.000 — all ≥ the contrast band's edge. The two
-        // ultralight variants cross chroma with hairline stroke weight (the S3
-        // completeness review's top gap: a thin stroke caps the contrast SHARE
+        // ultralight variants cross chroma with hairline stroke weight (a
+        // known gap: a thin stroke caps the contrast SHARE
         // while chroma caps the PEAK deviation under the 0.50 outlier floor —
         // this measures whether both rescues can be starved at once).
         let ultralight = CTFontCreateWithName("HelveticaNeue-UltraLight" as CFString, 10, nil)
@@ -553,15 +551,15 @@ struct Layer2FillGuardBatteryTests {
     /// sampler. Asserts the partition (drivers demote; leak ink is kept) and
     /// prints the table + margins for the PR body and the guard's doc comments.
     /// Demotion tier updated 2026-07-09: the fold is an informational note,
-    /// visible in Verification Details; suppressing the note entirely stays a
-    /// Maintainer decision, presented with this data, not decided here.
+    /// visible in Verification Details; suppressing the note entirely would be
+    /// a policy change, not a tuning.
     @Test("measure: driver-vs-leak separation table + margins (pin iOS 26.4)")
     func measure_separationTable_onDevice() async throws {
         var driverSamples: [(String, VerificationEngine.BoxFillSample)] = []
         var leakSamples: [(String, VerificationEngine.BoxFillSample)] = []
 
         // Drivers: the real fixture's in-region hallucination boxes, production
-        // sampler (the S2 measurement path, aggregated here for the table).
+        // sampler (the same measurement path, aggregated here for the table).
         let data = try TestFixtures.fillHallucinationRedactedPDF()
         let provider = try #require(CGDataProvider(data: data as CFData))
         let pdf = try #require(CGPDFDocument(provider))

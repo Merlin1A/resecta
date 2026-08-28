@@ -45,7 +45,7 @@ class RedactionOverlayView: UIView {
     /// current page. Drawn even more lightly than `searchHighlights` so the
     /// transition into committed results is visible.
     private var livePreviewRects: [CGRect] = []
-    /// UXC-44 (D-116, RB-93): id of the search result the result walk
+    /// The id of the search result the result walk
     /// currently focuses (`SearchState.currentResult`). Drawn as ONE
     /// 2-pt brand-tint ring just outside that highlight's rect; the
     /// highlight fills are untouched, no animation.
@@ -54,7 +54,7 @@ class RedactionOverlayView: UIView {
     private var selectedID: UUID? { selectedIDs.count == 1 ? selectedIDs.first : nil }
     private var cachedAccessibilityElements: [UIAccessibilityElement]?
 
-    /// UXC-49 (D-124 / REV-13): the "canvas touch in flight" flag that
+    /// The "canvas touch in flight" flag that
     /// window-level cancelling pans are required to fail against — see
     /// `CanvasTouchClaimGestureRecognizer` and `reconcileWindowPanDeference()`.
     private let canvasTouchClaim = CanvasTouchClaimGestureRecognizer(target: nil, action: nil)
@@ -67,7 +67,7 @@ class RedactionOverlayView: UIView {
 
     private var dragOrigin: CGPoint?
     /// Read-only outside the overlay so `RectangleDrawGestureTests` can
-    /// observe the rubber band mid-gesture (S1).
+    /// observe the rubber band mid-gesture.
     private(set) var currentDragRect: CGRect?
     private var activeResizeHandle: ResizeHandle?
 
@@ -229,7 +229,7 @@ class RedactionOverlayView: UIView {
     private var activeTextSnapTicks: [TextSnapTick] = []
 
     /// Test override for the zoom scale used by
-    /// `applyTextBoxSnapping(to:)` and, since S2-b (DT-06), by
+    /// `applyTextBoxSnapping(to:)` and by
     /// `fingerScale` — i.e. every finger tolerance in the overlay. The
     /// production path walks the view hierarchy looking for a `PDFView`;
     /// tests synthesise the overlay without a parent and pin the zoom
@@ -237,7 +237,7 @@ class RedactionOverlayView: UIView {
     /// `currentZoomScale()`.
     var snapZoomScaleOverride: CGFloat?
 
-    /// Screen points → overlay units (S2-b / DT-06). Finger tolerances
+    /// Screen points → overlay units. Finger tolerances
     /// (drag-start gate, commit floor, resize floor, long-press travel,
     /// region hit inset, handle boxes, snap proximity) are specified in
     /// SCREEN points; the overlay's space is the page's unscaled bounds
@@ -301,8 +301,8 @@ class RedactionOverlayView: UIView {
         isMultiSelectActive || shiftHeld
     }
 
-    // Label for the add-to-selection toolbar toggle (WU-38; historically
-    // "Select More"). UXF-22: verb-object form names what a tap does
+    // Label for the add-to-selection toolbar toggle (historically
+    // "Select More"). Verb-object form names what a tap does
     // while the toggle is on. When at least one region is selected, the
     // count surfaces in the label so the user can see the selection size
     // without opening a separate count badge.
@@ -330,7 +330,7 @@ class RedactionOverlayView: UIView {
     }
 
     // Resize handle that models the finger's corner while a new rectangle
-    // is being drawn (S1-b / DT-03): the drag origin is the anchored
+    // is being drawn: the drag origin is the anchored
     // corner, so only the two edges under the finger move — and snap —
     // through `applyResizeSnapping`. Ties (dx == 0 / dy == 0) fall to the
     // bottom/right side, matching the rect the drag produces. Pure so
@@ -382,7 +382,7 @@ class RedactionOverlayView: UIView {
         let hover = UIHoverGestureRecognizer(target: self, action: #selector(handleHover(_:)))
         addGestureRecognizer(hover)
 
-        // UXC-49: the canvas claim — installed once; the failure
+        // The canvas claim — installed once; the failure
         // requirements against window pans are wired per window in
         // `reconcileWindowPanDeference()`.
         addGestureRecognizer(canvasTouchClaim)
@@ -411,7 +411,7 @@ class RedactionOverlayView: UIView {
         let selectionChanged = selectedIDs != self.selectedIDs
         let searchChanged = searchHighlights != self.searchHighlights
         let previewChanged = livePreviewRects != self.livePreviewRects
-        // UXC-44 (RB-93): the walk moves the ring without any other
+        // The result walk can move the ring without any other
         // input changing — its own dirty bit.
         let focusChanged = focusedHighlightID != self.focusedHighlightID
         self.regions = regions
@@ -448,7 +448,7 @@ class RedactionOverlayView: UIView {
         // Pass through to PDFView for pan/zoom unless the overlay owns the
         // point (`claimsTouch(at:)`).
         guard claimsTouch(at: point) else { return nil }
-        // UXC-49 (D-124 / REV-13): hit-testing runs at touch-down, before
+        // Hit-testing runs at touch-down, before
         // the gesture environment dispatches the touch, so this is the
         // timing-proof seam to wire the failure requirement against a
         // window pan that arrived with a sheet since the last canvas
@@ -480,7 +480,7 @@ class RedactionOverlayView: UIView {
         reconcileWindowPanDeference()
     }
 
-    // MARK: - UXC-49 window-pan deference (D-124 / REV-13)
+    // MARK: - Window-pan deference
 
     /// Every window-level pan that would cancel this view's touches must
     /// fail before it may recognize while a canvas touch is in flight —
@@ -526,7 +526,7 @@ class RedactionOverlayView: UIView {
         guard primaryTouch == nil else { return }
         primaryTouch = touch
         let point = touch.location(in: self)
-        // DRAW WINS (RB-75 / DT-04, DT-05, DT-07): while the Rectangle tool
+        // DRAW WINS: while the Rectangle tool
         // is on, a touch-down ALWAYS starts a draw — over region bodies and
         // over resize-handle boxes alike. The handle / region / marquee
         // branches below run only with the tool off (`hitTest` already
@@ -645,7 +645,7 @@ class RedactionOverlayView: UIView {
 
         // Priority 3: lasso marquee — empty-space touch-down while the
         // "Select More" toggle is on becomes a rect-marquee multi-select drag.
-        // Gated on `isMultiSelectActive && !isDrawingMode` (S1-f / DT-07):
+        // Gated on `isMultiSelectActive && !isDrawingMode`:
         // while the Rectangle tool is on, an empty-space drag draws — the
         // marquee never runs in draw mode. The branch is orthogonal to
         // `currentDragRect` — see `marqueeRect` declaration. The
@@ -894,8 +894,8 @@ class RedactionOverlayView: UIView {
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        // Only honor the primary touch while a gesture is in flight
-        // (S1-d / DT-10): a second finger's moves must not steer it.
+        // Only honor the primary touch while a gesture is in flight:
+        // a second finger's moves must not steer it.
         guard let primaryTouch,
               let touch = touches.first(where: { $0 === primaryTouch })
         else { return }
@@ -960,7 +960,7 @@ class RedactionOverlayView: UIView {
         } else if let origin = dragOrigin {
             // Draw new region — the 8-pt start gate applies only until the
             // first over-threshold move; after that the band tracks the
-            // finger back in as well (S1-e / DT-11). A drag that returns
+            // finger back in as well. A drag that returns
             // to its origin commits nothing (the 20-pt floor rejects it).
             let dx = abs(point.x - origin.x)
             let dy = abs(point.y - origin.y)
@@ -974,7 +974,7 @@ class RedactionOverlayView: UIView {
                     height: abs(point.y - origin.y)
                 )
                 // Apply snap guides during new region drawing — anchored
-                // edges (S1-b / DT-03): only the two edges under the finger
+                // edges: only the two edges under the finger
                 // snap; the origin corner is invariant by construction.
                 rect = applyResizeSnapping(
                     to: rect,
@@ -989,7 +989,7 @@ class RedactionOverlayView: UIView {
                 // `1/zoomScale` so the same finger drift on screen
                 // means the same number of overlay points at any zoom.
                 rect = applyTextBoxSnapping(to: rect)
-                // Clamp the rubber band to the page (S1-c / DT-08) —
+                // Clamp the rubber band to the page —
                 // mirrors the resize clamp in `updateSelectedRegionForResize`.
                 // A band entirely off-page leaves the last rect in place.
                 rect = rect.intersection(bounds)
@@ -1145,7 +1145,7 @@ class RedactionOverlayView: UIView {
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         // A secondary finger's lift must not end — or reset — the primary's
-        // gesture (S1-d / DT-10). Checked BEFORE the defer on purpose.
+        // gesture. Checked BEFORE the defer on purpose.
         guard let primaryTouch, touches.contains(primaryTouch) else { return }
         defer { resetDragState() }
 
@@ -1246,8 +1246,8 @@ class RedactionOverlayView: UIView {
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        // Only the primary touch's cancel discards the gesture (S1-d /
-        // DT-10); a system cancel of the primary still cancels.
+        // Only the primary touch's cancel discards the gesture;
+        // a system cancel of the primary still cancels.
         guard let primaryTouch, touches.contains(primaryTouch) else { return }
         // Discard without committing — restore pre-drag region state
         if isGroupMoving {
@@ -1306,7 +1306,7 @@ class RedactionOverlayView: UIView {
         // on commit, escape, or tool deactivation.
         freeformPath = []
         freeformZoomScale = 1.0
-        // Repaint on gesture end (S1-a / DT-01, DT-02). The commit paths
+        // Repaint on gesture end. The commit paths
         // run under `isActivelyDragging`, which makes the coordinator's
         // `configure` a no-op, and the later state sync sees `regions`
         // unchanged (the overlay already holds the final rect) — so this
@@ -1479,7 +1479,7 @@ class RedactionOverlayView: UIView {
     /// cosmetic and contributes nothing to this test. `targetHandleSize`
     /// is clamped to at most HALF the region's shorter side (never
     /// past the region's own center, so opposite-edge handles stay
-    /// distinguishable) and at least the pre-UXC-18 22pt floor, so
+    /// distinguishable) and at least the 22pt floor, so
     /// handles on a small region shrink gracefully toward the old
     /// behavior instead of fully overlapping. When the clamped boxes
     /// of two or more handles overlap the touch point, the nearest
@@ -1643,7 +1643,7 @@ class RedactionOverlayView: UIView {
             }
         }
 
-        // UXC-44 (D-116, RB-93): the result walk's current match wears
+        // The result walk's current match wears
         // ONE 2-pt brand-tint ring drawn 3 pt OUTSIDE its highlight
         // rect so it sits clear of the selected state's orange border.
         // Fills untouched, no animation (Reduce Motion moot). The tint
@@ -2087,8 +2087,8 @@ class RedactionOverlayView: UIView {
         if !newPositions.isEmpty {
             snapFeedback.impactOccurred(intensity: 0.4)
             // VoiceOver announcement — gated to avoid throttling during
-            // drag. The draw path snaps through here since S1-b (packet
-            // §7.7): same announcement the move path's `applySnapping`
+            // drag. The draw path snaps through here:
+            // same announcement the move path's `applySnapping`
             // posts, so drawing and resizing both report guide alignment.
             if UIAccessibility.isVoiceOverRunning {
                 UIAccessibility.post(notification: .announcement,
@@ -2302,7 +2302,7 @@ class RedactionOverlayView: UIView {
                 let viewRect = pdfNormalizedToOverlay(highlight.normalizedRect)
                 element.accessibilityFrame = UIAccessibility.convertToScreenCoordinates(viewRect, in: self)
                 // NEVER include matched text — announce page only.
-                // UXC-44 (RB-93): the walk's current match carries a
+                // The walk's current match carries a
                 // ", current" suffix — still no matched text.
                 element.accessibilityLabel = highlight.id == focusedHighlightID
                     ? "Search highlight, page \(pageIndex + 1), current"
@@ -2362,7 +2362,7 @@ class RedactionOverlayView: UIView {
         }
 
         if let metadata = coordinator?.redactionState?.regionMetadata[region.id] {
-            // UXC-22 (RB-44) — qualitative descriptor replaces the raw
+            // Qualitative descriptor replaces the raw
             // percent; same one threshold source as every other site.
             // This canvas leg is currently unreachable by VoiceOver in
             // the served tree (accessibilityElements above never
@@ -2400,7 +2400,7 @@ extension RedactionOverlayView: UIContextMenuInteractionDelegate {
         _ interaction: UIContextMenuInteraction,
         configurationForMenuAtLocation location: CGPoint
     ) -> UIContextMenuConfiguration? {
-        // Draw wins (RB-75 / S2-a): no context menu while the Rectangle
+        // Draw wins: no context menu while the Rectangle
         // tool is on — a hold-then-drag would otherwise pop the menu and
         // cancel the draw in flight.
         guard !isDrawingMode else { return nil }

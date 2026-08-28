@@ -2,14 +2,14 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// D-19 fixture-driven test for DOB detection. The DataPipeline-generated
+// Fixture-driven test for DOB detection. The DataPipeline-generated
 // vectors at Fixtures/vectors/dob_vectors.json carry labeled-prefix
 // dates whose `text` field reproduces the original document context
 // (e.g. "Birthdate: 6/12/1955"). This test asserts the inline dobPattern
 // matches every valid row's text. DOBDetectorTests.swift covers other
 // surfaces; this file is fixture-driven specifically.
 
-@Suite("DOB fixture-driven vector tests (D-19)")
+@Suite("DOB fixture-driven vector tests")
 struct DOBVectorTests {
 
     struct Vectors: Decodable {
@@ -32,7 +32,7 @@ struct DOBVectorTests {
         return try JSONDecoder().decode(Vectors.self, from: data).vectors
     }
 
-    @Test("D-19 fixture loads with rows")
+    @Test("Fixture loads with rows")
     func fixtureLoads() throws {
         guard let vectors = try loadVectors() else {
             Issue.record("dob_vectors.json not bundled")

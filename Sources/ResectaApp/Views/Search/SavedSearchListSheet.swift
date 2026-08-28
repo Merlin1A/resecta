@@ -13,8 +13,8 @@ import RedactionEngine
 // interface-correct by construction (it saves the active shape).
 //
 // Presented through the hub's single `.sheet(item:)` slot as
-// `SearchModal.savedSearches` (F-5 single-modal contract). The capture
-// monitor arrives as a `let` per the 37b56c9 injection pattern — never an
+// `SearchModal.savedSearches`. The capture
+// monitor arrives as a `let` injected from the call site — never an
 // @Environment read inside a view that re-lays-out during sheet dismissal.
 
 struct SavedSearchListSheet: View {
@@ -31,19 +31,19 @@ struct SavedSearchListSheet: View {
     @State private var renameText: String = ""
     @State private var showSavePrompt = false
     @State private var savePromptName: String = ""
-    /// H-74 — collision feedback for the save / rename prompts. When the
+    /// Collision feedback for the save / rename prompts. When the
     /// store rejects a duplicate name the alert re-presents with this
     /// message in place of its standard body, re-armed from the dismissal
-    /// write by the `.onChange` collision handlers below (RW-F-005, D-86 —
-    /// an in-action re-arm is swallowed by the tap's own dismissal).
+    /// write by the `.onChange` collision handlers below — an
+    /// in-action re-arm is swallowed by the tap's own dismissal.
     @State private var savePromptError: String?
     @State private var renameError: String?
-    /// RW-F-005 (D-86): the entry whose rename collided, held across the
+    /// The entry whose rename collided, held across the
     /// alert's dismissal so the `.onChange` re-present can re-arm
     /// `renameTarget` — the button action's own re-arm is swallowed by the
     /// dismissal write (see the collision handlers below).
     @State private var renameRetryTarget: SavedSearch?
-    /// UXF-33 / ST-94: swipe-Delete asks for confirmation before the
+    /// Swipe-Delete asks for confirmation before the
     /// store removal (app-standard destructive-confirm idiom — same
     /// shape as Settings' Reset dialogs).
     @State private var deleteTarget: SavedSearch?
@@ -80,8 +80,8 @@ struct SavedSearchListSheet: View {
                     }
                 }
 
-                // Save entry point — always visible while the sheet is open
-                // (design §4.1), pre-filled with a generated name. Saves
+                // Save entry point — always visible while the sheet is open,
+                // pre-filled with a generated name. Saves
                 // the active interface's shape, so the new entry always
                 // lands in the list the user is looking at.
                 Section {
@@ -111,7 +111,7 @@ struct SavedSearchListSheet: View {
                     let trimmed = renameText.trimmingCharacters(in: .whitespaces)
                     if !trimmed.isEmpty,
                        !savedSearchStore.rename(id: search.id, to: trimmed) {
-                        // H-74 / RW-F-005 (D-86): duplicate name. Setting
+                        // Duplicate name. Setting
                         // `renameTarget` back here is swallowed — the tap's
                         // dismissal write nils it through the binding after
                         // this action returns — so stash the entry and let
@@ -143,11 +143,12 @@ struct SavedSearchListSheet: View {
                     if savedSearchStore.add(Self.capture(from: searchState, name: trimmed)) {
                         savePromptError = nil
                     } else {
-                        // H-74 / RW-F-005 (D-86): duplicate name. A
+                        // Duplicate name. A
                         // `showSavePrompt = true` here is swallowed — the
                         // tap's dismissal resets `isPresented` after this
-                        // action returns (the silent-drop defect; the UXF-04
-                        // original only survives because its action is
+                        // action returns (the silent-drop defect; the
+                        // sibling save-current-regex flow only survives
+                        // because its action is
                         // async). Record the error; the
                         // `.onChange(of: showSavePrompt)` re-present
                         // re-arms the alert carrying the message.
@@ -161,7 +162,7 @@ struct SavedSearchListSheet: View {
             } message: {
                 Text(savePromptError ?? Self.savePromptMessage(for: activeInterface))
             }
-            // UXF-33: destructive confirm for swipe-Delete, mirroring
+            // Destructive confirm for swipe-Delete, mirroring
             // the app-wide confirmation-dialog pattern (Settings
             // Reset-to-Defaults / Redact N instances). Title comes from
             // `deleteConfirmTitle(for:)` so the copy is pinned by test.
@@ -182,7 +183,7 @@ struct SavedSearchListSheet: View {
             } message: { search in
                 Text(Self.deleteConfirmMessage(for: search))
             }
-            // H-74 / RW-F-005 (D-86): collision re-present, decoupled from
+            // Collision re-present, decoupled from
             // the alert button actions — a same-transaction re-arm inside an
             // action is swallowed by the tap's own dismissal (both collision
             // paths shipped silently dead). Re-arm from the dismissal write
@@ -203,9 +204,9 @@ struct SavedSearchListSheet: View {
                 }
             }
         }
-        // S7 §4.1: saved query previews may themselves be PII — this sheet
+        // Saved query previews may themselves be PII — this sheet
         // presents modally above the search sheet's shield swap, so it
-        // carries its own (SEC-3 extension, same rationale as C10).
+        // carries its own screen-capture shield for the same reason.
         .shieldedSheetContent(monitor: captureMonitor)
     }
 
@@ -259,7 +260,7 @@ struct SavedSearchListSheet: View {
         }
     }
 
-    // MARK: - Testable static seams (S6 testable-static pattern)
+    // MARK: - Testable static seams
 
     /// The typed-list partition: entries whose persisted mode belongs
     /// to `interface`. One store underneath; the mode's frozen wire
@@ -293,7 +294,7 @@ struct SavedSearchListSheet: View {
         interface == .scan ? "Save current scan…" : "Save current search…"
     }
 
-    /// H-74 — collision message for a rejected duplicate name (save and
+    /// Collision message for a rejected duplicate name (save and
     /// rename prompts). Mechanism description, no outcome promise.
     static let duplicateNameMessage =
         "That name is already in use — choose a different name."
@@ -306,7 +307,7 @@ struct SavedSearchListSheet: View {
         interface == .scan ? "Save current scan" : "Save current search"
     }
 
-    /// UXC-31 (RB-40): rename-alert title — same curly-quote shape as
+    /// Rename-alert title — same curly-quote shape as
     /// `deleteConfirmTitle(for:)`. The nil fallback is defensive only:
     /// the alert's `isPresented` binding is false whenever
     /// `renameTarget` is nil, so this branch never reaches the screen.
@@ -348,13 +349,13 @@ struct SavedSearchListSheet: View {
         // every Scan→Scan recall is same-mode.
         searchState.piiCategoryFilter = nil
         searchState.sortOrder = .discoveryOrder
-        // D-63/UT-05: category restore only while the chips strip is
+        // Category restore only while the chips strip is
         // live — with the strip dark there is no UI that shows or
         // undoes a narrowed detector set, so recall must not silently
         // narrow what the next scan runs. The persisted
         // `enabledPIICategories` field is untouched (schema and codec
         // unchanged; capture still writes it) and restore revives with
-        // the flag. Pinned by `SavedListPartitionTests`. DC-212.
+        // the flag. Pinned by `SavedListPartitionTests`.
         if SearchState.scanCategoryStripEnabled,
            let categories = saved.enabledPIICategories {
             searchState.enabledPIICategories = categories
@@ -395,7 +396,7 @@ struct SavedSearchListSheet: View {
         )
     }
 
-    /// UXF-33: delete-confirm dialog title. Names the saved search being
+    /// Delete-confirm dialog title. Names the saved search being
     /// removed (the name is user-typed and already visible in the list
     /// row). Nil-tolerant so the dialog modifier can evaluate it while
     /// no target is armed.
@@ -404,7 +405,7 @@ struct SavedSearchListSheet: View {
         return "Delete “\(search.name)”?"
     }
 
-    /// UXF-33 / Q6 (D-86): delete-confirm dialog body, interface-adaptive
+    /// Delete-confirm dialog body, interface-adaptive
     /// like the sheet's other chrome — the noun follows the deleted entry's
     /// own interface (a saved SCAN is not a "saved search").
     static func deleteConfirmMessage(for search: SavedSearch) -> String {
@@ -413,7 +414,7 @@ struct SavedSearchListSheet: View {
             : "The saved search is removed from this device."
     }
 
-    /// Pre-filled save-prompt name (design §4.1).
+    /// Pre-filled save-prompt name.
     static func generatedName(for searchState: SearchState) -> String {
         switch searchState.searchModeType {
         case .piiScan:
@@ -439,7 +440,7 @@ struct SavedSearchListSheet: View {
     }
 
     /// Tertiary filter line — shown only when the shape departs from the
-    /// defaults (design §4.1: avoid clutter at the default state).
+    /// defaults (avoid clutter at the default state).
     static func filterSummary(for saved: SavedSearch) -> String? {
         var parts: [String] = []
         if saved.sourceFilter != .all {

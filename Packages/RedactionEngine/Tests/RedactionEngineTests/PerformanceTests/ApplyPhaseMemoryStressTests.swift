@@ -5,19 +5,19 @@ import PDFKit
 import CryptoKit
 @testable import RedactionEngine
 
-// ENGINE §5 / CND-11 (launch-fix-v2 S5) — apply-phase memory + output-parity
-// probes for the draw-on-append (K=0) PDFStreamReconstructor.
+// Apply-phase memory + output-parity probes for the draw-on-append (K=0)
+// PDFStreamReconstructor.
 //
 // REPORT-ONLY: this suite is listed in PERF_ALONE_RedactionEngine in
 // Scripts/test-batched.sh, so it runs by itself and its results do not gate the
-// batched exit status (verification.md §3). The hard O(1) peak-residency
-// assertion — phys_footprint stays flat across a large document under jetsam
-// pressure — is the on-device jetsam-soak gate (maintainer-run, pinned iOS 26.4), which
-// the simulator cannot stand in for faithfully. What CI can pin deterministically
-// is here: the streaming path handles a large page count, and its visible output
-// is reproducible byte-for-byte across independent runs.
+// batched exit status. The hard O(1) peak-residency assertion — phys_footprint
+// stays flat across a large document under jetsam pressure — is verified by an
+// on-device jetsam-soak gate (pinned iOS 26.4), which the simulator cannot
+// stand in for faithfully. What CI can pin deterministically is here: the
+// streaming path handles a large page count, and its visible output is
+// reproducible byte-for-byte across independent runs.
 
-@Suite("Apply-phase memory stress (CND-11)")
+@Suite("Apply-phase memory stress")
 struct ApplyPhaseMemoryStressTests {
 
     // MARK: - Large-N streaming (O(1)-residency proxy)

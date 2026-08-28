@@ -5,12 +5,12 @@ import CoreGraphics
 import CoreText
 @testable import RedactionEngine
 
-// ENGINE §6 — Verification engine tests.
+// Verification engine tests.
 
 @Suite("Verification Engine")
 struct VerificationEngineTests {
 
-    // MARK: - Layer Count (R4: never hardcoded)
+    // MARK: - Layer Count (never hardcoded)
 
     @Test("Secure Rasterization has 5 layers, Searchable has 10")
     func layerCounts() {
@@ -86,7 +86,7 @@ struct VerificationEngineTests {
                 "Should warn when all terms are too short to search")
     }
 
-    @Test("Layer 3 reports INFO when no sensitive terms provided (VQ-30)")
+    @Test("Layer 3 reports INFO when no sensitive terms provided")
     func layer3InfoOnEmptyTerms() async throws {
         let (doc, url) = try await makeCleanPDF()
         defer { try? FileManager.default.removeItem(at: url) }
@@ -153,7 +153,7 @@ struct VerificationEngineTests {
         }
     }
 
-    @Test("Layer 3 SVT-3 flags a case variant in decoded page text (residual tier)")
+    @Test("Layer 3 flags a case variant in decoded page text (residual tier)")
     func layer3CaseVariantInDecodedPage() async throws {
         // Same case-variant leak, but living only inside a text-show stream:
         // the structural pass excludes stream ranges, so the decoded
@@ -254,9 +254,9 @@ struct VerificationEngineTests {
         }
     }
 
-    // MARK: - Layer 3: Token-boundary + EXIF (CAT-357 A+B)
+    // MARK: - Layer 3: Token-boundary + EXIF
 
-    @Test("Layer 3 FAILs on a boundary-token structural match (CAT-357A)")
+    @Test("Layer 3 FAILs on a boundary-token structural match")
     func tokenBoundaryMatch_triggersFail() async throws {
         // Term in structural (non-stream) bytes followed by ")" — a PDF
         // delimiter → complete token → FAIL.
@@ -275,7 +275,7 @@ struct VerificationEngineTests {
                 "boundary-token structural match must FAIL; got \(result.status)")
     }
 
-    @Test("Layer 3 WARNs on a non-boundary (fragment) structural match (CAT-357A)")
+    @Test("Layer 3 WARNs on a non-boundary (fragment) structural match")
     func nonBoundaryMatch_triggersWarn() async throws {
         // Term embedded mid-token ("CLASSIFIEDZ") — the byte after the match is a
         // letter, not a delimiter → possible fragment collision → WARN, not FAIL.
@@ -294,7 +294,7 @@ struct VerificationEngineTests {
                 "non-boundary fragment match must WARN, not FAIL; got \(result.status)")
     }
 
-    @Test("Layer 3 WARNs on a sensitive term in JPEG EXIF (CAT-357B)")
+    @Test("Layer 3 WARNs on a sensitive term in JPEG EXIF")
     func jpegExifWithSensitiveTerm_triggersWarn() async throws {
         let jpeg = TestFixtures.exifJPEG(app1Payloads: ["CLASSIFIED"])
         let (doc, url) = try TestFixtures.writeTempPDF(
@@ -311,7 +311,7 @@ struct VerificationEngineTests {
                 "term in JPEG EXIF must WARN; got \(result.status)")
     }
 
-    @Test("EXIF scan: single, multi-APP1, truncated, absent (CAT-357B adversarial)")
+    @Test("EXIF scan: single, multi-APP1, truncated, absent (adversarial)")
     func exifScanAdversarialBytes() {
         let automaton = AhoCorasick(patterns: AhoCorasick.encodeForSearch("CLASSIFIED"))
         // single APP1 carrying the term
@@ -353,7 +353,7 @@ struct VerificationEngineTests {
         #expect(isClean, "Clean PDF should pass, warn, or be info-only (not fail) structural check")
     }
 
-    // MARK: - Layer 4: /Names name-dictionary carriers (VQ-20)
+    // MARK: - Layer 4: /Names name-dictionary carriers
 
     @Test("Layer 4 FAILs on active-content subtrees under /Names",
           arguments: ["EmbeddedFiles", "JavaScript"])
@@ -443,7 +443,7 @@ struct VerificationEngineTests {
                 "Should report auto-injected metadata as info or pass if none present")
     }
 
-    @Test("Layer 5 /Trapped WARN says Metadata present, not auto-injected (VQ-31b)")
+    @Test("Layer 5 /Trapped WARN says Metadata present, not auto-injected")
     func trappedWarnCopyNotAutoInjected() async throws {
         // /Trapped is workflow-set, not auto-injected — the mixed-warning
         // message must not claim auto-injection when it names /Trapped.
@@ -466,7 +466,7 @@ struct VerificationEngineTests {
         }
     }
 
-    @Test("Layer 5 expected-keys-only INFO copy unchanged (VQ-31b)")
+    @Test("Layer 5 expected-keys-only INFO copy unchanged")
     func expectedKeysOnlyInfoCopyUnchanged() async throws {
         // Producer/CreationDate/ModDate ARE auto-injected — the pure-INFO
         // path keeps the auto-injected wording.
@@ -490,14 +490,14 @@ struct VerificationEngineTests {
         }
     }
 
-    // MARK: - Layer 6: SVT-1 on region-less searchable pages (CAT-358)
+    // MARK: - Layer 6: spatial-exclusion check on region-less searchable pages
 
-    @Test("Layer 6 runs SVT-1 on region-less searchable pages (CAT-358)")
+    @Test("Layer 6 runs the spatial-exclusion check on region-less searchable pages")
     func layer6RunsOnRegionlessPage() async throws {
         // regions: [:] — pre-fix runLayer6 skipped region-less pages entirely
         // (guard !pageRegions.isEmpty), so a tampered region-less searchable
         // page passed Layer 6. After the split the empty maps flow into
-        // verifySpatialExclusion(regionShapes: []) and the SVT-1 lattice FAILs.
+        // verifySpatialExclusion(regionShapes: []) and the spatial-exclusion lattice FAILs.
         let (doc, url) = try TestFixtures.writeTempPDF(
             TestFixtures.withBlandKerningInjection(), prefix: "layer6_regionless_")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -510,12 +510,12 @@ struct VerificationEngineTests {
             filterDigests: [], perPageModes: [.searchableRedaction]
         )
         #expect(result.status.isFail,
-                "Layer 6 must run SVT-1 on a tampered region-less page; got \(result.status)")
+                "Layer 6 must run the spatial-exclusion check on a tampered region-less page; got \(result.status)")
     }
 
-    // MARK: - Layer 5: XMP-without-/Info and non-string key presence (CAT-378/379)
+    // MARK: - Layer 5: XMP-without-/Info and non-string key presence
 
-    @Test("Layer 5 scans XMP even when /Info is absent (CAT-378)")
+    @Test("Layer 5 scans XMP even when /Info is absent")
     func xmpScannedWhenInfoAbsent() async throws {
         // Fixture has an XMP /Metadata stream but no /Info dictionary. Pre-fix
         // the nil-/Info guard returned .pass before the XMP scan ran (red).
@@ -537,7 +537,7 @@ struct VerificationEngineTests {
         }
     }
 
-    @Test("Layer 5 FAILs on a non-string /Info value (CAT-379)")
+    @Test("Layer 5 FAILs on a non-string /Info value")
     func nonStringTitleValueFails() async throws {
         // /Title is an INTEGER (42). Pre-fix the GetString/GetName pair both
         // returned false for an integer value → fell through as "absent" (red).
@@ -600,7 +600,7 @@ struct VerificationEngineTests {
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
-        // Incremental update produces multiple %%EOF → FAIL (ENGINE §6.4)
+        // Incremental update produces multiple %%EOF → FAIL.
         #expect(result.status.isFail,
                 "Layer 4 should FAIL on incremental update (multiple %%EOF)")
     }
@@ -629,15 +629,15 @@ struct VerificationEngineTests {
         }
     }
 
-    @Test("aggregateStatus with only skipped layers returns skipped (CAT-372)")
+    @Test("aggregateStatus with only skipped layers returns skipped")
     func allSkippedReturnsSkipped() {
         let engine = VerificationEngine()
         let layers = [makeResult(.skipped), makeResult(.skipped)]
-        // CAT-372: all-skipped is the .skipped sentinel, not a silent .pass.
+        // All-skipped is the .skipped sentinel, not a silent .pass.
         #expect(engine.aggregateStatus(layers) == .skipped)
     }
 
-    // MARK: - Layers 7 & 9: Skipped-Layer Honesty (CAT-372)
+    // MARK: - Layers 7 & 9: Skipped-Layer Honesty
     //
     // On the verify-only resume path the per-page filter digests are rebuilt
     // all-nil, so the digest-consuming cross-checks (Layer 7 character count,
@@ -681,8 +681,8 @@ struct VerificationEngineTests {
 
     @Test("Layer 7 stays .pass when no page is eligible (all per-page SR)")
     func layer7AllSRPagesStaysPass() async throws {
-        // eligible == 0 (every page is per-page Secure Rasterization, e.g. the
-        // CAT-353 rotated-page stopgap): the layer is skipped by design and
+        // eligible == 0 (every page is per-page Secure Rasterization, e.g. a
+        // rotated-page stopgap): the layer is skipped by design and
         // must stay .pass — promoting it would WARN-flag valid docs.
         let (doc, url) = try makeBlankPDF(pageCount: 2)
         defer { try? FileManager.default.removeItem(at: url) }
@@ -718,10 +718,10 @@ struct VerificationEngineTests {
                 "Layer 1 should warn when CGPDFDocument cannot be opened")
     }
 
-    @Test("Layer 2 OCR-checks a no-JPEG page via the thumbnail fallback (CAT-377)")
+    @Test("Layer 2 OCR-checks a no-JPEG page via the thumbnail fallback")
     func layer2ThumbnailFallbackChecksNoJPEGPage() async throws {
-        // Pre-CAT-377 a page with no extractable JPEG XObject was added to
-        // uncheckedPages and the layer WARNed. CAT-377 renders a PDFPage
+        // Before this fix a page with no extractable JPEG XObject was added to
+        // uncheckedPages and the layer WARNed. Now the layer renders a PDFPage
         // thumbnail and OCRs it instead, so a vector page with no text is now
         // genuinely checked (OCR ran) and PASSes rather than warning unchecked.
         let (doc, url) = try makeVectorOnlyPDF()
@@ -738,9 +738,9 @@ struct VerificationEngineTests {
                 "vector page (no text) is OCR-checked via thumbnail → pass; got \(result.status)")
     }
 
-    // MARK: - Layer 2: Multi-image + thumbnail fallback (CAT-377)
+    // MARK: - Layer 2: Multi-image + thumbnail fallback
 
-    @Test("extractPageImages returns every image XObject on a page (CAT-377)")
+    @Test("extractPageImages returns every image XObject on a page")
     func multiImagePageBothImagesOCRd() async throws {
         // Two JPEG XObjects on one page. Pre-fix extractPageImage returned a
         // single CGImage (first XObject only, via `return false`);
@@ -758,7 +758,7 @@ struct VerificationEngineTests {
                 "well-formed JPEGs must not count as decode failures")
     }
 
-    @Test("Multi-image page with a region + text → conservative WARN (CAT-377)")
+    @Test("Multi-image page with a region + text → conservative WARN")
     func multiImagePageConservativeWarn() async throws {
         // Per-image Vision coordinates cannot be identity-mapped to page space
         // (C-B contract); with a region present and OCR text found, the page is
@@ -779,7 +779,7 @@ struct VerificationEngineTests {
                 "multi-image page with a region must conservatively WARN; got \(result.status)")
     }
 
-    @Test("aspectMatches: unpadded matches, letterboxed mismatches (A2-9)")
+    @Test("aspectMatches: unpadded matches, letterboxed mismatches")
     func thumbnailAspectMismatchIsConservative() {
         // A thumbnail whose aspect matches the requested page aspect is trusted
         // (unpadded); a mismatched (letterboxed) render is not — its
@@ -794,7 +794,7 @@ struct VerificationEngineTests {
             "square render of a portrait page is padded → not trusted")
     }
 
-    // MARK: - Layer 2: Region-Scoped OCR (CAT-351)
+    // MARK: - Layer 2: Region-Scoped OCR
 
     // -- Pure helper units (no Vision) --------------------------------------
 
@@ -948,7 +948,7 @@ struct VerificationEngineTests {
                 "case-only fold: diacritic-insensitivity must NOT be added")
     }
 
-    @Test("classifyPageOCR (A2-3): word boxes flanking a region suppress a false FAIL")
+    @Test("classifyPageOCR: word boxes flanking a region suppress a false FAIL")
     func classifyPageOCR_wordLevelIntersection() {
         // Line box spans the region (the survivors "JOHN"/"DOE" plus the filled
         // middle); word boxes sit entirely OUTSIDE the region. With line-level
@@ -969,15 +969,15 @@ struct VerificationEngineTests {
         #expect(verdict == .sensitiveTermOutsideRegions)
     }
 
-    // -- 01-FIX (2026-06-25): meaningful-containment in-region predicate -----
+    // -- Meaningful-containment in-region predicate ---------------------------
     // The any-overlap test (`CGRect.intersects`) counted a still-visible word
     // whose box clips a mid-line region's edge by a sliver as in-region; in
     // Secure Rasterization that is the ONLY thing that can ever touch an opaque
     // region, so every mid-line redaction false-FAILed. The coverage predicate
     // (≥ `inRegionCoverageThreshold` of the OCR box inside a region) keeps a
-    // real paint miss while dropping an edge sliver. See 00-DIAGNOSIS / 01-FIX.
+    // real paint miss while dropping an edge sliver.
 
-    @Test("classifyPageOCR (01-FIX A1): a neighbour word clipping a region edge is not in-region")
+    @Test("classifyPageOCR: a neighbour word clipping a region edge is not in-region")
     func classifyPageOCR_edgeClipNotInRegion() {
         // The repro: a mid-line redaction (the filled phone number) whose
         // adjacent still-visible lead-in word's box clips the region's left edge
@@ -991,7 +991,7 @@ struct VerificationEngineTests {
         #expect(verdict == .textOutsideRegionsOnly, "a sliver edge clip must not count as in-region")
     }
 
-    @Test("classifyPageOCR (01-FIX A2): glyphs substantially inside a region still FAIL")
+    @Test("classifyPageOCR: glyphs substantially inside a region still FAIL")
     func classifyPageOCR_paintMissStillInRegion() {
         let region = manualRegion(CGRect(x: 0.40, y: 0.40, width: 0.20, height: 0.20))
         // A readable token centred inside the region (a fill that missed its target).
@@ -1008,7 +1008,7 @@ struct VerificationEngineTests {
             hits: [plain], pageRegions: [region], sensitiveTerms: []) == .textInRegion)
     }
 
-    @Test("classifyPageOCR (01-FIX A3): sensitive text fully outside regions stays out-of-region")
+    @Test("classifyPageOCR: sensitive text fully outside regions stays out-of-region")
     func classifyPageOCR_sensitiveOutsideRegions() {
         let region = manualRegion(CGRect(x: 0.60, y: 0.10, width: 0.20, height: 0.20))
         let outside = VerificationEngine.OCRHit(
@@ -1021,7 +1021,7 @@ struct VerificationEngineTests {
             hits: [outside], pageRegions: [region], sensitiveTerms: ["secret"]) == .sensitiveTermOutsideRegions)
     }
 
-    @Test("classifyPageOCR (01-FIX A4): a sensitive neighbour clipping the edge does not FAIL")
+    @Test("classifyPageOCR: a sensitive neighbour clipping the edge does not FAIL")
     func classifyPageOCR_sensitiveNeighbourClipNoFail() {
         // Like A1 but the clipping neighbour contains a sensitive term. Old
         // predicate → sensitiveTermInRegion (false FAIL); coverage → outside.
@@ -1037,7 +1037,7 @@ struct VerificationEngineTests {
         #expect(verdict == .sensitiveTermOutsideRegions)
     }
 
-    @Test("classifyPageOCR (01-FIX A5): coverage exactly at the threshold is in-region (inclusive)")
+    @Test("classifyPageOCR: coverage exactly at the threshold is in-region (inclusive)")
     func classifyPageOCR_coverageAtThresholdInclusive() {
         // Exact-binary geometry: half the OCR box lies inside the region.
         let region = manualRegion(CGRect(x: 0.50, y: 0.0, width: 0.50, height: 1.0))
@@ -1049,7 +1049,7 @@ struct VerificationEngineTests {
             hits: [hit], pageRegions: [region], sensitiveTerms: []) == .textInRegion)
     }
 
-    @Test("coverageFraction (01-FIX): half-overlap = 0.5; disjoint and degenerate = 0")
+    @Test("coverageFraction: half-overlap = 0.5; disjoint and degenerate = 0")
     func coverageFraction_math() {
         let box = CGRect(x: 0.25, y: 0.25, width: 0.50, height: 0.50)
         let halfRegion = CGRect(x: 0.50, y: 0.0, width: 0.50, height: 1.0)
@@ -1060,7 +1060,7 @@ struct VerificationEngineTests {
         #expect(VerificationEngine.coverageFraction(of: degenerate, inside: halfRegion) == 0.0)
     }
 
-    @Test("layer2RegionSnapshot (A2-4): sub-threshold slivers dropped, survivors clamped")
+    @Test("layer2RegionSnapshot: sub-threshold slivers dropped, survivors clamped")
     func layer2RegionSnapshot_dropsSliversClampsSurvivors() {
         let sliverW = manualRegion(CGRect(x: 0.5, y: 0.5, width: 0.0005, height: 0.2))
         let sliverH = manualRegion(CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.0005))
@@ -1104,7 +1104,7 @@ struct VerificationEngineTests {
         }
     }
 
-    @Test("Layer 2 (D08-F1): SR out-of-region text with NO regions → PASS (no over-block)")
+    @Test("Layer 2: SR out-of-region text with NO regions → PASS (no over-block)")
     func layer2ScopedOCR_textOutsideRegions_noRegions_passes() async throws {
         let size = CGSize(width: 600, height: 800)
         let image = try renderTextPageImage(
@@ -1125,7 +1125,7 @@ struct VerificationEngineTests {
                 "SR text with no regions is the raster's own content → PASS; got \(result.status)")
     }
 
-    @Test("Layer 2 (CAT-351): Searchable out-of-region text → INFO (continuity preserved)")
+    @Test("Layer 2: Searchable out-of-region text → INFO (continuity preserved)")
     func layer2ScopedOCR_textOutsideRegions_searchable_info() async throws {
         let size = CGSize(width: 600, height: 800)
         let image = try renderTextPageImage(
@@ -1140,13 +1140,13 @@ struct VerificationEngineTests {
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: [.searchableRedaction])
-        // D08-F1 leaves the Searchable .info continuity untouched: selectable text
+        // The Searchable .info continuity stays untouched: selectable text
         // outside regions is expected on a Searchable page.
         #expect(result.status.isInfo,
                 "Searchable out-of-region text stays INFO; got \(result.status)")
     }
 
-    @Test("Layer 2 (CAT-351): sensitive term inside a region → FAIL, page number only")
+    @Test("Layer 2: sensitive term inside a region → FAIL, page number only")
     func layer2ScopedOCR_sensitiveTermInsideRegion_fails() async throws {
         let size = CGSize(width: 600, height: 800)
         // A solid, common dictionary word recognizes reliably under the FROZEN
@@ -1168,14 +1168,15 @@ struct VerificationEngineTests {
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isFail, "term readable inside a region must FAIL; got \(result.status)")
         if case .fail(let msg) = result.status {
-            // ARCH §12.2: page number present, document content (the term) absent.
+            // The FAIL message carries only the page number; document content
+            // (the term) never echoes.
             #expect(msg.contains("1"))
             #expect(!msg.localizedCaseInsensitiveContains(term),
                     "FAIL message must never echo the matched term")
         }
     }
 
-    @Test("Layer 2 (D08-F2): SR text in a region → FAIL (page only); identity coordinate guard")
+    @Test("Layer 2: SR text in a region → FAIL (page only); identity coordinate guard")
     func layer2ScopedOCR_textTopRegionTop_intersects() async throws {
         let size = CGSize(width: 600, height: 800)
         let image = try renderTextPageImage(
@@ -1190,14 +1191,14 @@ struct VerificationEngineTests {
             sourcePageCount: 1, regions: [0: [topBand]], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
-        // Identity mapping: top text (high y) ∈ top band → in-region → FAIL under
-        // D08-F2 (readable text in a destroyed-pixel SR region is a leak, no term
+        // Identity mapping: top text (high y) ∈ top band → in-region → FAIL
+        // (readable text in a destroyed-pixel SR region is a leak, no term
         // needed). A reintroduced y-flip would map it low → out-of-region → the
         // INFO note, so identity vs flip stays distinguishable (FAIL ≠ INFO).
         #expect(result.status.isFail,
-                "top text vs top region must intersect under identity mapping (D08-F2 FAIL); got \(result.status)")
+                "top text vs top region must intersect under identity mapping (FAIL); got \(result.status)")
         if case .fail(let msg) = result.status {
-            // ARCH §12.2: page number present, document content absent.
+            // The FAIL message carries only the page number; document content is absent.
             #expect(msg.contains("1"))
             #expect(!msg.localizedCaseInsensitiveContains("HEADER"),
                     "FAIL message must not echo OCR'd content")
@@ -1221,13 +1222,13 @@ struct VerificationEngineTests {
             filterDigests: [], perPageModes: [.secureRasterization])
         // Identity mapping: bottom text (low y) ∉ top band → out-of-region → the
         // INFO note (regions present). A reintroduced y-flip would map it high →
-        // in-region → FAIL (D08-F2), so identity vs flip stays distinguishable
+        // in-region → FAIL, so identity vs flip stays distinguishable
         // (INFO ≠ FAIL).
         #expect(result.status.isInfo,
                 "bottom text vs top region must not intersect under identity mapping (out-of-region INFO); got \(result.status)")
     }
 
-    @Test("Layer 2 (D08-F2): Searchable readable text inside a region → WARN (unchanged string)")
+    @Test("Layer 2: Searchable readable text inside a region → WARN (unchanged string)")
     func layer2ScopedOCR_textInRegion_searchable_warns() async throws {
         let size = CGSize(width: 600, height: 800)
         let image = try renderTextPageImage(
@@ -1242,18 +1243,18 @@ struct VerificationEngineTests {
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: [.searchableRedaction])
-        // D08-F2 keeps the Searchable branch as the existing WARN (a glyph layer
+        // The Searchable branch keeps the existing WARN (a glyph layer
         // legitimately survives behind a Searchable fill). Regression-lock the
-        // WARN + in-region wording (grammar updated by q16/UXF-10, wording only).
+        // WARN + in-region wording (the grammar was updated; wording only).
         #expect(result.status.isWarn,
-                "Searchable in-region text stays WARN (D08-F2); got \(result.status)")
+                "Searchable in-region text stays WARN; got \(result.status)")
         if case .warn(let msg) = result.status {
             #expect(msg.contains("OCR detected text within a redacted region"),
                     "Searchable in-region WARN wording must stay in-region-scoped; got \(msg)")
         }
     }
 
-    @Test("Layer 2 (D08-F2): sensitive term inside a region → FAIL in Searchable mode too")
+    @Test("Layer 2: sensitive term inside a region → FAIL in Searchable mode too")
     func layer2ScopedOCR_termInRegion_searchable_fails() async throws {
         let size = CGSize(width: 600, height: 800)
         let term = "CONFIDENTIAL"   // synthetic, non-PII
@@ -1277,7 +1278,7 @@ struct VerificationEngineTests {
                 "term readable inside a region must FAIL in Searchable mode; got \(result.status)")
     }
 
-    @Test("Layer 2 (D08-F2): SR faithfully redacted region (no in-region text) → PASS")
+    @Test("Layer 2: SR faithfully redacted region (no in-region text) → PASS")
     func layer2ScopedOCR_noSurvivor_secure_passes() async throws {
         let size = CGSize(width: 600, height: 800)
         // A blank (white) page models a faithfully destroyed region: the OCR pass
@@ -1389,18 +1390,17 @@ struct VerificationEngineTests {
         }
     }
 
-    @Test("Layer 2: SR page, region clean, term readable elsewhere → record informational (D-86 de-escalation)")
+    @Test("Layer 2: SR page, region clean, term readable elsewhere → record informational")
     func layer2ScopedOCR_termOutsideRegion_secure_staysRecordInfo() async throws {
         let size = CGSize(width: 600, height: 800)
         let term = "CONFIDENTIAL"   // synthetic, non-PII
         // Term at the top of the page; the region (bottom-right) is faithfully
-        // blank — a redacted term surviving OUTSIDE every region on a
-        // rasterized page. Pre-D-86 this surfaced a dedicated sensitive-term
-        // WARN; RW-F-002(b) de-escalated it: out-of-region content is the
+        // blank — a redacted term surviving outside every region on a
+        // rasterized page is de-escalated: out-of-region content is the
         // page's own un-redacted text, so the layer folds to the
-        // secure-raster informational — the certified record posture
-        // (08B A18) — byte-exact, term never echoed (ARCH §12.2). In-region
-        // survivors still FAIL (pins above).
+        // secure-raster informational (the certified record posture) —
+        // byte-exact, term never echoed. In-region survivors still FAIL
+        // (pins above).
         let image = try renderTextPageImage(
             [(term, CGPoint(x: 30, y: 680), 64)], size: size)
         let (doc, url) = try await makeImagePDF(image, size: size)
@@ -1414,7 +1414,7 @@ struct VerificationEngineTests {
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isInfo,
-                "a term readable outside every region on an SR page folds to the record informational (D-86); got \(result.status)")
+                "a term readable outside every region on an SR page folds to the record informational; got \(result.status)")
         if case .info(let msg) = result.status {
             #expect(msg == "Unredacted page content remains readable on page 1 — expected for this mode.",
                     "the record informational must render byte-exact; got \(msg)")
@@ -1446,7 +1446,7 @@ struct VerificationEngineTests {
                 "Searchable out-of-region term keeps the INFO continuity; got \(result.status)")
     }
 
-    // MARK: - Page references for Layers 1/2/3 (VQ-13 shape)
+    // MARK: - Page references for Layers 1/2/3
 
     @Test("Layer 1 accumulates annotation pages across the document and returns 0-based references")
     func layer1AnnotationPagesAccumulatedWithReferences() async throws {
@@ -1517,7 +1517,7 @@ struct VerificationEngineTests {
                 "references must be the message's page list minus one; got \(String(describing: result.pageReferences))")
     }
 
-    @Test("Layer 3 SVT-3 accumulates decoded-page hits across the document with 0-based references")
+    @Test("Layer 3 accumulates decoded-page hits across the document with 0-based references")
     func layer3DecodedPagesAccumulatedWithReferences() async throws {
         let (doc, url) = try TestFixtures.writeTempPDF(
             TestFixtures.withSensitiveTermOnFirstAndThirdPages(term: "Acme"),
@@ -1542,9 +1542,9 @@ struct VerificationEngineTests {
         }
     }
 
-    // MARK: - VF-04: stream-range EOL gate (VQ-22)
+    // MARK: - Stream-range EOL gate
 
-    @Test("Layer 3: a /Downstream token cannot open a phantom stream range (VQ-22)")
+    @Test("Layer 3: a /Downstream token cannot open a phantom stream range")
     func layer3DownstreamPhantomRangeGated() async throws {
         // Structural term sits between a /Downstream name and the document's
         // only real stream. Pre-gate, the "stream" letters inside
@@ -1570,7 +1570,7 @@ struct VerificationEngineTests {
         }
     }
 
-    @Test("Layer 3: malformed stream keyword EOL still excludes stream data (VQ-22 fallback)")
+    @Test("Layer 3: malformed stream keyword EOL still excludes stream data (fallback)")
     func layer3MalformedStreamEOLFallback() async throws {
         // The only `stream` keyword is followed by a bare CR (spec-invalid),
         // so the strict pass yields no ranges. The permissive fallback must
@@ -1593,9 +1593,9 @@ struct VerificationEngineTests {
                 "term inside malformed stream data must stay excluded; got \(result.status)")
     }
 
-    // MARK: - VF-04: unopenable-page honesty (VQ-23)
+    // MARK: - Unopenable-page honesty
 
-    /// VQ-23 seam: a document whose page 2 (index 1) cannot be opened.
+    /// A document whose page 2 (index 1) cannot be opened.
     /// PDFKit synthesizes a PDFPage even for a broken /Kids entry (measured
     /// on macOS 15 / iOS 26.4), so an unopenable page cannot be produced
     /// from fixture bytes; overriding `page(at:)` models the same runtime
@@ -1615,7 +1615,7 @@ struct VerificationEngineTests {
         return (doc, url)
     }
 
-    @Test("Layer 1 WARNs when a page cannot be read, with the page referenced (VQ-23)")
+    @Test("Layer 1 WARNs when a page cannot be read, with the page referenced")
     func layer1UnreadablePageWarns() async throws {
         let (doc, url) = try makeUnopenableSecondPageDoc()
         defer { try? FileManager.default.removeItem(at: url) }
@@ -1636,7 +1636,7 @@ struct VerificationEngineTests {
                 "0-based reference to the unreadable page; got \(String(describing: result.pageReferences))")
     }
 
-    @Test("Layer 2 buckets an unopenable page as unchecked (VQ-23)")
+    @Test("Layer 2 buckets an unopenable page as unchecked")
     func layer2UnopenablePageUnchecked() async throws {
         let (doc, url) = try makeUnopenableSecondPageDoc()
         defer { try? FileManager.default.removeItem(at: url) }
@@ -1656,7 +1656,7 @@ struct VerificationEngineTests {
                 "got \(String(describing: result.pageReferences))")
     }
 
-    @Test("Layer 6 WARNs when an eligible page cannot be read (VQ-23)")
+    @Test("Layer 6 WARNs when an eligible page cannot be read")
     func layer6UnreadablePageWarns() async throws {
         let (doc, url) = try makeUnopenableSecondPageDoc()
         defer { try? FileManager.default.removeItem(at: url) }
@@ -1676,7 +1676,7 @@ struct VerificationEngineTests {
                 "got \(String(describing: result.pageReferences))")
     }
 
-    @Test("Layer 8 WARNs when an eligible page cannot be read (VQ-23)")
+    @Test("Layer 8 WARNs when an eligible page cannot be read")
     func layer8UnreadablePageWarns() async throws {
         let (doc, url) = try makeUnopenableSecondPageDoc()
         defer { try? FileManager.default.removeItem(at: url) }
@@ -1696,9 +1696,9 @@ struct VerificationEngineTests {
                 "got \(String(describing: result.pageReferences))")
     }
 
-    // MARK: - VF-04: Layer 9 cooperative cancellation (VQ-24)
+    // MARK: - Layer 9 cooperative cancellation
 
-    @Test("Layer 9 surrenders to cancellation as .skipped (VQ-24)")
+    @Test("Layer 9 surrenders to cancellation as .skipped")
     func layer9CancelledReturnsSkipped() async throws {
         // The digest's lineage hash deliberately mismatches the blank page,
         // so a run that ignored cancellation would FAIL — .skipped proves the
@@ -1730,9 +1730,9 @@ struct VerificationEngineTests {
                 "cancelled Layer 9 must surrender as .skipped; got \(result.status)")
     }
 
-    // MARK: - VF-04: Layer-2 decode cap (VQ-32)
+    // MARK: - Layer-2 decode cap
 
-    @Test("extractPageImages caps the transient decode size (VQ-32)")
+    @Test("extractPageImages caps the transient decode size")
     func extractPageImagesDecodeCap() async throws {
         // 5000-px JPEG: an uncapped decode would exceed the 4096-px OCR cap;
         // the bounded thumbnail decode must come back within it.
@@ -1750,7 +1750,7 @@ struct VerificationEngineTests {
                 "decode must be capped at the OCR pixel ceiling; got \(image.width)x\(image.height)")
     }
 
-    @Test("Layer 2 buckets a page with an undecodable image as unchecked (VQ-32)")
+    @Test("Layer 2 buckets a page with an undecodable image as unchecked")
     func layer2UndecodableImageUnchecked() async throws {
         // A DCTDecode stream whose bytes are not a decodable JPEG: the page
         // was never OCR-checked, so it must WARN as unchecked rather than
@@ -1858,7 +1858,7 @@ struct VerificationEngineTests {
         return (doc, url)
     }
 
-    // MARK: - CAT-351 fixture helpers
+    // MARK: - Region-scoped-OCR fixture helpers
 
     private func manualRegion(_ rect: CGRect) -> RedactionRegion {
         RedactionRegion(id: UUID(), normalizedRect: rect, source: .manual)

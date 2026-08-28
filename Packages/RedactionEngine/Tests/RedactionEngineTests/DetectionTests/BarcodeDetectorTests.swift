@@ -8,10 +8,10 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// DRAW-2 — BarcodeDetector tests. Mirrors `FaceDetectorTests.swift` shape.
+// BarcodeDetector tests. Mirrors `FaceDetectorTests.swift` shape.
 //
 // .serialized: VNImageRequestHandler.perform() blocks cooperative pool threads
-// synchronously (F2-8). Concurrent Vision tests can exhaust the pool and
+// synchronously. Concurrent Vision tests can exhaust the pool and
 // deadlock, so serialize the suite.
 @Suite("Barcode Detector", .serialized)
 struct BarcodeDetectorTests {
@@ -69,7 +69,7 @@ struct BarcodeDetectorTests {
         return (image, normalized)
     }
 
-    // MARK: - DRAW-2 Required Tests
+    // MARK: - Required Tests
 
     @Test("QR payload is detected with overlapping bbox and correct matchedText")
     func testQRPayloadDetected() async throws {

@@ -2,7 +2,7 @@ import Testing
 import PDFKit
 @testable import RedactionEngine
 
-// S7 / design 04 §4.4 + Risk 1 — the offset-map regression gates.
+// The offset-map regression gates.
 //
 // The length-changing normalization extensions (separator strip,
 // diacritic fold) run matching on a transformed string while PDFKit
@@ -14,7 +14,7 @@ import PDFKit
 //
 // Privacy rule: test names use locate/match/resolve vocabulary (audit-lint M-1).
 
-@Suite("Offset-map rect correctness (design 04 §4.4 / Risk 1)", .tags(.search))
+@Suite("Offset-map rect correctness", .tags(.search))
 struct FindTextMatchesOffsetMapTests {
 
     // MARK: - Helpers
@@ -63,7 +63,7 @@ struct FindTextMatchesOffsetMapTests {
         guard let lhs = literal.first, let rhs = stripped.first else { return }
         #expect(rectsApproximatelyEqual(lhs.normalizedRect, rhs.normalizedRect),
                 "rect drifted: literal \(lhs.normalizedRect) vs stripped \(rhs.normalizedRect)")
-        // UXF-15: matchedText displays the base span (original separators
+        // matchedText displays the base span (original separators
         // included), re-sliced at the mapped offsets. Matching still ran
         // on the stripped form.
         #expect(rhs.matchedText == "123-45-6789")
@@ -110,7 +110,7 @@ struct FindTextMatchesOffsetMapTests {
         guard let lhs = literal.first, let rhs = folded.first else { return }
         #expect(rectsApproximatelyEqual(lhs.normalizedRect, rhs.normalizedRect),
                 "rect drifted: literal \(lhs.normalizedRect) vs folded \(rhs.normalizedRect)")
-        // UXF-15: display keeps the document's accents and casing.
+        // Display keeps the document's accents and casing.
         #expect(rhs.matchedText == "José García")
     }
 
@@ -223,7 +223,7 @@ struct FindTextMatchesOffsetMapTests {
             doc: doc, mode: .text("John-Smith", options: SearchOptions())
         )
         #expect(results.count == 1, "em-dash should fold to hyphen by default; got \(results.count)")
-        // UXF-15: original casing; the em dash reads as "-" because smart
+        // Original casing; the em dash reads as "-" because smart
         // punctuation is part of the base text (1:1 fold), not the case fold.
         #expect(results.first?.matchedText == "John-Smith")
 
@@ -270,7 +270,7 @@ struct FindTextMatchesOffsetMapTests {
         // seeded rect (padding only ever expands).
         #expect(result.normalizedRect.contains(lineRect) ||
                 rectsApproximatelyEqual(result.normalizedRect, lineRect, tolerance: 0.02))
-        // UXF-15: the OCR literal path also displays the base span with
+        // The OCR literal path also displays the base span with
         // its original separators.
         #expect(result.matchedText == "123-45-6789")
     }

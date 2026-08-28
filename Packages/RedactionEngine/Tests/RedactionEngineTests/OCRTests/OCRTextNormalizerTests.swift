@@ -1,7 +1,7 @@
 import Testing
 @testable import RedactionEngine
 
-// Plan Phase 2 / §G6 — unit tests for context-sensitive OCR normalization.
+// Unit tests for context-sensitive OCR normalization.
 
 @Suite("OCRTextNormalizer (G6)")
 struct OCRTextNormalizerTests {
@@ -105,7 +105,7 @@ struct OCRTextNormalizerTests {
         #expect(normalizer.normalize("123 O0I1S5 7") == "123 001155 7")
     }
 
-    // MARK: - design 04 §1.3/§1.4 additions
+    // MARK: - Additional confusable-pattern tests
 
     @Test("Confusable OCR SSN pattern normalizes to clean digits")
     func confusableSSNNormalizesToCleanDigits() {
@@ -134,11 +134,11 @@ struct OCRTextNormalizerTests {
         // "1OO-23-4567": ambiguous token "1OO" inherits digit context from
         // clear digits '2','3','4','5','6','7' on the line → O→0 → "100".
         // (Mirrors the existing digitContextFromLine test to pin the contract
-        // in this suite for design 04.)
+        // in this suite.)
         #expect(normalizer.normalize("1OO-23-4567") == "100-23-4567")
     }
 
-    // MARK: - Same-length invariant (leak-class guard, design 04 §1.3/§1.4)
+    // MARK: - Same-length invariant (leak-class guard)
     //
     // OCRTextNormalizer must be same-length by construction — 1:1 character
     // substitution, no deletions or insertions — because the search/detection

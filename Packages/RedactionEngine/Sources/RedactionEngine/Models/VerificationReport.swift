@@ -1,7 +1,3 @@
-// See ARCH §2.3 for VerificationReport, VerificationStatus, and LayerResult.
-// See ENGINE §6.7 for overall status derivation.
-// See ENGINE §6.8 for SF Symbol mapping.
-
 /// Complete verification report produced by the verification engine.
 public struct VerificationReport: Sendable {
     /// Why verification did not run, when `overallStatus` is `.skipped`.
@@ -22,7 +18,7 @@ public struct VerificationReport: Sendable {
     /// Per-page pipeline modes used during redaction. Indexed by page number.
     /// Allows the verification results UI to show which pages used which mode.
     public let perPageModes: [PipelineMode]
-    /// PD-5: sibling of `perPageModes` — why each page rasterized in a
+    /// Sibling of `perPageModes` — why each page rasterized in a
     /// Searchable-mode run (pre-flight trigger or runtime fallback). Nil
     /// entries are pages that kept searchable mode; all-nil for
     /// secure-raster-mode runs (rasterized by choice) and for reports built
@@ -71,7 +67,6 @@ public struct VerificationReport: Sendable {
     }
 }
 
-/// Canonical definition — also referenced in ENGINE §6.7 and UI_UX §4.
 /// When adding cases, update all switch sites across the project.
 public enum VerificationStatus: Sendable, Equatable {
     case pass
@@ -115,7 +110,7 @@ public enum VerificationStatus: Sendable, Equatable {
 public struct LayerResult: Sendable {
     /// Human-readable layer name (e.g., "Text Extraction", "OCR Check")
     public let name: String
-    /// SF Symbol name for the layer (from ENGINE §6.8)
+    /// SF Symbol name for the layer
     public let symbolName: String
     /// Result status for this layer
     public let status: VerificationStatus
@@ -129,7 +124,7 @@ public struct LayerResult: Sendable {
     public let durationSeconds: Double
     /// Display-only: the applied term texts behind an `.attention` result,
     /// so the results UI can tell the user exactly which text to search for.
-    /// Status messages stay content-free (ARCH §12.2); this field exists
+    /// Status messages stay content-free; this field exists
     /// solely for in-app display composition and is never logged or
     /// persisted. Nil for every other status.
     public let reviewTermTexts: [String]?

@@ -39,8 +39,8 @@ struct SearchStateLivePreviewTests {
             pageTextProvider: provider, debounce: .milliseconds(50)
         )
 
-        // CAT-234: self-clocking settle — poll the published preview instead of
-        // a fixed wall-clock sleep (which flaked under full-suite load, OQ-24).
+        // Self-clocking settle — poll the published preview instead of
+        // a fixed wall-clock sleep (which flaked under full-suite load).
         // Each scheduleLivePreview cancels the prior debounce, so only the final
         // "abc" query ever publishes; exit as soon as its 3 matches land.
         for _ in 0..<100 {
@@ -72,7 +72,7 @@ struct SearchStateLivePreviewTests {
         try? await Task.sleep(for: .milliseconds(20))
         state.clearLivePreview()
 
-        // CAT-238: replace the fixed 300 ms settle with a bounded poll that
+        // Replace the fixed 300 ms settle with a bounded poll that
         // spans the debounce window. clearLivePreview() nils synchronously and
         // cancels the in-flight task; the guard is that the cancelled debounce
         // never re-publishes, so the preview must STAY nil across the window.
@@ -114,10 +114,10 @@ struct SearchStateLivePreviewTests {
         #expect(state.resultVersion > before)
     }
 
-    // MARK: - D10-F3 scope + debounce
+    // MARK: - Scope + debounce
 
     /// #11 — the preview scopes to the current page even when whole-document
-    /// navigation is active. Pre-D10-F3 this walked every page; the read-index
+    /// navigation is active. Previously this walked every page; the read-index
     /// set proves only the visible page is read.
     @Test("scheduleLivePreview scopes to current page under wholeDocument nav")
     func previewAlwaysCurrentPageScope() async {
@@ -176,7 +176,7 @@ struct SearchStateLivePreviewTests {
     }
 
     /// #13 — a settled whole-document query reads ONLY the current page's text,
-    /// never the off-screen pages, after the D10-F3 scope fix.
+    /// never the off-screen pages, after the scope fix.
     @Test("a settled whole-document query reads only the current page")
     func settledWholeDocReadsOnlyCurrentPage() async {
         let state = SearchState()
@@ -203,16 +203,16 @@ struct SearchStateLivePreviewTests {
         #expect(Set(seen) == [2], "read-index set was \(Set(seen)); expected only the current page {2}")
     }
 
-    // MARK: - BH-B-02 preview count line
+    // MARK: - Preview count line
 
-    @Test("BH-B-02: the preview line prints the committed document total, never the page-scoped preview total")
+    @Test("The preview line prints the committed document total, never the page-scoped preview total")
     func previewCountLineUsesCommittedTotal() {
         // Committed run exists: the document-wide total renders beside
         // the page count.
         #expect(SearchResultsSection.previewCountLine(pageMatches: 1, committedTotal: 3)
                 == "Matches this page: 1 · Total: 3")
         // No committed run: the honest page count stands alone — the
-        // page-scoped preview's totalCount (≡ page count since D10-F3)
+        // page-scoped preview's totalCount (≡ page count)
         // must never masquerade as a document total.
         #expect(SearchResultsSection.previewCountLine(pageMatches: 1, committedTotal: nil)
                 == "Matches this page: 1")
@@ -222,7 +222,7 @@ struct SearchStateLivePreviewTests {
 }
 
 /// Records the page indices a `pageTextProvider` is asked for, so a test can
-/// assert the live preview reads only the current page (D10-F3 scope).
+/// assert the live preview reads only the current page.
 private actor PreviewIndexRecorder {
     private(set) var indices: [Int] = []
     func record(_ idx: Int) { indices.append(idx) }

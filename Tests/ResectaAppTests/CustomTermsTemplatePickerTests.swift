@@ -3,8 +3,7 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// Pkg G.3 — TRUST-template-preview-count-mismatch +
-// UX-template-preview-precount.
+// Preview/import count parity for the template picker.
 //
 // The template picker previously displayed "Add N entries" where N
 // included entries that `performImport` would silently skip
@@ -13,7 +12,7 @@ import Foundation
 // build time so the confirmation count matches the actual import
 // count.
 
-@Suite("CustomTermsTemplatePicker — preview/import parity (Pkg G.3)", .tags(.search))
+@Suite("CustomTermsTemplatePicker — preview/import parity", .tags(.search))
 @MainActor
 struct CustomTermsTemplatePickerTests {
 
@@ -104,18 +103,18 @@ struct CustomTermsTemplatePickerTests {
         #expect(partition.invalid.isEmpty)
     }
 
-    // MARK: - CL-QP1-02 — template-picker entry hidden for V1.0
+    // MARK: - Template-picker entry hidden for V1.0
 
-    @Test("Template-picker entry point is gated off (CL-QP1-02)")
+    @Test("Template-picker entry point is gated off")
     func testTemplatePickerEntryHidden() {
         // The browse button in CustomTermsView.templatesSection is behind
-        // this flag for V1.0 (approved cut, QCP-P 2026-07-03). The picker
+        // this flag for V1.0. The picker
         // view and import machinery stay compiled — this suite exercising
         // `partitionValid` above is part of that preserved surface.
         #expect(CustomTermsView.templatePickerEnabled == false)
     }
 
-    // MARK: - QW-2 (D07-F2) async ReDoS sentinel at preview time
+    // MARK: - Async ReDoS sentinel at preview time
 
     @Test("Heuristic-passing, sentinel-failing regex excluded from valid set")
     func testSentinelFailingRegexRejected() async {
@@ -123,7 +122,7 @@ struct CustomTermsTemplatePickerTests {
         // the RegexSafetyPrecheck and the nested-quantifier heuristic
         // both pass — but against the sentinel payload's 2048-char `a`
         // run the backtracking blows the 200 ms probe budget, so
-        // `RegexSentinelCheck.validate` rejects it. Before QW-2 this
+        // `RegexSentinelCheck.validate` rejects it. Previously this
         // pattern imported cleanly and stalled the next scan instead.
         let adversarial = UserTerm(pattern: "a*a*a*a*a*a*a*a*a*a*$", isRegex: true)
         // Guard the fixture premise: the static heuristic must accept it,
@@ -148,7 +147,7 @@ struct CustomTermsTemplatePickerTests {
         #expect(dedup.toImport.count == partition.valid.count)
     }
 
-    // MARK: - UXC-31 (RB-40) — dialog-grammar normalization
+    // MARK: - Dialog-grammar normalization
 
     @Test("Confirmation title is a sentence-case question under cap, a distinct title when capped")
     func confirmationTitleGrammar() {

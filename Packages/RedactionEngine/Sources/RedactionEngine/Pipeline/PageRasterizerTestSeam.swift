@@ -1,6 +1,6 @@
 import Foundation
 
-// PERF-1 test seam — exercises the per-page verification retry path.
+// Test seam — exercises the per-page verification retry path.
 //
 // The seam is `#if DEBUG`-gated so release builds carry zero state and no
 // hooks. Callers inside `PageRasterizer.rasterize` reach the seam through
@@ -9,9 +9,9 @@ import Foundation
 // the call sites don't need extra gating around individual properties.
 //
 // **Isolation model.** Earlier drafts used process-wide globals, which
-// raced when Swift Testing scheduled tests in parallel (PERF-1
+// raced when Swift Testing scheduled tests in parallel:
 // `testRetryAtHalfDPISucceeds` and `testHalfDPIFloor96` would
-// double-increment one another's `rasterizeCallCount`). The seam now keys
+// double-increment one another's `rasterizeCallCount`. The seam now keys
 // its state on a task-local activation handle so each test can install
 // its own `Recorder` via `withActivated(_:body:)`; calls outside that
 // scope (i.e. unrelated tests, production builds, the app at runtime)

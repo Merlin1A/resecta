@@ -2,13 +2,13 @@ import Testing
 import PDFKit
 @testable import RedactionEngine
 
-// W3 — synthetic always-flag hits must carry a MatchRationale that
+// Synthetic always-flag hits must carry a MatchRationale that
 // identifies them as user-authored. The rationale drives the
 // `MatchRationaleSheet` disclosure (which already renders
-// `userAlwaysFlag` / `userNeverFlag` cases) and will flow into the W5
+// `userAlwaysFlag` / `userNeverFlag` cases) and will flow into a future
 // audit export.
 
-@Suite("MatchRationale emission for W3 always-flag hits")
+@Suite("MatchRationale emission for always-flag hits")
 struct UserTermsRationaleTests {
 
     private func scan(
@@ -21,7 +21,7 @@ struct UserTermsRationaleTests {
             return []
         }
         let searcher = DocumentSearcher()
-        // W-P — wrap legacy UserTermMatcher fixture in UserTermsIndex.
+        // Wrap legacy UserTermMatcher fixture in UserTermsIndex.
         await searcher.setUserTerms(UserTermsIndex(matcher: matcher))
         let mode = SearchMode.piiScan(
             categories: Set(PIICategory.allCases), options: SearchOptions()
@@ -64,7 +64,7 @@ struct UserTermsRationaleTests {
             text: "Reference PROJ-4821 is relevant",
             matcher: matcher
         )
-        // W10: PROJ-4821 now also matches the Bates labeled pattern, so
+        // This fixture's value now also matches the Bates-labeled pattern, so
         // filter by term == "Custom" to reach the synthetic always-flag
         // hit. Downstream `applySearchResults` 80 %-overlap dedup collapses
         // the duplicate in the UI layer; here we assert the rationale the

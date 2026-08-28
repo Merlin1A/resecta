@@ -1,12 +1,12 @@
 import Foundation
 import OSLog
 
-// L4 / C10 — government-institution gazetteer. Loads `institutions.json`
-// produced by DataPipeline's src/resecta_data/gazetteers/institutions/ (C9).
+// Government-institution gazetteer. Loads `institutions.json`
+// produced by DataPipeline's src/resecta_data/gazetteers/institutions/.
 // Schema at DataPipeline/schemas/institutions.schema.json. Each entry:
 // name, aliases, category (e.g., "federal_agency"), jurisdictions.
 //
-// Two uses per findings L4 §"Swift-side integration":
+// Two uses:
 //   1. A5 coreference anchor — if a known institution appears in the
 //      document header, bias doctype classification (federal_agency → .foia).
 //   2. A6 negative-context expansion — header-anchored category suppression

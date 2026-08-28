@@ -35,7 +35,7 @@ struct PipelineCoordinatorTests {
         #expect(pages.first?.pageIndex == 0)
     }
 
-    // MARK: - Region Filtering (K3.1, AD-4-1)
+    // MARK: - Region Filtering
 
     @Test("Filters sub-threshold regions (width/height ≤ 0.001)")
     func filtersSubThresholdRegions() {
@@ -74,7 +74,7 @@ struct PipelineCoordinatorTests {
 
         let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
         #expect(pages.first?.pipelineMode == .secureRasterization)
-        // PD-5: a secure-raster-mode run rasterizes by choice — no reason.
+        // A secure-raster-mode run rasterizes by choice — no reason.
         #expect(pages.first?.fallbackReason == nil)
     }
 
@@ -92,7 +92,7 @@ struct PipelineCoordinatorTests {
 
         let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction)
         #expect(pages.first?.pipelineMode == .searchableRedaction)
-        // PD-5: a page that keeps searchable mode carries no reason.
+        // A page that keeps searchable mode carries no reason.
         #expect(pages.first?.fallbackReason == nil)
     }
 
@@ -104,7 +104,7 @@ struct PipelineCoordinatorTests {
 
         let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction)
         #expect(pages.first?.pipelineMode == .secureRasterization)
-        // PD-5: a sparse page in a Searchable-mode run is a per-page
+        // A sparse page in a Searchable-mode run is a per-page
         // fallback the report explains.
         #expect(pages.first?.fallbackReason == .noExtractableText)
     }
@@ -208,7 +208,7 @@ struct PipelineCoordinatorTests {
         #expect(pages.first?.fillColor == coord.settingsState.fillColor)
     }
 
-    // MARK: - KI-5: Memory-warning DPI ceiling (L-18)
+    // MARK: - KI-5: Memory-warning DPI ceiling
 
     @Test("Default dpiCap is 300")
     func defaultDPICap() {
@@ -241,17 +241,16 @@ struct PipelineCoordinatorTests {
                 "didReceiveMemoryWarningNotification should lower dpiCap to 150")
     }
 
-    // MARK: - F-002 sibling — MainActor PDF parse move-off (Package F)
+    // MARK: - MainActor PDF parse move-off
 
     /// The `runVerification` entry point used to call `PDFDocument(url:)`
-    /// synchronously on the MainActor; per F-002 the parse moves into a
+    /// synchronously on the MainActor; the parse moves into a
     /// `nonisolated static` helper invoked via `Task.detached`. The
     /// off-MainActor invariant is mostly compile-time-enforced (`nonisolated`),
     /// so the practical surface for this suite is "the helper exists,
     /// succeeds on a valid file, and throws the expected
     /// `PipelineError.verificationError(.engineCrash(layerIndex: 0))` on a
-    /// missing or unreadable file." Matches the spec implication noted in
-    /// `03-security-perf-audit.md §1.2.a`.
+    /// missing or unreadable file."
     @Test("loadOutputDocumentOffMainActor returns a wrapped document for a valid PDF URL")
     func loadOutputDocumentSucceeds() async throws {
         let url = try writeTempPDF()
@@ -294,7 +293,7 @@ struct PipelineCoordinatorTests {
         }
     }
 
-    // MARK: - Per-page mode gate (S1: D2 rotation stopgap + ENGINE §5A RTL wiring)
+    // MARK: - Per-page mode gate (rotation stopgap removal + RTL fallback wiring)
 
     @Test("Searchable mode, rich unrotated English page stays searchable")
     func searchableRichUnrotatedPageStaysSearchable() throws {
@@ -307,16 +306,16 @@ struct PipelineCoordinatorTests {
         #expect(pages.first?.pipelineMode == .searchableRedaction)
     }
 
-    @Test("CAT-353 (s15): rotated rich page now takes searchableRedaction",
+    @Test("Rotated rich page now takes searchableRedaction",
           arguments: [90, 180, 270])
     func rotatedRichPageTakesSearchable(rotation: Int) throws {
-        // s15 stopgap removal (D-34 / D-35): the former D2 stopgap forced
+        // Stopgap removal: the former rotation stopgap forced
         // secureRasterization for rotated pages because PageRasterizer pixel
         // fill and CharacterFilter read normalizedRect in incompatible spaces
         // under /Rotate. The canonical coordinate contract is now complete —
         // extractCharacters applies T_rot — so a rotated rich page (no fallback
         // trigger) takes searchable mode. Leak-freedom across all four rotations
-        // and both CropBox origins is proven by the D-35
+        // and both CropBox origins is proven by the
         // RotatedPageCoordinateTests matrix.
         let coord = makeCoordinator()
         let doc = makeRichTextPDFDocument(
@@ -332,7 +331,7 @@ struct PipelineCoordinatorTests {
         #expect(pages.first?.rotation == rotation)
     }
 
-    @Test("ENGINE §5A: RTL rich page falls back to secureRasterization")
+    @Test("RTL rich page falls back to secureRasterization")
     func rtlRichPageFallsBackToSecure() throws {
         // Arabic text trips TextLayerDetector.checkFallbackTriggers(.rtlText);
         // the gate must route the page to the visual path instead of trusting
@@ -344,7 +343,7 @@ struct PipelineCoordinatorTests {
         coord.documentState.textLayerStatus[0] = .rich
         let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction)
         #expect(pages.first?.pipelineMode == .secureRasterization)
-        // PD-5 / RC-5: the trigger's reason is recorded, not discarded.
+        // The trigger's reason is recorded, not discarded.
         #expect(pages.first?.fallbackReason == .rtlText)
     }
 
@@ -408,18 +407,18 @@ struct PipelineCoordinatorTests {
     }
 }
 
-// 01-FIX (Issue A, 2026-06-25): collectSensitiveTerms is scoped to the APPLIED
+// collectSensitiveTerms is scoped to the APPLIED
 // redactions (its prior pass harvested every detection in detectionResults,
 // including triage-deselected ones — which surfaced as false "Sensitive text
 // in region" Layer-2 reports). These pin the scoping on the pure seam and
 // through the instance method.
 //
-// PD-3 (SV-5) re-pin: single-token name matched text is INCLUDED with
+// Re-pin: single-token name matched text is INCLUDED with
 // `requiresTokenBoundary` (the byte layers post-filter embedded hits), the
 // search TERM contributes only for typed rows (where the query IS the
 // sensitive text — detector/user-term rows carry a category label or
 // "Custom" placeholder there), and matched text contributes for every region.
-@Suite("PipelineCoordinator.collectSensitiveTerms scoping (01-FIX Issue A + PD-3)")
+@Suite("PipelineCoordinator.collectSensitiveTerms scoping")
 @MainActor
 struct CollectSensitiveTermsScopingTests {
 
@@ -484,7 +483,7 @@ struct CollectSensitiveTermsScopingTests {
 
     @Test("piiScan region: category label stays out; matched text carries the terms")
     func piiScanLabelExcluded() {
-        // After the PD-3 stamp a piiScan-applied region's metadata carries
+        // After the stamp, a piiScan-applied region's metadata carries
         // .pii(category) while its Source keeps the label as `term` — the
         // label ("Name") must not become a sensitive term.
         let region = seededRegion(

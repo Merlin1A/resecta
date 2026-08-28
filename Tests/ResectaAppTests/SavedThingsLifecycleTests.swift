@@ -4,9 +4,9 @@ import UIKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// q12 — saved-things lifecycle repair (UXF-04/20/32/33, CL-QP1-07).
+// Saved-things lifecycle repair.
 //
-// UXF-04 background (reproduced 2/2 on the 26.4 sim: no dialog in the
+// Background (reproduced 2/2 on the 26.4 sim: no dialog in the
 // AX tree, nothing persisted): the "Save current..." menu item was
 // ordered after the 10 built-in patterns, which pushes it past the top
 // of the screen where it draws clipped outside the menu container and
@@ -21,12 +21,12 @@ import UIKit
 //   2. The presentation path: with the section mounted and the naming
 //      alert root-attached (production topology), firing the request
 //      callback presents a real UIAlertController with a text field.
-//   3. UXF-33 / UXF-32 destructive-confirm contracts, in the same
-//      contract style as `SettingsViewResetConfirmationTests` (GATE-2).
+//   3. Destructive-confirm contracts, in the same contract style as
+//      `SettingsViewResetConfirmationTests`.
 
-// MARK: - Commit seam (UXF-04)
+// MARK: - Commit seam
 
-@Suite("Save current regex — commit seam (UXF-04)")
+@Suite("Save current regex — commit seam")
 @MainActor
 struct SaveCurrentRegexCommitTests {
 
@@ -117,14 +117,14 @@ struct SaveCurrentRegexCommitTests {
         #expect(store.userSavedRegexes.count == 1)
     }
 
-    @Test("Success toast names the management destination (UXF-20)")
+    @Test("Success toast names the management destination")
     func successToastNamesDestination() {
         let toast = SearchAndRedactSheet.savedRegexSavedToast
         #expect(toast.contains("Settings"))
         #expect(toast.contains("Saved Regexes"))
     }
 
-    @Test("Alert gets its own title independent of the menu-item label (UXC-31/RB-40)")
+    @Test("Alert gets its own title independent of the menu-item label")
     func alertTitleIndependentOfMenuLabel() {
         #expect(SearchAndRedactSheet.saveCurrentRegexAlertTitle == "Save current pattern")
         // The menu item itself stays unchanged.
@@ -132,9 +132,9 @@ struct SaveCurrentRegexCommitTests {
     }
 }
 
-// MARK: - Presentation path (UXF-04)
+// MARK: - Presentation path
 
-@Suite("Save current regex — naming alert presents from the request callback (UXF-04)")
+@Suite("Save current regex — naming alert presents from the request callback")
 @MainActor
 struct SaveCurrentRegexPresentationTests {
 
@@ -198,9 +198,9 @@ struct SaveCurrentRegexPresentationTests {
                     let name = "app.resecta.tests.SavedThings.presentation.\(UUID().uuidString)"
                     return UserDefaults(suiteName: name)!
                 }()))
-            // UXF-14 (q13): the section now reads DocumentState for the
-            // conditional disabled-OCR caption; the hosted hierarchy must
-            // provide it like the production sheet does.
+            // The section now reads DocumentState for the conditional
+            // disabled-OCR caption; the hosted hierarchy must provide it
+            // like the production sheet does.
             .environment(DocumentState())
 
         let controller = UIHostingController(rootView: AnyView(root))
@@ -244,9 +244,9 @@ struct SaveCurrentRegexPresentationTests {
     }
 }
 
-// MARK: - Saved-search delete confirm (UXF-33)
+// MARK: - Saved-search delete confirm
 
-@Suite("Saved-search delete confirmation (UXF-33)")
+@Suite("Saved-search delete confirmation")
 @MainActor
 struct SavedSearchDeleteConfirmationTests {
 
@@ -290,14 +290,14 @@ struct SavedSearchDeleteConfirmationTests {
         #expect(SavedSearchListSheet.deleteConfirmTitle(for: nil) == "Delete saved search?")
     }
 
-    @Test("UXC-31 (RB-40): rename-alert title names the saved search, same quote shape as delete's")
+    @Test("Rename-alert title names the saved search, same quote shape as delete's")
     func renameTitle() {
         let saved = makeSaved(name: "Tax terms")
         #expect(SavedSearchListSheet.renameTitle(for: saved) == "Rename “Tax terms”")
         #expect(SavedSearchListSheet.renameTitle(for: nil) == "Rename Saved Search")
     }
 
-    @Test("Q6 (D-86): dialog body noun follows the entry's own interface")
+    @Test("Dialog body noun follows the entry's own interface")
     func deleteConfirmMessageFollowsInterface() {
         #expect(SavedSearchListSheet.deleteConfirmMessage(for: makeSaved(name: "Tax terms"))
                 == "The saved search is removed from this device.")
@@ -305,7 +305,7 @@ struct SavedSearchDeleteConfirmationTests {
                 == "The saved scan is removed from this device.")
     }
 
-    @Test("H-74: the collision rejection copy is the pinned string")
+    @Test("The collision rejection copy is the pinned string")
     func duplicateNameMessagePinned() {
         #expect(SavedSearchListSheet.duplicateNameMessage
                 == "That name is already in use — choose a different name.")
@@ -345,9 +345,9 @@ struct SavedSearchDeleteConfirmationTests {
     }
 }
 
-// MARK: - Reset Detection History confirm (UXF-32)
+// MARK: - Reset Detection History confirm
 
-@Suite("Reset Detection History confirmation (UXF-32)")
+@Suite("Reset Detection History confirmation")
 @MainActor
 struct ResetDetectionHistoryConfirmationTests {
 

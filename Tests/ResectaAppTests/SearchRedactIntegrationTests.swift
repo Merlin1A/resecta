@@ -116,7 +116,7 @@ struct SearchRedactIntegrationTests {
         #expect(redactionState.regions[0]?.count == 1)
     }
 
-    // MARK: - QW-1 (D06-F3) applied-badge honesty
+    // MARK: - Applied-badge honesty
 
     @Test("Overlap-skipped result is excluded from appliedResultIDs")
     func applyReturnsSurvivorIDsOnly() async {
@@ -187,7 +187,7 @@ struct SearchRedactIntegrationTests {
         #expect(!search.appliedResultIDs.contains(resultA.id))
     }
 
-    @Test("Fully covered selection grays Apply after one round-trip (BH-A-03)")
+    @Test("Fully covered selection grays Apply after one round-trip")
     func coveredSelectionGraysApply() async {
         // A selection whose members are ALL dedup-covered by existing
         // regions used to keep Apply enabled forever: skipped IDs never
@@ -218,7 +218,7 @@ struct SearchRedactIntegrationTests {
         search.appliedResultIDs.formUnion(outcome.appliedResultIDs)
         search.coveredResultIDs.formUnion(outcome.coveredResultIDs)
 
-        // QW-1 intact: no badge for the covered row …
+        // No badge for the covered row …
         #expect(!search.appliedResultIDs.contains(resultA.id))
         // … but the graying gate engages, killing the dead round-trip.
         #expect(search.selectionFullyApplied,
@@ -249,7 +249,7 @@ struct SearchRedactIntegrationTests {
         )
     }
 
-    // MARK: - PD-3/PD-13 piiKind stamping
+    // MARK: - piiKind stamping
 
     @Test("prepareApply stamps a piiScan result's category; typed results keep searchMatch")
     func applyStampsPIICategory() {

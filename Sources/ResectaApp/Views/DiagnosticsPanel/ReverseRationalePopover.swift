@@ -1,7 +1,7 @@
 import SwiftUI
 import RedactionEngine
 
-// W9 — "Why this match?" sheet. Accepts a snippet + bounded context buffer
+// "Why this match?" sheet. Accepts a snippet + bounded context buffer
 // (≤500 chars) and runs every PIICategory detector through
 // PIIDetector.reverseRationale. Scope contract surfaced in the footer so
 // users don't conflate the result with full-document scoring.
@@ -81,11 +81,11 @@ struct ReverseRationalePopover: View {
 
     private func loadRationale() async {
         isLoading = true
-        // ERR-05 (Pkg N): route through `loadWithDiagnostics` so a
+        // Route through `loadWithDiagnostics` so a
         // signed-manifest verification failure or per-gazetteer load
-        // failure surfaces as the SEC-7 degraded-detection signal (the
+        // failure surfaces as the degraded-detection signal (the
         // banner-flip happens in PipelineCoordinator, not here — the
-        // diagnostics value is discarded at this site because the W9
+        // diagnostics value is discarded at this site because the
         // popover is read-only and the warning toast surface is owned
         // by the detection-pipeline runner). The point is to avoid
         // the silent corpus skip the bare `PIIDetector()` init produced

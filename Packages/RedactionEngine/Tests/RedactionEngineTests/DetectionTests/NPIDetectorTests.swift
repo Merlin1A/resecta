@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Plan Phase 3 / §4 — NPILuhn80840 + NPIDetector regression. Loads the
+// NPILuhn80840 + NPIDetector regression. Loads the
 // DataPipeline-generated vectors at `Fixtures/vectors/npi_test_vectors.json`
 // and asserts every `valid` NPI passes the CMS checksum and every `!valid`
 // entry fails. NPIDetector is exercised by embedding each vector in a short
@@ -160,7 +160,7 @@ struct NPIDetectorTests {
         #expect(labelledHit.confidence >= unlabelledHit.confidence)
     }
 
-    // MARK: - D04-F1 — base-confidence margin (bare valid NPI clears the gate)
+    // MARK: - Base-confidence margin (bare valid NPI clears the gate)
 
     /// Mirrors DOBDetectorTests' helper: surface a single NPI match's confidence.
     private func confidence(of text: String, matching expected: String) -> Double? {
@@ -178,7 +178,7 @@ struct NPIDetectorTests {
                              matching: "1455395883")
         #expect(raw != nil)
         // NPI is an identity family (contextLogit = 0); at the default prior the
-        // posterior is sigma(logit(raw)). D04-F1 raises raw to 0.65 so this clears
+        // posterior is sigma(logit(raw)). The base confidence was raised to 0.65 so this clears
         // the 0.602 balanced/aggressive cutoff with margin (was 0.600 < 0.602).
         let posterior = CalibratedScorer().posterior(raw: raw ?? 0, priorMean: 0.5)
         #expect(posterior >= 0.602 + 0.02)

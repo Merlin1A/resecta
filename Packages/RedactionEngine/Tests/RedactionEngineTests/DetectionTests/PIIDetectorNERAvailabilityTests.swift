@@ -2,10 +2,10 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// GAP-DEPTARGET-NER (D04-F3 == D11-F3) — unit coverage for the static NER
+// Unit coverage for the static NER
 // name-model availability probe `PIIDetector.isNameNERAvailable()`. The probe is
 // consulted by `loadWithDiagnostics` (step 10) to fold a missing OS-provisioned
-// `.nameType` MobileAsset into the SEC-7 degraded-detection surface.
+// `.nameType` MobileAsset into the degraded-detection surface.
 //
 // These tests do NOT run detection and do NOT assert a fixed true/false for the
 // live probe — `.nameType` availability is environment-dependent (the asset is
@@ -13,7 +13,7 @@ import Foundation
 // assert the probe returns a Bool synchronously (no throw, no network) and that
 // the DEBUG override seam controls the result deterministically.
 
-@Suite("PIIDetector NER availability probe (GAP-DEPTARGET-NER)")
+@Suite("PIIDetector NER availability probe")
 struct PIIDetectorNERAvailabilityTests {
 
     @Test("isNameNERAvailable returns a Bool synchronously — no throw, no network")

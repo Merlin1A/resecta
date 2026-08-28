@@ -19,9 +19,9 @@ public struct NameGazetteer: Sendable {
         case unsupportedManifestVersion(actual: String, supported: Set<String>)
     }
 
-    // W-O — Q2 path (B). The manifest's `version` field is a semver String
+    // The manifest's `version` field is a semver String
     // (`"1.0.0"`, not an Int), so the standard `LoaderVersionFence.assert(...)`
-    // helper (Int / ClosedRange<Int>) doesn't apply. Pattern uses Set<String>
+    // helper (Int / ClosedRange<Int>) doesn't apply. This uses Set<String>
     // and inlines the membership check.
     private static let supportedManifestVersions: Set<String> = ["1.0.0"]
 
@@ -71,11 +71,11 @@ public struct NameGazetteer: Sendable {
         }
     }
 
-    /// W-O — paired throwing init alongside `init?()`. Surfaces resource-
+    /// Paired throwing init alongside `init?()`. Surfaces resource-
     /// missing, decode failure, and manifest-version-fence rejection as
     /// typed errors rather than collapsing them to nil. Closes the silent-
     /// decode-of-future-schema class for the manifest's String version field
-    /// (Q2 path B; `Set<String>` rather than `ClosedRange<Int>`).
+    /// (`Set<String>` rather than `ClosedRange<Int>`).
     public init(throwingFromBundle bundle: Bundle) throws {
         guard let manifestURL = bundle.url(
                   forResource: "gazetteer-manifest", withExtension: "json",
@@ -152,7 +152,7 @@ public struct NameGazetteer: Sendable {
         givenNameFilter.contains(givenName)
     }
 
-    // MARK: - W2 Boosted Lookup
+    // MARK: - Boosted Lookup
 
     /// Structured verdict for the NLTagger boost path: which filters hit,
     /// whether fuzzy was used, and the bounded confidence boost the caller
@@ -165,7 +165,7 @@ public struct NameGazetteer: Sendable {
         /// hit; `nil` otherwise. Stable at 0.6 today but surfaced so callers
         /// can persist the value into `MatchRationale.bloomFuzzySurnameHit`.
         public let fuzzyScore: Double?
-        /// 0.00, 0.05, 0.10, or 0.15. See W2 boost table in the plan.
+        /// 0.00, 0.05, 0.10, or 0.15 — see the boost table below.
         public let boost: Double
 
         public var hadAnyHit: Bool { surnameHit || givenHit || fuzzySurnameHit }
@@ -179,7 +179,6 @@ public struct NameGazetteer: Sendable {
     /// Name suffixes to strip before gazetteer lookup.
     /// Generational, professional credential, and retirement suffixes.
     /// Lowercased for case-insensitive comparison against lowercased token.
-    /// ENGINE §4.12 / WS1 item 1.12 (2026-06-10).
     private static let nameSuffixes: Set<String> = [
         // Generational
         "jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v",
@@ -213,7 +212,7 @@ public struct NameGazetteer: Sendable {
     /// a space as a given-name query. Hyphenated surnames are decomposed into
     /// components for independent lookup when the joined form misses.
     ///
-    /// Boost table (W2):
+    /// Boost table:
     /// - exact surname + given → +0.15
     /// - exact surname only    → +0.10
     /// - all hyphen components hit (+ given hit) → +0.15 / +0.10
@@ -235,7 +234,7 @@ public struct NameGazetteer: Sendable {
         candidate: String,
         fuzzy: Bool = true
     ) -> NameGazetteerVerdict {
-        // WS1 item 1.12: strip trailing suffixes before surname/given split.
+        // Strip trailing suffixes before the surname/given split.
         let rawTokens = candidate.split(separator: " ", omittingEmptySubsequences: true)
             .map { $0.trimmingCharacters(in: .punctuationCharacters) }
             .filter { !$0.isEmpty }
@@ -264,11 +263,10 @@ public struct NameGazetteer: Sendable {
             )
         }
 
-        // WS1 item 1.12: hyphenated surname component lookup.
+        // Hyphenated surname component lookup.
         // "Garcia-Lopez" → check "Garcia" and "Lopez" independently.
         // All components hit → treat as exact surname hit (boost 0.15 if given also
         // hit, else 0.10). Any component hit → fuzzy boost 0.05.
-        // Cite: design §8b (2026-06-10).
         if !surnameHit, surname.contains("-") {
             let components = surname.split(separator: "-").map(String.init)
             let componentHits = components.filter { contains(surname: $0) }

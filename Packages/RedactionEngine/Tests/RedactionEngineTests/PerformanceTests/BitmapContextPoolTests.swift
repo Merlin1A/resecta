@@ -3,14 +3,13 @@ import Foundation
 import CoreGraphics
 @testable import RedactionEngine
 
-// PERF-5 (paired with SEC-5) — Bitmap context pool tests.
+// Bitmap context pool tests.
 //
 // The canonical guard test (`testCheckInZeroizesBuffer`) is the load-
-// bearing contract for the SEC-5 ↔ PERF-5 cross-cutting risk. Per the
-// agent task body: "This is the canonical guard — do not weaken in
-// later edits."
+// bearing contract for buffer zeroization on pool reuse: this is the
+// canonical guard — do not weaken in later edits.
 
-@Suite("BitmapContextPool (PERF-5)", .tags(.security, .critical))
+@Suite("BitmapContextPool", .tags(.security, .critical))
 struct BitmapContextPoolTests {
 
     // MARK: - testCheckInZeroizesBuffer (canonical guard)
@@ -18,8 +17,7 @@ struct BitmapContextPoolTests {
     /// Write `0xFF` across the entire backing allocation, call
     /// `checkIn`, then peek the now-pooled context and assert every
     /// sampled byte is zero. This is the load-bearing invariant
-    /// designed to prevent pool reuse from leaking pixel data
-    /// (plan §6 cross-cutting risk SEC-5 ↔ PERF-5).
+    /// designed to prevent pool reuse from leaking pixel data.
     @Test("checkIn zeroizes buffer (canonical guard — do not weaken)")
     func testCheckInZeroizesBuffer() throws {
         let pool = BitmapContextPool()
@@ -120,9 +118,9 @@ struct BitmapContextPoolTests {
         }
     }
 
-    // MARK: - testFlushReleasesAllEntries (Package G)
+    // MARK: - testFlushReleasesAllEntries
 
-    /// Package G — `flush()` drops every pooled entry so iOS can reclaim
+    /// `flush()` drops every pooled entry so iOS can reclaim
     /// the buffers immediately on a memory-warning signal. Idempotent and
     /// expected to be callable from MainActor while a `@concurrent`
     /// rasterize page-loop is in flight; this test only pins the single-
@@ -175,10 +173,11 @@ struct BitmapContextPoolTests {
     /// `checkIn` calls `assert(debugAssertBufferIsZeroed(ctx), ...)` —
     /// firing that assert would crash the test process, so we exercise
     /// the predicate directly. To prove the predicate works against
-    /// the "bypassed zeroize" scenario the SEC-5 contract is concerned
-    /// with, we use the `#if DEBUG`-gated `_testOnlyCheckInWithoutZeroize`
-    /// shim to drop a tampered buffer into the pool, then drive the
-    /// same predicate the assert reads. The predicate must return
+    /// the "bypassed zeroize" scenario checkIn's zeroize step guards
+    /// against, we use the `#if DEBUG`-gated
+    /// `_testOnlyCheckInWithoutZeroize` shim to drop a tampered buffer
+    /// into the pool, then drive the same predicate the assert reads.
+    /// The predicate must return
     /// `false`, which is the value that would have crashed the process
     /// under DEBUG had a real `checkIn` been wired without zeroize.
     @Test("debug-assert predicate returns false on a non-zero buffer (DEBUG-only)")

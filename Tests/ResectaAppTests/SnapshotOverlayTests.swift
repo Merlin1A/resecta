@@ -2,9 +2,9 @@ import Testing
 import SwiftUI
 @testable import ResectaApp
 
-// SEC-4: Snapshot-privacy overlay scene-phase policy.
+// Snapshot-privacy overlay scene-phase policy.
 //
-// These tests pin the §0.1 invariant: the obscure path is synchronous (no
+// These tests pin the invariant: the obscure path is synchronous (no
 // animation), so the system snapshot captures the overlay rather than
 // landing mid-fade. The reveal path keeps the prior 0.15s ease-in animation
 // for visual polish on return-to-foreground.
@@ -13,7 +13,7 @@ import SwiftUI
 // `SnapshotPrivacyPolicy` testable seam). The scene-phase wire-up is in
 // `ResectaApp.swift`'s WindowGroup root.
 
-@Suite("Snapshot privacy overlay (SEC-4)")
+@Suite("Snapshot privacy overlay")
 @MainActor
 struct SnapshotOverlayTests {
 
@@ -89,7 +89,7 @@ struct SnapshotOverlayTests {
                 != SnapshotPrivacyPolicy.Action.none)
     }
 
-    // MARK: - Parametric regression sentinel (CAT-255, s09)
+    // MARK: - Parametric regression sentinel
     //
     // Belt-and-suspenders against a future ScenePhase case that silently
     // routes a backgrounding state through the reveal/none path. The two

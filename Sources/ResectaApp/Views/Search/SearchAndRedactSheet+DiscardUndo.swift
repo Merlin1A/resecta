@@ -2,7 +2,7 @@ import SwiftUI
 
 // Dismissal helpers for the search sheet's Dismiss control.
 //
-// UXC-35 — the live contract has TWO branches, both landing on the
+// The live contract has TWO branches, both landing on the
 // shared `performDismiss(afterConfirmation:)` (SearchAndRedactSheet.swift)
 // that this file's `currentSelectionSnapshot` / `clearSelection` helpers
 // underpin:
@@ -14,7 +14,7 @@ import SwiftUI
 //   irreversible is dropped — no confirmation is needed.
 // - Confirm-if-touched route: when `requiresDismissConfirmation` is
 //   true — the user modified selections this session
-//   (`userModifiedSelections`), OR (UXC-39) the session carries an
+//   (`userModifiedSelections`), OR the session carries an
 //   auto-selected set from the magic-wand preselect flow that has never
 //   been reviewed (`hasUnreviewedPreselection`) — Dismiss instead raises
 //   the "Discard selections?" `.confirmationDialog`
@@ -53,18 +53,18 @@ extension SearchAndRedactSheet {
     /// triggers). Shared with the mode-switch undo toast.
     static let discardUndoActionLabel: String = "Undo"
 
-    /// UXC-31 (RB-40) toast-punctuation outlier: the retired triage
+    /// Toast-punctuation outlier: the retired triage
     /// review's info trace that staged findings were dropped on an
     /// unconfirmed 0-selected dismiss. Was missing the sentence-final
     /// period every other toast in this family carries.
     static let detectionResultsDismissedToast = "Detection results dismissed."
 
-    /// UXF-27: message for the dismiss decision point. Dismiss with 0
+    /// Message for the dismiss decision point. Dismiss with 0
     /// selected closes instantly by construction; when the session
     /// still holds unapplied matches (piiScan results arrive
     /// deselected), the close drops them with no other signal. Returns
     /// nil when nothing unapplied is lost so the common dismiss stays
-    /// toast-free. BH-B-03 — the leading noun follows the interface
+    /// toast-free. The leading noun follows the interface
     /// (the UP-era adaptive-copy posture: save alert, displayName
     /// split): a Scan-interface dismissal says "Scan closed", not
     /// "Search closed". Pinned by `DiscardUndoToastTests`.

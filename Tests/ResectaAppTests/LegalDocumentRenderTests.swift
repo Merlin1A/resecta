@@ -2,16 +2,16 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// LR1 (LR-6) — the audit-lint override markers in the bundled legal docs
+// The audit-lint override markers in the bundled legal docs
 // must never render at the first-launch gate.
 //
 // EULA.md carries two same-line `<!-- LegalPhrases:safe -->` HTML comments
 // (audit-lint M-1 overrides — the .md sources keep them; the site copies
 // drop them at publish). `AttributedString(markdown:)` under
 // `.inlineOnlyPreservingWhitespace` passes inline HTML through as literal
-// text (reproduced on-sim at the gate, LR-6), so `LegalDocumentView`
+// text (reproduced on-sim at the gate), so `LegalDocumentView`
 // strips comment spans before parsing. This suite pins that pre-pass.
-@Suite("Gate legal-document rendering (LR-6)")
+@Suite("Gate legal-document rendering")
 struct LegalDocumentRenderTests {
 
     @Test("Marker-bearing paragraph renders without the HTML comment")

@@ -2,20 +2,20 @@ import Testing
 import PDFKit
 @testable import RedactionEngine
 
-// WU-66 / [P2] — verifies the per-page regex-timeout sink fires from BOTH
+// Verifies the per-page regex-timeout sink fires from BOTH
 // the live-preview branch (`previewRegex`) and the full-scan branch
 // (`searchRegex`). Tests use the `regexTimeoutOverride` constructor
 // parameter to force the timeout in nanoseconds rather than waiting the
 // production 5s ceiling. Per-instance avoids the cross-test race a
 // shared static would expose.
 //
-// RR-44: the original `[P2]` proposal swapped the function labels at the
-// two cite sites. The `sinkFiresInBothSearchAndPreviewBranches` test is
-// the load-bearing pin per DEFINITION_OF_DONE engine-WU section — it
-// asserts the sink fires from both branches regardless of label, so a
-// future refactor that flips the branches doesn't silently lose one path.
+// An earlier revision had the two branches' timeout wiring swapped at
+// their two call sites. The `sinkFiresInBothSearchAndPreviewBranches`
+// test is the load-bearing pin — it asserts the sink fires from both
+// branches regardless of label, so a future refactor that flips the
+// branches doesn't silently lose one path.
 
-@Suite("Regex timeout sink (WU-66)")
+@Suite("Regex timeout sink")
 struct RegexTimeoutSinkTests {
 
     // MARK: - Fixtures
@@ -92,8 +92,7 @@ struct RegexTimeoutSinkTests {
 
     @Test("Sink fires in both search and preview branches")
     func sinkFiresInBothSearchAndPreviewBranches() async throws {
-        // Load-bearing per RR-44 / DEFINITION_OF_DONE engine-WU section.
-        // The `[P2]` proposal cite originally swapped the function labels
+        // Load-bearing: an earlier revision swapped the function labels
         // at the two timeout-branch sites; this test asserts both wire
         // the sink regardless of which one is which.
 

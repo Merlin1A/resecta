@@ -4,7 +4,7 @@ import CoreGraphics
 import PDFKit
 @testable import RedactionEngine
 
-// SEC-1 — End-to-end export-path protection assertion.
+// End-to-end export-path protection assertion.
 //
 // Exercises the multi-page rasterize → reconstruct path and asserts that
 // every temp file emitted by the engine-side export path is hardened to

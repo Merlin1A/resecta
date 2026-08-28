@@ -2,23 +2,22 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// Pkg G.3 — multi-term TextField submission validator.
+// Multi-term TextField submission validator.
 //
-// TRUST-multiterm-no-length-cap + UX-multiterm-length-cap-banner:
-// the validator runs the length cap BEFORE the duplicate check so an
+// The validator runs the length cap BEFORE the duplicate check so an
 // over-cap dup-of-existing entry surfaces the more specific length-cap
-// copy from S2 §L.6 rather than the duplicate copy.
+// copy rather than the duplicate copy.
 //
-// Banner copy (S2 §L.6) is pinned verbatim — UI surfaces the same
+// Banner copy is pinned verbatim — UI surfaces the same
 // `duplicateTermMessage` channel for both length-cap and duplicate
 // rejections.
 
-@Suite("SearchAndRedactSheet — multi-term submission (Pkg G.3)", .tags(.search))
+@Suite("SearchAndRedactSheet — multi-term submission", .tags(.search))
 struct SearchAndRedactSheetMultiTermTests {
 
     // MARK: - Length cap
 
-    @Test("Over 200-char submission rejected with exact S2 §L.6 copy")
+    @Test("Over 200-char submission rejected with exact copy")
     func testOver200CharSubmissionRejected() {
         let raw = String(repeating: "a", count: 201)
         let outcome = SearchAndRedactSheet.validateMultiTermSubmission(

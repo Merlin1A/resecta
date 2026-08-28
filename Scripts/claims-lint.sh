@@ -1,11 +1,11 @@
 #!/bin/sh
-# claims-lint.sh — ASC-7.4 mechanism-language sweep over shipping docs +
+# claims-lint.sh — mechanism-language sweep over shipping docs +
 # non-Legal user-facing strings. Companion to LegalPhraseLintTests (which
 # guards only Sources/ResectaApp/Legal/Legal.xcstrings); this sweep covers
 # the shipping markdown set and the SwiftUI view-layer string literals that
 # the compiled test does not reach.
 #
-# ─── Claims framing (ASC-7.4 / LEGAL-9, ratified by Jesse) ──────────────────
+# ─── Claims framing ─────────────────────────────────────────────────────────
 # Approved positive phrasings (mechanism, no outcome guarantee):
 #   - "Secure rasterization removes the text in marked regions; affected
 #      pages are rasterized and metadata is stripped."

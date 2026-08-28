@@ -2,11 +2,11 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// WU-66 / [P2] / R-35 — banner copy + accumulation + RR-24 "pattern
+// Banner copy + accumulation + the "pattern
 // not echoed" invariant. The banner consumes the `regexTimeoutPages`
 // set on `SearchState`, populated by `DocumentSearcher`'s timeout sink.
 
-@Suite("Regex timeout banner (WU-66)", .tags(.search))
+@Suite("Regex timeout banner", .tags(.search))
 @MainActor
 struct RegexTimeoutBannerTests {
 
@@ -62,7 +62,7 @@ struct RegexTimeoutBannerTests {
         #expect(SearchResultsSection.formatPageList([1, 2, 3]) == "1, 2, and 3")
     }
 
-    @Test("Banner copy NEVER echoes pattern text — RR-24 privacy floor")
+    @Test("Banner copy NEVER echoes pattern text — privacy floor")
     func bannerCopyNeverEchoesPattern() {
         // Feed a known-distinctive pattern through the only public path
         // SearchState exposes for timeout-banner population. The

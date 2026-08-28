@@ -3,7 +3,7 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// UI_UX §8.4 — Legal gate tests.
+// Legal gate tests.
 
 @Suite("Legal and Export Gates")
 @MainActor

@@ -4,23 +4,23 @@ import UIKit
 import RedactionEngine
 @testable import ResectaApp
 
-// Pkg C / ERR-01, ERR-02, ERR-04 — share-export failure toast wiring.
+// Share-export failure toast wiring.
 // Today the audit CSV/JSON share path silently returns when the temp
 // write fails; the share-sheet path is then indistinguishable from a UI
-// bug. Pkg C wires a Tier 1 `.error` toast (top, red) onto the error
+// bug. This wires a Tier 1 `.error` toast (top, red) onto the error
 // path. The `writeTriageExport(...into:toastManager:)` and
 // `writeCoverageSnapshot(...into:toastManager:)` testable seams take a
 // caller-provided directory so we can pass one that is read-only (or
 // nonexistent) and assert the toast enqueue without invoking
 // `UIActivityViewController`.
 
-@Suite("MatchExportService failure-toast wiring (Pkg C)")
+@Suite("MatchExportService failure-toast wiring")
 @MainActor
 struct MatchExportServiceFailureTests {
 
     // MARK: - Copy
 
-    @Test("Triage write-failure toast copy is mechanism description (ARCH §1.3)")
+    @Test("Triage write-failure toast copy is mechanism description")
     func triageWriteFailureToastCopy() {
         #expect(MatchExportService.triageWriteFailureToastMessage
                 == "Could not save the match audit log.")
@@ -157,9 +157,9 @@ struct MatchExportServiceFailureTests {
         #expect(toastManager.activeToasts.isEmpty)
     }
 
-    // MARK: - S6 audit-leak fix + C10 share intercept (design 04)
+    // MARK: - Audit-leak fix + share intercept
 
-    @Test("Shielded-share toast copy is mechanism description (ARCH §1.3)")
+    @Test("Shielded-share toast copy is mechanism description")
     func testShareWhileShieldedToastCopy() {
         #expect(MatchExportService.shareWhileShieldedToastMessage
                 == "Screen recording detected. Export paused.")
@@ -185,7 +185,7 @@ struct MatchExportServiceFailureTests {
             toastManager: toastManager
         )
         let pair = try #require(result)
-        // Both artifacts live under the SEC-2 `redacted_session_<UUID>/`
+        // Both artifacts live under the `redacted_session_<UUID>/`
         // subdirectory — not the bare temp root.
         #expect(pair.csv.path.hasPrefix(tempDirectory.url.path))
         #expect(pair.json.path.hasPrefix(tempDirectory.url.path))
@@ -233,18 +233,18 @@ struct MatchExportServiceFailureTests {
         #expect(leftovers.isEmpty)
     }
 
-    // MARK: - SEC-1 / SEC-2 hardening on share-export writes (C-K / CAT-115)
+    // MARK: - Hardening on share-export writes
 
-    /// SEC-1 read-back tolerant of the iOS-Simulator coalescing of
+    /// Read-back tolerant of the iOS-Simulator coalescing of
     /// `.complete` → `.completeUntilFirstUserAuthentication` (and macOS hosts
-    /// that report nil). The load-bearing red→green for CAT-115 is the
+    /// that report nil). The load-bearing red→green check is the
     /// `isExcludedFromBackup` flag below — that is NOT coalesced on the sim.
     private func expectProtectionAtLeastComplete(_ url: URL) throws {
         guard let current = try TempFileHardening.currentProtection(of: url) else { return }
         #expect([.complete, .completeUntilFirstUserAuthentication].contains(current))
     }
 
-    @Test("Triage export pair is hardened — file-protection applied + excluded from backup (CAT-115)")
+    @Test("Triage export pair is hardened — file-protection applied + excluded from backup")
     func testTriageExportWriteAppliesProtection() async throws {
         let toastManager = ToastQueueManager()
         let parent = FileManager.default.temporaryDirectory
@@ -264,9 +264,9 @@ struct MatchExportServiceFailureTests {
         ))
 
         for url in [pair.csv, pair.json] {
-            // SEC-2 (D-20): the per-file backup-exclusion flag reads back
+            // The per-file backup-exclusion flag reads back
             // true. This flag is not coalesced on the simulator, so it is the
-            // genuine red→green: unset at pin, true after CAT-115.
+            // genuine red→green: unset at pin, true after the hardening fix.
             let backup = try url.resourceValues(forKeys: [.isExcludedFromBackupKey])
                 .isExcludedFromBackup
             #expect(backup == true)
@@ -274,7 +274,7 @@ struct MatchExportServiceFailureTests {
         }
     }
 
-    @Test("Coverage snapshot pair is hardened — file-protection applied + excluded from backup (CAT-115)")
+    @Test("Coverage snapshot pair is hardened — file-protection applied + excluded from backup")
     func testCoverageSnapshotWriteAppliesProtection() async throws {
         let toastManager = ToastQueueManager()
         let tmp = FileManager.default.temporaryDirectory
@@ -290,9 +290,9 @@ struct MatchExportServiceFailureTests {
         ))
 
         for url in [pair.csv, pair.json] {
-            // Flat `temporaryDirectory` (no SEC-2 session subdirectory), so
+            // Flat `temporaryDirectory` (no session subdirectory), so
             // the per-file flag is the only backup exclusion — unset at pin,
-            // true after CAT-115.
+            // true after the hardening fix.
             let backup = try url.resourceValues(forKeys: [.isExcludedFromBackupKey])
                 .isExcludedFromBackup
             #expect(backup == true)

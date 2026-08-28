@@ -5,7 +5,7 @@ import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// CANCEL-009 results-screen recovery — copy, retention, and re-verify honesty.
+// Results-screen recovery — copy, retention, and re-verify honesty.
 //
 // Covers the Run Verification card's reason-specific copy, the skip-induced
 // WARN masthead arm, the skipped-checks footnote gate, and the verify-only
@@ -42,7 +42,7 @@ struct VerificationRunVerificationCardTests {
         ].joined(separator: " ").lowercased()
         for word in bannedWords {
             #expect(!allText.contains(word),
-                    "Display text contains banned word '\(word)' (ARCH §1.3)")
+                    "Display text contains banned word '\(word)'")
         }
     }
 
@@ -117,7 +117,7 @@ struct VerificationRunVerificationCardTests {
 
     @Test("Footnote hidden on a PASS report even with a skipped layer")
     func footnoteHiddenOnPass() {
-        // Defensive: the aggregate never passes with skips (CAT-373), but
+        // Defensive: the aggregate never passes with skips, but
         // the gate must not rely on that invariant alone.
         let report = VerificationReport(
             layers: [makeLayer(name: "Check B", status: .skipped)],
@@ -191,7 +191,7 @@ struct VerificationRunVerificationCardTests {
         // fell back to rasterization. A uniform re-synthesis would erase
         // the fallback record from the results Page-Modes chips.
         let originalModes: [PipelineMode] = [.searchableRedaction, .secureRasterization]
-        // PD-5: the reason record rides beside the mode record — page 1
+        // The reason record rides beside the mode record — page 1
         // fell back with a recorded trigger.
         let originalReasons: [TextLayerDetector.FallbackReason?] =
             [nil, .unresolvedEncoding]
@@ -212,7 +212,7 @@ struct VerificationRunVerificationCardTests {
         #expect(report.perPageModes == originalModes,
                 "Re-verify must carry the original run's per-page mode record")
         #expect(report.perPageFallbackReasons == originalReasons,
-                "Re-verify must carry the original run's fallback-reason record (PD-5)")
+                "Re-verify must carry the original run's fallback-reason record")
     }
 
     @Test("Re-verify checks the ORIGINAL run's term snapshot, not re-collected terms")

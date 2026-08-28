@@ -4,9 +4,9 @@ import PDFKit
 import CoreGraphics
 import CoreText
 
-// EXP-011 migrated: PDFKit Text Layer Behavior
-// Audit: AA-4 (invisible text), AA-5 (per-char bounds), AA-10 (char counting),
-//        VE-1-1/CO-2-1 (Critical: output page zero-origin), VE-3-1 (High)
+// PDFKit Text Layer Behavior — audits invisible text (rendering-mode-3),
+// per-character bounds, character counting, output-page zero-origin bounds
+// (Critical), and characterBounds(at:) vs the PDFSelection workaround (High).
 
 @Suite("PDFKit Text Layer Behavior", .tags(.sandwich, .critical))
 struct PDFKitTextLayerTests {
@@ -33,8 +33,8 @@ struct PDFKitTextLayerTests {
         return url
     }
 
-    // --- AA-4: Selection finds invisible (rendering-mode-3) text ---
-    @Test("Selection finds invisible rendering-mode-3 text (AA-4)")
+    // --- Selection locates invisible (rendering-mode-3) text ---
+    @Test("Selection locates invisible rendering-mode-3 text")
     func selectionFindsInvisibleText() {
         let url = createInvisibleCourierPDF(text: "Hello World Test")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -49,8 +49,8 @@ struct PDFKitTextLayerTests {
         #expect(!selText.isEmpty, "page.selection(for:CGRect) must find invisible text")
     }
 
-    // --- AA-5: Per-character bounds on Courier ---
-    @Test("Per-character bounds on Courier text (AA-5)")
+    // --- Per-character bounds on Courier ---
+    @Test("Per-character bounds on Courier text")
     func perCharacterBoundsOnCourierText() {
         let url = createInvisibleCourierPDF(text: "ABCDEFGHIJ")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -69,8 +69,8 @@ struct PDFKitTextLayerTests {
         #expect(avgWidth < 20, "Must return per-character bounds, not per-run (avg: \(avgWidth)pt)")
     }
 
-    // --- AA-10 / VE-3-1: numberOfCharacters counting method ---
-    @Test("numberOfCharacters counting with emoji (AA-10)")
+    // --- numberOfCharacters counting method ---
+    @Test("numberOfCharacters counting with emoji")
     func numberOfCharactersWithEmoji() {
         let text = "Hello 😀 World"
         let url = createInvisibleCourierPDF(text: text)
@@ -98,17 +98,17 @@ struct PDFKitTextLayerTests {
                 "CTLineDraw must preserve composed characters (e-acute)")
     }
 
-    // --- CAT-364 (KI-2): iOS-26 A/B — direct characterBounds(at:) vs workaround ---
+    // --- iOS-26 A/B — direct characterBounds(at:) vs workaround (KI-2) ---
     // RECORD, not assume. KI-2 documents that PDFPage.characterBounds(at:)
     // regressed on iOS 18 (FB14843671), so the Searchable pipeline extracts
     // per-glyph bounds via the PDFSelection workaround
     // (TextLayerExtractor.extractCharacters). This A/B measures whether the
     // direct API has been fixed on the iOS 26 SDK. The fixture is zero-origin,
-    // which isolates the question from CAT-366's CropBox translation: cropOrigin
+    // which isolates the question from the CropBox translation fix: cropOrigin
     // is .zero here, so both APIs report in the same page space and the only
     // variable is the API itself. Synthetic Courier text only — never a real document.
     //
-    // RECORDED iOS-26 outcome (F13, 2026-06-14): the direct API still disagrees
+    // RECORDED iOS-26 outcome (measured 2026-06-14): the direct API still disagrees
     // with the PDFSelection workaround on every glyph (agree=0/10,
     // maxDelta≈5.05pt, no degenerate rects) — FB14843671 is NOT fixed on the
     // iOS 26 SDK, so the workaround stays (KI-2 remains open, rechecked). This
@@ -116,7 +116,7 @@ struct PDFKitTextLayerTests {
     // A future SDK that fixes the API makes every glyph agree, which flips this
     // RED — the prompt to retire the workaround and close KI-2. The failure
     // message carries the live numbers for that decision.
-    @Test("characterBounds(at:) direct vs PDFSelection workaround (CAT-364 / KI-2, iOS 26)")
+    @Test("characterBounds(at:) direct vs PDFSelection workaround (KI-2, iOS 26)")
     func characterBoundsDirectVsWorkaround_iOS26() {
         let url = createInvisibleCourierPDF(text: "ABCDEFGHIJ")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -150,8 +150,8 @@ struct PDFKitTextLayerTests {
         )
     }
 
-    // --- VE-1-1 / CO-2-1 (Critical): Output pages have zero-origin bounds ---
-    @Test("Output pages have zero-origin bounds (VE-1-1)")
+    // --- Output pages have zero-origin bounds (Critical) ---
+    @Test("Output pages have zero-origin bounds")
     func outputPageBoundsAreZeroOrigin() {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("origin_test_\(UUID().uuidString).pdf")

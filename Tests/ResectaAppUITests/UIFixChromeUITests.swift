@@ -1,24 +1,23 @@
 import XCTest
 
-/// REV-01 verification battery (device-review-uifix packet §7, D-107,
-/// battery RB-63..70) — the ruled compact chrome and the RB-64 chip
+/// Verification battery — the compact chrome and the chip
 /// strips, driven end-to-end:
 ///
-/// - GEOMETRY (packet §7.5): no pixel/snapshot test exists, so these
+/// - GEOMETRY: no pixel/snapshot test exists, so these
 ///   legs assert the ACCESSIBILITY frames of the redrawn controls.
-///   The ruled floor is a 46pt LAYOUT frame placed AFTER the drawn
-///   chrome (RB-67), so a ruled control's whole element measures
-///   ~46pt (≈44.2 effective under the sheet's ~0.96 render scale,
-///   RB-54); the retired chrome drew the floor INSIDE its wash and
+///   The floor is a 46pt LAYOUT frame placed AFTER the drawn
+///   chrome, so a control's whole element measures
+///   ~46pt (≈44.2 effective under the sheet's ~0.96 render scale);
+///   the retired chrome drew the floor INSIDE its wash and
 ///   measured 50–64pt. Anything ≥48 is the old slab.
-/// - STRIP COOPERATION (packet §7.3): the two RB-64 strips sit in the
-///   sheet's `.safeAreaInset` chrome layer (18-SCROLL-ARCH §10 law) —
+/// - STRIP COOPERATION: the two strips sit in the
+///   sheet's `.safeAreaInset` chrome layer —
 ///   a vertical drag STARTING on a strip must still resize the sheet
 ///   in BOTH directions (the horizontal ScrollView must not swallow
 ///   vertical pans), and a horizontal drag must scroll the chips
 ///   (17-category reachability on the scan strip).
 ///
-/// Rails (packet §7.5): the MCP swipe/gesture/drag tools are E3
+/// Rails: the MCP swipe/gesture/drag tools are E3
 /// silent no-ops and `snapshot_ui` is blind on the inset-bound sheet
 /// — XCUITest coordinate drives are the only admissible evidence
 /// here. Drag idioms + O-1/R7 settle-retry guards mirror
@@ -45,7 +44,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
 
     /// Scan surface with the chips strip revealed (`scanCategoryChips`
     /// is flag-dark in the shipping build; the strip converts with its
-    /// component family — packet §7.3).
+    /// component family).
     private func launchScanWithStrip() {
         app.launchArguments = [
             "--uitesting", "--loadTestDocument", "--openSearchSheet",
@@ -109,7 +108,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         )
     }
 
-    /// Ruled-floor band: 46pt layout ⇒ [44.2, 46] rendered (RB-54
+    /// Floor band: 46pt layout ⇒ [44.2, 46] rendered (render
     /// scale); the retired chrome measured ≥48 on the same element.
     private func assertRuledFloor(_ value: CGFloat, axis: String, of name: String) {
         XCTAssertGreaterThanOrEqual(
@@ -118,7 +117,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         )
         XCTAssertLessThan(
             value, 47.9,
-            "\(name) \(axis) measures \(value) — the retired ≥48pt slab chrome, not the ruled compact floor (packet §7.2)."
+            "\(name) \(axis) measures \(value) — the retired ≥48pt slab chrome, not the ruled compact floor."
         )
     }
 
@@ -129,11 +128,11 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         add(shot)
     }
 
-    // MARK: - Geometry: Scan surface (packet §7.2 items 1 + 3)
+    // MARK: - Geometry: Scan surface
 
     func testExpandedDetent_scanChromeDrawsRuledCompactGeometry() {
         launchScanWithStrip()
-        // R7 first-pan settle retry (house idiom — the first drag after
+        // First-pan settle retry (house idiom — the first drag after
         // presentation can be swallowed while custom-detent resolution
         // settles; a genuinely dead expand still fails the assert).
         dragSheetToExpanded()
@@ -165,7 +164,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         attachScreenshot(named: "uifix-scan-geometry")
     }
 
-    // MARK: - Geometry: Search surface (packet §7.2 items 2 + 4 + 5)
+    // MARK: - Geometry: Search surface
 
     func testExpandedDetent_searchChromeDrawsRuledCompactGeometry() {
         app.launchArguments = ["--uitesting", "--loadTestDocument", "--openSearchSheet"]
@@ -199,7 +198,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         XCTAssertTrue(sortChip.waitForExistence(timeout: 10), "Sort chip not found with results on board.")
         assertRuledFloor(sortChip.frame.height, axis: "height", of: "sort chip")
 
-        // Result-nav pair: two 46pt squares, ruled 6pt pair spacing
+        // Result-nav pair: two 46pt squares, 6pt pair spacing
         // (the retired pair drew ~64pt-wide bordered slabs at 2pt).
         let prev = app.buttons["resultNavPrevious"].firstMatch
         let next = app.buttons["resultNavNext"].firstMatch
@@ -212,7 +211,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         let gap = next.frame.minX - prev.frame.maxX
         XCTAssertTrue(
             gap >= 4 && gap <= 9,
-            "Nav pair gap \(gap) outside the ruled 6pt spacing band (packet §7.2 item 4)."
+            "Nav pair gap \(gap) outside the ruled 6pt spacing band."
         )
 
         // Select All arrives prominent (none selected): the custom
@@ -224,7 +223,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         attachScreenshot(named: "uifix-search-geometry")
     }
 
-    // MARK: - Strip cooperation (packet §7.3 battery, leg a — scan strip)
+    // MARK: - Strip cooperation (leg a — scan strip)
 
     func testMediumDetent_verticalDragOnScanStripResizesSheetBothDirections() {
         launchScanWithStrip()
@@ -236,7 +235,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
 
         // Vertical drag STARTING on the strip must cooperatively
         // EXPAND the sheet — the horizontal ScrollView must not
-        // swallow the vertical pan (R7 first-pan settle retry).
+        // swallow the vertical pan (first-pan settle retry).
         for _ in 0..<2 {
             let start = scanStrip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05))
@@ -246,7 +245,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         }
         XCTAssertLessThan(
             dismiss.frame.minY, window.frame.height * 0.2,
-            "A vertical drag starting on the scan chip strip did not expand the sheet — the strip swallowed the pan (RB-64 cooperation lost)."
+            "A vertical drag starting on the scan chip strip did not expand the sheet — the strip swallowed the pan."
         )
         attachScreenshot(named: "uifix-scanstrip-expanded")
 
@@ -273,7 +272,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         // the retired 17-chip wrap measured hundreds of points.
         XCTAssertLessThan(
             scanStrip.frame.height, 60,
-            "The scan chips render \(scanStrip.frame.height)pt tall — a wrap, not the ruled single-row strip (RB-64)."
+            "The scan chips render \(scanStrip.frame.height)pt tall — a wrap, not the ruled single-row strip."
         )
 
         // The last category chip overflows the strip at default type
@@ -298,7 +297,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         }
         XCTAssertTrue(
             reached,
-            "Horizontal drags never brought the last category chip on screen — the strip did not scroll (17-category reachability, packet §7.3)."
+            "Horizontal drags never brought the last category chip on screen — the strip did not scroll (17-category reachability)."
         )
         attachScreenshot(named: "uifix-scanstrip-scrolled")
     }
@@ -340,7 +339,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         }
         XCTAssertLessThan(
             dismiss.frame.minY, window.frame.height * 0.2,
-            "A vertical drag starting on the substrate chip strip did not expand the sheet — the strip swallowed the pan (RB-64 cooperation lost)."
+            "A vertical drag starting on the substrate chip strip did not expand the sheet — the strip swallowed the pan."
         )
         attachScreenshot(named: "uifix-substratestrip-expanded")
     }

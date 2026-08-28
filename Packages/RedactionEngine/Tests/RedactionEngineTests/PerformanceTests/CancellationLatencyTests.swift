@@ -6,7 +6,7 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// PERF-8 — Cooperative cancellation latency.
+// Cooperative cancellation latency.
 //
 // `applyRedactionFills` and `verifyFill` insert `try Task.checkCancellation()`
 // every 256 scanline rows. The cancellation budget is 50 ms p95 on the iPhone
@@ -14,8 +14,8 @@ import UIKit
 // band-boundary correctness so a future change to the band size or fill loop
 // must show its work.
 //
-// Tests run on iPhone 17 simulator. Real-device validation is tracked as a
-// V1.1 follow-up.
+// Tests run on iPhone 17 simulator. Real-device validation is a follow-up
+// item.
 //
 // MEASUREMENT NOTE: the latency tests measure the cancel→surrender window
 // directly — they record `ContinuousClock.now` from the error-handling
@@ -35,7 +35,7 @@ import UIKit
 // caller, because `RasterizeResult` is only returned at the end of the
 // per-page autoreleasepool block in `PageRasterizer.rasterize`.
 
-@Suite("Cancellation Latency (PERF-8)")
+@Suite("Cancellation Latency")
 struct CancellationLatencyTests {
 
     // MARK: - Helpers

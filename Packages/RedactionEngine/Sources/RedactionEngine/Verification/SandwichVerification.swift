@@ -9,7 +9,7 @@ import UIKit
 import AppKit  // macOS tooling destination: NSFont carries the .font attribute
 #endif
 
-// ENGINE §6.6 — Layers 6–10: Sandwich-specific verification.
+// Layers 6–10: Sandwich-specific verification.
 // Runs only for Searchable Redaction pages.
 
 /// Sandwich-specific verification layers for the Searchable Redaction pipeline.
@@ -22,11 +22,10 @@ public struct SandwichVerification: Sendable {
     /// Courier advance (600/1000 = 0.6). Probed against
     /// `CTFontGetAdvancesForGlyphs` for sizes {1, 6, 12, 24, 100}pt — the
     /// advance is exactly `0.60009765625 × fontSize` for every probed size.
-    /// See ENGINE §6.6 SVT-1 and plan §3.1.
     public static let courierAdvancePerPoint: CGFloat = 0.60009765625
 
     /// Tolerance for the Layer 6 advance crosscheck at the 12pt REFERENCE
-    /// size (M1 tightening). J-12 (2026-06-09) derives line pitches from
+    /// size (M1 tightening). The reconstructor derives line pitches from
     /// source metrics, so the operative tolerance scales linearly with the
     /// glyph's own point size via `advanceWidthTolerancePerPoint`; this
     /// constant remains the 12pt anchor (and the value probe/test code
@@ -34,22 +33,21 @@ public struct SandwichVerification: Sendable {
     public static let advanceWidthTolerance: CGFloat = 0.25
 
     /// Linear scaling of the advance tolerance: `0.25pt at 12pt`, applied
-    /// as `advanceWidthTolerancePerPoint × pointSize` (J-12 rider).
+    /// as `advanceWidthTolerancePerPoint × pointSize`.
     public static let advanceWidthTolerancePerPoint: CGFloat = 0.25 / 12.0
 
-    /// Vertical sweep tolerance for canonical line banding (J-12): walking
+    /// Vertical sweep tolerance for canonical line banding: walking
     /// Y values in descending order, a gap greater than this opens a new
     /// band. Shared by the reconstructor's line pooling, the filter-side
     /// lineage walk, and the verifier's output walk so all three agree on
     /// band structure. Source line spacing in real documents is several
     /// points; sub-baseline offsets (superscripts, ordinals) sit well
     /// under 1pt — measured on the committed real-document fixture
-    /// (RealDocProbeTests S06, 2026-06-09).
+    /// (RealDocProbeTests, 2026-06-09).
     public static let lineBandTolerance: CGFloat = 1.5
 
     /// Single-linkage sweep over Y values: returns each input index's band
     /// ordinal (0 = topmost). Deterministic in the input values only.
-    /// ENGINE §6.6 SVT-2 (J-12 canonical order).
     static func yBands(_ ys: [CGFloat]) -> [Int] {
         let order = ys.indices.sorted { ys[$0] > ys[$1] }
         var band = [Int](repeating: 0, count: ys.count)
@@ -64,7 +62,7 @@ public struct SandwichVerification: Sendable {
     }
 
     /// Natural CoreText advance of one composed grapheme in the accepted
-    /// family's own font at `pointSize` — the J-13 acceptance reference.
+    /// family's own font at `pointSize`.
     /// A font's natural advance is a writer/font property, not a position
     /// channel an attacker controls; comparing a measured origin delta
     /// against it (plus whole gap cells) keeps encoding-external glyphs
@@ -88,10 +86,10 @@ public struct SandwichVerification: Sendable {
         return advances.reduce(0) { $0 + $1.width }
     }
 
-    /// True when a read-back point size is one the reconstructor's §5C.2
+    /// True when a read-back point size is one the reconstructor's
     /// pitch derivation can emit: a whole multiple of
-    /// `pitchQuantizationStep` at or above `minimumFontSize` (J-14). The
-    /// SVT-1 pitch-flip acceptance gates on this so a foreign text object
+    /// `pitchQuantizationStep` at or above `minimumFontSize`. The
+    /// Layer 6 pitch-flip acceptance gates on this so a foreign text object
     /// at an arbitrary size never reads as a writer-band junction.
     static func isWriterQuantizedPitch(_ size: CGFloat) -> Bool {
         guard size >= TextLayerReconstructor.minimumFontSize - 0.01 else {
@@ -124,22 +122,22 @@ public struct SandwichVerification: Sendable {
 
     public init() {}
 
-    // MARK: - Layer 6: Spatial Exclusion Verification (ENGINE §6.6)
+    // MARK: - Layer 6: Spatial Exclusion Verification
 
     /// Verify that no character in the output text layer intersects any
     /// redaction region. This is a geometric re-check independent of string
     /// content — defense-in-depth against character filtering bugs.
     ///
-    /// CC-5-1: Receives PDFPage (non-Sendable). Safety: verification runner
+    /// Receives PDFPage (non-Sendable). Safety: verification runner
     /// calls layers sequentially; output PDFDocument is distinct from source.
     ///
     /// IMPORTANT: each `RegionShape`'s bounds must be in PDF page coordinates
     /// (bottom-left origin, in points). Use normalizedToPDFPageCoordinates()
-    /// with the OUTPUT page bounds (always zero-origin per EXP-011).
+    /// with the OUTPUT page bounds (always zero-origin).
     /// Called from the @concurrent runLayer() context — inherits caller isolation.
-    /// Not marked @concurrent itself to avoid PDFPage sending errors (CC-5-1).
+    /// Not marked @concurrent itself to avoid PDFPage sending errors.
     ///
-    /// DRAW-1 polygon-aware overload. Each `RegionShape` carries the
+    /// Polygon-aware overload. Each `RegionShape` carries the
     /// safety-margin-expanded bounding rect, the un-expanded rect, and an
     /// optional polygon.
     ///
@@ -163,9 +161,9 @@ public struct SandwichVerification: Sendable {
     /// lineage-whitespace are outside the check's domain: PDFKit
     /// synthesizes and coalesces inter-run whitespace on the output side
     /// (a coalesced bridge-space box can span a whole gutter and graze a
-    /// region the drawn ink never touches), the SVT-1/L9 domains already
+    /// region the drawn ink never touches), Layers 6 and 9's domains already
     /// exclude whitespace, and an invisible space carries no content.
-    /// Line bands derive from the same `yBands` sweep the SVT-1 lattice
+    /// Line bands derive from the same `yBands` sweep the Layer 6 lattice
     /// uses, over the core boxes. For a shape whose
     /// `bounds == expandedBounds` (the legacy construction) the two tiers
     /// coincide and the check reduces to its previous single-rect form.
@@ -174,13 +172,13 @@ public struct SandwichVerification: Sendable {
         regionShapes: [RegionShape],
         pageIndex: Int = 0
     ) async throws -> VerificationStatus {
-        // PERF-8 / CANCEL-002: entry-level cooperative cancellation.
+        // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         guard let pageText = outputPage.string else { return .pass }
         let nsText = pageText as NSString
         let count = outputPage.numberOfCharacters
         // Count-only guard. `!regionShapes.isEmpty` was dropped so the
-        // SVT-1 origin-delta lattice (below) also runs on region-less pages —
+        // The origin-delta lattice (below) also runs on region-less pages —
         // glyph-position tampering on a page with no redaction regions was the
         // only positional blind spot. The per-character exclusion loop is a
         // no-op on [] shapes, and the lattice gap-skip skips no pairs (strictly
@@ -188,7 +186,7 @@ public struct SandwichVerification: Sendable {
         // page with no text layer.
         guard count > 0 else { return .pass }
 
-        // PERF-8 / CANCEL-002: 256-iteration band counter in the per-character
+        // 256-iteration band counter in the per-character
         // walk. A 10k-character page would otherwise exceed the 50 ms p95
         // cancel→surrender budget; bitmask check is amortized constant time.
         var bandCounter = 0
@@ -198,7 +196,7 @@ public struct SandwichVerification: Sendable {
         // so collection precedes checking; failure order stays first-offset).
         var exclusionUnits: [(bounds: CGRect, utf16Offset: Int,
                               family: String?, pointSize: CGFloat)] = []
-        // Units collected for the SVT-1 origin-delta lattice pass below.
+        // Units collected for the origin-delta lattice pass below.
         var latticeUnits: [(string: String, bounds: CGRect,
                             family: String, pointSize: CGFloat,
                             utf16Offset: Int)] = []
@@ -349,7 +347,7 @@ public struct SandwichVerification: Sendable {
             }
         }
 
-        // ENGINE §6.6 SVT-1 (J-13 refinement, 2026-06-09): origin-delta
+        // Origin-delta
         // lattice crosscheck, replacing the M1 selection-WIDTH check. The
         // Bland et al. kerning channel displaces glyph ORIGINS, so the
         // consecutive same-band origin delta is the direct signal; PDFKit
@@ -361,12 +359,12 @@ public struct SandwichVerification: Sendable {
         // must sit at `delta == natural(prev) + j × cell`, integer j ≥ 0
         // (j counts whole skipped gap cells — bridge/synthesized spaces
         // are whitespace and excluded above), within the linearly scaled
-        // tolerance. The natural-advance reference (J-13/N1, approved
-        // 2026-06-09) is the accepted family's own CoreText advance — a
+        // tolerance. The natural-advance reference
+        // is the accepted family's own CoreText advance — a
         // writer/font property, not a position channel — so encoding-
         // external glyphs (U+2248 at 0.549 em) verify without widening
         // the lattice; TJ kerning injections land off it and still FAIL
-        // (RT-1). A point-size change inside a band FAILs: the
+        // A point-size change inside a band FAILs: the
         // reconstructor draws each band at one pooled pitch, so a mid-band
         // pitch flip in an accepted family reports output this writer did
         // not produce. Pairs whose gap interval intersects a redaction
@@ -389,20 +387,20 @@ public struct SandwichVerification: Sendable {
                       prev.pointSize > 0
                 else { continue }
                 if abs(prev.pointSize - curr.pointSize) > 0.01 {
-                    // J-14 (2026-07-20): the writer pools ONE pitch per
+                    // The writer pools ONE pitch per
                     // SOURCE-Y band, but PDFKit read-back pools adjacent
                     // writer lines into one selection line box, so a
                     // verifier band can legitimately straddle a writer-band
                     // junction and carry two pitches. The junction is
                     // accepted only when BOTH sizes sit on the writer's own
-                    // pitch lattice (§5C.2 quantization step, minimum size)
+                    // pitch lattice (quantization step, minimum size)
                     // — the grammar no foreign text object follows for free
                     // — and it resets the delta chain: each writer band
                     // re-anchors on its own cell grid, so no cross-pitch
                     // origin relation exists to verify. Positions within
                     // each pitch run stay lattice-pinned; the run-start
                     // origin gains only the freedom every band start
-                    // already has. The size class itself is the §5C.4
+                    // already has. The size class itself is the
                     // accepted bounded-bits channel. Any off-lattice size
                     // flip still reports output this writer did not
                     // produce.
@@ -467,9 +465,9 @@ public struct SandwichVerification: Sendable {
         return inside
     }
 
-    // MARK: - Layer 7: Character Count Cross-Check (ENGINE §6.6)
+    // MARK: - Layer 7: Character Count Cross-Check
 
-    /// Layer 7 excess tolerance, in composed characters (VH-1 re-pin).
+    /// Layer 7 excess tolerance, in composed characters.
     /// With both sides of the comparison counting NON-whitespace only
     /// (below), PDFKit's synthesized inter-run whitespace is out of the
     /// domain and the two counts agree exactly on the sample-statement and
@@ -480,12 +478,12 @@ public struct SandwichVerification: Sendable {
     static let characterCountExcessTolerance = 2
 
     /// Compare the number of non-whitespace characters in the output text
-    /// layer against the PageFilterDigest from the extraction phase (VH-1).
+    /// layer against the PageFilterDigest from the extraction phase.
     ///
     /// Uses composed-character-sequence iteration (same as extractCharacters)
     /// to count output characters — NOT PDFPage.numberOfCharacters which
-    /// uses inconsistent counting for emoji/supplementary-plane (EXP C1.1).
-    /// The count domain is non-whitespace on BOTH sides (mirror of the L9
+    /// uses inconsistent counting for emoji/supplementary-plane.
+    /// The count domain is non-whitespace on BOTH sides (mirror of the Layer 9
     /// lineage domain): PDFKit synthesizes inter-run whitespace — and
     /// clamp-reports synthesized separators with non-zero bounds — on the
     /// output side, while the extraction stream legitimately carries
@@ -497,7 +495,7 @@ public struct SandwichVerification: Sendable {
         outputPage: PDFPage,
         digest: PageFilterDigest
     ) async throws -> VerificationStatus {
-        // PERF-8 / CANCEL-002: entry-level cooperative cancellation.
+        // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         let outputCount = try countComposedCharacters(outputPage)
         let expectedCount = digest.survivingNonWhitespaceCount
@@ -519,7 +517,7 @@ public struct SandwichVerification: Sendable {
     }
 
     /// Count non-whitespace characters using composed-character-sequence
-    /// iteration, matching extractCharacters()'s unit (§5B.1) and the
+    /// iteration, matching extractCharacters()'s unit and the
     /// output lineage walk's two skip conditions (zero bounds, lineage
     /// whitespace — see `computeOutputLineageHash`).
     private func countComposedCharacters(_ page: PDFPage) throws -> Int {
@@ -528,7 +526,7 @@ public struct SandwichVerification: Sendable {
         let totalCodeUnits = page.numberOfCharacters
         var count = 0
         var utf16Offset = 0
-        // PERF-8 / CANCEL-002: 256-iteration band counter in the per-character
+        // 256-iteration band counter in the per-character
         // walk — mirrors verifySpatialExclusion's cancel-checkpoint cadence.
         var bandCounter = 0
 
@@ -538,7 +536,7 @@ public struct SandwichVerification: Sendable {
             let composedRange = nsText.rangeOfComposedCharacterSequence(at: utf16Offset)
             // Only count characters with non-zero bounds (matching
             // extractCharacters behavior) whose text is not lineage
-            // whitespace (the shared L7/L9 count domain).
+            // whitespace (the shared Layer 7 / Layer 9 count domain).
             if !FilterResult.isLineageWhitespace(nsText.substring(with: composedRange)),
                let sel = page.selection(for: composedRange) {
                 let bounds = sel.bounds(for: page)
@@ -551,7 +549,7 @@ public struct SandwichVerification: Sendable {
         return count
     }
 
-    // MARK: - Layer 8: Font Verification (ENGINE §6.6)
+    // MARK: - Layer 8: Font Verification
 
     /// Accepted monospace font suffixes for the invisible text layer.
     /// Courier is the primary target; Menlo is accepted because
@@ -569,7 +567,7 @@ public struct SandwichVerification: Sendable {
 
     /// True when the UIFont family name corresponds to one of the accepted
     /// monospace families (Courier or Menlo). Used by the Layer 6 advance-
-    /// width crosscheck (SVT-1) to gate the check on outputs the
+    /// width crosscheck (Layer 6) to gate the check on outputs the
     /// reconstructor itself produces; non-monospace fixtures running through
     /// `verifySpatialExclusion` are reported by Layer 8 instead.
     static func isCourierMonospaceFamily(_ familyName: String) -> Bool {
@@ -580,14 +578,14 @@ public struct SandwichVerification: Sendable {
     /// Verify that all fonts in the output PDF are accepted monospace fonts.
     /// No original-document fonts should survive.
     ///
-    /// EXP E5.1: CGPDFContext embeds fonts as TrueType with a random
+    /// CGPDFContext embeds fonts as TrueType with a random
     /// 6-letter subset prefix (e.g., "AAAAAB+Courier"). Layer 8 matches
     /// against /BaseFont using suffix check.
     public func verifyFontsAreMonospace(
         outputPage: PDFPage,
         pageIndex: Int
     ) async throws -> VerificationStatus {
-        // PERF-8 / CANCEL-002: entry-level cooperative cancellation.
+        // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         guard let pageRef = outputPage.pageRef,
               let dict = pageRef.dictionary else {
@@ -619,7 +617,7 @@ public struct SandwichVerification: Sendable {
                   let font = fontObj else { return true }
 
             // The /BaseFont accept-check is the Layer-8 security boundary
-            // and is UNCHANGED by the J-5 refinement below: an unaccepted
+            // and is UNCHANGED by the refinement below: an unaccepted
             // BaseFont FAILs with or without a CMap, and a font dict with
             // no readable /BaseFont is never `accepted`.
             var accepted = false
@@ -636,11 +634,11 @@ public struct SandwichVerification: Sendable {
                 }
             }
 
-            // ENGINE §6.6 SVT-4 (J-5 refinement, 2026-06-09): a /ToUnicode
+            // A /ToUnicode
             // CMap is tolerated ONLY on a font the /BaseFont check above
             // accepted (a fresh CGPDFContext Courier/Menlo subset); on any
             // other font dict it remains a structural anomaly and FAILs.
-            // EXP-E6.2 superseded EXP-E5.1's no-CMap attestation: the writer
+            // A newer writer behavior superseded the original no-CMap attestation: the writer
             // emits a /ToUnicode-bearing subset for any glyph outside its
             // simple 8-bit encoding — under fully explicit, fully covered
             // draws — and that CMap is load-bearing for those glyphs'
@@ -648,15 +646,15 @@ public struct SandwichVerification: Sendable {
             // (probe F reproduces the real-doc 20/23-page CMap picture with
             // no reconstructor involvement).
             //
-            // Preserved-invariant argument (00-PLAN §3.4, J-5 APPROVED):
+            // Preserved-invariant argument:
             // an Apple-writer-emitted CMap on an accepted fresh subset maps
             // only the drawn surviving glyphs — redacted content was
             // filtered before drawing and never embedded, so the CMap
             // cannot carry it. Content/operator leakage is independently
-            // covered by Layer 3 (SVT-3) and Layer 10 (SVT-5). The residual
+            // covered by Layer 3 and Layer 10. The residual
             // given up — a hand-injected, content-divergent CMap on a
             // spoofed accepted BaseFont — requires post-export tampering,
-            // outside the threat boundary (RT-6, §6.6 M4 residual).
+            // outside the threat boundary (M4 residual).
             var cmap: CGPDFStreamRef?
             if CGPDFDictionaryGetStream(font, "ToUnicode", &cmap), !accepted {
                 let resultPtr = ctx!.assumingMemoryBound(to: VerificationStatus.self)
@@ -671,7 +669,7 @@ public struct SandwichVerification: Sendable {
         return result
     }
 
-    // MARK: - Layer 9: Character Lineage (ENGINE §6.6 SVT-2)
+    // MARK: - Layer 9: Character Lineage
 
     /// Re-compute the SHA-256 over the output page's composed-character
     /// iteration and report mismatch against the filter's recorded
@@ -681,12 +679,12 @@ public struct SandwichVerification: Sendable {
     /// flip it — both sides iterate non-zero-bounds composed characters
     /// only (skip condition 1 below), so a zero-bounds insertion is outside
     /// the hash domain. That is the pinned M4 residual (adversarial suite
-    /// SVT-3/SVT-5 coverage): a term-bearing injection, zero-width or not,
+    /// coverage): a term-bearing injection, zero-width or not,
     /// is surfaced by Layers 3 and 10's term scans instead. Spatial
     /// tampering (chars shifted to different page coordinates with
-    /// identical content and order) is the responsibility of Layer 6 SVT-1,
+    /// identical content and order) is the responsibility of Layer 6,
     /// which compares raw `selection.bounds` against the redaction shapes
-    /// per character. See plan §4.4.
+    /// per character.
     ///
     /// Hash domain (post-H1 redesign): `(character.utf8, globalPos)` per
     /// non-zero-bounds composed character, where `globalPos` is a 0-indexed
@@ -698,13 +696,13 @@ public struct SandwichVerification: Sendable {
     /// `FilterResult.computeLineageHash` for the matching filter-side
     /// walk.
     ///
-    /// CC-5-1: Receives PDFPage (non-Sendable). Safety: verification runner
+    /// Receives PDFPage (non-Sendable). Safety: verification runner
     /// calls layers sequentially; output PDFDocument is distinct from source.
     public func verifyCharacterLineage(
         outputPage: PDFPage,
         digest: PageFilterDigest
     ) async throws -> VerificationStatus {
-        // PERF-8 / CANCEL-002 (VQ-24): entry-level cooperative cancellation —
+        // Entry-level cooperative cancellation —
         // Layer 9 previously had none, so a cancel arriving mid-lineage-walk
         // was not honored until the layer completed. The composed-character
         // walk below carries the banded 256-cadence checks (house pattern).
@@ -724,7 +722,7 @@ public struct SandwichVerification: Sendable {
     }
 
     /// SHA-256 over the output page's composed characters in CANONICAL
-    /// order (J-12 redesign, 2026-06-09). Mirrors
+    /// order. Mirrors
     /// `FilterResult.computeLineageHash` so filter and verifier produce
     /// matching digests in the non-tampered case. Two skip conditions
     /// apply uniformly on both sides:
@@ -737,9 +735,9 @@ public struct SandwichVerification: Sendable {
     ///      spaces) with non-zero bounds on the output side that the
     ///      filter's surviving `CharacterInfo` set does not contain.
     ///      Skipping whitespace on both sides keeps the hash domain a pure
-    ///      content/ordering signal. See N2 residual.
+    ///      content/ordering signal.
     ///
-    /// Canonical order (J-12): units sort by Y sweep band (descending; see
+    /// Canonical order: units sort by Y sweep band (descending; see
     /// `yBands`/`lineBandTolerance`), then X ascending within a band —
     /// NOT by PDFKit's string order. PDFKit's composition order on
     /// multi-baseline form rows is a layout heuristic the filter side
@@ -748,7 +746,7 @@ public struct SandwichVerification: Sendable {
     /// faithful-pitch redraw). The canonical sort anchors both sides to
     /// the drawn geometry itself. Detection power: insertions, deletions,
     /// and replacements still flip the hash; spatially moving a glyph
-    /// re-orders the canonical walk and flips it (RT-5); a content-stream
+    /// re-orders the canonical walk and flips it; a content-stream
     /// operator shuffle that leaves every glyph at identical coordinates
     /// hashes identically BY DESIGN — same glyphs at same positions is
     /// the same document (position-sorted domain; the raster and Layers
@@ -757,7 +755,6 @@ public struct SandwichVerification: Sendable {
     /// Hash domain: each emitted composed character contributes
     /// `(character.utf8, globalPos)` separated by `0x1F`, where `globalPos`
     /// is a 0-indexed integer counter incremented per emitted character.
-    /// See plan §4.4 and ENGINE §6.6 SVT-2.
     static func computeOutputLineageHash(_ outputPage: PDFPage) throws -> Data {
         guard let pageText = outputPage.string else { return Data() }
         let nsText = pageText as NSString
@@ -766,7 +763,7 @@ public struct SandwichVerification: Sendable {
 
         var units: [(string: String, minY: CGFloat, minX: CGFloat)] = []
         var utf16Offset = 0
-        // PERF-8 / CANCEL-002 (VQ-24): banded cooperative cancellation in the
+        // Banded cooperative cancellation in the
         // composed-character walk, matching the 256-iteration cadence of the
         // other per-character layer loops.
         var bandCounter = 0
@@ -804,23 +801,22 @@ public struct SandwichVerification: Sendable {
         return Data(hasher.finalize())
     }
 
-    // MARK: - Layer 10: Operator Re-Extraction (ENGINE §6.6 SVT-5)
+    // MARK: - Layer 10: Operator Re-Extraction
 
     /// Walk each output page's content stream via `CGPDFScanner` and
     /// accumulate the per-page semantic text decoded from the four
     /// PDF 1.7 §9.4.3 text-show operators (`Tj`, `TJ`, `'`, `"`). Each string
     /// operand is decoded via `CGPDFStringCopyTextString` — an Apple-
     /// maintained string-text decoder independent of PDFKit's `page.string`
-    /// (the basis of Layer 3 SVT-3). Reports presence of any sensitive
+    /// (the basis of Layer 3's decoder). Reports presence of any sensitive
     /// term in the accumulated bytes via Aho-Corasick.
     ///
-    /// Pairs with Layer 3 SVT-3 as a two-decoder cross-check: a sensitive
+    /// Pairs with Layer 3 as a two-decoder cross-check: a sensitive
     /// term surfaced by exactly one of the two layers reports a decoder
     /// divergence (e.g., a Name-object Tj operand surfaced only by the
     /// scanner; a literal-string surrogate-pair surfaced by both decoders).
-    /// See plan §4.5 and ENGINE §5C.3 SVT-5.
     ///
-    /// CC-5-1: receives a SendablePDFDocument. The page walk reads
+    /// Receives a SendablePDFDocument. The page walk reads
     /// `pageRef` (non-Sendable); the verification runner calls this layer
     /// on a single executor at a time. Hand-off across the @concurrent
     /// dispatch boundary uses the existing `SendablePDFDocument` wrapper.
@@ -828,22 +824,22 @@ public struct SandwichVerification: Sendable {
     /// carries the 0-based page behind an `.attention` verdict for the UI's
     /// tappable page chips; `reviewTermTexts` carries the display-only term
     /// texts behind that verdict (the status message itself stays
-    /// content-free, ARCH §12.2). Both nil for every other status.
+    /// content-free). Both nil for every other status.
     public func verifyTextOperatorSemantics(
         outputDocument: SendablePDFDocument,
         sensitiveTerms: [SensitiveTerm]
     ) async -> (status: VerificationStatus, pageReferences: [Int]?, reviewTermTexts: [String]?) {
-        // No terms provided — expected for manual-only redaction. VQ-30:
+        // No terms provided — expected for manual-only redaction.
         // INFO, not PASS — the operator-semantic search did not run, and
         // "No issues found" would overstate what this layer observed
         // (mirrors Layer 3's guard).
         guard !sensitiveTerms.isEmpty else {
             return (.info("No sensitive terms were provided — string search did not run."), nil, nil)
         }
-        // Filter terms too short to search (matches Layer 3 §6.3, shared
+        // Filter terms too short to search (matches Layer 3, shared
         // `AhoCorasick.isSearchableTerm`): ≥3 scalars (supports 3-letter PII
         // abbreviations like SSN, DOB, PHI) or a 2-character CJK name.
-        // VQ-30: the all-short case previously read as a clean PASS here
+        // The all-short case previously read as a clean PASS here
         // while Layer 3 WARNed — align on Layer 3's tier and copy.
         let validTerms = sensitiveTerms.filter { AhoCorasick.isSearchableTerm($0.text) }
         guard !validTerms.isEmpty else {
@@ -852,7 +848,7 @@ public struct SandwichVerification: Sendable {
         // Surfaced on the otherwise-clean path below (mirrors Layer 3).
         let droppedTermCount = sensitiveTerms.count - validTerms.count
 
-        // Boundary-required terms (PD-3) drop matches embedded in an
+        // Boundary-required terms drop matches embedded in an
         // alphanumeric run; plain terms keep substring semantics.
         let termAutomaton = SensitiveTermAutomaton(validTerms: validTerms)
         guard termAutomaton.hasPatterns else { return (.pass, nil, nil) }
@@ -891,10 +887,10 @@ public struct SandwichVerification: Sendable {
                 // (e.g., `/SSN Tj`) — invalid under spec but surfaced by a
                 // forgiving viewer — is observed alongside well-formed
                 // String operands. CGPDFStringCopyTextString is the
-                // independent decoder vs. PDFKit's `page.string` (Layer 3
-                // SVT-3). nil decodes are tolerated — false negatives are
+                // independent decoder vs. PDFKit's `page.string` (Layer 3's
+                // decoder). nil decodes are tolerated — false negatives are
                 // acceptable on a defense-in-depth layer; false positives
-                // are not (plan §4.5 traps).
+                // are not.
                 CGPDFOperatorTableSetCallback(table, "Tj") { scanner, info in
                     sandwichLayer10AppendPoppedOperand(scanner: scanner, info: info)
                 }
@@ -938,9 +934,9 @@ public struct SandwichVerification: Sendable {
                 ), nil, nil)
             }
 
-            // ARCH §12.2: the status message reports page index + match count
+            // The status message reports page index + match count
             // only; the matched term content is never echoed in it. Mirrors
-            // Layer 3 SVT-3's shape at VerificationEngine.runLayer3BinarySearch.
+            // Layer 3's shape at VerificationEngine.runLayer3BinarySearch.
             // The term texts travel beside the status in the display-only
             // third element instead. A hit here is decoded operator text that
             // survives OUTSIDE every region (in-region content is removed

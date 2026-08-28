@@ -2,18 +2,17 @@ import Foundation
 import ImageIO
 import CoreGraphics
 
-// SEC-8 prereq (plan §3): Live Photo / Portrait depth auxiliary-metadata stripper.
+// Live Photo / Portrait depth auxiliary-metadata stripper.
 //
 // Locked decision: this helper drops `kCGImagePropertyAuxiliaryData` keys,
 // `kCGImagePropertyMakerAppleDictionary`, and a peer-key denylist from the
 // image-properties dictionary. V1 strips the property dict only — the
 // `CGImage` is returned unchanged, since stripping aux data from the image
 // itself would require re-encoding (heavier change, out of scope here).
-// SEC-8 (unit 23) will flip the import-path gate when paranoid mode is
+// The import-path gate flips when paranoid mode is
 // enabled.
 //
-// **Where the actual aux-metadata gate lives.** Package H header note,
-// per `03-security-perf-audit.md §3.3.a`. The mechanism preventing aux
+// **Where the actual aux-metadata gate lives.** The mechanism preventing aux
 // metadata from reaching the export PDF is
 // `UIGraphicsPDFRenderer.pdfData` in
 // `Sources/ResectaApp/Views/ImportService.swift renderImageAsPDF(...)`,
@@ -21,10 +20,10 @@ import CoreGraphics
 // PDF stream. This helper is **defense-in-depth**: if the import path
 // ever switches to a `CGImageDestination`-based PDF writer (or any other
 // renderer that *does* propagate the property dict), the denylist below
-// remains a meaningful filter and the SEC-8 contract continues to hold at
-// the source. The pairing is recorded in `ARCHITECTURE.md §1.2 SEC-8`.
+// remains a meaningful filter and this protection continues to hold at
+// the source.
 //
-// Mechanism-description language (I6 / ARCH §1.3): this helper is designed
+// Mechanism-description language: this helper is designed
 // to reduce the surface area of camera-origin metadata that could be
 // carried into the export pipeline. It is a best-effort metadata filter.
 
@@ -57,14 +56,13 @@ import CoreGraphics
 // nonisolated: pure stateless aux-data stripper invoked from the
 // `nonisolated` off-main import path (ImportService.loadImageOffMainActor).
 // Restores the effective isolation it had before SE-0466 MainActor-default
-// was pinned project-wide (fix-series s04 flip) — no MainActor state touched.
+// was pinned project-wide — no MainActor state touched.
 nonisolated public struct LivePhotoAuxStripper: Sendable {
 
     public init() {}
 
     /// Keys removed by `strip(_:properties:)`. Exposed for tests and for any
-    /// caller that wants to assert denylist coverage against the SEC-8
-    /// contract in `ARCHITECTURE.md §1.2`. Computed (rather than stored
+    /// caller that wants to assert denylist coverage. Computed (rather than stored
     /// static `let`) because `CFString` is not `Sendable` in Swift 6 strict
     /// mode; the returned array is a fresh value per access.
     public static var denylist: [CFString] {

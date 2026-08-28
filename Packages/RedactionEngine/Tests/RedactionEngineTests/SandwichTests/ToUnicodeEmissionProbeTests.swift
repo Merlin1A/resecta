@@ -5,19 +5,19 @@ import CoreGraphics
 import CoreText
 @testable import RedactionEngine
 
-// S01 — EXP-E6.1 / OQ-3: when does CGPDFContext emit a /ToUnicode CMap, and
+// EXP-E6.1: when does CGPDFContext emit a /ToUnicode CMap, and
 // does an EXPLICITLY-created Menlo avoid it? This selects the Layer-8 fix
-// branch the master plan (00-PLAN.md §4.2/§4.3) defers to S01:
+// branch:
 //
 //   • Branch A — explicit accepted fallback does NOT emit /ToUnicode → ship the
 //     fix in the reconstructor (FIX-B: draw Courier-uncovered graphemes in an
-//     explicitly-created Menlo), SVT-4 + RT-4 untouched. PREFERRED.
+//     explicitly-created Menlo), the Layer 6 and Layer 8 checks untouched. PREFERRED.
 //   • Branch B — every non-Courier subset carries /ToUnicode regardless → the
-//     reconstructor route cannot avoid the CMap; resolve via a maintainer-gated SVT-4
-//     verifier refinement (FIX-B′, J-5/J-6) + RT-4 re-pointing.
+//     reconstructor route cannot avoid the CMap; resolve via a refined
+//     Layer 8 verifier check (FIX-B′), with its font acceptance re-pointed.
 //
-// ARCH §12.2: emit only font *resource* names, booleans, counts, and advances
-// in points — never document content. The probe strings are synthetic.
+// Logging discipline: emit only font *resource* names, booleans, counts, and
+// advances in points — never document content. The probe strings are synthetic.
 
 // MARK: - /ToUnicode emission probe builders (CGPDFContext + CTLineDraw)
 
@@ -81,7 +81,7 @@ enum ToUnicodeProbe {
 @Suite("ToUnicode emission probe", .tags(.sandwich))
 struct ToUnicodeEmissionProbeTests {
 
-    @Test("EXP-E6.1 — /ToUnicode emission by font choice (OQ-3)")
+    @Test("EXP-E6.1 — /ToUnicode emission by font choice")
     func toUnicodeEmissionByFontChoice() async throws {
         let courier = CTFontCreateWithName("Courier" as CFString, 12.0, nil)
         let menlo = CTFontCreateWithName("Menlo-Regular" as CFString, 12.0, nil)
@@ -100,7 +100,7 @@ struct ToUnicodeEmissionProbeTests {
             for f in infos { print("    base=\(f.baseFont) hasToUnicode=\(f.hasToUnicode)") }
         }
 
-        // Build each scenario's PDF once (reused for font report + SVT-4 verdict).
+        // Build each scenario's PDF once (reused for font report + Layer 8 verdict).
         let d1 = ToUnicodeProbe.pdf([(ascii, 72, 700, courier)])
         let d2 = ToUnicodeProbe.pdf([(ascii, 72, 700, menlo)])
         let d3 = ToUnicodeProbe.pdf([(courierCoveredLatin1 + " " + neitherCovered, 72, 700, courier)])
@@ -126,7 +126,7 @@ struct ToUnicodeEmissionProbeTests {
         dump("(4) coverage-aware seg of Latin-1 accents (Courier covers → stay Courier)", s4)
         dump("(5) coverage-aware seg of neither-covered glyphs (residual)", s5)
 
-        // Menlo advance vs SVT-1 tolerance (Branch-A viability for Layer 6).
+        // Menlo advance vs the Layer 6 tolerance (Branch-A viability).
         let menloAdvance = SearchableMergeProbe.courierHorizontalAdvance(
             of: "M", font: menlo)
         let expected = Double(SearchableMergeProbe.courierPerPt) * 12.0
@@ -134,7 +134,7 @@ struct ToUnicodeEmissionProbeTests {
         print("Menlo 'M' advance@12pt=\(round4(menloAdvance)) expected=\(round4(expected)) "
             + "withinSVT1Tol(0.25)=\(menloWithinTol)")
 
-        // SVT-4 verifier verdict (the real Layer-8 check) on each scenario.
+        // Layer 8 verifier verdict on each scenario.
         let verifier = SandwichVerification()
         func svt4Fail(_ data: Data) async throws -> Bool {
             guard let doc = PDFDocument(data: data), let page = doc.page(at: 0) else { return false }
@@ -145,32 +145,32 @@ struct ToUnicodeEmissionProbeTests {
         let v3 = try await svt4Fail(d3)
         let v4 = try await svt4Fail(d4)
         let v5 = try await svt4Fail(d5)
-        print("SVT-4 verdict isFail: (1)=\(v1) (2)=\(v2) (3)=\(v3) (4)=\(v4) (5)=\(v5)")
+        print("Layer 8 verdict isFail: (1)=\(v1) (2)=\(v2) (3)=\(v3) (4)=\(v4) (5)=\(v5)")
         print("===== END EXP-E6.1 =====")
 
         // --- Pins (regression-locked branch decision) ---
         // EMISSION pins measure the WRITER and are unchanged by any verifier
-        // edit; SVT-4 VERDICT pins v3/v5 flipped with the J-5 refinement
-        // (S05 phase A, 2026-06-09): the substituted subsets carry accepted
+        // edit; Layer 8 VERDICT pins v3/v5 flipped with the font-acceptance
+        // refinement: the substituted subsets carry accepted
         // Courier/Menlo BaseFont names, so their writer-emitted CMaps are
-        // tolerated. Unaccepted BaseFonts still FAIL (re-pointed RT-4).
+        // tolerated. Unaccepted BaseFonts still FAIL.
         #expect(anyToUnicode(s1) == false,
                 "(1) explicit Courier + ASCII must NOT emit /ToUnicode (EXP-E5.1 re-confirm).")
-        #expect(v1 == false, "(1) SVT-4 must PASS on explicit Courier + ASCII.")
+        #expect(v1 == false, "(1) Layer 8 must PASS on explicit Courier + ASCII.")
         #expect(anyToUnicode(s3) == true,
                 "(3) auto-substituted fallback MUST emit /ToUnicode (writer emission, EXP-E6.1 mechanism).")
         #expect(v3 == false,
-                "(3) refined SVT-4 tolerates the substituted subsets' CMaps (accepted BaseFonts, J-5).")
+                "(3) the refined Layer 8 check tolerates the substituted subsets' CMaps (accepted BaseFonts).")
 
         // BRANCH DECISION = A: an EXPLICITLY-created accepted fallback (Menlo)
         // drawing glyphs IT COVERS emits NO /ToUnicode, and its advance is within
-        // SVT-1 tolerance — so the Layer-8 fix can live in the reconstructor
-        // (FIX-B) with SVT-4 and RT-4 untouched.
+        // Layer 6 tolerance — so the Layer-8 fix can live in the reconstructor
+        // (FIX-B) with the Layer 6 and Layer 8 checks untouched.
         #expect(anyToUnicode(s2) == false,
                 "(2) explicit Menlo + ASCII: no /ToUnicode → Branch A viable.")
-        #expect(v2 == false, "(2) SVT-4 must PASS on explicit Menlo + ASCII.")
+        #expect(v2 == false, "(2) Layer 8 must PASS on explicit Menlo + ASCII.")
         #expect(menloWithinTol,
-                "Menlo advance must be within SVT-1 tolerance (Branch A keeps Layer 6 passing).")
+                "Menlo advance must be within Layer 6 tolerance (Branch A keeps Layer 6 passing).")
 
         // COVERAGE GATE: the segmentation routes each grapheme by Courier coverage.
         // Latin-1 accents (é à ñ ü) are Courier-COVERED on iOS 26.4, so they stay in
@@ -179,28 +179,28 @@ struct ToUnicodeEmissionProbeTests {
         // clean for ASCII by scenario 2.)
         #expect(anyToUnicode(s4) == false,
                 "(4) coverage-aware segmentation keeps Courier-covered Latin-1 in Courier: no /ToUnicode.")
-        #expect(v4 == false, "(4) SVT-4 must PASS on the coverage-aware Latin-1 segmentation.")
+        #expect(v4 == false, "(4) Layer 8 must PASS on the coverage-aware Latin-1 segmentation.")
 
         // RESIDUAL: graphemes covered by NEITHER accepted family force a SECOND
         // CoreText substitution, so /ToUnicode persists even under the FIX-B
         // segmentation — the EXP-E6.2 mechanism (encoding-driven emission)
         // subsumed this observation and retired Branch A entirely. The
         // emitted subsets still carry accepted Courier/Menlo names, so the
-        // J-5-refined SVT-4 tolerates them (verdict pin below); the
+        // refined Layer 8 check tolerates them (verdict pin below); the
         // emission pin is writer behavior and stays.
         #expect(anyToUnicode(s5) == true,
                 "(5) segmentation of neither-covered glyphs: /ToUnicode persists (writer emission).")
         #expect(v5 == false,
-                "(5) refined SVT-4 tolerates the accepted-BaseFont subsets' CMaps (J-5).")
+                "(5) the refined Layer 8 check tolerates the accepted-BaseFont subsets' CMaps.")
     }
 
     private func round4(_ d: Double) -> Double { (d * 10000).rounded() / 10000 }
 }
 
-// MARK: - EXP-E6.2 (S04, 2026-06-09) — encoding-driven /ToUnicode
+// MARK: - EXP-E6.2 — encoding-driven /ToUnicode
 
-// S04 additions. EXP-E6.1's scenarios drew only simple-encodable content
-// (ASCII + MacRoman Latin-1), which bounded its conclusions: probe F
+// Additions to EXP-E6.1's scenarios, which drew only simple-encodable content
+// (ASCII + MacRoman Latin-1), bounding its conclusions: probe F
 // (RealDocProbeTests) measured the Branch-A segmented-explicit shape against
 // the REAL document and the /ToUnicode picture did not move. These probes
 // isolate the mechanism: CGPDFContext emits a /ToUnicode-bearing subset for
@@ -274,7 +274,7 @@ struct ToUnicodeEncodingProbeTests {
         print("U+00D7 courierCovered=\(d7Covered)")
         dump("(6a) explicit Courier + covered encoding-external U+00D7", s6a)
 
-        // (6c) U+2713 (✓) is Menlo-COVERED (S03 probe D); explicit Menlo —
+        // (6c) U+2713 (✓) is Menlo-COVERED; explicit Menlo —
         // the EXP-E6.1 scenario-2 shape, with encoding-external content.
         let m13Covered = covered("\u{2713}", menlo)
         let d6c = ToUnicodeProbe.pdf([("OK \u{2713}", 72, 700, menlo)])
@@ -293,10 +293,10 @@ struct ToUnicodeEncodingProbeTests {
         }
         print("===== END EXP-E6.2 =====")
 
-        // Pins (measured 2026-06-09, S04). Mechanism (b): the CMap follows
+        // Pins (measured 2026-06-09). Mechanism (b): the CMap follows
         // the writer's encoding capability, not CoreText substitution. This
         // bounds EXP-E6.1 scenarios 1/2/4 (simple-encodable content only)
-        // and is WHY the Branch-A shape cannot clear SVT-4 on the real
+        // and is WHY the Branch-A shape cannot clear the Layer 8 check on the real
         // document (probe F reproduces the baseline 20/23 exactly).
         #expect(d7Covered,
                 "U+00D7 must be Courier-covered so 6a isolates encoding from substitution.")

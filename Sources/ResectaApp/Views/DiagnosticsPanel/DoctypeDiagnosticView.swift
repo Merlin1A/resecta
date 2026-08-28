@@ -1,22 +1,22 @@
 import SwiftUI
 import RedactionEngine
 
-// W9 — "Document profile" disclosure wired into the search sheet's footer.
+// "Document profile" disclosure wired into the search sheet's footer.
 // Renders the DoctypeExplanation produced by DocumentTypeClassifier.explain
 // for the first scanned page text. Read-only diagnostic — no overrides,
 // no mutation.
 //
-// WU-07 (2026-05-09): adds a banner-style rendering used by
-// SearchResultsSection to surface the primary doctype + confidence
-// always-visibly above PII Scan results, with single-tap disclosure
-// for the gated-out detector count + per-category list.
+// Adds a banner-style rendering used by SearchResultsSection to surface
+// the primary doctype + confidence always-visibly above PII Scan
+// results, with single-tap disclosure for the gated-out detector count
+// + per-category list.
 
 struct DoctypeDiagnosticView: View {
 
-    /// WU-07: render style. `.footerChip` is the original W9
-    /// disclosure-only chip; `.banner(...)` promotes the primary doctype
-    /// + detector count into an always-visible row above the results
-    /// list with a dismiss button + disclosure tap.
+    /// Render style. `.footerChip` is the original disclosure-only
+    /// chip; `.banner(...)` promotes the primary doctype + detector
+    /// count into an always-visible row above the results list with a
+    /// dismiss button + disclosure tap.
     enum Style {
         case footerChip
         case banner(enabledPIICategories: Set<PIICategory>, onDismiss: () -> Void)
@@ -34,7 +34,7 @@ struct DoctypeDiagnosticView: View {
         }
     }
 
-    // MARK: - Footer chip (original W9 disclosure)
+    // MARK: - Footer chip (original disclosure)
 
     private var footerChipBody: some View {
         DisclosureGroup {
@@ -92,7 +92,7 @@ struct DoctypeDiagnosticView: View {
         }
     }
 
-    // MARK: - WU-07 Banner (always-visible above PII Scan results)
+    // MARK: - Banner (always-visible above PII Scan results)
 
     @ViewBuilder
     private func bannerBody(
@@ -167,7 +167,7 @@ struct DoctypeDiagnosticView: View {
         .padding(.top, ResectaTokens.Spacing.xxs)
     }
 
-    // MARK: - WU-07 Doctype-gating mirror
+    // MARK: - Doctype-gating mirror
     //
     // App-side mirror of the engine's private `runsDOB/runsNPI/runsDEA/
     // runsAccount` rules at `Packages/.../PIIDetector.swift:320-341`.
@@ -199,8 +199,8 @@ struct DoctypeDiagnosticView: View {
         case .dateOfBirth: return false
         case .npi: return !(doctype == .medical || doctype == .foia)
         case .dea: return doctype != .medical
-        // CND-10 (launch-fix-v2 S5): mirrors the broadened
-        // PIIDetector.runsAccount — court + generic added, .foia held.
+        // Mirrors the broadened PIIDetector.runsAccount — court +
+        // generic added, .foia held.
         case .account: return !(doctype == .financial || doctype == .medical
             || doctype == .court || doctype == .generic)
         // Mirrors PIIDetector.runsRoutingNumber.
@@ -220,10 +220,10 @@ struct DoctypeDiagnosticView: View {
     }
 }
 
-// MARK: - WU-07 Banner copy
+// MARK: - Banner copy
 //
-// Strings classified per §19. SAFE: "tuned for" describes the gating
-// rule the detectors apply, not an outcome promise. Kept off
+// Strings classified as safe: "tuned for" describes the gating rule
+// the detectors apply, not an outcome promise. Kept off
 // `Legal.xcstrings` because they are operational copy, not legal/
 // marketing copy. Audit acceptance rule:
 // disclosure copy must NOT make outcome promises about the gating

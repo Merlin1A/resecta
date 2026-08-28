@@ -5,16 +5,16 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// DRAW-5 — magic-wand select-by-similar-text UI tests.
+// Magic-wand select-by-similar-text UI tests.
 //
-// The DRAW-5 contract is:
+// The contract is:
 //   - Long-press on a detected OCR word surfaces a context menu item
 //     "Select all instances" gated on the OCR-word hit.
 //   - The action sets `RedactionState.pendingMagicWandRequest`, which
 //     the host (DocumentEditorView) consumes to open the search sheet
 //     pre-filled with the escaped term and `SearchOptions.exactMatch =
-//     true`. The apply path is the search origin of `applyFindings`
-//     (hard stop — no new apply method).
+//     true`. The apply path is the search origin of `applyFindings` —
+//     no new apply method is added.
 //   - All resulting matches default-select so the user can apply with
 //     one tap; this is driven by `SearchState.preselectIncomingResults`.
 //
@@ -26,10 +26,10 @@ import RedactionEngine
 //    request on `RedactionState`.
 // 3. End-to-end: when the magic-wand path drives the result list via
 //    `preselectIncomingResults` and the user applies, the result count
-//    maps 1:1 to created regions (the 4-page same-SSN acceptance from
-//    DRAW-5).
+//    maps 1:1 to created regions (the 4-page same-SSN acceptance
+//    fixture).
 
-@Suite("Magic Wand select-by-similar-text (DRAW-5)")
+@Suite("Magic Wand select-by-similar-text")
 @MainActor
 struct MagicWandUITests {
 
@@ -105,7 +105,7 @@ struct MagicWandUITests {
 
     @Test("Magic-wand request escapes regex specials at the call site")
     func testMagicWandRequestEscapesAtCallSite() {
-        // Plan §0.4: regex specials escape at the call site, not in the
+        // Regex specials escape at the call site, not in the
         // engine runtime. The static helper on RedactionOverlayView
         // pins this contract.
         let raw = "C++"

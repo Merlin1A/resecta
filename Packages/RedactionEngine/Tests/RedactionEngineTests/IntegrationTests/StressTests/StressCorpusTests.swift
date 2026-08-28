@@ -5,7 +5,7 @@ import Testing
 import os
 @testable import RedactionEngine
 
-// PERF-7 — Stress-corpus baseline test.
+// Stress-corpus baseline test.
 //
 // Builds the deterministic 500-page synthetic PDF, runs the engine
 // per-page rasterize pipeline against every page, captures wall-clock
@@ -14,19 +14,19 @@ import os
 // `stress-baseline.json` is present (the canonical path is
 // `Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/StressTests/stress-baseline.json`),
 // the test asserts the current run is within the wall-clock window
-// (20%, M2) and the peak-memory window (30%, CAT-222) — both only on
+// (20%) and the peak-memory window (30%) — both only on
 // the baseline's recorded machine. Memory's wider window reflects its
 // higher noise; on any machine other than the baseline's, both
-// comparisons are documentary (withKnownIssue + log print,
-// CAT-231), never failures.
+// comparisons are documentary (withKnownIssue + log print),
+// never failures.
 //
 // Note: This is a multi-minute run; not part of the default green-bar
 // suite. Run it locally via `make stress-baseline`, which rewrites
 // the committed JSON. There is no remote workflow.
 //
-// Mechanism-description language only (I6 §4 of shared-context):
-// no outcome-promise vocabulary in user-visible strings or comments —
-// the baseline is a regression guard, not a hard contract.
+// Mechanism-description language only: no outcome-promise vocabulary
+// in user-visible strings or comments — the baseline is a regression
+// guard, not a hard contract.
 
 // Tag dedicated to long-running stress workloads. Defined inline here
 // rather than in `Fixtures/TestHelpers.swift` so future tag additions
@@ -38,7 +38,7 @@ extension Tag {
     @Tag static var stress: Self
 }
 
-@Suite("PERF-7 Stress Corpus")
+@Suite("Stress Corpus")
 struct StressCorpusTests {
 
     /// Smoke test — fast (a single ~500-page write, no rasterization).
@@ -96,8 +96,8 @@ struct StressCorpusTests {
         let clockStart = ContinuousClock.now
 
         // Two regions per page — header label + body block. These
-        // exercise the fill + verify path that PERF-5 / PERF-6 will
-        // optimise. Keeping them constant per page means the baseline
+        // exercise the fill + verify path a planned optimisation pass
+        // will touch. Keeping them constant per page means the baseline
         // is reproducible from `(pageCount, seed)` alone.
         let perPageRegions: [RedactionRegion] = [
             RedactionRegion(
@@ -125,7 +125,7 @@ struct StressCorpusTests {
                                  // at this DPI.
                 pipelineMode: .secureRasterization,
                 rotation: page.rotation,
-                // CAT-127: rasterize() now reads the pre-extracted geometry + CG page.
+                // rasterize() now reads the pre-extracted geometry + CG page.
                 cropBoxBounds: page.bounds(for: .cropBox),
                 cgPage: page.pageRef,
                 hasText: false
@@ -172,8 +172,7 @@ struct StressCorpusTests {
         if let baseline = loadCommittedBaseline() {
             let delta = (result.wallClockSeconds - baseline.wallClockSeconds)
                 / max(baseline.wallClockSeconds, 0.0001)
-            // M2 widened the perf budget from 10% to 20% per plan
-            // §2 locked-decision (Performance). Wall-clock target on the
+            // The perf budget widened from 10% to 20%. Wall-clock target on the
             // recorded machine: ≤ 1.2 × baseline. The window is one-sided
             // (a substantial speedup is worth a fresh baseline but does
             // not fail the test).
@@ -183,7 +182,7 @@ struct StressCorpusTests {
             // baseline machines disagree the wall-clock comparison is
             // documentary — re-derive the budget from a fresh baseline
             // on the current machine before treating a regression as
-            // load-bearing. See plan §7 ("Machine pinning").
+            // load-bearing.
             let currentMachine = MachineSpec.current()
             let sameMachine = baseline.machine?.matches(currentMachine) ?? false
             if sameMachine {
@@ -191,7 +190,7 @@ struct StressCorpusTests {
                     delta < 0.20,
                     "Wall-clock regressed by \(Int(delta * 100))% vs baseline (current=\(result.wallClockSeconds)s baseline=\(baseline.wallClockSeconds)s)"
                 )
-                // CAT-222: memory regression window, asserted only on the
+                // Memory regression window, asserted only on the
                 // baseline's recorded machine (same gating logic as the
                 // wall-clock window — cross-machine memory numbers are not
                 // comparable, and the GitHub runner never matches by
@@ -209,7 +208,7 @@ struct StressCorpusTests {
                     )
                 }
             } else {
-                // CAT-231: these branches previously called Issue.record
+                // These branches previously called Issue.record
                 // directly, which in Swift Testing marks the test FAILED —
                 // so every run on a machine that did not match the
                 // committed baseline (every GitHub-hosted runner) failed
@@ -224,7 +223,7 @@ struct StressCorpusTests {
                 } else {
                     detail = "Baseline JSON predates the machine schema; current wall-clock=\(result.wallClockSeconds)s — refresh the baseline with `make stress-baseline` on this machine."
                 }
-                withKnownIssue("Machine mismatch — baseline comparison is documentary (CAT-231)") {
+                withKnownIssue("Machine mismatch — baseline comparison is documentary") {
                     Issue.record(Comment(rawValue: detail))
                 }
                 print("[stress documentary] wall-clock delta vs baseline: \(Int(delta * 100))% (current=\(result.wallClockSeconds)s baseline=\(baseline.wallClockSeconds)s; peakMemory current=\(result.peakMemoryBytes)B baseline=\(baseline.peakMemoryBytes)B)")
@@ -285,7 +284,7 @@ struct StressCorpusTests {
 /// committed baseline. The committed file is intentionally tiny —
 /// CI diffs and regression-window math operate on these fields only.
 ///
-/// M2 added the `machine` block (plan §7 "Machine pinning"): the 20%
+/// The `machine` block records hardware/toolchain context: the 20%
 /// wall-clock budget is "of the recorded baseline on the recorded
 /// machine"; if the comparison machine differs from the baseline's
 /// machine, the comparison is documentary and the operator should
@@ -297,8 +296,9 @@ struct StressResult: Codable, Sendable {
     let seed: UInt64
     let recordedAtISO8601: String
     /// Hardware / toolchain context for the run. Optional for
-    /// backward compatibility with pre-M2 baselines (the `nil` case
-    /// reports a documentary Issue and skips the regression assertion).
+    /// backward compatibility with baselines recorded before this field
+    /// existed (the `nil` case reports a documentary Issue and skips the
+    /// regression assertion).
     let machine: MachineSpec?
 
     init(
@@ -324,7 +324,6 @@ struct StressResult: Codable, Sendable {
 /// The `osVersion` and `xcodeVersion` fields are documentary; an OS
 /// or Xcode bump on the same hardware does not invalidate the
 /// baseline (the regression window absorbs minor toolchain drift).
-/// See plan §7.
 struct MachineSpec: Codable, Sendable, Equatable {
     let deviceModel: String
     let deviceClass: String

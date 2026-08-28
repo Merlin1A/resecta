@@ -2,11 +2,11 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// A6 / G4 — NegativeContextGazetteer loader tests. Existing suppression-
+// NegativeContextGazetteer loader tests. Existing suppression-
 // behaviour coverage lives in `NegativeContextInstitutionAnchorTests`
-// inside `InstitutionGazetteerTests.swift`; this file scopes the W-O
-// loader-version-fence + resource-missing surfaces that the followers
-// chain added when the loader gained a `LoaderError` enum + throwing init.
+// inside `InstitutionGazetteerTests.swift`; this file scopes the
+// loader-version-fence + resource-missing surfaces added when the
+// loader gained a `LoaderError` enum + throwing init.
 
 // MARK: - Fixture bundle helper
 
@@ -30,7 +30,7 @@ private func makeNegCtxBundle(entriesJSON: String) throws -> (bundle: Bundle, ba
     return (bundle, tempBase)
 }
 
-@Suite("NegativeContextGazetteer loader (A6 / G4)")
+@Suite("NegativeContextGazetteer loader")
 struct NegativeContextGazetteerTests {
 
     @Test("Empty bundle throws resourceMissing")
@@ -40,7 +40,7 @@ struct NegativeContextGazetteerTests {
         }
     }
 
-    // MARK: - Suppression-weight semantics (S3 fix, design §1)
+    // MARK: - Suppression-weight semantics
 
     /// (a) Weak keyword match in a bucket containing a strong keyword → suppresses
     /// at the WEAK weight, not the bucket max.
@@ -123,7 +123,7 @@ struct NegativeContextGazetteerTests {
         #expect(factor == 1.0, "no match → factor must be exactly 1.0, got \(factor)")
     }
 
-    @Test("Version-fence rejects out-of-range version (W-O)")
+    @Test("Version-fence rejects out-of-range version")
     func versionFenceRejectsOutOfRange() throws {
         let tempBase = FileManager.default.temporaryDirectory
             .appending(path: "wo-followers-negctx-\(UUID().uuidString)", directoryHint: .isDirectory)

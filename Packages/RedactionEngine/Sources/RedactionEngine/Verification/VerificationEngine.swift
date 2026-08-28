@@ -8,17 +8,16 @@ import UIKit  // PDFPage.thumbnail(of:for:) returns UIImage
 import AppKit  // macOS tooling destination: thumbnail returns NSImage
 #endif
 
-// ENGINE §6.1–§6.9 — Verification engine with 5 base layers
+// Verification engine with 5 base layers
 // (+ 3 sandwich-specific in Phase 7; +Layer 9 lineage in M1; +Layer 10
 // operator re-extraction in M3 — Searchable only, total 10).
 
 /// Stateless verification engine. Runs individual layers on output PDFs.
-/// See ENGINE §6.7a for the public API contract.
 public struct VerificationEngine: Sendable {
 
-    /// Confidence threshold for Layer 2 OCR check (ENGINE §6.2).
+    /// Confidence threshold for Layer 2 OCR check.
     /// 0.50 is standard for text recognition — reduces noise from bitmap
-    /// artifacts while still catching leaked text.
+    /// artifacts while still detecting leaked text.
     private static let ocrConfidenceThreshold: Float = 0.50
 
     /// FAIL confidence gate for a sensitive-term-in-region hit.
@@ -28,7 +27,7 @@ public struct VerificationEngine: Sendable {
     private static let sensitiveTermFailConfidenceThreshold: Float = ocrConfidenceThreshold
 
     /// Minimum fraction of an OCR word/line box that must lie inside a redacted
-    /// region for the hit to count as "in region" (ENGINE §6.2). Replaces the
+    /// region for the hit to count as "in region". Replaces the
     /// prior any-overlap test (`CGRect.intersects`), under which the bounding box
     /// of an adjacent still-visible word clipping a mid-line region's edge by a
     /// sliver counted as in-region. In Secure Rasterization the region is painted
@@ -38,7 +37,7 @@ public struct VerificationEngine: Sendable {
     /// region edge is neighbouring text. A real paint miss leaves glyphs
     /// substantially inside the region (fraction → 1.0, still a FAIL); an
     /// edge-clipping sliver is a small fraction (≪ 0.5) and is dropped. Threshold
-    /// is inclusive (`>=`). See 00-DIAGNOSIS / 01-FIX (2026-06-25).
+    /// is inclusive (`>=`).
     private static let inRegionCoverageThreshold: CGFloat = 0.5
 
     /// Bounded width for the Layer-2 OCR task group. Vision's own
@@ -47,7 +46,7 @@ public struct VerificationEngine: Sendable {
     /// var` purely so the wall-clock acceptance gate can measure width-1 (serial)
     /// against width-3 on the one production code path — production never mutates
     /// it (the perf test is `.serialized` + `.disabled`, run on demand alone).
-    /// S3 rider: the width bounds pages-resident memory and the overlap of
+    /// The width bounds pages-resident memory and the overlap of
     /// extraction/sampling/classification; the Vision perform itself is
     /// serialized on `visionPerformQueue` (see `layer2OCRHits`), so width no
     /// longer multiplies concurrent Vision sync-waits.
@@ -69,10 +68,10 @@ public struct VerificationEngine: Sendable {
     /// concurrency). Nil in production — the `?.` invocation below compiles to a
     /// no-op. `VerificationEngine` is a value type, so set this on the verifier
     /// value BEFORE passing it into `collectParallelBaseLayerResults`; the
-    /// per-task copies the fan-out makes each carry the closure (ADV-2 A2-10).
+    /// per-task copies the fan-out makes each carry the closure.
     public var onRunLayerDispatch: (@Sendable (Int, ObjectIdentifier) -> Void)?
 
-    /// Total layer count for a given pipeline mode (R4: never hardcoded).
+    /// Total layer count for a given pipeline mode (never hardcoded).
     public func layerCount(for mode: PipelineMode) -> Int {
         switch mode {
         case .secureRasterization: 5
@@ -81,7 +80,6 @@ public struct VerificationEngine: Sendable {
     }
 
     /// Human-readable name for the layer at the given index.
-    /// See ENGINE §6.8 for SF Symbol mapping.
     public func layerName(at index: Int) -> String {
         switch index {
         case 0: "Text Extraction"
@@ -98,7 +96,7 @@ public struct VerificationEngine: Sendable {
         }
     }
 
-    /// SF Symbol name for the layer (ENGINE §6.8).
+    /// SF Symbol name for the layer.
     public func layerSymbol(at index: Int) -> String {
         switch index {
         case 0: "doc.text.magnifyingglass"
@@ -116,7 +114,6 @@ public struct VerificationEngine: Sendable {
     }
 
     /// Run a single verification layer.
-    /// See ENGINE §6.7a for parameter documentation.
     @concurrent
     public func runLayer(
         _ layerIndex: Int,
@@ -128,7 +125,7 @@ public struct VerificationEngine: Sendable {
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode]
     ) async -> LayerResult {
-        // R4 / CLAUDE.md §49: the valid layer-index range is mode-dependent
+        // The valid layer-index range is mode-dependent
         // (5 for .secureRasterization, 10 for .searchableRedaction). A
         // silent .pass on an out-of-range index would let caller bugs
         // masquerade as verification success. Fail fast instead.
@@ -152,7 +149,7 @@ public struct VerificationEngine: Sendable {
         // 10) — threaded into LayerResult.reviewTermTexts; nil elsewhere.
         var layerReviewTerms: [String]? = nil
 
-        // PERF-8 / CANCEL-001..007: Each layer method calls
+        // Each layer method calls
         // `try Task.checkCancellation()` on entry (and within long inner
         // loops for layers that walk many pages or characters). A
         // CancellationError thrown from a layer is converted below into a
@@ -187,7 +184,7 @@ public struct VerificationEngine: Sendable {
                 layerPageReferences = pages
             case 4:
                 status = try runLayer5Metadata(doc)
-            // Layers 6–10: Sandwich-specific (ENGINE §6.6)
+            // Layers 6–10: Sandwich-specific.
             // Only run for Searchable Redaction pages.
             case 5:
                 let (s5, pages5) = try await runLayer6SpatialVerification(
@@ -213,10 +210,10 @@ public struct VerificationEngine: Sendable {
                 status = s8
                 layerPageReferences = pages8
             case 9:
-                // Layer 10 (ENGINE §6.6 SVT-5) — operator-semantic re-extraction.
+                // Layer 10 — operator-semantic re-extraction.
                 // Independent of `regions`, `perPageModes`, `filterDigests`, and
                 // `sourcePageCount`: walks the output content streams directly.
-                // Pairs with Layer 3 SVT-3 as a two-decoder cross-check.
+                // Pairs with Layer 3 as a two-decoder cross-check.
                 let l10 = await sandwichVerifier.verifyTextOperatorSemantics(
                     outputDocument: outputDocument,
                     sensitiveTerms: sensitiveTerms
@@ -301,7 +298,7 @@ public struct VerificationEngine: Sendable {
         )
     }
 
-    /// Aggregate per-layer results into overall status (ENGINE §6.7).
+    /// Aggregate per-layer results into overall status.
     /// Any FAIL → overall FAIL. Else any ATTENTION → overall ATTENTION
     /// (un-redacted residual text — user-recoverable, so it outranks notes
     /// but never masks an output defect). Else any WARN → overall WARN.
@@ -342,7 +339,7 @@ public struct VerificationEngine: Sendable {
         return .pass
     }
 
-    // MARK: - Layer 1: Text Extraction (ENGINE §6.1)
+    // MARK: - Layer 1: Text Extraction
 
     /// Returns (status, affectedPages). Page-level findings (selectable text,
     /// annotations) are accumulated across ALL pages — not returned at the
@@ -353,11 +350,11 @@ public struct VerificationEngine: Sendable {
         _ doc: PDFDocument,
         pipelineMode: PipelineMode
     ) throws -> (VerificationStatus, [Int]?) {
-        // PERF-8 / CANCEL-001: entry-level cooperative cancellation.
+        // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         var selectableTextPages: [Int] = []
         var annotationPages: [Int] = []
-        // VQ-23: pages PDFKit cannot open were previously skipped silently and
+        // Pages PDFKit cannot open were previously skipped silently and
         // folded into a clean PASS. Collect them; when the layer would
         // otherwise PASS, they surface as a WARN (Layer 10's per-page
         // unavailability shape). Real leaks below still outrank the WARN.
@@ -415,7 +412,7 @@ public struct VerificationEngine: Sendable {
             return (.fail("Form fields found in output"), nil)
         }
 
-        // VQ-23: no leak reported, but some pages were never inspected —
+        // No leak reported, but some pages were never inspected —
         // an honest WARN, not a clean PASS.
         if !unreadablePages.isEmpty {
             return (unreadablePagesWarn(unreadablePages), unreadablePages)
@@ -423,7 +420,7 @@ public struct VerificationEngine: Sendable {
         return (.pass, nil)
     }
 
-    // MARK: - Layer 2: OCR on Output (ENGINE §6.2)
+    // MARK: - Layer 2: OCR on Output
 
     /// A single Layer-2 OCR observation, reduced to a plain value type so the
     /// classification logic is unit-testable without Vision. Boxes are normalized
@@ -456,7 +453,7 @@ public struct VerificationEngine: Sendable {
     struct OCRHit: Sendable {
         /// Line-level observation box; the conservative intersection fallback.
         let box: CGRect
-        /// Per-word boxes when obtainable (ADV-2 A2-3); empty → use `box`.
+        /// Per-word boxes when obtainable; empty → use `box`.
         let wordBoxes: [CGRect]
         /// Top-candidate recognized string, for sensitive-term matching.
         let text: String?
@@ -495,7 +492,7 @@ public struct VerificationEngine: Sendable {
     /// can never fold to a clean PASS. `sensitiveTermOutsideRegions` marks a page where a sensitive term
     /// is readable OUTSIDE every region. `pageBucket(for:effectiveMode:)`
     /// folds it to the generic outside-regions bucket on BOTH page modes
-    /// (D-86 / RW-F-002(b) de-escalation: out-of-region content is the page's
+    /// (out-of-region content is the page's
     /// own un-redacted text — an occurrence the user left unredacted or
     /// detection missed — so the raster arm reads informational; Searchable
     /// pages' text layer is owned by Layers 3/10 either way). The distinct
@@ -509,7 +506,7 @@ public struct VerificationEngine: Sendable {
         case none
     }
 
-    /// ADV-2 A2-4: build the Layer-2 region set through the SAME K3.1 sliver
+    /// Builds the Layer-2 region set through the SAME sliver
     /// predicate the fill path uses (`PipelineCoordinator.buildPDFPageData`):
     /// drop regions with `normalizedRect.width/height <= 0.001`, clamp survivors.
     /// Painter and verifier then see one region set — a sub-threshold sliver the
@@ -553,7 +550,7 @@ public struct VerificationEngine: Sendable {
         pageRegions: [RedactionRegion],
         sensitiveTerms: [SensitiveTerm]
     ) -> PageOCRFinding {
-        // ADV-2 A2-3: mirror Layer 3's length filter (shared
+        // Mirrors Layer 3's length filter (shared
         // `AhoCorasick.isSearchableTerm`). The memo's "filtered upstream ≥4"
         // cited spec text, not code — this helper receives raw terms.
         let validTerms = sensitiveTerms.filter { AhoCorasick.isSearchableTerm($0.text) }
@@ -564,7 +561,7 @@ public struct VerificationEngine: Sendable {
         var sawTextOutsideRegions = false
 
         for hit in hits {
-            // ADV-2 A2-3: intersect WORD-level boxes when obtainable so a line
+            // Intersect WORD-level boxes when obtainable so a line
             // observation spanning a filled region (e.g. "John █████ Doe") does
             // not false-intersect on the survivors; fall back to the line box.
             // Part A: `boxFill` is index-parallel to these boxes (empty ⇒ unknown).
@@ -623,7 +620,7 @@ public struct VerificationEngine: Sendable {
             // in-region FAIL above): the term the user redacted is still readable
             // somewhere on the page. Signal only — `pageBucket(for:effectiveMode:)`
             // folds it to the generic outside bucket on both page modes
-            // (D-86 / RW-F-002(b); see PageOCRFinding doc).
+            // (see the `PageOCRFinding` cases above).
             if hitHasOutOfRegionBox,
                hit.confidence >= sensitiveTermFailConfidenceThreshold,
                let text = hit.text,
@@ -713,7 +710,7 @@ public struct VerificationEngine: Sendable {
     /// Fraction of `box` that lies inside `region` (both in identity space, 0–1
     /// bottom-left). Returns 0 when the rectangles are disjoint or `box` is
     /// degenerate (zero area). Used by `classifyPageOCR` to require meaningful
-    /// containment instead of an any-overlap edge touch (ENGINE §6.2; see
+    /// containment instead of an any-overlap edge touch (see
     /// `inRegionCoverageThreshold`). `static` so the coverage math has a direct
     /// unit test.
     static func coverageFraction(of box: CGRect, inside region: CGRect) -> CGFloat {
@@ -737,7 +734,7 @@ public struct VerificationEngine: Sendable {
     // band or trips the outlier floor, so it is KEPT; and a demoted box still
     // yields at least an informational note in Verification Details (it can never
     // produce a silent clean PASS). Thresholds were landed at the original
-    // strict values in S2 and FINALIZED UNCHANGED by the S3 adversarial battery
+    // strict values and finalized unchanged by an adversarial battery
     // (`Layer2FillGuardBatteryTests`, iOS 26.4): the real drivers measure
     // byte-exact fill (1.000 / 0.000 / maxDev ≤ 0.012) while every readable-leak
     // class the battery could surface through Vision holds a wide margin on at
@@ -745,18 +742,17 @@ public struct VerificationEngine: Sendable {
     // 2026-07-09): the demotion folds to an informational note — visible in
     // Verification Details, never affecting pass/fail — on BOTH page modes; any
     // further promotion of provable tier-1 boxes (e.g. suppressing the note
-    // entirely) is a policy change reserved to Jesse.
-    // See plans/resecta-partA-verifier-guard-2026-06-27/.
+    // entirely) would be a policy change, not a tuning.
 
     /// Δ_fill — full-RGB (per-channel Chebyshev) distance within which a pixel is
     /// "essentially the fill colour"; generous enough to absorb JPEG q0.92 noise
-    /// on a solid bar. 0…1. S3 band pin: a uniform dev-0.149 field still counts
+    /// on a solid bar. 0…1. Measured: a uniform dev-0.149 field still counts
     /// as fill, dev-0.1725 does not (battery `propertyFloors_pure`).
     private static let fillDistance: CGFloat = 0.16
     /// Δ_contrast — distance at/over which a pixel counts as readable contrast.
     /// MUST be ≤ `fillDistance` (asserted in `isFillConsistent`) so the bands are
     /// complementary — no dead zone a pale-but-readable stroke can hide in. Set
-    /// below the readability JND and above JPEG noise. 0…1. S3 margins: the
+    /// below the readability JND and above JPEG noise. 0…1. Measured: the
     /// palest Vision-readable ink the battery measured deviates ≥ 0.176
     /// (gray-45 on black; pale-on-white F-WEBER ink deviates ≈ 0.18 with its
     /// loose-band break only at a hypothetical Δ_contrast ≥ 44/255 ≈ 0.173 —
@@ -766,7 +762,7 @@ public struct VerificationEngine: Sendable {
     /// F_min — minimum in-region-portion fill fraction for a box to be a demotion
     /// candidate (efficacy floor). Because `contrastFraction >= 1 - fillFraction`
     /// (every non-fill pixel is a contrast pixel, given Δ_contrast ≤ Δ_fill),
-    /// demotion already implies `fillFraction >= 1 - contrastCeil`. S3 margins:
+    /// demotion already implies `fillFraction >= 1 - contrastCeil`. Measured:
     /// real drivers fill = 1.000 (margin 0.03 above); the fullest readable-leak
     /// box measured 0.938 (gray-45) — 0.032 below the floor. The battery's
     /// chroma×hairline probe (blue-115 ultralight, below Vision's `.fast`
@@ -776,14 +772,14 @@ public struct VerificationEngine: Sendable {
     /// demotion region by any ink class.
     private static let fillFloor: CGFloat = 0.97
     /// C_max — maximum readable-contrast fraction for a demotion candidate
-    /// (≤ 0.03 by charter). The binding safety constraint. S3 margins: drivers
+    /// (≤ 0.03 by charter). The binding safety constraint. Measured: drivers
     /// contrast = 0.000; the faintest readable-leak contrast measured 0.096
     /// (hairline ultralight digits) — 3.2× the ceiling, and that box is also
     /// refused by the fill floor (0.906) and the outlier floor (maxDev 0.986).
     private static let contrastCeil: CGFloat = 0.03
     /// Recall-floor invariant: a box with at least this much readable contrast is
     /// NEVER excluded, regardless of `fillFraction`. Structural — it holds even if
-    /// `contrastCeil` were later loosened past it. Cannot be tuned away. S3: the
+    /// `contrastCeil` were later loosened past it. Cannot be tuned away. The
     /// battery's readable-leak contrast spans 0.096–0.995; the 0.096 hairline
     /// row rides the composed fill/outlier floors (see `contrastCeil`), every
     /// other class clears this floor outright.
@@ -791,7 +787,7 @@ public struct VerificationEngine: Sendable {
     /// Outlier floor: a single pixel this far (full-RGB) from the fill is
     /// "definitely ink" (the dark/contrasting core of a real glyph, including
     /// coloured ink whose luminance ≈ the fill) and blocks exclusion. 0…1.
-    /// S3 margins: drivers maxDev ≤ 0.012 (0.488 below); hairline/reverse-video
+    /// Measured: drivers maxDev ≤ 0.012 (0.488 below); hairline/reverse-video
     /// rims measure 0.867–1.000 (≥ 0.367 above); navy-on-black chroma ink
     /// (dev 0.338–0.455) sits under this floor and is carried by the recall
     /// floor instead — the floors compose per class.
@@ -807,7 +803,7 @@ public struct VerificationEngine: Sendable {
     /// floor). Measured necessary on iOS 26.4: without it, boundary ringing spikes
     /// maxDeviation to ~1.0 on the narrow drivers (box flush with the rect edge,
     /// no overhang to clip) and blocks their demotion; with a 2 px trim every
-    /// fixture driver demotes and the recall ink is still KEPT. S3 tiny-strip
+    /// fixture driver demotes and the recall ink is still KEPT. Tiny-strip
     /// probes (battery `rider_insetTinyStrips`): interior hairline ink 2 px
     /// inside the sample edge survives the trim (contrast 0.125, maxDev 1.0 →
     /// KEPT); a 3 px strip collapses the inset and the un-inset fallback keeps
@@ -849,7 +845,7 @@ public struct VerificationEngine: Sendable {
     /// probe. `fill` is the calibrated fill colour in 0…1 per channel. Distance is
     /// the per-channel Chebyshev (max |Δ| over R,G,B), so a coloured glyph whose
     /// luminance ≈ the fill still reads as contrast. `static` + buffer-pointer
-    /// based so the pixel math is directly unit-testable without Vision (§3b).
+    /// based so the pixel math is directly unit-testable without Vision.
     static func boxFillSample(
         box: CGRect,
         rgba: UnsafePointer<UInt8>,
@@ -987,7 +983,7 @@ public struct VerificationEngine: Sendable {
     /// the region it overlaps most (by area). Only the
     /// single coordinate-trusted page image is sampled. On any failure the hits are
     /// returned unchanged (empty boxFill ⇒ the classifier excludes nothing). The
-    /// buffer is zeroized on exit (SEC-5) so output pixels do not linger in heap.
+    /// buffer is zeroized on exit so output pixels do not linger in heap.
     static func enrichWithFillSamples(
         _ hits: [OCRHit],
         image: CGImage,
@@ -1034,7 +1030,7 @@ public struct VerificationEngine: Sendable {
                 guard let chosen = best else {
                     return BoxFillSample(fillFraction: 0, contrastFraction: 1, maxDeviation: 1)
                 }
-                // OPTION A (Jesse-approved 2026-06-28): decide fill-consistency on the
+                // Fill-consistency is classified against the
                 // verifyFill-proven IN-REGION portion (box ∩ region-rect), NOT the whole
                 // box. On-device measurement (iOS 26.4) falsified the original whole-box
                 // assumption — Vision's hallucination boxes STRADDLE the bar edge into
@@ -1046,7 +1042,7 @@ public struct VerificationEngine: Sendable {
                 // the ORIGINAL floors (no threshold loosening). The classifier still uses
                 // the WHOLE box for the in-region COVERAGE decision; only this fill SAMPLE
                 // is clipped. Residual: a contrived edge-straddle LEAK demotes to WARN,
-                // never a clean PASS — the precision-only bar holds (S3 may route the
+                // never a clean PASS — the precision-only bar holds (the verifier may route the
                 // out-of-rect portion to the out-of-region WARN).
                 let raw = box.intersection(chosen.rect)
                 guard !raw.isNull, !raw.isEmpty else {
@@ -1069,7 +1065,7 @@ public struct VerificationEngine: Sendable {
         }
     }
 
-    /// Per-word normalized boxes for a recognized line (ADV-2 A2-3), mirroring
+    /// Per-word normalized boxes for a recognized line, mirroring
     /// `DetectionOrchestrator.extractWordBounds` (`.byWords` + `boundingBox(for:)`).
     /// Returns `[]` when no word box is obtainable — the caller then falls back
     /// to the conservative line-level box.
@@ -1095,7 +1091,7 @@ public struct VerificationEngine: Sendable {
         case sensitiveTermInRegion
         // Split per page mode: a readable in-region hit on a rasterized page is
         // a leak regardless of term match (the region holds no readable text by
-        // construction — D08-F2), even when the DOCUMENT ran in Searchable mode
+        // construction), even when the DOCUMENT ran in Searchable mode
         // and only this page fell back to rasterization. The fold FAILs the
         // secure-raster list and keeps the Searchable list on the existing WARN.
         case textInRegionSecureRaster
@@ -1130,7 +1126,7 @@ public struct VerificationEngine: Sendable {
         let effectiveMode: PipelineMode
     }
 
-    /// S3 (Part A rider): the verifier's one Vision seam. `VNImageRequestHandler
+    /// The verifier's one Vision seam. `VNImageRequestHandler
     /// .perform()` is synchronous and dispatches internally onto a
     /// capacity-controlled Vision queue; called from cooperative-pool threads
     /// (the Layer-2 task group below) it BLOCKS those threads inside Vision's
@@ -1142,7 +1138,7 @@ public struct VerificationEngine: Sendable {
     /// (they await a continuation instead of blocking) and Vision sees at most
     /// one verifier request at a time. Page extraction and classification still
     /// overlap under the task group; Vision parallelizes internally within a
-    /// request. (F2-8 precedent in `DetectionOrchestrator.runOCR` — acceptable
+    /// request. (The same pattern applies in `DetectionOrchestrator.runOCR` — acceptable
     /// there because detection's page loop is sequential; the Layer-2 group is
     /// not.) The queue declares NO QoS of its own: each block runs at the
     /// submitting task's propagated QoS, matching the pre-queue semantics where
@@ -1225,12 +1221,12 @@ public struct VerificationEngine: Sendable {
             // textInRegion WARN path above.
             return .fillArtifactInRegion
         case .sensitiveTermOutsideRegions:
-            // D-86 / RW-F-002(b): a term readable outside every region is the
+            // A term readable outside every region is the
             // page's own un-redacted content — an occurrence the user left
             // unredacted or detection missed — and the output is exactly as
             // redacted. Both page modes fold it to the generic outside
             // bucket, whose secure-raster arm reads informational ("expected
-            // for this mode") — the certified record posture (08B A18).
+            // for this mode").
             // In-region survivors still FAIL above; Searchable pages' text
             // layer is owned by Layers 3/10 either way.
             return .textOutsideRegionsOnly
@@ -1245,7 +1241,7 @@ public struct VerificationEngine: Sendable {
     /// result into a single Layer-2 bucket. No PDFKit — so the bounded task group
     /// runs pages concurrently. Mirrors the per-page body of the original
     /// sequential loop exactly; only the dispatch shape changed. The Vision
-    /// perform itself hops to the serial `visionPerformQueue` (S3 rider — see
+    /// perform itself hops to the serial `visionPerformQueue` (see
     /// `layer2OCRHits`) so no cooperative-pool thread blocks inside Vision.
     private static func classifyPageImages(
         _ work: PageOCRWork,
@@ -1253,9 +1249,9 @@ public struct VerificationEngine: Sendable {
     ) async throws -> PageOutcome {
         // Run OCR on EVERY image with the FROZEN verificationLayer2 preset
         // (.fast, no language correction) at the moderate confidence threshold
-        // (ENGINE §6.2) — 0.50 reduces bitmap-artifact noise while detecting
-        // leaked text; Layers 1 and 3 give independent coverage. The S8 OCR
-        // program must not retune the verifier. An OCR error on ANY of the
+        // — 0.50 reduces bitmap-artifact noise while detecting
+        // leaked text; Layers 1 and 3 give independent coverage. Later OCR
+        // tuning work must not retune the verifier. An OCR error on ANY of the
         // page's images means the page was not fully checked — fold it into the
         // `.unchecked` WARN rather than letting the missing image read as clean.
         var hits: [OCRHit] = []
@@ -1303,7 +1299,7 @@ public struct VerificationEngine: Sendable {
         sensitiveTerms: [SensitiveTerm],
         perPageModes: [PipelineMode]
     ) async throws -> (VerificationStatus, [Int]?) {
-        // PERF-8 / CANCEL-001: entry-level cooperative cancellation, plus a
+        // Entry-level cooperative cancellation, plus a
         // per-page check inside the OCR loop. A 50-page OCR pass that does
         // not check until layer return would exceed the 50 ms p95
         // cancel→surrender budget by ~180×.
@@ -1337,7 +1333,7 @@ public struct VerificationEngine: Sendable {
 
             // Phase 1 — sequential extraction on this task. A page with no
             // extractable image is bucketed `.unchecked` here and never enters the
-            // OCR group. VQ-23: a page PDFKit cannot open (or with no CGPDFPage
+            // OCR group. A page PDFKit cannot open (or with no CGPDFPage
             // backing) is bucketed `.unchecked` too — it was never OCR-checked,
             // and the prior silent `continue` let it read as clean.
             var chunkWork: [PageOCRWork] = []
@@ -1362,7 +1358,7 @@ public struct VerificationEngine: Sendable {
                 }
                 var images = extraction.images
 
-                // Identity contract (C-B binding §3 / ADV-2 A2-1): Vision's
+                // Identity contract (C-B binding): Vision's
                 // normalized observation coordinates equal page-normalized
                 // coordinates ONLY for a single full-page image. With multiple
                 // image XObjects, per-image Vision space does not map to page space.
@@ -1411,7 +1407,7 @@ public struct VerificationEngine: Sendable {
                 // identity contract above is unaffected by the resize.
                 let ocrImages = images.map(Self.downsampleForOCR)
 
-                // ADV-2 A2-4: scope against the SAME region set the fill path used.
+                // Scope against the SAME region set the fill path used.
                 let pageRegions = Self.layer2RegionSnapshot(regions[i] ?? [])
                 chunkWork.append(PageOCRWork(
                     page: i + 1,
@@ -1428,7 +1424,7 @@ public struct VerificationEngine: Sendable {
                 ) { group in
                     for work in chunkWork {
                         group.addTask {
-                            // PERF-8: per-page cooperative cancellation inside the
+                            // Per-page cooperative cancellation inside the
                             // group body — the discipline the sequential loop kept
                             // at the top of each iteration now lives here.
                             try Task.checkCancellation()
@@ -1480,7 +1476,7 @@ public struct VerificationEngine: Sendable {
         let pagesWithUnmappableImages = pages(in: .unmappable)
         let uncheckedPages = pages(in: .unchecked)
 
-        // ARCH §12.2: page numbers only, never document content, in any message.
+        // Page numbers only, never document content, in any message.
         // Priority fold: FAIL (term in region) > FAIL/WARN (text in region, by
         // the page's own mode) > WARN (unmappable) > INFO (Part A fill artifact
         // in region) > INFO (text only outside regions) > unchecked WARN >
@@ -1491,7 +1487,7 @@ public struct VerificationEngine: Sendable {
         // (fill artifact > generic outside text); the unchecked arm keeps its
         // long-standing position below the expected-state notes. The dedicated
         // sensitive-term-outside WARN arm is de-escalated into the outside-text
-        // informational (D-86 / RW-F-002(b) — `pageBucket(for:effectiveMode:)`
+        // informational (`pageBucket(for:effectiveMode:)`
         // folds that finding generic); the classifier-level signal remains in
         // `PageOCRFinding`.
         if !pagesWithSensitiveTermInRegion.isEmpty {
@@ -1502,7 +1498,7 @@ public struct VerificationEngine: Sendable {
             return (.fail("Sensitive text detected within a redacted region on \(pagePhrase(pagesWithSensitiveTermInRegion, list: list))"),
                     pagesWithSensitiveTermInRegion.map { $0 - 1 })
         }
-        // D08-F2: on a rasterized page the region is a destroyed-pixel box that
+        // On a rasterized page the region is a destroyed-pixel box that
         // holds NO readable text by construction, so ANY in-region OCR hit is a
         // leak regardless of term match — FAIL. Keyed to the PAGE's mode (not
         // the document's): a Searchable-mode run's fallback-rasterized page has
@@ -1556,11 +1552,11 @@ public struct VerificationEngine: Sendable {
                 // content, so as a WARN this arm fired on virtually every run and
                 // pinned the masthead off green, drowning the conditional warns
                 // (unmappable, unchecked, could-not-read) that DO carry signal.
-                // The displaced-fill leak the D08-F1 WARN was aimed at is
+                // The displaced-fill leak this WARN was originally aimed at is
                 // carried by the in-region arms above (a displaced fill leaves
                 // the region's own text readable in-region → FAIL); a redacted
                 // term surviving out-of-region folds here as
-                // expected-under-this-mode content (D-86 / RW-F-002(b)).
+                // expected-under-this-mode content.
                 // Expected-under-this-mode observations are informational;
                 // every could-not-verify condition keeps its warning tier.
                 // Pages with NO regions have nothing to violate → the raster's
@@ -1582,7 +1578,7 @@ public struct VerificationEngine: Sendable {
     /// streams. Returns every image, not just the first —
     /// a page can carry multiple image XObjects and each must be OCR-checked.
     ///
-    /// VQ-32: each image decodes via `CGImageSourceCreateThumbnailAtIndex`
+    /// Each image decodes via `CGImageSourceCreateThumbnailAtIndex`
     /// bounded by the existing `ocrMaxPixelDimension` cap, so a pathological
     /// embedded image cannot force an unbounded full-size transient decode
     /// (the prior `CGImageSourceCreateImageAtIndex` deferred the full-size
@@ -1660,7 +1656,7 @@ public struct VerificationEngine: Sendable {
     }
 
     /// True when an image's pixel aspect ratio matches the requested page aspect
-    /// within tolerance — i.e. a thumbnail render is unpadded (ADV-2 A2-9). A
+    /// within tolerance — i.e. a thumbnail render is unpadded. A
     /// padded (letterboxed) thumbnail scales/shifts Vision-normalized
     /// coordinates off page-normalized space, so its observations must be
     /// treated conservatively rather than identity-mapped.
@@ -1729,9 +1725,9 @@ public struct VerificationEngine: Sendable {
         return false
     }
 
-    // MARK: - Layer 3: Binary String Search (ENGINE §6.3)
+    // MARK: - Layer 3: Binary String Search
 
-    /// Returns (status, affectedPages, reviewTermTexts). The SVT-3
+    /// Returns (status, affectedPages, reviewTermTexts). The
     /// decoded-page hits and the EXIF WARN carry their 0-based page lists
     /// for the UI's tappable page chips; the structural raw-byte pass is
     /// document-level (nil). The third element carries the display-only term
@@ -1739,9 +1735,9 @@ public struct VerificationEngine: Sendable {
     private func runLayer3BinarySearch(
         _ doc: PDFDocument, sensitiveTerms: [SensitiveTerm]
     ) throws -> (VerificationStatus, [Int]?, [String]?) {
-        // PERF-8 / CANCEL-001: entry-level cooperative cancellation.
+        // Entry-level cooperative cancellation.
         try Task.checkCancellation()
-        // No terms provided — expected for manual-only redaction. VQ-30:
+        // No terms provided — expected for manual-only redaction.
         // INFO, not PASS — the string search did not run, and "No issues
         // found" would overstate what this layer observed. INFO lands in the
         // notes group without bumping the masthead (Layer-7 boundary-count
@@ -1749,7 +1745,7 @@ public struct VerificationEngine: Sendable {
         guard !sensitiveTerms.isEmpty else {
             return (.info("No sensitive terms were provided — string search did not run."), nil, nil)
         }
-        // Filter terms too short to search (ENGINE §6.3, shared
+        // Filter terms too short to search (shared
         // `AhoCorasick.isSearchableTerm`): ≥3 scalars (supports 3-letter PII
         // abbreviations like SSN, DOB, PHI) or a 2-character CJK name.
         let validTerms = sensitiveTerms.filter { AhoCorasick.isSearchableTerm($0.text) }
@@ -1761,7 +1757,7 @@ public struct VerificationEngine: Sendable {
         let droppedTermCount = sensitiveTerms.count - validTerms.count
 
         // Build the Aho-Corasick automaton with all encoding variants, keeping
-        // each pattern's token-boundary discipline (PD-3) for the match
+        // each pattern's token-boundary discipline for the match
         // post-filters below.
         // DEFERRED: automaton caching is deferred to
         // V1.1. AhoCorasick is a Sendable value built fresh per
@@ -1771,14 +1767,14 @@ public struct VerificationEngine: Sendable {
         guard termAutomaton.hasPatterns else { return (.pass, nil, nil) }
         let automaton = termAutomaton.automaton
 
-        // ENGINE §6.3a: If the automaton degraded due to pattern size limits,
+        // If the automaton degraded due to pattern size limits,
         // report the limitation rather than silently passing.
         if automaton.isDegraded {
             return (.warn("Sensitive term search exceeded size limit — results may be incomplete"), nil, nil)
         }
 
         // Get raw PDF bytes.
-        // ENGINE §6.3 specifies memory-mapped access via
+        // Memory-mapped access via
         // `Data(contentsOf:options:.mappedIfSafe)`; loadPDFData uses the
         // default-options overload, which is `.mappedIfSafe`.
         guard let (data, cgDoc) = loadPDFData(doc) else {
@@ -1787,10 +1783,10 @@ public struct VerificationEngine: Sendable {
 
         // First WARN encountered, returned only if no FAIL is found below: a
         // non-boundary structural fragment (Part A) or an EXIF hit (Part B) must
-        // not mask a boundary-token or SVT-3 FAIL. Carries the 0-based page
+        // not mask a boundary-token or decoded-text FAIL. Carries the 0-based page
         // list when the WARN is page-scoped (EXIF); nil when document-level.
         var deferredWarn: (message: String, pages: [Int]?)?
-        // Structural complete-token FAIL, held (not returned) so the SVT-3
+        // Structural complete-token FAIL, held (not returned) so the
         // decoded pass below always runs — a structural hit must not mask a
         // decoded-text hit; both findings combine into one result at the end.
         var structuralFailMessage: String?
@@ -1802,9 +1798,9 @@ public struct VerificationEngine: Sendable {
         // independently verify text content. See ISO 32000-2 §7.3.8.
         // DEFERRED: stream decompression (decompress-then-search)
         // is deferred to V1.1 — Resecta's own CGPDFContext
-        // output embeds no compressed PII-bearing streams, and the SVT-3
+        // output embeds no compressed PII-bearing streams, and the
         // page.string re-scan below compensates for PDFKit-decoded text.
-        // Boundary-required terms (PD-3) drop matches embedded in an
+        // Boundary-required terms drop matches embedded in an
         // alphanumeric run before any classification.
         let allMatches = termAutomaton.tokenFilteredMatches(in: data)
         if !allMatches.isEmpty {
@@ -1843,13 +1839,13 @@ public struct VerificationEngine: Sendable {
             }
         }
 
-        // ENGINE §6.3 SVT-3 (M1 tightening): always re-scan PDFKit's decoded
+        // M1 tightening: always re-scan PDFKit's decoded
         // page.string, even when the structural raw-byte pass produced no
         // matches. PDFKit decodes operator-level encodings transparently
         // (UTF-16 surrogate halves, octal escapes inside literal strings,
         // Name-object substitution); sensitive terms that live only inside
         // an excluded stream range or behind a decoding transformation
-        // surface here. See plan §4.1.
+        // surface here.
         // Accumulate across ALL pages (not first-hit-return) so a multi-page
         // leak is reported in one run; the 0-based page list feeds the chips.
         var decodedHitPages: [Int] = []
@@ -1896,7 +1892,7 @@ public struct VerificationEngine: Sendable {
         // (the decoded text rides along in the combined message). A decoded
         // hit alone is residual text OUTSIDE every region — the user's remedy
         // is a text search — → ATTENTION, with the term texts threaded for
-        // display (the message itself stays content-free, ARCH §12.2).
+        // display (the message itself stays content-free).
         if let structuralFailMessage {
             let message = [structuralFailMessage, decodedResidualMessage]
                 .compactMap { $0 }
@@ -2018,12 +2014,12 @@ public struct VerificationEngine: Sendable {
         return ranges
     }
 
-    // MARK: - Layer 4: Structural Verification (ENGINE §6.4)
+    // MARK: - Layer 4: Structural Verification
 
     /// Returns (status, affectedPages) where affectedPages is non-nil
     /// only for per-page /AA findings (enables tappable page chips in UI).
     private func runLayer4Structural(_ doc: PDFDocument) throws -> (VerificationStatus, [Int]?) {
-        // PERF-8 / CANCEL-001: entry-level cooperative cancellation.
+        // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         guard let (pdfData, cgDoc) = loadPDFData(doc),
               let catalog = cgDoc.catalog else {
@@ -2031,7 +2027,7 @@ public struct VerificationEngine: Sendable {
         }
 
         // FAIL-triggering keys
-        // ENGINE §6.4: Keys that indicate active content or encryption in the
+        // Keys that indicate active content or encryption in the
         // document catalog. /AA triggers automatic actions (can execute JS on
         // open/close/print). /Encrypt should never appear in redacted output.
         // /RichMedia and /Flash can embed content containing PII.
@@ -2045,7 +2041,7 @@ public struct VerificationEngine: Sendable {
             }
         }
 
-        // ENGINE §6.4: the standard real-world carrier for embedded files and
+        // The standard real-world carrier for embedded files and
         // document-level JavaScript is the catalog's /Names name-dictionary
         // (/Names → /EmbeddedFiles, /Names → /JavaScript), not the catalog top
         // level the loop above covers. Resecta's writer never emits /Names, so
@@ -2061,7 +2057,7 @@ public struct VerificationEngine: Sendable {
             }
         }
 
-        // ENGINE §6.4: Check per-page /AA entries. Page-level automatic actions
+        // Check per-page /AA entries. Page-level automatic actions
         // can trigger JavaScript or URI opens that leak document content.
         // Collects all affected pages for tappable navigation in the UI.
         let pageCount = cgDoc.numberOfPages
@@ -2090,7 +2086,7 @@ public struct VerificationEngine: Sendable {
         }
 
         // Check for multiple %%EOF markers (incremental updates).
-        // pdfData already loaded by loadPDFData (memory-mapped per ENGINE §6.3).
+        // pdfData already loaded by loadPDFData (memory-mapped).
         let eofMarker = "%%EOF".data(using: .ascii)!
         var eofCount = 0
         var searchRange = pdfData.startIndex..<pdfData.endIndex
@@ -2099,7 +2095,7 @@ public struct VerificationEngine: Sendable {
             searchRange = range.upperBound..<pdfData.endIndex
         }
         if eofCount > 1 {
-            // ENGINE §6.4: Incremental updates can append original content
+            // Incremental updates can append original content
             // after redaction. Resecta's reconstructor writes a single clean
             // PDF stream — multiple markers indicate tampering or corruption.
             return (.fail("Multiple %%EOF markers (\(eofCount)) — incremental update may contain original content"), nil)
@@ -2111,10 +2107,10 @@ public struct VerificationEngine: Sendable {
         return (.pass, nil)
     }
 
-    // MARK: - Layer 5: Metadata Verification (ENGINE §6.5)
+    // MARK: - Layer 5: Metadata Verification
 
     private func runLayer5Metadata(_ doc: PDFDocument) throws -> VerificationStatus {
-        // PERF-8 / CANCEL-001: entry-level cooperative cancellation.
+        // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         guard let (pdfData, cgDoc) = loadPDFData(doc) else {
             return .warn("Could not inspect metadata")
@@ -2124,7 +2120,7 @@ public struct VerificationEngine: Sendable {
         // the document's /Metadata stream, independent of /Info; the prior
         // early `return .pass` on a nil /Info dictionary skipped the XMP scan
         // entirely, so a document carrying XMP but no /Info passed silently.
-        // pdfData already loaded by loadPDFData (memory-mapped per ENGINE §6.3).
+        // pdfData already loaded by loadPDFData (memory-mapped).
         let hasXMP = pdfData.range(of: "<?xpacket".data(using: .ascii)!) != nil
             || pdfData.range(of: "<x:xmpmeta>".data(using: .ascii)!) != nil
             || pdfData.range(of: "<rdf:RDF".data(using: .ascii)!) != nil
@@ -2147,7 +2143,7 @@ public struct VerificationEngine: Sendable {
         // "absent," and Name-object values are covered without a second call.
         // CGPDFContext (Apple's writer) never emits these keys, so any presence
         // is suspicious.
-        // ARCH §12.2: Never include metadata values in status messages.
+        // Never include metadata values in status messages.
         let sensitiveKeys = ["Title", "Author", "Subject", "Keywords", "Creator"]
         for key in sensitiveKeys {
             var obj: CGPDFObjectRef?
@@ -2156,8 +2152,8 @@ public struct VerificationEngine: Sendable {
             }
         }
 
-        // /Producer, /CreationDate, /ModDate are Apple auto-injected (ENGINE
-        // §5.4) — informational only; they ride in `infoFindings` so a clean
+        // /Producer, /CreationDate, /ModDate are Apple auto-injected —
+        // informational only; they ride in `infoFindings` so a clean
         // doc with only these doesn't bump the masthead off green.
         var infoFindings: [String] = []
         var warnings: [String] = []
@@ -2169,7 +2165,7 @@ public struct VerificationEngine: Sendable {
             }
         }
 
-        // Check for /Trapped (can reveal document workflow — ENGINE §6.5)
+        // Check for /Trapped (can reveal document workflow)
         var trappedStr: CGPDFStringRef?
         if CGPDFDictionaryGetString(infoDict, "Trapped", &trappedStr) {
             warnings.append("/Trapped")
@@ -2198,7 +2194,7 @@ public struct VerificationEngine: Sendable {
             return true
         }, nil)
         if !nonStandardKeys.isEmpty {
-            // ARCH §12.2: Do not include key values — just names
+            // Do not include key values — just names
             return .fail("Non-standard /Info key(s): \(nonStandardKeys.joined(separator: ", "))")
         }
 
@@ -2229,7 +2225,7 @@ public struct VerificationEngine: Sendable {
 
     /// Load raw PDF bytes and a CGPDFDocument from a PDFDocument.
     /// Prefers URL-based loading; the default-options `Data(contentsOf:)`
-    /// is `.mappedIfSafe`, matching ENGINE §6.3.
+    /// is `.mappedIfSafe`.
     /// Falls back to dataRepresentation() for non-file documents.
     private func loadPDFData(_ doc: PDFDocument) -> (Data, CGPDFDocument)? {
         if let url = doc.documentURL,
@@ -2245,13 +2241,13 @@ public struct VerificationEngine: Sendable {
         return (data, cgDoc)
     }
 
-    // MARK: - Layer 6: Spatial Verification (ENGINE §6.6)
+    // MARK: - Layer 6: Spatial Verification
 
     /// Dispatch spatial verification across all Searchable Redaction pages.
     /// Collects all failing pages for tappable navigation chips.
-    /// Skips pages that fell back to Secure Rasterization (AD-7-1).
+    /// Skips pages that fell back to Secure Rasterization.
     ///
-    /// DRAW-1: when any region on the page carries `vertices`, the spatial
+    /// When any region on the page carries `vertices`, the spatial
     /// exclusion check uses polygon-or-rect intersection (rect for
     /// vertex-less regions, even-odd polygon for vertex-bearing). The
     /// helper accepts `regionShapes` so the verifier can choose per-region.
@@ -2261,7 +2257,7 @@ public struct VerificationEngine: Sendable {
         perPageModes: [PipelineMode],
         verifier: SandwichVerification
     ) async throws -> (VerificationStatus, [Int]?) {
-        // PERF-8 / CANCEL-001: entry-level cooperative cancellation.
+        // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         var failingPages: [Int] = []
         var firstFailMessage: String?
@@ -2269,13 +2265,13 @@ public struct VerificationEngine: Sendable {
         // fold below FAIL and above the unreadable-page WARN.
         var grazePages: [Int] = []
         var firstGrazeMessage: String?
-        // VQ-23: eligible pages PDFKit cannot open surface as a WARN when the
+        // Eligible pages PDFKit cannot open surface as a WARN when the
         // layer would otherwise PASS — see runLayer1TextExtraction.
         var unreadablePages: [Int] = []
 
         for i in 0..<doc.pageCount {
             try Task.checkCancellation()
-            // AD-7-1: Skip pages that fell back to Secure Rasterization
+            // Skip pages that fell back to Secure Rasterization
             guard i < perPageModes.count, perPageModes[i] == .searchableRedaction else {
                 continue
             }
@@ -2287,20 +2283,20 @@ public struct VerificationEngine: Sendable {
             // Do NOT skip region-less pages. The empty pageRegions
             // flows through the maps below as regionShapes == [] into
             // verifySpatialExclusion, which (count-only guard) still runs the
-            // SVT-1 origin-delta lattice — closing the glyph-position-tamper gap
+            // origin-delta lattice — closing the glyph-position-tamper gap
             // on region-less searchable pages. Cost is bounded by the existing
-            // 256-iteration cancellation cadence (PERF-8) in the lattice walk.
+            // 256-iteration cancellation cadence in the lattice walk.
 
-            // Convert regions to output page coordinates (EXP-011: output pages
+            // Convert regions to output page coordinates (output pages
             // always have zero-origin bounds)
             let outputBounds = page.bounds(for: .cropBox)
             let rectsInPoints = pageRegions.map {
                 normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: outputBounds)
             }
-            // DRAW-1: build polygon-aware shapes. Polygon vertices are
+            // Build polygon-aware shapes. Polygon vertices are
             // converted into PDF-point-space via the same conversion the
             // rect path uses. Rect-only regions carry `polygonVertices ==
-            // nil`. PD-8: `bounds` carries the un-expanded rect (the
+            // nil`. `bounds` carries the un-expanded rect (the
             // unconditional 0pt floor + the band gate) and `expandedBounds`
             // the filter's safety-margin halo, so Layer 6 enforces the
             // same two-tier contract the character filter excludes by.
@@ -2356,7 +2352,7 @@ public struct VerificationEngine: Sendable {
         return (.pass, nil)
     }
 
-    // MARK: - Layer 7: Character Count Cross-Check (ENGINE §6.6)
+    // MARK: - Layer 7: Character Count Cross-Check
 
     /// Dispatch character count verification across all Searchable Redaction pages.
     /// Collects all failing pages for tappable navigation chips.
@@ -2366,7 +2362,7 @@ public struct VerificationEngine: Sendable {
         perPageModes: [PipelineMode],
         verifier: SandwichVerification
     ) async throws -> (VerificationStatus, [Int]?) {
-        // PERF-8 / CANCEL-001: entry-level cooperative cancellation.
+        // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         var failingPages: [Int] = []
         var firstFailMessage: String?
@@ -2415,7 +2411,7 @@ public struct VerificationEngine: Sendable {
         return (.pass, nil)
     }
 
-    // MARK: - Layer 8: Font Verification (ENGINE §6.6)
+    // MARK: - Layer 8: Font Verification
 
     /// Dispatch font verification across all Searchable Redaction pages.
     /// Collects all failing pages for tappable navigation chips.
@@ -2424,11 +2420,11 @@ public struct VerificationEngine: Sendable {
         perPageModes: [PipelineMode],
         verifier: SandwichVerification
     ) async throws -> (VerificationStatus, [Int]?) {
-        // PERF-8 / CANCEL-001: entry-level cooperative cancellation.
+        // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         var failingPages: [Int] = []
         var firstFailMessage: String?
-        // VQ-23: see runLayer1TextExtraction — unreadable eligible pages WARN
+        // See runLayer1TextExtraction — unreadable eligible pages WARN
         // on the otherwise-PASS path.
         var unreadablePages: [Int] = []
 
@@ -2458,7 +2454,7 @@ public struct VerificationEngine: Sendable {
         return (.pass, nil)
     }
 
-    // MARK: - Layer 9: Character Lineage (ENGINE §6.6 SVT-2)
+    // MARK: - Layer 9: Character Lineage
 
     /// Dispatch character-lineage verification across all Searchable Redaction
     /// pages. Re-computes the SHA-256 over output composed-character iteration
@@ -2467,7 +2463,7 @@ public struct VerificationEngine: Sendable {
     /// characters between filter and final PDF flip the hash. Zero-width
     /// insertions do NOT — both sides iterate non-zero-bounds composed
     /// characters only (pinned M4 residual; term-bearing injections are
-    /// covered by Layers 3/10, SVT-3/SVT-5). See plan §4.4 and
+    /// covered by Layers 3 and 10). See
     /// `SandwichVerification.verifyCharacterLineage`.
     private func runLayer9CharacterLineage(
         _ doc: PDFDocument,
@@ -2475,7 +2471,7 @@ public struct VerificationEngine: Sendable {
         perPageModes: [PipelineMode],
         verifier: SandwichVerification
     ) async throws -> (VerificationStatus, [Int]?) {
-        // PERF-8 / CANCEL-001 (VQ-24): entry-level cooperative cancellation +
+        // Entry-level cooperative cancellation +
         // a per-page check, matching every other layer dispatcher; the
         // composed-character walk inside the verifier carries the banded
         // 256-cadence checks. `runLayer` converts the CancellationError to
@@ -2536,7 +2532,7 @@ private func pageCountPhrase(_ count: Int) -> String {
     count == 1 ? "1 page" : "\(count) pages"
 }
 
-/// VQ-23: WARN copy for pages a per-page layer loop could not open
+/// WARN copy for pages a per-page layer loop could not open
 /// (Layers 1/6/8), mirroring Layer 10's per-page unavailability shape.
 /// `pages` are 0-based (the UI chip convention); the copy prints 1-based
 /// numbers — a single page by number, multiple as count + list.

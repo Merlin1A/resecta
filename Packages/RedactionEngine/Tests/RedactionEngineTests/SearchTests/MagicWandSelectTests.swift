@@ -2,9 +2,9 @@ import Testing
 import PDFKit
 @testable import RedactionEngine
 
-// DRAW-5 — magic-wand select-by-similar-text engine tests.
+// Magic-wand select-by-similar-text engine tests.
 //
-// The DRAW-5 contract is:
+// The contract is:
 //   - `SearchMode.exact(term:)` does NOT exist; the magic-wand path uses
 //     `SearchMode.text(escapedTerm, options:)` with a new
 //     `SearchOptions.exactMatch: Bool = false` flag.
@@ -19,7 +19,7 @@ import PDFKit
 // the escape into the runtime (which would break callers that
 // deliberately pass a regex via the `.regex` mode).
 
-@Suite("MagicWandSelect (DRAW-5)", .tags(.search))
+@Suite("MagicWandSelect", .tags(.search))
 struct MagicWandSelectTests {
 
     /// Helper — run the text-search path against a single-page PDF and
@@ -56,7 +56,6 @@ struct MagicWandSelectTests {
         //   - "Doe" — stand-alone word (matches)
         //   - "Doer" — "Doe" is a prefix (no match under exactMatch)
         //   - "OldDoe" — "Doe" is a suffix (no match under exactMatch)
-        // Plan §4 DRAW-5 acceptance corpus.
         let text = "Doe is here. Doer runs fast. OldDoe is older."
         var options = SearchOptions()
         options.exactMatch = true
@@ -67,8 +66,8 @@ struct MagicWandSelectTests {
 
         // Only the stand-alone "Doe" should match. Both `Doer` and
         // `OldDoe` are excluded by the word-boundary check.
-        // UXF-15: matchedText displays the original casing; matching
-        // still runs on the normalized form (REDACTION_ENGINE.md §9.6).
+        // matchedText displays the original casing; matching
+        // still runs on the normalized form.
         #expect(matches == ["Doe"])
     }
 
@@ -82,9 +81,9 @@ struct MagicWandSelectTests {
             on: text, query: "Doe", options: options
         )
 
-        // Substring semantics: all three "Doe" runs match. Plan §0.4
-        // hard stop — existing callers must not change behavior.
-        // UXF-15: matchedText displays the original casing.
+        // Substring semantics: all three "Doe" runs match; existing
+        // callers must not see a behavior change.
+        // matchedText displays the original casing.
         #expect(matches.count == 3, "expected substring hits, got \(matches)")
         #expect(matches.contains("Doe"))
     }
@@ -139,7 +138,7 @@ struct MagicWandSelectTests {
         let unescaped = await runSearch(
             on: text, query: "C++", options: options
         )
-        // UXF-15: matchedText displays the original casing.
+        // matchedText displays the original casing.
         #expect(unescaped == ["C++"], "raw '+' is a literal in .text(...) mode")
         // The escaped form must not throw and must not silently match
         // unrelated tokens — empty or single-match is acceptable.

@@ -162,11 +162,11 @@ struct VerificationSkipReasonTests {
         ].joined(separator: " ").lowercased()
         for word in bannedWords {
             #expect(!allText.contains(word),
-                    "Skipped display text for \(reason) contains banned word '\(word)' (ARCH §1.3)")
+                    "Skipped display text for \(reason) contains banned word '\(word)'")
         }
     }
 
-    // VF-12: a skipped sentinel has no layer results — the details
+    // A skipped sentinel has no layer results — the details
     // disclosure ("0 of 0 checks passed", expanding to nothing) and the
     // timing footer ("0 checks") described a run that never happened.
     // One gate hides both mounts.

@@ -7,14 +7,14 @@ import PDFKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// SEC-8 prereq: Live Photo / Portrait depth aux-metadata stripper tests.
+// Live Photo / Portrait depth aux-metadata stripper tests.
 //
 // The helper drops `kCGImagePropertyAuxiliaryData`, `kCGImagePropertyMakerAppleDictionary`,
 // and peer keys from the image property dictionary. V1 returns the CGImage unchanged.
 //
 // `testHookOffByDefault` exercises the import path with the default flag value
 // (`stripAuxData == false`) and confirms the image-import flow still completes
-// without regression. SEC-8 (unit 23) flips the flag when paranoid mode is on.
+// without regression. The paranoid-mode path flips the flag.
 
 @Suite("LivePhotoAuxStripper")
 struct LivePhotoAuxStripperTests {
@@ -68,12 +68,12 @@ struct LivePhotoAuxStripperTests {
         #expect(outDict[kCGImagePropertyMakerAppleDictionary] == nil)
     }
 
-    @Test("Denylist covers the expanded Package H key set (Q2)")
+    @Test("Denylist covers the expanded key set")
     func testDenylistCoverage() {
-        // Maintainer-ruled expanded denylist. The set of keys removed
+        // The expanded denylist. The set of keys removed
         // by `LivePhotoAuxStripper.strip` is exposed via the static
         // `denylist` property and must include every camera-origin metadata
-        // key the SEC-8 contract (`ARCHITECTURE.md §1.2`) enumerates.
+        // key the stripper contract enumerates.
         let expected: Set<CFString> = [
             kCGImagePropertyAuxiliaryData,
             kCGImagePropertyMakerAppleDictionary,
@@ -185,25 +185,25 @@ struct LivePhotoAuxStripperTests {
         #expect(doc.pageCount == 1)
     }
 
-    // MARK: - H1 — rendered PDF carries no EXIF (CAT-153)
+    // MARK: - Rendered PDF carries no EXIF
 
     /// Distinctive ASCII probe embedded in the fixture's EXIF UserComment.
     static let exifProbe = "RESECTA-EXIF-PROBE-DO-NOT-PROPAGATE"
 
-    /// CAT-153 H1 (SEC-8): a JPEG carrying an EXIF + GPS APP1 segment is driven
+    /// A JPEG carrying an EXIF + GPS APP1 segment is driven
     /// through the paranoid import path (`stripAuxData: true`) and the resulting
     /// PDF bytes are inspected. The import render boundary
     /// (`ImportService.renderImageAsPDF`) rebuilds the page from a fresh bitmap
     /// (`UIGraphicsImageRenderer`), which drops ALL ImageIO metadata, so neither
     /// the EXIF APP1 marker nor the UserComment probe may survive into the PDF.
     ///
-    /// HISTORY (CAT-NEW-s12-2): an earlier render path drew the
+    /// HISTORY: an earlier render path drew the
     /// ORIGINAL EXIF-bearing `UIImage(data:)`, so `UIGraphicsPDFRenderer`
     /// embedded the source JPEG (APP1/EXIF incl. GPS) into the PDF as a
     /// DCTDecode stream and the metadata survived. These assertions were pinned
     /// with `withKnownIssue` until the leak was fixed; the render boundary now
     /// strips metadata, so they run as a HARD guard.
-    @Test("Import path strips source EXIF/GPS from the rendered PDF (CAT-153 H1)")
+    @Test("Import path strips source EXIF/GPS from the rendered PDF")
     @MainActor
     func testRenderedPDFHasNoEXIF() async throws {
         let jpeg = try #require(makeJPEGWithEXIFAndGPS(), "failed to build EXIF JPEG fixture")
@@ -224,13 +224,13 @@ struct LivePhotoAuxStripperTests {
             "import did not produce a PDF")
 
         // HARD guard: the import render boundary rebuilds the page from a fresh
-        // bitmap, so no source EXIF/GPS may survive into the PDF (CAT-153 H1).
+        // bitmap, so no source EXIF/GPS may survive into the PDF.
         #expect(
             !containsEXIFMarker(pdfData),
-            "rendered PDF must not embed an EXIF APP1 marker (CAT-153 H1)")
+            "rendered PDF must not embed an EXIF APP1 marker")
         #expect(
             pdfData.range(of: Data(Self.exifProbe.utf8)) == nil,
-            "rendered PDF must not contain the EXIF UserComment probe (CAT-153 H1)")
+            "rendered PDF must not contain the EXIF UserComment probe")
     }
 
     /// JPEG APP1 EXIF segment signature: ASCII "Exif" followed by two NUL bytes.

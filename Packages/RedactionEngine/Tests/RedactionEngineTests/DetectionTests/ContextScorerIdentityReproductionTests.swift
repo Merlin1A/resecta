@@ -2,9 +2,9 @@ import Foundation
 import Testing
 @testable import RedactionEngine
 
-// B03/B05 — context-scorer unit-level invariants.
+// Context-scorer unit-level invariants.
 //
-// B03 shipped a w=0 placeholder; B05 promoted the trained calibrated scorer
+// A w=0 placeholder scorer shipped first; the trained calibrated scorer was promoted
 // (account/phone w_family 1, mrn/ein/itin identity). Two invariants are pinned
 // here at the unit level:
 //   1. The IDENTITY scorer — the loader's fail-open value — contributes exactly 0

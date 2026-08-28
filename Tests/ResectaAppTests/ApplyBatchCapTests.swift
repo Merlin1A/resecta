@@ -4,15 +4,14 @@ import CoreGraphics
 import RedactionEngine
 @testable import ResectaApp
 
-// DRAW-6 (Phase 3) — 500-region cap on `RedactionState.applyBatch`.
+// 500-region cap on `RedactionState.applyBatch`.
 // The lasso marquee path routes its hit set through `applyBatch`; on
 // large documents an indiscriminate marquee could land thousands of
 // regions in one gesture. The cap is a defense against an accidental
 // select-all — when input > 500, `applyBatch` truncates to the first
 // 500 (by stored order) and posts a `.warning` toast surfacing the
 // truncation. `.warning` (not `.error`) because overflow is an expected
-// outcome on large documents, not a fault state. See `plan.md §4
-// DRAW-6` and `shared-context.md §4`.
+// outcome on large documents, not a fault state.
 //
 // These tests pin two contracts:
 // 1. `applyBatch` truncates input > 500 to exactly 500 and surfaces the
@@ -21,7 +20,7 @@ import RedactionEngine
 //    caller's stable ordering so future callers (sort-by-coverage,
 //    sort-by-detection-confidence) can drive truncation deterministically.
 
-@Suite("ApplyBatch 500-region cap (DRAW-6)")
+@Suite("ApplyBatch 500-region cap")
 @MainActor
 struct ApplyBatchCapTests {
 

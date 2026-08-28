@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// CAT-278 (C-J2) — the text-layer toast must fire once per import, on the
+// The text-layer toast must fire once per import, on the
 // import-completion transition (.importing -> .editing), for EVERY import path.
 // Original gap: the Home -> redact load (AppCoordinator.openRedactWithDocument)
 // runs its import AFTER the workspace view mounts, so the in-view post-import
@@ -10,7 +10,7 @@ import Foundation
 // these pin the transition rule — pipeline returns to .editing and import
 // failures must NOT re-fire the toast.
 
-@Suite("Text-layer toast import-completion gate (CAT-278)")
+@Suite("Text-layer toast import-completion gate")
 @MainActor
 struct RedactWorkspaceTextLayerToastTests {
 

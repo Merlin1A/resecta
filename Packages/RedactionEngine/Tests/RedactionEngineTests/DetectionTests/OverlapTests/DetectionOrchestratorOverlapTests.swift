@@ -2,10 +2,10 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W10 — DetectionOrchestrator.resolveOverlaps: cross-category overlap
+// DetectionOrchestrator.resolveOverlaps: cross-category overlap
 // resolution. Pure static function, deterministic, sort-stable.
 
-@Suite("Overlap resolver (W10)")
+@Suite("Overlap resolver")
 struct DetectionOrchestratorOverlapTests {
 
     private func match(
@@ -99,7 +99,7 @@ struct DetectionOrchestratorOverlapTests {
             match(location: 40, length: 5, kind: .email, confidence: 0.90),
             match(location: 50, length: 11, kind: .ssn, confidence: 0.95),
             match(location: 50, length: 11, kind: .licensePlate, confidence: 0.70),
-            // D05-F1 — a partial-overlap group ([70,80) vs [75,85)) so the
+            // A partial-overlap group ([70,80) vs [75,85)) so the
             // widened-survivor path is exercised under shuffle. The coalesced
             // span [70,85) is order-independent (min location, max NSMaxRange).
             match(location: 70, length: 10, kind: .address, confidence: 0.70),
@@ -115,10 +115,10 @@ struct DetectionOrchestratorOverlapTests {
         }
     }
 
-    @Test("Partial overlap widens the survivor to the coalesced span (D05-F1)")
+    @Test("Partial overlap widens the survivor to the coalesced span")
     func resolveOverlapsPartialOverlap() {
         // email spans [0,11); phone spans [5,16). They overlap on [5,11).
-        // The email wins on raw confidence (0.85 vs 0.70); D05-F1 widens its
+        // The email wins on raw confidence (0.85 vs 0.70); the resolver widens its
         // range to the coalesced group span [0,16) so the phone's
         // non-overlapping tail [11,16) still maps to a redaction region.
         let email = match(text: "foo@bar.com", location: 0, length: 11, kind: .email, confidence: 0.85)
@@ -132,7 +132,7 @@ struct DetectionOrchestratorOverlapTests {
         #expect(result.suppressedCountByCategory[.phone] == 1)
     }
 
-    // MARK: - W10 adversarial pairs + suppressedByOverlap rationale
+    // MARK: - Adversarial pairs + suppressedByOverlap rationale
 
     @Test("NPI vs License Plate: NPI wins on tied confidence (rank 11 > 8)")
     func npiVsLicensePlateNPIWins() {
@@ -198,7 +198,7 @@ struct DetectionOrchestratorOverlapTests {
         #expect(loser?.rationale?.signals.last == .suppressedByOverlap(winnerCategory: .dea, loserCategory: .licensePlate))
     }
 
-    // MARK: - QW-5 (SRCH-ACCT-PHONE) suppressed-loser label
+    // MARK: - SRCH-ACCT-PHONE suppressed-loser label
 
     @Test("Account loses to Phone: loser keeps its OWN category in counts and rationale")
     func accountLosesToPhoneLoserKeepsOwnCategory() {
@@ -224,9 +224,9 @@ struct DetectionOrchestratorOverlapTests {
         #expect(summary.contains("suppressedByOverlap(Account via Phone)"))
     }
 
-    // MARK: - D05-F1 coalesced-survivor range
+    // MARK: - Coalesced-survivor range
 
-    @Test("Partial overlap widens survivor range; structured winner past loser (D05-F1)")
+    @Test("Partial overlap widens survivor range; structured winner past loser")
     func resolveOverlapsPartialOverlapWidensSurvivorRange() {
         // address [0,40) loses to ssn [30,41); the survivor widens to [0,41)
         // so the address head the ssn does not cover is still redacted.
@@ -253,9 +253,9 @@ struct DetectionOrchestratorOverlapTests {
         #expect(r2.suppressedCountByCategory[.ssn] == 1)
     }
 
-    // MARK: - D05-F2 gate-aware winner selection
+    // MARK: - Gate-aware winner selection
 
-    @Test("Gate-surviving sibling wins over a raw-stronger gate-failing one (D05-F2)")
+    @Test("Gate-surviving sibling wins over a raw-stronger gate-failing one")
     func resolveOverlapsPrefersGateSurvivor() {
         // phone has the higher RAW confidence (0.80 > 0.70); without the
         // gate-aware key it would win. The stub marks phone as failing its
@@ -291,7 +291,7 @@ struct DetectionOrchestratorOverlapTests {
         #expect(r3.surviving.first?.kind == .phone)
     }
 
-    @Test("nil survivability equals the no-closure resolver (D05-F2)")
+    @Test("nil survivability equals the no-closure resolver")
     func resolveOverlapsNilSurvivabilityMatchesLegacy() {
         let group: [PIIDetector.PIIMatch] = [
             match(location: 0, length: 11, kind: .ssn, confidence: 0.95),
@@ -303,7 +303,7 @@ struct DetectionOrchestratorOverlapTests {
         #expect(noClosure == nilClosure)
     }
 
-    @Test("SurvivabilityKey is Equatable; meetsThreshold dominates posterior (D05-F2)")
+    @Test("SurvivabilityKey is Equatable; meetsThreshold dominates posterior")
     func survivabilityKeyComparatorSemantics() {
         #expect(DetectionOrchestrator.SurvivabilityKey(meetsThreshold: true, posterior: 0.6)
                 == DetectionOrchestrator.SurvivabilityKey(meetsThreshold: true, posterior: 0.6))
@@ -322,7 +322,7 @@ struct DetectionOrchestratorOverlapTests {
         #expect(result.surviving.first?.kind == .account)
     }
 
-    @Test("Survivability-ranked result is deterministic under input shuffles (D05-F2)")
+    @Test("Survivability-ranked result is deterministic under input shuffles")
     func resolveOverlapsDeterministicUnderShuffleWithSurvivability() {
         let fixtures: [PIIDetector.PIIMatch] = [
             match(location: 0, length: 11, kind: .phone, confidence: 0.80),
@@ -350,7 +350,7 @@ struct DetectionOrchestratorOverlapTests {
         }
     }
 
-    // MARK: - D04-F4 account generic-kind demotion (boostedConfidence 0.58)
+    // MARK: - Account generic-kind demotion (boostedConfidence 0.58)
 
     @Test("Account (0.58) does not suppress an overlapping address (0.70)")
     func test_accountDoesNotSuppressOverlappingAddress() {
@@ -394,7 +394,7 @@ struct DetectionOrchestratorOverlapTests {
         #expect(result.suppressedCountByCategory.isEmpty)
     }
 
-    @Test("Near-tie within epsilon favors structural rank, not raw confidence (D04-F4 Fix B)")
+    @Test("Near-tie within epsilon favors structural rank, not raw confidence")
     func test_nearTieFavorsStructuralRank() {
         // account has the HIGHER raw (0.59) but the LOWER rank (1); address is
         // 0.58 / rank 3. The 0.02 dead-band makes structural rank decide, so

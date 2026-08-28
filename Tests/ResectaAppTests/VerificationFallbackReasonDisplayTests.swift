@@ -2,12 +2,12 @@ import Testing
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// PD-5 disclosure surface: display copy for per-page fallback reasons on the
+// Disclosure surface: display copy for per-page fallback reasons on the
 // verification-results page-mode chips and the sidebar thumbnail badges.
 // Reasons render ONLY for pages whose mode fell back in a Searchable-mode
 // run; secure-raster-mode runs (all-nil reasons) render none.
 
-@Suite("Fallback Reason Display (PD-5)")
+@Suite("Fallback Reason Display")
 struct VerificationFallbackReasonDisplayTests {
 
     // nonisolated: read by the @Test(arguments:) macro expansion outside the
@@ -26,7 +26,7 @@ struct VerificationFallbackReasonDisplayTests {
         #expect(copy.first?.isUppercase != true)
     }
 
-    @Test("Reason copy pins (PD-5 copy pattern)")
+    @Test("Reason copy pins")
     func reasonCopyPins() {
         #expect(TextLayerDetector.FallbackReason.rtlText.shortReasonText
                 == "right-to-left text")

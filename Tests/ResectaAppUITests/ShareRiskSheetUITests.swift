@@ -1,15 +1,15 @@
 import XCTest
 
-/// UI test for the share-risk confirm sheet's completion path (RB-55).
+/// UI test for the share-risk confirm sheet's completion path.
 ///
-/// `SlideToShareControl` (DocumentEditorView.swift) is the UXC-14
+/// `SlideToShareControl` (DocumentEditorView.swift) is the
 /// slide-to-confirm control on the share-risk sheet. Its VoiceOver /
-/// XCUITest completion path (RB-32) is a hidden-but-accessible `Button`
+/// XCUITest completion path is a hidden-but-accessible `Button`
 /// overlaid on the visible track, carrying the family's stable
 /// accessibility identifier (`shareAnywayConfirm` / `shareSkippedConfirm`
 /// / `shareIncompleteWarnConfirm`). Measured on the frozen 1.1.0 build: a
 /// 1×1-pt hidden target answered a coordinate `.tap()` on a freshly
-/// presented sheet but not on a RE-presented one. RB-55 widened the
+/// presented sheet but not on a RE-presented one. The fix widened the
 /// target to `ResectaTokens.TouchTarget.minimum`, moved into dead space
 /// below the footer's "Go back" row.
 ///
@@ -237,19 +237,19 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
         start.press(forDuration: 0.1, thenDragTo: end)
     }
 
-    // MARK: - RB-55 placement measurement (logged once, not asserted)
+    // MARK: - Placement measurement (logged once, not asserted)
 
     /// Prints the hidden Button's frame, the "Go back" row's frame, and
-    /// the window frame — the geometry the RB-55 ref reports rather than
-    /// hardcodes, since the sheet's own render scale is device/OS
-    /// dependent (RB-54).
+    /// the window frame — the geometry is measured rather than
+    /// hardcoded, since the sheet's own render scale is device/OS
+    /// dependent.
     private func logMeasuredGeometry() {
         let confirmFrame = app.buttons["shareSkippedConfirm"].frame
         let goBackFrame = app.buttons["shareRiskConfirmGoBack"].frame
         let windowFrame = app.windows.firstMatch.frame
-        print("RB-55 geometry — shareSkippedConfirm.frame = \(confirmFrame)")
-        print("RB-55 geometry — shareRiskConfirmGoBack.frame = \(goBackFrame)")
-        print("RB-55 geometry — window.frame = \(windowFrame)")
+        print("[measured geometry] shareSkippedConfirm.frame = \(confirmFrame)")
+        print("[measured geometry] shareRiskConfirmGoBack.frame = \(goBackFrame)")
+        print("[measured geometry] window.frame = \(windowFrame)")
     }
 
     // MARK: - Screenshots

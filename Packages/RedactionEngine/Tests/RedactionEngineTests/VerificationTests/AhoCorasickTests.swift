@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// ENGINE §6.3a — Aho-Corasick correctness tests.
+// Aho-Corasick correctness tests.
 
 @Suite("Aho-Corasick Multi-Pattern Matcher")
 struct AhoCorasickTests {

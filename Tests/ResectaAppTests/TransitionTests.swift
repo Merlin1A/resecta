@@ -3,13 +3,13 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// UI_UX §8.1: State machine transition tests.
+// State machine transition tests.
 
 @Suite("Phase Transition Engine")
 @MainActor
 struct TransitionTests {
 
-    // MARK: - Valid Transitions (UI_UX §1.2)
+    // MARK: - Valid Transitions
 
     @Test("empty → importing succeeds")
     func emptyToImporting() {
@@ -105,7 +105,7 @@ struct TransitionTests {
         #expect(state.transition(to: .editing))
     }
 
-    @Test("verified → verifying succeeds (OCR re-verification §5.7)")
+    @Test("verified → verifying succeeds (OCR re-verification)")
     func verifiedToVerifying() {
         let state = DocumentState()
         state.phase = .verified(report: .skipped)
@@ -224,7 +224,7 @@ struct TransitionTests {
 
     @Test("isCancellable reports correctly")
     func cancellableFlag() {
-        // CANCEL-006 (Pkg B): `.importing` is now cancellable so the
+        // `.importing` is now cancellable so the
         // scene-phase observer and the in-card Cancel button can reach
         // the detached per-page validation loops.
         let cancellable: [DocumentState.PhaseKind] = [
@@ -259,7 +259,7 @@ struct TransitionTests {
 
     @Test("overrideVerificationFailure in a non-verified phase is a no-op (ERR-05 wrong-phase guard)")
     func overrideVerificationFailureWrongPhaseNoOp() {
-        // F08 → F11/C-K ERR lens: the negative branch of
+        // The negative branch of
         // `guard case .verified(var report) = phase else { return }`
         // (DocumentState.overrideVerificationFailure) was unexercised. In any
         // non-verified phase the call must return without mutating the phase
@@ -273,22 +273,22 @@ struct TransitionTests {
         #expect(isStillEditing, "wrong-phase override must not mutate the phase")
     }
 
-    // MARK: - UXC-13/UXC-14: share-risk confirm shadow reset conditioning
+    // MARK: - Share-risk confirm shadow reset conditioning
     //
     // None of the three share-risk confirm shadows
     // (`failShareAcknowledged`, `skippedShareAcknowledged`,
     // `incompleteWarnShareAcknowledged`) can be read back off
-    // `VerificationReport` (Packages/RedactionEngine is C-5-fenced), so all
-    // three live on DocumentState and `transition(to:)` resets them in
-    // place of the "new report starts false" behavior a report-scoped flag
-    // would get for free. The reset must fire exactly on the two
-    // transitions that produce a genuinely NEW report
+    // `VerificationReport` (RedactionEngine keeps its own state fenced
+    // off), so all three live on DocumentState and `transition(to:)`
+    // resets them in place of the "new report starts false" behavior a
+    // report-scoped flag would get for free. The reset must fire exactly
+    // on the two transitions that produce a genuinely NEW report
     // (`.redacting → .verified`, `.verifying → .verified`) and must NOT
     // fire on the two that resume the SAME report
     // (`.exporting → .verified`, `.failed → .verified`). Originally pinned
-    // for `incompleteWarnShareAcknowledged` alone (UXC-14); UXC-13
-    // generalized the shape to all three, so these tests now seed and
-    // assert on all three every time.
+    // for `incompleteWarnShareAcknowledged` alone; that was later
+    // generalized to all three, so these tests now seed and assert on all
+    // three every time.
 
     private func warnReport() -> VerificationReport {
         VerificationReport(
@@ -381,7 +381,7 @@ struct TransitionTests {
         #expect(state.incompleteWarnShareAcknowledged == true)
 
         // `.verified → .failed` is not itself a legal pair (see
-        // `legalTransitions`) — the real ERR-06 export-failure path always
+        // `legalTransitions`) — the real export-failure path always
         // routes `.verified → .exporting → .failed`, so the test mirrors
         // that route rather than a synthetic direct edge.
         state.transition(to: .exporting)

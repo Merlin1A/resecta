@@ -3,17 +3,17 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-12 — Pre-scan, the PII category chip row inside `piiScanOptions`
-// wraps in a `DisclosureGroup("Customize")` collapsed by default per
-// [OQ-21] / [D-34] (Hybrid IA novice default; pros one tap away). Each
+// Pre-scan, the PII category chip row inside `piiScanOptions`
+// wraps in a `DisclosureGroup("Customize")` collapsed by default
+// (Hybrid IA novice default; pros one tap away). Each
 // chip label gains a count badge `"\(category.rawValue) (\(count))"`
 // — pre-scan all counts read 0, post-scan they reflect
-// `SearchState.categoryCounts`. Plan sub-agent (D-15) confirmed pre-scan
-// chips remain inside `piiScanOptions`; post-scan filter chips stay in
-// `chipRowSubstrate` per [RR-22] substrate invariants — substrate
-// gating (`anyChipsToShow`) remains post-scan-only.
+// `SearchState.categoryCounts`. Pre-scan chips remain inside
+// `piiScanOptions`; post-scan filter chips stay in `chipRowSubstrate`
+// per substrate invariants — substrate gating (`anyChipsToShow`)
+// remains post-scan-only.
 
-@Suite("PII category chip count badges + Customize disclosure (WU-12)", .tags(.search))
+@Suite("PII category chip count badges + Customize disclosure", .tags(.search))
 @MainActor
 struct PIICategoryChipTests {
 

@@ -5,7 +5,7 @@ import UIKit
 #endif
 import os
 
-// ENGINE §2.4, §2.7, §7.1 — Page rasterization, render timeout,
+// Page rasterization, render timeout,
 // and per-page processing loop.
 
 /// KI-5: `os_proc_available_memory()` does not accurately reflect CGImage
@@ -26,31 +26,31 @@ private let dpiBudgetSentinel: Int = Int.max / 4
 /// Default DPI ceiling used when rasterize is called without an explicit cap.
 public let defaultDPICap: Int = 300
 
-/// L-19: Guard against CGContextDrawPDFPage running for seconds on
+/// Guard against CGContextDrawPDFPage running for seconds on
 /// pathologically large pages — the synchronous C call has no cancellation
 /// points, so the existing 30s timeout cannot interrupt it.
 private let pageDimensionLimit: CGFloat = 10_000
 
-/// PERF-8: os_signpost emission around the synchronous `drawPDFPage` call so
+/// os_signpost emission around the synchronous `drawPDFPage` call so
 /// the wall-clock can be sampled in Instruments without re-instrumenting
 /// every release. The signpost intervals are cheap (`OSSignposter`
 /// emits only when a tool is attached or the category is enabled) and let
 /// us defer the chunking decision until we have field data on real devices.
 ///
-/// Locked decision (plan §5 PERF-8): `drawPDFPage` is NOT chunked in V1.
-/// Chunking the synchronous draw risks aliasing seams between bands. On the
+/// `drawPDFPage` is not chunked in V1. Chunking the synchronous draw risks
+/// aliasing seams between bands. On the
 /// `RawPDFBuilder`-generated test fixtures and the iPhone 17 simulator the
 /// single-call render stays well under the 200 ms threshold that would
-/// motivate chunking. Real-device validation is tracked as a V1.1 follow-up
-/// in `specs/TESTING_AND_CI.md`. The 256-row cancellation bands inside
+/// motivate chunking. Real-device validation remains a tracked follow-up.
+/// The 256-row cancellation bands inside
 /// `applyRedactionFills` / `verifyFill` cover the long-running CPU loops we
 /// do own.
 private let pageRasterizerSignposter = OSSignposter(
     subsystem: "com.resecta.engine", category: "PageRasterizer"
 )
 
-/// PD-5 / RC-5: runtime per-page fallbacks are logged (page index + generic
-/// reason only — never document content, ARCH §12.2) and recorded on the
+/// Runtime per-page fallbacks are logged (page index + generic
+/// reason only — never document content) and recorded on the
 /// RasterizeResult so the verification report can say why a page rasterized.
 private let pageRasterizerLogger = Logger(
     subsystem: "com.resecta.engine", category: "PageRasterizer"
@@ -68,15 +68,14 @@ private struct SendableCGPDFPage: @unchecked Sendable {
 
 /// Processor for single-page rasterization and pixel destruction.
 /// nonisolated by SPM package default. Entry point is `@concurrent`.
-/// See ARCH §3.2 for the two-layer concurrency pattern.
 ///
-/// **Why a class.** Owns a per-pipeline-run `BitmapContextPool`
-/// (PERF-5). The pool is reference-typed and its eviction order is
+/// **Why a class.** Owns a per-pipeline-run `BitmapContextPool`.
+/// The pool is reference-typed and its eviction order is
 /// mutated on every page, so the rasterizer carries it as private
 /// state. The public surface is unchanged: callers still construct
 /// with `PageRasterizer()` and call the same `@concurrent` methods.
 /// The pipeline coordinator creates one rasterizer per run; pages are
-/// rasterized with bounded parallelism (PERF-2), so several `rasterize`
+/// rasterized with bounded parallelism, so several `rasterize`
 /// calls share one instance concurrently.
 ///
 /// `@unchecked Sendable`: the only shared mutable state is the
@@ -88,7 +87,7 @@ private struct SendableCGPDFPage: @unchecked Sendable {
 public final class PageRasterizer: @unchecked Sendable {
 
     /// Bitmap context pool. Released when the rasterizer goes out of
-    /// scope at the end of the pipeline run. See plan §5 PERF-5.
+    /// scope at the end of the pipeline run.
     private let bitmapPool = BitmapContextPool()
 
     public init() {}
@@ -100,7 +99,6 @@ public final class PageRasterizer: @unchecked Sendable {
     /// released immediately rather than waiting for the rasterizer to drop at
     /// run end. Idempotent and thread-safe against in-flight
     /// `rasterize(...)` calls (pool guards `entries` internally).
-    /// Audit `03-security-perf-audit.md §5.2.a`.
     public func flushBitmapPool() {
         bitmapPool.flush()
     }
@@ -108,7 +106,6 @@ public final class PageRasterizer: @unchecked Sendable {
     /// Process a single page: rasterize → fill → verify → return.
     /// For Searchable Redaction pages, text extraction and character filtering
     /// happen before rasterization (Phase 7).
-    /// See ENGINE §7.1 for the canonical per-page processing loop.
     ///
     /// `dpiCap` is the MainActor-owned ceiling maintained by the pipeline
     /// coordinator (lowered on memory-warning notifications per KI-5).
@@ -129,7 +126,7 @@ public final class PageRasterizer: @unchecked Sendable {
             throw PipelineError.redactionError(.insufficientMemory(pageIndex: page.pageIndex))
         }
 
-        // PERF-1 test seam — records call telemetry and optionally injects a
+        // Test seam — records call telemetry and optionally injects a
         // `fillVerificationFailed` for the page index on the next attempt.
         // Activation is task-local (see `PageRasterizerTestSeam.withActivated`)
         // so concurrent tests do not race on shared state. Release builds
@@ -143,7 +140,7 @@ public final class PageRasterizer: @unchecked Sendable {
             )
         }
 
-        // ENGINE §5A: Searchable Redaction requires a text layer.
+        // Searchable Redaction requires a text layer.
         // Callers should set .secureRasterization for textless pages.
         // Graceful fallback exists, but this catches logic bugs in debug builds.
         // Read the pre-extracted `hasText` (computed serially at build
@@ -168,15 +165,15 @@ public final class PageRasterizer: @unchecked Sendable {
             throw PipelineError.redactionError(.insufficientMemory(pageIndex: page.pageIndex))
         }
 
-        // 2. Text extraction for Searchable Redaction (ENGINE §5B)
+        // 2. Text extraction for Searchable Redaction
         // Extract character positions BEFORE rasterization to capture from source PDF.
         // For Secure Rasterization pages, skip entirely.
         var textLayerEntries: [CharacterInfo]? = nil
         var pageDigest: PageFilterDigest? = nil
         // J-12: the text-layer line assembly receives the page's redaction
-        // rects (PDF points) so a bridge never crosses one (ENGINE §5C.1).
+        // rects (PDF points) so a bridge never crosses one.
         var redactionRectsForTextLayer: [CGRect] = []
-        // PD-5: effective per-page fallback reason. Starts as the pre-flight
+        // Effective per-page fallback reason. Starts as the pre-flight
         // reason recorded at build time (non-nil only for fallback pages of a
         // Searchable-mode run); the runtime fallback paths below overwrite it.
         var fallbackReason = page.fallbackReason
@@ -188,7 +185,7 @@ public final class PageRasterizer: @unchecked Sendable {
                     from: page.page, hasHiddenOCG: page.hasHiddenOCG
                 )
 
-                // Check for fallback triggers (ENGINE §5A)
+                // Check for fallback triggers
                 // >1% U+FFFD check on extracted characters (tightened from 5% —
                 // at 5%, up to 95% of CJK text could survive in the text layer)
                 let replacementCount = characters.filter {
@@ -209,9 +206,9 @@ public final class PageRasterizer: @unchecked Sendable {
                     // statement overwrites the earlier `cropBoxBounds` value, while
                     // the :119 geometry read survives). For an un-rotated page
                     // `effectiveSize` equals the cropBox size; the origin is zero.
-                    // This one `pageBounds` feeds all FOUR synchronized consumers
-                    // (ADV-2 A2-5): the rect filter, the polygon shapes,
-                    // `redactionRectsForTextLayer` (the §5C.1 bridge check), and
+                    // This one `pageBounds` feeds all FOUR synchronized consumers:
+                    // the rect filter, the polygon shapes,
+                    // `redactionRectsForTextLayer` (the bridge check), and
                     // `filterResult.toDigest(redactionRects:)`. Never give the
                     // digest an independent conversion.
                     let pageBounds = CGRect(origin: .zero, size: effectiveSize)
@@ -219,7 +216,7 @@ public final class PageRasterizer: @unchecked Sendable {
                         normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: pageBounds)
                     }
 
-                    // DRAW-1: build polygon-aware shapes alongside the rect-
+                    // Build polygon-aware shapes alongside the rect-
                     // only path. Pure rectangle pages still consume the
                     // pre-filter against `expandedBounds` only; polygon
                     // pages add the polygon test for the final overlap
@@ -263,7 +260,7 @@ public final class PageRasterizer: @unchecked Sendable {
                             regionShapes: shapes
                         )
                     } else {
-                        // Filter characters against redaction regions (§5B.2)
+                        // Filter characters against redaction regions
                         filterResult = try await filterCharacters(
                             characters: characters,
                             redactionRects: redactionRectsInPoints
@@ -279,8 +276,8 @@ public final class PageRasterizer: @unchecked Sendable {
                     )
                 } else {
                     // shouldFallback or empty: textLayerEntries remains nil,
-                    // page processed as Secure Rasterization (ENGINE §5A
-                    // TL-7-1). PD-5: record which runtime condition it was.
+                    // page processed as Secure Rasterization.
+                    // Record which runtime condition it was.
                     fallbackReason = shouldFallback
                         ? .cjkEncodingFailure : .noExtractableText
                     pageRasterizerLogger.log(
@@ -289,9 +286,9 @@ public final class PageRasterizer: @unchecked Sendable {
                 }
             } catch { // LegalPhrases:safe (Swift keyword)
                 // Extraction threw (e.g., OCG defense) — per-page fallback
-                // to Secure Rasterization. textLayerEntries remains nil (TL-7-1).
-                // PD-5 / RC-5: record + log the runtime reason (reason text
-                // only — no document content, ARCH §12.2).
+                // to Secure Rasterization. textLayerEntries remains nil.
+                // Record + log the runtime reason (reason text
+                // only — no document content).
                 fallbackReason = .extractionFailed
                 pageRasterizerLogger.log(
                     "page \(page.pageIndex) fell back to secure rasterization at runtime (text extraction threw)"
@@ -299,7 +296,7 @@ public final class PageRasterizer: @unchecked Sendable {
             }
         }
 
-        // 3. Render page with timeout (ENGINE §2.7)
+        // 3. Render page with timeout
         // CG-only concurrent render path — draw the pre-extracted
         // `cgPage` with the pre-extracted `cropBoxBounds`/`rotation`; the shared
         // `PDFPage` is never touched here.
@@ -311,12 +308,12 @@ public final class PageRasterizer: @unchecked Sendable {
             pageIndex: page.pageIndex, dpi: CGFloat(dpi)
         )
 
-        // ENGINE §7.1: autoreleasepool wraps the synchronous bitmap work
+        // autoreleasepool wraps the synchronous bitmap work
         // (context creation, fill, verify, image extraction) to release ObjC
         // objects between pages. The async portions above cannot be wrapped.
         //
-        // PERF-5: bitmap context comes from the per-rasterizer pool. SEC-5:
-        // after `makeImage()` returns, the buffer is zeroized AND the
+        // Bitmap context comes from the per-rasterizer pool. After
+        // `makeImage()` returns, the buffer is zeroized AND the
         // context is checked back into the pool (which zeroizes again
         // unconditionally). Both calls are inside this autoreleasepool so
         // the pool entry is wiped before its CGImage retains anything.
@@ -329,8 +326,8 @@ public final class PageRasterizer: @unchecked Sendable {
             }
 
             // After `makeImage()` returns, the buffer holds the redacted
-            // pixels — zeroize before the context returns to the pool
-            // (SEC-5). `defer` covers every exit path including thrown
+            // pixels — zeroize before the context returns to the pool.
+            // `defer` covers every exit path including thrown
             // errors so the pool invariant holds even on verify failure.
             defer {
                 PixelOperations.zeroizeBitmapBuffer(ctx)
@@ -339,15 +336,15 @@ public final class PageRasterizer: @unchecked Sendable {
 
             ctx.draw(renderedImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 
-            // 5. Apply fills — bitmap dimensions only, no PDF geometry (ENGINE §3.1)
-            // PERF-8: 256-row band cancellation checks happen inside.
+            // 5. Apply fills — bitmap dimensions only, no PDF geometry.
+            // 256-row band cancellation checks happen inside.
             try applyRedactionFills(
                 context: ctx, regions: page.regions, fillColor: page.fillColor
             )
 
-            // 6. Verify fills (ENGINE §3.4). PERF-8: 256-row band cancellation
+            // 6. Verify fills. 256-row band cancellation
             // checks happen inside; a thrown CancellationError propagates here.
-            // DRAW-1: regions with `vertices != nil` route through the
+            // Regions with `vertices != nil` route through the
             // polygon-mask scanline verify (only mask-set pixels checked).
             for region in page.regions {
                 let verifyPassed: Bool
@@ -366,7 +363,7 @@ public final class PageRasterizer: @unchecked Sendable {
                     let pixelRect = normalizedToFillPixels(
                         region.normalizedRect, bitmapWidth: width, bitmapHeight: height
                     )
-                    // PD-4-1: Clamp to bitmap bounds
+                    // Clamp to bitmap bounds
                     let clamped = pixelRect.intersection(
                         CGRect(x: 0, y: 0, width: width, height: height)
                     )
@@ -377,7 +374,7 @@ public final class PageRasterizer: @unchecked Sendable {
                     )
                 }
                 guard verifyPassed else {
-                    // ENGINE §3.4a: Fill verification failed — the redaction fill did
+                    // Fill verification failed — the redaction fill did
                     // not produce the expected pixel values across the entire region.
                     throw PipelineError.redactionError(
                         .fillVerificationFailed(pageIndex: page.pageIndex)
@@ -404,7 +401,7 @@ public final class PageRasterizer: @unchecked Sendable {
         }
     }
 
-    // MARK: - Render with Timeout (ENGINE §2.7)
+    // MARK: - Render with Timeout
 
     /// CG-only render-with-timeout, used by the concurrent `rasterize`.
     /// Consumes the pre-extracted `CGPDFPage` + geometry, so no shared
@@ -414,13 +411,13 @@ public final class PageRasterizer: @unchecked Sendable {
     /// (TSan, iOS 26 SDK, 2026-06); revalidate on SDK bumps. The other surviving
     /// concurrent PDFKit surfaces are `extractCharacters` (searchable text) and
     /// the OCG `pageReferencesHiddenOCG` `pageRef` walk — both covered by that
-    /// harness (ADV-2 A2-12).
+    /// harness.
     @concurrent
     func renderCGPageWithTimeout(
         _ cgPage: CGPDFPage, bounds: CGRect, rotation: Int,
         pageIndex: Int, dpi: CGFloat
     ) async throws -> CGImage {
-        // L-19: Pre-flight bound-check before entering the render task group —
+        // Pre-flight bound-check before entering the render task group —
         // drawPDFPage on a pathologically large page spins inside an
         // uninterruptible C call (same defense as the PDFPage overload).
         guard bounds.width < pageDimensionLimit,
@@ -451,11 +448,11 @@ public final class PageRasterizer: @unchecked Sendable {
         }
     }
 
-    // MARK: - Core Render (ENGINE §2.4)
+    // MARK: - Core Render
 
     /// Render a PDF page to a CGImage using CGPDFPage (NOT PDFPage.draw()).
     /// Handles cropBox origin, /Rotate, DPI scaling, and anti-aliasing defense.
-    /// See ENGINE §2.4 — R5: NEVER use PDFPage.draw(with:to:).
+    /// Never render through PDFKit's page `draw(with:to:)` here.
     @concurrent
     public func renderPage(
         _ page: PDFPage, pageIndex: Int,
@@ -472,7 +469,7 @@ public final class PageRasterizer: @unchecked Sendable {
         let rawRect = page.bounds(for: box)
         let rotation = page.rotation
 
-        // 2. Compute post-rotation visual dimensions (ENGINE §2.2)
+        // 2. Compute post-rotation visual dimensions
         let effectiveSize: CGSize = (rotation == 90 || rotation == 270)
             ? CGSize(width: rawRect.height, height: rawRect.width)
             : rawRect.size
@@ -486,7 +483,7 @@ public final class PageRasterizer: @unchecked Sendable {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
         }
 
-        // 4. White background (AC-1: UIColor on iOS)
+        // 4. White background (UIColor on iOS)
         #if canImport(UIKit)
         ctx.setFillColor(UIColor.white.cgColor)
         #else
@@ -494,7 +491,7 @@ public final class PageRasterizer: @unchecked Sendable {
         #endif
         ctx.fill(CGRect(x: 0, y: 0, width: pw, height: ph))
 
-        // 5. Security: disable font smoothing (Bland et al. defense, ENGINE §2.3)
+        // 5. Security: disable font smoothing (Bland et al. defense)
         ctx.setShouldSmoothFonts(false)
         ctx.setShouldSubpixelQuantizeFonts(false)
         ctx.setAllowsFontSubpixelPositioning(false)
@@ -517,8 +514,8 @@ public final class PageRasterizer: @unchecked Sendable {
         ctx.addRect(cropBox)
         ctx.clip()
 
-        // 9. Render using CoreGraphics (NOT PDFKit's draw() — R5).
-        // PERF-8: wrap the synchronous C call in a signpost interval so
+        // 9. Render using CoreGraphics (NOT PDFKit's draw()).
+        // Wrap the synchronous C call in a signpost interval so
         // Instruments can sample wall-clock without code changes. See the
         // top-of-file note for why chunking is deliberately deferred.
         let signpostID = pageRasterizerSignposter.makeSignpostID()
@@ -539,7 +536,7 @@ public final class PageRasterizer: @unchecked Sendable {
     /// so the concurrent render path never reads the live `PDFPage`. The box is
     /// always `.cropBox` (the production call site). Pixel output is identical
     /// to the PDFPage overload — the same `bounds`/`rotation` feed the
-    /// pixel-dimension math and `selectDPI` already consumed them. R5: render
+    /// pixel-dimension math and `selectDPI` already consumed them. Rendering is
     /// via CoreGraphics (`drawPDFPage`), never the PDFKit page-level draw API.
     @concurrent
     func renderPageFromCGPage(
@@ -550,7 +547,7 @@ public final class PageRasterizer: @unchecked Sendable {
 
         let rawRect = bounds
 
-        // Compute post-rotation visual dimensions (ENGINE §2.2)
+        // Compute post-rotation visual dimensions
         let effectiveSize: CGSize = (rotation == 90 || rotation == 270)
             ? CGSize(width: rawRect.height, height: rawRect.width)
             : rawRect.size
@@ -564,7 +561,7 @@ public final class PageRasterizer: @unchecked Sendable {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
         }
 
-        // White background (AC-1: UIColor on iOS)
+        // White background (UIColor on iOS)
         #if canImport(UIKit)
         ctx.setFillColor(UIColor.white.cgColor)
         #else
@@ -572,7 +569,7 @@ public final class PageRasterizer: @unchecked Sendable {
         #endif
         ctx.fill(CGRect(x: 0, y: 0, width: pw, height: ph))
 
-        // Security: disable font smoothing (Bland et al. defense, ENGINE §2.3)
+        // Security: disable font smoothing (Bland et al. defense)
         ctx.setShouldSmoothFonts(false)
         ctx.setShouldSubpixelQuantizeFonts(false)
         ctx.setAllowsFontSubpixelPositioning(false)
@@ -592,7 +589,7 @@ public final class PageRasterizer: @unchecked Sendable {
         ctx.addRect(cropBox)
         ctx.clip()
 
-        // Render using CoreGraphics (NOT PDFKit's draw() — R5).
+        // Render using CoreGraphics (NOT PDFKit's draw()).
         let signpostID = pageRasterizerSignposter.makeSignpostID()
         let signpostState = pageRasterizerSignposter.beginInterval(
             "drawPDFPage", id: signpostID, "page=\(pageIndex) dpi=\(Int(dpi))"

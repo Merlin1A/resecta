@@ -1,6 +1,6 @@
 import Foundation
 
-// Plan §4 / §3.1b — DEA registration number. Format: two uppercase letters
+// DEA registration number. Format: two uppercase letters
 // + seven digits. First letter = registrant type (A/B/F/G/M/P/R); second
 // letter = first letter of registrant surname (or 9 for NPs/midlevels).
 // Checksum: (d1 + d3 + d5) + 2·(d2 + d4 + d6) with last digit of result
@@ -39,7 +39,6 @@ struct DEADetector: Sendable {
     /// P/R/S/T/U (narcotic treatment programs), X (DATA 2000 waiver / Suboxone,
     /// no longer newly issued post-2022 but still valid for historic records).
     /// Letters I, N, O, Q, V, W, Y, Z have no documented registrant assignment.
-    /// ENGINE §4.11 / WS1 item 1.11 (2026-06-10).
     private static let validRegistrantLetters: Set<Character> = [
         "A", "B", "C", "D", "E", "F", "G", "H",
         "J", "K", "L", "M", "P", "R", "S", "T", "U", "X"
@@ -62,7 +61,7 @@ struct DEADetector: Sendable {
     /// Validates that the first letter is a documented DEA registrant-type code.
     /// This is a separate semantic gate from the checksum arithmetic — a number
     /// can pass the checksum while having an undocumented registrant type.
-    /// Cite: DEA Practitioner's Manual §I.A; 21 CFR §1301.11 (WS1 item 1.11, 2026-06-10).
+    /// Cite: DEA Practitioner's Manual §I.A; 21 CFR §1301.11.
     /// The regex [A-Z]{2} matches uppercase only, so chars[0] is uppercase on entry; no uppercasing needed.
     static func isValidRegistrantLetter(_ code: String) -> Bool {
         guard let first = code.first else { return false }
@@ -75,7 +74,7 @@ struct DEADetector: Sendable {
         return Self.pattern.matches(in: fullText, range: range).compactMap { match in
             let matchedText = text.substring(with: match.range)
             guard Self.isValidChecksum(matchedText) else { return nil }
-            // ENGINE §4.11: registrant-type first-letter gate (WS1 item 1.11, 2026-06-10).
+            // Registrant-type first-letter gate.
             // Applied after checksum to allow isValidChecksum to remain a pure arithmetic
             // predicate (preserving vector test contract). Unrecognized first letter →
             // fail-safe miss (no false positive); user can manually redact. New DEA
@@ -99,7 +98,7 @@ struct DEADetector: Sendable {
             ) {
                 signals.append(ctxSignal)
             }
-            // WU-76 / [P4] — per-keyword breakdown alongside the scalar.
+            // Per-keyword breakdown alongside the scalar.
             if let ctxDetail = scorer.signalDetail(
                 text: fullText,
                 matchRange: match.range,

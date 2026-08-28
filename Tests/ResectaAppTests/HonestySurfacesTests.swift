@@ -3,7 +3,7 @@ import Foundation
 @testable import ResectaApp
 import RedactionEngine
 
-// VF-16 — honesty surfaces at the share decision.
+// Honesty surfaces at the share decision.
 //
 // Three pinned contracts:
 //
@@ -50,16 +50,15 @@ struct HonestyDisclaimerMountTests {
         }
     }
 
-    // UXC-43 (D-118; supersedes REV-03's placement, RB-61/RB-68): the
-    // disclaimer's one gate-wrapped mount is the LAST element of the
+    // The disclaimer's one gate-wrapped mount is the LAST element of the
     // page on EVERY verdict — inside the footer block beneath the
     // trust strip, after the timing footer's mount — no per-status
     // placement branches. On SKIPPED there is no timing line, so the
     // disclaimer sits directly under the strip (accepted as-falls).
-    // UXC-47 (D-122): the block's spacing is `disclaimerFootGap` (144 pt,
+    // The block's spacing is `disclaimerFootGap` (144 pt,
     // was `Spacing.sm`) so the note starts below the first screen at the
     // default type size on the 6.3″ and 6.9″ phones.
-    @Test("UXC-43/47 placement: one gate-wrapped mount, last on the page beneath the trust strip and the timing footer, spaced by disclaimerFootGap")
+    @Test("Placement: one gate-wrapped mount, last on the page beneath the trust strip and the timing footer, spaced by disclaimerFootGap")
     func disclaimerMountSitsAtThePageFoot() throws {
         let source = try loadRepoFile(
             "Sources/ResectaApp/Views/VerificationResultsView.swift")
@@ -86,23 +85,23 @@ struct HonestyDisclaimerMountTests {
         }
         #expect(strip.upperBound <= footerMount.lowerBound
                     && footerMount.upperBound <= disclaimerMount.lowerBound,
-                "the disclaimer mount must be the last element, beneath trustStrip and the footer mount (UXC-43)")
+                "the disclaimer mount must be the last element, beneath trustStrip and the footer mount")
         // The two mounts share ONE footer block spaced by
-        // `disclaimerFootGap` (UXC-47; was `Spacing.sm` under UXC-43).
+        // `disclaimerFootGap` (was `Spacing.sm`).
         #expect(source.contains(
             "VStack(spacing: Self.disclaimerFootGap) {\n"
             + "                        if Self.shouldShowRunBreakdown(report: report) {\n"
             + "                            footer\n"
             + "                        }\n"
             + "                        if Self.shouldShowHonestyDisclaimer("),
-                "the timing footer and the disclaimer must share one footer block spaced by disclaimerFootGap (UXC-43/47)")
+                "the timing footer and the disclaimer must share one footer block spaced by disclaimerFootGap")
     }
 
-    // UXC-47 (D-122): the gap is a pinned value — 3 × `Spacing.xxl` =
+    // The gap is a pinned value — 3 × `Spacing.xxl` =
     // 144 pt, sized from the measured PASS layout so the note's top edge
     // lands ≈23 pt below the 6.9″ screen and ≈105 pt below the 6.3″ one.
     // Re-measure before changing it (the App Store frame depends on it).
-    @Test("UXC-47: the timing-line → disclaimer gap is 3 × Spacing.xxl = 144 pt")
+    @Test("The timing-line → disclaimer gap is 3 × Spacing.xxl = 144 pt")
     func disclaimerFootGapIsPinned() {
         #expect(VerificationResultsView.disclaimerFootGap == 144)
         #expect(VerificationResultsView.disclaimerFootGap == ResectaTokens.Spacing.xxl * 3)
@@ -201,7 +200,7 @@ struct FailedStatePrimaryActionTests {
     func importWhileEditingReturnsToEditor() {
         // Import-while-editing: the editor still holds the PREVIOUS,
         // valid document. Returning is a go-back, so the non-recoverable
-        // import class keeps it (deliberate current UX, noted in VF-16).
+        // import class keeps it (deliberate current UX).
         let action = FailedStateView.primaryAction(
             error: .importError(.corrupt), returnPhase: .editing)
         #expect(action == Action.returnToEditor)
@@ -277,50 +276,49 @@ struct FailedStatePrimaryActionTests {
     }
 }
 
-// RB-28/29/30 — the run-facts strip (UXC-04/05/06) and the non-visual
-// review-limitation line (UXC-16).
+// The run-facts strip and the non-visual review-limitation line.
 //
-// UXC-04: OCR pixel-cap skip pages snapshotted onto
+// OCR pixel-cap skip pages snapshotted onto
 // `RedactionState.DetectionRunRecord`, rendered as a pinned singular/
 // plural builder using `SearchResultsSection.formatPageList`.
-// UXC-05: no detection ran this session, yet a region was applied for
+// No detection ran this session, yet a region was applied for
 // this output.
-// UXC-06: the degrade-failure list snapshotted onto the record at
+// The degrade-failure list snapshotted onto the record at
 // record time, rendered by reusing `DetectionDegradeCopy.banner`
 // verbatim.
-// UXC-16: a pinned line above the honesty disclaimer, reused as the
+// A pinned line above the honesty disclaimer, reused as the
 // `RedactedPreviewView` verdict capsule's accessibility label.
 
-@Suite("Run-facts strip (UXC-04/05/06) + non-visual limit line (UXC-16)")
+@Suite("Run-facts strip + non-visual limit line")
 @MainActor
 struct RunFactsStripTests {
 
-    // MARK: - F-04 (UXC-04)
+    // MARK: - OCR skip line
 
-    @Test("F-04 singular exact text — 0-indexed page 6 renders as Page 7")
+    @Test("Singular exact text — 0-indexed page 6 renders as Page 7")
     func ocrSkipLineSingular() {
         let line = VerificationResultsView.RunFactsStrip.ocrSkipLine(pages: [6])
         #expect(line == "Page 7 was too large to scan for text, so its image content was not examined by detection. Review that page manually before sharing.")
     }
 
-    @Test("F-04 plural exact text — pages sorted regardless of Set iteration order")
+    @Test("Plural exact text — pages sorted regardless of Set iteration order")
     func ocrSkipLinePlural() {
         let unordered: Set<Int> = [6, 2, 4]
         let line = VerificationResultsView.RunFactsStrip.ocrSkipLine(pages: Array(unordered))
         #expect(line == "Pages 3, 5, and 7 were too large to scan for text, so image content there was not examined by detection. Review those pages manually before sharing.")
     }
 
-    // MARK: - F-05 (UXC-05)
+    // MARK: - Detection-never-ran line
 
-    @Test("F-05 exact text")
+    @Test("Exact text")
     func detectionNeverRanExactText() {
         #expect(VerificationResultsView.RunFactsStrip.detectionNeverRanLine
                 == "Automated detection did not run on this document. Every region here came from Search or manual marking — review each page for anything those did not cover before sharing.")
     }
 
-    // MARK: - F-06 (UXC-06) — verbatim reuse
+    // MARK: - Degrade line — verbatim reuse
 
-    @Test("F-06 equals DetectionDegradeCopy.banner verbatim on both branches")
+    @Test("Degrade line equals DetectionDegradeCopy.banner verbatim on both branches")
     func degradeLineMatchesBannerVerbatim() {
         let nerOnly = [GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue]
         let corpus = ["NameGazetteer"]
@@ -350,7 +348,7 @@ struct RunFactsStripTests {
         #expect(VerificationResultsView.RunFactsStrip.lines(for: degradeOnly).count == 1)
     }
 
-    @Test("F-04 + F-06 render in order [F-04, F-06]")
+    @Test("OCR skip line + degrade line render in order")
     func linesOCRAndDegrade() {
         let facts = VerificationResultsView.RunFacts(
             ocrSkippedPages: [0], degradeFailures: ["NameGazetteer"])
@@ -361,7 +359,7 @@ struct RunFactsStripTests {
             .degradeLine(failedGazetteers: ["NameGazetteer"]))
     }
 
-    @Test("F-05 + F-06 render in order [F-05, F-06]")
+    @Test("Detection-never-ran line + degrade line render in order")
     func linesNeverRanAndDegrade() {
         let facts = VerificationResultsView.RunFacts(
             detectionNeverRan: true, degradeFailures: ["NameGazetteer"])
@@ -452,7 +450,7 @@ struct RunFactsStripTests {
 
     @Test("run-facts strip copy stays mechanism-only, no percent sign")
     func runFactsCopyIsMechanismOnly() {
-        // REV-02 removed the UXC-16 limit line — its copy is out of
+        // The non-visual limit line was removed — its copy is out of
         // the sample set with it.
         let samples = [
             VerificationResultsView.RunFactsStrip.ocrSkipLine(pages: [6]),
@@ -485,9 +483,9 @@ struct RunFactsStripTests {
 
     @Test("VerificationResultsView mounts runFactsStrip")
     func sourcePinsForNewMounts() throws {
-        // REV-02 removed the UXC-16 limit line (and with it the
+        // The non-visual limit line was removed (and with it the
         // RedactedPreviewView label composition) — the strip pin is
-        // what remains of the F-16-era source pins.
+        // what remains of the earlier source pins.
         let viewSource = try loadRepoFile(
             "Sources/ResectaApp/Views/VerificationResultsView.swift")
         #expect(viewSource.contains("runFactsStrip"),

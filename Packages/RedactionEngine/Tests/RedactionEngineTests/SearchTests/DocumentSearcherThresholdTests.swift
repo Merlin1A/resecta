@@ -2,14 +2,14 @@ import Testing
 import PDFKit
 @testable import RedactionEngine
 
-// W4 — end-to-end threshold gating through DocumentSearcher.
+// End-to-end threshold gating through DocumentSearcher.
 //
 // Verifies the vector set via `setThresholdVector(_:)` actually filters
 // PIIMatches before they reach the SearchResult stream, and that
 // survivors carry the appliedThreshold + presetThresholdPass signal
 // in their rationale.
 
-@Suite("DocumentSearcher threshold gating (W4)", .tags(.search))
+@Suite("DocumentSearcher threshold gating", .tags(.search))
 struct DocumentSearcherThresholdTests {
 
     private func runPIIScan(
@@ -33,7 +33,7 @@ struct DocumentSearcherThresholdTests {
         return results
     }
 
-    @Test("Nil vector preserves pre-W4 behavior — all matches pass")
+    @Test("Nil vector preserves prior behavior — all matches pass")
     func nilVectorBackCompat() async {
         let results = await runPIIScan(
             text: "Patient John Smith SSN 123-45-6789",

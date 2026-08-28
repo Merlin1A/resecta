@@ -1,16 +1,16 @@
 import Foundation
 import os
 
-// W-I2 — gazetteer-manifest.json `version` accessor for audit-export records.
+// gazetteer-manifest.json `version` accessor for audit-export records.
 //
 // `Resources/Gazetteers/gazetteer-manifest.json` ships a `version` field
-// (e.g. `"1.0.0"`) tracked by the data-side bloom build. W-I2 surfaces
-// that string on every `MatchAuditRecord` so an audit export can pin
-// which gazetteer-manifest version produced the match.
+// (e.g. `"1.0.0"`) tracked by the data-side bloom build. This accessor
+// surfaces that string on every `MatchAuditRecord` so an audit export
+// can pin which gazetteer-manifest version produced the match.
 //
 // Cache lifetime: lazy `static let shared` initializes once on first
-// access; effectively per-app-session for V1 (Improvement 9). The manifest
-// only changes via Jesse's `make install-assets` boundary-crossing, which
+// access; effectively per-app-session for V1. The manifest
+// only changes via the datapipeline's `make install-assets` boundary-crossing, which
 // happens between app invocations. Missing-file → `nil`; decode-error →
 // log + `nil` (do NOT hard-fail the audit-export surface).
 

@@ -3,30 +3,30 @@ import SwiftUI
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// Package J — pins the VoiceOver labels, hints, and values added by the
-// Wave 1 accessibility sweep (A11Y-3 / 4 / 5 / 6 / 7 + A11Y-toast-ax5).
+// Pins the VoiceOver labels, hints, and values added by the
+// Wave 1 accessibility sweep.
 // The strings are exposed as `static` constants on each view so they can
 // be unit-tested without rendering, mirroring the contract for
-// `InlineWarningBanner.lineLimit(for:)` (ACCESSIBILITY.md §9.3).
+// `InlineWarningBanner.lineLimit(for:)`.
 
-@Suite("Accessibility labels and hints (Pkg J)")
+@Suite("Accessibility labels and hints")
 struct AccessibilityLabelTests {
 
-    // A11Y-3 (triage batch-actions menu label) and A11Y-4 (triage
-    // min-confidence slider label + spoken value) retired with their
+    // The triage batch-actions menu label and the triage
+    // min-confidence slider label + spoken value retired with their
     // controls: the batch menu's job moved to the footer Select All +
     // Select-Where predicates, and the review-side confidence slider
     // followed the per-run Confidence slider out (predicates are the
     // confidence tools). The unified review surface's spoken contracts
     // are pinned by `FindingRowFamilyTests`.
 
-    // MARK: - A11Y-5 / A11Y-6 — Settings picker hints
+    // MARK: - Settings picker hints
 
     @Test("Default Mode picker hint describes both pipeline modes")
     func testSettingsDefaultModeHint() {
-        // Closes A11Y-5 — the descriptive mode rows below the picker are
+        // The descriptive mode rows below the picker are
         // invisible to VoiceOver, so the hint carries the trade-off.
-        // Mechanism-description language (I6 / ARCH §1.3) — no outcome
+        // Mechanism-description language — no outcome
         // promise.
         #expect(
             SettingsView.defaultModeAccessibilityHint
@@ -36,7 +36,7 @@ struct AccessibilityLabelTests {
 
     @Test("Fill Color picker hint describes what the color controls")
     func testSettingsFillColorHint() {
-        // Closes A11Y-6 — the leading color swatch is .accessibilityHidden,
+        // The leading color swatch is .accessibilityHidden,
         // so without a hint VoiceOver announces "Fill Color, Black,
         // popup button" with no context on what gets filled.
         #expect(
@@ -47,7 +47,7 @@ struct AccessibilityLabelTests {
 
     @Test("Settings picker hints — both Default Mode and Fill Color pinned")
     func testSettingsPickerHints() {
-        // Group test that re-asserts both A11Y-5 + A11Y-6 in one place so
+        // Group test that re-asserts both picker hints in one place so
         // a future regression in either picker hint surfaces here even
         // if the individual tests are skipped.
         #expect(!SettingsView.defaultModeAccessibilityHint.isEmpty)
@@ -57,13 +57,13 @@ struct AccessibilityLabelTests {
         #expect(SettingsView.fillColorAccessibilityHint.contains("redacted regions"))
     }
 
-    // MARK: - A11Y-7 — Verify-Before-Export conditional hint
+    // MARK: - Verify-Before-Export conditional hint
 
     @Test("Verify toggle default hint mentions verification before export")
     func testVerifyToggleDefaultHint() {
-        // Closes A11Y-7 default branch — when paranoid mode is off, the
+        // The default branch — when paranoid mode is off, the
         // hint describes the toggle's behavior using mechanism-description
-        // copy per CLAUDE.md Hard Rules / ARCH §1.3.
+        // copy.
         let hint = SettingsView.verifyToggleHint(paranoidMode: false)
         #expect(hint == SettingsView.verifyToggleDefaultHint)
         #expect(hint == "When enabled, the app runs verification checks before you can export")
@@ -71,9 +71,9 @@ struct AccessibilityLabelTests {
 
     @Test("Verify toggle paranoid hint explains the lock reason")
     func testParanoidLockedHint() {
-        // Closes A11Y-7 paranoid branch — when paranoid mode forces the
+        // The paranoid branch — when paranoid mode forces the
         // toggle on, swap the hint copy so VoiceOver explains *why* the
-        // control reads as disabled. SEC-8 override #2 — paranoid mode
+        // control reads as disabled. Paranoid-mode override #2 — paranoid mode
         // forces verification on; see SettingsView.workflowSection.
         let hint = SettingsView.verifyToggleHint(paranoidMode: true)
         #expect(hint == SettingsView.verifyToggleParanoidLockedHint)
@@ -90,11 +90,11 @@ struct AccessibilityLabelTests {
         )
     }
 
-    // MARK: - A11Y-toast-ax5 — ToastView line-limit at AX5
+    // MARK: - ToastView line-limit at AX5
 
     @Test("Toast caps at 2 lines for info severity below AX5")
     func testToastInfoBelowAX5CapsAtTwoLines() {
-        // §A6.3 compact-capsule contract, amended: the original 1-line
+        // The compact-capsule contract, amended: the original 1-line
         // info cap truncated shipped messages mid-sentence at standard
         // text sizes (text-layer notice, dismissal-cleared counts), so
         // info matches the warning/error 2-line cap.
@@ -146,9 +146,9 @@ struct AccessibilityLabelTests {
             .error,
           ])
     func testToastAtAX5LiftsToThreeLines(severity: ToastSeverity) {
-        // Closes A11Y-toast-ax5 — at .accessibility5 the cap lifts to 3
+        // At .accessibility5 the cap lifts to 3
         // lines for all severities, mirroring the InlineWarningBanner
-        // pattern (ACCESSIBILITY.md §9.3). Same lift applies regardless
+        // pattern. Same lift applies regardless
         // of the per-severity baseline so long messages remain readable
         // when the text size is at its accessibility maximum.
         #expect(
@@ -233,7 +233,7 @@ struct AccessibilityLabelTests {
     func testLayerAccessibilityPhrase(status: VerificationStatus, expected: String) {
         // Per-layer surfaces must not speak "All checks completed without
         // issues." after each of up to 10 layers mid-run — that is the
-        // spoken twin of the premature-confidence anchoring §4.3a's
+        // spoken twin of the premature-confidence anchoring that
         // intermediateColor prevents visually.
         #expect(status.layerAccessibilityPhrase == expected)
         #expect(status.layerAccessibilityPhrase != status.accessibilityLabel)

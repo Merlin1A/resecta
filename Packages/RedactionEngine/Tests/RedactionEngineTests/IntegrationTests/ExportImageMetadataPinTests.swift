@@ -5,7 +5,7 @@ import ImageIO
 import PDFKit
 @testable import RedactionEngine
 
-// q34 (QD-15 / GT §4 gap 1) — export-side EXIF/GPS regression pin.
+// Export-side EXIF/GPS regression pin.
 //
 // HONEST ATTRIBUTION: the export path carries no stripper. Source-image
 // metadata is absent from exports because the pipeline fully re-rasters each
@@ -16,7 +16,7 @@ import PDFKit
 // through the ACTUAL pipeline (PageRasterizer.rasterize — rasterize + fill +
 // verify — then PDFStreamReconstructor) and asserts the OUTPUT's embedded
 // image streams carry no GPS/Exif property dictionaries. The import side has
-// its own pin (LivePhotoAuxStripperTests, CAT-153 H1); this is the export
+// its own pin (LivePhotoAuxStripperTests); this is the export
 // side, which previously had none.
 
 @Suite("Export image metadata pin (redraw boundary)")
@@ -76,7 +76,7 @@ struct ExportImageMetadataPinTests {
         await recon.finalize()
 
         // 4. Output asserts — embedded image streams carry no SOURCE metadata.
-        // CGPDFContext re-encodes every drawn image (EXP-010) and its encoder
+        // CGPDFContext re-encodes every drawn image and its encoder
         // injects a purely technical Exif dictionary describing the fresh
         // raster ({ColorSpace, PixelXDimension, PixelYDimension} — measured
         // 2026-07-06 on the iOS 26.5 sim; the dimensions match the OUTPUT
@@ -110,7 +110,7 @@ struct ExportImageMetadataPinTests {
         // 5. /Info stays within the Apple auto-injected set (same asserts as
         // ReconstructionTests.metadataStripped; /Producer is auto-injected by
         // CGPDFContext and then rewritten to the fixed value by finalize() —
-        // ENGINE §5.4, pinned in ReconstructionTests).
+        // pinned in ReconstructionTests).
         let pdfString = String(data: outputData, encoding: .ascii) ?? ""
         #expect(!pdfString.contains("/Author"))
         #expect(!pdfString.contains("/Title"))

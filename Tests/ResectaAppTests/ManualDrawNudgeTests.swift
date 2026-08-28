@@ -4,19 +4,19 @@ import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// WU-72: manual-draw nearby-PII nudge predicate + accept
+// Manual-draw nearby-PII nudge predicate + accept
 // path + suppression boundary resets. The predicate
 // `RedactionState.nearbyUnappliedPIIMatch(...)` is pure and pinned
 // without a SwiftUI host; the boundary-reset tests instantiate a
 // `RedactionState` to exercise the didSet on `activeSearch` and the
-// explicit resets in `clearAll()` + `clearForNewDocument()` per
-// [RR-29] load-bearing scope. The rationale-continuity test pins
-// the [WU-71] handoff at the accept seam — a nudge-accepted region
+// explicit resets in `clearAll()` + `clearForNewDocument()`, which are
+// load-bearing scope. The rationale-continuity test pins
+// the accept-seam handoff — a nudge-accepted region
 // carries `.searchMatch(term:rationale:)` with the source result's
 // rationale intact, so `RedactionState.rationale(forRegionID:)`
 // continues to surface the rationale on the canvas.
 
-@Suite("Manual-draw nearby-PII nudge (WU-72)")
+@Suite("Manual-draw nearby-PII nudge")
 @MainActor
 struct ManualDrawNudgeTests {
 
@@ -28,7 +28,7 @@ struct ManualDrawNudgeTests {
     }
 
     /// Build a PII search result on `page` at `rect`. The rationale carries
-    /// a stable rule ID so the WU-71 continuity test can assert it survives
+    /// a stable rule ID so the continuity test can assert it survives
     /// the accept path.
     static func piiResult(
         id: UUID = UUID(),
@@ -59,7 +59,7 @@ struct ManualDrawNudgeTests {
         )
     }
 
-    // MARK: - (a) Proximity threshold (load-bearing per ACTION-WU-72)
+    // MARK: - (a) Proximity threshold (load-bearing)
 
     @Test("Just-inside 50pt proximity surfaces the match")
     func proximityJustInsideFires() {
@@ -191,9 +191,9 @@ struct ManualDrawNudgeTests {
         #expect(match == nil)
     }
 
-    // MARK: - (c) Suppression boundary resets per [RR-29] (load-bearing)
+    // MARK: - (c) Suppression boundary resets (load-bearing)
 
-    @Test("[RR-29] boundary (a): activeSearch transition resets suppression")
+    @Test("boundary (a): activeSearch transition resets suppression")
     func boundaryActiveSearchTransitionResets() {
         let state = RedactionState()
         let search = SearchState()
@@ -205,7 +205,7 @@ struct ManualDrawNudgeTests {
         #expect(state.manualDrawNudgeSuppressedForSession == false)
     }
 
-    @Test("[RR-29] boundary (a) replay: re-opening the sheet resets again")
+    @Test("boundary (a) replay: re-opening the sheet resets again")
     func boundaryActiveSearchReplayResets() {
         let state = RedactionState()
         // First session: flag set, then dismiss, then re-open.
@@ -219,7 +219,7 @@ struct ManualDrawNudgeTests {
         #expect(state.manualDrawNudgeSuppressedForSession == false)
     }
 
-    @Test("[RR-29] boundary (b): clearForNewDocument resets suppression")
+    @Test("boundary (b): clearForNewDocument resets suppression")
     func boundaryNewDocumentResets() {
         let state = RedactionState()
         state.setManualDrawNudgeSuppressedForTesting(true)
@@ -230,7 +230,7 @@ struct ManualDrawNudgeTests {
         #expect(state.pendingManualDrawNudge == nil)
     }
 
-    @Test("[RR-29] boundary (c): clearAll resets suppression")
+    @Test("boundary (c): clearAll resets suppression")
     func boundaryClearAllResets() {
         let state = RedactionState()
         state.setManualDrawNudgeSuppressedForTesting(true)
@@ -241,9 +241,9 @@ struct ManualDrawNudgeTests {
         #expect(state.pendingManualDrawNudge == nil)
     }
 
-    // MARK: - (d) Accept path + [WU-71] rationale continuity (load-bearing)
+    // MARK: - (d) Accept path + rationale continuity (load-bearing)
 
-    @Test("Accept path creates a region whose Source carries the result's rationale (WU-71 continuity)")
+    @Test("Accept path creates a region whose Source carries the result's rationale")
     func acceptPropagatesRationale() {
         let state = RedactionState()
         let search = SearchState()

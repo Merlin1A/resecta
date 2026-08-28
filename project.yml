@@ -1,12 +1,11 @@
 name: ResectaApp
 options:
   bundleIdPrefix: com.resecta
-  # GAP-DEPTARGET-NER (D04-F3 == D11-F3) — floor stays iOS 26.0 by design. The
-  # runtime `.nameType` NER name model is reliably provisioned only on 26.4+ (per
-  # the detection harness pin); the 26.0 floor is INTENTIONAL because non-NER
-  # detectors + the degraded banner (now also fired on NER-asset absence)
-  # cover the 26.0–26.3 gap. Do NOT raise to 26.4 — Jesse decision
-  # (J-DEPTARGET / J-NER-ONDEVICE option B); on-device proof = GAP-REL-ONDEVICE.
+  # The deployment floor stays iOS 26.0 by design. The runtime `.nameType` NER
+  # name model is reliably provisioned only on 26.4+ (per the detection harness
+  # pin); the 26.0 floor is intentional because the non-NER detectors plus the
+  # degraded-detection banner (also fired on NER-asset absence) cover the
+  # 26.0–26.3 gap. Do not raise the floor to 26.4.
   deploymentTarget:
     iOS: "26.0"
   createIntermediateGroups: true
@@ -20,11 +19,10 @@ settings:
   base:
     SWIFT_VERSION: "6.2"
     # Default Actor Isolation = MainActor (SE-0466), pinned across all Xcode
-    # targets (app + unit/UI test bundles). Jesse ruling 2026-06-12 (fix-series
-    # s04): the Swift 6.2 compiler default is `nonisolated`, so this
-    # MainActor assumption and PipelineCoordinator's @unchecked Sendable
-    # rationale was previously unenforced. Set explicitly here rather than
-    # relying on the toolchain default. The RedactionEngine SPM package keeps
+    # targets (app + unit/UI test bundles). Set explicitly: the Swift 6.2
+    # compiler default is `nonisolated`, so this MainActor assumption and
+    # PipelineCoordinator's @unchecked Sendable rationale would otherwise be
+    # unenforced. The RedactionEngine SPM package keeps
     # its own `nonisolated` + @concurrent default (Packages/.../Package.swift).
     SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
 
@@ -118,7 +116,7 @@ targets:
         # silently disarms the fixture-strip postBuildScript below: the
         # sandboxed script cannot stat ${SRCROOT}/UITestFixtures, its -d
         # guard skips, and both synthetic fixtures ship in Release archives
-        # (caught at the first-ever archive, D-91). The strip's whole job is
+        # (caught at the first-ever archive). The strip's whole job is
         # deleting from the built product, so declared outputs cannot model
         # it; pin the E4-verified environment instead.
         ENABLE_USER_SCRIPT_SANDBOXING: NO

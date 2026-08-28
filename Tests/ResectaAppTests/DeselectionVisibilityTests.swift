@@ -96,7 +96,7 @@ struct DeselectionRecordLifecycleTests {
     }
 }
 
-@Suite("Deselection apply-commit capture (UXC-01)", .tags(.search))
+@Suite("Deselection apply-commit capture", .tags(.search))
 @MainActor
 struct DeselectionApplyCommitCaptureTests {
 

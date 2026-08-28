@@ -36,7 +36,7 @@ import XCTest
 // nonisolated: this is an XCUITest that drives the app through `XCUIApplication`
 // (a separate process) and does NOT `@testable import` app internals, so it touches
 // no @MainActor app state and was nonisolated pre-flip (ran 4/4 green). Under the
-// s04 SE-0466 MainActor-default flip it would default to MainActor, whose
+// SE-0466 MainActor-default flip it would default to MainActor, whose
 // setUp/tearDown/init overrides then mismatch XCTestCase's nonisolated ObjC lifecycle
 // methods ("different actor isolation from nonisolated overridden declaration"). Pin
 // it nonisolated to restore the pre-flip isolation. (The ResectaAppTests unit classes

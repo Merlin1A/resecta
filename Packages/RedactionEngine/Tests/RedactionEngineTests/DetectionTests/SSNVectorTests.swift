@@ -2,18 +2,18 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W-G fixture-driven test for SSN structural detection. The DataPipeline-
+// Fixture-driven test for SSN structural detection. The DataPipeline-
 // generated vectors at Fixtures/vectors/ssn_structural_vectors.json carry
 // every SSN-shape variant + every SSA structural rejection rule. This file
 // exercises SSNStateMachine.scan + SSNStructuralValidator.isValid against
 // the fixture so a silent regression in either surface fails CI. Closes the
-// 14-of-14 vector parity gap (13 already shipped via D-19 PR #38; SSN was
-// the lone family without a fixture-driven Swift consumer).
+// 14-of-14 vector parity gap (SSN was the lone family without a
+// fixture-driven Swift consumer).
 //
 // SSNDetectionTests.swift keeps its inline cases — this suite is additive,
 // not a replacement.
 
-@Suite("SSN fixture-driven vector tests (W-G)")
+@Suite("SSN fixture-driven vector tests")
 struct SSNVectorTests {
 
     struct Vectors: Decodable {
@@ -37,7 +37,7 @@ struct SSNVectorTests {
         return try JSONDecoder().decode(Vectors.self, from: data).vectors
     }
 
-    @Test("W-G fixture loads with rows")
+    @Test("fixture loads with rows")
     func fixtureLoads() throws {
         guard let vectors = try loadVectors() else {
             Issue.record("ssn_structural_vectors.json not bundled")

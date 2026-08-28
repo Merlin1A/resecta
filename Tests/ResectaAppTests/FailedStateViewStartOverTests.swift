@@ -4,11 +4,11 @@ import PDFKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// STATE-6 (Pkg I) — FailedStateView Start Over confirmation + teardown.
+// FailedStateView Start Over confirmation + teardown.
 //
-// Pre-Pkg-I, Start Over only walked the phase back to .empty, leaving
+// Previously, Start Over only walked the phase back to .empty, leaving
 // drawn regions and `sourceDocument` in memory — a PII-in-memory
-// regression. Pkg I closes that by mirroring the verification Done
+// regression. Start Over now closes that by mirroring the verification Done
 // semantics (originally in `VerificationActionBar`, now lifted into
 // `DocumentEditorView.performDoneCloseSession()`): clear regions, drop
 // the sourceDocument reference, then transition.
@@ -21,10 +21,9 @@ import PDFKit
 //   3. The Start Over (destructive) role mirrors `clearAll()` +
 //      `sourceDocument = nil`, closing the PII-in-memory regression.
 //
-// Plan reference: post-V1.0 improvements §3 Pkg I (STATE-6).
-// Mechanism-description copy per ARCH §1.3.
+// Mechanism-description copy.
 
-@Suite("FailedStateView Start Over teardown (STATE-6, Pkg I)")
+@Suite("FailedStateView Start Over teardown")
 @MainActor
 struct FailedStateViewStartOverTests {
 
@@ -37,7 +36,7 @@ struct FailedStateViewStartOverTests {
         return [0: page]
     }
 
-    @Test("Start Over calls production resetForStartOver, clears PII state, and lands .empty (CAT-226)")
+    @Test("Start Over calls production resetForStartOver, clears PII state, and lands .empty")
     func testStartOverClearsAllAndSourceDocument() {
         let coordinator = makeCoordinator()
         defer { coordinator.tempExportDirectory.tearDown() }
@@ -60,7 +59,7 @@ struct FailedStateViewStartOverTests {
         redactionState.detectionResults = [0: [DetectionResult.mock()]]
         redactionState.triageSelections[UUID()] = true
 
-        // CAT-226: call the PRODUCTION teardown. This was previously an inline
+        // Call the production teardown. This was previously an inline
         // copy of the `performStartOver()` body — a copy that no test could
         // invoke and that omitted the `transition(to: .empty)` call, leaving
         // the phase postcondition uncovered.
@@ -82,7 +81,7 @@ struct FailedStateViewStartOverTests {
         #expect(documentState.currentPageIndex == 0)
         #expect(documentState.lastUsedPipelineMode == nil)
         #expect(documentState.wasPausedByBackground == false)
-        // CAT-226: the phase-transition postcondition the inline-copy test
+        // The phase-transition postcondition the inline-copy test
         // never asserted. resetForStartOver ends in `transition(to: .empty)`;
         // a regression dropping that call lands here (verified red→green:
         // the prior inline body left the document in `.failed`).
@@ -152,7 +151,7 @@ struct FailedStateViewStartOverTests {
 
     @Test("Confirmation copy is mechanism-description (no outcome-promise phrases)")
     func testConfirmationCopyIsMechanismDescription() {
-        // CAT-239: read the production constants directly so the sweep runs
+        // Read the production constants directly so the sweep runs
         // against the live copy — a rename cannot slip a banned word past this
         // test by drifting an independent test-local literal.
         let title = FailedStateView.startOverTitle
@@ -172,9 +171,9 @@ struct FailedStateViewStartOverTests {
         #expect(message.contains("document"))
     }
 
-    // MARK: - CAT-319: Start Over runs the SEC-1 session-close downgrade
+    // MARK: - Start Over runs the session-close downgrade
 
-    @Test("Start Over downgrades the session temp protection before clearing state (CAT-319)")
+    @Test("Start Over downgrades the session temp protection before clearing state")
     func testStartOverCallsDowngrade() throws {
         let coordinator = makeCoordinator()
         let redactionState = RedactionState()
@@ -188,22 +187,22 @@ struct FailedStateViewStartOverTests {
         documentState.sourceDocument = makeTestPDFDocument()
         redactionState.regions = makeRegions(count: 2)
 
-        // Seed a file in the coordinator's SEC-2 session subtree at `.complete`,
+        // Seed a file in the coordinator's session subtree at `.complete`,
         // the state a live (then-failed) session leaves behind.
         let child = try coordinator.tempExportDirectory.childURL(named: "recon_failed.pdf")
         defer { coordinator.tempExportDirectory.tearDown() }
         try Data([0x25, 0x50, 0x44, 0x46]).write(to: child)
         try TempFileHardening.applyProtection(child, level: .complete)
 
-        // CAT-226: call the PRODUCTION teardown (was an inline replica of the
-        // performStartOver body). resetForStartOver runs the CAT-319 downgrade
-        // FIRST, then the PII-in-memory clears, then transition(to: .empty) —
+        // Call the production teardown (was an inline replica of the
+        // performStartOver body). resetForStartOver runs the session-close downgrade
+        // first, then the PII-in-memory clears, then transition(to: .empty) —
         // so this test now also guards that the downgrade is not lost in a
         // future refactor.
         documentState.resetForStartOver(redactionState: redactionState, coordinator: coordinator)
 
         // Side effect on the real coordinator temp file: the session subtree
-        // was downgraded via downgradeTree (CAT-124). The child still exists
+        // was downgraded via downgradeTree. The child still exists
         // (downgrade is non-destructive) and reads at-least
         // `.completeUntilFirstUserAuthentication`. On the iOS Simulator
         // protection classes coalesce, so the strict read-back is the
@@ -215,7 +214,7 @@ struct FailedStateViewStartOverTests {
         // The PII-in-memory teardown contract is preserved.
         #expect(redactionState.regions.isEmpty)
         #expect(documentState.sourceDocument == nil)
-        // CAT-226: and the phase postcondition.
+        // And the phase postcondition.
         #expect(documentState.phaseKind == .empty)
     }
 }

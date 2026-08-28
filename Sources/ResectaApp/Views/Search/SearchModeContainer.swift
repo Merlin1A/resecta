@@ -1,6 +1,6 @@
 import SwiftUI
 
-// SEARCH-AND-REDACT §S2: Mode picker (Text / Regex / Multi-term) —
+// Mode picker (Text / Regex / Multi-term) —
 // the Search interface's second-level mode control. The Scan interface
 // has no mode picker (its controls are category chips + scope), so
 // this view renders only on the Search side and iterates the
@@ -11,7 +11,7 @@ import SwiftUI
 //
 // 3 × ~70pt = 210pt fits comfortably at iPhone 17 standard width
 // (393pt); at high Dynamic Type the segmented row would overflow, so
-// [RR-14](RISK_REGISTER.md#rr-14) routes through a `Menu` fallback at
+// this routes through a `Menu` fallback at
 // `.accessibility4`+.
 
 struct SearchModeContainer: View {
@@ -24,7 +24,7 @@ struct SearchModeContainer: View {
     /// directly on `searchModeType`.
     static let searchModes: [SearchModeType] = [.text, .regex, .multiTerm]
 
-    /// [RR-14] AX-bound threshold, re-derived for 3 segments: the
+    /// AX-bound threshold, re-derived for 3 segments: the
     /// threshold was safe at 4 segments, and dropping a segment gives
     /// each remaining one ~33% more width ("Multi-term", the longest
     /// label, bounds the row), so `.accessibility4` carries with margin.

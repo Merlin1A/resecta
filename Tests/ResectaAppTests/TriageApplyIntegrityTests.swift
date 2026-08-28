@@ -4,21 +4,21 @@ import CoreGraphics
 import RedactionEngine
 @testable import ResectaApp
 
-// q14 — Triage/apply integrity.
+// Triage/apply integrity.
 //
 // Pins three contracts:
-//   - UXF-11: one commit-feedback copy (`CommitFeedback.markedMessage`)
+//   - One commit-feedback copy (`CommitFeedback.markedMessage`)
 //     across every origin of the one `applyFindings` path, always
 //     reporting the count of regions actually created.
-//   - UXF-06: the detection run record (`RedactionState.DetectionRunRecord`)
+//   - The detection run record (`RedactionState.DetectionRunRecord`)
 //     and the pure banner-model builder covering every outcome —
 //     zero/failed runs persist instead of dying as toasts.
-//   - UXF-29 support surface: apply calls return honest created-counts,
-//     the promotion flag gates banner Review re-entry, and lifecycle
-//     resets drop the record. (The double-apply repro itself lives in
+//   - Apply calls return honest created-counts, the promotion flag
+//     gates banner Review re-entry, and lifecycle resets drop the
+//     record. (The double-apply repro itself lives in
 //     `CrossPageEntityLinkingTests`.)
 
-@Suite("Triage/apply integrity (q14)")
+@Suite("Triage/apply integrity")
 @MainActor
 struct TriageApplyIntegrityTests {
 
@@ -63,11 +63,11 @@ struct TriageApplyIntegrityTests {
         return ids
     }
 
-    // MARK: - UXF-11: one commit-feedback copy
+    // MARK: - One commit-feedback copy
 
     @Test("markedMessage covers created-only, mixed, skip-only, and no-op cases")
     func markedMessageCopy() {
-        // UXC-24 (RB-39): every non-nil case carries the
+        // Every non-nil case carries the
         // "Not redacted until you tap Redact." suffix so "Marked"
         // doesn't read as already-redacted.
         #expect(CommitFeedback.markedMessage(applied: 3)
@@ -123,7 +123,7 @@ struct TriageApplyIntegrityTests {
             .detectionResults([0: [name], 1: [ssn, sig]]), undoManager: nil)
 
         // The toast's count is regions created — the signature candidate
-        // routed to the review instead (ST-100: never applied directly).
+        // routed to the review instead (never applied directly).
         #expect(outcome?.applied == 2)
         #expect(outcome?.signatureCandidates == 1)
         #expect(state.regions.values.flatMap { $0 }.count == 2)
@@ -159,7 +159,7 @@ struct TriageApplyIntegrityTests {
             == "Marked 3 for redaction. Not redacted until you tap Redact.")
     }
 
-    // MARK: - UXF-29 rider: group apply records accepted priors
+    // MARK: - Group apply records accepted priors
 
     @Test("Group apply records accepted priors for promoted members")
     func groupApplyRecordsAcceptedPriors() async {
@@ -205,7 +205,7 @@ struct TriageApplyIntegrityTests {
         #expect(state.regions.values.flatMap { $0 }.isEmpty)
     }
 
-    // MARK: - UXF-06: run record lifecycle
+    // MARK: - Run record lifecycle
 
     @Test("recordDetectionRun bumps the run counter and resets the promotion flag")
     func recordDetectionRunLifecycle() {
@@ -242,7 +242,7 @@ struct TriageApplyIntegrityTests {
         #expect(!state.triagePromotionOccurred)
     }
 
-    // MARK: - UXF-06: banner model per outcome
+    // MARK: - Banner model per outcome
 
     @Test("Staged outcome keeps the per-kind Found summary and Review re-entry")
     func bannerModelStaged() {
@@ -325,7 +325,7 @@ struct TriageApplyIntegrityTests {
         #expect(!clean.isWarning)
         #expect(!clean.showsReview)
 
-        // ST-83 family: a zero-found run never opens the triage sheet, so
+        // A zero-found run never opens the triage sheet, so
         // the coverage gap must surface here.
         let skipped = DocumentEditorView.detectionBannerModel(
             outcome: .nothingFound(pageCount: 3),

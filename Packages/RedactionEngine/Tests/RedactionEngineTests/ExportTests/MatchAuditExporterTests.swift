@@ -2,10 +2,10 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W5 — CSV + JSON serialization, RFC 4180 quoting, sensitive-content
+// CSV + JSON serialization, RFC 4180 quoting, sensitive-content
 // redaction, and rationale-summary formatting.
 
-@Suite("MatchAuditExporter (W5)")
+@Suite("MatchAuditExporter")
 struct MatchAuditExporterTests {
 
     // MARK: - Helpers
@@ -85,14 +85,14 @@ struct MatchAuditExporterTests {
         )
         let text = String(data: data, encoding: .utf8) ?? ""
         let lines = text.split(separator: "\r\n", omittingEmptySubsequences: false)
-        // Header is the first non-comment line. W-I2 schema v4 inserts
+        // Header is the first non-comment line. Schema v4 inserts
         // ruleVersion + gazetteerManifestVersion between ruleID and
         // finalScore (19 columns total).
         let header = lines.first { !$0.hasPrefix("#") }
         #expect(header == "id,pageIndex,matchedText,source,piiCategory,piiConfidence,term,ruleID,ruleVersion,gazetteerManifestVersion,finalScore,appliedThreshold,rationaleSummary,isSelected,wasApplied,suppressedByOverlap,foiaExemption,foiaCitation,foiaNote")
     }
 
-    @Test("csvColumns has 19 fields after W-I2 schema v4 bump")
+    @Test("csvColumns has 19 fields after schema v4 bump")
     func csvColumnCountIsNineteen() {
         #expect(MatchAuditExporter.csvColumns.count == 19)
     }
@@ -178,7 +178,7 @@ struct MatchAuditExporterTests {
         #expect(decoded.records[0].matchedText == "Acme Corp")
     }
 
-    @Test("JSON round-trip preserves W-I2 ruleVersion + gazetteerManifestVersion")
+    @Test("JSON round-trip preserves ruleVersion + gazetteerManifestVersion")
     func jsonRoundTripV4Fields() throws {
         let rec = MatchAuditRecord(
             id: UUID(), pageIndex: 0, matchedText: "Acme",
@@ -226,14 +226,14 @@ struct MatchAuditExporterTests {
         #expect(text.contains(",name.nltagger,1.0,1,0.91,0.70,"))
     }
 
-    @Test("JSON default redaction covers matchedText, term, and userFlag rationale (CAT-112)")
+    @Test("JSON default redaction covers matchedText, term, and userFlag rationale")
     func jsonDefaultRedactionCoversAllUserContentFields() throws {
-        // Post-S6 (CAT-112): includeSensitive=false redacts EVERY
+        // includeSensitive=false redacts EVERY
         // user-content field, not matchedText alone. Text-mode row, so
         // `term` is the user's own query (piiCategory nil) and the
         // rationale carries a user always-flag pattern. "Jane Doe" is a
         // synthetic stand-in for user PII; assertions compare against the
-        // hard-coded fixture, never an interpolated runtime value (§10).
+        // hard-coded fixture, never an interpolated runtime value.
         let data = try MatchAuditExporter.json(
             [makeRecord(
                 matchedText: "Jane Doe",
@@ -255,7 +255,7 @@ struct MatchAuditExporterTests {
 
     @Test("JSON record object carries no keys outside the audit schema (no transient-field leak)")
     func jsonRecordHasNoUnexpectedKeys() throws {
-        // S6 redacts in place rather than threading a transient raw-rationale
+        // Redacts in place rather than threading a transient raw-rationale
         // field through the record (the dossier's contingency architecture).
         // This pins that invariant generically: no out-of-schema key — a
         // future raw-rationale, debug, or un-CodingKey'd field — can reach
@@ -390,7 +390,7 @@ struct MatchAuditExporterTests {
         #expect(MatchAuditExporter.sourceDescription(.ocr(confidence: 0.87)) == "ocr(confidence=0.87)")
     }
 
-    // MARK: - S6 audit-leak fix (design 04 §audit)
+    // MARK: - Audit-leak fix
 
     @Test("term column is redacted for non-piiScan rows when includeSensitive=false")
     func termRedactedWhenIncludeSensitiveFalse() throws {
@@ -522,15 +522,15 @@ struct MatchAuditExporterTests {
         #expect(csv.contains("userAlwaysFlag(Jane Doe)"))
     }
 
-    // MARK: - Pkg C / ERR-02 — JSON encode failure propagates
+    // MARK: - JSON encode failure propagates
 
-    /// Pkg C / ERR-02: `MatchAuditExporter.json` is `throws` so encoder
+    /// `MatchAuditExporter.json` is `throws` so encoder
     /// failures propagate to the caller (`MatchExportService.share`) where
     /// they wire into a Tier 1 `.error` toast. Inject an unencodable
     /// `Double.nan` into `ExportMetadata.perCategoryOverrides` — the
     /// default `JSONEncoder.NonConformingFloatEncodingStrategy.throw`
     /// rejects non-finite floats with `EncodingError.invalidValue`.
-    @Test("JSON encode failure propagates as a throw (Pkg C / ERR-02)")
+    @Test("JSON encode failure propagates as a throw")
     func jsonEncodeFailurePropagates() {
         let unencodableMetadata = ExportMetadata(
             schemaVersion: 4,
@@ -554,7 +554,7 @@ struct MatchAuditExporterTests {
     /// Round-trip on the happy path still works after the throwing
     /// signature change — guards against accidentally regressing the
     /// success path while wiring the propagation.
-    @Test("JSON throws-signature does not regress the happy path (Pkg C)")
+    @Test("JSON throws-signature does not regress the happy path")
     func jsonHappyPathStillReturnsData() throws {
         let data = try MatchAuditExporter.json(
             [makeRecord()],
@@ -564,7 +564,7 @@ struct MatchAuditExporterTests {
         #expect(!data.isEmpty)
     }
 
-    // MARK: - D07-F1 — CSV / formula-injection neutralizer (CWE-1236)
+    // MARK: - CSV / formula-injection neutralizer (CWE-1236)
 
     /// The CWE-1236 lead characters the neutralizer defuses. Kept in the test
     /// independently of the production set so a silent drop from the source

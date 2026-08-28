@@ -11,7 +11,7 @@ import RedactionEngine
 /// at scan kickoff.
 // nonisolated: a Sendable value blob persisted via the generic
 // `FileJSONBlob<T: Codable & Sendable>` and read off-MainActor on the
-// detached hydrate path. Under SE-0466 MainActor-default (fix-series s04 flip)
+// detached hydrate path. Under SE-0466 MainActor-default
 // the synthesized Decodable conformance would become main-actor-isolated and
 // fail the Sendable generic bound — keep the whole type nonisolated.
 nonisolated struct UserTermsBlob: Codable, Sendable, Equatable {
@@ -24,7 +24,7 @@ nonisolated struct UserTermsBlob: Codable, Sendable, Equatable {
 @MainActor
 final class UserTermsStore {
 
-    // CONC-1 (Pkg N): `nonisolated` so the detached-task hydrate path
+    // `nonisolated` so the detached-task hydrate path
     // can read these constants off-MainActor. They are compile-time
     // constants and never mutated, so opting out of @MainActor isolation
     // here is sound.
@@ -71,7 +71,7 @@ final class UserTermsStore {
     // cold-start critical path. Default is false so tests calling
     // `init(fileURL:legacyDefaults:)` keep their synchronous contract.
     //
-    // CONC-1 (Pkg N): the async path runs the file read and
+    // The async path runs the file read and
     // `sanitize` on a detached Task so the work happens off-MainActor.
     // The previous `Task { @MainActor in ... }` formulation only
     // deferred the work to a later MainActor tick — it never left the
@@ -140,7 +140,7 @@ final class UserTermsStore {
         isHydrated = true
     }
 
-    /// CONC-1 (Pkg N): nonisolated helper invoked from `Task.detached` so
+    /// A nonisolated helper invoked from `Task.detached` so
     /// the file read and the `sanitize` pass run off-MainActor.
     /// Pure function of the storage handle; no MainActor state read.
     nonisolated private static func loadAndSanitize(
@@ -193,7 +193,7 @@ final class UserTermsStore {
     // MARK: - Validation
 
     /// Accept the term if it passes length + (optional) regex validation.
-    /// CONC-1 (Pkg N): `nonisolated` so the detached-task hydrate path
+    /// `nonisolated` so the detached-task hydrate path
     /// (via `sanitize`) can call this off-MainActor. Pure function —
     /// reads only its argument and the `nonisolated` constants above.
     nonisolated static func isValidUserTerm(_ term: UserTerm) -> Bool {
@@ -209,7 +209,7 @@ final class UserTermsStore {
     /// hydrate so a corrupted or out-of-date blob can't leak invalid
     /// terms into a scan.
     ///
-    /// CONC-1 (Pkg N): `nonisolated` so the detached-task hydrate path
+    /// `nonisolated` so the detached-task hydrate path
     /// can call this off-MainActor. The function is pure — reads only
     /// its argument and the `nonisolated` validator helper below.
     nonisolated static func sanitize(_ blob: UserTermsBlob) -> UserTermsBlob {

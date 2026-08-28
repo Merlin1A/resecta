@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 import OSLog
 
-// SEC-6 — Signed gazetteer manifest verification.
+// Signed gazetteer manifest verification.
 //
 // Verifies that the bundled `gazetteer_manifest.json` is a byte-for-byte
 // match for what the DataPipeline signed at build time. The signature
@@ -22,7 +22,7 @@ import OSLog
 //
 // Cryptography:
 //   - Algorithm: Curve25519.Signing (Ed25519). First CryptoKit use in the
-//     iOS app (pre-approved I7 — escalation.md §1.1).
+//     iOS app.
 //   - Privacy manifest: CryptoKit signature verification is a compute-only
 //     primitive; it is not on Apple's NSPrivacyAccessedAPITypes required-
 //     reason list. No new privacy-manifest entry required.
@@ -31,7 +31,7 @@ public enum GazetteerLoader {
 
     /// Errors returned when the on-disk crypto material is malformed. Internal
     /// because all callers convert into `PipelineError.detectionError(.detectionCorpusInvalid)`
-    /// — the surface the SEC-7 banner / toast machinery already consumes.
+    /// — the surface the degraded-detection banner / toast machinery already consumes.
     enum VerificationError: Error {
         case resourceMissing(name: String)
         case publicKeyMalformed
@@ -62,7 +62,7 @@ public enum GazetteerLoader {
     /// verification succeeds. Consumed through `GazetteerTrust`, the
     /// memoized chokepoint behind `PIIDetector.loadWithDiagnostics` and the
     /// public `PIIDetector.init` defaults — a failed verdict short-circuits
-    /// gazetteer loading and the diagnostic surfaces via the existing SEC-7
+    /// gazetteer loading and the diagnostic surfaces via the existing degraded-detection
     /// banner / toast path rather than throwing out of the loader.
     static func isManifestSignatureValid(bundle: Bundle) -> Bool {
         do {

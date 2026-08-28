@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W9 — CoverageReport value-type tests. The orchestrator aggregates these
+// CoverageReport value-type tests. The orchestrator aggregates these
 // at the UI layer for v1 (no engine wiring), so the coverage here focuses
 // on the struct's API: construction, withDeselectedCount, equality.
 
@@ -35,7 +35,7 @@ struct CoverageReportTests {
         #expect(updated.belowThresholdSuppressedCount == base.belowThresholdSuppressedCount)
     }
 
-    @Test("withAppliedCount replaces only the applied field (D06-F2 Part 2 sibling)")
+    @Test("withAppliedCount replaces only the applied field")
     func withAppliedReplacesField() {
         let base = makeReport(deselected: 0)
         let updated = base.withAppliedCount(9)

@@ -1,7 +1,7 @@
 import Foundation
 
-// W-I2 — A22 (`Resources/Audit/rule-catalog.json`) loader + engine-rule-id
-// translation layer (path-(a) per Q1 / 2026-04-30 DECIDED).
+// The `Resources/Audit/rule-catalog.json` loader + engine-rule-id
+// translation layer (the alias-map below is the shipped V1 design).
 //
 // The catalog ships 19 entries with `rule_id` in `pii.<X>.[<sub>.]v1` form;
 // the engine emits ruleIDs in `<family>.<sub>` form (e.g.,
@@ -10,12 +10,10 @@ import Foundation
 // audit-export records can pin a catalog `version` + `source_artifact`
 // without renaming either side.
 //
-// Q1 (2026-04-30, Jesse): path (a) is the binding V1 choice. Paths (b)
-// and (c) are recorded in STRAT §5.2 stop-conditions as historical
-// alternatives. The alias map below is the V1 surface; V1.1+ may move
+// The alias map below is the V1 surface; V1.1+ may move
 // it to a paired schema field on rule_catalog.schema.json.
 //
-// Schema: `~/resecta-datapipeline/schemas/rule_catalog.schema.json`.
+// Schema: `resecta-datapipeline/schemas/rule_catalog.schema.json`.
 
 public struct RuleCatalog: Sendable {
 
@@ -43,13 +41,12 @@ public struct RuleCatalog: Sendable {
 
     public static let supportedVersions: ClosedRange<Int> = 1...1
 
-    /// Engine-ruleID → catalog rule_id. V1 alias map (Q1 path-(a) DECIDED).
+    /// Engine-ruleID → catalog rule_id. V1 alias map.
     /// Update alongside any new engine-ruleID emission. Coverage is
     /// guarded at build time by `RuleCatalogTests.everyEmittedRuleIDIsAliased`.
     ///
     /// RHS values are aligned to the live catalog rule_id strings shipped
-    /// in `Resources/Audit/rule-catalog.json` (A22 wire-locked at ship per
-    /// audit §B.1 row 5).
+    /// in `Resources/Audit/rule-catalog.json`, locked to match at ship time.
     private static let engineToCatalog: [String: String] = [
         // SSN — two engine emissions collapse onto one catalog entry.
         "ssn.state-machine":    "pii.ssn.state_machine.v1",
@@ -145,8 +142,8 @@ public struct RuleCatalog: Sendable {
         return byCatalogRuleID[catalogRuleID]
     }
 
-    /// Direct catalog-rule_id lookup (callers that already speak A22's
-    /// vocabulary).
+    /// Direct catalog-rule_id lookup (callers that already speak the
+    /// catalog's vocabulary).
     public func entry(forCatalogRuleID ruleID: String) -> Entry? {
         byCatalogRuleID[ruleID]
     }

@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// LF-10 — the reverseRationale popover rendered raw keys because its
+// The reverseRationale popover rendered raw keys because its
 // `String(localized:)` call sites omitted `table: "Legal"`. The app has
 // exactly one string catalog (Legal.xcstrings); there is no default
 // Localizable table, so an un-tabled lookup finds nothing and Foundation
@@ -17,13 +17,13 @@ import Foundation
 //    is this defect class. If a default Localizable.xcstrings is ever
 //    added, rework this guard rather than deleting it.
 
-@Suite("ReverseRationale localization resolution (LF-10)")
+@Suite("ReverseRationale localization resolution")
 struct ReverseRationaleLocalizationTests {
 
     private var appBundle: Bundle { Bundle(for: AppCoordinator.self) }
 
     // nonisolated: consumed by `@Test(arguments:)` (hoisted nonisolated peer
-    // under the s04 SE-0466 MainActor default — same posture as
+    // under the SE-0466 MainActor default — same posture as
     // LegalKeyExistenceTests.eulaKeys).
     nonisolated static let popoverKeys = [
         "reverseRationale.title",

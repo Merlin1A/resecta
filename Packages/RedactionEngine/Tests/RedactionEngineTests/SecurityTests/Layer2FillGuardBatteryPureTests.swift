@@ -3,13 +3,13 @@ import CoreGraphics
 import Testing
 @testable import RedactionEngine
 
-// PART A — S3 adversarial battery, PURE probes (no Vision, no PDF): the
+// PART A — adversarial battery, PURE probes (no Vision, no PDF): the
 // formula-independence, canary, wiring, property-floor, and S2-reviewer
 // residual probes. Split from `Layer2FillGuardBatteryTests` (the on-device
 // half + the shared harness) to respect the new-file LOC cap (M-6); read that
 // file's header for the battery map and probe philosophy.
 
-@Suite("Part A — S3 fill-guard battery (pure probes)", .serialized)
+@Suite("Part A — fill-guard battery (pure probes)", .serialized)
 struct Layer2FillGuardBatteryPureTests {
 
     /// The on-device battery suite hosts the shared harness (samples, mirrors,
@@ -205,13 +205,13 @@ struct Layer2FillGuardBatteryPureTests {
         #expect(mismatches == 0, "the test-local predicate mirror must match production at the shipped constants")
     }
 
-    // MARK: - S2 reviewer residual 1: calibrated-subset region argmax
+    // MARK: - Reviewer residual 1: calibrated-subset region argmax
 
     /// A box whose true region fails calibration (a sub-pixel strip that
     /// survives the >0.001 snapshot gate) while overlapping a calibrated solid
     /// bar MORE by area: the argmax samples the bar's geometry, the strip's ink
-    /// never enters the sample, and the box demotes. Locked bound (S2 review,
-    /// adjudicated non-blocking): FAIL→WARN, never a clean PASS. This probe
+    /// never enters the sample, and the box demotes. Locked bound (reviewed,
+    /// non-blocking): FAIL→WARN, never a clean PASS. This probe
     /// pins that bound through the production sampler + classifier.
     @Test("residual-1: calibration-nil strip + calibrated-bar argmax stays WARN-bounded (never clean)")
     func rider_calibrationSubsetArgmax() throws {
@@ -257,7 +257,7 @@ struct Layer2FillGuardBatteryPureTests {
                 "the residual folds to the fill-artifact WARN — never a clean PASS — got \(verdict)")
     }
 
-    // MARK: - S2 reviewer residual 2: the 2px sample inset on tiny strips
+    // MARK: - Reviewer residual 2: the 2px sample inset on tiny strips
 
     /// Thin-strip sample geometry through the PRODUCTION sampler: (a) ink 2px
     /// inside a 12px strip's sample survives the 2px inset → KEPT; (b) a 3px

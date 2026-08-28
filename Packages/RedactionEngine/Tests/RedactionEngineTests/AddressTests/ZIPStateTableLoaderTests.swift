@@ -2,9 +2,9 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// L6 / C12 — ZIPStateTableLoader JSON loader + ZIPStateTable fallback tests.
+// ZIPStateTableLoader JSON loader + ZIPStateTable fallback tests.
 
-@Suite("ZIPStateTableLoader (L6 / C12)")
+@Suite("ZIPStateTableLoader")
 struct ZIPStateTableLoaderTests {
 
     @Test("Loads zip_scf_states.json from the module bundle")
@@ -35,7 +35,7 @@ struct ZIPStateTableLoaderTests {
         #expect(ZIPStateTable.state(forZIPPrefix: "902") == "CA")
     }
 
-    @Test("Version-fence rejects out-of-range version (W-O)")
+    @Test("Version-fence rejects out-of-range version")
     func versionFenceRejectsOutOfRange() throws {
         let tempBase = FileManager.default.temporaryDirectory
             .appending(path: "wo-pilot-\(UUID().uuidString)", directoryHint: .isDirectory)

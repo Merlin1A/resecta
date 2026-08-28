@@ -3,14 +3,14 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-21 — multi-term chips append `(N)` count badges using
+// Multi-term chips append `(N)` count badges using
 // `searchState.resultsByTerm[term]?.count ?? 0`. 0-count chips render at
 // reduced opacity. The chip view reads the same `resultsByTerm`
 // dictionary the rest of the results list reads; this suite pins the
 // per-term count contract so the chip label stays in sync with the
 // grouped sections.
 
-@Suite("Multi-term chip count badges (WU-21)", .tags(.search))
+@Suite("Multi-term chip count badges", .tags(.search))
 @MainActor
 struct MultiTermChipCountTests {
 

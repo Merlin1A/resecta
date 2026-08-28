@@ -1,13 +1,13 @@
 import SwiftUI
 import RedactionEngine
 
-// ARCH §4.2: @main entry point with environment injection.
-// ARCH §6.1: First-launch clickwrap gates the entire app.
+// @main entry point with environment injection.
+// First-launch clickwrap gates the entire app.
 // MainActor by default (SE-0466, Xcode 26 app target).
 @main
 struct ResectaApp: App {
-    // ARCH §6.1: Persist EULA acceptance. @AppStorage is fine in App struct (R6
-    // only prohibits @AppStorage inside @Observable classes).
+    // Persist EULA acceptance. @AppStorage is fine in App struct —
+    // it only prohibits @AppStorage inside @Observable classes.
     // Versioned key for EULA re-acceptance on terms change.
     // The key-history list + superseded-key cleanup live in EULAGateView
     // (the acceptance site). Bump this key and EULAGateView's in lockstep.
@@ -19,17 +19,17 @@ struct ResectaApp: App {
     /// app-wide like its sibling stores.
     @State private var savedSearchStore: SavedSearchStore
     @State private var appCoordinator: AppCoordinator
-    // SEC-3: Screen-capture / mirroring privacy shield. Owned at the
+    // Screen-capture / mirroring privacy shield. Owned at the
     // WindowGroup level so every workspace observes the same monitor
     // instance via @Environment.
     @State private var screenCaptureMonitor: ScreenCaptureMonitor
 
-    // SEC-4: App-snapshot privacy overlay flag, lifted from ContentView to
+    // App-snapshot privacy overlay flag, lifted from ContentView to
     // the WindowGroup root so the overlay can sit as a ZStack peer at the
     // top of the view tree. Root-level placement is intended to cover the
     // full window on iPad Stage Manager + split-view (where ContentView's
-    // own layout would not span the whole scene).
-    // See plan §3 SEC-4 and §0.1 (no animation change to the obscure path).
+    // own layout would not span the whole scene). No animation change to
+    // the obscure path here.
     @State private var obscureContent = false
 
     // Tracks scene phase at the root so we can drive `obscureContent`
@@ -43,7 +43,7 @@ struct ResectaApp: App {
         // `_meta.git_head` (engineer-facing diagnostic; not consumed at runtime).
         ColdStartTimer.shared.captureProcessStart()
 
-        // WA-01: the persisted-recents feature is excised. Sweep its
+        // The persisted-recents feature is excised. Sweep its
         // four retired storage keys out of existing installs at every
         // launch — unconditional and idempotent (no marker key).
         SearchState.purgeRetiredRecentsStorage()
@@ -63,10 +63,10 @@ struct ResectaApp: App {
         _savedSearchStore = State(initialValue: searchStore)
         _settingsState = State(initialValue: set)
         _appCoordinator = State(initialValue: AppCoordinator(settingsState: set))
-        // SEC-3: instantiate alongside AppCoordinator. The monitor begins
+        // Instantiate alongside AppCoordinator. The monitor begins
         // observing UIScreen notifications immediately in its init.
         _screenCaptureMonitor = State(initialValue: ScreenCaptureMonitor())
-        // R7/D10: Disable shake-to-undo — accidental shakes during precision
+        // Disable shake-to-undo — accidental shakes during precision
         // drawing are disruptive. Toolbar buttons are the sole undo mechanism.
         UIApplication.shared.applicationSupportsShakeToEdit = false
 
@@ -79,7 +79,7 @@ struct ResectaApp: App {
     /// Handle launch arguments for UI testing.
     /// --uitesting: Auto-accept EULA to bypass the gate, and clear the
     ///   persisted last-filter shape so every test launch opens the
-    ///   search sheet at the default Source=All (D-69). The cross-session
+    ///   search sheet at the default Source=All. The cross-session
     ///   filter persistence is a shipped feature; a non-default source
     ///   filter left in the app container by a manual drive filter-hides
     ///   text-layer results and deterministically reds the XCUI
@@ -99,7 +99,7 @@ struct ResectaApp: App {
         }
     }
 
-    /// S7 sim-verification: `--searchMode=` arg value → SearchModeType.
+    /// Sim-verification: `--searchMode=` arg value → SearchModeType.
     /// Arg names are a stable external contract (verification scripts +
     /// UI tests), mapped to cases directly so a wire-value change can't
     /// silently break the hook.
@@ -113,12 +113,12 @@ struct ResectaApp: App {
 
     var body: some Scene {
         WindowGroup {
-            // SEC-4: Root-level ZStack peers the snapshot-privacy overlay
+            // Root-level ZStack peers the snapshot-privacy overlay
             // with the main scene content. Promoting to the WindowGroup
             // root (rather than nesting inside ContentView) is intended to
             // cover the full window on iPad Stage Manager and split-view.
             ZStack {
-                // UI_UX §6.4: EULA gate — show clickwrap before any app content
+                // EULA gate — show clickwrap before any app content
                 if disclaimerAccepted {
                     ContentView()
                         .environment(settingsState)
@@ -177,8 +177,8 @@ struct ResectaApp: App {
                                     if launchArguments.contains("--openSearchSheet")
                                         || launchArguments.contains("--openSavedSearches") {
                                         let seeded = SearchState()
-                                        // S7 sim-verification hooks (read-only
-                                        // MCP; verification.md §6):
+                                        // Sim-verification hooks (read-only
+                                        // MCP):
                                         // `--searchMode=<text|regex|multiTerm|piiScan>`
                                         // sets the initial mode so per-mode
                                         // surfaces (saved-regex menu, piiScan
@@ -191,7 +191,7 @@ struct ResectaApp: App {
                                             seeded.searchModeType = mode
                                         }
                                         ws.redactionState.activeSearch = seeded
-                                        // `--openSavedSearches` (S7 §4.1) also
+                                        // `--openSavedSearches` also
                                         // seeds one sample row so the list
                                         // screenshot shows a populated state;
                                         // the sheet itself presents from
@@ -207,12 +207,11 @@ struct ResectaApp: App {
                                     }
                                 }
                             }
-                            // S6 / C10 sim-verification hook: drive the SEC-3
+                            // Sim-verification hook: drive the screen-capture
                             // monitor's DEBUG seam at launch. UIScreen.isCaptured
                             // cannot be forced on the simulator from outside the
                             // process, and this machine's MCP UI is read-only
-                            // (no taps) — the launch arg is the sanctioned route
-                            // per verification.md §6.
+                            // (no taps) — the launch arg is the sanctioned route.
                             if launchArguments.contains("--simulateCapture") {
                                 screenCaptureMonitor._setForTesting(
                                     isCaptured: true, isMirroring: false
@@ -224,7 +223,7 @@ struct ResectaApp: App {
                     EULAGateView()
                 }
 
-                // SEC-4: Branded placeholder rendered above all content
+                // Branded placeholder rendered above all content
                 // when the scene is inactive or backgrounded.
                 if obscureContent {
                     SnapshotPrivacyOverlay()
@@ -242,10 +241,10 @@ struct ResectaApp: App {
                     cleanOrphanedTempFiles()
                 }
             }
-            // SEC-4: Drive `obscureContent` from scene-phase transitions at
+            // Drive `obscureContent` from scene-phase transitions at
             // the root so the overlay is in the view hierarchy before the
             // system takes its snapshot. The obscure path is synchronous
-            // (`withAnimation(.none)`) per §0.1 — animating it would let
+            // (`withAnimation(.none)`) — animating it would let
             // the snapshot land mid-fade. The reveal path keeps the prior
             // 0.15s ease-in for visual polish on return-to-foreground.
             .onChange(of: scenePhase) { _, newPhase in
@@ -258,11 +257,11 @@ struct ResectaApp: App {
                     break
                 }
             }
-            // 02-dark-mode-design.md §5: apply the user's appearance
+            // Apply the user's appearance
             // preference at the WindowGroup root. `.system` resolves to
             // `nil` so the OS-level Light/Dark setting is honored.
             .preferredColorScheme(settingsState.appearancePreference.colorScheme)
-            // CD-19: ambient brand tint at the root. The AccentColor colorset
+            // Ambient brand tint at the root. The AccentColor colorset
             // (same pair, lockstep-tested) is not adopted as the global tint
             // by the iOS 26.4 simulator runtime, so SwiftUI ambient color is
             // pinned here; the colorset still themes system-presented chrome

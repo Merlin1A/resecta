@@ -1,11 +1,11 @@
 import XCTest
 
-/// UI tests for the q17 (UXF-08) first-launch-gate document links.
+/// UI tests for the first-launch-gate document links.
 ///
 /// The gate ("Before You Begin") offers view-only access to the bundled EULA
 /// and Privacy Policy via two link buttons; each opens `LegalDocumentView`
 /// read-only and dismissing lands back on the still-un-accepted gate. These
-/// tests pin the C-7 property that matters: viewing a document is NOT a path
+/// tests pin the property that matters: viewing a document is NOT a path
 /// past the gate — after opening and closing both documents the gate still
 /// blocks, and only "I Agree" clears it.
 ///
@@ -14,7 +14,7 @@ import XCTest
 /// each test starts from a virgin gate regardless of what earlier suites did
 /// to the shared simulator app container.
 // nonisolated: XCUITest driving a separate process, no @MainActor app state —
-// same s04 SE-0466 posture as DetectionTriageDismissUITests.
+// same SE-0466 posture as DetectionTriageDismissUITests.
 nonisolated final class EULAGateLinksUITests: XCTestCase {
 
     private var app: XCUIApplication!
@@ -73,7 +73,7 @@ nonisolated final class EULAGateLinksUITests: XCTestCase {
         openAndDismissDocument(linkIdentifier: "eulaViewPrivacy")
     }
 
-    /// The full C-7 sequence: view BOTH documents, assert the gate still
+    /// The full sequence: view BOTH documents, assert the gate still
     /// blocks, then accept and require the gate to clear — viewing neither
     /// substitutes for nor breaks acceptance.
     func testViewingBothDocumentsDoesNotAcceptAndAgreeStillWorks() {

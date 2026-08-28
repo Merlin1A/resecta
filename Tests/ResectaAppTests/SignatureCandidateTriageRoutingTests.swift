@@ -4,7 +4,7 @@ import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// DRAW-3 — App-side half of the review-only contract for signature
+// App-side half of the review-only contract for signature
 // heuristic candidates. The engine emits `.pii(.signatureCandidate)`
 // detections; the detection-map origin of `applyFindings` peels
 // those out and routes them into `pendingTriage` rather than creating
@@ -14,8 +14,6 @@ import CoreGraphics
 // like every review arrival — the former selected-by-default routing
 // died with the absent-reads-accepted fallback, so a routed candidate
 // can never apply without an explicit user selection.
-//
-// DRAW-3 contract.
 
 @Suite("Signature Candidate Triage Routing")
 @MainActor

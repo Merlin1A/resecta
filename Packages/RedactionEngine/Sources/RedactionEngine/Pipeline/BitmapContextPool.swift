@@ -1,11 +1,10 @@
 import CoreGraphics
 import Foundation
 
-// PERF-5 (paired with SEC-5) — Per-rasterizer bitmap context pool with
+// Per-rasterizer bitmap context pool with
 // unconditional zeroize on check-in. Fixed cap of 4 entries keyed by
-// `(width, height)`. LRU eviction on size mismatch. See plan §5 PERF-5
-// and §6 SEC-5↔PERF-5 cross-cutting risk: shipping pool reuse without
-// zeroize is a SEC-5 regression, so `checkIn` calls
+// `(width, height)`. LRU eviction on size mismatch. Shipping pool reuse
+// without zeroize would be a security regression, so `checkIn` calls
 // `PixelOperations.zeroizeBitmapBuffer` unconditionally and the post-
 // checkIn buffer is debug-asserted to be all zeros.
 
@@ -16,8 +15,8 @@ import Foundation
 /// **Concurrency.** The pool guards `entries` with an internal `NSLock`.
 /// The page-loop's `checkOut`/`checkIn` calls are still serialized by
 /// the rasterizer's per-run, one-page-at-a-time ownership — the lock's
-/// purpose is the cross-isolation `flush()` path (PERF-bitmappool-no-
-/// memwarning-flush): `PipelineCoordinator.memoryWarningTask` runs on
+/// purpose is the cross-isolation `flush()` path:
+/// `PipelineCoordinator.memoryWarningTask` runs on
 /// MainActor and the page loop runs on a `@concurrent` executor, so
 /// without the lock a memory-warning-driven `flush()` could race the
 /// `checkOut`/`checkIn` mutations of `entries`. Lock acquisition is
@@ -25,9 +24,9 @@ import Foundation
 /// an in-flight checkOut/checkIn, and only briefly).
 public final class BitmapContextPool: @unchecked Sendable {
 
-    /// Locked decision: 4 same-size contexts, LRU eviction (decisions.md
-    /// Batch 10 Q1). Cap is intentionally not configurable — the value
-    /// is part of the SEC-5/PERF-5 contract.
+    /// The pool holds 4 same-size contexts with LRU eviction, by design.
+    /// Cap is intentionally not configurable — the value
+    /// is part of the pool's zeroize contract.
     public static let capacity: Int = 4
 
     /// One pool entry. Order in `entries` is LRU-ordered (oldest first,
@@ -65,7 +64,7 @@ public final class BitmapContextPool: @unchecked Sendable {
         if let idx = entries.lastIndex(where: { $0.width == width && $0.height == height }) {
             let entry = entries.remove(at: idx)
             lock.unlock()
-            // SEC-5: pool-held buffers are always zeroed (`checkIn` zeroizes
+            // Pool-held buffers are always zeroed (`checkIn` zeroizes
             // before appending). No re-zero needed here.
             return entry.context
         }
@@ -76,13 +75,13 @@ public final class BitmapContextPool: @unchecked Sendable {
     // MARK: - Check-in
 
     /// Return a context to the pool. Always invokes
-    /// `PixelOperations.zeroizeBitmapBuffer(_:)` first (SEC-5: this is
+    /// `PixelOperations.zeroizeBitmapBuffer(_:)` first (this is
     /// non-negotiable — the buffer must not retain pixel data when it
     /// sits in the pool). If the pool is at capacity and no existing
     /// entry matches the size, the oldest LRU entry is evicted to
     /// make room.
     public func checkIn(_ context: CGContext) {
-        // SEC-5 INVARIANT: zeroize first, every time, no flag.
+        // Invariant: zeroize first, every time, no flag.
         // Performed outside the lock — the buffer is exclusively owned by
         // the caller until appended, and zeroizeBitmapBuffer touches only
         // the CGContext's backing memory, not the pool's `entries` array.
@@ -92,7 +91,6 @@ public final class BitmapContextPool: @unchecked Sendable {
         // post-checkIn. Cheap O(W) row probe (NOT the full buffer) —
         // detects a regression where `zeroizeBitmapBuffer` was bypassed
         // or stubbed without paying full-buffer cost on every page.
-        // Plan §3 SEC-5: "Debug assert post-`checkIn`: buffer is all zeros."
         assert(
             debugAssertBufferIsZeroed(context),
             "BitmapContextPool.checkIn invariant violated: buffer is not all zeros after zeroizeBitmapBuffer"
@@ -120,10 +118,9 @@ public final class BitmapContextPool: @unchecked Sendable {
     /// px × 4 B at 300 DPI). Idempotent and thread-safe against in-flight
     /// `checkOut`/`checkIn`. Called from
     /// `PipelineCoordinator.memoryWarningTask` after iOS posts
-    /// `UIApplication.didReceiveMemoryWarningNotification`: with the
-    /// PERF-2 collapse-to-1-parallelism cap also engaged, the remaining
+    /// `UIApplication.didReceiveMemoryWarningNotification`: with
+    /// the collapse-to-1-parallelism cap also engaged, the remaining
     /// pages reallocate one pool entry lazily on next checkOut.
-    /// Plan §5 PERF-5 + audit `03-security-perf-audit.md §5.2.a`.
     public func flush() {
         lock.lock()
         defer { lock.unlock() }
@@ -166,8 +163,7 @@ public final class BitmapContextPool: @unchecked Sendable {
     /// `internal` so the test target can exercise the predicate in
     /// isolation (the `assert(...)` call in `checkIn` itself crashes
     /// the process when it fires, which is unsuitable for unit-test
-    /// coverage). Plan §3 PERF-5:
-    /// `testDebugAssertCatchesNonZero` exercises this method directly
+    /// coverage). `testDebugAssertCatchesNonZero` exercises this method directly
     /// against a tampered buffer.
     internal func debugAssertBufferIsZeroed(_ context: CGContext) -> Bool {
         guard let data = context.data else { return true }  // nothing to check
@@ -210,7 +206,7 @@ public final class BitmapContextPool: @unchecked Sendable {
     /// `testDebugAssertCatchesNonZero` uses to validate that the
     /// debug-assert predicate would detect a regression that skipped
     /// `zeroizeBitmapBuffer`. Not exposed outside the package — calling
-    /// this in production code is a SEC-5 regression.
+    /// this in production code is a security regression.
     internal func _testOnlyCheckInWithoutZeroize(_ context: CGContext) {
         lock.lock()
         defer { lock.unlock() }

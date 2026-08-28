@@ -3,15 +3,15 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-02 / D-28: clear-paths symmetry as a tested
+// Clear-paths symmetry as a tested
 // invariant. Every per-scan field that survives the scan but should
 // not survive a clear must be reset by both `clear()` and `clearResults()`.
-// `appliedResultIDs` is lifted from view-state per D-09
-// and added to the symmetric clear contract in this WU.
-// WU-18 / RR-26: `appliedFilter` is a new
+// `appliedResultIDs` is lifted from view-state
+// and added to the symmetric clear contract.
+// `appliedFilter` is a new
 // post-scan filter; it joins the symmetric clear contract here.
 
-@Suite("SearchState clear symmetry (WU-02 / D-28)", .tags(.search))
+@Suite("SearchState clear symmetry", .tags(.search))
 @MainActor
 struct SearchStateClearTests {
 
@@ -99,7 +99,7 @@ struct SearchStateClearTests {
         #expect(state.isProgrammaticModeChange == false)
     }
 
-    @Test("SO-03 — a landing regex error clears stale results and survives the clear")
+    @Test("A landing regex error clears stale results and survives the clear")
     func regexErrorArrivalClearsStaleResults() {
         let state = SearchState()
         state.results = [SearchResult(

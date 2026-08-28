@@ -4,13 +4,13 @@ import PDFKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// CAT-369 (VE-8-1) + CAT-373.
+// Verification page-count integrity and cancel-race invariants.
 //
-// VE-8-1: a verify-only run whose output page count does not match the source
+// A verify-only run whose output page count does not match the source
 // must FAIL before any layer runs, rather than verifying a truncated document
 // and reporting a misleading PASS/WARN.
 //
-// CAT-373: a cancel landing anywhere in a verify-only run must never leave the
+// A cancel landing anywhere in a verify-only run must never leave the
 // document on `.verified` with an overall `.pass` while any layer is `.skipped`
 // — the dishonest verdict the final pre-report cancellation checkpoint closes.
 
@@ -18,9 +18,9 @@ import PDFKit
 @MainActor
 struct VerificationPageCountIntegrityTests {
 
-    // MARK: - VE-8-1 (CAT-369 part 2)
+    // MARK: - Page-count mismatch short-circuit
 
-    @Test("VE-8-1: verify-only on a page-count mismatch FAILs before any layer")
+    @Test("verify-only on a page-count mismatch FAILs before any layer")
     func verifyOnlyFailsOnPageCountMismatch() async throws {
         let coordinator = makeCoordinator()
         let documentState = coordinator.documentState
@@ -51,19 +51,20 @@ struct VerificationPageCountIntegrityTests {
         }
         #expect(report.overallStatus.isFail,
                 "Page-count mismatch must FAIL the overall verdict")
-        // VE-8-1 returns before any layer runs: exactly one synthetic FAIL
-        // layer (pre-fix the full 5/10-layer report would have run).
+        // The short-circuit returns before any layer runs: exactly one
+        // synthetic FAIL layer (pre-fix the full 5/10-layer report would
+        // have run).
         #expect(report.layers.count == 1,
-                "VE-8-1 short-circuits before the layer checks")
+                "The short-circuit fires before the layer checks")
         #expect(report.layers.first?.status.isFail == true,
-                "The single VE-8-1 layer must be FAIL")
-        // ARCH §12.2: message carries page counts only, never content.
+                "The single short-circuit layer must be FAIL")
+        // The message carries page counts only, never content.
         if case .fail(let msg) = report.overallStatus {
             #expect(!msg.isEmpty)
         }
     }
 
-    @Test("VE-8-1: matching page counts let verify-only proceed to the layers")
+    @Test("matching page counts let verify-only proceed to the layers")
     func verifyOnlyProceedsWhenPageCountsMatch() async throws {
         let coordinator = makeCoordinator()
         let documentState = coordinator.documentState
@@ -84,15 +85,15 @@ struct VerificationPageCountIntegrityTests {
             Issue.record("Expected .verified after verify-only")
             return
         }
-        // The layers actually ran (no VE-8-1 short-circuit): more than one
+        // The layers actually ran (no short-circuit): more than one
         // layer in the report.
         #expect(report.layers.count > 1,
                 "Matching page counts must not short-circuit before the layers")
     }
 
-    // MARK: - CAT-373 cancel-race stress harness
+    // MARK: - Cancel-race stress harness
 
-    @Test("CAT-373: verify-only cancel race never yields .verified+.pass with a skipped layer")
+    @Test("verify-only cancel race never yields .verified+.pass with a skipped layer")
     func verifyOnlyCancelRaceHoldsInvariant() async throws {
         // ~200 iterations on a blank 1-page output in Searchable mode (so the
         // digest-consuming Layers 7 & 9 report `.skipped` on the all-nil-digest

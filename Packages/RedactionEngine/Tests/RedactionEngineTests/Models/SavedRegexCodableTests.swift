@@ -2,7 +2,6 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Pkg G.2 — TRUST-savedregex-codable-decoder-bypass.
 // Pins the codable invariant locks on `SavedRegex`:
 //   1. Decoder MUST lock `isBuiltIn = false` regardless of the encoded
 //      payload — built-ins are merged in-process from `allBuiltIns`,
@@ -11,7 +10,7 @@ import Foundation
 //   2. Decoder MUST mirror the memberwise init's clamps on `label`
 //      (`labelLengthCap`) and `pattern` (`patternLengthCap`) so the
 //      schema floor holds across both construction paths.
-@Suite("SavedRegex codable invariant locks (Pkg G.2)")
+@Suite("SavedRegex codable invariant locks")
 struct SavedRegexCodableTests {
 
     private static let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
@@ -40,7 +39,7 @@ struct SavedRegexCodableTests {
         let data = try Self.makeTamperedJSON(isBuiltIn: true)
         let decoded = try JSONDecoder().decode(SavedRegex.self, from: data)
         #expect(decoded.isBuiltIn == false,
-                "Decoder must lock isBuiltIn=false per Jesse Q6 / Pkg G.2")
+                "Decoder must lock isBuiltIn=false")
     }
 
     @Test("Tampered blob with isBuiltIn=false decodes as user-saved (false)")

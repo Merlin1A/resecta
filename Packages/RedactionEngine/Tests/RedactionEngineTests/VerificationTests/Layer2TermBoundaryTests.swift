@@ -3,7 +3,7 @@ import Foundation
 import CoreGraphics
 @testable import RedactionEngine
 
-// ENGINE §6 — Layer-2 OCR-side term-matching boundary discipline (SV-F).
+// Layer-2 OCR-side term-matching boundary discipline.
 // The per-term boundary flag the byte layers already honor
 // (`SensitiveTermAutomaton.tokenFilteredMatches`) applies to the OCR gate
 // too, via the String-space mirror `containsTerm`: a boundary-required name

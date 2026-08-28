@@ -1,6 +1,6 @@
 import XCTest
 
-/// 1.1.0 draw-tool program (D-109; RB-74..77) — the S3 verification
+/// The 1.1.0 draw-tool program — the S3 verification
 /// battery for the S1 + S2 overlay changes, driven end to end on the
 /// real device tree (black-box XCUITest, no `@testable import`):
 ///
@@ -8,29 +8,29 @@ import XCTest
 ///  - T2 a 4-pt drag sits under the 8-pt start gate: nothing commits,
 ///    the editor stays up.
 ///  - T3 a drag STARTING INSIDE the first box draws a second one — draw
-///    wins while the tool is on (RB-75, S2-a).
+///    wins while the tool is on.
 ///  - T4 More › Add to Selection leaves the tool; re-entering the tool
-///    clears the toggle and the next drag draws, not a marquee (DT-07).
+///    clears the toggle and the next drag draws, not a marquee.
 ///  - T5 zoom: after a pinch a 24 × 24 screen-pt drag commits and a
-///    9 × 9 one does not (the commit floor is measured on screen, S2-b).
+///    9 × 9 one does not (the commit floor is measured on screen).
 ///    The pinch is proven through the served count itself: the band
 ///    beneath the page is off-page at fit and on-page once zoomed, so a
 ///    drag there commits only after a real zoom. A simulator pinch that
-///    never zooms skips the leg with the reason (packet §4.10 — the
-///    device pass and the unit-level `snapZoomScaleOverride` proofs in
+///    never zooms skips the leg with the reason (the device pass and
+///    the unit-level `snapZoomScaleOverride` proofs in
 ///    `DrawWinsTests` carry it).
 ///  - T6 Undo removes the drawn box.
-///  - T7 (UXC-49 / REV-13) with the Search sheet parked at the compact
+///  - T7 with the Search sheet parked at the compact
 ///    float, a drag on the page still draws one box — beneath the float
 ///    iOS 26's window-level sheet pan cancelled every moving canvas
 ///    touch (0/6 on the parent tree); the overlay's claim recognizer and
 ///    failure requirement carry the drag through.
-///  - T8 (UXC-49 / REV-14) Redact with the sheet parked at the compact
+///  - T8 Redact with the sheet parked at the compact
 ///    float closes the sheet before the run — no float over the results
 ///    screen — and Keep Editing returns with Search available again.
 ///
-/// Rails (packet §3 / §6): canvas regions are not in the accessibility
-/// tree (D2-10), so every assertion reads the page bar's "N region(s)"
+/// Rails: canvas regions are not in the accessibility
+/// tree, so every assertion reads the page bar's "N region(s)"
 /// text — the one served canvas hook (the bar shows nothing at zero);
 /// drags are window-normalized coordinate presses
 /// (`press(forDuration:thenDragTo:)`), the only admissible drive on
@@ -103,7 +103,7 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         attachScreenshot(named: "canvasdraw-t2-subthreshold")
     }
 
-    /// T3 — a drag starting INSIDE an existing box draws a new box (draw wins, RB-75).
+    /// T3 — a drag starting INSIDE an existing box draws a new box (draw wins).
     func testDragStartingInsideABoxDrawsANewBox() {
         launchSampleInEditor()
         enterDrawMode()
@@ -113,7 +113,7 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         drag(from: CGVector(dx: 0.375, dy: 0.50), to: CGVector(dx: 0.62, dy: 0.66))
         XCTAssertTrue(
             waitForRegionCount(base + 1),
-            "With the tool on, a drag starting inside an existing box must draw another box — draw wins (RB-75 / S2-a); page bar read \(currentRegionCount())."
+            "With the tool on, a drag starting inside an existing box must draw another box — draw wins; page bar read \(currentRegionCount())."
         )
         attachScreenshot(named: "canvasdraw-t3-draw-over-box")
     }
@@ -127,14 +127,14 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         openOverflowAndTap(label: "Add to Selection", identifier: "selectMoreToggle")
         XCTAssertTrue(
             waitForToolValue("Tap to enter drawing mode"),
-            "Turning Add to Selection on must leave the Rectangle tool (mutual exclusion, S2-a)."
+            "Turning Add to Selection on must leave the Rectangle tool (mutual exclusion)."
         )
 
         enterDrawMode()
         drag(from: CGVector(dx: 0.55, dy: 0.28), to: CGVector(dx: 0.80, dy: 0.40))
         XCTAssertTrue(
             waitForRegionCount(base + 1),
-            "After re-entering the tool the drag must draw a box, not run the marquee (DT-07 / S2-a); page bar read \(currentRegionCount())."
+            "After re-entering the tool the drag must draw a box, not run the marquee; page bar read \(currentRegionCount())."
         )
         attachScreenshot(named: "canvasdraw-t4-toggle-roundtrip")
     }
@@ -159,7 +159,7 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         sleep(2)
         if currentRegionCount() > 0 {
             throw XCTSkip(
-                "The band beneath the page drew at fit on this device — no off-page band to prove the zoom with; the zoom leg moves to the device pass (packet §4.10)."
+                "The band beneath the page drew at fit on this device — no off-page band to prove the zoom with; the zoom leg moves to the device pass."
             )
         }
         attachScreenshot(named: "canvasdraw-t5-fit")
@@ -182,7 +182,7 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         attachScreenshot(named: "canvasdraw-t5-zoomed")
         guard zoomed else {
             throw XCTSkip(
-                "The zoom leg did not prove out in two attempts on this simulator (the pinch did not zoom, or the post-pinch drag was dropped — see the attached stills); the leg stays with the unit-level snapZoomScaleOverride proofs (DrawWinsTests) and the device pass (packet §4.10)."
+                "The zoom leg did not prove out in two attempts on this simulator (the pinch did not zoom, or the post-pinch drag was dropped — see the attached stills); the leg stays with the unit-level snapZoomScaleOverride proofs (DrawWinsTests) and the device pass."
             )
         }
 
@@ -191,13 +191,13 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         sleep(2)
         XCTAssertEqual(
             currentRegionCount(), 1,
-            "A 9 × 9 screen-pt drag must not commit at zoom — the commit floor is measured on screen (S2-b)."
+            "A 9 × 9 screen-pt drag must not commit at zoom — the commit floor is measured on screen."
         )
         // … and 24 × 24 commits again.
         drag(fromNormalized: bandRight, byPoints: 24, 24)
         XCTAssertTrue(
             waitForRegionCount(2),
-            "A 24 × 24 screen-pt drag must commit at zoom (S2-b); page bar read \(currentRegionCount())."
+            "A 24 × 24 screen-pt drag must commit at zoom; page bar read \(currentRegionCount())."
         )
         attachScreenshot(named: "canvasdraw-t5-zoomed-floor")
     }
@@ -216,7 +216,7 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         attachScreenshot(named: "canvasdraw-t6-after-undo")
     }
 
-    /// T7 — the compact-float draw (UXC-49 / REV-13).
+    /// T7 — the compact-float draw.
     func testDragBeneathCompactFloatDrawsOneBox() {
         launchSampleInEditor(extraArguments: ["--searchDetent=compact"])
         openSearchSheetAtCompact()
@@ -229,8 +229,8 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         attachScreenshot(named: "canvasdraw-t7-compact-float-draw")
     }
 
-    /// T8 — Redact with the sheet parked at the compact float (UXC-49 /
-    /// REV-14): the sheet is down on the results screen and Keep Editing
+    /// T8 — Redact with the sheet parked at the compact float: the
+    /// sheet is down on the results screen and Keep Editing
     /// re-enables Search.
     func testRedactWithCompactFloatClosesTheSheet() {
         launchSampleInEditor(extraArguments: ["--searchDetent=compact"])
@@ -247,7 +247,7 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         )
         XCTAssertFalse(
             compactFloatStrip.exists,
-            "The Search sheet must be down on the results screen (REV-14)."
+            "The Search sheet must be down on the results screen."
         )
         attachScreenshot(named: "canvasdraw-t8-results-no-float")
 
@@ -260,7 +260,7 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         XCTAssertTrue(search.waitForExistence(timeout: 15), "The editor's Search button never came back.")
         XCTAssertTrue(
             waitForEnabled(search, timeout: 10),
-            "Search must be enabled again after Keep Editing (RW-F-001)."
+            "Search must be enabled again after Keep Editing."
         )
         attachScreenshot(named: "canvasdraw-t8-keep-editing-search-enabled")
     }
@@ -318,7 +318,7 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         XCTFail("The Rectangle tool did not report drawing mode after three taps.")
     }
 
-    /// Poll the tool's accessibility value (§A8 strings).
+    /// Poll the tool's accessibility value.
     private func waitForToolValue(_ expected: String, timeout: TimeInterval = 10) -> Bool {
         let tool = app.buttons["drawTool"]
         let deadline = Date().addingTimeInterval(timeout)

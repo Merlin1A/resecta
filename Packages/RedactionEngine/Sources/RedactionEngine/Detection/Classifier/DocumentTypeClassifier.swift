@@ -16,8 +16,7 @@ public struct DoctypeResult: Sendable {
     public let runnerUp: DoctypeClass?
     public let softmax: [DoctypeClass: Double]
     /// Top contributing keywords, for the G5 "Why this classification?" panel
-    /// (Phase 3 UI). Kept in-memory only — never logged or persisted
-    /// (ARCHITECTURE.md §12.2).
+    /// (Phase 3 UI). Kept in-memory only — never logged or persisted.
     public let topKeywords: [TopKeyword]
 
     public struct TopKeyword: Sendable, Equatable, Hashable {
@@ -48,7 +47,7 @@ public struct DoctypeResult: Sendable {
     }
 }
 
-/// W9 — detailed classifier output shared with the "Document profile" panel.
+/// Detailed classifier output shared with the "Document profile" panel.
 /// A read-out of the same internal state that `classify(...)` consumes;
 /// lives alongside DoctypeResult because it reuses TopKeyword.
 public struct DoctypeExplanation: Sendable {
@@ -220,9 +219,9 @@ public struct DocumentTypeClassifier: Sendable {
         )
     }
 
-    // MARK: - W9 Explain
+    // MARK: - Explain
 
-    /// W9 — expose classifier state as a top-3 probability breakdown plus
+    /// Expose classifier state as a top-3 probability breakdown plus
     /// top-5 keyword contributors and the structural bonuses that fired.
     /// Shares `computeLogits(...)` with `classify(...)` so the primary
     /// class + probability always agree with the triage sheet's G5 panel.
@@ -242,7 +241,7 @@ public struct DocumentTypeClassifier: Sendable {
         let logits = computeLogits(pageText: pageText)
         let softmax = Self.softmax(logits.rawScores)
         let paired: [(DoctypeClass, Double)] = DoctypeClass.canonicalOrder.map { ($0, softmax[$0] ?? 0.0) }
-        // Same rawValue tie-break as classify(...) so the W9 panel and the
+        // Same rawValue tie-break as classify(...) so the explain panel and the
         // gating primary agree on exact ties.
         let sorted = paired.sorted {
             if $0.1 != $1.1 { return $0.1 > $1.1 }

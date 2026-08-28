@@ -1,6 +1,6 @@
 import SwiftUI
 
-// GAP-4 §7.3: Horizontal flow layout for page reference chips.
+// Horizontal flow layout for page reference chips.
 // Chips wrap to the next line when they exceed available width.
 
 struct FlowLayout: Layout {

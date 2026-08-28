@@ -1,14 +1,14 @@
 import SwiftUI
 
-// SEC-3 extension: sheet-level capture shield.
+// Sheet-level capture shield.
 //
 // Modal presentation renders ABOVE `DocumentEditorView`'s shield swap, so
-// the existing SEC-3 shield does not cover the Search & Redact or Detection
+// the existing shield does not cover the Search & Redact or Detection
 // Triage sheets — the two most PII-dense surfaces in the app. This shared
 // modifier swaps the sheet's entire content for `PrivacyShieldView` while
 // `ScreenCaptureMonitor.isShielded` is set, mirroring the editor-level swap.
 //
-// INJECTION PATTERN (decided 2026-06-10): the monitor arrives as a `let`,
+// The monitor arrives as a `let`,
 // NOT an @Environment read inside `body` — the toast dismiss-crash incident
 // (ToastView's `@Environment(ToastQueueManager.self)` asserting during a
 // dismiss-coincident re-layout, fixed in 37b56c9 by let-injection) is the
@@ -37,7 +37,7 @@ struct ShieldedSheetContent: ViewModifier {
 }
 
 extension View {
-    /// Swap this sheet's content for the SEC-3 `PrivacyShieldView` while a
+    /// Swap this sheet's content for the `PrivacyShieldView` while a
     /// screen capture / mirroring signal is active. Apply at the outermost
     /// level of a sheet's `body` so no sensitive subview survives the swap.
     func shieldedSheetContent(monitor: ScreenCaptureMonitor) -> some View {

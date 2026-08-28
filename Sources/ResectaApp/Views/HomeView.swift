@@ -3,8 +3,8 @@ import UIKit
 
 // Variant B home screen — wordmark masthead, two equally-weighted choice
 // cards (Open a Document / Try the Sample), trust strip, version footer.
-// R1: Mechanism-description language only — no outcome promises.
-// Frozen strings (handoff §10): tagline, card bodies, trust labels.
+// Mechanism-description language only — no outcome promises.
+// Frozen strings: tagline, card bodies, trust labels.
 
 struct HomeView: View {
     @Environment(AppCoordinator.self) private var appCoordinator
@@ -14,7 +14,7 @@ struct HomeView: View {
 
     @State private var showFilePicker = false
     @State private var showSettings = false
-    // Q-FLOW-1 / FLOW-1 (Pkg N): the prior `showImportError` state field
+    // The prior `showImportError` state field
     // drove a generic `.alert("Import Error", ...)` on HomeView. Removed —
     // import errors now uniformly surface through the workspace-level
     // FailedStateView via `.failed(.importError(.corrupt))`. See
@@ -52,8 +52,8 @@ struct HomeView: View {
                     Button("Settings", systemImage: "gearshape") {
                         showSettings = true
                     }
-                    // UXC-43: neutral, like the editor toolbar's Settings
-                    // (the UXC-32 rule) — `.primary` is black in light and
+                    // Neutral, like the editor toolbar's Settings
+                    // button — `.primary` is black in light and
                     // white in dark; scoped to the button, so the Settings
                     // sheet's own tint is unaffected.
                     .tint(.primary)
@@ -72,17 +72,16 @@ struct HomeView: View {
                     .presentationDetents([.medium, .large])
             }
             #if DEBUG
-            // S7 sim-verification hook (read-only MCP — no taps): open the
+            // Sim-verification hook (read-only MCP — no taps): open the
             // Settings sheet at launch so the detection-preset picker and
-            // search-history affordances are screenshotable. Documented
-            // per verification.md §6.
+            // search-history affordances are screenshotable.
             .onAppear {
                 if CommandLine.arguments.contains("--openSettings") {
                     showSettings = true
                 }
             }
             #endif
-            // Q-FLOW-1 / FLOW-1 (Pkg N): the generic Import Error alert
+            // The generic Import Error alert
             // is gone. The fileImporter `.failure` branch now opens a
             // workspace whose phase lands on `.failed(.importError(.corrupt))`
             // — the same FailedStateView the corrupt-file import branch
@@ -173,7 +172,7 @@ struct HomeView: View {
         case .failure(let error):
             // User cancellation returns CocoaError.userCancelled — no surface needed.
             if (error as? CocoaError)?.code == .userCancelled { return }
-            // Q-FLOW-1 / FLOW-1 (Pkg N): open a fresh workspace and drive
+            // Open a fresh workspace and drive
             // its DocumentState to `.failed(.importError(.corrupt))`. The
             // workspace's FailedStateView is the same surface a corrupt-
             // file import (from inside the workspace) lands on; threading

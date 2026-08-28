@@ -15,7 +15,7 @@ private extension NSImage {
 }
 #endif
 
-// SEARCH-AND-REDACT §3: Engine-layer document search with text-layer,
+// Engine-layer document search with text-layer,
 // regex, and OCR paths. Returns results via AsyncStream for progressive UI.
 
 /// Performs text search across a PDF document with dual-path
@@ -27,13 +27,13 @@ public actor DocumentSearcher {
 
     // MARK: - Configuration
 
-    /// Maximum regex pattern length (ReDoS prevention — §S4).
+    /// Maximum regex pattern length (ReDoS prevention).
     static let maxRegexPatternLength = 200
 
-    /// Per-page regex timeout (§S4).
+    /// Per-page regex timeout.
     static let perPageRegexTimeout: Duration = .seconds(5)
 
-    /// WU-66 — per-instance test override for `perPageRegexTimeout`. Set via
+    /// Per-instance test override for `perPageRegexTimeout`. Set via
     /// the optional `regexTimeoutOverride` init parameter; production code
     /// leaves it nil and the production constant applies. Marked
     /// `nonisolated let` so the nonisolated `previewRegex` can read it
@@ -41,10 +41,10 @@ public actor DocumentSearcher {
     /// static override would expose.
     nonisolated let regexTimeoutOverride: Duration?
 
-    /// Maximum results to accumulate (§9.5).
+    /// Maximum results to accumulate.
     public static let maxResults = 1000
 
-    /// Maximum pixel dimension for OCR rendering (§S2 / ENGINE §2.5).
+    /// Maximum pixel dimension for OCR rendering.
     /// Pages exceeding this in either axis are skipped for OCR to
     /// prevent multi-gigabyte bitmap allocations.
     private static let maxOCRPixelDimension: CGFloat = 10_000
@@ -67,24 +67,24 @@ public actor DocumentSearcher {
     // copy-on-write, so the buffer is shared rather than re-copied. Mirrors
     // `AddressSpatialAssembler.sharedAddressComponents`.
     //
-    // H-201 (SEC-7 re-wire): the shared detector is built through
+    // The shared detector is built through
     // `loadWithDiagnostics()` — NOT the bare `PIIDetector()` — so the live
     // scan path carries the same degrade diagnostics the legacy detection
     // pipeline surfaced. On a healthy install the constructed detector is
     // identical to the bare init's; on a corpus/signature failure or an
     // NER-asset-absent OS build, `sharedLoadDiagnostics` records it and the
-    // scan kickoff surfaces the SEC-7 banner instead of degrading silently.
+    // scan kickoff surfaces the degraded-detection banner instead of degrading silently.
     private static let sharedPIIDetectorLoad = PIIDetector.loadWithDiagnostics()
     private let piiDetector = DocumentSearcher.sharedPIIDetectorLoad.detector
 
-    /// SEC-7 diagnostics for the process-shared search detector (H-201).
+    /// Diagnostics for the process-shared search detector.
     /// Cached with the detector — the probe reflects load-time state, which
     /// is the state every search in this process actually runs under.
     public static var sharedLoadDiagnostics: GazetteerLoadDiagnostics {
         sharedPIIDetectorLoad.diagnostics
     }
 
-    // B06 — Site-B / Search parity. The five scored families
+    // Site-B / Search parity. The five scored families
     // {account, phone, mrn, ein, itin} now gate at Search on the SAME composed
     // posterior the detection path uses (DetectionOrchestrator.swift:432-446),
     // rather than on raw match.confidence. Both are `Sendable` value types,
@@ -95,16 +95,16 @@ public actor DocumentSearcher {
     // w_family 1 and mrn/ein/itin at w_family 0.
     private let calibratedScorer = CalibratedScorer()
     private let contextScorer = ContextScorerWeights.loadFromEngineBundle()
-    // B06 — empty priors at Search (no triage history is threaded into a scan),
+    // Empty priors at Search (no triage history is threaded into a scan),
     // so `PerCategoryPriors().mean(category)` is 0.5 for every category ⇒
     // logit(prior) is 0 and priorMean floors to absorbingStateFloor only when the
     // category has accrued enough rejections elsewhere (it has not, at scan time).
     // Held as a stored value for parity with the orchestrator's `priors` local.
     private let searchPriors = PerCategoryPriors()
 
-    // RC-4 — spatial address assembly on the Search legs. The orchestrator
-    // has run `AddressSpatialAssembler` over per-line records since WS1 item
-    // 1.6 (DetectionOrchestrator.detectPage Step 3a); both Search legs ran
+    // Spatial address assembly on the Search legs. The orchestrator
+    // has run `AddressSpatialAssembler` over per-line records
+    // (DetectionOrchestrator.detectPage Step 3a); both Search legs ran
     // only the flat single-line regex arms, so a multi-line address block
     // never became a Search candidate on either leg. The assembler is a
     // Sendable value whose gazetteer load is cached statically
@@ -112,27 +112,27 @@ public actor DocumentSearcher {
     // construction is cheap. See `assembledAddressMatches(lines:haystack:)`.
     private let addressAssembler = AddressSpatialAssembler()
 
-    // W4 — optional preset-threshold vector applied to PII matches before
-    // conversion to SearchResult. nil preserves pre-W4 behavior (no gating).
+    // Optional preset-threshold vector applied to PII matches before
+    // conversion to SearchResult. nil disables gating (no vector installed).
     // Set via `setThresholdVector(_:)` before each search kickoff so the UI
     // layer can snapshot the user's current settings state.
     private var thresholdVector: PresetThresholdVector?
 
-    // W3 / W-P — optional compiled user term index. nil (or an empty
+    // Optional compiled user term index. nil (or an empty
     // index) leaves `.piiScan` behavior unchanged. Set via
     // `setUserTerms(_:)` alongside `setThresholdVector(_:)` before each
-    // scan kickoff. W-P wraps the underlying `UserTermMatcher` in
+    // scan kickoff. The index wraps the underlying `UserTermMatcher` in
     // `UserTermsIndex` so never-flag suppression can run pre-threshold
     // via `UserTermsIndex.merge(into:doctype:)`.
     private var userTermsIndex: UserTermsIndex?
 
-    // W10 — optional sink for per-page cross-category overlap-suppressed
+    // Optional sink for per-page cross-category overlap-suppressed
     // counts. Installed before a scan to route resolver output into the
     // app-layer CoverageReport aggregator. Runs after `piiDetector.detect`
     // and before threshold filtering, mirroring DetectionOrchestrator.
     private var overlapSink: (@Sendable ([PIICategory: Int]) -> Void)?
 
-    // D06-F2 Part 1 — optional sink for the per-page count of matches dropped
+    // Optional sink for the per-page count of matches dropped
     // for falling below their preset threshold (the raw-gate drops on `restText`
     // / `restOCR`). Fired beside `overlapSink` so the app-layer CoverageReport's
     // "below threshold" line is truthful instead of a hardcoded 0. Scored
@@ -140,32 +140,32 @@ public actor DocumentSearcher {
     // drops are intentionally NOT counted here.
     private var belowThresholdSink: (@Sendable (Int) -> Void)?
 
-    // WU-66 / [P2] — optional sink for per-page regex-timeout pages.
-    // Fires once per page where the regex enumerator bails on the §S4
+    // Optional sink for per-page regex-timeout pages.
+    // Fires once per page where the regex enumerator bails on the
     // `perPageRegexTimeout` ceiling, in both the live-preview path
     // (`previewRegex`) and the full-scan path (`searchRegex`). The app
-    // layer accumulates page indices to render the `R-35` timeout banner.
+    // layer accumulates page indices to render the regex-timeout banner.
     private var regexTimeoutSink: (@Sendable (Int) -> Void)?
 
-    // ST-83 — optional sink for per-page oversized-OCR-skip reporting.
+    // Optional sink for per-page oversized-OCR-skip reporting.
     // Fires once per page whose 300-DPI render exceeds the OCR pixel caps
     // (`maxOCRPixelDimension` / `maxOCRPixelCount`) and is therefore never
     // OCR'd, in all three OCR entry paths (manual OCR search, PII scan,
     // regex OCR fallback). Reporting-only: the skip behavior itself is
     // unchanged. The app layer accumulates page indices to render the
-    // OCR-skip banner alongside the R-35 regex-timeout banner.
+    // OCR-skip banner alongside the regex-timeout banner.
     private var ocrSkipSink: (@Sendable (Int) -> Void)?
 
-    // Package C — optional sink for per-page custom-terms always-flag
+    // Optional sink for per-page custom-terms always-flag
     // regex timeouts. Fires once per (page, user-authored pattern) when
     // `UserTermMatcher.alwaysFlagHits` reports the pattern bailed on the
     // `perPageRegexTimeout` ceiling. Separate from `regexTimeoutSink`
     // because the UX surface differs — saved-search regex timeouts route
-    // to the R-35 banner (no pattern echo per RR-24); custom-terms
+    // to the regex-timeout banner (no pattern echo); custom-terms
     // timeouts route to a `.warning` toast that includes the truncated
     // user-named pattern so the user can identify which list entry to
     // revise. Per-term-per-page semantics — the term remains active on
-    // subsequent pages within the same scan. See REDACTION_ENGINE.md §9.4.
+    // subsequent pages within the same scan.
     private var userTermsTimeoutSink: (@Sendable (Int, String) -> Void)?
 
     // Per-page import-time text-layer classification, used to
@@ -195,7 +195,7 @@ public actor DocumentSearcher {
     private var ocrCacheAccess: [Int: Int] = [:]
     private var ocrAccessCounter: Int = 0
 
-    // Plan Phase 2 / §G6 — parallel cache of normalized PII-scan inputs,
+    // Parallel cache of normalized PII-scan inputs,
     // keyed identically to `ocrCache` and LRU-evicted in lockstep. The PII
     // path (`scanPagePIIViaOCR`) reads this cache; user text search
     // (`searchPageViaOCR`) continues reading verbatim `ocrCache`. Normalizer
@@ -223,11 +223,11 @@ public actor DocumentSearcher {
         self.textLayerStatusByPage = textLayerStatusByPage
     }
 
-    // MARK: - B06 Site-B posterior composition
+    // MARK: - Site-B posterior composition
 
-    /// B06 — Site-B gate for the five scored families, composing the SAME
+    /// Site-B gate for the five scored families, composing the SAME
     /// posterior + learned-context term the detection path applies at
-    /// DetectionOrchestrator.swift:432-446 + the W4 gate at :455-460.
+    /// DetectionOrchestrator.swift:432-446 + the posterior threshold gate at :455-460.
     ///
     /// For each match whose category resolves to a vector cutoff:
     ///   finalConfidence = posterior(raw, priorMean, contextLogit)
@@ -244,7 +244,7 @@ public actor DocumentSearcher {
     /// byte-identical to the raw path.
     ///
     /// DOCTYPE: `DocumentSearcher` carries no doctype (the text-layer merge runs
-    /// with `doctype: nil`, Q9) and the search path has no classifier output to
+    /// with `doctype: nil`) and the search path has no classifier output to
     /// mirror Site-A's `effectiveDoctype`, so the feature builder is fed
     /// `.generic` for BOTH the `doctype` and `effectiveDoctype` parameters (the
     /// value the detection seam uses for an unknown doctype). The SAME value is
@@ -297,9 +297,9 @@ public actor DocumentSearcher {
                     pageText: pageText
                 )
             )
-            // SRCH-S2 D02-scorer-posterior-F1/F2 — under-redaction posterior floor,
+            // Under-redaction posterior floor,
             // the Search-path twin of the Site-A (DetectionOrchestrator) seam. The
-            // SAME raw-bar helper (DESIGN-DECISIONS DQ2), so a keyword-confirmed
+            // SAME raw-bar helper, so a keyword-confirmed
             // account/phone the learned term collapsed is re-floored to the
             // preset-invariant conservative cutoff before the gate. Flooring at
             // BOTH seams keeps Auto-Detect and Search symmetric — leaving either
@@ -336,9 +336,9 @@ public actor DocumentSearcher {
         }
     }
 
-    // MARK: - RC-4 Spatial address assembly (both PII-scan legs)
+    // MARK: - Spatial address assembly (both PII-scan legs)
 
-    /// RC-4 — run spatial address assembly over per-line records and convert
+    /// Run spatial address assembly over per-line records and convert
     /// each `Assembled` into a `PIIDetector.PIIMatch`, mirroring
     /// `DetectionOrchestrator.detectPage` Step 3a: callers append the matches
     /// BEFORE `resolveOverlaps` so assembled candidates participate in overlap
@@ -438,7 +438,7 @@ public actor DocumentSearcher {
     /// immutable Sendable `piiDetector` let.
     nonisolated var _testNameBloomBufferAddress: Int? { piiDetector._testNameBloomBufferAddress }
 
-    /// B06 — observation-only seam over the Site-B composition (the same
+    /// Observation-only seam over the Site-B composition (the same
     /// `composedSurvivors` core production calls). The G8 Site-B parity harness
     /// drives this with a chosen scorer — `ContextScorerWeights.identity` for the
     /// w=0 identity control (composed-at-identity == raw), the installed bundle
@@ -463,41 +463,41 @@ public actor DocumentSearcher {
     }
     #endif
 
-    /// W4 — install the threshold vector to apply on future PII scans.
-    /// Pass nil to disable gating entirely (pre-W4 behavior).
+    /// Install the threshold vector to apply on future PII scans.
+    /// Pass nil to disable gating entirely.
     public func setThresholdVector(_ vector: PresetThresholdVector?) {
         self.thresholdVector = vector
     }
 
-    /// W3 / W-P — install the user term index to apply on future PII
+    /// Install the user term index to apply on future PII
     /// scans. Pass nil (or an empty index) to disable user-term behavior.
     public func setUserTerms(_ index: UserTermsIndex?) {
         self.userTermsIndex = index
     }
 
-    /// W10 — install a per-page overlap-suppressed-count sink. Pass nil
+    /// Install a per-page overlap-suppressed-count sink. Pass nil
     /// to disable reporting. Called once per page where the resolver
     /// actually dropped at least one loser.
     public func setOverlapSink(_ sink: (@Sendable ([PIICategory: Int]) -> Void)?) {
         self.overlapSink = sink
     }
 
-    /// D06-F2 Part 1 — install a per-page below-threshold-drop-count sink. Pass
+    /// Install a per-page below-threshold-drop-count sink. Pass
     /// nil to disable reporting. Called once per page where the raw threshold
     /// gate dropped at least one match, mirroring `setOverlapSink`.
     public func setBelowThresholdSink(_ sink: (@Sendable (Int) -> Void)?) {
         self.belowThresholdSink = sink
     }
 
-    /// WU-66 / [P2] — install a per-page regex-timeout sink. Pass nil to
-    /// disable reporting. Fires once per page where the §S4 enumerator
+    /// Install a per-page regex-timeout sink. Pass nil to
+    /// disable reporting. Fires once per page where the enumerator
     /// bails on the `perPageRegexTimeout` ceiling, in both `previewRegex`
     /// and `searchRegex` branches.
     public func setRegexTimeoutSink(_ sink: (@Sendable (Int) -> Void)?) {
         self.regexTimeoutSink = sink
     }
 
-    /// ST-83 — install a per-page oversized-OCR-skip sink. Pass nil to
+    /// Install a per-page oversized-OCR-skip sink. Pass nil to
     /// disable reporting. Fires once per OCR attempt on a page whose
     /// render exceeds the OCR pixel caps, in all three OCR entry paths
     /// (manual OCR search, PII scan, regex OCR fallback). The consumer
@@ -507,12 +507,11 @@ public actor DocumentSearcher {
         self.ocrSkipSink = sink
     }
 
-    /// Package C — install a per-page custom-terms always-flag timeout
+    /// Install a per-page custom-terms always-flag timeout
     /// sink. Pass nil to disable reporting. Fires once per (pageIndex,
     /// user-authored pattern) when `UserTermMatcher.alwaysFlagHits`
-    /// reports a regex term whose enumeration bailed on the §S4
+    /// reports a regex term whose enumeration bailed on the
     /// `perPageRegexTimeout` ceiling during a `.piiScan` page loop.
-    /// See REDACTION_ENGINE.md §9.4.
     public func setUserTermsTimeoutSink(_ sink: (@Sendable (Int, String) -> Void)?) {
         self.userTermsTimeoutSink = sink
     }
@@ -534,7 +533,7 @@ public actor DocumentSearcher {
         self.scannedRegionNotAnalyzedSink = sink
     }
 
-    /// WU-66 — actor-isolated reader so the `nonisolated previewMatches`
+    /// Actor-isolated reader so the `nonisolated previewMatches`
     /// bridge can snapshot the sink before invoking `previewRegex`.
     private func currentRegexTimeoutSink() -> (@Sendable (Int) -> Void)? {
         regexTimeoutSink
@@ -583,18 +582,18 @@ public actor DocumentSearcher {
         return stream
     }
 
-    // MARK: - W7 Live Preview
+    // MARK: - Live Preview
 
-    /// W7 — total cap on live-preview match count. Above this we report
+    /// Total cap on live-preview match count. Above this we report
     /// `saturated` and stop counting. The full search has its own cap
     /// (`maxResults`) and is unaffected.
     public static let maxPreviewMatches = 10_000
 
-    /// W7 — per-page cap on the highlighted ranges returned for the
+    /// Per-page cap on the highlighted ranges returned for the
     /// visible page. Bounds the overlay redraw cost on dense pages.
     public static let maxCurrentPageHighlights = 500
 
-    /// W7 — fast-path counterpart to `search(...)`. Walks the requested
+    /// Fast-path counterpart to `search(...)`. Walks the requested
     /// scope, counts matches, and (for the visible page only) collects
     /// up to `maxCurrentPageHighlights` ranges so the overlay can render
     /// transient yellow rectangles before the full search completes.
@@ -704,7 +703,7 @@ public actor DocumentSearcher {
             } else {
                 searchText = pageText
             }
-            // S7 / §4.4 — page-side smart punctuation (1:1, UTF-16
+            // Page-side smart punctuation (1:1, UTF-16
             // length-preserving, so emitted NSRanges stay valid). The
             // pattern itself is never transformed; see SearchOptions.
             if options.normalizeSmartPunctuation {
@@ -718,7 +717,7 @@ public actor DocumentSearcher {
             let effectiveTimeout: Duration =
                 regexTimeoutOverride ?? Self.perPageRegexTimeout
 
-            // F-001 — `.reportProgress` parity with `searchRegex`: the
+            // `.reportProgress` parity with `searchRegex`: the
             // closure fires periodically during a long match attempt
             // so the timeout / cancellation check actually samples.
             regex.enumerateMatches(
@@ -732,7 +731,7 @@ public actor DocumentSearcher {
                     return
                 }
                 if ContinuousClock.now - startTime > effectiveTimeout {
-                    // WU-66 / [P2] — preview-path timeout branch.
+                    // Preview-path timeout branch.
                     timeoutSink?(pageIndex)
                     stop.pointee = true
                     return
@@ -794,7 +793,7 @@ public actor DocumentSearcher {
                 nfkcText = pageText
             }
 
-            // S7 / §4.4 — same extension pipeline as findTextMatches so
+            // Same extension pipeline as findTextMatches so
             // preview counts agree with the full search. Emitted ranges
             // are mapped back to base coordinates before they reach the
             // highlight-rect resolver (leak-class otherwise).
@@ -841,7 +840,7 @@ public actor DocumentSearcher {
                         baseBounds = (baseStart, baseEnd)
                     }
 
-                    // DRAW-5 — magic-wand `exactMatch` gates the same
+                    // The magic-wand `exactMatch` gates the same
                     // live-preview word-boundary check as `wholeWord`.
                     // Base-coordinate variant when an offset map is active.
                     if options.wholeWord || options.exactMatch {
@@ -882,7 +881,7 @@ public actor DocumentSearcher {
         )
     }
 
-    /// W7 — local whole-word check for the preview path. Mirrors the
+    /// Local whole-word check for the preview path. Mirrors the
     /// instance `isWholeWord` but is callable from nonisolated context.
     private nonisolated static func previewIsWholeWord(_ range: Range<String.Index>, in text: String) -> Bool {
         if range.lowerBound > text.startIndex {
@@ -960,7 +959,7 @@ public actor DocumentSearcher {
         }
     }
 
-    // MARK: - Text Search (§3.1)
+    // MARK: - Text Search
 
     private func searchText(
         doc: PDFDocument,
@@ -997,7 +996,7 @@ public actor DocumentSearcher {
                     totalYielded += 1
                 }
             } else if options.includeOCR {
-                // OCR fallback path (§3.2) — page has no usable text layer
+                // OCR fallback path — page has no usable text layer
                 // (empty, or a `.sparse`/`.none` layer over a scanned body)
                 let ocrResults = await searchPageViaOCR(
                     page: page, pageIndex: pageIndex,
@@ -1020,11 +1019,11 @@ public actor DocumentSearcher {
         continuation.finish()
     }
 
-    // MARK: - Regex Search (§3.3)
+    // MARK: - Regex Search
 
     /// Validate a regex pattern for safety before execution.
     /// Returns the compiled regex or nil if the pattern is unsafe.
-    /// S6 / 4.7: thin wrapper over `validateRegexPatternWithError` so the
+    /// Thin wrapper over `validateRegexPatternWithError` so the
     /// two entry points share one rule set and cannot drift.
     public static func validateRegexPattern(_ pattern: String) -> NSRegularExpression? {
         try? validateRegexPatternWithError(pattern)
@@ -1045,7 +1044,7 @@ public actor DocumentSearcher {
     /// adds a sentinel-string runtime probe at compose-execution
     /// and profile-import time on top of this.
     public static func validateRegexPatternWithError(_ pattern: String) throws -> NSRegularExpression {
-        // §S4: Pattern length cap
+        // Pattern length cap
         guard pattern.count <= maxRegexPatternLength else {
             throw RegexValidationError.patternTooLong(maxLength: maxRegexPatternLength)
         }
@@ -1054,7 +1053,7 @@ public actor DocumentSearcher {
             throw RegexValidationError.likelyPathological
         }
 
-        // §S4: Nested quantifier rejection — heuristic for catastrophic backtracking.
+        // Nested quantifier rejection — heuristic for catastrophic backtracking.
         // Reject patterns like (a+)+, (.*)+, (a{2,})*
         if hasNestedQuantifiers(pattern) {
             throw RegexValidationError.nestedQuantifiers
@@ -1127,7 +1126,7 @@ public actor DocumentSearcher {
         }
 
         var totalYielded = 0
-        // WU-66 / [P2] — snapshot the sink for the synchronous
+        // Snapshot the sink for the synchronous
         // `regex.enumerateMatches` closure; reading `self.regexTimeoutSink`
         // inside the closure would re-enter actor isolation.
         let timeoutSink = self.regexTimeoutSink
@@ -1180,7 +1179,7 @@ public actor DocumentSearcher {
             } else {
                 searchText = pageText
             }
-            // S7 / §4.4 — page-side smart punctuation only (1:1, UTF-16
+            // Page-side smart punctuation only (1:1, UTF-16
             // length-preserving, so match NSRanges still index the page
             // correctly). The pattern is never transformed, and the
             // length-changing extensions are excluded from regex paths;
@@ -1192,9 +1191,9 @@ public actor DocumentSearcher {
             let nsString = searchText as NSString
             let fullRange = NSRange(location: 0, length: nsString.length)
 
-            // §S4: enumerateMatches with per-match time check — allows bailing
+            // enumerateMatches with per-match time check — allows bailing
             // mid-enumeration instead of waiting for all matches to complete.
-            // F-001 — `.reportProgress` lets the engine invoke the closure
+            // `.reportProgress` lets the engine invoke the closure
             // between match-attempt iterations even when no match has been
             // found, so the timeout / cancellation check below fires on
             // long-running alternation walks instead of waiting for the
@@ -1215,7 +1214,7 @@ public actor DocumentSearcher {
                     return
                 }
                 if ContinuousClock.now - startTime > effectiveTimeout {
-                    // WU-66 / [P2] — search-path timeout branch.
+                    // Search-path timeout branch.
                     timeoutSink?(pageIndex)
                     stop.pointee = true
                     return
@@ -1258,7 +1257,7 @@ public actor DocumentSearcher {
         continuation.finish()
     }
 
-    // MARK: - Multi-Term Search (§3.4)
+    // MARK: - Multi-Term Search
 
     private func searchMultiTerm(
         doc: PDFDocument,
@@ -1268,12 +1267,12 @@ public actor DocumentSearcher {
         progress: @Sendable (Int, Int) -> Void,
         continuation: AsyncStream<SearchResult>.Continuation
     ) async {
-        // Design 04 §4.5 — AND mode requires accumulate-then-filter-then-stream.
+        // AND mode requires accumulate-then-filter-then-stream.
         // OR mode (default) streams results directly as before (zero behavior change).
         if options.multiTermConjunction {
             // Accumulation phase: collect all per-term results up to maxResults.
             // Peak memory is bounded by the existing cap — no page-streaming
-            // variant is needed (design §4.5 memory note).
+            // variant is needed.
             var accumulated: [SearchResult] = []
 
             for pageIndex in 0..<pageCount {
@@ -1321,7 +1320,7 @@ public actor DocumentSearcher {
             }
 
             // Conjunction filter: retain only pages where every term has
-            // at least one result. Design 04 §4.5 snippet.
+            // at least one result.
             let allTerms = Set(terms)
             let pageResults = Dictionary(grouping: accumulated, by: \.pageIndex)
             let conjunctPages = pageResults.filter { _, pageHits in
@@ -1392,7 +1391,7 @@ public actor DocumentSearcher {
         continuation.finish()
     }
 
-    // MARK: - PII Scan (§4 bridge)
+    // MARK: - PII Scan
 
     /// Scan the document for PII patterns using PIIDetector.
     /// Text-layer first with OCR fallback, same as text search.
@@ -1418,11 +1417,11 @@ public actor DocumentSearcher {
                 // Text-layer path: run PIIDetector on extracted text,
                 // then map NSRange → bounding rect via PDFKit selection.
                 var rawMatches = await piiDetector.detect(in: pageText, categories: categories)
-                // RC-4 — spatial address assembly on the text leg. The line
+                // Spatial address assembly on the text leg. The line
                 // records come from `EmbeddedTextSource.make` — the SAME
-                // provider the orchestrator's PERF-4 embedded fast path feeds
+                // provider the orchestrator's embedded fast path feeds
                 // the assembler (word enumeration → per-word selection bounds
-                // → y-bucketed lines, displayed-space normalized, CND-02) —
+                // → y-bucketed lines, displayed-space normalized) —
                 // so Search and the detection path see identical line
                 // geometry for the same page.
                 var spatialRectByText: [String: CGRect] = [:]
@@ -1433,20 +1432,20 @@ public actor DocumentSearcher {
                     rawMatches.append(contentsOf: assembly.matches)
                     spatialRectByText = assembly.spatialRectByText
                 }
-                // W10 — cross-category overlap resolution before threshold
+                // Cross-category overlap resolution before threshold
                 // filter, mirroring DetectionOrchestrator.detectPage.
                 let resolution = DetectionOrchestrator.resolveOverlaps(rawMatches)
                 if !resolution.suppressedCountByCategory.isEmpty {
                     overlapSink?(resolution.suppressedCountByCategory)
                 }
-                // W-P — never-flag suppression runs BEFORE threshold filter
+                // Never-flag suppression runs BEFORE threshold filter
                 // so suppressed matches don't compete in the threshold vote
-                // (§D16 = P1, user always wins). V1 flat-N1 passes
-                // `doctype: nil` per Q9; the parameter is reserved for V1.1+.
+                // (user always wins). V1 flat-N1 passes
+                // `doctype: nil`; the parameter is reserved for V1.1+.
                 let merged = userTermsIndex?.merge(
                     into: resolution.surviving, doctype: nil
                 ) ?? resolution.surviving
-                // B06 — Site-B parity. Partition, then gate (Option A): the five
+                // Site-B parity. Partition, then gate (Option A): the five
                 // scored families route through the composed posterior; every
                 // other family keeps the raw `applying(thresholdVector:)` path
                 // byte-for-byte. Text feature source is `pageText` (in scope). The
@@ -1454,7 +1453,7 @@ public actor DocumentSearcher {
                 // and J/K navigation keep the positional order resolveOverlaps
                 // produced — the partition alone groups non-scored ahead of scored.
                 let (scoredText, restText) = merged.partitionedByScoredFamily()
-                // D06-F2 Part 1 — count the raw-gate below-threshold drops on the
+                // Count the raw-gate below-threshold drops on the
                 // text path and fire the sink (mirrors the overlapSink guard
                 // above). Only `restText` is gated by `applying(...)`; the scored
                 // families flow through `composedSurvivors` and are intentionally
@@ -1469,7 +1468,7 @@ public actor DocumentSearcher {
                 for match in matches {
                     if Task.isCancelled || totalYielded >= Self.maxResults { break }
 
-                    // RC-4 — an assembled spatial survivor uses the stored
+                    // An assembled spatial survivor uses the stored
                     // union rect: its range is either the sentinel (no
                     // selection exists) or the located anchor text (whose
                     // selection would cover only part of the block). Every
@@ -1506,10 +1505,10 @@ public actor DocumentSearcher {
                     totalYielded += 1
                 }
 
-                // W3 — always-flag synthetic hits. Emitted after detector
+                // Always-flag synthetic hits. Emitted after detector
                 // survivors; downstream `applySearchResults` 80% overlap
                 // dedup collapses any collision with a detector-emitted
-                // hit at the same range. W-P preserves this path verbatim —
+                // hit at the same range. This path stays verbatim —
                 // by-design post-threshold so synthetic matches always
                 // emit regardless of the detector's score for the same text.
                 if let matcher = userTermsIndex?.underlyingMatcher, !matcher.alwaysFlag.isEmpty {
@@ -1545,8 +1544,8 @@ public actor DocumentSearcher {
                         ))
                         totalYielded += 1
                     }
-                    // Package C — surface per-(page, pattern) timeouts so the
-                    // app layer can enqueue the §9.4 custom-terms-skip toast.
+                    // Surface per-(page, pattern) timeouts so the
+                    // app layer can enqueue the custom-terms-skip toast.
                     if let sink = userTermsTimeoutSink {
                         for pattern in alwaysFlagResult.timedOutPatterns {
                             sink(pageIndex, pattern)
@@ -1614,7 +1613,7 @@ public actor DocumentSearcher {
             guard thumbnailSize.width <= Self.maxOCRPixelDimension,
                   thumbnailSize.height <= Self.maxOCRPixelDimension,
                   pixelCount <= Self.maxOCRPixelCount else {
-                // ST-83 — report the skip so the app layer can tell the
+                // Report the skip so the app layer can tell the
                 // user this page's image content was never text-scanned.
                 ocrSkipSink?(pageIndex)
                 return []
@@ -1645,7 +1644,7 @@ public actor DocumentSearcher {
 
         guard !textLines.isEmpty else { return [] }
 
-        // Plan Phase 2 / §G6 — PII detection reads the normalized parallel
+        // PII detection reads the normalized parallel
         // cache, not verbatim Vision output. On miss, run OCRTextNormalizer
         // per line and record offsets against the normalized concatenation.
         let normalizedPage: NormalizedOCRPage
@@ -1672,7 +1671,7 @@ public actor DocumentSearcher {
         let lineOffsets = normalizedPage.entries
 
         var rawMatches = await piiDetector.detect(in: concatenated, categories: categories)
-        // RC-4 — spatial address assembly on the OCR leg, over the SAME
+        // Spatial address assembly on the OCR leg, over the SAME
         // normalized per-line records the detector text was built from (the
         // assembler header's long-documented Search-leg rewire). Injected
         // before resolveOverlaps, mirroring the text leg and detectPage
@@ -1692,20 +1691,20 @@ public actor DocumentSearcher {
             rawMatches.append(contentsOf: assembly.matches)
             spatialRectByText = assembly.spatialRectByText
         }
-        // W10 — overlap resolver runs on the OCR path too. Resolver is a
+        // The overlap resolver runs on the OCR path too. Resolver is a
         // pure static function on DetectionOrchestrator.
         let resolution = DetectionOrchestrator.resolveOverlaps(rawMatches)
         if !resolution.suppressedCountByCategory.isEmpty {
             overlapSink?(resolution.suppressedCountByCategory)
         }
-        // B06 — Site-B parity on the OCR path too (an un-routed site would leak
+        // Site-B parity on the OCR path too (an un-routed site would leak
         // raw-gated FP for the scored families). Same partition-then-gate split;
         // the OCR feature text is `concatenated` (the normalized page text the
         // detector ran on at :1330), NOT a `pageText` variable. Re-sorted by
         // position so the recombined survivors keep positional order (the
         // partition groups non-scored ahead of scored otherwise).
         let (scoredOCR, restOCR) = resolution.surviving.partitionedByScoredFamily()
-        // D06-F2 Part 1 — symmetric below-threshold drop count on the OCR path
+        // Symmetric below-threshold drop count on the OCR path
         // (counting at only one path would under-report). Same scoped gate: only
         // `restOCR` is raw-gated; scored families route through `composedSurvivors`.
         let gatedOCR = restOCR.applyingCountingDrops(thresholdVector: thresholdVector)
@@ -1717,7 +1716,7 @@ public actor DocumentSearcher {
             .sorted { $0.range.location < $1.range.location }
         var results: [SearchResult] = []
 
-        // W3 — spatial mapping shared between detector matches and
+        // Spatial mapping shared between detector matches and
         // synthetic always-flag hits. Returns nil when no OCR line covers
         // the range, mirroring the existing `continue` behavior.
         func mapToOCR(
@@ -1746,7 +1745,7 @@ public actor DocumentSearcher {
                 height: min(1, unionRect.height + padY * 2)
             )
 
-            // UXC-45 (RB-101c): the canonical context window over the
+            // The canonical context window over the
             // normalized concatenation the detector matched in — the same
             // centered, word-trimmed, ellipsized shape as the text leg,
             // with the match located inside it.
@@ -1756,7 +1755,7 @@ public actor DocumentSearcher {
             return (paddedRect, window, ocrConfidence)
         }
 
-        // RC-4 — geometry for assembled spatial survivors: the stored union
+        // Geometry for assembled spatial survivors: the stored union
         // rect wins over character-range mapping (mirror of the text leg's
         // rect override). When the assembled text is not present verbatim in
         // the concatenation (sentinel range → `mapToOCR` has no overlapping
@@ -1785,14 +1784,14 @@ public actor DocumentSearcher {
         }
 
         for match in matches {
-            // W3 — never-flag suppression on OCR path. W-P keeps this
+            // Never-flag suppression on OCR path. This stays
             // post-threshold for V1; consistency follow-up to mirror the
             // text-layer pre-threshold merge is V1.1+ scope.
             if userTermsIndex?.underlyingMatcher.shouldSuppress(match.text) != nil { continue }
 
             guard let mapped = resolvedMapping(for: match) else { continue }
 
-            // W1 — fold OCR confidence into the rationale so power users can
+            // Fold OCR confidence into the rationale so power users can
             // see the OCR contribution alongside detector evidence.
             let rationale: MatchRationale?
             if let base = match.rationale {
@@ -1823,7 +1822,7 @@ public actor DocumentSearcher {
             ))
         }
 
-        // W3 — always-flag synthetic OCR hits. Matched against the
+        // Always-flag synthetic OCR hits. Matched against the
         // normalized concatenation (same text the detector saw) so range
         // math stays consistent with lineOffsets.
         if let matcher = userTermsIndex?.underlyingMatcher, !matcher.alwaysFlag.isEmpty {
@@ -1857,8 +1856,8 @@ public actor DocumentSearcher {
                     matchRangeInSnippet: mapped.window.matchRange
                 ))
             }
-            // Package C — surface per-(page, pattern) timeouts so the app
-            // layer can enqueue the §9.4 custom-terms-skip toast. Same
+            // Surface per-(page, pattern) timeouts so the app
+            // layer can enqueue the custom-terms-skip toast. Same
             // sink as the text-layer branch above so the toast fires
             // regardless of which path produced the page's text.
             if let sink = userTermsTimeoutSink {
@@ -1875,7 +1874,7 @@ public actor DocumentSearcher {
 
     /// Evict the least-recently-used entry from the OCR caches when the capacity
     /// ceiling is reached. Both `ocrCache` and `ocrNormalizedConcat` are always
-    /// evicted in lockstep so the two parallel caches never diverge (N-12).
+    /// evicted in lockstep so the two parallel caches never diverge.
     /// Callers invoke this BEFORE inserting a new entry.
     private func evictOCRCacheIfNeeded() {
         if ocrCache.count >= Self.maxOCRCacheEntries {
@@ -1887,7 +1886,7 @@ public actor DocumentSearcher {
         }
     }
 
-    // MARK: - OCR Search Path (§3.2)
+    // MARK: - OCR Search Path
 
     /// Search a page via OCR when no text layer is available.
     /// Uses existing OCREngine with .accurate recognition level.
@@ -1912,7 +1911,7 @@ public actor DocumentSearcher {
             let thumbnailSize = Self.ocrThumbnailSize(
                 pageBounds: pageBounds, rotation: page.rotation)
 
-            // §S2 / ENGINE §2.5: Memory guard for OCR rendering.
+            // Memory guard for OCR rendering.
             // Oversized pages (e.g., architectural drawings) can produce
             // multi-gigabyte bitmaps at 300 DPI. Skip OCR rather than risk
             // an allocation crash. See KI-5 re: os_proc_available_memory().
@@ -1923,7 +1922,7 @@ public actor DocumentSearcher {
             guard thumbnailSize.width <= Self.maxOCRPixelDimension,
                   thumbnailSize.height <= Self.maxOCRPixelDimension,
                   pixelCount <= Self.maxOCRPixelCount else {
-                // ST-83 — report the skip so the app layer can tell the
+                // Report the skip so the app layer can tell the
                 // user this page's image content was never text-scanned.
                 ocrSkipSink?(pageIndex)
                 return []
@@ -1984,7 +1983,7 @@ public actor DocumentSearcher {
             if lineQuery.isEmpty { continue }
             let baseLineChars: [Character]? = ext.offsetMap != nil ? Array(ext.baseText) : nil
 
-            // UXF-15 — case-preserved analog of `ext.baseText`, used only
+            // Case-preserved analog of `ext.baseText`, used only
             // to re-slice the DISPLAYED span (see `displaySlice`). Mirrors
             // the base chain minus the case fold: confusable-normalized
             // line → (NFKC) → (smart punctuation).
@@ -2006,8 +2005,8 @@ public actor DocumentSearcher {
                     range: searchStart..<lineText.endIndex
                 ) else { break }
 
-                // DRAW-5 — magic-wand `exactMatch` gates the same OCR
-                // word-boundary check as `wholeWord` (plan §0.4). Base-
+                // The magic-wand `exactMatch` gates the same OCR
+                // word-boundary check as `wholeWord`. Base-
                 // coordinate variant when an offset map is active, same
                 // as findTextMatches.
                 if options.wholeWord || options.exactMatch {
@@ -2034,7 +2033,7 @@ public actor DocumentSearcher {
                 }
 
                 // Vision bounding boxes are already normalized 0–1, bottom-left origin.
-                // Add padding for OCR imprecision (§3.2: 2pt in normalized coords).
+                // Add padding for OCR imprecision (2pt in normalized coords).
                 let pageBounds = page.bounds(for: .cropBox)
                 let padX = 2.0 / pageBounds.width
                 let padY = 2.0 / pageBounds.height
@@ -2045,9 +2044,9 @@ public actor DocumentSearcher {
                     height: min(1, line.normalizedRect.height + padY * 2)
                 )
 
-                // UXF-15 — display span re-slices from the case-preserved
+                // The display span re-slices from the case-preserved
                 // analog at base offsets; matching stays on the normalized
-                // text (REDACTION_ENGINE.md §9.6). The BUG-006-norm-drift
+                // text. The norm-drift
                 // trap (Character-count drift on heavy-ligature input) is
                 // guarded inside `displaySlice`, which falls back to the
                 // normalized slice.
@@ -2062,7 +2061,7 @@ public actor DocumentSearcher {
                     displayChars: displayLineChars,
                     baseCount: ext.baseText.count,
                     fallback: normalizedSlice)
-                // UXC-45 (RB-101c): the canonical context window in place
+                // The canonical context window in place
                 // of the raw line. Built over the same case-preserved
                 // analog `displaySlice` re-sliced from, at the base span,
                 // so the window's match slice IS `matchedText`; when the
@@ -2124,7 +2123,7 @@ public actor DocumentSearcher {
         guard thumbnailSize.width <= Self.maxOCRPixelDimension,
               thumbnailSize.height <= Self.maxOCRPixelDimension,
               pixelCount <= Self.maxOCRPixelCount else {
-            // ST-83 — report the skip so the app layer can tell the
+            // Report the skip so the app layer can tell the
             // user this page's image content was never text-scanned.
             ocrSkipSink?(pageIndex)
             return []
@@ -2229,7 +2228,7 @@ public actor DocumentSearcher {
         let normalizedLines = lines.map { self.ocrNormalizer.normalize($0.text) }
         var searchText = normalizedLines.joined(separator: "\n")
         guard !searchText.isEmpty else { return [] }
-        // S7 / §4.4 — page-side smart punctuation, same contract as the
+        // Page-side smart punctuation, same contract as the
         // text-layer regex path. 1:1 substitution keeps both UTF-16
         // NSRanges and the Character-offset line walk in ocrLineRect
         // aligned with the per-line lengths.
@@ -2327,7 +2326,7 @@ public actor DocumentSearcher {
         pageIndex: Int,
         term: String
     ) -> [SearchResult] {
-        // §9.7: Detect CJK text per-page and disable whole-word matching.
+        // Detect CJK text per-page and disable whole-word matching.
         // Per-page detection is necessary for multilingual documents (e.g.,
         // Japanese-English contracts) where language varies across pages.
         // NLLanguageRecognizer on 500 chars is sub-millisecond.
@@ -2338,7 +2337,7 @@ public actor DocumentSearcher {
         ]
         let isCJK = recognizer.dominantLanguage.map { cjkLanguages.contains($0) } ?? false
         var effectiveOptions = options
-        // DRAW-5 — `exactMatch` rides the same CJK-disable shape as
+        // `exactMatch` rides the same CJK-disable shape as
         // `wholeWord`. CJK runs lack the alphanumeric run-boundaries the
         // predicate relies on, so the boundary check would always pass
         // (or always fail) and add no signal.
@@ -2385,7 +2384,7 @@ public actor DocumentSearcher {
         // integer indexing.
         let baseChars: [Character]? = ext.offsetMap != nil ? Array(ext.baseText) : nil
 
-        // UXF-15 — case-preserved analog of `ext.baseText`, used only to
+        // Case-preserved analog of `ext.baseText`, used only to
         // re-slice the DISPLAYED span (see `displaySlice`). Mirrors the
         // base chain minus the case fold: page text → (ligature/NFKC
         // normalize) → (smart punctuation).
@@ -2440,8 +2439,8 @@ public actor DocumentSearcher {
             }
 
             // Whole-word check: verify word boundaries around match.
-            // DRAW-5 — `exactMatch` is the magic-wand select-by-similar-text
-            // call-site flag (plan §0.4); semantically equivalent to
+            // `exactMatch` is the magic-wand select-by-similar-text
+            // call-site flag; semantically equivalent to
             // `wholeWord` on the text/multi-term/OCR paths. With an offset
             // map active the predicate evaluates in base coordinates
             // (separators are gone from the searched text, so boundaries
@@ -2464,10 +2463,10 @@ public actor DocumentSearcher {
             // Get bounding rect via PDFKit selection — base coordinates.
             let nsRange = NSRange(location: baseStartOffset, length: baseLength)
             if let normalizedRect = boundingRect(for: nsRange, page: page) {
-                // UXF-15 — display span re-slices from the case-preserved
+                // Display span re-slices from the case-preserved
                 // analog at the already-mapped base offsets; matching stays
-                // on the normalized text (REDACTION_ENGINE.md §9.6). The
-                // BUG-006-norm-drift trap is guarded inside `displaySlice`,
+                // on the normalized text. The
+                // norm-drift trap is guarded inside `displaySlice`,
                 // which falls back to the normalized slice on drift.
                 let normalizedSlice = String(searchPageText[matchRange.lowerBound..<matchRange.upperBound])
                 let matchedText = Self.displaySlice(
@@ -2476,7 +2475,7 @@ public actor DocumentSearcher {
                     displayChars: displayBaseChars,
                     baseCount: ext.baseText.count,
                     fallback: normalizedSlice)
-                // UXC-45 (RB-101b): the context window is built over the
+                // The context window is built over the
                 // same case-preserved analog `displaySlice` re-sliced from,
                 // at the base span, so its match slice IS `matchedText`; on
                 // display drift (the `displaySlice` fallback) it comes from
@@ -2513,7 +2512,7 @@ public actor DocumentSearcher {
         return results
     }
 
-    /// UXF-15 — re-slice the DISPLAYED match span from the case-preserved
+    /// Re-slice the DISPLAYED match span from the case-preserved
     /// analog of the base text, so a match on "Hartwell" displays as
     /// "Hartwell" rather than the case-folded "hartwell". Matching still
     /// runs on the normalized text; this touches only the display slice.
@@ -2523,7 +2522,7 @@ public actor DocumentSearcher {
     /// when the offsets are already base coordinates). Returns `fallback`
     /// (the normalized slice — today's behavior) whenever the
     /// case-preserved analog drifted from the base Character count: the
-    /// BUG-006-norm-drift trap (REDACTION_ENGINE.md §9.6) this guard
+    /// norm-drift trap this guard
     /// exists for.
     static func displaySlice(
         start: Int, length: Int, offsetMap: [Int]?,
@@ -2549,7 +2548,7 @@ public actor DocumentSearcher {
         return String(displayChars[baseStart..<baseEndExclusive])
     }
 
-    /// UXC-45 — the base-coordinate span `displaySlice` re-slices, or nil
+    /// The base-coordinate span `displaySlice` re-slices, or nil
     /// under the same bound guards, so the context-window builder and the
     /// display slice agree on when the fallback is taken.
     static func baseSpan(start: Int, length: Int, offsetMap: [Int]?) -> Range<Int>? {
@@ -2597,13 +2596,13 @@ public actor DocumentSearcher {
         return true
     }
 
-    // MARK: - Coordinate Conversion (§3.5)
+    // MARK: - Coordinate Conversion
 
     /// Convert an NSRange in page text to a normalized bounding rect.
     ///
-    /// Coordinate path (CANVAS_OVERLAY §S2.3):
+    /// Coordinate path:
     /// PDFPage.selection(for:) → .bounds(for: page) → PDF points (bottom-left,
-    /// UN-ROTATED space, confirmed TL-1-1). Transform to post-rotation visual
+    /// UN-ROTATED space). Transform to post-rotation visual
     /// space before normalizing, so normalized coords align with the post-rotation
     /// bitmap produced by renderPage()/getDrawingTransform().
     ///
@@ -2670,7 +2669,7 @@ public actor DocumentSearcher {
 
     // MARK: - Context Snippet
 
-    /// UXC-45 (RB-101a/b) — one context window per match: the snippet
+    /// One context window per match: the snippet
     /// text plus the match's position inside it, in Character offsets
     /// (a leading `…` counts as one). Every `SearchResult` builder path
     /// routes through `contextSnippet` so the row can highlight the
@@ -2803,12 +2802,12 @@ public actor DocumentSearcher {
 /// Reasons `DocumentSearcher.validateRegexPatternWithError` rejects a
 /// pattern before compilation. Engine-compile failures are NOT wrapped —
 /// they propagate as the system `NSError` so its `localizedDescription`
-/// reaches the regex error callout verbatim (spec SEARCH_AND_REDACT §S2).
+/// reaches the regex error callout verbatim.
 ///
 /// Copy constraint: these three strings are app-owned user-facing copy and
-/// use mechanism-description language per ARCH §1.3 ("has not been
+/// use mechanism-description language ("has not been
 /// accepted" — names the response, promises no outcome). The strings never
-/// echo the submitted pattern text (RR-24 precedent).
+/// echo the submitted pattern text.
 public enum RegexValidationError: Error, LocalizedError {
     case patternTooLong(maxLength: Int)
     case likelyPathological

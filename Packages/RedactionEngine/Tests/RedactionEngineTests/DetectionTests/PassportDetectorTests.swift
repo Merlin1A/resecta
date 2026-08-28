@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// L-15 — dedicated passport-detector coverage: labeled-format recall,
+// Dedicated passport-detector coverage: labeled-format recall,
 // unlabeled rejection, doctype-agnostic behavior, and confidence
 // calibration. Mirrors DetectionTests/BatesDetectorTests.swift structure.
 
@@ -139,11 +139,11 @@ struct PassportDetectorTests {
         #expect(!matches.contains { $0.kind == .passport })
     }
 
-    // MARK: - W1 validation gate (D-14)
+    // MARK: - Validation gate
 
     // The default `detector` (line 12) loads PassportPatternGazetteer via
     // `(try? PassportPatternGazetteer())`, so every test above also
-    // exercises the W1 path — the existing labeled-prefix recall samples
+    // exercises the validation-gate path — the existing labeled-prefix recall samples
     // were verified at chain start to all match ≥1 of the 11 shipping
     // issuers' patterns (CA-legacy 2L+6D for AB1234567/CD345678/etc.;
     // IN strict/lenient 1L+7D for A1234567/D4567890/etc.; MX/VN/US-current
@@ -151,7 +151,7 @@ struct PassportDetectorTests {
     // accept/suppress/inert/case-normalisation behaviour and the multi-
     // issuer audit-only surface.
 
-    @Test("W1 keeps candidate matching one issuer (IN strict 1L+7D)")
+    @Test("Gate keeps candidate matching one issuer (IN strict 1L+7D)")
     func testW1KeepsSingleIssuerMatch() async {
         let detector = PIIDetector(nameGazetteer: nil)
         // A1234567 — 8-char 1L+7D. IN strict ^[A-PR-WY][1-9][0-9]{5}[1-9]$
@@ -164,10 +164,10 @@ struct PassportDetectorTests {
         let hit = try! #require(matches.first)
         #expect(hit.text == "A1234567")
         #expect(abs(hit.confidence - 0.80) < 0.001,
-                "W1 keeps the 0.80 baseline confidence")
+                "Gate keeps the 0.80 baseline confidence")
     }
 
-    @Test("W1 suppresses candidate matching no issuer (10-char 1L+9D)")
+    @Test("Gate suppresses candidate matching no issuer (10-char 1L+9D)")
     func testW1SuppressesNoIssuerMatch() async {
         let detector = PIIDetector(nameGazetteer: nil)
         // A123456789 — 10-char 1L+9D. The inline regex captures the
@@ -177,14 +177,14 @@ struct PassportDetectorTests {
         let matches = await detector.detect(in: "Passport: A123456789", doctype: nil)
             .filter { $0.kind == .passport }
         #expect(matches.isEmpty,
-                "Candidate with no issuer match must be suppressed under W1")
+                "Candidate with no issuer match must be suppressed")
     }
 
-    @Test("W1 inert when passport gazetteer absent (test-bundle-only fallback)")
+    @Test("Gate is inert when passport gazetteer absent (test-bundle-only fallback)")
     func testW1InertWhenGazetteerNil() async {
         // Same 10-char input as the suppression test above. With the
-        // passport gazetteer explicitly nil, W1 is bypassed and the
-        // candidate flows through (pre-W1 behavior preserved for builds
+        // passport gazetteer explicitly nil, the gate is bypassed and the
+        // candidate flows through (pre-gate behavior preserved for builds
         // that strip the JSON resource).
         let detector = PIIDetector(
             nameGazetteer: nil,
@@ -194,24 +194,24 @@ struct PassportDetectorTests {
         let matches = await detector.detect(in: "Passport: A123456789", doctype: nil)
             .filter { $0.kind == .passport }
         #expect(!matches.isEmpty,
-                "Without gazetteer, W1 gate must not fire — pass-through behavior")
+                "Without gazetteer, the gate must not fire — pass-through behavior")
     }
 
-    @Test("W1 normalizes case before gazetteer lookup")
+    @Test("Case is normalized before gazetteer lookup")
     func testW1CaseNormalization() async {
         let detector = PIIDetector(nameGazetteer: nil)
         // The inline regex is case-insensitive, so it captures a lowercase
         // candidate. The gazetteer's per-issuer patterns are case-sensitive
-        // (every row has an A-Z alphabet). W1 must uppercase the candidate
+        // (every row has an A-Z alphabet). The gate must uppercase the candidate
         // before lookup so OCR-noise lowercase still passes the gate.
         // ab123456 → AB123456 → matches CA-legacy ^[A-Z]{2}[0-9]{6}$.
         let matches = await detector.detect(in: "passport: ab123456", doctype: nil)
             .filter { $0.kind == .passport }
         #expect(!matches.isEmpty,
-                "Lowercase candidate captured by case-insensitive inline regex must pass W1 after uppercase normalization")
+                "Lowercase candidate captured by case-insensitive inline regex must pass the gate after uppercase normalization")
     }
 
-    @Test("W1 keeps multi-issuer ambiguous candidate (PH-legacy + SV)")
+    @Test("Gate keeps multi-issuer ambiguous candidate (PH-legacy + SV)")
     func testW1KeepsMultiIssuerCandidate() async {
         let detector = PIIDetector(nameGazetteer: nil)
         // AB1234567 — 9-char 2L+7D. Matches PH-legacy ^[A-Z]{2}[0-9]{7}$

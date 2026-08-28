@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// RES-01 — `ScreenCaptureMonitor` strong-reference cycle fix.
+// `ScreenCaptureMonitor` strong-reference cycle fix.
 //
 // Prior to this fix, the monitor's initializer aliased
 // `nonisolated(unsafe) let monitor = self` and the two infinite-loop
@@ -12,14 +12,14 @@ import Foundation
 // itself for the app lifetime — `deinit` was unreachable. The
 // app-lifetime singleton at `ResectaApp.swift:54` masks this in
 // production, but it breaks tests and multi-scene re-instantiation
-// (PERF-7-style iPad scene restoration).
+// (iPad multi-scene restoration).
 //
 // The fix rewrites both observer Tasks with `[weak self]`, mirroring
 // `PipelineCoordinator.memoryWarningTask` at `PipelineCoordinator.swift:172`.
 // These tests pin that `deinit` is reachable when no external strong
 // reference remains.
 
-@Suite("ScreenCaptureMonitor lifecycle (RES-01)")
+@Suite("ScreenCaptureMonitor lifecycle")
 @MainActor
 struct ScreenCaptureMonitorLifecycleTests {
 
@@ -49,6 +49,6 @@ struct ScreenCaptureMonitorLifecycleTests {
         await Task.yield()
 
         #expect(weakMonitor == nil,
-                "ScreenCaptureMonitor.deinit must be reachable (RES-01).")
+                "ScreenCaptureMonitor.deinit must be reachable.")
     }
 }

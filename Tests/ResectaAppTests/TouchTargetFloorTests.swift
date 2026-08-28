@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// UXC-18 — effective-touch-target floor program.
+// Effective-touch-target floor program.
 //
 // Pins two things cheaply, without a simulator host:
 //   1. The `ResectaTokens.TouchTarget.minimum` value itself.
@@ -12,7 +12,7 @@ import Foundation
 //      could drift independently of the catalog value — plus the new
 //      stable identifiers this program added, and the load-bearing
 //      `.buttonStyle(.plain)` on the sheet's fixed-chrome buttons
-//      (18-SCROLL-ARCH §10: default-styled buttons there are a proven
+//      (default-styled buttons there are a proven
 //      cooperative-scroll-arbitration poison — a future contributor
 //      "fixing" the frame must not be able to drop `.plain`).
 //
@@ -22,25 +22,25 @@ import Foundation
 // coordinate-probe pass — see ResizeHandleHitTestTests for the
 // resize-handle geometry's pure-function coverage instead.
 
-@Suite("Touch-target floor (UXC-18)", .tags(.display))
+@Suite("Touch-target floor", .tags(.display))
 struct TouchTargetFloorTests {
 
-    @Test("ResectaTokens.TouchTarget.minimum is the HIG EFFECTIVE floor (46pt layout / RB-54)")
+    @Test("ResectaTokens.TouchTarget.minimum is the HIG EFFECTIVE floor (46pt layout)")
     func touchTargetMinimumIsFortySix() {
-        // RB-54: 46, not 44 — the medium-detent inset sheet renders at
+        // 46, not 44 — the medium-detent inset sheet renders at
         // ~0.96 scale on iOS 26, so a 46pt layout frame is what yields
         // >=44pt EFFECTIVE inside the sheet (measured 2026-08-22).
         #expect(ResectaTokens.TouchTarget.minimum == 46)
     }
 
-    @Test("TouchTarget.pencil is untouched by the UXC-18 addition")
+    @Test("TouchTarget.pencil is untouched by the touch-target floor addition")
     func pencilConstantUnchanged() {
         #expect(ResectaTokens.TouchTarget.pencil == 22)
     }
 
     // MARK: - Source pins: every floored site references the token
 
-    @Test("Every UXC-18 site references ResectaTokens.TouchTarget.minimum, not a bare 46")
+    @Test("Every floored site references ResectaTokens.TouchTarget.minimum, not a bare 46")
     func everySiteReferencesTheSharedToken() throws {
         let sites = [
             "Sources/ResectaApp/Views/Search/FindingRow.swift",
@@ -48,15 +48,15 @@ struct TouchTargetFloorTests {
             "Sources/ResectaApp/Views/PageNavigationBar.swift",
             "Sources/ResectaApp/Views/SearchResultRow.swift",
             "Sources/ResectaApp/Views/Search/ScanReviewSection.swift",
-            // UXC-45 (RB-105/109): `SearchResultsSection`'s only floored
+            // `SearchResultsSection`'s only floored
             // control — the "Add to selection…" menu — relocated into
-            // `SearchFooterSection`, and UXC-46 (D-121) then removed the
-            // menu outright; the section hosts no floored control, so
+            // `SearchFooterSection`, then the menu was removed
+            // outright; the section hosts no floored control, so
             // it stays out of this inventory (the footer keeps its
             // Select All floor, listed below).
             "Sources/ResectaApp/Views/Search/SearchToolbarSection.swift",
             "Sources/ResectaApp/Views/SearchAndRedactSheet.swift",
-            // UXC-51 (D-128, RB-123): the compact handle's per-item
+            // The compact handle's per-item
             // Apply — its builder split out under the M-6 hub cap.
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift",
             "Sources/ResectaApp/Views/Search/SearchSheetHeaderSection.swift",
@@ -72,7 +72,7 @@ struct TouchTargetFloorTests {
         }
     }
 
-    // MARK: - New identifiers (UXC-18, lead ruling #9)
+    // MARK: - New identifiers
 
     @Test("The new stable identifiers this program added are present in source")
     func newIdentifiersArePresent() throws {
@@ -99,7 +99,7 @@ struct TouchTargetFloorTests {
     @Test("Existing identifiers this program did NOT touch stay byte-identical")
     func preExistingIdentifiersUnchanged() throws {
         // STRING-FREE constraint guard: the page-bar chevrons and the
-        // sheet header/footer already had identifiers before UXC-18;
+        // sheet header/footer already had identifiers before this program;
         // this program only added frame/contentShape around them.
         let expectations: [(path: String, identifier: String)] = [
             ("Sources/ResectaApp/Views/PageNavigationBar.swift", "pageNavPrevious"),
@@ -119,9 +119,9 @@ struct TouchTargetFloorTests {
         }
     }
 
-    // MARK: - Arbitration-poison guard (18-SCROLL-ARCH §10)
+    // MARK: - Arbitration-poison guard
 
-    @Test("Dismiss and Apply stay .buttonStyle(.plain) after the UXC-18 frame restructuring")
+    @Test("Dismiss and Apply stay .buttonStyle(.plain) after the frame restructuring")
     func sheetHeaderButtonsStayPlainStyled() throws {
         let source = try loadRepoFile(
             "Sources/ResectaApp/Views/Search/SearchSheetHeaderSection.swift"
@@ -129,13 +129,13 @@ struct TouchTargetFloorTests {
         let plainCount = source.components(separatedBy: ".buttonStyle(.plain)").count - 1
         #expect(
             plainCount >= 2,
-            "Dismiss and Apply must both keep .buttonStyle(.plain) — default-styled buttons in the sheet's fixed chrome are a proven cooperative-scroll-arbitration poison (18-SCROLL-ARCH §10)."
+            "Dismiss and Apply must both keep .buttonStyle(.plain) — default-styled buttons in the sheet's fixed chrome are a proven cooperative-scroll-arbitration poison."
         )
     }
 
-    @Test("Select All keeps the ruled prominent/quiet asymmetry (REV-01 custom capsule vs untouched quiet branch)")
+    @Test("Select All keeps the ruled prominent/quiet asymmetry (custom capsule vs untouched quiet branch)")
     func footerSelectAllStaysOnItsExistingStyles() throws {
-        // REV-01 (packet §7.2 item 5): the prominent branch draws a
+        // The prominent branch draws a
         // compact BrandTeal capsule itself — the system
         // `.borderedProminent` wash rendered the floored label as a
         // ≥46pt pill — with states on `CapsulePressButtonStyle`; the
@@ -149,7 +149,7 @@ struct TouchTargetFloorTests {
         #expect(source.contains(".buttonStyle(.capsulePress)"),
                 "the prominent Select All must carry the custom pressed state")
         #expect(!source.contains(".buttonStyle(.borderedProminent)"),
-                "the system prominent wash must stay retired on this surface (REV-01)")
+                "the system prominent wash must stay retired on this surface")
         #expect(source.contains("\"Select All\""))
         #expect(source.contains("\"Deselect All\""))
     }

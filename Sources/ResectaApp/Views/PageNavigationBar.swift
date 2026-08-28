@@ -1,8 +1,8 @@
 import SwiftUI
 
-// UI_UX §6.5: iPhone-only floating page navigation bar.
+// iPhone-only floating page navigation bar.
 // Placed as .safeAreaInset(edge: .bottom) on the editor view.
-// WA/D-75 (R-2): chevron-only buttons — the word titles ellipsized on
+// Chevron-only buttons — the word titles ellipsized on
 // iPhone widths ("Previo…") — and the center counter drops the word
 // "Page"; the full words survive as accessibility labels. Matches the
 // sheet's result-nav chevron idiom.
@@ -16,7 +16,7 @@ struct PageNavigationBar: View {
             Button {
                 documentState.currentPageIndex = max(0, documentState.currentPageIndex - 1)
             } label: {
-                // UXC-18: this pair measured as the smallest
+                // This pair measured as the smallest
                 // interactive targets in the app (12.7×16.7 at Large
                 // type) — the bare glyph carried no hit-area floor.
                 Image(systemName: "chevron.left")
@@ -33,7 +33,7 @@ struct PageNavigationBar: View {
             .accessibilityIdentifier("pageNavPrevious")
             .disabled(documentState.currentPageIndex <= 0)
 
-            // Phase 4B: page position + region count for iPhone
+            // Page position + region count for iPhone
             HStack(spacing: ResectaTokens.Spacing.xs) {
                 Text("\(documentState.currentPageIndex + 1) of \(documentState.pageCount)")
                     .font(.subheadline.monospacedDigit())
@@ -75,6 +75,6 @@ struct PageNavigationBar: View {
         // counter all reported "pageNav"), which erases the per-button
         // identifiers the page-bar pin queries.
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("pageNav") // §A8
+        .accessibilityIdentifier("pageNav")
     }
 }

@@ -2,8 +2,8 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Plan Phase 2 / §G6 — **regression guard**, NOT the plan's ≥50-real-scan
-// exit criterion (device-gated, Phase 4, per DataPipeline CLAUDE.md §2.3).
+// Regression guard — not the real-scan exit criterion, which is
+// device-gated and runs separately.
 //
 // This suite injects deterministic OCR noise into g8 corpus documents
 // (seeded digit-↔-letter substitutions at known rates), runs the PII
@@ -99,15 +99,14 @@ struct G6SyntheticRecallTests {
               "normalized=\(normalizedHits) (\(String(format: "%.4f", normalizedRecall))), " +
               "delta=\(normalizedHits - rawHits)")
 
-        // Search-impl S3 (2026-06-11): the g8 corpus reached Bundle.module
-        // for the first time (D1 gate resource), un-gating this suite —
-        // measured normalized=357 vs raw=371 on the noise-injected sample.
-        // Pre-existing normalizer gap, not an S3 regression; the OCR
-        // program (S8) owns the fix and re-baselines this suite per
-        // verification.md §6. The withKnownIssue pin keeps the measurement
-        // live and flips red when the normalizer reaches parity; remove
-        // the pin then.
-        withKnownIssue("normalizer recall below raw until the S8 OCR program re-baselines") {
+        // The g8 corpus reached Bundle.module for the first time, un-gating
+        // this suite — measured normalized=357 vs raw=371 on the
+        // noise-injected sample. Pre-existing normalizer gap, not caused by
+        // this change; the OCR program owns the fix and re-baselines this
+        // suite. The withKnownIssue pin keeps the measurement live and
+        // flips red when the normalizer reaches parity; remove the pin
+        // then.
+        withKnownIssue("normalizer recall below raw until the OCR program re-baselines") {
             #expect(
                 normalizedHits >= rawHits,
                 "Normalizer regressed recall: raw=\(rawHits) normalized=\(normalizedHits)"

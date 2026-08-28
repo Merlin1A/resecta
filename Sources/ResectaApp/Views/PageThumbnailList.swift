@@ -3,11 +3,11 @@ import PDFKit
 import UIKit
 import RedactionEngine
 
-// UI_UX §6.3: iPad sidebar with page thumbnails and region count badges.
-// GAP-6 §9.1: Per-page text layer status indicators.
-// GAP-6 §9.2: "With Text" filter chip for large documents.
+// iPad sidebar with page thumbnails and region count badges.
+// Per-page text layer status indicators.
+// "With Text" filter chip for large documents.
 
-// §9.2: Page filter — amends deferred A14.1.
+// Page filter for large documents.
 private enum PageFilter: String, CaseIterable {
     case all = "All Pages"
     case withRegions = "With Regions"
@@ -25,7 +25,7 @@ struct PageThumbnailList: View {
         return report.perPageModes.hasMixedModes ? report.perPageModes : nil
     }
 
-    /// PD-5: per-page fallback reasons beside the modes — non-nil entries
+    /// Per-page fallback reasons beside the modes — non-nil entries
     /// only for pages whose mode fell back in a Searchable-mode run, so
     /// secure-raster runs keep their plain badges.
     private var perPageFallbackReasons: [TextLayerDetector.FallbackReason?]? {
@@ -46,10 +46,10 @@ struct PageThumbnailList: View {
         return mode.shortDisplayName
     }
 
-    // §9.2: Filter state for large documents (pageCount >= 50).
+    // Filter state for large documents (pageCount >= 50).
     @State private var pageFilter: PageFilter = .all
 
-    // §9.2: Filtered page indices based on selected filter.
+    // Filtered page indices based on selected filter.
     private var filteredPages: [Int] {
         switch pageFilter {
         case .all:
@@ -67,7 +67,7 @@ struct PageThumbnailList: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // §9.2: Segmented filter — shown only for large documents (A14.1 threshold).
+            // Segmented filter — shown only for large documents.
             if documentState.pageCount >= 50 {
                 Picker("Filter", selection: $pageFilter) {
                     Text(PageFilter.all.rawValue).tag(PageFilter.all)
@@ -94,7 +94,7 @@ struct PageThumbnailList: View {
                                 )
                                 .frame(width: 60, height: 80)
                                 .clipShape(RoundedRectangle(cornerRadius: 4))
-                                // R4/D3: Status dots — orange dot = has regions, none = untouched.
+                                // Status dots — orange dot = has regions, none = untouched.
                                 // Pattern from Working Copy / PDF Expert.
                                 .overlay(alignment: .topTrailing) {
                                     if regionCount > 0 {
@@ -109,7 +109,7 @@ struct PageThumbnailList: View {
                                     Text("Page \(index + 1)")
                                         .font(.subheadline)
 
-                                    // §9.1: Text layer indicator — amends deferred A14.2.
+                                    // Text layer indicator.
                                     if let status = documentState.textLayerStatus[index] {
                                         HStack(spacing: ResectaTokens.Spacing.xxs) {
                                             switch status {
@@ -131,7 +131,7 @@ struct PageThumbnailList: View {
                                     }
 
                                     // Per-page mode badge (only when modes are mixed + verified).
-                                    // PD-5: fallback pages carry the short reason.
+                                    // Fallback pages carry the short reason.
                                     if let modes = perPageModes, index < modes.count {
                                         let reason = perPageFallbackReasons
                                             .flatMap { index < $0.count ? $0[index] : nil }
@@ -160,7 +160,7 @@ struct PageThumbnailList: View {
                         )
                     }
                 }
-                // WP6a: Auto-scroll sidebar to current page on navigation
+                // Auto-scroll sidebar to current page on navigation
                 .onChange(of: documentState.currentPageIndex) { _, newIndex in
                     withAnimation(ResectaTokens.Anim.stateChange) {
                         proxy.scrollTo(newIndex, anchor: .center)
@@ -182,7 +182,7 @@ struct PageThumbnailList: View {
 /// NSCache-backed thumbnail cache. Auto-evicts on memory pressure.
 /// Keyed by page index; cleared when the source document changes.
 ///
-/// RES-05 (Pkg N): explicit `countLimit` and `totalCostLimit` so the
+/// Explicit `countLimit` and `totalCostLimit` so the
 /// cache cannot grow without bound on multi-hundred-page documents.
 /// NSCache's default limits are zero (unbounded) and rely on system
 /// memory-pressure callbacks to evict. The explicit ceilings give the
@@ -257,7 +257,7 @@ struct PageThumbnailView: View {
             guard let page = document?.page(at: pageIndex) else { return }
             // PDFPage is not Sendable; render via nonisolated(unsafe) bridge.
             nonisolated(unsafe) let unsafePage = page
-            // Phase 5A: Render at display size (60×80pt), not 2× oversized.
+            // Render at display size (60×80pt), not 2× oversized.
             // Saves ~75% pixel work and cache memory per thumbnail.
             let scale = UITraitCollection.current.displayScale
             let size = CGSize(width: 60 * scale, height: 80 * scale)
@@ -286,9 +286,9 @@ private struct ShimmerPlaceholder: View {
         Rectangle()
             .fill(.quaternary)
             .overlay {
-                // 04-ux-ui-audit.md §1.3.c: `.primary.opacity(0.10)`
-                // inverts per scheme so the shimmer band reads against
-                // `.quaternary` in both light and dark.
+                // `.primary.opacity(0.10)` inverts per scheme so the
+                // shimmer band reads against `.quaternary` in both
+                // light and dark.
                 LinearGradient(
                     colors: [.clear, .primary.opacity(0.10), .clear],
                     startPoint: .leading,
@@ -299,10 +299,9 @@ private struct ShimmerPlaceholder: View {
             .clipped()
             .accessibilityLabel("Loading page thumbnail")
             .onAppear {
-                // 04-ux-ui-audit.md §3.4.b: mirror the
-                // VerificationProgressView reduce-motion gate — skip the
-                // perpetual shimmer animation when the user prefers
-                // reduced motion.
+                // Mirror the VerificationProgressView reduce-motion
+                // gate — skip the perpetual shimmer animation when the
+                // user prefers reduced motion.
                 guard !reduceMotion else { return }
                 withAnimation(
                     .linear(duration: 1.5)

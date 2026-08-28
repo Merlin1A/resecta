@@ -5,17 +5,15 @@ import OSLog
 // produced by DataPipeline's src/resecta_data/gazetteers/passport_patterns/
 // (DP commit 5b19a84, 2026-04-26). 11 issuers = CA/CN/DO/GB/IN/KR/MX/PH/SV/US/VN.
 //
-// Spec authority: the DataPipeline data-requirements spec §1.16.
-//   Substrate substituted to ICAO Doc 9303 Ed. 8 (2021) Part 4 §4.7
-//   per Disposition §4 cite-swap (treaty-PD-equivalent fact-extraction
-//   per legal-ref §9.4.12 + §10.4; verbatim ICAO expression categorically
-//   excluded per §10.5). F-38 GB pending_decision_memo is a V1-MOOT
+// Substrate substituted to ICAO Doc 9303 Ed. 8 (2021) Part 4 §4.7
+//   (treaty-PD-equivalent fact-extraction; verbatim ICAO expression is
+//   categorically excluded). GB pending_decision_memo is a V1-MOOT
 //   metadata carrier — not consumed at detection time.
 // Schema: ../resecta-datapipeline/schemas/passport_patterns.schema.json
 //
 // Layered onto the existing inline labeled-prefix detector at
 // PIIDetector.detectPassports; this gazetteer supplies per-issuer
-// validation patterns (W1 strategy: candidate from inline regex must
+// validation patterns (candidate from inline regex must
 // match at least one issuer's pattern, otherwise it is suppressed).
 //
 // `recent_format_changes` rows (6 of 11: CA/CN/KR/MX/PH/US) keep the
@@ -43,7 +41,7 @@ public struct PassportPatternGazetteer: @unchecked Sendable {
     /// Engineer-facing audit metadata for an issuer row. Not consumed at
     /// detection time — surfaced so review tooling can inspect per-row
     /// license posture, confidence, recent-format-changes context, and
-    /// any pending decision memo (GB only — F-38 V1-MOOT carrier).
+    /// any pending decision memo (GB only — a V1-MOOT carrier).
     public struct IssuerMetadata: Sendable {
         public let licensePosture: String
         public let licenseNotes: String
@@ -74,8 +72,8 @@ public struct PassportPatternGazetteer: @unchecked Sendable {
 
     /// Closed enum of the 11 V1 shipping issuer codes. Mirrors the
     /// `issuer_code` enum in passport_patterns.schema.json. Cuba (CU) is
-    /// candidates-file-only per F-37 OFAC sanctions posture; Guatemala
-    /// (GT) is V1.1+ swap candidate per W-R-4.1.
+    /// candidates-file-only due to OFAC sanctions posture; Guatemala
+    /// (GT) is a V1.1+ swap candidate.
     private static let validIssuerCodes: Set<String> = [
         "CA", "CN", "DO", "GB", "IN", "KR", "MX", "PH", "SV", "US", "VN",
     ]
@@ -213,7 +211,7 @@ public struct PassportPatternGazetteer: @unchecked Sendable {
     }
 
     /// Match `candidate` against every issuer; return the matching issuer
-    /// codes in ascending order. Used by the W1 validation gate (any-
+    /// codes in ascending order. Used by the validation gate (any-
     /// issuer acceptance) and to surface multi-issuer ambiguity (e.g. an
     /// 8-char `^[A-Z]{2}[0-9]{6}$` candidate matching CA-legacy).
     public func matches(_ candidate: String, anyIssuer: ()) -> [String] {

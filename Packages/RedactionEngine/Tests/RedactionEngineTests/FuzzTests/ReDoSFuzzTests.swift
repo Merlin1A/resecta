@@ -12,7 +12,7 @@ import Foundation
 // shapes before any pattern reaches enumerateMatches — but we still fuzz the
 // already-bundled patterns in case a hand-authored one slips through.
 
-@Suite("ReDoS fuzz (SEARCH_AND_REDACT §9.4)", .tags(.security, .critical))
+@Suite("ReDoS fuzz", .tags(.security, .critical))
 struct ReDoSFuzzTests {
 
     // MARK: - Fixture
@@ -88,7 +88,7 @@ struct ReDoSFuzzTests {
 
     @Test("validateRegexPattern rejects canonical nested-quantifier shapes")
     func validateRejectsNestedQuantifiers() {
-        // F-001 — `validateRegexPattern` now delegates to
+        // `validateRegexPattern` now delegates to
         // `RegexSafetyPrecheck.isLikelyPathological` in addition to the
         // original `hasNestedQuantifiers` heuristic. The combined check
         // covers both (group-with-quantifier)quantifier shapes and

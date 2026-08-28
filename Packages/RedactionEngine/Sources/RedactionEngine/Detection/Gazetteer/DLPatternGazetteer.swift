@@ -5,15 +5,13 @@ import OSLog
 // produced by DataPipeline's src/resecta_data/gazetteers/dl_patterns/build.py
 // (DP commit 9940520, 2026-04-26). 51 rows = 50 states + DC.
 //
-// Spec authority: the DataPipeline data-requirements spec §1.15 + §7.3
-//   (F-25 closed by Disposition §2 — NC/TN/UT statute-anchored;
-//    AK/MT/SC/SD/WV/WY/DC envelope.
-//    F-39 closed by Disposition §8 — IL/WA/NV/NJ envelope.)
+// NC/TN/UT are statute-anchored; AK/MT/SC/SD/WV/WY/DC and
+// IL/WA/NV/NJ use the AAMVA envelope pattern.
 // Schema: ../resecta-datapipeline/schemas/dl_patterns.schema.json
 //
 // Layered onto the existing inline label-prefix detector at
 // PIIDetector.detectDriversLicenses; this gazetteer supplies per-state
-// validation patterns (W1 strategy: candidate from inline regex must match
+// validation patterns (candidate from inline regex must match
 // at least one state's pattern, otherwise it is suppressed).
 //
 // SSN/DLN two-way ambiguity: five rows (AR/HI/ID/LA/MS) carry
@@ -40,7 +38,7 @@ public struct DLPatternGazetteer: @unchecked Sendable {
 
     /// Engineer-facing audit metadata for a state row. Not consumed at
     /// detection time — surfaced so review tooling can inspect per-row
-    /// attestation, license posture, F-flag context, and the F-35 SSN/DLN
+    /// attestation, license posture, F-flag context, and the SSN/DLN
     /// overlap note where present (AR/HI/ID/LA/MS only).
     public struct StateMetadata: Sendable {
         public let attestation: String
@@ -56,7 +54,7 @@ public struct DLPatternGazetteer: @unchecked Sendable {
     private let metadataByState: [String: StateMetadata]
     private let advisoryNoteValue: String?
 
-    /// Canonical AAMVA M1 envelope per legal-ref §8.4 / §8.4a. Locked at
+    /// Canonical AAMVA M1 envelope. Locked at
     /// load time for every `aamva-envelope` row (defense-in-depth beyond
     /// the build-side schema check).
     private static let canonicalEnvelopePattern = "^[A-Z0-9]{8,13}$"
@@ -120,7 +118,7 @@ public struct DLPatternGazetteer: @unchecked Sendable {
                     compiled.append(try NSRegularExpression(pattern: pattern))
                 }
                 // Historical variants (3 rows: MA, NH, RI) sit inside the
-                // active renewal window per the d13-DONE record — the
+                // active renewal window — the
                 // legacy_pattern still matches DLs in real circulation.
                 if let variants = row.historicalVariants {
                     for variant in variants {
@@ -165,8 +163,8 @@ public struct DLPatternGazetteer: @unchecked Sendable {
     }
 
     /// Match `candidate` against every jurisdiction; return the matching
-    /// state codes in ascending order. Used by the W1 validation gate
-    /// (any-state acceptance) and to surface the F-35 SSN/DLN ambiguity
+    /// state codes in ascending order. Used by the validation gate
+    /// (any-state acceptance) and to surface the SSN/DLN ambiguity
     /// for AR/HI/ID/LA/MS-shaped 9-digit candidates.
     public func matches(_ candidate: String, anyState: ()) -> [String] {
         let range = NSRange(location: 0, length: (candidate as NSString).length)
@@ -180,8 +178,7 @@ public struct DLPatternGazetteer: @unchecked Sendable {
         return hits
     }
 
-    /// File-root advisory note (F-32 Tier 2 advisory per legal-ref §13.6 /
-    /// §12.3, delegation 2026-04-26). A single string at the JSON root,
+    /// File-root advisory note (a Tier 2 advisory). A single string at the JSON root,
     /// not a per-row field — `nil` if the artifact omits it.
     public func advisoryNote() -> String? {
         advisoryNoteValue

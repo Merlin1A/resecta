@@ -3,7 +3,7 @@ import Foundation
 import PDFKit
 @testable import RedactionEngine
 
-// TEST §3.3, §3.4 — Adversarial PDF verification tests.
+// Adversarial PDF verification tests.
 // These validate that Layers 4 and 5 catch real attack vectors.
 
 @Suite("Adversarial Verification", .tags(.security))
@@ -11,7 +11,7 @@ struct AdversarialVerificationTests {
 
     private let engine = VerificationEngine()
 
-    // MARK: - Layer 4: Structural FAIL Keys (ENGINE §6.4)
+    // MARK: - Layer 4: Structural FAIL Keys
 
     @Test("Layer 4 FAILs on /JavaScript in catalog")
     func layer4FailsJavaScript() async throws {
@@ -111,11 +111,11 @@ struct AdversarialVerificationTests {
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
-        // ENGINE §6.4: Multiple %%EOF now triggers FAIL (incremental update attack)
+        // Multiple %%EOF now triggers FAIL (incremental update attack)
         #expect(result.status.isFail, "Multiple %%EOF should produce FAIL")
     }
 
-    // MARK: - Layer 5: Metadata FAIL/WARN (ENGINE §6.5)
+    // MARK: - Layer 5: Metadata FAIL/WARN
 
     @Test("Layer 5 FAILs when /Author metadata is present")
     func layer5FailsAuthor() async throws {

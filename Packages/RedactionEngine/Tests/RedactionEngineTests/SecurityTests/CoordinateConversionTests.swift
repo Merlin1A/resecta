@@ -4,7 +4,7 @@ import PDFKit
 import CoreGraphics
 @testable import RedactionEngine
 
-// TEST §3.7 — Coordinate conversion edge cases.
+// Coordinate conversion edge cases.
 // Validates normalizedToPDFPageCoordinates and normalizedToFillPixels
 // with non-zero origins, cropBox offsets, and full-page spans.
 
@@ -41,7 +41,7 @@ struct CoordinateConversionTests {
         let result = normalizedToFillPixels(
             normalized, bitmapWidth: 2550, bitmapHeight: 3300
         )
-        // §3.2a expands 1 px outward on every side past pixel alignment; the
+        // The fill expansion adds 1 px outward on every side past pixel alignment; the
         // overhang clips at the bitmap when filling.
         #expect(result == CGRect(x: -1, y: -1, width: 2552, height: 3302))
     }
@@ -53,7 +53,7 @@ struct CoordinateConversionTests {
             normalized, bitmapWidth: 1275, bitmapHeight: 1650
         )
         // 0.25 * 1275 = 318.75, pixelAligned → floor(318.75) = 318, then
-        // the §3.2a 1-px outward expansion → 317
+        // the 1-px outward expansion → 317
         // 0.25 * 1650 = 412.5, pixelAligned → floor(412.5) = 412 → 411
         #expect(result.minX == 317)
         #expect(result.minY == 411)
@@ -73,7 +73,7 @@ struct CoordinateConversionTests {
         let outputPage = try #require(outputDoc.page(at: 0))
         let bounds = outputPage.bounds(for: .cropBox)
 
-        // Output pages from CGPDFContext always have zero origin (EXP-011)
+        // Output pages from CGPDFContext always have zero origin
         #expect(bounds.origin.x == 0)
         #expect(bounds.origin.y == 0)
     }

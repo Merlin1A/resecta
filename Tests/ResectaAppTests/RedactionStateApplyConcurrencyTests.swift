@@ -188,11 +188,11 @@ struct RedactionStateApplyConcurrencyTests {
     }
 }
 
-// D06-F1 — the search-origin apply records the `regionVersion` it produces as a
+// The search-origin apply records the `regionVersion` it produces as a
 // monotonic high-water-mark (`lastAppliedSearchRegionVersion`) so the Search &
 // Redact sheet can skip clearing the applied markers for the apply's own
 // region bump (vs a real undo/redo). See `SearchAndRedactSheet.shouldClearAppliedMarkers`.
-@Suite("RedactionState applied-version high-water-mark (D06-F1)", .tags(.search))
+@Suite("RedactionState applied-version high-water-mark", .tags(.search))
 @MainActor
 struct RedactionStateAppliedVersionTests {
 

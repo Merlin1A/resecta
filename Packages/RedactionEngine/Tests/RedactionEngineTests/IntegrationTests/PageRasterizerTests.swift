@@ -4,12 +4,12 @@ import CoreGraphics
 import PDFKit
 @testable import RedactionEngine
 
-// L-18 / L-19 — PageRasterizer memory-safety guards.
+// PageRasterizer memory-safety guards.
 
 @Suite("PageRasterizer Memory Safety")
 struct PageRasterizerTests {
 
-    // MARK: - L-19: Pre-flight size rejection
+    // MARK: - Pre-flight size rejection
 
     @Test("renderCGPageWithTimeout rejects 50,000-pt-wide pages before drawPDFPage")
     func rejectsPageTooLarge() async throws {
@@ -65,7 +65,7 @@ struct PageRasterizerTests {
         #expect(image.height > 0)
     }
 
-    // MARK: - L-18: dpiCap ceiling
+    // MARK: - dpiCap ceiling
 
     @Test("rasterize(dpiCap: 150) produces 150-DPI bitmap even when targetDPI is 300")
     func rasterizeRespectsDPICap() async throws {
@@ -83,7 +83,7 @@ struct PageRasterizerTests {
             page: page, pageIndex: 0, regions: [],
             fillColor: .black, targetDPI: 300,
             pipelineMode: .secureRasterization, rotation: 0,
-            // CAT-127: rasterize() now reads the pre-extracted geometry + CG page.
+            // rasterize() now reads the pre-extracted geometry + CG page.
             cropBoxBounds: page.bounds(for: .cropBox),
             cgPage: page.pageRef,
             hasText: false
@@ -101,7 +101,7 @@ struct PageRasterizerTests {
                 "cap should prevent 300 DPI bitmap (got \(result.pageOutput.image.height) tall)")
     }
 
-    // MARK: - CAT-127: CG-only concurrent render path guards
+    // MARK: - CG-only concurrent render path guards
 
     @Test("rasterize follows the pre-extracted cropBox geometry, not the live PDFPage (decoy)")
     func rasterizeUsesPreExtractedGeometryNotLivePDFPage() async throws {
@@ -128,7 +128,7 @@ struct PageRasterizerTests {
         }
         let targetBounds = targetPage.bounds(for: .cropBox)
         let decoyBounds = decoyPage.bounds(for: .cropBox)
-        // L3-13: the delta must be unambiguous at the selected DPI.
+        // The delta must be unambiguous at the selected DPI.
         #expect(targetBounds.size != decoyBounds.size,
                 "decoy and target must differ in size for this guard to discriminate")
 
@@ -282,7 +282,7 @@ struct PageRasterizerTests {
     }
 }
 
-// MARK: - PD-5: effective per-page fallback reason (RC-5)
+// MARK: - Effective per-page fallback reason
 
 @Suite("PageRasterizer Fallback Reason")
 struct PageRasterizerFallbackReasonTests {
@@ -309,9 +309,9 @@ struct PageRasterizerFallbackReasonTests {
 
     @Test("Runtime extraction throw records .extractionFailed and still rasterizes")
     func runtimeThrowRecordsExtractionFailed() async throws {
-        // The OCG defense makes extractCharacters throw (AD-2-1 fixture); the
+        // The OCG defense makes extractCharacters throw; the
         // page must complete as Secure Rasterization AND the result must say
-        // why — the reason used to be dropped at this exact point (RC-5).
+        // why — the reason used to be dropped at this exact point.
         let data = TestFixtures.ocgHiddenLayerPDF(hiddenText: "CONFIDENTIAL")
         let pageData = try makePageData(
             from: data, pipelineMode: .searchableRedaction,

@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// W4 — round-trip + schema-version + corrupt-payload coverage for the
+// Round-trip + schema-version + corrupt-payload coverage for the
 // shared persistence helper. Uses a scratch UserDefaults suite per test
 // so the app's real defaults are untouched.
 
@@ -11,7 +11,7 @@ struct UserDefaultsJSONBlobTests {
 
     // nonisolated: passed as the `T` of `UserDefaultsJSONBlob<T: Codable & Sendable>`,
     // so its Codable conformance must be usable from a nonisolated (Sendable) context.
-    // Under the s04 SE-0466 MainActor-default flip this nested test type would default
+    // Under the SE-0466 MainActor-default flip this nested test type would default
     // to MainActor (main-actor-isolated conformance can't satisfy the Sendable bound);
     // pin it nonisolated (mirrors the production UserTermsBlob/SavedSearch fix).
     nonisolated private struct Payload: Codable, Sendable, Equatable {

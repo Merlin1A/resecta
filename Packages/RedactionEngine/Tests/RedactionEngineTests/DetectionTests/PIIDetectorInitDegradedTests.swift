@@ -2,14 +2,14 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// SEC-7 — `PIIDetector.loadWithDiagnostics(bundle:)` is the explicit-degrade
+// `PIIDetector.loadWithDiagnostics(bundle:)` is the explicit-degrade
 // loader. When any of the gazetteer / context-keywords resources fail
 // to initialize, the diagnostics value records the failure and the detector
 // falls back to nil-gazetteer pass-through. Non-gazetteer regex detectors
 // (SSN state machine, DEA letter check, etc.) MUST keep returning results so
 // the user retains some auto-detection even when the corpus is unavailable.
 //
-// SEC-7 acceptance: force-rename `surnames.bloom` in a fixture build,
+// Acceptance check: force-rename `surnames.bloom` in a fixture build,
 // run pipeline, observe banner + toast, observe pipeline completes without
 // crash.
 //
@@ -27,14 +27,14 @@ import Foundation
 // never reaches. So the empty-bundle signature-fail failure count is 5 even
 // though `Gazetteer.allCases.count` is larger.
 
-@Suite("PIIDetector init degraded — SEC-7")
+@Suite("PIIDetector init degraded")
 struct PIIDetectorInitDegradedTests {
 
     @Test("Empty bundle: the five signature-gated loaders fail, listed by kind")
     func testCorruptedBloomFileDegradesAndReportsKind() {
         // An empty Bundle() has no `Gazetteers/` subdirectory, so every
         // loader hits `LoaderError.resourceMissing`. This stands in for the
-        // "corrupted bloom file" failure mode named in the plan: from the
+        // "corrupted bloom file" failure mode: from the
         // app's point of view, "resource missing" and "decode failed" both
         // surface through the same `failedGazetteers` array (the wire
         // mechanism is one of three named cases on each loader).
@@ -110,7 +110,7 @@ struct PIIDetectorInitDegradedTests {
         // Compose a diagnostic by hand and round-trip through `appending`.
         // This pins the wire shape that `failedGazetteers` keys are stable
         // (used by `PipelineCoordinator.surfaceGazetteerLoadDiagnostics` and
-        // by the audit log row in the eventual SEC-6 sign-manifest output).
+        // by an eventual audit-log sign-manifest row).
         let diag = GazetteerLoadDiagnostics()
             .appending(.dlPatternGazetteer, reason: "schemaInvariantViolation")
 
@@ -121,11 +121,11 @@ struct PIIDetectorInitDegradedTests {
                 "non-failing loaders must NOT appear in failureReasons")
     }
 
-    // MARK: - GAP-DEPTARGET-NER (D04-F3 == D11-F3) — NER name-model availability
+    // MARK: - NER name-model availability
 
     @Test("Appending .nerNameModel flips didDegrade and lists NERNameModel (wiring)")
     func testNERNameModelAppendDrivesDegrade() {
-        // Environment-independent proof: the SEC-7 banner fires off `didDegrade`,
+        // Environment-independent proof: the degraded-detection banner fires off `didDegrade`,
         // so appending the NER tracker flips it through the SAME path a corpus
         // failure uses — no new banner, no PipelineCoordinator change.
         let diag = GazetteerLoadDiagnostics()
@@ -135,10 +135,10 @@ struct PIIDetectorInitDegradedTests {
         #expect(diag.failureReasons["NERNameModel"] == "NER name model unavailable")
     }
 
-    @Test("Signature-fail path does NOT attribute the NER model (A4 exclusion)")
+    @Test("Signature-fail path does NOT attribute the NER model")
     func testSignatureFailDoesNotAttributeNER() {
         // The empty bundle short-circuits BEFORE the NER probe runs, and the
-        // signature-fail loop excludes .nerNameModel (A4) — so regardless of NER
+        // signature-fail loop excludes .nerNameModel — so regardless of NER
         // availability it must not appear in the failure list. No override needed.
         let (_, diagnostics) = PIIDetector.loadWithDiagnostics(bundle: Bundle())
         #expect(diagnostics.didDegrade, "signature-covered loaders still fail on empty bundle")
@@ -149,7 +149,7 @@ struct PIIDetectorInitDegradedTests {
     @Test("NER absent (override=false) surfaces .nerNameModel via the signature-valid path")
     func testNERAbsentOverrideAppendsViaValidPath() {
         // Uses the no-arg loader (engine `.module`, signature-valid in the test
-        // bundle) so execution reaches step 10 where the probe runs. The task-local
+        // bundle) so execution reaches the point where the probe runs. The task-local
         // binding forces absence within this call; the loader must fold in the NER
         // tracker. (Binding is task-scoped — no concurrent test observes it.)
         let (_, diagnostics) = PIIDetector.$_nerAvailabilityOverride.withValue(false) {

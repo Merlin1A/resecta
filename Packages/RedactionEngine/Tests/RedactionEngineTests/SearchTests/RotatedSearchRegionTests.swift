@@ -4,27 +4,27 @@ import PDFKit
 import CoreGraphics
 @testable import RedactionEngine
 
-// S15 CAT-353 — task 4: region-orientation probes for the two SEARCH-side
-// region producers on rotated pages (C-C deep-plan §6, ADV-2 A2-8).
+// Region-orientation probes for the two search-side region producers on
+// rotated pages.
 //
 //  • Text search → `DocumentSearcher.boundingRect(for:page:)` maps PDFKit's
 //    absolute (MediaBox) selection bounds into cropBox-LOCAL space — it now
-//    subtracts `pageBounds.origin` (CAT-366 parity with TextLayerExtractor,
-//    D01-F2) BEFORE the rotation mirror, so it is origin-aware. These tests pin
-//    it across rotation × CropBox origin, both at the producer (centre-tolerance)
-//    and end to end through export. The offset-origin export guards assert
-//    TERM-ABSENCE in the output (not Layer-2 status — the .searchableRedaction
-//    → .info continuity, CAT-351, can mask an offset-page leak).
+//    subtracts `pageBounds.origin` (parity with TextLayerExtractor) before
+//    the rotation mirror, so it is origin-aware. These tests pin it across
+//    rotation × CropBox origin, both at the producer (centre-tolerance) and
+//    end to end through export. The offset-origin export guards assert
+//    TERM-ABSENCE in the output (not Layer-2 status — the
+//    .searchableRedaction → .info continuity can mask an offset-page leak).
 //  • OCR PII detection → `scanPagePIIViaOCR` / `ocrPage` request the page
-//    thumbnail. At the pin the size came from the UNROTATED cropBox, so PDFKit
-//    aspect-fit/letterboxed the rotation-applied render and shifted every OCR
-//    `normalizedRect` (A2-8). The fix routes all three OCR-thumbnail sites
-//    through `DocumentSearcher.ocrThumbnailSize`, which uses DISPLAYED dims.
+//    thumbnail. Previously the size came from the UNROTATED cropBox, so
+//    PDFKit aspect-fit/letterboxed the rotation-applied render and shifted
+//    every OCR `normalizedRect`. The fix routes all three OCR-thumbnail
+//    sites through `DocumentSearcher.ocrThumbnailSize`, which uses
+//    DISPLAYED dims.
 //
-// The UI-drawn overlay producer (A2-8 path (a)) normalizes in displayed space
-// by construction (overlay over PDFView's displayed page); it lives in the app
-// target and has no engine-test surface — see the exit note for
-// the operator-side device confirmation. The engine matrix's seeded
+// The UI-drawn overlay producer normalizes in displayed space by
+// construction (overlay over PDFView's displayed page); it lives in the app
+// target and has no engine-test surface. The engine matrix's seeded
 // displayed-space regions (RotatedPageCoordinateTests) exercise the same
 // contract the overlay feeds.
 @Suite("Rotated Search Region Orientation", .tags(.security, .critical))
@@ -32,7 +32,7 @@ struct RotatedSearchRegionTests {
 
     private let engine = VerificationEngine()
 
-    /// Test-local, independent A2-7 transform (CropBox-local → displayed),
+    /// Test-local, independent transform (CropBox-local → displayed),
     /// used to position the EXPECTED region without reusing production code.
     private func displayedRect(_ r: CGRect, sourceSize s: CGSize, rotation: Int) -> CGRect {
         let x = r.minX, y = r.minY, wr = r.width, hr = r.height
@@ -62,8 +62,8 @@ struct RotatedSearchRegionTests {
         return unionBounds(marker)
     }
 
-    // --- A2-8 fix guard: thumbnail size uses DISPLAYED (effective) dims ---
-    @Test("ocrThumbnailSize requests displayed (effective) dims (CAT-353 / A2-8)",
+    // --- Thumbnail size uses DISPLAYED (effective) dims ---
+    @Test("ocrThumbnailSize requests displayed (effective) dims",
           arguments: [0, 90, 180, 270])
     func ocrThumbnailSizeUsesEffectiveDimensions(rotation: Int) {
         let bounds = CGRect(x: 0, y: 0, width: 612, height: 792)
@@ -92,7 +92,7 @@ struct RotatedSearchRegionTests {
         // The expected position is origin-INDEPENDENT: markerLocalBounds() reads
         // the zero-origin r=0 reference and `displayedRect` maps local→displayed,
         // so a CropBox origin shift must NOT move the expected normalized centre.
-        // An origin-aware boundingRect (D01-F2) still lands on it; the pre-fix
+        // An origin-aware boundingRect still lands on it; the pre-fix
         // producer lands off by ~(ox/W, oy/H) on the non-zero-origin cases.
         let markerLocal = try await markerLocalBounds()
         let effective = effectiveBounds(
@@ -156,11 +156,11 @@ struct RotatedSearchRegionTests {
                 "Layer 2 OCR must be clean under a search-sourced region on a /Rotate 90 page")
     }
 
-    // --- D01-F1: search-sourced region → export → term-absent across CropBox
-    //     origins on a /Rotate 90 page. Complements the rotation-0 D08-F3 guard
-    //     by exercising the rotation × origin INTERSECTION of the localize-then-
+    // --- Search-sourced region → export → term-absent across CropBox
+    //     origins on a /Rotate 90 page. Complements the rotation-0 guard
+    //     by exercising the rotation × origin intersection of the localize-then-
     //     rotate transform. Asserts TERM-ABSENCE (not !l2.status.isFail) — the
-    //     .searchableRedaction → .info continuity (CAT-351) can mask a leak. ---
+    //     .searchableRedaction → .info continuity can mask a leak. ---
     @Test("Search-sourced region exports term-absent across CropBox origins on a /Rotate 90 page",
           arguments: [CGPoint.zero, CGPoint(x: 50, y: 50)])
     func searchSourcedRegionExportTermAbsentOnOffsetRotatedPage(origin: CGPoint) async throws {
@@ -192,13 +192,12 @@ struct RotatedSearchRegionTests {
                 "\(label): MARKER must not survive in the output under a search-sourced region on a rotated, offset-CropBox page")
     }
 
-    // --- D08-F3: search-sourced region → export → MARKER destroyed under the
-    //     region, across CropBox origins (offset-CropBox end-to-end guard;
-    //     couples to D01-F2 / D08-F1). On a zero-origin page boundingRect is a
-    //     no-op; on an offset page the missing -pageBounds.origin subtraction
-    //     displaces the fill → MARKER survives. Asserts TERM-ABSENCE, not Layer-2
-    //     status, because the .searchableRedaction → .info continuity (CAT-351)
-    //     masks a leak. Permanent red without D01-F2; red→green proves the fix. ---
+    // --- Search-sourced region → export → MARKER destroyed under the
+    //     region, across CropBox origins (offset-CropBox end-to-end guard). On
+    //     a zero-origin page boundingRect is a no-op; on an offset page the
+    //     missing -pageBounds.origin subtraction displaces the fill → MARKER
+    //     survives. Asserts TERM-ABSENCE, not Layer-2 status, because the
+    //     .searchableRedaction → .info continuity masks a leak. ---
     @Test("Search-sourced region destroys MARKER under the region across CropBox origins",
           arguments: [CGPoint.zero, CGPoint(x: 50, y: 50)])
     func searchSourcedRegionDestroysMarkerOnOffsetCropBox(origin: CGPoint) async throws {
@@ -224,7 +223,7 @@ struct RotatedSearchRegionTests {
 
         // Positive leak assertion: the term must be GONE from the output's
         // selectable text under a correctly placed search region. On the offset
-        // case with the pre-D01-F2 producer, the fill misses MARKER → it survives.
+        // case with the pre-fix producer, the fill misses MARKER → it survives.
         let outString = (outPage.string ?? "") as NSString
         #expect(outString.range(of: "MARKER").location == NSNotFound,
                 "\(label): MARKER must not survive in the output under a search-sourced region")

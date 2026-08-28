@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Plan Phase 3 / §5 / A5 — entity clustering correctness + bare-surname flag.
+// Entity clustering correctness + bare-surname flag.
 
 @Suite("EntityClusterer (A5)")
 struct EntityClustererTests {

@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W9 — performance guard. reverseRationale runs every detector against a
+// Performance guard. reverseRationale runs every detector against a
 // bounded (≤500-char) context, so worst-case p95 should stay well under
 // the 50 ms target on simulator.
 
@@ -38,7 +38,7 @@ struct ReverseRationalePerformanceTests {
             durations.append(clock.now - start)
         }
         durations.sort()
-        // CAT-248: index count-1 is the MAX, not the p95. The 95th percentile of
+        // Index count-1 is the MAX, not the p95. The 95th percentile of
         // 20 sorted samples by floor interpolation is index 18
         // (Int((20-1) * 0.95) = 18); count-1 = 19 is the worst-case sample.
         // Renamed p95 → p95Latency so the variable is searchable.
