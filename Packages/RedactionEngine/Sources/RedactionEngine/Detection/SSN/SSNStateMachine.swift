@@ -1,7 +1,7 @@
 import Foundation
 
 // A6: Linear-time SSN candidate scanner over UnicodeScalars.
-// O(n) — no regex, bypasses the per-page 5 s timeout (SEARCH_AND_REDACT §9.4).
+// O(n) — no regex, bypasses the per-page 5 s timeout.
 
 /// A candidate SSN span extracted by the state machine.
 public struct SSNCandidate: Sendable {

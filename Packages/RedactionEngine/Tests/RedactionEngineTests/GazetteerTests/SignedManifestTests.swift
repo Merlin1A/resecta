@@ -3,9 +3,9 @@ import Foundation
 import Testing
 @testable import RedactionEngine
 
-// SEC-6 — Signed gazetteer manifest verification tests.
+// Signed gazetteer manifest verification tests.
 //
-// SEC-6 signing scheme: Ed25519, rotation per major release,
+// Signing scheme: Ed25519, rotation per major release,
 //   degrade-with-banner on failure.
 //
 // Wire-format contract:
@@ -25,10 +25,10 @@ import Testing
 // the suite stays self-contained (no fixture file shipped, no dependency
 // on a `make sign-manifest` having run).
 
-@Suite("SignedManifest (SEC-6)")
+@Suite("SignedManifest")
 struct SignedManifestTests {
 
-    // SEC-2 cross-test invariant (BackupExclusionTests): no test must create
+    // Cross-test invariant (BackupExclusionTests): no test must create
     // entries at the bare `FileManager.default.temporaryDirectory` root
     // during a parallel `testNoWriteAtTempRootDuringSession` run, since that
     // test snapshots the root before / after and flags unexpected new
@@ -236,7 +236,7 @@ struct SignedManifestTests {
 
     @Test("Degrade banner surfaces on failure: loadWithDiagnostics flags all gazetteers + sets didDegrade")
     func testDegradeBannerSurfacesOnFailure() throws {
-        // Integration with SEC-7: when signature verification fails inside
+        // When signature verification fails inside
         // `PIIDetector.loadWithDiagnostics`, every gazetteer entry in the
         // `GazetteerLoadDiagnostics` value must report as failed so the
         // app-side `PipelineCoordinator.surfaceGazetteerLoadDiagnostics`
@@ -295,13 +295,13 @@ struct SignedManifestTests {
         _ = detector
     }
 
-    // REL-1 / D11-config-golive-F2 — the regression that the SEC-6 .gitignore
-    // footgun hid. Unlike the cases above (which write a freshly re-signed pair
-    // into a temp bundle and so always pass), this asserts over the bytes as
-    // BUNDLED from the committed tree (Package.swift `.copy("Resources/Gazetteers")`).
-    // A missing / re-ignored / stale committed pair fails here instead of
-    // degrading silently to the SEC-7 banner on device.
-    @Test("Committed gazetteer signature pair verifies the shipped manifest (REL-1 / SEC-6)")
+    // This is the regression that a stale .gitignore entry hid. Unlike the
+    // cases above (which write a freshly re-signed pair into a temp bundle
+    // and so always pass), this asserts over the bytes as BUNDLED from the
+    // committed tree (Package.swift `.copy("Resources/Gazetteers")`). A
+    // missing / re-ignored / stale committed pair fails here instead of
+    // degrading silently to the degraded-detection banner on device.
+    @Test("Committed gazetteer signature pair verifies the shipped manifest")
     func committedSignaturePairVerifiesShippedManifest() throws {
         #expect(GazetteerLoader.isManifestSignatureValid(bundle: .module))
     }

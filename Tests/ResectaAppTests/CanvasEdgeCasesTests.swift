@@ -3,23 +3,23 @@ import Foundation
 import CoreGraphics
 @testable import ResectaApp
 
-// WU-44 — canvas polish edge-cases. Two pure-function predicates pinned
+// Canvas polish edge-cases. Two pure-function predicates pinned
 // independently so a drift on either branch surfaces in isolation.
 //
-// M-D.7 — dimension-label position helper. Small regions prefer above,
+// Dimension-label position helper. Small regions prefer above,
 //          taller regions prefer below; both fall back to the alternate
 //          slot, and suppress when neither slot fits in the overlay.
-// M-D.8 — drag-offset clamping helper. Grab point stays under finger up
+// Drag-offset clamping helper. Grab point stays under finger up
 //          to the overlay edge; degenerate region-bigger-than-overlay
 //          case stays pinned at the origin corner.
 
-@Suite("Canvas edge cases (WU-44)")
+@Suite("Canvas edge cases")
 @MainActor
 struct CanvasEdgeCasesTests {
 
-    // MARK: - M-D.7 — Dimension label position
+    // MARK: - Dimension label position
 
-    @Test("Small region (<40pt tall) with room above prefers above (M-D.7)")
+    @Test("Small region (<40pt tall) with room above prefers above")
     func smallRegionPrefersAbove() {
         // Region 200x20 in the middle of a 400x400 overlay. With pill
         // height 16 and gap 4, above wants minY - 16 - 4 = 100 - 20 = 80.
@@ -97,9 +97,9 @@ struct CanvasEdgeCasesTests {
         #expect(position == .below(y: 144))
     }
 
-    // MARK: - M-D.8 — Drag-offset clamping
+    // MARK: - Drag-offset clamping
 
-    @Test("Touch in-bounds: origin tracks the touch minus dragOffset (M-D.8)")
+    @Test("Touch in-bounds: origin tracks the touch minus dragOffset")
     func touchInBoundsTracksGrabPoint() {
         // Touch at (150, 150), drag offset (50, 50) (grab is 50pt from
         // top-left of the region). Region 100x100 in 400x400 overlay.

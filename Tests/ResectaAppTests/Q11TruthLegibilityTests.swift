@@ -2,14 +2,14 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// q11 — piiScan truth + role legibility.
-// UXF-02: pre-scan idle state must not claim a completed scan.
-// UXF-03 / QRC-14: coverageReport.* + doctypeDiagnostic.* keys must
-//   resolve from the "Legal" table (raw-key leakage regression pin).
-// QRC-16a: role copy wording constraints.
-// UXF-13 (labels only): explicit selection-default labels.
+// piiScan truth + role legibility.
+// Pre-scan idle state must not claim a completed scan.
+// coverageReport.* + doctypeDiagnostic.* keys must resolve from the
+//   "Legal" table (raw-key leakage regression pin).
+// Role copy wording constraints.
+// Explicit selection-default labels (labels only).
 
-@Suite("q11 — UXF-02 idle honesty")
+@Suite("PII scan idle honesty")
 struct PIIScanIdleHonestyTests {
 
     @Test("clearResults() resets scan-progress counters so a mode switch cannot fake a completed scan")
@@ -53,7 +53,7 @@ struct PIIScanIdleHonestyTests {
     }
 }
 
-@Suite("q11 — UXF-03 / QRC-14 Legal-table resolution")
+@Suite("Legal-table resolution")
 struct CoverageReportLocalizationTests {
 
     /// All 8 coverageReport.* + 3 doctypeDiagnostic.* keys the two
@@ -86,7 +86,7 @@ struct CoverageReportLocalizationTests {
     }
 }
 
-@Suite("q11 — QRC-16a role copy")
+@Suite("Role copy")
 struct PIIScanRoleCopyTests {
 
     // The role copy's history: it moved from the piiScan toolbar
@@ -142,18 +142,18 @@ struct PIIScanRoleCopyTests {
     }
 }
 
-@Suite("q11 — UXF-13 review-first selection-default labels")
+@Suite("Review-first selection-default labels")
 struct SelectionDefaultLabelTests {
 
     // The triage sheet's "All N preselected" summary retired with the
     // all-preselected arrival default itself: the review-first arrival rule flips every
     // producer to all-DESELECTED, and the one footer label family
     // below covers both result origins of the unified surface.
-    // UXC-45 (RB-105): the footer is the surface's one selection
-    // authority and states "M of N selected" in EVERY state — the
-    // "N found — none selected yet" arrival phrasing retired.
+    // The footer is the surface's one selection authority and states
+    // "M of N selected" in EVERY state — the "N found — none selected
+    // yet" arrival phrasing retired.
 
-    @Test("footer states the zero state as a plain count — any origin (UXC-45)")
+    @Test("footer states the zero state as a plain count — any origin")
     func noneSelectedYet() {
         let label = SearchFooterSection.selectionCountLabel(selected: 0, total: 27)
         #expect(label == "0 of 27 selected")

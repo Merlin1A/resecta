@@ -1,9 +1,9 @@
 import SwiftUI
 
-// SA-2 (D-70): the sheet's in-content header row — Dismiss · title ·
+// The sheet's in-content header row — Dismiss · title ·
 // Apply — replacing the retired NavigationStack toolbar. The
 // NavigationStack wrapper was one of the two proven cooperation
-// poisons (18-SCROLL-ARCH §3): with it present, the sheet's
+// poisons: with it present, the sheet's
 // tracked-scroll-view discovery failed through the bridged
 // UINavigationController and `.automatic` content interaction
 // resolved every in-list drag against scrolling. The header carries
@@ -37,13 +37,12 @@ struct SearchSheetHeaderSection: View {
 
     var body: some View {
         // `.buttonStyle(.plain)` + explicit tint on BOTH buttons is
-        // load-bearing, not cosmetic: the SA-2 bisect showed
-        // default-styled buttons in the sheet's fixed chrome join the
-        // arbitration-poison class (18- §10) — every button proven
-        // innocent in the COOP probe runs (chips, footer) is
-        // plain-styled.
+        // load-bearing, not cosmetic: default-styled buttons in the
+        // sheet's fixed chrome join the arbitration-poison class —
+        // every button proven innocent in the COOP probe runs (chips,
+        // footer) is plain-styled.
         HStack(spacing: ResectaTokens.Spacing.sm) {
-            // UXC-18: 57-61×19.5 measured — height only, width already
+            // 57-61×19.5 measured — height only, width already
             // clears the floor. Restructured from the `Button(_:action:)`
             // string initializer to a closure-label form so a
             // `.frame(minHeight:)` can sit on the label without
@@ -92,7 +91,7 @@ struct SearchSheetHeaderSection: View {
     }
 }
 
-// MARK: - Hub chrome (SA-2)
+// MARK: - Hub chrome
 
 extension SearchAndRedactSheet {
     /// The sheet-level chrome both interfaces mount at the top of
@@ -127,7 +126,7 @@ extension SearchAndRedactSheet {
                 onDismiss: {
                     // Conditional dismiss: route through the dialog
                     // when the USER has modified selections this
-                    // session, OR (UXC-39) when this session received
+                    // session, OR when this session received
                     // an auto-selected set (magic-wand preselect) that
                     // has not yet been reviewed — a never-reviewed
                     // preselect no longer drops silently on the way
@@ -168,10 +167,10 @@ extension SearchAndRedactSheet {
                 degradedDetectionBanner
             }
 
-            // UXC-40 shape C (RB-42): orientation line — pages with
+            // Orientation line — pages with
             // hits out of total pages, mounted only after a completed
             // run that actually produced something. Orientation
-            // framing only (EV-P1-02): never "scanned" / "covered" /
+            // framing only: never "scanned" / "covered" /
             // "clear" wording — the builder below is the only copy
             // for this line. Search reads the UNFILTERED result set
             // (document-wide distribution, not the filtered view);
@@ -198,7 +197,7 @@ extension SearchAndRedactSheet {
         .background(.background)
     }
 
-    /// UXC-40 shape C (RB-42) header sub-line view — `.caption`
+    /// Header sub-line view — `.caption`
     /// `.secondary`, spoken text identical to the visible text.
     @ViewBuilder
     private func pagesWithHitsLineView(pagesWithHits: Int) -> some View {
@@ -213,7 +212,7 @@ extension SearchAndRedactSheet {
         .accessibilityIdentifier("pagesWithHitsLine")
     }
 
-    // MARK: - UXC-40 shape C (RB-42) — pages-with-hits orientation line
+    // MARK: - Pages-with-hits orientation line
 
     /// Header sub-line text — "N pages · M with hits". Orientation
     /// framing only: never "scanned" / "covered" / "clear" wording.

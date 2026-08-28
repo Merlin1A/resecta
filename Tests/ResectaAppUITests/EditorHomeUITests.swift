@@ -1,6 +1,6 @@
 import XCTest
 
-/// 1.1.0 Home swap (UXC-41) — the iPhone editor's overflow ("…") menu offers Home
+/// The 1.1.0 Home swap — the iPhone editor's overflow ("…") menu offers Home
 /// in place of the former file-import entry: Home closes the open
 /// document through the verification-screen Done teardown and the
 /// editor's `.empty` auto-return brings HomeView back. The shared
@@ -16,7 +16,7 @@ import XCTest
 ///    → overflow → Home → dialog → back out (Cancel row, or a tap
 ///    outside the iOS 26 popover) keeps the editor → overflow → Home →
 ///    Close → HomeView.
-///  - T3 REV-05 (RB-85): `--seedTriage` → the review sheet dropped to
+///  - T3: `--seedTriage` → the review sheet dropped to
 ///    the compact float (toolbar reachable behind it) → overflow → Home
 ///    → the sheet parks first and the dialog presents once it is down →
 ///    back out re-presents the review → overflow → Home → Close →
@@ -95,7 +95,7 @@ nonisolated final class EditorHomeUITests: XCTestCase {
         assertHomeViewPresent()
     }
 
-    /// T3 — REV-05 (RB-85): Home with the Scan review sheet parked at the
+    /// T3 — Home with the Scan review sheet parked at the
     /// compact float AND a confirm owed (the staged review). The shared
     /// dialog cannot present over a presented sheet, so the editor parks
     /// the sheet first and presents the dialog once it is down; backing
@@ -110,7 +110,7 @@ nonisolated final class EditorHomeUITests: XCTestCase {
         let title = app.staticTexts["Close this document?"]
         XCTAssertTrue(
             title.waitForExistence(timeout: 10),
-            "Home over a floating review sheet with a confirm owed must present the close dialog (REV-05)."
+            "Home over a floating review sheet with a confirm owed must present the close dialog."
         )
         XCTAssertFalse(
             compactStrip.exists,

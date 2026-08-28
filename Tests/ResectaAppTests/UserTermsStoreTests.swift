@@ -3,7 +3,7 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// CAT-342 (C-J2) — the async-hydrate write-back must not clobber a term/regex
+// The async-hydrate write-back must not clobber a term/regex
 // the user adds in the window between the off-MainActor snapshot and the
 // MainActor write-back. Both stores set an `isHydrated` barrier on any mutation
 // (via persist()); the hydrate write-back (`applyHydration`) skips once the
@@ -17,7 +17,7 @@ import Foundation
 // storage and mask the bug). The live `hydrationTask` — which calls the same
 // seam — is drained at the end so no task dangles past the test.
 
-@Suite("Store async-hydrate race guard (CAT-342)")
+@Suite("Store async-hydrate race guard")
 @MainActor
 struct UserTermsStoreHydrationTests {
 

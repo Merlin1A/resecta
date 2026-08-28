@@ -2,23 +2,23 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// 1.1.0 Home swap (UXC-41) — the iPhone editor overflow menu's Home entry (in place
+// The 1.1.0 Home swap — the iPhone editor overflow menu's Home entry (in place
 // of the former file-import entry) closes the document through the
 // verification-screen Done path: `performDoneCloseSession()` behind the
 // shared "Close this document?" dialog. Two pure seams are pinned here
 // without a SwiftUI host:
 //
 //  1. `homeNeedsCloseConfirm(hasDrawnRegions:hasPendingTriage:)` — the
-//     confirm gate: drawn/applied regions (Done's GATE-3 gate) OR a staged
-//     Scan review awaiting the user. Neither → Home closes directly.
+//     confirm gate: drawn/applied regions (Done's own confirm gate) OR a
+//     staged Scan review awaiting the user. Neither → Home closes directly.
 //  2. `closeDialogMessage(phaseKind:)` — the shared dialog's message: the
-//     `.verified` literal stays byte-identical to the GATE-3 copy pinned by
+//     `.verified` literal stays byte-identical to the copy pinned by
 //     `VerificationActionBarDoneConfirmationTests`; every other phase reads
-//     the D12 Replace dialog's second sentence, byte-identical to the
+//     the Replace-import dialog's second sentence, byte-identical to the
 //     literal in `RedactWorkspaceView.swift` (asserted by value against the
 //     source file — the string is deliberately NOT hoisted across files).
 
-@Suite("Document editor Home close (1.1.0 Home swap, UXC-41)")
+@Suite("Document editor Home close (1.1.0 Home swap)")
 @MainActor
 struct DocumentEditorHomeCloseTests {
 
@@ -50,7 +50,7 @@ struct DocumentEditorHomeCloseTests {
 
     // MARK: - Dialog message
 
-    @Test(".verified keeps the pinned GATE-3 verification-results literal")
+    @Test(".verified keeps the pinned verification-results literal")
     func verifiedMessageIsPinnedLiteral() {
         #expect(DocumentEditorView.closeDialogMessage(phaseKind: .verified)
                 == "Drawn regions and verification results will be cleared.")
@@ -69,19 +69,19 @@ struct DocumentEditorHomeCloseTests {
         }
     }
 
-    @Test("The editing message is byte-identical to the D12 Replace dialog sentence in RedactWorkspaceView")
+    @Test("The editing message is byte-identical to the Replace-import dialog sentence in RedactWorkspaceView")
     func editingMessageMatchesD12Literal() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/RedactWorkspaceView.swift")
         let sentence = DocumentEditorView.closeDialogMessage(phaseKind: .editing)
         #expect(
             source.contains("Importing a new file will replace the current document. \(sentence)\""),
-            "RedactWorkspaceView's D12 Replace message must end with the exact sentence the Home close dialog reads"
+            "RedactWorkspaceView's Replace-import message must end with the exact sentence the Home close dialog reads"
         )
     }
 
-    // MARK: - REV-05 route (RB-85): a presented sheet parks before the dialog
+    // MARK: - A presented sheet parks before the dialog
 
-    @Test("REV-05: no confirm owed → close directly, sheet presented or not")
+    @Test("No confirm owed → close directly, sheet presented or not")
     func noConfirmClosesDirectlyRegardlessOfSheet() {
         #expect(DocumentEditorView.homeCloseRoute(needsConfirm: false, sheetPresented: false)
                 == .closeDirectly)
@@ -89,19 +89,19 @@ struct DocumentEditorHomeCloseTests {
                 == .closeDirectly)
     }
 
-    @Test("REV-05: confirm owed with the sheet slot idle → the dialog")
+    @Test("Confirm owed with the sheet slot idle → the dialog")
     func confirmWithIdleSlotPresentsDialog() {
         #expect(DocumentEditorView.homeCloseRoute(needsConfirm: true, sheetPresented: false)
                 == .presentDialog)
     }
 
-    @Test("REV-05: confirm owed while the slot presents → park the sheet, dialog from onDismiss")
+    @Test("Confirm owed while the slot presents → park the sheet, dialog from onDismiss")
     func confirmWithPresentedSheetParksFirst() {
         #expect(DocumentEditorView.homeCloseRoute(needsConfirm: true, sheetPresented: true)
                 == .parkSheetThenDialog)
     }
 
-    @Test("REV-05: a parked review re-presents only while still pending, with the slot idle, in an editing session")
+    @Test("A parked review re-presents only while still pending, with the slot idle, in an editing session")
     func parkedReviewRepresentGate() {
         #expect(DocumentEditorView.homeCloseShouldRepresentReview(
             parkedReview: true, hasPendingTriage: true, sheetPresented: false, phaseKind: .editing))
@@ -125,7 +125,7 @@ struct DocumentEditorHomeCloseTests {
         }
     }
 
-    @Test("REV-05 wiring: the sheet slot hands off to the dialog on dismissal, the dialog presents through the restoring binding, Close drops the parked state (source pin)")
+    @Test("Wiring: the sheet slot hands off to the dialog on dismissal, the dialog presents through the restoring binding, Close drops the parked state (source pin)")
     func rev05WiringSourcePin() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
         guard let slot = source.range(of: ".sheet(item: Binding<ActiveSheet?>("),

@@ -1,6 +1,6 @@
 import RedactionEngine
 
-// UI display copy for TextLayerDetector.FallbackReason (PD-5). Centralized
+// UI display copy for TextLayerDetector.FallbackReason. Centralized
 // here following the same pattern as PipelineMode+Display.swift. Shown on the
 // verification-results page-mode chips and the sidebar thumbnail badges for
 // pages that fell back to Secure Rasterization in a Searchable-mode run.

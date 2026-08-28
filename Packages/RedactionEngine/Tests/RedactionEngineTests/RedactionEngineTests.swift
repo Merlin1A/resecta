@@ -69,7 +69,7 @@ struct ModelTypeTests {
 
     @Test("VerificationStatus compares case identity only, ignoring associated strings")
     func verificationStatusEquality() {
-        // Same case, different messages — should be equal (ARCH §2.3)
+        // Same case, different messages — should be equal
         #expect(VerificationStatus.warn("message A") == VerificationStatus.warn("message B"))
         #expect(VerificationStatus.fail("reason 1") == VerificationStatus.fail("reason 2"))
 

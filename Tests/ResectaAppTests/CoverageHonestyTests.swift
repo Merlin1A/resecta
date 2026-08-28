@@ -4,13 +4,13 @@ import CoreGraphics
 import RedactionEngine
 @testable import ResectaApp
 
-// q13 — results/coverage honesty. Pins the QW-12 cap-remainder banner,
-// the ST-83 OCR-skip surfacing on both legs (search banner + triage
-// banner), and the UXF-16 mode-switch preview-counter clear.
+// Results/coverage honesty. Pins the cap-remainder banner, the
+// OCR-skip surfacing on both legs (search banner + triage banner), and
+// the mode-switch preview-counter clear.
 
-// MARK: - QW-12 cap remainder
+// MARK: - Cap remainder
 
-@Suite("Search footer cap banner (QW-12)", .tags(.search))
+@Suite("Search footer cap banner", .tags(.search))
 @MainActor
 struct SearchFooterCapBannerTests {
 
@@ -66,9 +66,9 @@ struct SearchFooterCapBannerTests {
     }
 }
 
-// MARK: - ST-83 search-leg banner
+// MARK: - Search-leg banner
 
-@Suite("OCR skip banner (ST-83, search leg)", .tags(.search))
+@Suite("OCR skip banner (search leg)", .tags(.search))
 @MainActor
 struct OCRSkipBannerTests {
 
@@ -112,9 +112,9 @@ struct OCRSkipBannerTests {
     }
 }
 
-// MARK: - ST-83 detect-leg banner
+// MARK: - Detect-leg banner
 
-@Suite("Review OCR skip banner (ST-83, detect leg)")
+@Suite("Review OCR skip banner (detect leg)")
 @MainActor
 struct DetectionTriageOCRSkipBannerTests {
 
@@ -139,9 +139,9 @@ struct DetectionTriageOCRSkipBannerTests {
     }
 }
 
-// MARK: - UXF-16 mode-switch preview residue
+// MARK: - Mode-switch preview residue
 
-@Suite("Mode-switch preview residue (UXF-16)", .tags(.search))
+@Suite("Mode-switch preview residue", .tags(.search))
 @MainActor
 struct ModeSwitchPreviewResidueTests {
 

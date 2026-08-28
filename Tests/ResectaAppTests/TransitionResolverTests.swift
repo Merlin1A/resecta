@@ -3,10 +3,10 @@ import Foundation
 import SwiftUI
 @testable import ResectaApp
 
-// UXC-33 (RB-24) — partial revival of DC-023's
-// `Anim.resolvedTransition(standard:reduceMotion:)`, removed by the W1
-// dead-code wave (ref `0f9fc672`) as never-read even though RB-24 had
-// already ruled "wire through the resolver". This suite pins:
+// Partial revival of
+// `Anim.resolvedTransition(standard:reduceMotion:)`, removed by the
+// dead-code wave (ref `0f9fc672`) as never-read even though the
+// resolver was already the intended wiring. This suite pins:
 //
 //  1. Reachability of `resolvedTransition` against both Reduce-Motion
 //     flags, mirroring `ToastReduceMotionTests`'s posture for
@@ -19,7 +19,7 @@ import SwiftUI
 //     call — a regression to a raw, unresolved `.move(edge` transition
 //     trips this rather than silently reverting the Reduce-Motion fix.
 
-@Suite("Transition resolver adoption (UXC-33)")
+@Suite("Transition resolver adoption")
 struct TransitionResolverTests {
 
     @Test("resolvedTransition with Reduce Motion off returns the standard transition (reachable)")

@@ -2,7 +2,7 @@ import Testing
 import SwiftUI
 @testable import ResectaApp
 
-// ToastView structural guard — PR #148 regression gate (CAT-235).
+// ToastView structural guard — PR #148 regression gate.
 //
 // The dismiss crash (master 37b56c9 / PR #148) was caused by ToastView reading
 // `@Environment(ToastQueueManager.self)`: when a `toastVersion` change

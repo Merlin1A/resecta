@@ -3,9 +3,9 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// W9 — SearchState session-scoped diagnostic fields.
+// SearchState session-scoped diagnostic fields.
 
-@Suite("SearchState W9 diagnostics", .tags(.search))
+@Suite("SearchState diagnostics", .tags(.search))
 @MainActor
 struct SearchStateDiagnosticsTests {
 

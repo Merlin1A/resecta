@@ -2,10 +2,10 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// L6 / C12 / search-impl S5 item 2.9 -- AddressComponentsGazetteer JSON
-// loader + lookup tests, including the new streetTypes surface.
+// AddressComponentsGazetteer JSON loader + lookup tests, including the
+// new streetTypes surface.
 
-@Suite("AddressComponentsGazetteer (L6 / C12 / S5)")
+@Suite("AddressComponentsGazetteer")
 struct AddressComponentsGazetteerTests {
 
     // MARK: - Helper: build a temp bundle with injected fixture JSON
@@ -68,7 +68,7 @@ struct AddressComponentsGazetteerTests {
         }
     }
 
-    @Test("Version-fence rejects out-of-range version (W-O)")
+    @Test("Version-fence rejects out-of-range version")
     func versionFenceRejectsOutOfRange() throws {
         let fixtureJSON = #"""
             {"version": 99, "cities": [], "counties": [], "street_types": []}
@@ -87,9 +87,9 @@ struct AddressComponentsGazetteerTests {
         }
     }
 
-    // MARK: - S5 street_types tests
+    // MARK: - Street-types tests
 
-    @Test("street_types decoded into streetTypes set (S5 item 2.9)")
+    @Test("street_types decoded into streetTypes set")
     func testStreetTypesDecoded() throws {
         let fixtureJSON = #"""
             {
@@ -110,7 +110,7 @@ struct AddressComponentsGazetteerTests {
         #expect(gazetteer.streetTypes.count == 3)
     }
 
-    @Test("containsStreetType is case-insensitive (S5 item 2.9)")
+    @Test("containsStreetType is case-insensitive")
     func testContainsStreetTypeNormalization() throws {
         let fixtureJSON = #"""
             {
@@ -133,7 +133,7 @@ struct AddressComponentsGazetteerTests {
         #expect(!gazetteer.containsStreetType("ZZZFakeType"))
     }
 
-    @Test("Bundled artifact contains the expected 20 street types (S5 item 2.9)")
+    @Test("Bundled artifact contains the expected 20 street types")
     func testBundledStreetTypeCount() throws {
         let gazetteer = try AddressComponentsGazetteer()
         // The pipeline emits exactly 20 street types (the fixed top-20 list).

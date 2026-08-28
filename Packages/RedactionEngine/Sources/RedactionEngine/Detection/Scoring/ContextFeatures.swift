@@ -1,16 +1,16 @@
 import Foundation
 
-// B02 — learned-context-scorer FEATURE BUILDER (additive; not yet wired).
+// Learned-context-scorer FEATURE BUILDER (additive; not yet wired).
 //
-// This file exposes the production `contextFeatures(...)` builder that the C1
-// augment scorer will consume at the posterior seam
+// This file exposes the production `contextFeatures(...)` builder that the
+// context-scorer augment will consume at the posterior seam
 // (DetectionOrchestrator.swift:423-424). It is ADDITIVE in this PR: nothing in
-// the live detection path calls it yet (B03 wires the seam at w=0). The B02
+// the live detection path calls it yet (the seam is wired at w=0). The
 // measurement harness (@testable) calls it so the per-fire dump's features are
 // LITERALLY what the seam will compute — closing the projection's count-only gap
-// (plan 04 §5.4; one feature list, three consumers — §9).
+// (one feature list, three consumers).
 //
-// Contract (plan 04 §3.2, §9 — the single index authority):
+// Contract (the single index authority):
 //   13 features, returned as [Double] IN feature_order order (arity 13).
 //   Features 1-2  : ±5-token presence window (reuses extractContextWindow
 //                   semantics — radius 5, ±200-char cap; ContextWindowScorer.swift:292).
@@ -28,14 +28,14 @@ import Foundation
 // five scored families have non-empty vocabularies).
 //
 // Pure (no I/O, no global state), deterministic. Internal visibility so both the
-// B03 in-module seam and the @testable harness call the SAME code.
+// in-module seam and the @testable harness call the SAME code.
 //
-// Privacy (ARCH §12.2): the builder reads match.range + match.text + pageText to
+// Privacy: the builder reads match.range + match.text + pageText to
 // derive bounded numeric signals only; no document text, no PII value, and no
 // coordinate ever leaves this function. The matched text is consumed solely to
 // COUNT digits and test for a separator character.
 
-/// The canonical 13-feature order (plan 04 §9). SINGLE index authority: the
+/// The canonical 13-feature order. SINGLE index authority: the
 /// File-5 dump, the Swift seam, and the Python trainer all key off this list.
 enum ContextFeatureContract {
     static let featureOrder: [String] = [
@@ -176,7 +176,7 @@ func contextFeatures(
 
 /// ±radius-token window around the match, ±200-char capped.
 /// Source: ContextWindowScorer.swift:292 (`extractContextWindow`, private there).
-/// Replicated byte-for-byte so the seam and the B03 Swift↔Python parity test
+/// Replicated byte-for-byte so the seam and the Swift↔Python parity test
 /// share one windowing definition.
 private func Self_extractContextWindow(text: NSString, matchRange: NSRange, radius: Int) -> String {
     // Text before the match (cap 200 chars back).

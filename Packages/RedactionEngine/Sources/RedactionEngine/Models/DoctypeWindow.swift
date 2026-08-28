@@ -1,6 +1,6 @@
 import Foundation
 
-// Plan §2 / G5 — doctype context carried into per-page detection.
+// G5 — doctype context carried into per-page detection.
 // Multi-doc-packet boundary widening (a neighbouring-type field alongside
 // `primary`) was scaffolded but never wired up: every production call site
 // only ever threads the primary doctype across pages.

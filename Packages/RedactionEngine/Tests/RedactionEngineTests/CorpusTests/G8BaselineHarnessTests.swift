@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// S3 detection-quality baseline — standing emitter (NOT a pass/fail gate).
+// Detection-quality baseline — standing emitter (NOT a pass/fail gate).
 //
 // Pinned by the detection-baseline evaluation contract.
 // Per that contract: "standing baseline emitter, not a gate" — this suite runs
@@ -18,7 +18,7 @@ import Foundation
 // also keys cells by (category, doctype, demographic_bucket) and scores all 12
 // G8 categories including phone/email (the gate's category map drops those two).
 //
-// Privacy (ARCH §12.2, contract §Privacy): every emitted record carries
+// Every emitted record carries
 // category + offset-derived counts + bucket + raw score only. No document text,
 // no PII values, no coordinates. The harness never reads or emits span/match
 // `text`; only NSRange locations are used, and only as overlap arithmetic.
@@ -54,10 +54,10 @@ struct G8BaselineHarnessTests {
         let expected_outcome: String?
     }
 
-    // MARK: - Output JSON shapes (CONTRACT.md File 1 + File 2)
+    // MARK: - Output JSON shapes
 
-    /// One (category, doctype, bucket) cell. Field names + semantics are pinned
-    /// by CONTRACT.md File 1.
+    /// One (category, doctype, bucket) cell. Field names and semantics are
+    /// fixed by the baseline's output schema.
     struct BaselineCell: Encodable, Sendable {
         var true_positives: Int = 0
         var false_negatives: Int = 0
@@ -91,16 +91,16 @@ struct G8BaselineHarnessTests {
         let rows: [RawScoreRow]
     }
 
-    // MARK: - File 5: per-fire feature dump (B02, plan 04 §5.4)
+    // MARK: - File 5: per-fire feature dump
     //
     // Offset-only, emitted ONLY for the five scored families
     // (account, phone, mrn, ein, itin). The `features` array is produced by the
     // @testable-imported production builder `contextFeatures(...)`, so these are
-    // LITERALLY the features the C1 seam will compute (no test re-implementation).
-    // Privacy (ARCH §12.2): category / offset / bucket / aggregate / raw-score /
+    // LITERALLY the features the context-scoring seam will compute (no test re-implementation).
+    // category / offset / bucket / aggregate / raw-score /
     // doctype only — never match or span TEXT.
     //
-    // D-5 split: `family` is the scorer/trainer block key (= wireName(for:),
+    // `family` is the scorer/trainer block key (= wireName(for:),
     // MRN → "mrn"); `cell_category_key` joins to baseline_cells.json
     // (= PIICategory.rawValue lowercased, MRN → "medicalrecord"). The two differ
     // for exactly one family — both are emitted (neither is hard-coded).
@@ -209,7 +209,7 @@ struct G8BaselineHarnessTests {
     @Test("Emit G8 baseline cells + raw scores")
     func emitBaseline() async throws {
         guard let corpus = try Self.loadBaselineCorpus() else {
-            print("[S3 baseline] g8_corpus.json not bundled; emit skipped " +
+            print("[detection-baseline] g8_corpus.json not bundled; emit skipped " +
                   "until `make install-assets` runs.")
             return
         }
@@ -220,7 +220,7 @@ struct G8BaselineHarnessTests {
         // cellKey = "<categoryKey>_<doctype>_<bucket>"
         var cells: [String: BaselineCell] = [:]
         var rawRows: [RawScoreRow] = []
-        // File 5 (B02): per-fire rows for the five scored families only.
+        // File 5: per-fire rows for the five scored families only.
         var fireRows: [FireFeatureRow] = []
 
         for doc in sortedDocs {
@@ -248,7 +248,7 @@ struct G8BaselineHarnessTests {
             }
 
             // Surfaced detections grouped by kind. "Surfaced" = confidence clears
-            // the balanced cutoff (nil cutoff → passes W4 unfiltered).
+            // the balanced cutoff (nil cutoff → passes unfiltered).
             // Each entry carries (range, neg-context-suppressed self-report).
             var surfacedByKind: [RedactionRegion.PIIKind: [(NSRange, Bool)]] = [:]
             for match in matches {
@@ -278,8 +278,8 @@ struct G8BaselineHarnessTests {
                         gt_class: gtClass
                     ))
 
-                    // File 5 (B02): append a per-fire row ONLY for the five
-                    // scored families, keyed by `family` (= wireName). The D-5
+                    // File 5: append a per-fire row ONLY for the five
+                    // scored families, keyed by `family` (= wireName). This
                     // split keeps `cell_category_key` (= catKey) distinct — both
                     // come from functions, neither literal. `gtClass` and
                     // `surfaced` are reused (not recomputed). `features` is the
@@ -356,8 +356,7 @@ struct G8BaselineHarnessTests {
         }
 
         // Balanced cutoff map for the raw_scores header — one entry per cell
-        // category key that has a non-nil balanced cutoff (nil omitted, per
-        // CONTRACT File 2).
+        // category key that has a non-nil balanced cutoff (nil omitted).
         var cutoffMap: [String: Double] = [:]
         let allKinds: [RedactionRegion.PIIKind] = [
             .ssn, .name, .address, .account, .ein, .npi, .dea,
@@ -388,8 +387,8 @@ struct G8BaselineHarnessTests {
         )
         try Self.writeJSON(rawReport, to: "\(base)_raw_scores.json")
 
-        // File 5 (B02): per-fire feature dump. OWN provenance string; the
-        // frozen S3 cells report keeps "G8BaselineHarness.sweepG8Corpus"
+        // File 5: per-fire feature dump. OWN provenance string; the
+        // frozen detection-baseline cells report keeps "G8BaselineHarness.sweepG8Corpus"
         // untouched above. feature_order references the single contract authority.
         let fireReport = FireFeaturesReport(
             schema_version: 1,
@@ -399,9 +398,9 @@ struct G8BaselineHarnessTests {
         )
         try Self.writeJSON(fireReport, to: "\(base)_fire_features.json")
 
-        print("[S3 baseline] cells → \(base)_cells.json (\(cells.count) cells)")
-        print("[S3 baseline] raw_scores → \(base)_raw_scores.json (\(rawRows.count) rows)")
-        print("[S3 baseline] fire_features → \(base)_fire_features.json (\(fireRows.count) fires)")
+        print("[detection-baseline] cells → \(base)_cells.json (\(cells.count) cells)")
+        print("[detection-baseline] raw_scores → \(base)_raw_scores.json (\(rawRows.count) rows)")
+        print("[detection-baseline] fire_features → \(base)_fire_features.json (\(fireRows.count) fires)")
 
         // Emitter sanity only (this is NOT a pass/fail quality gate).
         #expect(!cells.isEmpty, "no cells emitted — corpus loaded but produced nothing")

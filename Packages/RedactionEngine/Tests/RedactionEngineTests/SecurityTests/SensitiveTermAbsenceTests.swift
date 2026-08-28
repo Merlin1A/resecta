@@ -3,7 +3,7 @@ import Foundation
 import PDFKit
 @testable import RedactionEngine
 
-// TEST §3.1 — Parameterized sensitive term absence tests.
+// Parameterized sensitive term absence tests.
 // Verifies that PII terms are completely absent from output PDF bytes
 // across UTF-8, UTF-16BE, and UTF-16LE encodings.
 

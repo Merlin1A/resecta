@@ -3,7 +3,7 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-22 — Sort migrated from `SearchFooterSection` to a chip-row
+// Sort migrated from `SearchFooterSection` to a chip-row
 // consumer in `SearchToolbarSection.chipRowSubstrate`. The Sort
 // `Menu` itself is gone from the footer; the chip's binding writes
 // `searchState.sortOrder` directly via the existing didSet path.
@@ -11,7 +11,7 @@ import RedactionEngine
 // (`sortChipLabel`, `sortChipAccessibilityLabel`) and the SearchState
 // binding behavior post-relocation.
 
-@Suite("Sort chip (WU-22)", .tags(.search))
+@Suite("Sort chip", .tags(.search))
 @MainActor
 struct SortChipTests {
 
@@ -59,10 +59,10 @@ struct SortChipTests {
         #expect(confSorted.map(\.id) == [r2.id, r1.id])
     }
 
-    @Test("ResultSortOrder rawValues stay locked — case renames are migration events per RR-05")
+    @Test("ResultSortOrder rawValues stay locked — case renames are migration events")
     func rawValueContract() {
         // Pinning prevents accidental rename — `SavedSearchStore`
-        // (post-WU-26) decodes against these strings.
+        // decodes against these strings.
         #expect(ResultSortOrder.discoveryOrder.rawValue == "Default")
         #expect(ResultSortOrder.confidenceDescending.rawValue == "Confidence")
         #expect(ResultSortOrder.pageAscending.rawValue == "Page")

@@ -1,6 +1,6 @@
 import Foundation
 
-// Plan §4 — financial/medical account-number detector. Context-only: the
+// Financial/medical account-number detector. Context-only: the
 // regex alone would fire on every long digit run, so base confidence is 0
 // and only rises when an "account" token sits within ±5 tokens of the
 // match. This is deliberately cautious — CC, SSN, EIN, MRN, DEA all have
@@ -13,7 +13,7 @@ struct AccountDetector: Sendable {
         pattern: #"(?<![A-Za-z0-9])([A-Z]{0,3}\d{6,15})(?![A-Za-z0-9])"#
     )
 
-    // Visibility widened private→internal (B02): the learned context-feature
+    // Visibility widened private→internal: the learned context-feature
     // builder (ContextFeatures.swift) reads this shipped keyword set verbatim
     // so the scorer's kw_positive_window feature reuses the live vocabulary
     // rather than a re-typed copy. Read-only; no behavior change.
@@ -26,7 +26,7 @@ struct AccountDetector: Sendable {
         negativeKeywords: [],
         windowRadius: 5,
         baseConfidence: 0.0,      // strict: no signal without context
-        // D04-F4 — boosted RAW confidence dropped below the unstructured peers
+        // The boosted RAW confidence dropped below the unstructured peers
         // it would otherwise suppress in resolveOverlaps. Raw arbitration runs
         // at DetectionOrchestrator.swift:386, BEFORE the posterior seam and the
         // preset gate. account is the lowest-priority generic kind
@@ -52,7 +52,7 @@ struct AccountDetector: Sendable {
                 profile: Self.profile,
                 category: .account
             )
-            // L-05: the 0.05 floor was vestigial — the scorer only emits ~0.0
+            // The 0.05 floor was vestigial — the scorer only emits ~0.0
             // (no keyword) or ~0.75 (boost), so the threshold only filtered
             // rare intermediate dampened values. The real per-preset gate is
             // applied downstream by PresetThresholdVector ("account"); this
@@ -67,7 +67,7 @@ struct AccountDetector: Sendable {
             ) {
                 signals.append(ctxSignal)
             }
-            // WU-76 / [P4] — per-keyword breakdown alongside the scalar.
+            // Per-keyword breakdown alongside the scalar.
             if let ctxDetail = scorer.signalDetail(
                 text: fullText,
                 matchRange: match.range,

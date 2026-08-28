@@ -2,13 +2,13 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// D-19 fixture-driven test for email detection. The DataPipeline-generated
+// Fixture-driven test for email detection. The DataPipeline-generated
 // vectors at Fixtures/vectors/email_test_vectors.json carry the bare email
 // value (local@domain.tld). This test asserts the inline emailPattern
 // matches every valid row. Email has no dedicated detector test file
 // today; this fixture-driven file is the first.
 
-@Suite("Email fixture-driven vector tests (D-19)")
+@Suite("Email fixture-driven vector tests")
 struct EmailVectorTests {
 
     struct Vectors: Decodable {
@@ -31,7 +31,7 @@ struct EmailVectorTests {
         return try JSONDecoder().decode(Vectors.self, from: data).vectors
     }
 
-    @Test("D-19 fixture loads with rows")
+    @Test("Fixture loads with rows")
     func fixtureLoads() throws {
         guard let vectors = try loadVectors() else {
             Issue.record("email_test_vectors.json not bundled")

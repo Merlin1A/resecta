@@ -5,14 +5,14 @@ import Testing
 import CryptoKit
 @testable import RedactionEngine
 
-// S01 / W2 — Resecta sample/test-document packet series.
+// Resecta sample/test-document packet series.
 //
 // Dual-leg Stage-1 detection SNAPSHOT of the FROZEN shipped sample bank
 // statement (`Resources/SampleDocument.pdf` → engine fixture
 // `TestResources/sample-bank-statement.pdf`, SHA 992ca054…ce18fa20, 3 pp). This
-// closes the statement's never-run pre-ship gates: revision-plan G1 (engine
-// fixture copy + dual-copy identity) and handoff H2 — "the single most
-// important pre-ship check" — the Stage-1 detection snapshot itself.
+// test performs the fixture-copy and dual-copy identity check together with
+// the Stage-1 detection snapshot itself, the most consequential check before
+// this fixture ships.
 //
 // MEASUREMENT HARNESS, not a regression guard. It surfaces every detection on
 // BOTH legs across all 3 pages — text-extraction (the production path for a
@@ -25,19 +25,19 @@ import CryptoKit
 // guard (SHA + page count) and the per-leg OCR-invocation behavior.
 //
 // MATCHED-TEXT LOGGING EXEMPTION (pending maintainer confirmation):
-// CLAUDE.md's real-document rule forbids emitting running text for a real-document
+// The real-document rule forbids emitting running text for a real-document
 // fixture. THIS fixture is categorically different — fully synthetic, with
 // every planted value fixture-disclosed and synthetic — so
 // logging matched text here is safe and is exactly what lets the snapshot be
 // reconciled against the manifest. If the maintainer prefers conservatism, set
 // `matchedText` to nil (counts + rects stay position-reconcilable to the
-// manifest by page). Production logging rules (ARCH §12.2) are untouched — this
+// manifest by page). Production logging rules are untouched — this
 // is a test-only exemption scoped to a synthetic, publicly-manifested fixture.
 
-@Suite("Sample bank-statement Stage-1 snapshot (S01/W2)", .serialized)
+@Suite("Sample bank-statement Stage-1 snapshot", .serialized)
 struct SampleStatementSnapshotTests {
 
-    // MARK: - W1 dual-copy fixture identity (engine half)
+    // MARK: - Dual-copy fixture identity (engine half)
 
     /// Engine half of the dual-copy identity guard. The app-bundle copy is
     /// pinned by `ResectaAppTests/BundleContentsTests`; the two repo files are
@@ -53,7 +53,7 @@ struct SampleStatementSnapshotTests {
         #expect(doc.pageCount == TestFixtures.sampleStatementPageCount)
     }
 
-    // MARK: - W2 dual-leg Stage-1 snapshot (measurement; no Stage-2 freeze)
+    // MARK: - Dual-leg Stage-1 snapshot (measurement; no Stage-2 freeze)
 
     @Test("Dual-leg Stage-1 detection snapshot — 3 pages × {text, OCR}")
     func dualLegSnapshot() async throws {
@@ -90,7 +90,7 @@ struct SampleStatementSnapshotTests {
             // (DetectionOrchestrator.swift:301-308). The counter is mutated by
             // sibling suites running concurrently in the same batched
             // `xcodebuild` invocation, so an exact `== 0` on it is batch-fragile
-            // (that pollution was the first b6 red). The non-empty guard keeps
+            // (that pollution caused the first observed failure here). The non-empty guard keeps
             // the allSatisfy from passing vacuously (not a count freeze — this
             // fixture's text leg yields detections on every page).
             #expect(!textResult.detections.isEmpty,
@@ -126,12 +126,12 @@ struct SampleStatementSnapshotTests {
                 name: "sample-bank-statement.pdf",
                 sha256: TestFixtures.sampleStatementSHA256,
                 pageCount: TestFixtures.sampleStatementPageCount),
-            generatedBy: "SampleStatementSnapshotTests (S01/W2, resecta-sample-packet-2026-06-12)",
+            generatedBy: "SampleStatementSnapshotTests",
             note: "Dual-leg Stage-1 snapshot of the FROZEN shipped statement. "
                 + "thresholdVector=nil → every detection surfaces; `aboveBalanced` applies the "
                 + "calibrated balanced preset (preset-thresholds.json, status=calibrated) in post. "
                 + "`confidence` is the post-posterior score (absorbing-state floor 0.35, empty priors). "
-                + "MEASUREMENT ONLY — no Stage-2 regression freeze (gated on Jesse's review). The text "
+                + "MEASUREMENT ONLY — no Stage-2 regression freeze. The text "
                 + "leg is fully deterministic; OCR-leg numbers may vary by ±epsilon across Vision / "
                 + "simulator-runtime versions.",
             balancedPreset: Self.balancedDump(balanced),
@@ -147,8 +147,8 @@ struct SampleStatementSnapshotTests {
         Self.printSummary(pageSnaps)
     }
 
-    /// OCR-leg detect with cold-start retries. The S8 exit notes document a
-    /// transient Vision "Could not create inference context" (#9) on the FIRST
+    /// OCR-leg detect with cold-start retries. A transient Vision
+    /// "Could not create inference context" error can occur on the FIRST
     /// 200-DPI call in a fresh process; an immediate retry warms the context
     /// (measured with a one-off cold-start probe). The extra attempts also absorb the
     /// Vision / memory contention this OCR-heavy suite sees when it runs inside
@@ -173,7 +173,7 @@ struct SampleStatementSnapshotTests {
         throw lastError ?? CancellationError()   // unreachable; satisfies the type checker
     }
 
-    // MARK: - Snapshot model (forward-compatible subset of the D12 ground-truth schema)
+    // MARK: - Snapshot model (forward-compatible subset of the ground-truth schema)
 
     struct SnapshotDoc: Codable {
         let schemaVersion: Int

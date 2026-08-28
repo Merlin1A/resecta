@@ -2,7 +2,7 @@ import Testing
 import SwiftUI
 @testable import ResectaApp
 
-// UXC-40 shape C (RB-42) — two pure-function contracts pinned without a
+// Two pure-function contracts pinned without a
 // SwiftUI host:
 //
 //   (a) The "N pages · M with hits" orientation line beneath the
@@ -14,7 +14,7 @@ import SwiftUI
 //       sheet floats at the compact detent, so it clears the compact
 //       strip instead of sitting underneath it.
 
-@Suite("Pages-with-hits header line (UXC-40 shape C / RB-42)")
+@Suite("Pages-with-hits header line")
 @MainActor
 struct PagesWithHitsLineTests {
 
@@ -51,7 +51,7 @@ struct PagesWithHitsLineTests {
     }
 }
 
-@Suite("Page nav bar compact-float inset (UXC-40 shape C / RB-42)")
+@Suite("Page nav bar compact-float inset")
 @MainActor
 struct PageBarCompactInsetTests {
 
@@ -78,9 +78,9 @@ struct PageBarCompactInsetTests {
     }
 }
 
-// UXC-50 (D-128, RB-123 item 5): the unified inset for the no-page-bar
+// The unified inset for the no-page-bar
 // case (single-page documents) — same geometry, same symbolic hug.
-@Suite("Compact-parked canvas inset with no page bar (UXC-50)")
+@Suite("Compact-parked canvas inset with no page bar")
 @MainActor
 struct CompactParkedCanvasInsetTests {
 

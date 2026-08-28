@@ -1,17 +1,17 @@
 import Foundation
 import OSLog
 
-// L6 / C12 / search-impl S5 item 2.9 — address-component gazetteer. Loads
+// Address-component gazetteer. Loads
 // `address_components.json` produced by DataPipeline's
-// src/resecta_data/gazetteers/address_components/ (C11). Schema:
+// src/resecta_data/gazetteers/address_components/. Schema:
 // `cities: [String]`, `counties: [String]`, `street_types: [String]`.
 //
 // Cities are GNIS-derived entries cross-filtered through Census TIGER/Line
-// 2024 PLACE boundaries (S5 item 2.9); junk entries with no formal municipal
+// 2024 PLACE boundaries; junk entries with no formal municipal
 // boundary are excluded at pipeline build time.
 //
 // `street_types` decodes non-optionally: the artifact has carried the key
-// since C12 and the pipeline always emits it.
+// since the schema added it, and the pipeline always emits it.
 //
 // Keys are NFKC-normalized and lowercased via `TextNormalizer.normalize(_:)`
 // so callers can pass raw OCR text and hit case-insensitively.
@@ -109,8 +109,9 @@ private struct WireFormat: Decodable {
     let version: Int
     let cities: [String]
     let counties: [String]
-    // `street_types` has been present in address_components.json since C12;
-    // decode non-optionally because the artifact always carries the key.
+    // `street_types` has been present in address_components.json since the
+    // schema added it; decode non-optionally because the artifact always
+    // carries the key.
     let street_types: [String]
 }
 

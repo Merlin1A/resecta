@@ -3,18 +3,14 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// Pkg N — V1.0 polish omnibus. Per-site smoke tests for the fixes that
+// V1.0 polish omnibus. Per-site smoke tests for the fixes that
 // introduce non-trivial behavior. Trivially-correct edits (comment-only,
 // docstring updates, copy tweaks) are not covered here; they are
 // validated by the audit-lint hook + visual review.
-//
-// IDs covered: RES-03, RES-04, RES-06, CONC-1, FLOW-1 (HomeView
-// failure-routing), UX-redaction-applied-blocks (toast replacement
-// surface).
 
-// MARK: - RES-03 — ToastQueueManager per-position queue cap
+// MARK: - ToastQueueManager per-position queue cap
 
-@Suite("Pkg N — RES-03 toast queue cap", .tags(.search))
+@Suite("Toast queue cap", .tags(.search))
 @MainActor
 struct ToastQueueCapTests {
 
@@ -56,15 +52,15 @@ struct ToastQueueCapTests {
     }
 }
 
-// MARK: - RES-04 — searchDebounceTask cancel on disappear
+// MARK: - searchDebounceTask cancel on disappear
 
-@Suite("Pkg N — RES-04 search debounce cancel on disappear", .tags(.search))
+@Suite("Search debounce cancel on disappear", .tags(.search))
 @MainActor
 struct SearchDebounceCancelTests {
 
-    @Test("Swift Task cancellation surrenders cooperatively (primitive smoke test, not an RES-04 integration guard)")
+    @Test("Swift Task cancellation surrenders cooperatively (primitive smoke test, not an integration guard)")
     func testSwiftTaskCancellationCooperativelySurrenders() async {
-        // CAT-251: this is a Swift-primitive smoke test, NOT an RES-04
+        // This is a Swift-primitive smoke test, not an
         // integration guard. It pins the cooperative-cancellation contract that
         // SearchAndRedactSheet's `.onDisappear { searchDebounceTask?.cancel() }`
         // relies on (a cancelled debounce sleep surrenders at the next
@@ -89,15 +85,15 @@ struct SearchDebounceCancelTests {
     }
 }
 
-// MARK: - RES-06 — Import dispatch cancels prior on rapid duplicate
+// MARK: - Import dispatch cancels prior on rapid duplicate
 
-@Suite("Pkg N — RES-06 import dispatch cancellation", .tags(.search))
+@Suite("Import dispatch cancellation", .tags(.search))
 @MainActor
 struct ImportDispatchCancellationTests {
 
     @Test("Cancelling a prior dispatch task surrenders the await chain")
     func testPriorDispatchCancels() async {
-        // RES-06's fix is `activeImportDispatch?.cancel(); activeImportDispatch = Task { ... }`
+        // The fix is `activeImportDispatch?.cancel(); activeImportDispatch = Task { ... }`
         // at every import dispatch site. The smoke shape pins the
         // Task<Void, Never> cancel-then-replace pattern that
         // RedactWorkspaceView uses.
@@ -120,9 +116,9 @@ struct ImportDispatchCancellationTests {
     }
 }
 
-// MARK: - CONC-1 — Detached-task hydration on UserDefaults read
+// MARK: - Detached-task hydration on UserDefaults read
 
-@Suite("Pkg N — CONC-1 store hydrate runs off-MainActor", .tags(.search))
+@Suite("Store hydrate runs off-MainActor", .tags(.search))
 @MainActor
 struct StoreHydrateOffMainActorTests {
 
@@ -225,9 +221,9 @@ struct StoreHydrateOffMainActorTests {
     }
 }
 
-// MARK: - FLOW-1 — HomeView routes Result.failure through workspace
+// MARK: - HomeView routes Result.failure through workspace
 
-@Suite("Pkg N — FLOW-1 HomeView import failure routes to FailedStateView", .tags(.search))
+@Suite("HomeView import failure routes to FailedStateView", .tags(.search))
 @MainActor
 struct HomeViewFailureRoutingTests {
 
@@ -262,7 +258,7 @@ struct HomeViewFailureRoutingTests {
 
 // MARK: - UX-redaction-applied-blocks — apply path enqueues toast
 
-@Suite("Pkg N — UX-redaction-applied-blocks toast replacement", .tags(.search))
+@Suite("UX-redaction-applied-blocks toast replacement", .tags(.search))
 @MainActor
 struct ApplyTriggersToastTests {
 
@@ -272,7 +268,7 @@ struct ApplyTriggersToastTests {
         // `toastManager.enqueue(message, severity: .success)`. The
         // severity-to-position mapping is the load-bearing invariant —
         // success toasts land at the bottom (non-blocking confirmatory
-        // position per §A6.1).
+        // position).
         let manager = ToastQueueManager()
         manager.enqueue("Marked 3 for redaction", severity: .success)
         #expect(manager.activeBottomToasts.count == 1)
@@ -282,7 +278,7 @@ struct ApplyTriggersToastTests {
 
     @Test("Singular-form copy renders for 1-instance apply")
     func testSingularFormCopy() {
-        // UX-singular-plural-grammar (Pkg N): the count-suffix ternary
+        // UX-singular-plural-grammar: the count-suffix ternary
         // idiom for user-facing counts. The templates this test
         // originally quoted ("Redact N instance(s)?", the triage
         // sheet's "N item(s) detected") retired with their surfaces;
@@ -297,9 +293,9 @@ struct ApplyTriggersToastTests {
     }
 }
 
-// MARK: - CANCEL-011 / STATE-8 — cancellation gate suppresses progress flicker
+// MARK: - Cancellation gate suppresses progress flicker
 
-@Suite("Pkg N — STATE-8 cancellation gate", .tags(.search))
+@Suite("Cancellation gate", .tags(.search))
 @MainActor
 struct CancellationGateTests {
 

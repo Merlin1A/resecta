@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// D-14 — PassportPatternGazetteer JSON loader + lookup tests. Mirrors
+// PassportPatternGazetteer JSON loader + lookup tests. Mirrors
 // DLPatternGazetteerTests structure. Samples used as positive controls
 // are taken verbatim from the row's `sample` field in the shipping
 // artifact `passport_patterns.json` (DataPipeline commit 5b19a84,
@@ -11,7 +11,7 @@ import Foundation
 // derived from the row's `current_pattern` regex; no ICAO 9303 prose
 // is reproduced.
 
-@Suite("PassportPatternGazetteer (D-14)")
+@Suite("PassportPatternGazetteer")
 struct PassportPatternGazetteerTests {
 
     // Closed enum of the 11 V1 shipping issuer codes.
@@ -86,7 +86,7 @@ struct PassportPatternGazetteerTests {
         #expect(!gazetteer.matches("   ", issuedBy: "CA"))
         #expect(!gazetteer.matches("AB000000", issuedBy: "XX"),
                 "Unknown issuer code returns false (not a crash)")
-        // CU is candidates-file-only per F-37 OFAC posture; never shipped.
+        // CU is candidates-file-only per OFAC posture; never shipped.
         #expect(!gazetteer.matches("AB000000", issuedBy: "CU"),
                 "CU is excluded from V1 shipping set")
     }
@@ -110,7 +110,7 @@ struct PassportPatternGazetteerTests {
         // both require a digit at position 1 (B is a letter — no match).
         // All other issuers expect 9 chars. Result is genuinely CA-only.
         // Note: any 9-char alphanumeric candidate hits SV by construction
-        // (W-R-4.1 §II.6 medium-confidence permissive ceiling), so
+        // (SV's medium-confidence permissive ceiling), so
         // single-hit-at-9-chars is not achievable in V1 — the audit-only
         // multi-issuer surface is the V1 contract.
         let hits = gazetteer.matches("AB000000", anyIssuer: ())
@@ -130,14 +130,14 @@ struct PassportPatternGazetteerTests {
         #expect(hits.contains("IN"), "IN should accept 1L+7D shape; hits=\(hits)")
     }
 
-    // MARK: - GB F-38 V1-MOOT framing
+    // MARK: - GB F-38 licensing posture
 
     @Test("GB row matches normally; F-38 metadata exposed but unconsumed")
     func testGBF38Carrier() throws {
         let gazetteer = try PassportPatternGazetteer()
-        // Sample matches like any other row — F-38 OGL attribution
-        // posture is V1-MOOT per Disposition §4 cite-swap; the
-        // pending_decision_memo is engineer-facing audit metadata only.
+        // Sample matches like any other row — the F-38 OGL attribution
+        // posture is a pending legal decision; pending_decision_memo is
+        // engineer-facing audit metadata only.
         #expect(gazetteer.matches("204567813", issuedBy: "GB"))
 
         let meta = try #require(gazetteer.metadata(for: "GB"))
@@ -220,7 +220,7 @@ struct PassportPatternGazetteerTests {
         }
     }
 
-    @Test("Version-fence rejects out-of-range version (W-O)")
+    @Test("Version-fence rejects out-of-range version")
     func versionFenceRejectsOutOfRange() throws {
         let tempBase = FileManager.default.temporaryDirectory
             .appending(path: "wo-followers-passport-\(UUID().uuidString)", directoryHint: .isDirectory)

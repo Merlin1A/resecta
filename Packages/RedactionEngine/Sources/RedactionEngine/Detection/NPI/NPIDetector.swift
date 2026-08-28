@@ -1,6 +1,6 @@
 import Foundation
 
-// Plan §4 / §3.1b — 10-digit NPI with the CMS Luhn-80840 checksum.
+// 10-digit NPI with the CMS Luhn-80840 checksum.
 // Regex rejects any digit run abutting another digit so "1234567890" inside
 // a longer number sequence doesn't trigger. Positive context keywords
 // ("NPI", "provider ID") boost confidence; base 0.60 with no context since
@@ -17,7 +17,7 @@ struct NPIDetector: Sendable {
         "national provider identifier", "provider #"
     ]
 
-    // D04-F1: base 0.60 -> 0.65 so a bare Luhn-80840-valid NPI clears the
+    // Base 0.60 -> 0.65 so a bare Luhn-80840-valid NPI clears the
     // swept balanced/aggressive npi cutoff (both 0.602) with a ~0.05 posterior
     // margin at the default prior (posterior is the identity there:
     // sigma(logit(0.65)) = 0.65). Was 0.600 < 0.602 -> dropped at every preset.
@@ -60,7 +60,7 @@ struct NPIDetector: Sendable {
             ) {
                 signals.append(ctxSignal)
             }
-            // WU-76 / [P4] — per-keyword breakdown alongside the scalar.
+            // Per-keyword breakdown alongside the scalar.
             if let ctxDetail = scorer.signalDetail(
                 text: fullText,
                 matchRange: match.range,

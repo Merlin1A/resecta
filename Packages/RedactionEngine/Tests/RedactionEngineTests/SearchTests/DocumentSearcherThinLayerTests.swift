@@ -5,14 +5,14 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// CAT-167 / D-27a — DocumentSearcher must not let a thin (`.sparse`) or
+// DocumentSearcher must not let a thin (`.sparse`) or
 // image-only (`.none`) text layer suppress OCR. When a page carries a
 // header-only text layer over a scanned body, the four search paths
 // (text / regex / multi-term / PII) route to OCR instead of running the
 // text-layer fast path against the (incomplete) embedded text.
 //
 // The per-page classification arrives via the `textLayerStatusByPage` init
-// parameter (dossier Option A); production installs it from
+// parameter; production installs it from
 // `documentState.textLayerStatus` through `setTextLayerStatus(_:)`. These tests
 // use the `_testSeedOCRLines` seam to inject deterministic OCR output, so no
 // real Vision OCR runs on the simulator.
@@ -20,7 +20,7 @@ import UIKit
 // Privacy rule (audit-lint M-1): test names use locate/route/resolve
 // vocabulary. No outcome-promise language in comments or display names.
 
-@Suite("DocumentSearcher thin text-layer routing (CAT-167)", .tags(.search))
+@Suite("DocumentSearcher thin text-layer routing", .tags(.search))
 struct DocumentSearcherThinLayerTests {
 
     private func stubLine(
@@ -38,8 +38,8 @@ struct DocumentSearcherThinLayerTests {
         // The page has a non-empty header-only text layer that does NOT contain
         // the query; the query lives only in the (seeded) OCR output. With the
         // page classified `.sparse`, the search consults OCR and locates it.
-        // Pre-CAT-167 the non-empty `page.string` took the text-layer path
-        // exclusively → zero results (the red state).
+        // Before this routing fix, the non-empty `page.string` took the
+        // text-layer path exclusively → zero results (the red state).
         let data = TestFixtures.textLayerPDF(text: "Header")
         guard let doc = PDFDocument(data: data) else {
             Issue.record("Failed to create PDFDocument")
@@ -100,11 +100,11 @@ struct DocumentSearcherThinLayerTests {
         #expect(results.first?.source == .textLayer)
     }
 
-    @Test("Unknown-status page preserves pre-CAT-167 behavior")
+    @Test("Unknown-status page preserves prior behavior")
     func testUnknownStatusUsesTextPath() async {
         // Backward-compat: a searcher constructed without status (default `[:]`)
         // treats every non-empty page as `.rich`, so callers that don't supply
-        // status — including every pre-CAT-167 test — see no behavior change.
+        // status see no behavior change.
         let data = TestFixtures.textLayerPDF(text: "Contains CONFIDENTIAL here")
         guard let doc = PDFDocument(data: data) else {
             Issue.record("Failed to create PDFDocument")

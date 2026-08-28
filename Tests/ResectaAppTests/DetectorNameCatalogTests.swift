@@ -2,10 +2,10 @@ import Testing
 import RedactionEngine
 @testable import ResectaApp
 
-// q19 / UXF-09 — pin the shared detector-ID → human-name mapping and
+// Pins the shared detector-ID → human-name mapping and
 // its fail-open contract (unmapped ID renders the raw ID, never blank).
 
-@Suite("DetectorNameCatalog mapping (q19)")
+@Suite("DetectorNameCatalog mapping")
 struct DetectorNameCatalogTests {
 
     @Test("Known engine ruleIDs map to human names")

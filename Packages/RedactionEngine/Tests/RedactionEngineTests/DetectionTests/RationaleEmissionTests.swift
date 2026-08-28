@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W1 — verify that every PII detector path populates a MatchRationale.
+// Verify that every PII detector path populates a MatchRationale.
 // SSN and Name emit structured rationale (bespoke signals). The rest of
 // the detectors rely on the `ensureRationales` fallback in `detect()`,
 // which stamps a generic `regexPattern` signal and copies the confidence
@@ -32,8 +32,8 @@ struct RationaleEmissionTests {
 
     @Test("Name (NLTagger) emits regex signal with pre-threshold baseline")
     func nameRationaleIsPopulated() async {
-        // Inject nil gazetteer so this test stays focused on the W1 wiring
-        // and doesn't observe W2's per-candidate boosts (which can make
+        // Inject nil gazetteer so this test stays focused on the base rationale
+        // wiring and doesn't observe the per-candidate gazetteer boosts (which can make
         // finalScore > preThresholdScore).
         let detector = PIIDetector(nameGazetteer: nil)
         let text = "Patient: Maria Johnson was admitted."

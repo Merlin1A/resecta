@@ -3,7 +3,7 @@ import CoreGraphics
 import Foundation
 @testable import RedactionEngine
 
-// design 04 §1.4 Gap B — tests that OCRTextNormalizer is applied inside
+// Gap B — tests that OCRTextNormalizer is applied inside
 // DetectionOrchestrator.runOCR before line text is appended to fullTextParts.
 //
 // Seam choice: `runOCR` is internal and Vision-bound. A real Vision call on
@@ -25,7 +25,7 @@ import Foundation
 // Privacy rule: test names use locate/match/resolve vocabulary (audit-lint M-1).
 // No outcome-promise language.
 
-@Suite("DetectionOrchestrator OCR normalizer (design 04 §1.4 Gap B)", .serialized)
+@Suite("DetectionOrchestrator OCR normalizer (Gap B)", .serialized)
 struct DetectionOrchestratorOCRNormalizerTests {
 
     // MARK: - Unit seam
@@ -58,7 +58,7 @@ struct DetectionOrchestratorOCRNormalizerTests {
         // This test validates the downstream wiring: when runOCR (after Gap B)
         // hands normalized text to piiDetector.detect, an SSN-shaped token
         // is detected. We drive the same piiDetector path via the
-        // EmbeddedTextSource PERF-4 fast path so Vision is not invoked.
+        // EmbeddedTextSource fast path so Vision is not invoked.
         guard let image = makeBlankImage(width: 32, height: 32) else {
             Issue.record("Could not create blank image")
             return

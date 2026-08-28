@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W10 — MRN detector: three labeled patterns + context scoring + doctype gate.
+// MRN detector: three labeled patterns + context scoring + doctype gate.
 //
 // Documented exceptions to the "every old-alternation hit preserved" rule:
 // none. The pre-W10 alternation only captured `\d{4,12}` after an MRN/Patient
@@ -10,7 +10,7 @@ import Foundation
 // to `[A-Z0-9]{5,12}` — covers the G8 corpus alphanumeric shape too) or by
 // `mrnPatternPatientID`.
 
-@Suite("MRN detector (W10)")
+@Suite("MRN detector")
 struct MRNDetectorTests {
 
     private let detector = PIIDetector(nameGazetteer: nil)

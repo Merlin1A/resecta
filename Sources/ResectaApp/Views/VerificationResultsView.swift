@@ -1,19 +1,19 @@
 import SwiftUI
 import RedactionEngine
 
-// UI_UX §4.1: Verification results recomposed around HomeView's grammar
-// (Phase 2 of i-want-you-to-declarative-sparkle): status masthead →
+// Verification results recomposed around HomeView's grammar:
+// status masthead →
 // action choice stack (Share / Keep Editing / Preview HomeChoiceCards) →
 // chevron-disclosed details (page modes + per-layer rows) → trust strip
-// → footer block (timing line + audit-scope disclaimer, UXC-43). The
+// → footer block (timing line + audit-scope disclaimer). The
 // segmented Picker and the prior contained status
 // card are gone; Preview is a NavigationLink push now (matches HomeView's
 // "tap card → go deeper" idiom). Action-bar and export dialogs are still
-// mounted by DocumentEditorView (Phase 1A C7 + Phase 3).
+// mounted by DocumentEditorView.
 
 struct VerificationResultsView: View {
     let report: VerificationReport
-    /// Q1 / §4.4a defense-in-depth gate, computed once on `DocumentEditorView`
+    /// Defense-in-depth gate, computed once on `DocumentEditorView`
     /// (Phase 3) and threaded into both the bar and this card so they share
     /// one source of truth.
     let canExport: Bool
@@ -32,8 +32,8 @@ struct VerificationResultsView: View {
     /// `onExport` so ⌘E reaches `handleExportTap(report:)` from either
     /// surface.
     var onExport: () -> Void
-    /// Tap handler for the Run Verification card shown on skipped reports
-    /// (CANCEL-009 recovery). The routing decision — verify-only against the
+    /// Tap handler for the Run Verification card shown on skipped reports.
+    /// The routing decision — verify-only against the
     /// existing output vs. a full re-run — lives on `DocumentEditorView`
     /// (`handleRunVerificationTap`), which owns the coordinator and
     /// `RedactionState`; this view stays decoupled like `onExport`.
@@ -50,8 +50,8 @@ struct VerificationResultsView: View {
     /// phase transition. Nil hides the affordance — the search session the
     /// counts came from is gone, so there is no panel to reopen.
     var onReviewDeselections: (() -> Void)? = nil
-    /// UXC-04/05/06 pre-derived run facts for the run-facts strip
-    /// (RB-28/29/30). This view injects no RedactionState (mirrors
+    /// Pre-derived run facts for the run-facts strip.
+    /// This view injects no RedactionState (mirrors
     /// `deselectionSnapshot`/`previewAvailable`); `DocumentEditorView`
     /// builds this via the pure `RunFacts.derive(...)` static func.
     /// Defaults to the empty/false value, so the strip renders nothing
@@ -62,7 +62,7 @@ struct VerificationResultsView: View {
     @Environment(DocumentState.self) private var documentState
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    // UXC-33 (RB-24, partial revival of DC-023): needed to route the
+    // Routes the
     // page-modes / layer-detail `.move(edge:)` transitions through
     // `Anim.resolvedTransition`.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -85,13 +85,12 @@ struct VerificationResultsView: View {
                         detailsSection
                     }
                     trustStrip
-                    // UXC-43 (D-118; supersedes REV-03's placement,
-                    // RB-61/RB-68): the timing footer and the audit-scope
+                    // The timing footer and the audit-scope
                     // disclaimer close the page as ONE footer block — the
                     // disclaimer is the LAST element on every verdict,
                     // beneath "Completed in … · N checks". One
                     // gate-wrapped mount, no per-status placement
-                    // branches. UXC-47 (D-122): the block's spacing is
+                    // branches. The block's spacing is
                     // `disclaimerFootGap` (144 pt, was 8) so the note
                     // starts below the first screen on the 6.3″ and 6.9″
                     // phones at the default type size — the timing line
@@ -113,7 +112,7 @@ struct VerificationResultsView: View {
                     }
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.md)
-                // UXC-43: the verdict title leads the page 24 pt under the
+                // The verdict title leads the page 24 pt under the
                 // bar at every Dynamic Type size; the bottom edge keeps
                 // its prior behavior.
                 .padding(.top, ResectaTokens.Spacing.lg)
@@ -122,8 +121,8 @@ struct VerificationResultsView: View {
                 .frame(maxWidth: .infinity)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .accessibilityIdentifier("verificationResults") // §A8
-            // WP9a (broadened, Phase 2): auto-expand the details disclosure
+            .accessibilityIdentifier("verificationResults")
+            // Auto-expand the details disclosure (broadened)
             // on WARN, FAIL, or any mixed-mode page set. PASS + uniform
             // modes ships collapsed so the masthead leads the page.
             .onAppear {
@@ -139,9 +138,9 @@ struct VerificationResultsView: View {
                 }
             }
         }
-        // C7: VerificationActionBar is placed by the phase router in
+        // VerificationActionBar is placed by the phase router in
         // DocumentEditorView as .safeAreaInset, not embedded here. Export
-        // dialogs also lifted to DocumentEditorView (Phase 1A).
+        // dialogs are also mounted on DocumentEditorView.
     }
 
     // MARK: - Layout helpers
@@ -164,11 +163,11 @@ struct VerificationResultsView: View {
     }
 
     /// Phase 2 auto-expand gate. Lifted to a static helper so it's testable
-    /// without a SwiftUI host (mirrors Session 1's `shouldAutoReturnHome`
+    /// without a SwiftUI host (mirrors the `shouldAutoReturnHome`
     /// pattern). PASS + uniform modes → collapsed; WARN/FAIL or mixed
     /// modes → expanded.
     ///
-    /// UXC-02: a snapshot with at least one deselected result also forces
+    /// A snapshot with at least one deselected result also forces
     /// the expansion, regardless of verdict — the exact case
     /// `shouldShowDeselectionRow` gates the deselection row on. PASS is
     /// precisely the verdict where "N of M results were left un-checked"
@@ -193,13 +192,13 @@ struct VerificationResultsView: View {
 
     // MARK: - Status masthead
     //
-    // §4.1 + Phase 2 lock: neutral chrome — no card background; the
+    // Phase 2 lock: neutral chrome — no card background; the
     // masthead reads as part of the page, not as a contained card.
-    // UXC-43: title → subtitle, no glyph — the verdict is conveyed by the
+    // Title → subtitle, no glyph — the verdict is conveyed by the
     // title/subtitle text and the combined accessibility label below (the
     // former 56pt status-symbol slot above the title is removed; the
     // per-layer status glyphs in `LayerResultRow` are unchanged).
-    // UXC-47 (D-122): PASS renders the title alone — `mastheadSubtitle`
+    // PASS renders the title alone — `mastheadSubtitle`
     // is nil on PASS, so the subtitle `Text` is not mounted at all (no
     // empty line, no stray spacing); every other verdict keeps its line.
 
@@ -248,7 +247,7 @@ struct VerificationResultsView: View {
 
     /// Plain subtitle (no timing). Timing moved to the footer; the
     /// per-page-mode summary moves into the details disclosure header.
-    /// Nil on PASS (UXC-47) — the masthead mounts no subtitle at all.
+    /// Nil on PASS — the masthead mounts no subtitle at all.
     private var mastheadSubtitle: String? {
         Self.mastheadSubtitle(report: report)
     }
@@ -261,7 +260,7 @@ struct VerificationResultsView: View {
     static func mastheadSubtitle(report: VerificationReport) -> String? {
         switch report.overallStatus {
         case .pass:
-            // UXC-47 (D-122): "All N verification checks completed without
+            // "All N verification checks completed without
             // issues." (+ the informational-notes tail) is gone in both
             // pipeline modes — "Checks Passed" carries the verdict, and the
             // Verification Details header still reads "N of N checks
@@ -286,7 +285,7 @@ struct VerificationResultsView: View {
             // returns .fail/.warn/.pass, or .skipped when every layer was
             // skipped (skip-aware aggregation). Keep an arm for
             // exhaustiveness; if ever surfaced, treat like .pass (title
-            // alone, UXC-47).
+            // alone).
             return nil
         case .attention:
             // Name the exact text once at the masthead (display-only
@@ -319,28 +318,28 @@ struct VerificationResultsView: View {
         return texts
     }
 
-    // MARK: - Run facts strip (RB-28/29/30)
+    // MARK: - Run facts strip
     //
-    // UXC-04/05/06: 0-3 conditional caption-weight lines disclosing what
+    // 0-3 conditional caption-weight lines disclosing what
     // this run's detection did or did not cover. Mounted directly
     // beneath the masthead, above the action stack, on every verdict —
     // a routine PASS with nothing to disclose renders no strip (no
-    // empty container). Every line is a pinned static builder (T-03
-    // discipline) so the rendered text is unit-testable without a
+    // empty container). Every line is a pinned static builder
+    // so the rendered text is unit-testable without a
     // SwiftUI host.
 
     /// Pure facts input for the strip. `derive` is the single production
     /// source (called from `DocumentEditorView`); the plain-value
     /// default keeps every field off.
     struct RunFacts: Equatable {
-        /// UXC-04 — 0-indexed pages whose raster exceeded the OCR pixel
+        /// 0-indexed pages whose raster exceeded the OCR pixel
         /// caps during the run behind this output.
         var ocrSkippedPages: Set<Int> = []
-        /// UXC-05 — no detection ran this session, yet a region was
+        /// No detection ran this session, yet a region was
         /// applied for this output (Search or manual marking produced
         /// it).
         var detectionNeverRan: Bool = false
-        /// UXC-06 — the degrade-failure list snapshotted when the run
+        /// The degrade-failure list snapshotted when the run
         /// behind this output was recorded; nil when that run was not
         /// degraded.
         var degradeFailures: [String]? = nil
@@ -367,7 +366,7 @@ struct VerificationResultsView: View {
 
     /// Pinned line builders + line-order assembly.
     enum RunFactsStrip {
-        /// UXC-04. 0-indexed input (mirrors
+        /// 0-indexed input (mirrors
         /// `ScanReviewSection.ocrSkipBannerHeadline`); 1-based page
         /// numbers via `SearchResultsSection.formatPageList`.
         static func ocrSkipLine(pages: [Int]) -> String {
@@ -379,18 +378,18 @@ struct VerificationResultsView: View {
             return "Pages \(list) were too large to scan for text, so image content there was not examined by detection. Review those pages manually before sharing."
         }
 
-        /// UXC-05.
         static let detectionNeverRanLine =
             "Automated detection did not run on this document. Every region here came from Search or manual marking \u{2014} review each page for anything those did not cover before sharing."
 
-        /// UXC-06 — reuses `DetectionDegradeCopy.banner` verbatim; no new
+        /// Reuses `DetectionDegradeCopy.banner` verbatim; no new
         /// degrade string.
         static func degradeLine(failedGazetteers: [String]) -> String {
             DetectionDegradeCopy.banner(failedGazetteers: failedGazetteers)
         }
 
-        /// Ordered lines for the given facts — F-04, then F-05, then
-        /// F-06. F-04 and F-05 are mutually exclusive by construction
+        /// Ordered lines for the given facts: the OCR-skip line, then
+        /// the detection-never-ran line, then the degrade line. The first
+        /// two are mutually exclusive by construction
         /// (both key off `lastDetectionRun`'s nilness), so at most two
         /// lines render for this fact set today.
         static func lines(for facts: RunFacts) -> [String] {
@@ -427,7 +426,7 @@ struct VerificationResultsView: View {
 
     // MARK: - Action choice stack
     //
-    // Phase 2 lock, amended by the preview/share-tint decouple (#217):
+    // Phase 2 lock, amended by the preview/share-tint decouple:
     // Share / Keep Editing always; the Preview card appears whenever a
     // redacted output exists on disk (`previewAvailable`), independent of
     // the verdict. ⌘E binds to the Share card's wrapping Button (locked
@@ -447,7 +446,7 @@ struct VerificationResultsView: View {
         .frame(maxWidth: columnMaxWidth)
     }
 
-    // MARK: - Run Verification card (CANCEL-009 recovery)
+    // MARK: - Run Verification card
     //
     // A skipped report previously stranded the user: the only "Re-verify"
     // affordance was an overlay in DocumentEditorView gated on a phase whose
@@ -497,8 +496,8 @@ struct VerificationResultsView: View {
 
     /// VoiceOver label for the Share card. Promoted to a `static` constant
     /// so the rebuild can't silently alter the spoken string and so it's
-    /// unit-testable without rendering (mirrors the Pkg J label contract in
-    /// `AccessibilityLabelTests`).
+    /// unit-testable without rendering (mirrors the accessibility label
+    /// contract in `AccessibilityLabelTests`).
     static let shareCardAccessibilityLabel =
         "Share Document. Save the redacted PDF or share it from this device."
 
@@ -506,7 +505,7 @@ struct VerificationResultsView: View {
     static let previewCardAccessibilityLabel =
         "Preview Redacted Document. Open the redacted output in a read-only viewer."
 
-    /// §4.4a defense-in-depth gate for the Share card: Share is enabled
+    /// Defense-in-depth gate for the Share card: Share is enabled
     /// exactly when a fresh, valid output exists (`canExport`). Lifted to a
     /// `static` helper so the gate is a single source of truth and is
     /// unit-testable without a SwiftUI host (mirrors `shouldAutoExpand`).
@@ -594,9 +593,9 @@ struct VerificationResultsView: View {
         }
     }
 
-    /// UXF-12 (hint slice): Keep Editing body copy states the undo
+    /// Keep Editing body copy states the undo
     /// boundary where it bites — applying redactions cleared the undo
-    /// stack (demonstrated ts6-01), so returning to the editor cannot
+    /// stack, so returning to the editor cannot
     /// Cmd-Z back past the apply. Static so the a11y label and the card
     /// speak the same string and the wording is pinned without a host.
     static let keepEditingBodyText =
@@ -763,7 +762,7 @@ struct VerificationResultsView: View {
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.sm)
                 .padding(.bottom, ResectaTokens.Spacing.sm)
-                // UXC-33 (RB-24, partial revival of DC-023): routed
+                // Routed
                 // through the resolver so Reduce Motion swaps the slide
                 // for an opacity-only crossfade.
                 .transition(ResectaTokens.Anim.resolvedTransition(
@@ -776,7 +775,7 @@ struct VerificationResultsView: View {
         .frame(maxWidth: columnMaxWidth)
     }
 
-    /// VQ-26 at the display surface: the generic skipped-row copy says the
+    /// At the display surface: the generic skipped-row copy says the
     /// layer "was not applicable for this pipeline mode", but on the
     /// digest-less verify-only path the layer applies and merely lacked
     /// data — the user's actual remedy is a full re-run. One caption under
@@ -945,7 +944,7 @@ struct VerificationResultsView: View {
     // source") and is status-independent: the strip states standing facts
     // about the app, while the run's outcome lives in the status banner and
     // the footer. The former PASS/INFO-gated "Verification complete" item is
-    // gone entirely, and with it the ARCH §1.3 outcome-promise concern.
+    // gone entirely, and with it the outcome-promise concern.
 
     private var trustStrip: some View {
         FlowLayout(spacing: ResectaTokens.Spacing.sm, alignment: .center) {
@@ -980,15 +979,14 @@ struct VerificationResultsView: View {
     // The legally reviewed scope-limitation copy (`HonestyDisclaimer`,
     // `.redacted` profile) had zero production call sites — no surface named
     // the checks' epistemic limits at the point where the share decision is
-    // made. It mounts at ONE site on every verdict: since UXC-43 (D-118,
-    // superseding REV-03's placement under "Verification Details") it is
+    // made. It mounts at ONE site on every verdict: it is
     // the last element of the page, in the footer block beneath the
-    // timing line — `disclaimerFootGap` under it (8 pt at UXC-43, 144 pt
-    // since UXC-47). The component supplies its own caption styling,
+    // timing line — `disclaimerFootGap` under it (8 pt originally, 144 pt
+    // now). The component supplies its own caption styling,
     // centered alignment, and accessibility label; the call site owns the
     // spacing; Dynamic Type flows through `Text`.
 
-    /// UXC-47 (D-122): the footer block's spacing — the distance from the
+    /// The footer block's spacing — the distance from the
     /// timing line to the audit-scope note. 3 × `Spacing.xxl` = 144 pt,
     /// sized from the measured PASS layout at the default type size: the
     /// timing line ends ≈835 pt from the top of the screen on the 6.3″ and
@@ -1120,7 +1118,7 @@ struct VerificationResultsView: View {
                         .foregroundStyle(.secondary)
                     }
 
-                    // PD-5: why each rasterized page fell back, for
+                    // Why each rasterized page fell back, for
                     // Searchable-mode runs only (secure-raster runs carry no
                     // reasons — every page rasterized by choice). One caption
                     // row per fallback page, same factual register as the
@@ -1145,7 +1143,7 @@ struct VerificationResultsView: View {
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.sm)
                 .padding(.bottom, ResectaTokens.Spacing.sm)
-                // UXC-33 (RB-24, partial revival of DC-023): routed
+                // Routed
                 // through the resolver so Reduce Motion swaps the slide
                 // for an opacity-only crossfade.
                 .transition(ResectaTokens.Anim.resolvedTransition(
@@ -1165,7 +1163,7 @@ struct VerificationResultsView: View {
         return "\(searchable) Searchable, \(secure) Rasterized"
     }
 
-    /// PD-5: the report's fallback reason for a page index, nil when the
+    /// The report's fallback reason for a page index, nil when the
     /// reasons array is absent (old-session verify-only resume) or shorter
     /// than the mode array.
     private func fallbackReason(at index: Int) -> TextLayerDetector.FallbackReason? {
@@ -1173,7 +1171,7 @@ struct VerificationResultsView: View {
         return report.perPageFallbackReasons[index]
     }
 
-    /// PD-5 reason row copy. Static so tests pin the exact string (mirrors
+    /// Fallback-reason row copy. Static so tests pin the exact string (mirrors
     /// `deselectionRowText`).
     static func fallbackReasonRowText(
         pageNumber: Int, reason: TextLayerDetector.FallbackReason

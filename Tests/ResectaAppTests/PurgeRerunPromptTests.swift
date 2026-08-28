@@ -4,7 +4,7 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// Package E (quality-pass-2026-05) — KI-4 proactive purge re-run prompt.
+// KI-4 proactive purge re-run prompt.
 //
 // The scene-phase observer in DocumentEditorView surfaces a `.warning`
 // toast when iOS reclaims the pipeline's temp output PDF while the app
@@ -17,9 +17,9 @@ import RedactionEngine
 // 1. Fires on `.background → .active` only — not on `.inactive → .active`.
 // 2. Fires only when the editor is on `.verified(report)`.
 // 3. Fires only when the output file does NOT exist (purge happened).
-// 4. Mechanism-description copy (no banned vocabulary from ARCH §1.3).
+// 4. Mechanism-description copy (no banned vocabulary).
 
-@Suite("KI-4 proactive purge re-run toast (Package E)")
+@Suite("KI-4 proactive purge re-run toast")
 @MainActor
 struct PurgeRerunPromptTests {
 
@@ -131,10 +131,10 @@ struct PurgeRerunPromptTests {
         #expect(msg.contains("Re-run"))
     }
 
-    @Test("Toast copy avoids ARCH §1.3 / §19 banned vocabulary")
+    @Test("Toast copy avoids banned vocabulary")
     func toastCopyBannedVocabulary() {
         let msg = DocumentEditorView.purgeRerunToastMessage.lowercased()
-        // Outcome-promise vocabulary banned by ARCH §1.3 and the audit-lint
+        // Outcome-promise vocabulary banned by the audit-lint
         // M-1 regex. Mirrors the safer pattern enforced upstream. Each
         // sentinel string carries the `LegalPhrases:safe` override marker
         // so the M-1 scanner accepts these test-only literals.

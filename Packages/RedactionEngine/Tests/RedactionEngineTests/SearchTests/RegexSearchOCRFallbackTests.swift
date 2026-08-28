@@ -5,7 +5,7 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// design 04 §1.3 — tests for the regex-search OCR fallback path.
+// Tests for the regex-search OCR fallback path.
 // When searchRegex encounters a page with no text layer and
 // options.includeOCR is true, it delegates to
 // searchPageViaOCRFallback_regex. These tests use the
@@ -15,7 +15,7 @@ import UIKit
 // Privacy rule: test names use locate/match/resolve vocabulary (audit-lint M-1).
 // No outcome-promise language used in comments or test display names.
 
-@Suite("Regex search OCR fallback (design 04 §1.3)", .tags(.search))
+@Suite("Regex search OCR fallback", .tags(.search))
 struct RegexSearchOCRFallbackTests {
 
     // MARK: - Fixture helpers

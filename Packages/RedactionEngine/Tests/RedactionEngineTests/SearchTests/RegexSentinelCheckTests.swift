@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-@Suite("RegexSentinelCheck (W6-b ReDoS guard)", .tags(.search))
+@Suite("RegexSentinelCheck (ReDoS guard)", .tags(.search))
 struct RegexSentinelCheckTests {
 
     @Test("Safe pattern accepted")
@@ -33,7 +33,7 @@ struct RegexSentinelCheckTests {
         #expect(await RegexSentinelCheck.validate(#"(unclosed"#) == false)
     }
 
-    // MARK: - S6 / 4.7 — typed rejection reasons (design 04 §4.7)
+    // MARK: - Typed rejection reasons
 
     @Test("Over-cap pattern throws patternTooLong with mechanism copy")
     func tooLongPatternThrowsTypedError() {
@@ -91,7 +91,7 @@ struct RegexSentinelCheckTests {
         }
     }
 
-    @Test("Adversarial: typed rejection copy never echoes the submitted pattern (RR-24)")
+    @Test("Adversarial: typed rejection copy never echoes the submitted pattern")
     func testRegexErrorStringDoesNotContainPatternText() {
         // One probe per typed case; each pattern carries a sentinel token
         // that must not appear in the surfaced copy.

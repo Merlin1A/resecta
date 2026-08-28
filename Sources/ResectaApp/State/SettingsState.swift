@@ -203,7 +203,7 @@ class SettingsState {
 /// App-side display copy for the ENGINE's existing `SettingsPreset`
 /// (do not introduce a parallel preset type). "Aggressive" reads as
 /// "Sensitive" in the UI — the engine term is a developer word.
-/// Mechanism-description copy per CLAUDE.md hard rules.
+/// Mechanism-description copy, not outcome language.
 extension SettingsPreset {
     var displayLabel: String {
         switch self {

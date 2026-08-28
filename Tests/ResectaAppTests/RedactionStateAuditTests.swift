@@ -3,12 +3,12 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// W5 — verify the search origin of `applyFindings` populates the audit
+// Verify the search origin of `applyFindings` populates the audit
 // dict, undo removes entries in lockstep with the regions, redo restores
 // them, and clearAll wipes everything on document close. (The
 // detection-origin audit contract is pinned in `ApplyFindingsSeamTests`.)
 
-@Suite("RedactionState appliedMatchAudit (W5)")
+@Suite("RedactionState appliedMatchAudit")
 @MainActor
 struct RedactionStateAuditTests {
 

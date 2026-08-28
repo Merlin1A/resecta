@@ -1,6 +1,6 @@
 import Foundation
 
-// Plan §4 — structured DOB with age-proximity heuristic. Replaces the
+// Structured DOB with age-proximity heuristic. Replaces the
 // inline `PIIDetector.dobPattern` once doctype-aware routing is live.
 //
 // Strategy:
@@ -44,7 +44,7 @@ struct DOBDetector: Sendable {
         for match in Self.numericPattern.matches(in: fullText, range: range) {
             let matchedText = text.substring(with: match.range)
             guard Self.isStructurallyValid(matchedText) else { continue }
-            // D04-F2 A1: numeric base 0.01 -> 0.05 to match the textual path, so a
+            // Numeric base 0.01 -> 0.05 to match the textual path, so a
             // label-boosted numeric DOB clears the 0.30 Balanced/Conservative cutoff
             // with the same 0.05 margin the textual path already has (was 0.31, a
             // 0.01 razor). Unlabeled numeric (0.05) still does not clear 0.30 -> the
@@ -114,7 +114,7 @@ struct DOBDetector: Sendable {
         guard parts.count == 3 else { return false }
         guard let month = Int(parts[0]), let day = Int(parts[1]), var year = Int(parts[2]) else { return false }
         guard (1...12).contains(month) else { return false }
-        // L-03: expand the 2-digit year BEFORE the leap-year check, so the
+        // Expand the 2-digit year BEFORE the leap-year check, so the
         // Gregorian century rule (100-year exclusion with 400-year override)
         // uses the full year.
         if year < 100 {

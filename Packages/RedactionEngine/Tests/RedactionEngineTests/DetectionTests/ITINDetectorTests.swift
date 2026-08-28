@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Plan M6 / C3 — IRS YY-bucket tightening for the ITIN detector.
+// IRS YY-bucket tightening for the ITIN detector.
 //
 // IRS-issued ITINs carry YY in one of four ranges:
 //   [50-65, 70-88, 90-92, 94-99]
@@ -107,7 +107,7 @@ struct ITINDetectorTests {
     }
 }
 
-// WS1 design 01 §6 — ITIN ContextWindowScorer migration (item 1.10, 2026-06-10).
+// ITIN ContextWindowScorer migration.
 //
 // Prior implementation used inline contains() checks for three keywords.
 // The scorer migration is functionally equivalent: same baseConfidence (0.60)
@@ -115,7 +115,7 @@ struct ITINDetectorTests {
 // itinProfile.positiveKeywords. WS2 can extend the keyword set via JSON
 // without touching Swift code.
 
-@Suite("ITIN ContextWindowScorer migration (design 01 §6, item 1.10)")
+@Suite("ITIN ContextWindowScorer migration")
 struct ITINScorerMigrationTests {
 
     private func itinMatches(in text: String) async -> [PIIDetector.PIIMatch] {

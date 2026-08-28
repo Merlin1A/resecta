@@ -5,11 +5,11 @@ import CoreGraphics
 
 // Shared canvas touch harness for `RedactionOverlayView` gesture tests
 // (`RectangleDrawGestureTests`, `SnapToTextBoxTests`, `PolygonDrawingTests`).
-// ONE internal copy (1.1.0 draw-tool S1) — the pair used to live as private
+// ONE internal copy — the pair used to live as private
 // duplicates in the two older suites.
 //
-// The overlay keys an in-flight gesture on the primary `UITouch` instance
-// (S1-d / DT-10): `touchesMoved` / `touchesEnded` / `touchesCancelled`
+// The overlay keys an in-flight gesture on the primary `UITouch` instance:
+// `touchesMoved` / `touchesEnded` / `touchesCancelled`
 // ignore any touch that is not the one `touchesBegan` recorded. A
 // began → moved → ended sequence must therefore reuse ONE `StubTouch`
 // and relocate it with `move(to:)`, exactly as UIKit delivers a real
@@ -26,7 +26,7 @@ final class RecordingCoordinator: PDFViewCoordinator {
     var resizedRegions: [(id: UUID, newRect: CGRect)] = []
     var lassoCommits: [[RedactionRegion]] = []
     var testOverlays: [RedactionOverlayView] = []
-    /// Every `selectRegion(_:)` call in order (`nil` = clear) — S2 draw-wins pins.
+    /// Every `selectRegion(_:)` call in order (`nil` = clear).
     var selections: [UUID?] = []
 
     override func selectRegion(_ id: UUID?) {

@@ -2,9 +2,9 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// S3 baseline — negative-corpus document-level false-positive emitter.
+// Baseline — negative-corpus document-level false-positive emitter.
 //
-// Pinned by the negative-corpus evaluation contract (File 4).
+// Pinned by the negative-corpus evaluation contract.
 // Scores the deterministic no-PII negative corpus through the SAME
 // PIIDetector.detect path the baseline harness uses. The corpus is all-negative
 // (no spans), so ANY surfaced detection on ANY document is a false positive.
@@ -16,13 +16,13 @@ import Foundation
 //
 // "Surfaced" uses the SAME balanced-cutoff helper (balancedCutoff(for:)) as the
 // G8 baseline so the FP definition is consistent across both files. Output is
-// keyed by category only (CONTRACT File 4) and carries counts + token-rate
-// derivations — no document text, no values (ARCH §12.2).
+// keyed by category only and carries counts + token-rate
+// derivations — no document text, no values.
 
-@Suite("S3 negative-corpus FP (standing emitter)", .serialized)
+@Suite("Negative-corpus FP (standing emitter)", .serialized)
 struct NegativeCorpusScoreTests {
 
-    // MARK: - Fixture wire format (CONTRACT "Negative corpus fixture format")
+    // MARK: - Fixture wire format
 
     struct NegativeCorpus: Decodable, Sendable {
         let version: Int
@@ -37,7 +37,7 @@ struct NegativeCorpusScoreTests {
         let text: String
     }
 
-    // MARK: - Output JSON (CONTRACT File 4)
+    // MARK: - Output JSON
 
     struct NegCorpusReport: Encodable, Sendable {
         let schema_version: Int
@@ -67,7 +67,7 @@ struct NegativeCorpusScoreTests {
     @Test("Emit negative-corpus document FP counts")
     func scoreNegativeCorpus() async throws {
         guard let corpus = try Self.loadNegativeCorpus() else {
-            print("[S3 negcorpus] negative_corpus.json not bundled; emit skipped " +
+            print("[negcorpus] negative_corpus.json not bundled; emit skipped " +
                   "until the Python generator + install-assets run.")
             return
         }
@@ -81,7 +81,7 @@ struct NegativeCorpusScoreTests {
         var totalTokens = 0
 
         for doc in sortedDocs {
-            // Whitespace-split token estimate (CONTRACT: total_tokens ≈ whitespace
+            // Whitespace-split token estimate (total_tokens ≈ whitespace
             // splits). Counts only, never the tokens themselves.
             totalTokens += doc.text.split(whereSeparator: { $0.isWhitespace }).count
 
@@ -122,7 +122,7 @@ struct NegativeCorpusScoreTests {
         let base = G8BaselineHarnessTests.baselineOutBase()
         try G8BaselineHarnessTests.writeJSON(report, to: "\(base)_negcorpus.json")
 
-        print("[S3 negcorpus] → \(base)_negcorpus.json " +
+        print("[negcorpus] → \(base)_negcorpus.json " +
               "(docs=\(docCount) tokens=\(totalTokens) fp=\(totalFP) " +
               "docsWithFP=\(docsWithAnyFP))")
 

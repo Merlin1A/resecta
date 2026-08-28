@@ -1,18 +1,18 @@
 import SwiftUI
 
-// SEARCH-AND-REDACT §S3 / §S4: Footer summary, grouping, audit export.
-// Lifted from `SearchAndRedactSheet.swift` (WU-01).
-// WU-22 (session-9): the Sort `Menu` migrated out of the footer and
+// Footer summary, grouping, audit export.
+// Lifted from `SearchAndRedactSheet.swift`.
+// The Sort `Menu` migrated out of the footer and
 // into the `SearchToolbarSection.chipRowSubstrate` chip-row consumer.
 //
 // Under the unified review surface the footer serves BOTH result
 // origins: search/scan-run results (reading `searchState`) and staged
-// detections under review (via `ReviewFooterModel`). UXC-45 (D-117,
-// RB-105/109): it is the surface's ONE selection authority — the
-// "M of N selected" count and the prominent global Select All (the
-// affordance set that makes all-deselected arrival livable). UXC-46
-// (D-121) removed the "Add to selection" predicate menu that sat
-// between them: selection is per row or Select All.
+// detections under review (via `ReviewFooterModel`). It is the
+// surface's ONE selection authority — the "M of N selected" count and
+// the prominent global Select All (the affordance set that makes
+// all-deselected arrival livable). The "Add to selection" predicate
+// menu that sat between them was removed: selection is per row or
+// Select All.
 
 struct SearchFooterSection: View {
     @Bindable var searchState: SearchState
@@ -46,7 +46,7 @@ struct SearchFooterSection: View {
                     .padding(.bottom, ResectaTokens.Spacing.xxs)
             }
             if review == nil, searchState.resultsAtCap {
-                // QW-12 — the cap banner carries the unscanned remainder
+                // The cap banner carries the unscanned remainder
                 // so "showing first N" stops reading as full coverage.
                 Text(Self.capBannerText(
                     resultCount: searchState.totalCount,
@@ -57,10 +57,10 @@ struct SearchFooterSection: View {
             }
             HStack {
                 // One label family for the whole surface: "M of N
-                // selected" in every state (UXC-45 — the zero state
+                // selected" in every state (the zero state
                 // reads "0 of N selected"; the footer is the selection
                 // authority and states the count plainly).
-                // BH-A-01 — M and N must come from the SAME domain.
+                // M and N must come from the SAME domain.
                 // The global `selectedCount` beside the filtered total
                 // produced M>N reads under a kind filter
                 // ("12 of 6 selected"); `selectedFilteredCount` keys
@@ -76,7 +76,7 @@ struct SearchFooterSection: View {
 
                 Spacer()
 
-                // W5 — Export audit log (CSV + JSON). Enabled when there
+                // Export audit log (CSV + JSON). Enabled when there
                 // are live results OR any previously-applied audit entries.
                 // Hidden for 1.0 behind `searchAuditSurfacesEnabled`.
                 if SearchState.searchAuditSurfacesEnabled, review == nil {
@@ -124,7 +124,7 @@ struct SearchFooterSection: View {
                 // Conditional dismiss: footer bulk selection is user selection work.
                 searchState.userModifiedSelections = true
             }
-        // UXC-18/REV-01: closure-label form so the floor can sit on
+        // Closure-label form so the floor can sit on
         // the label; `Text(...)` reproduces the exact
         // string-initializer label, so the accessible name is
         // unchanged in both states.
@@ -137,8 +137,7 @@ struct SearchFooterSection: View {
                 .controlSize(.small)
                 .accessibilityIdentifier("footerSelectAllButton")
         } else {
-            // REV-01 (packet §7.2 item 5, RB-66/RB-67): custom
-            // prominent chrome — subheadline white label on a 36pt
+            // Custom prominent chrome — subheadline white label on a 36pt
             // drawn BrandTeal capsule (visual parity with the retired
             // `.borderedProminent` small control), with the 46pt
             // LAYOUT floor + contentShape AFTER the fill so the drawn
@@ -160,7 +159,7 @@ struct SearchFooterSection: View {
         }
     }
 
-    /// QW-12 — cap-banner copy. States the truncation AND how many pages
+    /// Cap-banner copy. States the truncation AND how many pages
     /// the cancelled scan never reached (0 when the cap fired on the last
     /// page, or when the count is unavailable — the truncation sentence
     /// alone still renders). Pure function pinned by
@@ -176,7 +175,7 @@ struct SearchFooterSection: View {
 
     /// Footer selection count for the unified surface: "M of N
     /// selected" in EVERY state, the zero state included ("0 of 30
-    /// selected"). UXC-45 (RB-105): the footer is the one selection
+    /// selected"). The footer is the one selection
     /// authority and states the count plainly; the former "N found —
     /// none selected yet" arrival phrasing retired with the standalone
     /// predicate rows. One rule for both origins. Pure function pinned

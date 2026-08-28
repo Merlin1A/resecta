@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// F-5 / F-10 — `SearchModal` is the Identifiable enum driving the
+// `SearchModal` is the Identifiable enum driving the
 // consolidated `.sheet(item:)` on `SearchAndRedactSheet`. SwiftUI's
 // `.sheet(item:)` keys presentation on the value's `id`: switching
 // from one case to another (different `id`) triggers a single dismiss
@@ -11,7 +11,7 @@ import Foundation
 // silently regress the dismiss-and-present semantics that replaced
 // the prior multi-modifier stack.
 
-@Suite("SearchModal — presentation identity (F-5, F-10)", .tags(.search))
+@Suite("SearchModal — presentation identity", .tags(.search))
 struct SearchModalPresentationTests {
 
     @Test("Distinct cases have distinct ids — switching forces dismiss + present")

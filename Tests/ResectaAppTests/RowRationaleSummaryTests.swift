@@ -2,8 +2,8 @@ import Testing
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-30: pin the rationale summary format and verify the §19
-// mechanism-only invariant. Since UXC-46 (D-121) the summary renders as
+// Pin the rationale summary format and verify the
+// mechanism-only invariant. The summary renders as
 // the Signals footer of `MatchRationaleSheet`, not on the row; the
 // view-side toggle (chevron flip → expansion + Details button →
 // MatchRationaleSheet) is UI-only and covered by
@@ -15,7 +15,7 @@ import RedactionEngine
 // boundaries, since the trailing-suffix split still surfaces the
 // stem token to the regex word-boundary check).
 
-@Suite("Rationale summary line (WU-30; the MatchRationaleSheet Signals footer since UXC-46)")
+@Suite("Rationale summary line (the MatchRationaleSheet Signals footer)")
 struct RowRationaleSummaryTests {
     @Test("Reason format with regex + context signals + score")
     func basicRegexPlusContext() {
@@ -131,7 +131,7 @@ struct RowRationaleSummaryTests {
         #expect(SearchResultRow.signalShortLabel(for: .suppressedByOverlap(winnerCategory: .ssn, loserCategory: .name)) == nil)
     }
 
-    @Test("Reason text is mechanism-only — no §19 forbidden phrases per [D-37]")
+    @Test("Reason text is mechanism-only — no forbidden phrases")
     func sigma19MechanismOnly() {
         // Forbidden-phrase set assembled mid-word per audit-lint learning
         // so the test source itself doesn't trip the audit-lint hook.
@@ -173,7 +173,7 @@ struct RowRationaleSummaryTests {
         }
     }
 
-    @Test("Reason prefix line itself is SAFE per [D-37] (literal 'Reason:' allowed)")
+    @Test("Reason prefix line itself is SAFE (literal 'Reason:' allowed)")
     func reasonPrefixSafe() {
         let rationale = MatchRationale(
             ruleID: "test",

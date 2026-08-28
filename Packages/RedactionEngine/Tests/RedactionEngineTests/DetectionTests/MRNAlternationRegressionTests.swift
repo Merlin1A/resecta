@@ -2,19 +2,19 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W10 — `MRNAlternationRegressionTests`. Ensures the three-pattern MRN
+// `MRNAlternationRegressionTests`. Confirms the three-pattern MRN
 // rewrite (mrnPatternLabeled / mrnPatternPatientID / mrnPatternInstitution)
-// does not drop any hit the pre-W10 single alternation regex produced on
+// does not drop any hit the prior single alternation regex produced on
 // the G8 medical corpus, AND recalls the corpus's ground-truth MRN spans.
 //
-// The pre-W10 pattern is re-created inline below so the test stays
+// The prior pattern is re-created inline below so the test stays
 // self-contained after the detector-level source is rewritten.
 
 @Suite("MRN alternation regression (G8 medical)")
 struct MRNAlternationRegressionTests {
 
-    /// The pre-W10 MRN regex — required a numeric-only identifier (4–12 digits)
-    /// after one of the fixed labels. The W10 rewrite accepts alphanumerics
+    /// The prior MRN regex — required a numeric-only identifier (4–12 digits)
+    /// after one of the fixed labels. The rewrite accepts alphanumerics
     /// and adds an institution-prefix pattern.
     private static let oldAlternation: NSRegularExpression = {
         try! NSRegularExpression(
@@ -25,7 +25,7 @@ struct MRNAlternationRegressionTests {
 
     /// Any old-alternation hit whose label+value matches an item here is
     /// treated as an intentional exception (documented drop). Empty today —
-    /// the W10 rewrite is a strict superset on the G8 medical slice.
+    /// the rewrite is a strict superset on the G8 medical slice.
     private static let intentionalExceptions: [String] = []
 
     private struct CorpusDoc: Decodable {
@@ -61,7 +61,7 @@ struct MRNAlternationRegressionTests {
         return corpus.documents.filter { $0.doctype == "medical" }
     }
 
-    @Test("W10 three-pattern set is a superset of the pre-W10 alternation")
+    @Test("The three-pattern MRN set is a superset of the previous single alternation")
     func noRegressionOnOldAlternation() throws {
         guard let medical = try loadMedicalDocs() else {
             print("[MRN regression] g8_corpus.json not bundled; skipping.")
@@ -97,10 +97,10 @@ struct MRNAlternationRegressionTests {
 
         let lostSample = lostExamples.prefix(10).joined(separator: "; ")
         #expect(lostExamples.isEmpty,
-                "W10 MRN rewrite dropped old-alternation hits not in intentionalExceptions: \(lostSample)")
+                "MRN rewrite dropped old-alternation hits not in intentionalExceptions: \(lostSample)")
     }
 
-    @Test("W10 three-pattern set recalls every G8 medical ground-truth MRN span")
+    @Test("Three-pattern set recalls every G8 medical ground-truth MRN span")
     func groundTruthRecall() throws {
         guard let medical = try loadMedicalDocs() else { return }
         let detector = PIIDetector()
@@ -125,6 +125,6 @@ struct MRNAlternationRegressionTests {
         // real regression.
         let missSample = misses.prefix(10).joined(separator: "\n  ")
         #expect(misses.isEmpty,
-                "W10 MRN rewrite missed ground-truth spans:\n  \(missSample)")
+                "MRN rewrite missed ground-truth spans:\n  \(missSample)")
     }
 }

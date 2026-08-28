@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// SEC-7 — the three `Classifier/` quality assets (context-scorer.json,
+// The three `Classifier/` quality assets (context-scorer.json,
 // doctype-temperature.json, preset-thresholds.json) degrade gracefully when
 // missing or invalid: identity scorer, identity T = 1.0, built-in threshold
 // defaults. These tests pin that each fallback REPORTS through
@@ -15,7 +15,7 @@ import Foundation
 // reachable from the test target's `Bundle.module` via the Package.swift
 // Classifier copy entry (same wiring as the Gazetteers entry).
 
-@Suite("Asset load diagnostics — SEC-7")
+@Suite("Asset load diagnostics")
 struct AssetLoadDiagnosticsTests {
 
     // MARK: - Helpers
@@ -141,7 +141,7 @@ struct AssetLoadDiagnosticsTests {
         #expect(canonicalResult.failureReason == nil)
     }
 
-    // MARK: - Detector integration (the SEC-7 banner path)
+    // MARK: - Detector integration (the degraded-detection banner path)
 
     @Test("Altered quality assets surface through detector diagnostics; healthy bundle stays silent")
     func alteredAssetsSurfaceThroughDetectorDiagnostics() throws {
@@ -195,8 +195,8 @@ struct AssetLoadDiagnosticsTests {
 
     @Test("Appending the quality-asset trackers flips didDegrade (banner wiring)")
     func appendingAssetTrackersDrivesDegrade() {
-        // Environment-independent proof that the SEC-7 banner path fires for
-        // the new trackers — same wiring pin the NER tracker carries.
+        // Environment-independent proof that the degraded-detection banner path
+        // fires for the new trackers — same wiring pin the NER tracker carries.
         for tracker: GazetteerLoadDiagnostics.Gazetteer in [
             .contextScorerWeights, .doctypeTemperature, .presetThresholds,
         ] {

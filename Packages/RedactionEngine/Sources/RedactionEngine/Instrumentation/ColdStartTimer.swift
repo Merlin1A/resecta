@@ -6,13 +6,12 @@ import Foundation
 // `git rev-parse --short HEAD` at build time) for manual cross-reference
 // against the marks this type records.
 //
-// Spec: the DataPipeline data-requirements spec §1.35 + §4 #13
-// (engineer-facing only — no Resecta UI copy in V1) + §7.7 F-12 (ack option c:
-// engine_load_ms, first_detection_ready_ms).
+// This timer is engineer-facing only — no Resecta UI copy in V1 — and
+// records engine_load_ms and first_detection_ready_ms.
 //
 // Storage and mark methods are gated behind `#if DEBUG`; release builds compile
 // to no-op shims with the same public surface so call sites need no extra
-// gating. Resecta `CLAUDE.md` zero-networking + no-document-content invariants
+// gating. The zero-networking + no-document-content invariants
 // are preserved (the type captures durations only — no payload).
 
 #if DEBUG
@@ -92,7 +91,7 @@ public final class ColdStartTimer: @unchecked Sendable {
 }
 #else
 /// Release-build no-op shim — identical public surface, zero state.
-/// Spec §4 #13: engineer-facing only; release builds pay no instrumentation
+/// Engineer-facing only; release builds pay no instrumentation
 /// cost.
 public final class ColdStartTimer: @unchecked Sendable {
     public static let shared = ColdStartTimer()

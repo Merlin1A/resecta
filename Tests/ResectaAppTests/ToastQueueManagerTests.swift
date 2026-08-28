@@ -3,12 +3,12 @@ import Foundation
 import SwiftUI
 @testable import ResectaApp
 
-// §A6 — ToastQueueManager lifecycle. Focused on coalescing, per-position
+// ToastQueueManager lifecycle. Focused on coalescing, per-position
 // queueing, and clearAll determinism. Auto-dismiss timers are bounded below
 // at 2.5 s so those paths are exercised via `dismiss(_:)` + a short sleep
 // to cross the 0.3 s drain gap.
 
-@Suite("ToastQueueManager (§A6)")
+@Suite("ToastQueueManager")
 @MainActor
 struct ToastQueueManagerTests {
 
@@ -70,9 +70,9 @@ struct ToastQueueManagerTests {
         mgr.dismiss(first)
         // Immediate removal from activeToasts (animation target state).
         #expect(mgr.activeToasts.count == 0)
-        // CAT-234: self-clocking — poll until the 300 ms-gap drain promotes the
+        // Self-clocking — poll until the 300 ms-gap drain promotes the
         // queued toast instead of a fixed 450 ms wall-clock sleep (which flaked
-        // under full-suite load, OQ-25). The 300 ms drain gap constant is NOT
+        // under full-suite load). The 300 ms drain gap constant is NOT
         // reduced; only the test wait becomes deterministic.
         for _ in 0..<100 {
             if mgr.activeBottomToasts.count == 1 { break }
@@ -109,7 +109,7 @@ struct ToastQueueManagerTests {
         #expect(mgr.toastVersion > v1)
     }
 
-    @Test("displayDuration floors at 8s for action-bearing toasts (q16/UXF-19)")
+    @Test("displayDuration floors at 8s for action-bearing toasts")
     func actionToastFloor() {
         let mgr = ToastQueueManager()
         let short = ToastItem(message: "Cleared 1 match.", severity: .info,
@@ -129,7 +129,7 @@ struct ToastQueueManagerTests {
         #expect(mgr.displayDuration(for: long) <= 10.0)
     }
 
-    // MARK: - UXC-27 (GAP-36): severity tint routes through the text tier
+    // MARK: - Severity tint routes through the text tier
 
     @Test("ToastSeverity.tintColor maps each case to its text-tier token",
           arguments: [

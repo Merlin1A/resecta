@@ -70,10 +70,10 @@ struct SearchAndRedactSheet: View {
     /// the `Anim.resolved` fade since the pulse is a one-shot affordance
     /// hint, not a state-change cue. See `CompactFloatDetent.shouldPulseGrabber`.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// UXC-44 (RB-94 rider, measured on-sim): the compact handle
-    /// hides the result counter from the XXXL Dynamic Type size up
-    /// and lays the row out as a plain HStack at accessibility sizes
-    /// so the title never collides with the trailing cluster.
+    /// Measured on-sim: the compact handle hides the result counter
+    /// from the XXXL Dynamic Type size up and lays the row out as a
+    /// plain HStack at accessibility sizes so the title never
+    /// collides with the trailing cluster.
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State var searchDebounceTask: Task<Void, Never>?
     // The prior `applyResultMessage`
@@ -94,12 +94,12 @@ struct SearchAndRedactSheet: View {
     // out); once the USER has modified selections this session
     // (`searchState.userModifiedSelections`), Dismiss routes through a
     // confirmation dialog. This generalizes the retired triage sheet's
-    // confirm-if-selections-touched rule to the whole surface and
-    // consciously supersedes the prior one-tap-always ruling: under
+    // confirm-if-selections-touched rule to the whole surface: under
     // all-deselected arrival, every live selection is deliberate opt-in
-    // work. See `SearchAndRedactSheet+DiscardUndo.swift` for the
-    // selection helpers and the UXF-27 dismissal message (untouched
-    // path only — the dialog already names the drop on the other).
+    // work, so a one-tap-always dismiss would silently discard it. See
+    // `SearchAndRedactSheet+DiscardUndo.swift` for the selection helpers
+    // and the dismissal message (untouched path only — the dialog
+    // already names the drop on the other).
     // Visibility: read/written by the sheetHeaderChrome builder in
     // `SearchSheetHeaderSection.swift` (cross-file extension — the
     // established +Trigger pattern; internal is the smallest
@@ -131,7 +131,7 @@ struct SearchAndRedactSheet: View {
     /// `CompactFloatDetent.shouldPulseGrabber(...)` for testability.
     @State private var hasPulsedGrabberThisSession: Bool = false
 
-    /// UXF-04: "Save current..." (saved-regex menu) naming prompt state.
+    /// "Save current..." (saved-regex menu) naming prompt state.
     /// The alert lives at this sheet's root — the attachment that stays
     /// presentable after the triggering Menu dismisses; the menu-side
     /// half of the fix (item ordering) is documented on
@@ -185,10 +185,10 @@ struct SearchAndRedactSheet: View {
     /// handlers, sheet-local toast host, shield) lives on `body`'s
     /// shared container so BOTH compositions keep it.
     private var fullSheetContent: some View {
-        // SA-2 (D-70): the NavigationStack wrapper is RETIRED and the
-        // sheet's fixed chrome rides the active List's top safe-area
-        // insets instead of stacking above it as VStack siblings. The
-        // SA-2 bisect corrected the D-70 poison model (18- §10):
+        // The NavigationStack wrapper is retired: the sheet's fixed
+        // chrome rides the active List's top safe-area insets instead
+        // of stacking above it as VStack siblings. On-device
+        // measurement corrected the original assumption:
         // UISheetPresentationController's `.automatic` cooperation
         // binds only to a scroll view whose top edge sits at/near the
         // sheet's content top (~40 pt tolerance on this device
@@ -197,9 +197,8 @@ struct SearchAndRedactSheet: View {
         // threshold, so every sibling composition was dead. With the
         // chrome in `.safeAreaInset(edge: .top)` layers the List's
         // UIKit frame binds at the sheet top and one-swipe
-        // scroll↔detent cooperation is native (probe SPIKE-1a/b:
-        // listY 415→62 cooperative expand with the full chrome load
-        // in the inset).
+        // scroll↔detent cooperation is native (measured: listY 415→62
+        // cooperative expand with the full chrome load in the inset).
         Group {
             if isReviewActive {
                 VStack(spacing: 0) {
@@ -213,14 +212,13 @@ struct SearchAndRedactSheet: View {
                         onRequestWhy: { request in
                             activeModal = .rationale(request)
                         },
-                        // SA-3 rider (B-3): review rows navigate the
-                        // canvas with the search rows' shipped idiom —
-                        // page write + compact drop (ST-105 keeps the
-                        // canvas interactive behind the compact float).
-                        // UXC-50 (D-128, RB-123 item 6): the detection's
+                        // Review rows navigate the canvas with the
+                        // search rows' shipped idiom — page write plus
+                        // compact drop (the canvas stays interactive
+                        // behind the compact float). The detection's
                         // rect rides along so the row tap frames the
                         // detection like a search-row tap; the review
-                        // chevron WALK stays 1.2.
+                        // chevron walk is unchanged.
                         onNavigateToFinding: { page, normalizedRect in
                             documentState.currentPageIndex = page
                             documentState.requestCanvasScroll(
@@ -271,8 +269,8 @@ struct SearchAndRedactSheet: View {
                         // The Search interface's whole fixed chrome
                         // joins the header in ONE inset stack — the
                         // search bar, toolbar, and separator must not
-                        // re-offset the results list's frame (the
-                        // same threshold, 18- §10).
+                        // re-offset the results list's frame (the same
+                        // safe-area threshold noted above).
                         VStack(spacing: 0) {
                             sheetHeaderChrome
                             searchBar
@@ -300,12 +298,12 @@ struct SearchAndRedactSheet: View {
                 }
             }
         }
-        // Conditional dismiss: conditional Dismiss confirmation, the retired
-        // triage sheet's donor rule generalized. Copy is
-        // mechanism-description (ARCH §1.3) — names what the action
-        // does without an outcome promise. Attached to the content
-        // Group (not the outer modifier chain) to stay inside the
-        // type-checker budget beside the audit-export dialog.
+        // Conditional dismiss confirmation, generalized from the retired
+        // triage sheet's donor rule. Copy is a mechanism description —
+        // names what the action does without an outcome promise.
+        // Attached to the content Group (not the outer modifier chain)
+        // to stay inside the type-checker budget beside the
+        // audit-export dialog.
         .confirmationDialog(
             Self.dismissTitle,
             isPresented: $showDismissConfirmation,
@@ -322,15 +320,14 @@ struct SearchAndRedactSheet: View {
     }
 
     var body: some View {
-        // Compact composition branch (BH-B-01 origin; WA/D-75 shape,
-        // AMENDED by UXC-44 / D-116 / RB-92/94 and again by UXC-51 /
-        // D-128 / RB-123): at the compact detent the sheet renders ONLY
-        // the glanceable handle (`compactFloatStrip`) — the interface
-        // title, the result-nav cluster (‹ › + k/N) so the result walk
-        // continues while the sheet is parked, and the per-item Apply
-        // that marks just the current match. Every OTHER control lives
-        // at medium/large, and the canvas owns interaction below the
-        // sheet (BH-A-04 grant). The full chrome returns at medium+.
+        // Compact composition branch: at the compact detent the sheet
+        // renders ONLY the glanceable handle (`compactFloatStrip`) —
+        // the interface title, the result-nav cluster (‹ › + k/N) so
+        // the result walk continues while the sheet is parked, and the
+        // per-item Apply that marks just the current match. Every OTHER
+        // control lives at medium/large, and the canvas owns
+        // interaction below the sheet. The full chrome returns at
+        // medium+.
         Group {
             if selectedDetent == .compactFloat {
                 compactFloatStrip
@@ -356,9 +353,8 @@ struct SearchAndRedactSheet: View {
         // The dialog routes through
         // `exportAudit(includeSensitive:schema:)` with `.v4` and
         // abbreviated content only: a raw-content share is not a dialog
-        // row (DC-214 — revival is a deliberate re-add, reviewed with
-        // PB-124's payload-policy pass, not a flag flip). The
-        // dialog-shape choice (vs. a custom sheet) keeps the
+        // row — that revival is a deliberate re-add, not a flag flip.
+        // The dialog-shape choice (vs. a custom sheet) keeps the
         // `.confirmationDialog` fitting inside the iOS sheet at
         // AX5 since each label is single-line. V1.1+ scope
         // re-introduces a v3 surface only if the per-region exemption
@@ -407,11 +403,11 @@ struct SearchAndRedactSheet: View {
                 .presentationDragIndicator(.visible)
             }
         }
-        // UXF-04: "Save current..." (saved-regex menu) naming prompt.
+        // "Save current..." (saved-regex menu) naming prompt.
         // Root-attached — see `showSavedRegexSavePrompt`. Sentinel-validates via
         // `RegexSentinelCheck.validate(_:)`, then commits through
         // `savedRegexStore.add(label:pattern:)`; on success a toast
-        // names where the saved pattern is managed (UXF-20).
+        // names where the saved pattern is managed.
         .alert(Self.saveCurrentRegexAlertTitle, isPresented: $showSavedRegexSavePrompt) {
             TextField("Label", text: $savedRegexSaveLabel)
                 .textInputAutocapitalization(.words)
@@ -431,9 +427,9 @@ struct SearchAndRedactSheet: View {
             }
         }
         .onAppear {
-            // BH-B-01 rider — no auto-focus at the compact detent
-            // (sticky-detent reopen): the raised keyboard would cover
-            // the very document the float exists to expose.
+            // No auto-focus at the compact detent (sticky-detent
+            // reopen): the raised keyboard would cover the very
+            // document the float exists to expose.
             isSearchFieldFocused = selectedDetent != .compactFloat
             // When the sheet appears already carrying a
             // magic-wand pre-fill (the host wrote `queryText` +
@@ -508,7 +504,7 @@ struct SearchAndRedactSheet: View {
             #endif
         }
         .onDisappear {
-            toastManager.bottomClearance = 0 // UXC-51: nothing to clear
+            toastManager.bottomClearance = 0 // Nothing to clear at this detent
             // Cancel the in-flight debounce task on sheet
             // dismissal. Without this, a search debounce sleep that was
             // started just before `.onDisappear` fires would still resolve
@@ -563,10 +559,10 @@ struct SearchAndRedactSheet: View {
         // preserve applied markers + filter chips. Today every transition
         // is user-initiated, so the gate is always taken.
         .onChange(of: searchState.searchModeType) { oldMode, newMode in
-            // UXF-19: snapshot BEFORE `clearResults()` so the undo toast
-            // can restore the session ([RR-04] reset-after-check
-            // ordering). The unapplied-count is likewise read against
-            // the LIVE results array.
+            // Snapshot BEFORE `clearResults()` so the undo toast can
+            // restore the session (reset-after-check ordering). The
+            // unapplied-count is likewise read against the LIVE
+            // results array.
             let isProgrammatic = searchState.isProgrammaticModeChange
             let snapshot = Self.modeSwitchSnapshot(of: searchState, previousMode: oldMode)
             let unappliedCount = Self.unappliedMatchCount(in: searchState)
@@ -601,13 +597,13 @@ struct SearchAndRedactSheet: View {
             // branch so the next programmatic transition starts from
             // `false` and a fresh user transition still defaults to `false`.
             searchState.isProgrammaticModeChange = false
-            // UXF-16 — drop the previous mode's preview counters on EVERY
-            // user transition: the "Matches this page … Total …" row
+            // Drop the previous mode's preview counters on EVERY user
+            // transition: the "Matches this page … Total …" row
             // otherwise sits beside the new mode's empty state right
-            // after a switch (demonstrated ts3-01). No immediate
-            // reschedule — the persisted query would repopulate the row
-            // before the user has interacted with the new mode; the
-            // `queryText` onChange below re-schedules on the first edit.
+            // after a switch. No immediate reschedule — the persisted
+            // query would repopulate the row before the user has
+            // interacted with the new mode; the `queryText` onChange
+            // below re-schedules on the first edit.
             // Programmatic transitions (saved-search recall) keep the
             // pre-existing schedule so recall still previews immediately.
             searchState.clearLivePreview()
@@ -630,16 +626,15 @@ struct SearchAndRedactSheet: View {
                 searchState.appliedResultIDs.removeAll()
             }
         }
-        // UXF-05 (ts2-04): at the medium detent the fixed chrome above
-        // the results list consumes nearly the full sheet height, so
-        // arriving results rendered below the fold with the first row
-        // clipped at the footer. Raise the detent to large when results
-        // arrive while the sheet sits at medium — the blessed small
-        // behavior nudge. Never fires from compactFloat (ST-105: the
-        // canvas stays interactive behind the sheet by design) and
-        // never re-fires while results merely change, only on the
-        // empty → non-empty transition. Predicate is static for
-        // unit-testability.
+        // At the medium detent the fixed chrome above the results list
+        // consumes nearly the full sheet height, so arriving results
+        // rendered below the fold with the first row clipped at the
+        // footer. Raise the detent to large when results arrive while
+        // the sheet sits at medium — a small behavior nudge. Never
+        // fires from compactFloat (the canvas stays interactive behind
+        // the sheet by design) and never re-fires while results merely
+        // change, only on the empty → non-empty transition. Predicate
+        // is static for unit-testability.
         .onChange(of: searchState.results.isEmpty) { wasEmpty, isEmpty in
             if Self.shouldRaiseDetentForArrivedResults(
                 wasEmpty: wasEmpty,
@@ -656,12 +651,12 @@ struct SearchAndRedactSheet: View {
         // predicate seam so the call site stays declarative.
         .onChange(of: selectedDetent, initial: false) { (_: PresentationDetent, newDetent: PresentationDetent) in
             handleDetentChangeForPulse(newDetent: newDetent)
-            // BH-B-01 rider — dropping to compact releases field focus
-            // so the keyboard never sits over the exposed document.
+            // Dropping to compact releases field focus so the
+            // keyboard never sits over the exposed document.
             if newDetent == .compactFloat {
                 isSearchFieldFocused = false
             }
-            // UXC-51: ContentView's toast host clears the parked float.
+            // ContentView's toast host clears the parked float.
             toastManager.bottomClearance = Self.toastBottomClearance(for: newDetent)
         }
         // Observed on-sim: the app's single toast host
@@ -673,17 +668,16 @@ struct SearchAndRedactSheet: View {
         // Mount a sheet-local bottom host so this sheet's own toasts
         // render in the presented layer. ContentView's copy stays —
         // it is covered while the sheet is up and takes over if the
-        // toast outlives the sheet (e.g. the UXF-27 dismissal toast) —
-        // and at the compact float, where this host yields (UXC-51: the
-        // 80-pt float has no room, and the uncovered ContentView copy
-        // lifts by `bottomClearance` to clear it).
+        // toast outlives the sheet (e.g. a dismissal toast) — and at
+        // the compact float, where this host yields (the 80-pt float
+        // has no room, and the uncovered ContentView copy lifts by
+        // `bottomClearance` to clear it).
         .overlay(alignment: .bottom) {
             if selectedDetent != .compactFloat {
             VStack(spacing: ResectaTokens.Spacing.sm) {
                 ForEach(toastManager.activeBottomToasts) { item in
                     ToastView(item: item, toastManager: toastManager)
-                        // UXC-33 (RB-24, partial revival of DC-023):
-                        // routed through the resolver so Reduce Motion
+                        // Routed through the resolver so Reduce Motion
                         // swaps the slide for an opacity-only crossfade.
                         .transition(ResectaTokens.Anim.resolvedTransition(
                             standard: .asymmetric(
@@ -707,20 +701,18 @@ struct SearchAndRedactSheet: View {
         .shieldedSheetContent(monitor: captureMonitor)
     }
 
-    // MARK: - compactFloat Strip (WA/D-75, amended by UXC-44 and UXC-51)
+    // MARK: - compactFloat Strip
 
     /// The compact detent's WHOLE composition: one row — per-item Apply
     /// leading, centred interface title, result-nav cluster (‹ › + k/N)
-    /// trailing. CONSTRAINT (WA/D-75 as AMENDED by UXC-44 / D-116 /
-    /// RB-92/94 and again by UXC-51 / D-128 / RB-123): compact is a
-    /// glanceable handle — title + cluster + per-item Apply; every OTHER
-    /// control lives at medium+; the canvas owns interaction below the
-    /// sheet (BH-A-04). The cluster is the medium+ search bar's builder
-    /// (`resultNavCluster`; never co-mounted, ids unique); cluster and
-    /// Apply render only with results and no review pending
-    /// (`showsResultNavCluster`). RB-94 rider (FB-2/FB-9): the counter
-    /// hides from XXXL up; at accessibility sizes the row is a plain
-    /// HStack (Apply · title · chevrons) so the headline never collides.
+    /// trailing. Compact is a glanceable handle — title + cluster +
+    /// per-item Apply; every OTHER control lives at medium+; the canvas
+    /// owns interaction below the sheet. The cluster is the medium+
+    /// search bar's builder (`resultNavCluster`; never co-mounted, ids
+    /// unique); cluster and Apply render only with results and no
+    /// review pending (`showsResultNavCluster`). The counter hides from
+    /// XXXL up; at accessibility sizes the row is a plain HStack
+    /// (Apply · title · chevrons) so the headline never collides.
     /// Identifier kept for the detent-layout pins; `children: .contain`
     /// keeps the inner ids. The Apply's contract: `+CompactApply.swift`.
     private var compactFloatStrip: some View {
@@ -757,7 +749,7 @@ struct SearchAndRedactSheet: View {
             // The row is always the 46-pt layout height of its controls
             // so the title sits on the same line whether or not the
             // cluster and the Apply render (no jump between results /
-            // no results / review; measured on-sim, FB-2).
+            // no results / review; measured on-sim).
             .frame(minHeight: ResectaTokens.TouchTarget.minimum)
             Spacer(minLength: 0)
         }
@@ -765,7 +757,7 @@ struct SearchAndRedactSheet: View {
         .accessibilityIdentifier("compactFloatStrip")
     }
 
-    /// The compact handle's title — the D-75 centred headline, unchanged.
+    /// The compact handle's title — the centred headline, unchanged.
     private var compactStripTitle: some View {
         Text(searchState.searchModeType.interface.displayName)
             .font(.headline)
@@ -777,18 +769,18 @@ struct SearchAndRedactSheet: View {
     private var searchBar: some View {
         HStack(spacing: ResectaTokens.Spacing.sm) {
             if searchState.searchModeType == .piiScan {
-                // Scan interface leading controls (D-63/UT-04): the ↻
-                // re-run — relocated here from the retired
-                // category-chips row, and hidden again whenever the
-                // DEBUG reveal restores that row so the surface never
-                // renders two run controls — and the saved-searches
-                // bookmark, relocated from the retired scope row
-                // (this home is reachable at every detent; the scope
-                // row never was at compact). Entry auto-run still
-                // starts scans (the one-tap contract); the row keeps
-                // its cancel-while-searching and result-navigation
-                // jobs at the trailing edge, giving Scan the same
-                // leading-controls … trailing-nav read as Search.
+                // Scan interface leading controls: the ↻ re-run —
+                // relocated here from the retired category-chips row,
+                // and hidden again whenever the DEBUG reveal restores
+                // that row so the surface never renders two run
+                // controls — and the saved-searches bookmark, relocated
+                // from the retired scope row (this home is reachable at
+                // every detent; the scope row never was at compact).
+                // Entry auto-run still starts scans (the one-tap
+                // contract); the row keeps its cancel-while-searching
+                // and result-navigation jobs at the trailing edge,
+                // giving Scan the same leading-controls … trailing-nav
+                // read as Search.
                 if !SearchState.scanCategoryStripEnabled {
                     scanRescanButton
                 }
@@ -855,10 +847,10 @@ struct SearchAndRedactSheet: View {
                     .accessibilityLabel("Search text")
                     // Return runs the current query — the explicit-run
                     // affordance for carried queries the mode switch
-                    // deliberately does not auto-run (UXF-16) and for
-                    // short queries below the debounce floor.
+                    // deliberately does not auto-run, and for short
+                    // queries below the debounce floor.
                     .onSubmit {
-                        // BH-B-06 — trimmed gate (mirrors multi-term's
+                        // Trimmed gate (mirrors multi-term's
                         // validator): a whitespace-only Return must not
                         // run an invisible query.
                         if !searchState.queryText
@@ -875,9 +867,9 @@ struct SearchAndRedactSheet: View {
             // Saved-searches entry point for the Search interface —
             // by the field so it stays reachable at the compact
             // detent. The Scan interface renders the SAME
-            // `savedSearchesBookmark` from its leading branch above
-            // (D-63/UT-04) — one shared component, two per-mode
-            // render sites, so exactly one bookmark shows per mode.
+            // `savedSearchesBookmark` from its leading branch above —
+            // one shared component, two per-mode render sites, so
+            // exactly one bookmark shows per mode.
             if searchState.searchModeType != .piiScan {
                 savedSearchesBookmark
             }
@@ -892,8 +884,9 @@ struct SearchAndRedactSheet: View {
                 .accessibilityLabel("Cancel search")
             }
 
-            // Prev/Next navigation + position indicator (UXC-44:
-            // gated on the pending review too — packet RN-06).
+            // Prev/Next navigation + position indicator — also gated
+            // on the pending review (a detections list has no
+            // "current" to walk).
             if showsResultNavCluster {
                 resultNavigationControls
             }
@@ -902,13 +895,12 @@ struct SearchAndRedactSheet: View {
         .padding(.vertical, ResectaTokens.Spacing.sm)
     }
 
-    /// REV-01 (packet §7.2 items 3–4, RB-66/RB-67): shared label
-    /// chrome for this sheet's circular icon buttons — an 18pt SF
-    /// glyph in a drawn Ø44 circle whose wash is matched by eye to
-    /// the retired `.bordered`-small background, floored to the
+    /// Shared label chrome for this sheet's circular icon buttons — an
+    /// 18pt SF glyph in a drawn Ø44 circle whose wash is matched by eye
+    /// to the retired `.bordered`-small background, floored to the
     /// `TouchTarget.minimum` LAYOUT square with the floor AFTER the
     /// chrome (hit area unchanged, visual back to circle scale; hit
-    /// expansion beyond the layout frame is banned — RB-67).
+    /// expansion beyond the layout frame is banned).
     /// Interaction states live on `CircularIconButtonStyle`.
     private func circularIconLabel(_ systemName: String) -> some View {
         Image(systemName: systemName)
@@ -930,16 +922,16 @@ struct SearchAndRedactSheet: View {
     /// single modal slot. Parked while staged detections await review:
     /// a recall re-triggers a run, and a run must not race the pending
     /// review for the Scan surface. Resolve the review (Apply /
-    /// Dismiss) first. Since D-63/UT-04 this is the one live bookmark
-    /// for BOTH interfaces (Scan renders it from the search bar's
-    /// leading branch; the scope-row sibling is dormant).
+    /// Dismiss) first. This is the one live bookmark for BOTH
+    /// interfaces (Scan renders it from the search bar's leading
+    /// branch; the scope-row sibling is dormant).
     private var savedSearchesBookmark: some View {
         Button {
             activeModal = .savedSearches
         } label: {
-            // REV-01 (packet §7.2 item 3): drawn Ø44 circle + 18pt
-            // glyph in place of the `.bordered` wash that rendered the
-            // UXC-18 floor as a ~64pt slab; hit area unchanged.
+            // Drawn Ø44 circle + 18pt glyph in place of the
+            // `.bordered` wash that rendered the touch-target floor as
+            // a ~64pt slab; hit area unchanged.
             circularIconLabel("bookmark")
         }
         .buttonStyle(.circularIcon)
@@ -949,7 +941,7 @@ struct SearchAndRedactSheet: View {
     }
 
     /// Compact re-run control for the Scan interface bar — the
-    /// relocated home of the retired chips-row ↻ (D-63/UT-04).
+    /// relocated home of the retired chips-row ↻.
     /// Inherits the run control's stable accessibility label
     /// ("Scan document for PII") so existing UI-test queries and
     /// VoiceOver habits keep resolving to the surface's one run
@@ -962,11 +954,10 @@ struct SearchAndRedactSheet: View {
         Button {
             triggerSearch()
         } label: {
-            // REV-01 (packet §7.2 item 3): the ruled circle chrome,
-            // same as SearchToolbarSection.rescanButton; identifier
-            // matches that sibling since the two are mutually
-            // exclusive (only one renders per
-            // `scanCategoryStripEnabled` state).
+            // The ruled circle chrome, same as
+            // SearchToolbarSection.rescanButton; identifier matches
+            // that sibling since the two are mutually exclusive (only
+            // one renders per `scanCategoryStripEnabled` state).
             circularIconLabel("arrow.clockwise")
         }
         .buttonStyle(.circularIcon)
@@ -1020,43 +1011,42 @@ struct SearchAndRedactSheet: View {
 
     // MARK: - Result Navigation
 
-    /// UXC-44 (RB-92) + packet RN-06 gate: the ‹ k/N › cluster renders
-    /// at EITHER site only with search results on board and no
-    /// pipeline review pending — stale sheet-scan results must not
-    /// show a walk over a detections list, which has no "current".
-    /// UXC-51: the compact handle's per-item Apply rides the same gate.
+    /// The ‹ k/N › cluster renders at EITHER site only with search
+    /// results on board and no pipeline review pending — stale
+    /// sheet-scan results must not show a walk over a detections list,
+    /// which has no "current". The compact handle's per-item Apply
+    /// rides the same gate.
     private var showsResultNavCluster: Bool {
         !searchState.results.isEmpty && !isReviewActive
     }
 
-    /// The medium+ search-bar site of the ‹ k/N › cluster. REV-01
-    /// (packet §7.2 item 4, RB-65): geometry only — the pair keeps
-    /// its row, counter, labels, ids, and shortcuts; each chevron is
-    /// the ruled Ø44 drawn circle inside the 46pt layout floor, pair
-    /// spacing 2 → 6 (≈8pt visual gap between the drawn circles).
-    /// UXC-44 (D-116, RB-92) changed the pair's BEHAVIOUR (a tap parks
-    /// the sheet at the compact float — `navigateToCurrentResult(dropToCompact:)`)
-    /// and re-homed the composition into the shared `resultNavCluster`
-    /// builder so this site and the compact handle never drift; the
-    /// geometry here is untouched (`UIFixChromeUITests` measures it)
-    /// and the counter always renders at this site.
+    /// The medium+ search-bar site of the ‹ k/N › cluster. Geometry
+    /// only — the pair keeps its row, counter, labels, ids, and
+    /// shortcuts; each chevron is the ruled Ø44 drawn circle inside the
+    /// 46pt layout floor, pair spacing 2 → 6 (≈8pt visual gap between
+    /// the drawn circles). A later change to the pair's BEHAVIOUR (a
+    /// tap parks the sheet at the compact float —
+    /// `navigateToCurrentResult(dropToCompact:)`) re-homed the
+    /// composition into the shared `resultNavCluster` builder so this
+    /// site and the compact handle never drift; the geometry here is
+    /// untouched (`UIFixChromeUITests` measures it) and the counter
+    /// always renders at this site.
     private var resultNavigationControls: some View {
         resultNavCluster(hidesCounterAtLargeTypeSizes: false)
     }
 
-    /// UXC-44 (D-116, RB-92/94): the ONE result-nav cluster — the
-    /// ‹ › pair plus the k/N counter — mounted at BOTH sites (the
-    /// medium+ search bar's trailing edge via
-    /// `resultNavigationControls`, and the compact handle's trailing
-    /// edge in `compactFloatStrip`). The sites are never co-mounted,
-    /// so the ids / labels / ⌘G shortcuts stay unique in the live
-    /// tree. A chevron tap steps the current result AND parks the
-    /// sheet at the compact float (the row-tap idiom, RB-92); ⌘G /
-    /// ⇧⌘G ride these same Buttons, so the shortcut ≡ the chevron by
+    /// The ONE result-nav cluster — the ‹ › pair plus the k/N counter
+    /// — mounted at BOTH sites (the medium+ search bar's trailing edge
+    /// via `resultNavigationControls`, and the compact handle's
+    /// trailing edge in `compactFloatStrip`). The sites are never
+    /// co-mounted, so the ids / labels / ⌘G shortcuts stay unique in
+    /// the live tree. A chevron tap steps the current result AND parks
+    /// the sheet at the compact float (the row-tap idiom); ⌘G / ⇧⌘G
+    /// ride these same Buttons, so the shortcut ≡ the chevron by
     /// construction (J/K keep the medium semantics —
-    /// `SearchResultsSection`). `hidesCounterAtLargeTypeSizes` is
-    /// the RB-94 rider for the compact handle only: the counter hides
-    /// from XXXL up (measured — see `compactFloatStrip`).
+    /// `SearchResultsSection`). `hidesCounterAtLargeTypeSizes` applies
+    /// to the compact handle only: the counter hides from XXXL up
+    /// (measured — see `compactFloatStrip`).
     private func resultNavCluster(hidesCounterAtLargeTypeSizes: Bool) -> some View {
         HStack(spacing: ResectaTokens.Spacing.xs) {
             HStack(spacing: 6) {
@@ -1094,7 +1084,7 @@ struct SearchAndRedactSheet: View {
     /// position within the visible filtered set; an en dash (–)
     /// signals that the current result is hidden by the filter.
     /// Rendered by `resultNavCluster` at both sites — the strings
-    /// and a11y labels are the RB-65 survivors, unchanged.
+    /// and a11y labels are unchanged from the prior implementation.
     @ViewBuilder
     private var resultNavCounter: some View {
         if let idx = searchState.currentResultIndex {
@@ -1120,34 +1110,32 @@ struct SearchAndRedactSheet: View {
         }
     }
 
-    /// The ONE result-navigation seam (SA-3 rider d — the former
-    /// section-side duplicate is deleted; its J/K keyboard buttons
-    /// call back through `onNavigateToCurrentResult`). UXC-44 (D-116,
-    /// RB-92): two detent targets behind the one seam — the chevrons
-    /// and ⌘G pass `dropToCompact: true` (step AND park the sheet at
-    /// the compact float, the row-tap idiom, so the outlined match is
-    /// in view and the walk continues from the handle's cluster); J/K
-    /// pass `false` and keep the prior large → medium rule (keyboard
-    /// users read the list while stepping). The page write + rect
-    /// scroll half is shared by both.
+    /// The ONE result-navigation seam (the former section-side
+    /// duplicate is deleted; its J/K keyboard buttons call back
+    /// through `onNavigateToCurrentResult`). Two detent targets behind
+    /// the one seam — the chevrons and ⌘G pass `dropToCompact: true`
+    /// (step AND park the sheet at the compact float, the row-tap
+    /// idiom, so the outlined match is in view and the walk continues
+    /// from the handle's cluster); J/K pass `false` and keep the prior
+    /// large → medium rule (keyboard users read the list while
+    /// stepping). The page write + rect scroll half is shared by both.
     private func navigateToCurrentResult(dropToCompact: Bool) {
         guard let result = searchState.currentResult else { return }
         documentState.currentPageIndex = result.pageIndex
-        // SA-3 rider (D-70): rect-level half — when the canvas is
-        // zoomed past fit, the page write alone can leave the match
-        // off-screen; the canvas consumes this with the engine's
-        // canonical rect conversion.
-        // UXC-50 (D-128, RB-123): the sheet-parking walk (chevrons,
-        // ⌘G/⇧⌘G) frames the item at the readability scale; J/K keeps
-        // today's page-only intent (RB-92 semantics untouched).
+        // Rect-level half — when the canvas is zoomed past fit, the
+        // page write alone can leave the match off-screen; the canvas
+        // consumes this with the engine's canonical rect conversion.
+        // The sheet-parking walk (chevrons, ⌘G/⇧⌘G) frames the item at
+        // the readability scale; J/K keeps today's page-only intent
+        // (semantics untouched).
         documentState.requestCanvasScroll(
             toPageIndex: result.pageIndex,
             normalizedRect: result.normalizedRect,
             zoom: dropToCompact ? .readability : .none
         )
         if dropToCompact {
-            // RB-92: the chevron walk parks the sheet (the row-tap
-            // idiom in `SearchResultsSection`). The UXF-05 arrival
+            // The chevron walk parks the sheet (the row-tap idiom in
+            // `SearchResultsSection`). The results-arrival detent
             // raise is untouched — the first tap from large drops
             // straight to compact.
             if selectedDetent != .compactFloat {
@@ -1237,9 +1225,9 @@ struct SearchAndRedactSheet: View {
                       unappliedCount: Self.unappliedMatchCount(in: searchState),
                       interface: searchState.searchModeType.interface
                   ) {
-            // UXF-27: a 0-selected dismissal names what the close drops
-            // when unapplied matches exist so the loss isn't silent.
-            // The toast manager outlives the sheet.
+            // A 0-selected dismissal names what the close drops when
+            // unapplied matches exist so the loss isn't silent. The
+            // toast manager outlives the sheet.
             toastManager.enqueue(message, severity: .info)
         }
         if redactionState.pendingTriage != nil {
@@ -1271,12 +1259,12 @@ struct SearchAndRedactSheet: View {
 
     /// Persistent top banner while `redactionState.autoDetectionDegraded`
     /// is true (one or more gazetteer / context-keywords resources failed
-    /// to load this session). Mechanism-description copy per ARCH §1.3 /
-    /// I6 — describes what happened and what remains available, no
-    /// outcome promises. The copy pass reworded the inherited banner
-    /// line: the state is a degrade (runs proceed with the resources
-    /// that loaded), and the retired flow name is gone — the wording
-    /// now matches the toast that announces the same state.
+    /// to load this session). The copy is a mechanism description —
+    /// describes what happened and what remains available, no outcome
+    /// promises. The copy pass reworded the inherited banner line: the
+    /// state is a degrade (runs proceed with the resources that
+    /// loaded), and the retired flow name is gone — the wording now
+    /// matches the toast that announces the same state.
     @ViewBuilder
     var degradedDetectionBanner: some View {
         HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
@@ -1318,8 +1306,8 @@ struct SearchAndRedactSheet: View {
                 undoManager: undoManager,
                 documentState: documentState
             ) else { return }
-            // UXF-11 — commit feedback through the shared copy builder so
-            // the count stays in lockstep with every other apply surface.
+            // Commit feedback through the shared copy builder so the
+            // count stays in lockstep with every other apply surface.
             // The sheet stays up (the review resolves in place); the
             // sheet-local toast host renders it. The conditional-dismiss
             // tracker reset is owned by the apply path.
@@ -1405,12 +1393,12 @@ struct SearchAndRedactSheet: View {
         }
     }
 
-    /// UXF-05 (ts2-04) — pure decision for the results-arrival detent
-    /// raise. True only on the empty → non-empty transition while the
-    /// sheet sits at `.medium`: compactFloat is a deliberate
-    /// canvas-visible state (ST-105) and large already shows the list,
-    /// so neither is touched. Static so `SearchDetentRaiseTests` pins
-    /// the contract without driving the SwiftUI render cycle.
+    /// Pure decision for the results-arrival detent raise. True only
+    /// on the empty → non-empty transition while the sheet sits at
+    /// `.medium`: compactFloat is a deliberate canvas-visible state
+    /// and large already shows the list, so neither is touched. Static
+    /// so `SearchDetentRaiseTests` pins the contract without driving
+    /// the SwiftUI render cycle.
     static func shouldRaiseDetentForArrivedResults(
         wasEmpty: Bool,
         isEmpty: Bool,
@@ -1434,16 +1422,15 @@ struct SearchAndRedactSheet: View {
         return !isEmpty
     }
 
-    // MARK: - Save current regex (UXF-04)
+    // MARK: - Save current regex
 
-    /// UXC-31 (RB-40): the alert's own title — previously borrowed the
-    /// "Save current..." menu item's label text; the alert isn't a
-    /// menu, so it gets independent copy. The menu item itself is
-    /// unchanged.
+    /// The alert's own title — previously borrowed the "Save
+    /// current..." menu item's label text; the alert isn't a menu, so
+    /// it gets independent copy. The menu item itself is unchanged.
     static let saveCurrentRegexAlertTitle = "Save current pattern"
 
     /// Success toast for a committed "Save current..." — names where the
-    /// saved pattern is managed so the save isn't a dead end (UXF-20).
+    /// saved pattern is managed so the save isn't a dead end.
     /// SAFE copy — factual destination, no outcome promise.
     static let savedRegexSavedToast = "Saved — manage in Settings → Saved Regexes"
 

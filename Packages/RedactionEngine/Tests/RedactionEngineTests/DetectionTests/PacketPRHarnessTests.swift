@@ -3,20 +3,20 @@ import CoreGraphics
 import Testing
 @testable import RedactionEngine
 
-// S05 / Step B -- Resecta sample/test-document packet series.
+// Resecta sample/test-document packet series.
 //
-// The manifest-driven precision/recall harness implementing D22 Option C (the
-// ratified two-gate model). It UPGRADES the counts-only S8 `RealDocOCRQuality`
+// The manifest-driven precision/recall harness implementing the two-gate
+// model. It UPGRADES the counts-only `RealDocOCRQuality`
 // harness from counts to a labeled per-occurrence P/R/F-beta join.
 //
-// DETERMINISTIC + REPORT-ONLY. It joins two committed artifacts -- the D21
+// DETERMINISTIC + REPORT-ONLY. It joins two committed artifacts -- the
 // ground truth (`packet-ground-truth.json`) and the dual-leg Stage-1 snapshot
 // (`snapshots/packet-stage1.json`, produced by `PacketSnapshotTests`) -- with
 // NO engine run, so it never flakes on the simulator Vision path. The LIVE
 // regression guard is `PacketRegressionTests` (the must-fire/not-fire freeze);
 // this suite is the measurement report + a few cross-consistency assertions.
 //
-// D22 OPTION C, as implemented here:
+// THE TWO-GATE MODEL, as implemented here:
 //  - Region match TWO ways: (1) coverage (fraction of the GT value under a
 //    detection box) -- the LABEL-AGNOSTIC redaction-recall / privacy outcome;
 //    (2) IoU -- the headline match-QUALITY number, reported at >= 0.5 with the
@@ -28,16 +28,16 @@ import Testing
 //  - Tier -> metric mapping: must_fire -> recall denominator; must_not_fire ->
 //    precision denominator (a same-category fire is a false positive);
 //    should_fire -> off-headline known-miss line; watch -> record only.
-//  - The account/phone collision (S01 Sec 1.5#2) surfaces as the snapshot's
+//  - The account/phone collision surfaces as the snapshot's
 //    `overlapSuppressedByCategory` + the account->phone confusion cell.
 //  - Pages 10 (GOV-ID) + 11 (VEH) are face-blocked in the snapshot (sim Vision
 //    face #9); their occurrences are reported in a separate FACE-BLOCKED bucket
 //    and EXCLUDED from the headline denominators (they are frozen live, on the
 //    face-free seam, by PacketRegressionTests).
 //
-// MATCHED-TEXT LOGGING (D31): synthetic, publicly-manifested fixture -- logged.
+// MATCHED-TEXT LOGGING: synthetic, publicly-manifested fixture -- logged.
 
-@Suite("Hartwell packet -- D22 Option-C P/R harness (S05/B)", .serialized)
+@Suite("Hartwell packet -- precision/recall harness", .serialized)
 struct PacketPRHarnessTests {
 
     // MARK: - Committed-artifact models
@@ -154,7 +154,7 @@ struct PacketPRHarnessTests {
 
     // MARK: - The harness
 
-    @Test("D22 Option-C per-leg P/R/F-beta + account->phone cell + carried-STMT resolution")
+    @Test("Per-leg P/R/F-beta + account->phone cell + carried-STMT resolution")
     func harness() throws {
         let gt = try Self.loadGroundTruth()
         let snap = try Self.loadSnapshot()
@@ -163,7 +163,7 @@ struct PacketPRHarnessTests {
         #expect(snap.pages.count == 12, "snapshot must cover all 12 packet pages")
         #expect(gt.occurrences.count == 106, "ground truth must carry all 106 drawn occurrences")
 
-        print("[OCRQ-pkt] ===== D22 Option-C P/R harness (committed snapshot join) =====")
+        print("[OCRQ-pkt] ===== P/R harness (committed snapshot join) =====")
 
         // Per-leg tallies.
         var faceBlocked: [String] = []
@@ -231,11 +231,11 @@ struct PacketPRHarnessTests {
             // PacketRegressionTests freeze, against the committed snapshot).
             if legName == "text" {
                 #expect(regionRecall == 1.0,
-                        "text-leg must_fire region recall must be 1.0 after S05 tier reconciliation; got \(Self.pct(regionRecall))")
+                        "text-leg must_fire region recall must be 1.0 after tier reconciliation; got \(Self.pct(regionRecall))")
             }
         }
 
-        // account -> phone confusion cell (S01 Sec 1.5#2) + overlap suppression.
+        // account -> phone confusion cell + overlap suppression.
         print("[OCRQ-pkt] ----- category confusion (region-matched, category mismatch) -----")
         for (k, n) in confusion.sorted(by: { $0.value > $1.value }) { print("[OCRQ-pkt]   \(k): \(n)") }
         var suppressed: [String: Int] = [:]
@@ -246,13 +246,13 @@ struct PacketPRHarnessTests {
         }
         print("[OCRQ-pkt]   overlapSuppressedByCategory (summed): \(suppressed.sorted { $0.key < $1.key })")
         #expect((suppressed["account"] ?? 0) >= 1 || (confusion["account->phone"] ?? 0) >= 1,
-                "the S01 account->phone collision (Sec 1.5#2) must reproduce in the packet")
+                "the account->phone collision must reproduce in the packet")
 
         // Face-blocked bucket (pages 10/11; frozen live by PacketRegressionTests).
         print("[OCRQ-pkt] ----- FACE-BLOCKED (pages 10/11, excluded from headline; frozen by PacketRegressionTests) -----")
         for f in faceBlocked { print("[OCRQ-pkt]   \(f)") }
 
-        // Carried STMT resolution (B.8): the 20 S01-measured classes now sit on
+        // Carried STMT resolution: the 20 previously-measured classes now sit on
         // packet pages 3-5 (the embedded FROZEN statement -- the OCR-path
         // exhibit). Resolve each class's measured count on its applicable leg.
         print("[OCRQ-pkt] ----- carried STMT resolution (pages 3-5) -----")

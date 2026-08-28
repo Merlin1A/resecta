@@ -3,7 +3,7 @@ import Foundation
 import CoreGraphics
 @testable import RedactionEngine
 
-// SEC-1 — File protection on temp output.
+// File protection on temp output.
 //
 // These tests exercise `TempFileHardening.applyProtection` against the same
 // engine-side write path used in production:
@@ -185,13 +185,13 @@ struct FileProtectionTests {
         try expectProtectionStrict(b, equals: .completeUntilFirstUserAuthentication)
     }
 
-    @Test("downgradeTree through a TempExportDirectory downgrades the session's child files (CAT-124 coordinator path)")
+    @Test("downgradeTree through a TempExportDirectory downgrades the session's child files (coordinator path)")
     func testDowngradeThroughCoordinatorUsesDowngradeTree() throws {
         // The fixed PipelineCoordinator.downgradeTempProtectionOnSessionClose()
         // calls `TempFileHardening.downgradeTree(at: tempExportDirectory.url, …)`.
         // This exercises that exact engine composition: a file written into the
-        // SEC-2 session subdirectory at `.complete` is downgraded by the tree
-        // walk. Pre-CAT-124 the coordinator applied protection to the directory
+        // session subdirectory at `.complete` is downgraded by the tree
+        // walk. Previously the coordinator applied protection to the directory
         // node only, so the nested child kept `.complete`; `downgradeTree` is
         // the correct recursive tool. (On the iOS Simulator protection classes
         // coalesce — see host-tolerance notes — so the strict assertion is the

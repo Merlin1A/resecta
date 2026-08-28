@@ -2,14 +2,14 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// SEC-2 — Backup exclusion on temp dir.
+// Backup exclusion on temp dir.
 //
-// SEC-2 — these tests exercise the `TempExportDirectory` lifecycle directly. The
+// These tests exercise the `TempExportDirectory` lifecycle directly. The
 // integration assertion (no write at the bare `temporaryDirectory` root
 // during the session) is covered here by inspecting filesystem residue
 // before and after creating a session-scoped child URL.
 
-@Suite("Backup Exclusion on Temp Dir (SEC-2)", .tags(.security))
+@Suite("Backup Exclusion on Temp Dir", .tags(.security))
 struct BackupExclusionTests {
 
     // --- Test 1 ------------------------------------------------------------

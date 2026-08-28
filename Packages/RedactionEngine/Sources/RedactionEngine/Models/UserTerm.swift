@@ -1,6 +1,6 @@
 import Foundation
 
-// W3 — user-defined custom keyword. Consumed by `UserTermMatcher` during
+// User-defined custom keyword. Consumed by `UserTermMatcher` during
 // PII scans and persisted globally by `SettingsState.customUserTerms`.
 //
 // Length and regex-validity are NOT enforced on the struct — enforcement

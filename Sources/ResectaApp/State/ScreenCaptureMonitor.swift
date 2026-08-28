@@ -1,7 +1,7 @@
 import Foundation
 import UIKit
 
-// SEC-3: Screen-capture / mirroring privacy shield.
+// Screen-capture / mirroring privacy shield.
 //
 // Observes `UIScreen.capturedDidChangeNotification` (driving `isCaptured`)
 // and `UIScreen.didConnectNotification` / `didDisconnectNotification`
@@ -11,7 +11,7 @@ import UIKit
 // their sensitive content for a `PrivacyShieldView` so the document never
 // reaches a screen recorder or external display.
 //
-// Mechanism-description language (ARCH §1.3 / I6): this monitor reacts to
+// Mechanism-description language: this monitor reacts to
 // the platform's published capture/mirroring signals. It does not claim to
 // defeat hardware-level capture paths outside that signal surface.
 //
@@ -21,10 +21,10 @@ import UIKit
 //   `UIScene`-routed equivalents, but they remain the documented surface
 //   for "is the main display currently being mirrored?" and continue to
 //   fire reliably on iOS 26. We suppress the deprecation warnings here
-//   to keep the SEC-3 posture intact without introducing a scene-
+//   to keep the privacy-shield posture intact without introducing a scene-
 //   delegate detour. Revisit if Apple removes these APIs.
 
-/// MainActor-isolated monitor that drives the SEC-3 privacy shield.
+/// MainActor-isolated monitor that drives the privacy shield.
 ///
 /// The `@Observable` machinery delivers per-property change notifications
 /// to SwiftUI consumers, so views that read `isShielded` re-evaluate when
@@ -36,7 +36,7 @@ import UIKit
 /// mutation; the @Observable macro generates storage that Swift 6 does
 /// not infer as Sendable, so the annotation is opt-in to what the
 /// runtime already enforces via the MainActor hop. Mirrors
-/// `PipelineCoordinator` (`:97`). Required so the RES-01 fix can use
+/// `PipelineCoordinator` (`:97`). Required so the deinit-reachability fix can use
 /// `Task { @MainActor [weak self] in }` (PipelineCoordinator.swift:172
 /// pattern) without the prior `nonisolated(unsafe) let monitor = self`
 /// cycle-forming alias.
@@ -47,8 +47,8 @@ final class ScreenCaptureMonitor: @unchecked Sendable {
     private(set) var isCaptured: Bool
 
     /// Set when more than one `UIScreen` is connected — covers AirPlay /
-    /// HDMI / wired mirroring. The threshold matches the SEC-3 locked
-    /// decision (`UIScreen.screens.count > 1`).
+    /// HDMI / wired mirroring. The threshold is
+    /// `UIScreen.screens.count > 1`.
     private(set) var isMirroring: Bool
 
     /// Convenience for view-side gating. True if either trigger fires.
@@ -56,8 +56,8 @@ final class ScreenCaptureMonitor: @unchecked Sendable {
 
     // nonisolated(unsafe): assigned once in `init` (on MainActor) and read only in
     // the nonisolated `deinit` to cancel them. `Task<Void, Never>` is Sendable with
-    // no concurrent access, so opting these out of the s04 SE-0466 MainActor default
-    // keeps the deinit synchronous (RES-01 reachability). These are @Observable-
+    // no concurrent access, so opting these out of the SE-0466 MainActor default
+    // keeps the deinit synchronous (deinit reachability). These are @Observable-
     // tracked mutable stored properties: plain `nonisolated` is REJECTED ("cannot be
     // applied to mutable stored properties"), so `nonisolated(unsafe)` is the required
     // form. The compiler's "has no effect, consider 'nonisolated'" suggestion is a
@@ -72,7 +72,7 @@ final class ScreenCaptureMonitor: @unchecked Sendable {
         self.isCaptured = Self.readIsCaptured()
         self.isMirroring = Self.readIsMirroring()
 
-        // RES-01: capture `self` weakly in the observer tasks so this
+        // Capture `self` weakly in the observer tasks so this
         // monitor can deallocate. The prior `nonisolated(unsafe) let
         // monitor = self` alias formed a strong-reference cycle that
         // pinned the instance for the app lifetime, breaking `deinit`
@@ -118,7 +118,7 @@ final class ScreenCaptureMonitor: @unchecked Sendable {
         // `nonisolated(unsafe)` (see above) so this nonisolated deinit can read and
         // `cancel()` them without hopping to MainActor — they are Sendable,
         // written once in `init`, and never touched concurrently. With the
-        // RES-01 `[weak self]` fix, deinit is now reachable (was previously
+        // `[weak self]` fix, deinit is now reachable (was previously
         // pinned by the strong `monitor = self` alias captured by the tasks).
         captureObservationTask?.cancel()
         screenConnectObservationTask?.cancel()
@@ -135,14 +135,14 @@ final class ScreenCaptureMonitor: @unchecked Sendable {
     }
 
     /// Centralized read of `UIScreen.screens.count > 1`. Same rationale
-    /// as `readIsCaptured` — the SEC-3 posture pins this API.
+    /// as `readIsCaptured` — the privacy shield's mirroring check pins this API.
     @available(iOS, deprecated: 16.0)
     private static func readIsMirroring() -> Bool {
         UIScreen.screens.count > 1
     }
 
-    /// Centralized notification name lookup. The SEC-3 posture
-    /// names `UIScreen.didConnectNotification`; this static keeps the
+    /// Centralized notification name lookup. The mirroring detector
+    /// reads `UIScreen.didConnectNotification`; this static keeps the
     /// deprecation-suppression annotation off the call sites above.
     @available(iOS, deprecated: 16.0)
     private static var didConnectNotificationName: Notification.Name {

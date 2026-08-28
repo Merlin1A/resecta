@@ -6,7 +6,7 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// ENGINE §3 — Pixel destruction security tests.
+// Pixel destruction security tests.
 // This is the most security-critical test suite. Every fill must be verifiable.
 
 @Suite("Pixel Destruction and Fill Verification")
@@ -235,7 +235,7 @@ struct PixelDestructionTests {
     func normalizedToPixels() {
         let fullPage = CGRect(x: 0, y: 0, width: 1, height: 1)
         let pixels = normalizedToFillPixels(fullPage, bitmapWidth: 2550, bitmapHeight: 3300)
-        // §3.2a expands 1 px outward on every side; overhang clips at fill.
+        // The fill expansion adds 1 px outward on every side; overhang clips at fill.
         #expect(pixels == CGRect(x: -1, y: -1, width: 2552, height: 3302))
     }
 
@@ -244,7 +244,7 @@ struct PixelDestructionTests {
         let halfPage = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
         let pixels = normalizedToFillPixels(halfPage, bitmapWidth: 200, bitmapHeight: 200)
         // 0.25 * 200 = 50, 0.5 * 200 = 100 → pixelAligned → same, then the
-        // §3.2a 1-px outward expansion.
+        // 1-px outward expansion.
         #expect(pixels == CGRect(x: 49, y: 49, width: 102, height: 102))
     }
 
@@ -289,7 +289,7 @@ struct PixelDestructionTests {
         #expect(ctx2.bytesPerRow % 16 == 0)
     }
 
-    // MARK: - Non-Gray Fill Discriminator (TEST §3.4)
+    // MARK: - Non-Gray Fill Discriminator
 
     @Test("Non-gray fill discriminates channel swaps via per-channel verification")
     func nonGrayChannelDiscriminator() throws {

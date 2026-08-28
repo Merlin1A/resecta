@@ -3,12 +3,12 @@ import PDFKit
 import CoreGraphics
 @testable import RedactionEngine
 
-// Tests for ENGINE §5B — character filtering and coordinate conversion.
+// Tests for character filtering and coordinate conversion.
 
 @Suite("Character Filtering")
 struct CharacterFilterTests {
 
-    // MARK: - normalizedToPDFPageCoordinates (ENGINE §5B.1a)
+    // MARK: - normalizedToPDFPageCoordinates
 
     @Test("Coordinate conversion with zero-origin page")
     func coordinateConversionZeroOrigin() {
@@ -57,7 +57,7 @@ struct CharacterFilterTests {
         #expect(abs(bottomLeft.origin.y) < 0.01)
     }
 
-    // MARK: - filterCharacters (ENGINE §5B.2)
+    // MARK: - filterCharacters
 
     @Test("Characters inside redaction region are excluded")
     func charactersInsideRedactionExcluded() async throws {
@@ -145,7 +145,7 @@ struct CharacterFilterTests {
         #expect(result.surviving.count + result.excludedCount == result.totalCharacters)
     }
 
-    // MARK: - FilterResult.toDigest (ENGINE §5B.2)
+    // MARK: - FilterResult.toDigest
 
     @Test("Digest preserves same counts as FilterResult")
     func digestPreservesCounts() async throws {
@@ -217,7 +217,7 @@ struct CharacterFilterTests {
         #expect(result.surviving.count + result.excludedCount == result.totalCharacters)
     }
 
-    // MARK: - Boundary Character Test (TEST §3.6)
+    // MARK: - Boundary Character Test
 
     @Test("Boundary character at exact safety margin edge",
           .timeLimit(.minutes(1)))
@@ -356,9 +356,9 @@ struct CharacterFilterTests {
         }
     }
 
-    // MARK: - CAT-366: CropBox-local end-to-end (D-34 canonical coordinate contract)
+    // MARK: - CropBox-local end-to-end (canonical coordinate contract)
 
-    @Test("CAT-366: a zero-origin output region redacts non-zero-origin source text",
+    @Test("a zero-origin output region redacts non-zero-origin source text",
           .timeLimit(.minutes(1)))
     func nonZeroCropBoxCharacterFilter() async throws {
         let data = TestFixtures.nonZeroOriginDiscriminatingPDF()
@@ -370,12 +370,12 @@ struct CharacterFilterTests {
         #expect(!chars.isEmpty, "fixture must yield extractable characters")
 
         // The region is given in zero-origin OUTPUT-page normalized coordinates
-        // and converted through the rasterizer's POST-CAT-366 basis
+        // and converted through the rasterizer's zero-origin basis
         // (CGRect(origin: .zero, size: effectiveSize)) — exactly what
         // PageRasterizer feeds the filter once the basis is switched. It covers
         // the text's cropBox-LOCAL position (x ≈ [0,214], y ≈ [396,594]).
         // Pre-fix the extracted characters are still absolute (x ≈ 220, y ≈ 700)
-        // and escape this zero-origin region → red. After CAT-366 they are local
+        // and escape this zero-origin region → red. After the fix they are local
         // and fall inside it → green.
         let effectiveSize = cropBox.size
         let regionRect = normalizedToPDFPageCoordinates(
@@ -386,15 +386,15 @@ struct CharacterFilterTests {
         #expect(result.surviving.isEmpty,
                 "text under the zero-origin output region must be filtered out")
         #expect(result.excludedCount == chars.count,
-                "every extracted character lies under the region post-CAT-366")
+                "every extracted character lies under the region")
     }
 
-    @Test("CAT-366: the lineage digest is translation-invariant across cropBox origins",
+    @Test("the lineage digest is translation-invariant across cropBox origins",
           .timeLimit(.minutes(1)))
     func nonZeroCropBoxDigestTranslationInvariant() async throws {
         // Two fixtures with identical text but different cropBox origins. The
         // lineage hash is coordinate-free ((character, globalPos) in band
-        // order), so CAT-366's uniform coordinate shift cannot perturb it.
+        // order), so a uniform coordinate shift cannot perturb it.
         func extract(_ data: Data) async throws -> [CharacterInfo] {
             let doc = try #require(PDFDocument(data: data))
             let page = try #require(doc.page(at: 0))

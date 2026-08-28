@@ -3,11 +3,11 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// W10 — SearchState.pendingOverlapSuppressed accumulation path.
+// SearchState.pendingOverlapSuppressed accumulation path.
 // Unit-level tests for the accumulator + reset hooks; end-to-end
 // collision behavior is covered by DetectionOrchestratorOverlapTests.
 
-@Suite("SearchState overlap coverage (W10)", .tags(.search))
+@Suite("SearchState overlap coverage", .tags(.search))
 @MainActor
 struct SearchStateOverlapCoverageTests {
 

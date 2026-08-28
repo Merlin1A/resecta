@@ -2,12 +2,12 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W10 — License-plate detector.
+// License-plate detector.
 // Labeled-only pattern (License plate / Plate No / Tag # / LP # / Reg #
 // / Vehicle plate) followed by a 2–3+2–5 alphanumeric plate value.
 // Doctype-gated: court / FOIA / generic / nil.
 
-@Suite("License plate detector (W10)")
+@Suite("License plate detector")
 struct LicensePlateDetectorTests {
 
     private let detector = PIIDetector(nameGazetteer: nil)

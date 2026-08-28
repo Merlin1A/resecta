@@ -22,7 +22,7 @@ struct GateG8Span: Decodable, Sendable {
     let end: Int
 }
 
-// MARK: - Output JSON shapes (design 02 §12)
+// MARK: - Output JSON shapes
 
 struct GateG8Results: Encodable, Sendable {
     let by_category_doctype: [String: GateCellResult]
@@ -51,7 +51,7 @@ func gateMapCategory(_ s: String) -> RedactionRegion.PIIKind? {
     case "dea":      return .dea
     case "account":  return .account
     case "mrn":      return .medicalRecord
-    // S4 calibration corpus (2026-06-11) carries routingNumber and ein
+    // The calibration corpus (2026-06-11) carries routingNumber and ein
     // truth spans; without these cases their detections all miscount as
     // false positives against an empty truth set.
     case "routingNumber": return .routingNumber

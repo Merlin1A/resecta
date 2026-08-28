@@ -5,7 +5,7 @@ import UIKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// UI_UX §5.1–§5.2: Import validation and loading tests.
+// Import validation and loading tests.
 
 @Suite("ImportService", .tags(.importFlow))
 @MainActor
@@ -317,12 +317,12 @@ struct ImportServiceTests {
         #expect(doc.sourceDocument === originalDocument)
     }
 
-    // MARK: - CAT-274 / CAT-402 / CAT-403: import clears stale review state
+    // MARK: - Import clears stale review state
 
     /// A successful import runs `clearForNewDocument()`, which must drop the
     /// prior document's pending detection-review state so a replacement never
-    /// inherits triage selections (wrong-coordinate stamping — CAT-274), a
-    /// stale degraded banner (CAT-402), or a blank rationale sheet (CAT-403).
+    /// inherits triage selections (wrong-coordinate stamping), a
+    /// stale degraded banner, or a blank rationale sheet.
     @Test("Import clears pending triage, selections, degraded flag, rationale request")
     func testImportClearsPendingTriage() async {
         let doc = DocumentState()
@@ -339,10 +339,10 @@ struct ImportServiceTests {
             documentState: doc, redactionState: redaction)
 
         #expect(doc.phaseKind == .editing)
-        #expect(redaction.pendingTriage == nil)                  // CAT-274
-        #expect(redaction.triageSelections.isEmpty)              // CAT-274
-        #expect(redaction.autoDetectionDegraded == false)        // CAT-402
-        #expect(redaction.pendingCanvasRationaleRequest == nil)  // CAT-403
+        #expect(redaction.pendingTriage == nil)
+        #expect(redaction.triageSelections.isEmpty)
+        #expect(redaction.autoDetectionDegraded == false)
+        #expect(redaction.pendingCanvasRationaleRequest == nil)
     }
 
     /// The drag-drop import path consults the composed `canStartImport(with:)`

@@ -2,14 +2,14 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// WU-38 — iPhone "Select More" toolbar toggle. The toggle
+// iPhone "Select More" toolbar toggle. The toggle
 // flag layers on top of the existing iPad Shift+tap selection model:
 // when EITHER input route signals "add to selection", the touchesBegan
 // branch routes through `coordinator?.toggleRegionSelection(_:)`. Tests
 // pin the predicate's OR shape + the label's count-surfacing shape so
 // future refactors that drift either contract surface as a test break.
 
-@Suite("Canvas Select More toggle (WU-38)")
+@Suite("Canvas Select More toggle")
 @MainActor
 struct CanvasSelectMoreToggleTests {
 
@@ -24,7 +24,7 @@ struct CanvasSelectMoreToggleTests {
 
     @Test("iPad Shift+tap survives whether the toggle is off or on")
     func shiftHoldAlwaysRoutesThroughToggle() {
-        // Invariant from WU-38: iPad Shift+tap continues to work — no
+        // Invariant: iPad Shift+tap continues to work — no
         // parallel code path. The toggle layers on top, not in place of.
         #expect(RedactionOverlayView.shouldToggleSelection(
             isMultiSelectActive: false, shiftHeld: true

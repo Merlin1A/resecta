@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W4 — threshold post-filter for the search path.
+// Threshold post-filter for the search path.
 //
 // Validates the five behaviors that DocumentSearcher relies on:
 //   1. nil vector → full pass-through (back-compat)
@@ -11,7 +11,7 @@ import Foundation
 //   4. non-calibration category (no wire-name) → kept unchanged
 //   5. vector missing entry for a calibration category → kept unchanged
 
-@Suite("ThresholdFilter (W4)")
+@Suite("ThresholdFilter")
 struct ThresholdFilterTests {
 
     // MARK: - Fixtures
@@ -84,7 +84,7 @@ struct ThresholdFilterTests {
     @Test("Category absent from vector passes through untouched")
     func nonCalibrationIsUntouched() {
         // Vector only has ssn/name; the email threshold is absent from this vector
-        // (note: email does have a wire name as of S3, but the vector omits it).
+        // (note: email does have a wire name, but the vector omits it).
         let vector = PresetThresholdVector(
             thresholdsByWireName: ["ssn": 0.80, "name": 0.70])
         let emailRationale = rationale(ruleID: "email.regex", score: 0.60)
@@ -141,7 +141,7 @@ struct ThresholdFilterTests {
         #expect(!filtered.contains(where: { $0.kind == .ssn }))
     }
 
-    // MARK: - D06-F2 Part 1: applyingCountingDrops (drop count)
+    // MARK: - applyingCountingDrops (drop count)
 
     @Test("applyingCountingDrops counts exactly the below-cutoff matches")
     func countingDropsCountsBelowCutoff() {

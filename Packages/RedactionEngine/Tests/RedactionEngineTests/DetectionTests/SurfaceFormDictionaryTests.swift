@@ -1,7 +1,7 @@
 import Testing
 @testable import RedactionEngine
 
-// Plan Phase 3 / §A7 — SurfaceFormDictionary normalization.
+// SurfaceFormDictionary normalization.
 
 @Suite("SurfaceFormDictionary")
 struct SurfaceFormDictionaryTests {
@@ -27,7 +27,7 @@ struct SurfaceFormDictionaryTests {
         #expect(dict.lookup("Dr. Jane   Smith") == .accepted)
     }
 
-    // D-29: bounded-growth cap regression tests.
+    // Bounded-growth cap regression tests.
 
     @Test("Recording exactly capacity entries keeps all")
     func recordingExactlyCapacityKeepsAll() {

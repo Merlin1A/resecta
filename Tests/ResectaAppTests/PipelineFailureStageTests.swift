@@ -10,7 +10,7 @@ import CoreGraphics
 //
 // `runFullPipeline`'s generic error handler used to discriminate
 // "redaction failed" from "verification crashed" by `outputURL` presence.
-// CANCEL-008 moved the `outputURL` registration BEFORE `processDocument`
+// A fix moved the `outputURL` registration BEFORE `processDocument`
 // (eager, to close an orphaned-file leak), which made that check true for
 // every throw after run start — all redaction-stage failures took the
 // "output is valid" branch: `clearOutput()` was skipped and "Return to
@@ -89,7 +89,7 @@ struct PipelineFailureStageTests {
         let failure = try #require(terminal,
                                    "Oversized-page run must land on .failed")
         guard case .redactionError(.insufficientMemory) = failure.error else {
-            Issue.record("Expected .redactionError(.insufficientMemory) from the CAT-138 pre-flight, got \(failure.error)")
+            Issue.record("Expected .redactionError(.insufficientMemory) from the pre-flight check, got \(failure.error)")
             return
         }
         guard case .editing = failure.returnPhase else {
@@ -162,10 +162,10 @@ struct PipelineFailureStageTests {
     }
 
     /// A 1-page PDF whose page is 5,200 × 300 pt — past the 5,000-pt
-    /// validatePage dimension cap (ENGINE §2.6) but cheap to build. Loaded
+    /// validatePage dimension cap but cheap to build. Loaded
     /// directly onto the coordinator, which bypasses the import-time
     /// dimension gate so the page reaches `PageRasterizer.rasterize`, where
-    /// the CAT-138 pre-flight refuses it with `.insufficientMemory` — a
+    /// the pre-flight check refuses it with `.insufficientMemory` — a
     /// deterministic redaction-stage throw for the recovery-route tests
     /// (same fixture as FullPipelineFlowTests).
     private func makeOversizedPDFDocument() -> PDFDocument {

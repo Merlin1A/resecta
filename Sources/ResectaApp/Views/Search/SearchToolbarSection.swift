@@ -29,14 +29,14 @@ import RedactionEngine
 struct SearchToolbarSection: View {
     @Bindable var searchState: SearchState
     @Environment(SavedRegexStore.self) private var savedRegexStore
-    // UXF-14 — per-page text-layer classification feeds the disabled-OCR
+    // Per-page text-layer classification feeds the disabled-OCR
     // caption: when no page classifies `.sparse`/`.none`, no OCR leg will
     // run and "Awaiting OCR results" would promise something that never
     // arrives.
     @Environment(DocumentState.self) private var documentState
     @Binding var duplicateTermMessage: String?
     let onTriggerSearch: () -> Void
-    /// UXF-04: "Save current..." requests the naming prompt from the
+    /// "Save current..." requests the naming prompt from the
     /// hosting sheet. The demonstrated no-op had two parts: the menu
     /// item was ordered after the 10 built-ins, which pushes it past
     /// the top of the screen where it draws clipped and taps never
@@ -45,16 +45,15 @@ struct SearchToolbarSection: View {
     /// section's VStack.
     let onRequestSaveCurrentRegex: () -> Void
 
-    // SO-04 — initialized FROM the contract constant (previously a
+    // Initialized FROM the contract constant (previously a
     // hardcoded `false` whose comment claimed this initialization,
     // under the inverted name `optionsCollapsedByDefault`). The
     // contract is pinned by `SearchToolbarSectionTests`.
     @State private var optionsExpanded: Bool = SearchToolbarSection.optionsExpandedByDefault
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    // RB-64 AX rider (packet §7.3): at accessibility type sizes the
-    // two chip strips fall back to the FlowLayout wrap — every chip
-    // visible, no panning.
+    // At accessibility type sizes the two chip strips fall back to
+    // the FlowLayout wrap — every chip visible, no panning.
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
@@ -107,7 +106,7 @@ struct SearchToolbarSection: View {
             // Disclosure animation respects Reduce Motion via
             // `Anim.resolved(_:reduceMotion:)`.
             DisclosureGroup("Options", isExpanded: $optionsExpanded) {
-                // V1 flow chips (SO study §5 R-1). FlowLayout +
+                // Flow chips (V1 layout). FlowLayout +
                 // FilterChip — both existing house components — replace
                 // the fixed two-HStack toggle rows: uniform
                 // always-stroked capsules whose silhouette holds in
@@ -193,7 +192,7 @@ struct SearchToolbarSection: View {
                     ))
                         .toggleStyle(.button)
                         .controlSize(.small)
-                        // H-13 rider — disable while a run is in flight.
+                        // Disable while a run is in flight.
                         .disabled(Self.optionControlsDisabled(isSearching: searchState.isSearching))
                         .accessibilityLabel("All terms must match")
                         .accessibilityHint("When enabled, results come only from pages where every term has a match")
@@ -249,7 +248,7 @@ struct SearchToolbarSection: View {
                 regexErrorCallout
             }
 
-            // Short term warning. SO-02 — suppressed while a regex
+            // Short term warning. Suppressed while a regex
             // error stands: rendering "Search Anyway" beside a
             // non-compiling pattern invited a no-op loop (the attempt
             // clears the list, the error stays, the button remains).
@@ -278,9 +277,9 @@ struct SearchToolbarSection: View {
         }
     }
 
-    // MARK: - Option Bindings (BH-B-04)
+    // MARK: - Option Bindings
 
-    /// BH-B-04 — Search-side option toggles re-run the live query,
+    /// Search-side option toggles re-run the live query,
     /// matching their two re-running siblings (the conjunction toggle
     /// and the saturation-banner shortcuts). The re-run fires from the
     /// toggle's own `set` — a user gesture — NEVER value observation,
@@ -289,7 +288,7 @@ struct SearchToolbarSection: View {
     /// alongside a saved-search recall's own trigger whenever the
     /// recalled value differs. The gate
     /// (`optionChangeShouldRetrigger`) keeps un-run sessions un-run:
-    /// carried queries (UXF-16) and short-term-guarded queries stay
+    /// carried queries and short-term-guarded queries stay
     /// explicit-trigger. (The Scan interface's own option controls
     /// deliberately keep next-run semantics, like its category chips.)
     private func optionBinding(_ keyPath: WritableKeyPath<SearchOptions, Bool>) -> Binding<Bool> {
@@ -307,11 +306,11 @@ struct SearchToolbarSection: View {
         )
     }
 
-    // MARK: - Option Chips (V1 layout, SO study §5 R-1)
+    // MARK: - Option Chips (V1 layout)
 
     /// One option chip: `FilterChip` driven through `optionBinding(_:)`
-    /// so every chip keeps the BH-B-04 re-run gate. The visible label
-    /// is the V1 short string; `a11yLabel` is the shipped VoiceOver
+    /// so every chip keeps the same re-run gate. The visible label
+    /// is the short string; `a11yLabel` is the shipped VoiceOver
     /// label, VERBATIM (stable-label policy — existing queries and
     /// VoiceOver habits keep resolving). The value mirrors the retired
     /// Toggle's announced on/off state; `a11yHint` carries the original
@@ -326,7 +325,7 @@ struct SearchToolbarSection: View {
         return FilterChip(label: label, isSelected: binding.wrappedValue) {
             binding.wrappedValue.toggle()
         }
-        // H-13 rider — disable while a run is in flight (all six chips
+        // Disable while a run is in flight (all six chips
         // via this shared builder).
         .disabled(Self.optionControlsDisabled(isSearching: searchState.isSearching))
         .accessibilityLabel(a11yLabel)
@@ -349,7 +348,7 @@ struct SearchToolbarSection: View {
         return HStack(spacing: 4) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
-            // GAP-41 — small error TEXT routes through the measured
+            // Small error TEXT routes through the measured
             // text tier; the glyph above stays on the system-color tier.
             Text(error ?? "")
                 .font(.caption)
@@ -384,18 +383,18 @@ struct SearchToolbarSection: View {
             // Settings' Detection Sensitivity preset is the one
             // engine-level control, and the confidence sort is the
             // review-side confidence tool (the Select-where ≥75/≥90
-            // predicates retired with the footer menu, UXC-46).
+            // predicates retired with the footer menu).
 
             // Category chips — pre-scan detector selection over
             // `enabledPIICategories` — plus the trailing re-run
             // affordance. Toggling narrows the NEXT run; runs stay
             // trigger-driven (no auto re-run on chip change).
-            // D-63/UT-01: the strip is retired for 1.0 — dark behind
+            // The strip is retired for 1.0 — dark behind
             // `scanCategoryStripEnabled` (the ↻ re-run relocated to
             // the sheet's search-bar row; the "no categories" notice
             // below goes unreachable with it, since the strip is the
             // only UI that can empty the selection). Machinery and
-            // tests stay compiled; DC-209.
+            // tests stay compiled.
             if SearchState.scanCategoryStripEnabled {
                 scanChipsRow
             }
@@ -426,7 +425,7 @@ struct SearchToolbarSection: View {
                     Toggle("Include OCR Pages", isOn: $searchState.options.includeOCR)
                         .toggleStyle(.button)
                         .controlSize(.small)
-                        // H-13 rider — disable while a run is in flight.
+                        // Disable while a run is in flight.
                         .disabled(Self.optionControlsDisabled(isSearching: searchState.isSearching))
                         .accessibilityLabel("Include scanned page text")
                     Spacer()
@@ -466,9 +465,8 @@ struct SearchToolbarSection: View {
         Button {
             onTriggerSearch()
         } label: {
-            // REV-01 (packet §7.2 item 3, RB-66/RB-67): drawn Ø44
-            // circle + 18pt glyph in place of the `.bordered` wash
-            // that rendered the UXC-18 floor as a ~64pt slab. The
+            // Drawn as a Ø44 circle + 18pt glyph in place of the
+            // `.bordered` wash that rendered as a ~64pt slab. The
             // 46pt floor is a LAYOUT frame AFTER the chrome — hit
             // area unchanged, visual back to circle scale. States
             // live on `CircularIconButtonStyle`.
@@ -502,22 +500,17 @@ struct SearchToolbarSection: View {
     /// scan; runs stay trigger-driven. Rendered through `FilterChip`
     /// (the one chip component), category-tinted.
     private var scanCategoryChips: some View {
-        // RB-64 (packet §7.3): single-row horizontal strip INSIDE the
-        // sheet's existing safeAreaInset chrome layer. LAW:
-        // 18-SCROLL-ARCH §10 (the D-72 addendum, superseding §3's
-        // species framing) — `.automatic` detent cooperation binds
-        // GEOMETRICALLY: the List stays root-bound at the sheet top
-        // with ALL fixed chrome on the `.safeAreaInset(.top)` stack,
-        // and the horizontal chip ScrollView species itself proved
-        // INNOCENT in the SA-2 bisect. A strip inside the inset
-        // chrome therefore complies with the standing law. Recorded
-        // as a supersession of SA-2 B-1's wrap VISUAL on exactly this
-        // surface + `chipRowSubstrate` (visual, not architectural).
+        // Single-row horizontal strip inside the
+        // sheet's existing safeAreaInset chrome layer. Detent
+        // cooperation binds GEOMETRICALLY: the List stays root-bound
+        // at the sheet top with ALL fixed chrome on the
+        // `.safeAreaInset(.top)` stack, and the horizontal chip
+        // ScrollView does not interfere with that binding — a strip
+        // inside the inset chrome keeps the cooperation intact.
         // The surface stays flag-dark (`--showRetiredSheetControls`)
         // and converts with its component family; the 17-category set
         // scrolls in one row, with the wrap returning at
-        // accessibility type sizes (B-1's every-chip-visible
-        // rationale, preserved as the AX fallback).
+        // accessibility type sizes so every chip stays visible.
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 FlowLayout(spacing: ResectaTokens.Spacing.xs) {
@@ -530,13 +523,13 @@ struct SearchToolbarSection: View {
                 }
             }
         }
-        // BH-A-06 — chips freeze while a run is in flight, matching the
+        // Chips freeze while a run is in flight, matching the
         // sibling ↻ control: kickoff snapshots the category set, so a
         // mid-run toggle neither re-scopes the running scan nor warns —
         // it only desynced the completion copy from the run that
         // actually executed.
         .disabled(searchState.isSearching)
-        // Container id rides the strip/wrap chassis (packet §7.3).
+        // Container id rides the strip/wrap chassis.
         .accessibilityIdentifier("scanCategoryChips")
     }
 
@@ -603,7 +596,7 @@ struct SearchToolbarSection: View {
             .disabled(isDisabled)
 
             if isDisabled {
-                // UXF-14 — the caption is conditional: "awaiting" only
+                // The caption is conditional: "awaiting" only
                 // when at least one page will actually route to OCR.
                 let caption = Self.ocrDisabledCaption(
                     anyPageAwaitsOCR: documentState.textLayerStatus.values
@@ -633,12 +626,11 @@ struct SearchToolbarSection: View {
             || !searchState.results.isEmpty
     }
 
-    /// One chip block hosting all post-scan filter chips — since
-    /// RB-64 (packet §7.3) a single-row horizontal strip inside the
+    /// One chip block hosting all post-scan filter chips — a
+    /// single-row horizontal strip inside the
     /// sheet's inset chrome layer, wrapping again at accessibility
-    /// type sizes. LAW: 18-SCROLL-ARCH §10 — the strip complies (see
-    /// `scanCategoryChips` for the full citation; supersedes SA-2
-    /// B-1's wrap visual on these two surfaces only). Established as
+    /// type sizes (see `scanCategoryChips` for the mechanism this
+    /// strip shares). Established as
     /// the integration substrate; downstream additions append chip
     /// groups inside `chipRowSubstrateItems` without altering the
     /// chassis.
@@ -663,8 +655,7 @@ struct SearchToolbarSection: View {
                 }
             }
         }
-        // Container id for the XCUI strip-cooperation battery (packet
-        // §7.5 grants ids where XCUITest needs to measure or drive) —
+        // Container id for the XCUI strip-cooperation battery —
         // mirrors `scanCategoryChips`' container-id shape.
         .accessibilityIdentifier("chipRowSubstrate")
     }
@@ -693,10 +684,10 @@ struct SearchToolbarSection: View {
         // Downstream chip groups inserted here.
     }
 
-    /// RB-64 strip chassis shared by `scanCategoryChips` and
-    /// `chipRowSubstrate` (packet §7.3 — exactly these two surfaces;
+    /// The strip chassis shared by `scanCategoryChips` and
+    /// `chipRowSubstrate` — exactly these two surfaces;
     /// the options rows, multi-term chips, and the review bar keep
-    /// their wraps). Single row, 8pt gap, with a trailing ~44pt fade
+    /// their wraps. Single row, 8pt gap, with a trailing ~44pt fade
     /// that signals the pan without stealing touches.
     private func chipStrip<Content: View>(
         @ViewBuilder content: () -> Content
@@ -711,11 +702,11 @@ struct SearchToolbarSection: View {
             .padding(.trailing, 44)
         }
         .scrollIndicators(.hidden)
-        // Right-edge ~44pt fade (packet §7.3), rendered as a MASK so
+        // Right-edge ~44pt fade, rendered as a MASK so
         // the fade tracks whatever the inset chrome paints beneath it:
         // a gradient overlay painted `Color(.systemBackground)` read
         // as a hard black box over the ELEVATED sheet background in
-        // dark mode (impl-session visual pass, 2026-08-24). Masking
+        // dark mode (observed in a visual pass, 2026-08-24). Masking
         // leaves hit-testing untouched, so chips under the fade stay
         // tappable — the overlay sketch's `.allowsHitTesting(false)`
         // contract, preserved by construction.
@@ -763,7 +754,7 @@ struct SearchToolbarSection: View {
                 Text(active.rawValue)
                     .font(.caption2)
             }
-            // REV-01 (packet §7.2 item 2, RB-66/RB-67): the ruled
+            // The same padding/floor
             // chain, matching the sibling sortChip below — 12pt h-pad,
             // 36pt drawn minimum, then the 46pt LAYOUT floor +
             // contentShape AFTER the background.
@@ -815,11 +806,11 @@ struct SearchToolbarSection: View {
                 Text(Self.sortChipLabel(active: active))
                     .font(.caption2)
             }
-            // REV-01 (packet §7.2 item 2, RB-66/RB-67): the ruled
+            // The same padding/floor
             // FilterChip chain — 12pt h-pad, 36pt drawn minimum, then
             // the 46pt LAYOUT floor + contentShape AFTER the
-            // background, so the hit area keeps the UXC-18 guarantee
-            // while the capsule draws compact.
+            // background, so the hit area stays at the touch-target
+            // minimum while the capsule draws compact.
             .padding(.horizontal, 12)
             .frame(minHeight: 36)
             .background(isCustomSort ? ResectaTokens.BrandTeal.tint.opacity(0.2) : Color.clear, in: Capsule())
@@ -883,8 +874,9 @@ struct SearchToolbarSection: View {
     // MARK: - Multi-Term Chips
 
     private var multiTermChips: some View {
-        // SA-2 (D-70): FlowLayout wrap replaces the horizontal
-        // ScrollView (cooperation poison — 18-SCROLL-ARCH §3). Every
+        // FlowLayout wrap replaces the horizontal
+        // ScrollView (a horizontal ScrollView here breaks the sheet's
+        // detent-cooperation gesture chain). Every
         // staged term stays visible; a long term set wraps to more
         // rows instead of panning off-screen.
         FlowLayout(spacing: ResectaTokens.Spacing.xs) {
@@ -921,7 +913,7 @@ struct SearchToolbarSection: View {
     /// Regex mode. Tapping a saved entry inserts its pattern into
     /// `searchState.queryText` (which fires the existing `.onChange`
     /// debounce on the regex `TextField`). "Save current..." renders
-    /// FIRST (see the UXF-04 note on `onRequestSaveCurrentRegex`) and
+    /// FIRST (see the note on `onRequestSaveCurrentRegex`) and
     /// asks the hosting sheet to present the naming prompt; the sheet
     /// sentinel-validates and commits via
     /// `savedRegexStore.add(label:pattern:)`.
@@ -934,7 +926,7 @@ struct SearchToolbarSection: View {
             queryText: searchState.queryText
         )
         Menu {
-            // UXF-04: "Save current..." goes FIRST so it renders nearest
+            // "Save current..." goes FIRST so it renders nearest
             // the menu's bottom anchor. Placed after the built-ins
             // section it was the menu's top row, which overflows the
             // screen with 10+ saved entries — the row draws clipped
@@ -946,7 +938,7 @@ struct SearchToolbarSection: View {
                 Text(Self.saveCurrentRegexMenuItem)
             }
             .disabled(!canSave)
-            // CL-QP1-07: say WHY "Save current..." is disabled at the
+            // Say WHY "Save current..." is disabled at the
             // 100-entry cap instead of disabling silently (the library
             // view already surfaces the same message inline).
             if let capMessage = Self.savedRegexCapMessage(savedCount: savedCount) {

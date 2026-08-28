@@ -1,13 +1,12 @@
 import Testing
 import Foundation
 
-// CAT-083 (D-11) — transparency-claim lint.
+// Transparency-claim lint.
 //
 // README.md previously claimed Custom Terms and detection state "do not
 // persist across app launches" / are "in-session only". That is false:
 // `UserTermsStore` and `SavedRegexStore` persist to `UserDefaults` (keys
-// `userTerms.v1` / `savedRegexes.v1`) in V1.0 — see
-// `docs/release-notes/v1.0.md`, which already describes this correctly.
+// `userTerms.v1` / `savedRegexes.v1`) in V1.0.
 //
 // These guards read the front-door docs from the source tree (mirroring the
 // `LegalKeyExistenceTests` / `LegalPhraseLintTests` `#filePath` loader posture)
@@ -15,12 +14,12 @@ import Foundation
 // pass cannot silently re-introduce it. Whitespace is collapsed first because
 // the claim was line-wrapped in the source ("do\n  not persist ...").
 //
-// D-11 is maintainer-gated copy: the replacement wording lands as
+// This is maintainer-gated copy: the replacement wording lands as
 // a draft the maintainer approves/edits at merge. These guards
 // pin the *accuracy invariant* (no false non-persistence claim), not the exact
 // approved wording.
 
-@Suite("Transparency claims — persistence accuracy (CAT-083)")
+@Suite("Transparency claims — persistence accuracy")
 struct TransparencyClaimsTests {
 
     /// False-claim literals that asserted V1 does not persist user terms.
@@ -50,7 +49,7 @@ struct TransparencyClaimsTests {
         for claim in Self.falsePersistenceClaims {
             #expect(
                 !collapsed.contains(claim),
-                "\(relativePath) still contains the false non-persistence claim '\(claim)'. V1.0 persists Custom Terms / saved regexes via UserDefaults (CAT-083 / D-11).")
+                "\(relativePath) still contains the false non-persistence claim '\(claim)'. V1.0 persists Custom Terms / saved regexes via UserDefaults.")
         }
     }
 

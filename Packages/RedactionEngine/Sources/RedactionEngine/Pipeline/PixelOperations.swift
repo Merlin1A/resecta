@@ -5,24 +5,23 @@ import UIKit
 #endif
 import os
 
-// ENGINE §2.1, §2.2, §2.5, §2.6, §3.1–§3.4 — Bitmap context, coordinate
+// Bitmap context, coordinate
 // conversion, fill application, and pixel verification.
 
-// MARK: - Signpost (SEC-5 zeroize instrumentation)
+// MARK: - Signpost (Zeroize Instrumentation)
 
 /// Shared signposter for zeroize-overhead measurement. The signpost
 /// interval covers a single `memset_s` call so test fixtures can
-/// derive p95 cost. See plan §3 SEC-5.
+/// derive p95 cost.
 private let zeroizeSignposter = OSSignposter(
     subsystem: "app.resecta.engine",
     category: "Zeroize"
 )
 
-// MARK: - Bitmap Context (ENGINE §2.1)
+// MARK: - Bitmap Context
 
 /// Create a bitmap context with sRGB color space and BGRA pixel layout.
 /// Returns nil if non-premultiplied alpha is requested (iOS restriction).
-/// See ENGINE §2.1 for rationale on each setting.
 public func createBitmapContext(width: Int, height: Int) -> CGContext? {
     guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
     let bitmapInfo = CGBitmapInfo.byteOrder32Little.rawValue
@@ -35,7 +34,7 @@ public func createBitmapContext(width: Int, height: Int) -> CGContext? {
     )
 }
 
-// MARK: - Pixel Buffer Zeroize (SEC-5, ENGINE §3.3)
+// MARK: - Pixel Buffer Zeroize
 
 /// Namespace for pixel-buffer routines that are not naturally part of
 /// fill / verify / render. Caseless enum (Swift idiomatic namespace).
@@ -47,11 +46,10 @@ public enum PixelOperations {
     /// mandates the call is performed). Called from `PageRasterizer`
     /// after `makeImage()` returns and from `BitmapContextPool.checkIn`;
     /// the latter is the canonical guard intended to prevent pixel
-    /// data from surviving a pool reuse cycle. See plan §3 SEC-5.
+    /// data from surviving a pool reuse cycle.
     ///
     /// Mechanism: zeroes `bytesPerRow * height` bytes — the full
-    /// backing allocation including any SIMD-alignment padding
-    /// (ENGINE §2.1).
+    /// backing allocation including any SIMD-alignment padding.
     ///
     /// SECURITY: this routine is designed to reduce the risk of source
     /// pixel data persisting in heap memory after fill/verify
@@ -73,13 +71,12 @@ public enum PixelOperations {
     }
 }
 
-// MARK: - Coordinate Conversion (ENGINE §2.2, §3.1a)
+// MARK: - Coordinate Conversion
 
 /// Compute post-rotation visual dimensions.
 /// bounds(for:) returns raw/un-rotated dimensions (R-1 confirmed, Experiment D).
-/// See ENGINE §2.2.
 ///
-/// TRUST-pdf-rotation-non-90-multiples: PDFKit normalizes the page's
+/// PDFKit normalizes the page's
 /// `/Rotate` entry to one of {0, 90, 180, 270} per ISO 32000 §8.3.2 —
 /// non-multiple-of-90 values are clamped on parse, so this switch
 /// covers every rotation the engine can observe via `PDFPage.rotation`.
@@ -98,7 +95,6 @@ public func effectiveBounds(_ rawBounds: CGRect, rotation: Int) -> CGRect {
 ///
 /// SECURITY NOTE: Correctness depends entirely on renderPage() producing
 /// a bitmap where visual content fills the full width and height.
-/// See ENGINE §3.1a.
 public func normalizedToFillPixels(
     _ normalized: CGRect,
     bitmapWidth: Int,
@@ -111,24 +107,23 @@ public func normalizedToFillPixels(
         width: clamped.width * CGFloat(bitmapWidth),
         height: clamped.height * CGFloat(bitmapHeight)
     ).pixelAligned()
-    // §3.2a — expand 1 px outward beyond pixel alignment. The rendered
+    // Expand 1 px outward beyond pixel alignment. The rendered
     // content spans points × dpi/72 while the bitmap is ceil() of that, so a
     // rect scaled by the bitmap dimension can sit up to 1 px off the content
     // basis; the extra pixel covers the boundary row/column in the shifted
-    // direction. Strictly over-redacting (the safe direction, §3.2). Page
+    // direction. Strictly over-redacting (the safe direction). Page
     // edges need no special case — fills clip at the bitmap and verifyFill
-    // clamps (PD-4-1). Empty aligned rects stay empty so degenerate regions
+    // clamps. Empty aligned rects stay empty so degenerate regions
     // remain no-ops. Do NOT shrink the bitmap instead: floor() would crop a
     // column of real page content out of the output.
     return aligned.isEmpty ? aligned : aligned.insetBy(dx: -1, dy: -1)
 }
 
-// MARK: - Pixel Alignment (ENGINE §3.2)
+// MARK: - Pixel Alignment
 
 extension CGRect {
     /// Expand to integer pixel boundaries. Prevents partial-pixel fills
     /// that could leak original content through anti-aliased edges.
-    /// See ENGINE §3.2.
     public func pixelAligned() -> CGRect {
         CGRect(x: floor(minX), y: floor(minY),
                width: ceil(maxX) - floor(minX),
@@ -136,10 +131,10 @@ extension CGRect {
     }
 }
 
-// MARK: - Fill Application (ENGINE §3.1, §3.4 — PERF-8 cancellation bands)
+// MARK: - Fill Application (cancellation bands)
 
 /// Width of a scanline band for cooperative cancellation checks.
-/// Locked at 256 rows by PERF-8: large enough that the per-band overhead is
+/// Locked at 256 rows: large enough that the per-band overhead is
 /// negligible relative to fill/verify work, small enough that the worst-case
 /// cancellation latency on a 5000×5000 region stays inside the 50 ms p95
 /// budget on iPhone 17 simulator. Do not change without re-running
@@ -148,15 +143,15 @@ internal let cancellationBandRows: Int = 256
 
 /// Apply opaque fills over redaction regions. Uses bitmap dimensions only —
 /// no PDF page geometry needed because the bitmap already contains the
-/// correctly-rendered visual content. See ENGINE §3.1.
+/// correctly-rendered visual content.
 ///
-/// PERF-8: each region's pixel rect is split into 256-row scanline bands so
+/// Each region's pixel rect is split into 256-row scanline bands so
 /// `Task.checkCancellation()` can run between bands. The bands tile exactly
 /// across pixel-aligned integer rows, so there is no overlap, no gap, and no
 /// anti-aliasing seam between adjacent bands (blend mode is `.copy` and
-/// anti-aliasing is disabled — see ENGINE §3.1, §3.2).
+/// anti-aliasing is disabled).
 ///
-/// DRAW-1: regions with non-nil `vertices` are filled via `CGMutablePath`
+/// Regions with non-nil `vertices` are filled via `CGMutablePath`
 /// with even-odd winding. The rectangle path (vertices == nil) keeps the
 /// fast scanline-band fill route. Anti-aliasing is disabled across both
 /// paths so polygon edges are pixel-exact and verify can use the same
@@ -169,13 +164,13 @@ public func applyRedactionFills(
     context.setBlendMode(.copy)           // R = S, regardless of destination
     context.setShouldAntialias(false)     // No edge blending
     context.setFillColor(fillColor.cgColor)
-    // §3.2a — the polygon path dilates by stroking its own boundary in the
+    // The polygon path dilates by stroking its own boundary in the
     // fill color (see fillPolygonRegion); the stroke color rides the same
     // context state as the fill color so both routes paint identically.
     context.setStrokeColor(fillColor.cgColor)
 
     for region in regions {
-        // DRAW-1: polygon path. Build a CGPath and fill with even-odd
+        // Polygon path. Build a CGPath and fill with even-odd
         // winding. Even-odd is the locked rule for self-intersecting paths
         // (a deliberately-tuned freeform stroke that loops back is still
         // filled in the visible interior region under even-odd).
@@ -194,7 +189,7 @@ public func applyRedactionFills(
             bitmapWidth: context.width,
             bitmapHeight: context.height
         )
-        // PERF-8: fill in 256-row bands with a cancellation check between
+        // Fill in 256-row bands with a cancellation check between
         // bands. Region rects are already pixel-aligned (see
         // normalizedToFillPixels → pixelAligned), so integer banding is safe.
         let minY = Int(pixelRect.minY)
@@ -217,7 +212,7 @@ public func applyRedactionFills(
     }
 }
 
-// MARK: - Polygon Fill (DRAW-1)
+// MARK: - Polygon Fill
 
 /// Convert a normalized point (0–1, bottom-left origin) into the pixel
 /// coordinate space of a fill bitmap context (same bottom-left origin).
@@ -254,7 +249,7 @@ internal func normalizedVertexToPixels(
 /// equal to `polygon ∩ [0,1]²` (for concave subjects, coincident zero-area
 /// boundary seams may appear; they do not change the filled area). SECURITY:
 /// over-redaction is safe, under-redaction is a breach — clipping never pulls
-/// the boundary inside the true polygon. See ENGINE §3.1 / DRAW-1.
+/// the boundary inside the true polygon.
 internal func clipPolygonToUnitRect(_ vertices: [CGPoint]) -> [CGPoint] {
     guard vertices.count >= 3 else { return [] }
 
@@ -347,7 +342,7 @@ internal func fillPolygonRegion(
     context.saveGState()
     context.addPath(path)
     context.fillPath(using: .evenOdd)
-    // §3.2a — the vertex mapping shares normalizedToFillPixels' bitmap-
+    // The vertex mapping shares normalizedToFillPixels' bitmap-
     // dimension basis, so the polygon boundary can sit up to 1 px inside the
     // rendered content at non-integral raster dimensions. Stroking the same
     // path 2 px wide (1 px outward, round joins bounding the reach at
@@ -362,14 +357,13 @@ internal func fillPolygonRegion(
     context.restoreGState()
 }
 
-// MARK: - Post-Fill Pixel Verification (ENGINE §3.4)
+// MARK: - Post-Fill Pixel Verification
 
 /// Read back raw pixels to confirm fill is complete. Uses memcmp with
 /// NEON SIMD for ARM64 (283x faster than pixel-by-pixel per Experiment J1.1).
 /// Accounts for Y-flip between context coordinates and memory layout.
-/// See ENGINE §3.4.
 ///
-/// PERF-8: a cooperative `Task.checkCancellation()` runs every
+/// A cooperative `Task.checkCancellation()` runs every
 /// `cancellationBandRows` (256) rows so a long verify on a large region
 /// surrenders within the 50 ms p95 cancellation budget. Throws
 /// `CancellationError` on cancel; returns `Bool` for the verification result
@@ -386,7 +380,7 @@ public func verifyFill(
     let bitmapWidth = context.width
     let aligned = rect.pixelAligned()
 
-    // PD-4-1: Clamp to bitmap bounds. pixelAligned() can produce rects exceeding
+    // Clamp to bitmap bounds. pixelAligned() can produce rects exceeding
     // bitmap dimensions when normalizedRect extends slightly past 1.0.
     let minX = max(0, Int(aligned.minX))
     let minY = max(0, Int(aligned.minY))
@@ -397,7 +391,7 @@ public func verifyFill(
     let fillWidth = maxX - minX
     let compareBytes = fillWidth * 4
 
-    // Build reference row buffer using memset_pattern4 (ENGINE §3.4a).
+    // Build reference row buffer using memset_pattern4.
     // Pattern byte order matches BGRA layout: [B, G, R, A].
     var pattern: (UInt8, UInt8, UInt8, UInt8) = (
         expectedColor.b, expectedColor.g, expectedColor.r, expectedColor.a
@@ -410,7 +404,7 @@ public func verifyFill(
 
     var rowsSinceCheck = 0
     for contextY in minY..<maxY {
-        // PERF-8: cooperative cancellation every 256 rows. We check at the top
+        // Cooperative cancellation every 256 rows. We check at the top
         // of each band so a freshly cancelled task surrenders before doing
         // another 256-row scan.
         if rowsSinceCheck == 0 {
@@ -432,7 +426,7 @@ public func verifyFill(
     return true
 }
 
-// MARK: - Polygon Verification (DRAW-1)
+// MARK: - Polygon Verification
 
 /// Build a 1-bit (per-pixel) inclusion mask for a closed polygon defined in
 /// the bitmap's pixel coordinate system (bottom-left origin). The mask uses
@@ -575,7 +569,7 @@ internal func buildPolygonMask(
 /// (sandwich spatial exclusion) is the canonical check for character
 /// content surviving outside the redaction.
 ///
-/// PERF-8: cooperative `Task.checkCancellation()` runs at the top of every
+/// Cooperative `Task.checkCancellation()` runs at the top of every
 /// 256-row band — same discipline as the rectangle `verifyFill`. Throws
 /// `CancellationError` on cancel; returns `Bool` for the verification
 /// result itself.
@@ -612,8 +606,7 @@ public func verifyPolygonFill(
         expectedColor.b, expectedColor.g, expectedColor.r, expectedColor.a
     ]
 
-    // Package H — PERF-verify-polygon-alloc-in-loop (`03-security-perf-audit.md
-    // §2.6.a`). One allocation per call, sized to the widest possible run
+    // One allocation per call, sized to the widest possible run
     // (full mask width). The buffer is pre-filled with the BGRA pattern; each
     // memcmp consumes the first `compareBytes` bytes. Pattern is identical for
     // every run, so the prefix-equality of memcmp reads remains correct.
@@ -629,7 +622,7 @@ public func verifyPolygonFill(
     var rowsSinceCheck = 0
     // Iterate scanlines in mask row order (row 0 = bottom of mask).
     for row in 0..<mask.height {
-        // PERF-8: cooperative cancellation at the top of each 256-row band.
+        // Cooperative cancellation at the top of each 256-row band.
         if rowsSinceCheck == 0 {
             try Task.checkCancellation()
         }
@@ -687,14 +680,13 @@ public func verifyPolygonFill(
     return true
 }
 
-// MARK: - DPI Selection (ENGINE §2.5)
+// MARK: - DPI Selection
 
 /// Select the effective DPI for a page, respecting both the user's
 /// chosen maximum and the device's available memory.
 /// Returns nil if even 150 DPI exceeds available memory (abort).
 /// Page dimensions default to US Letter for backward compatibility;
 /// callers should pass actual dimensions for large-format pages.
-/// See ENGINE §2.5.
 public func selectDPI(
     availableMemory: Int,
     userMaxDPI: Int,
@@ -702,12 +694,12 @@ public func selectDPI(
     pageHeight: CGFloat = 792
 ) -> Int? {
     let clampedMax = [150, 200, 300].filter { $0 <= userMaxDPI }.max() ?? 150
-    // ENGINE §2.5: 150 MB headroom. Floor at 0 for constrained devices
+    // 150 MB headroom. Floor at 0 for constrained devices
     // where availableMemory <= 150 MB — the tier loop returns nil gracefully.
     let budget = max(0, availableMemory - 150_000_000)
     // Compute actual memory needed at each DPI tier based on page dimensions.
     // 2× multiplier accounts for concurrent render + fill bitmap contexts
-    // during PageRasterizer.rasterize() (ENGINE §2.5).
+    // during PageRasterizer.rasterize().
     let tiers = [300, 200, 150].filter { $0 <= clampedMax }
     for dpi in tiers {
         let scale = CGFloat(dpi) / 72.0
@@ -717,16 +709,16 @@ public func selectDPI(
     return nil
 }
 
-// MARK: - Input Validation (ENGINE §2.6)
+// MARK: - Input Validation
 
 /// Validate a page before rendering. Checks dimensions, /UserUnit, and
-/// memory budget at the effective DPI. See ENGINE §2.6.
+/// memory budget at the effective DPI.
 public func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
     let box = page.bounds(for: .cropBox)
     guard box.width >= 10, box.height >= 10,
           box.width <= 5000, box.height <= 5000 else { return false }
 
-    // H-16: Check for /UserUnit (Experiment N)
+    // Check for /UserUnit (Experiment N)
     if let pageRef = page.pageRef,
        let dict = pageRef.dictionary {
         var userUnit: CGPDFReal = 0
@@ -736,7 +728,7 @@ public func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
         }
     }
 
-    // MP-3-1: Use effective DPI for memory budget check.
+    // Use effective DPI for memory budget check.
     let scale: CGFloat = CGFloat(effectiveDPI) / 72.0
     let bytes = Int(ceil(box.width * scale)) * Int(ceil(box.height * scale)) * 4
 
@@ -744,7 +736,7 @@ public func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
     // on the simulator — it reports well under 67 MB regardless of real
     // headroom, so a standard page's 300-DPI raster (~33.7 MB) fails the
     // fraction-of-available test and the validatePage wire-up would then refuse every page.
-    // When the reading is at or below the §2.5 headroom (150 MB) — the same
+    // When the reading is at or below the 150 MB headroom — the same
     // floor at which `selectDPI` yields zero budget — treat it as unusable and
     // defer the memory decision to the runtime DPI cap + `selectDPI` (KI-5),
     // which are the effective memory defense. The dimension/UserUnit guards
@@ -763,7 +755,7 @@ public func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
     #endif
 }
 
-/// The per-page memory admission predicate (ENGINE §2.6): a page is admitted
+/// The per-page memory admission predicate: a page is admitted
 /// when THREE bitmaps' worth of its raster fit in available memory — the same
 /// per-page estimate the app layer budgets (render context + pooled fill
 /// context + encode buffer, `PipelineCoordinator`'s

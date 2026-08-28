@@ -1,8 +1,6 @@
 import PDFKit
 import CoreGraphics
 
-// See ARCH §2.3 for PDFPageData, SendablePDFDocument, and SendablePDFPage.
-
 /// Wrapper providing the engine with all per-page data needed for processing.
 /// Bridges the app target (which holds the PDFDocument) and the engine package
 /// (which processes individual pages without knowing the document lifecycle).
@@ -32,8 +30,7 @@ public struct PDFPageData: @unchecked Sendable {
     /// Doc-level OCG hidden-layer presence, precomputed at import time
     /// against a CGPDFDocument built from the raw bytes. Required because
     /// `PDFDocument(data:)` leaves `documentURL == nil`, which prevented the
-    /// engine from reaching the catalog at extraction time. See AD-2-1 /
-    /// ENGINE §5B.1.
+    /// engine from reaching the catalog at extraction time.
     public let hasHiddenOCG: Bool
     /// The page's cropBox bounds, pre-extracted serially at build time
     /// so the concurrent rasterize path never reads `page.bounds(for:)` off the
@@ -51,7 +48,7 @@ public struct PDFPageData: @unchecked Sendable {
     /// pages). Feeds the searchable-mode debug assertion without a concurrent
     /// `page.string` read.
     public let hasText: Bool
-    /// PD-5: why this page's mode fell back to Secure Rasterization in a
+    /// Why this page's mode fell back to Secure Rasterization in a
     /// Searchable-mode run, recorded at build time where the pre-flight
     /// trigger check runs (`PipelineCoordinator.buildPDFPageData`). Nil for
     /// pages that kept searchable mode AND for every page of a
@@ -85,7 +82,7 @@ public struct PDFPageData: @unchecked Sendable {
 /// never reuse one instance across concurrent tasks. The sequential layers
 /// (3/4, sandwich 5–8) and the provisioning-failure fallback access a single
 /// instance sequentially.
-/// SEARCH (D10-F1): the off-main search consumers honor the same rule — the
+/// Search: the off-main search consumers honor the same rule — the
 /// background search and the live-preview text-walk EACH receive their own
 /// copy (`DocumentState.makeSearchCopy`), so the wrapper is never constructed
 /// against an instance another task (or the on-screen `PDFView`) is reading.

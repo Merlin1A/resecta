@@ -55,8 +55,8 @@ struct DetectorScoreDumpTests {
 
     private static let canonicalCategories: [String] = [
         // Order matches the pipeline's sweep_thresholds._CATEGORIES (the
-        // loader hard-fails on exact-order mismatch). routingNumber added
-        // in search-impl S2 (design 01 §4) — the S4 re-dump carries it.
+        // loader hard-fails on exact-order mismatch). routingNumber was
+        // added later — the next re-dump run carries it.
         "ssn", "npi", "dea", "dob", "address", "account", "mrn", "name",
         "routingNumber",
     ]
@@ -144,8 +144,8 @@ struct DetectorScoreDumpTests {
         case .creditCard, .email, .phone, .ein, .itin,
              .driversLicense, .passport,
              .licensePlate, .barcode, .signatureCandidate, .other:
-            // .barcode (DRAW-2) is detected by Vision; .signatureCandidate
-            // (DRAW-3) is a heuristic visual detector — neither is on the
+            // .barcode is detected by Vision; .signatureCandidate
+            // is a heuristic visual detector — neither is on the
             // calibration path; same shape as `.other`.
             return nil
         }

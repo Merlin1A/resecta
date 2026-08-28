@@ -1,7 +1,5 @@
 import CoreGraphics
 
-// See ENGINE §5B for CharacterInfo definition.
-
 /// A single character's identity and position in PDF page space.
 /// Used by the text extraction, character filtering, and text layer
 /// reconstruction pipeline (Searchable Redaction mode).
@@ -13,7 +11,7 @@ public struct CharacterInfo: Sendable {
     /// UTF-16 offset into PDFPage.string.
     public let stringIndex: Int
     /// Ordinal of the character's source line: the count of synthesized
-    /// line-separator offsets preceding it in `page.string` (PD-7). The
+    /// line-separator offsets preceding it in `page.string`. The
     /// partition is string-order, so it is invariant under page rotation.
     /// Callers that construct `CharacterInfo` without line information get
     /// a single shared line (index 0), under which the line-aware character

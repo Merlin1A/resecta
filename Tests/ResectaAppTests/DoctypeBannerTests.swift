@@ -3,12 +3,12 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-07 — Doctype banner above PII Scan results per [D-23] (single-purpose
-// headline) + [RR-12] (data-driven gated-out count, V1.x mirror updates
-// when WU-75 ships engine parity for the 3 additional categories
-// MRN/Bates/LicensePlate).
+// Doctype banner above PII Scan results (single-purpose
+// headline) + data-driven gated-out count, V1.x mirror updates
+// when engine parity ships for the 3 additional categories
+// MRN/Bates/LicensePlate.
 
-@Suite("Doctype banner (WU-07)", .tags(.search))
+@Suite("Doctype banner", .tags(.search))
 @MainActor
 struct DoctypeBannerTests {
 
@@ -26,7 +26,7 @@ struct DoctypeBannerTests {
         #expect(headline == "Scanning with 1 detector tuned for court documents.")
     }
 
-    @Test("Banner headline contains no §19 forbidden phrases")
+    @Test("Banner headline contains no forbidden phrases")
     func bannerHeadlineNoForbiddenPhrases() {
         let headline = WU07Strings.headline(detectorCount: 5, doctype: "financial")
         // Forbidden phrase set per the M-1 check (CONTRIBUTING, audit checklist) — assembled
@@ -56,7 +56,7 @@ struct DoctypeBannerTests {
 
     @Test("Medical doctype gates out only categories the user has enabled")
     func disclosureRevealsGatedForMedical() {
-        // Medical: NPI runs, DEA runs, Account runs, MRN runs (post-W10),
+        // Medical: NPI runs, DEA runs, Account runs, MRN runs,
         // DOB runs, Bates does NOT (court/foia only) — but Bates is in the
         // `default: false` bucket of the engine helper, so the V1.x mirror
         // won't surface it. Only DOB/NPI/DEA/Account are gateable in V1.x.
@@ -66,19 +66,19 @@ struct DoctypeBannerTests {
         #expect(gated.isEmpty)
     }
 
-    @Test("Financial doctype gates out NPI + DEA (DOB label-anchored per D4)")
+    @Test("Financial doctype gates out NPI + DEA (DOB is label-anchored)")
     func disclosureRevealsGatedForFinancial() {
-        // Financial: DOB runs via the S2 label-anchored dispatch (design 01
-        // §1, decision D4 — no longer doctype-gated), NPI off (medical/foia
+        // Financial: DOB runs via the label-anchored dispatch (no longer
+        // doctype-gated), NPI off (medical/foia
         // only), DEA off (medical only), Account runs.
         let enabled = Set<PIICategory>([.dateOfBirth, .npi, .dea, .account, .ssn])
         let gated = Set(DoctypeDiagnosticView.gatedOutCategories(for: .financial, enabled: enabled))
         #expect(gated == [.npi, .dea])
     }
 
-    @Test("Court doctype gates out NPI + DEA (account runs post-CND-10)")
+    @Test("Court doctype gates out NPI + DEA (account runs on court now)")
     func disclosureRevealsGatedForCourt() {
-        // CND-10 (launch-fix-v2 S5): account broadened to run on court (and
+        // Account broadened to run on court (and
         // generic), so it no longer surfaces as gated-out here. NPI (medical/
         // foia only) and DEA (medical only) remain gated on court.
         let enabled = Set<PIICategory>([.dateOfBirth, .npi, .dea, .account, .ssn])
@@ -90,7 +90,7 @@ struct DoctypeBannerTests {
     func disclosureFiltersToEnabled() {
         // The banner only counts the user's currently-selected detector
         // set: with DOB disabled, the financial gated list is the
-        // enabled-and-gated NPI/DEA pair. (Post-D4, DOB is no longer
+        // enabled-and-gated NPI/DEA pair. (DOB is no longer
         // doctype-gated on financial, so the absence assertion below pins
         // the enabled-filter, not the doctype gate.)
         let enabled = Set<PIICategory>([.npi, .dea, .account])  // no DOB

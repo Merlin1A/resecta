@@ -2,14 +2,14 @@ import Testing
 import SwiftUI
 @testable import ResectaApp
 
-// WU-59: pin the per-sheet-session pulse predicate so
+// Pin the per-sheet-session pulse predicate so
 // the first compact-drop fires once, subsequent compact-drops in the
 // same session stay silent, and Reduce Motion suppresses the pulse
 // entirely. The view-side wiring (scaleEffect on the grabber capsule
 // + deferred reset) is UI-only and deferred to manual on-device
-// verification per CLAUDE.md.
+// verification.
 
-@Suite("Compact-detent grabber pulse (WU-59)")
+@Suite("Compact-detent grabber pulse")
 struct CompactDetentPulseTests {
     @Test("First compact-drop fires the pulse")
     func firstDropPulses() {
@@ -86,7 +86,7 @@ struct CompactDetentPulseTests {
         // After a sheet dismiss, `hasPulsedGrabberThisSession` resets
         // to false (via .onDisappear + @State destruction); next
         // session's first compact-drop must pulse again. This pins
-        // the [RR-16] reset contract at the predicate seam.
+        // the reset contract at the predicate seam.
         let beforeReset = CompactFloatDetent.shouldPulseGrabber(
             transitioningTo: .compactFloat,
             hasAlreadyPulsed: true,

@@ -8,26 +8,27 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// S01 — Searchable-Redaction merge measurement TESTS. The reusable §12.2-safe
-// harness (`enum SearchableMergeProbe`) lives in `SearchableMergeProbe.swift`;
-// this file holds the @Suite validation-gate + open-question regression tests.
+// Searchable-Redaction merge measurement TESTS. The reusable harness
+// (`enum SearchableMergeProbe`) — which logs only counts and geometry, never
+// document content — lives in `SearchableMergeProbe.swift`; this file holds
+// the @Suite validation-gate + open-question regression tests.
 
 @Suite("Searchable merge probe", .tags(.sandwich))
 struct SearchableMergeProbeTests {
 
     /// VALIDATION GATE — runs the fixture through the pipeline + all 10 layers,
-    /// prints a §12.2-safe measurement report, and ASSERTS the pinned per-layer
-    /// matrix. History: on the S01-era engine ONLY Layer 6 (idx5 / SVT-1,
-    /// off-grid substituted advance) and Layer 8 (idx7 / SVT-4, /ToUnicode)
+    /// prints a count-and-geometry-only measurement report, and ASSERTS the
+    /// pinned per-layer matrix. History: on the earlier engine ONLY Layer 6
+    /// (idx5, off-grid substituted advance) and Layer 8 (idx7, /ToUnicode)
     /// reproduced; Layer 7 (idx6, count) and Layer 9 (idx8, lineage) are NOT
     /// synthetically reproducible on this fixture (PDFKit does not merge
     /// co-located glyphs on iOS 26.4 — see directColocationTest) and PASS here.
-    /// S05 (2026-06-09): idx7 flipped to PASS with the J-5 SVT-4 refinement;
+    /// idx7 flipped to PASS with the Layer 8 font-verification refinement;
     /// idx5 stays FAIL BY DESIGN — the fixture's ∑/∆/█/─ glyphs draw at their
     /// natural substituted advances, off the cell grid at ANY base size, which
-    /// is a deliberate adversarial property SVT-1 correctly flags. Do NOT
+    /// is a deliberate adversarial property Layer 6 correctly flags. Do NOT
     /// chase idx5 green here; never weaken a verifier to move a pin.
-    @Test("S01 validation gate — fixture reproduces Layer 6 + Layer 8 FAIL")
+    @Test("Validation gate — fixture reproduces Layer 6 + Layer 8 FAIL")
     func validationGate() async throws {
         let fixture = TestFixtures.searchableMergeReproPDF()
         let regions = TestFixtures.searchableMergeReproRegions()
@@ -50,7 +51,7 @@ struct SearchableMergeProbeTests {
             regions: regions, digests: digests, perPageModes: perPageModes
         )
 
-        print("===== S01 VALIDATION GATE =====")
+        print("===== VALIDATION GATE =====")
         print("pages=\(outDoc.pageCount)  cellWidth=\(SearchableMergeProbe.cellWidth)  tol=\(SearchableMergeProbe.advanceTol)")
         var totalOffGrid = 0
         var maxCountDeficit = Int.min   // max over pages of (surviving − outputComposed)
@@ -91,21 +92,20 @@ struct SearchableMergeProbeTests {
         print("===== END VALIDATION GATE =====")
 
         // ---- Validation gate assertions (BLOCKER-aware) ----
-        // [S06 J-12/J-13 flip, 2026-06-09] idx5 FAIL → PASS: SVT-1 now
-        // verifies origin DELTAS against `natural(prev) + j × cell` — and a
-        // glyph's natural advance in the accepted family (the very thing
-        // this fixture's anomalous-advance class deliberately tripped under
-        // the S01-era selection-WIDTH proxy) is a writer/font property the
-        // lattice admits (J-13/N1). TJ kerning displacements still land off
-        // the lattice (RT-1). See §6.6 SVT-1.
+        // idx5 FAIL → PASS: Layer 6 now verifies origin DELTAS against
+        // `natural(prev) + j × cell` — and a glyph's natural advance in the
+        // accepted family (the very thing this fixture's anomalous-advance
+        // class deliberately tripped under the earlier selection-WIDTH
+        // proxy) is a writer/font property the lattice admits. TJ kerning
+        // displacements still land off the lattice.
         #expect(layers[5]?.status.isFail == false,
-                "Spatial/SVT-1 (idx5 = spec Layer 6) PASSes: natural advances ride inside the J-13 lattice.")
-        // [S05 phase-A flip, 2026-06-09] idx7 FAIL → PASS: the fixture's
-        // CMap-bearing subsets carry accepted Courier/Menlo BaseFont names
-        // (the S01-measured font picture), so the J-5-refined SVT-4
-        // tolerates them. Emission itself is unchanged (writer behavior).
+                "Spatial/Layer 6 (idx5) PASSes: natural advances ride inside the origin-delta lattice.")
+        // idx7 FAIL → PASS: the fixture's CMap-bearing subsets carry
+        // accepted Courier/Menlo BaseFont names (the measured font
+        // picture), so the refined Layer 8 check tolerates them. Emission
+        // itself is unchanged (writer behavior).
         #expect(layers[7]?.status.isFail == false,
-                "Font/SVT-4 (idx7 = spec Layer 8) PASSes: accepted-subset CMaps tolerated (J-5).")
+                "Font/Layer 8 (idx7) PASSes: accepted-subset CMaps tolerated.")
         // Leak/structure + base layers must stay non-FAIL:
         #expect(layers[9]?.status.isFail == false,
                 "Operator Re-Extraction (idx9 = spec Layer 10) must stay PASS (no sensitive operators).")
@@ -113,18 +113,18 @@ struct SearchableMergeProbeTests {
             #expect(layers[base]?.status.isFail == false,
                     "Base layer idx\(base) must stay PASS/INFO.")
         }
-        // BLOCKER §2/§4: Character Count (idx6 = spec Layer 7) and Character
-        // Lineage (idx8 = spec Layer 9) are NOT synthetically reproducible. PDFKit
-        // on iOS 26.4 does not merge co-located glyphs (directColocationTest), so
-        // output composed ≥ surviving — no count deficit, no lineage divergence.
+        // Character Count (idx6, Layer 7) and Character Lineage (idx8,
+        // Layer 9) are NOT synthetically reproducible. PDFKit on iOS 26.4
+        // does not merge co-located glyphs (directColocationTest), so output
+        // composed ≥ surviving — no count deficit, no lineage divergence.
         // They PASS here; assert PASS deliberately (do NOT manufacture a FAIL).
         #expect(layers[6]?.status.isFail == false,
-                "Character Count (idx6 = spec Layer 7): unreproducible deficit — PASS (BLOCKER §2).")
+                "Character Count (idx6, Layer 7): unreproducible deficit — PASS.")
         #expect(layers[8]?.status.isFail == false,
-                "Character Lineage (idx8 = spec Layer 9): unreproducible here — PASS (BLOCKER §2/§4).")
+                "Character Lineage (idx8, Layer 9): unreproducible here — PASS.")
         // Supporting mechanism evidence:
         #expect(totalOffGrid >= 1,
-                "At least one off-grid substituted advance must exist (the Layer 6/SVT-1 trigger).")
+                "At least one off-grid substituted advance must exist (the Layer 6 trigger).")
         #expect(maxCountDeficit <= 0,
                 "No page has output composed < surviving (this is WHY Layer 7 count passes).")
     }
@@ -132,23 +132,23 @@ struct SearchableMergeProbeTests {
     /// Sweep the inter-column gap and record where `groupIntoRuns` splits
     /// the row.
     ///
-    /// [SV-4 re-pin] The S01-era premise — PDFKit bridges every born-digital
-    /// same-line gap with a selectable synthesized space, so the row never
-    /// splits — described the geometry defect the extractor now removes: a
-    /// gap-wide bridging entry sat gap-free against BOTH columns, the row
-    /// drew as ONE group, and the drawn gutter compressed to a single cell
-    /// (value columns landed far off the raster). The extractor skips a
-    /// whitespace entry at the run-grouping adjacency break (width ≥ 1.5×
-    /// the previous entry's): below the break the space keeps its entry and
-    /// the row stays whole (word spacing); at or beyond it the row SPLITS
-    /// and the line layout re-tiles the gutter with whole cells at
-    /// raster-true positions. The 1b run-boundary-overlap concern the old
-    /// premise ruled out is measured directly by `constructedMergeProbe`
-    /// (split + overlapping redraw → no merge, no Layer-7/9 deficit).
-    @Test("S01 gap sweep — run-break window follows the grouping threshold")
+    /// The earlier premise — PDFKit bridges every born-digital same-line gap
+    /// with a selectable synthesized space, so the row never splits —
+    /// described the geometry defect the extractor now removes: a gap-wide
+    /// bridging entry sat gap-free against BOTH columns, the row drew as ONE
+    /// group, and the drawn gutter compressed to a single cell (value
+    /// columns landed far off the raster). The extractor skips a whitespace
+    /// entry at the run-grouping adjacency break (width ≥ 1.5× the previous
+    /// entry's): below the break the space keeps its entry and the row
+    /// stays whole (word spacing); at or beyond it the row SPLITS and the
+    /// line layout re-tiles the gutter with whole cells at raster-true
+    /// positions. The run-boundary-overlap concern the old premise ruled
+    /// out is measured directly by `constructedMergeProbe` (split +
+    /// overlapping redraw → no merge, no Layer-7/9 deficit).
+    @Test("Gap sweep — run-break window follows the grouping threshold")
     func gapSweep() async throws {
         let regions = TestFixtures.searchableMergeReproRegions()
-        print("===== S01 GAP SWEEP =====")
+        print("===== GAP SWEEP =====")
         for rightX in stride(from: 128.0, through: 210.0, by: 4.0) {
             let fixture = TestFixtures.searchableMergeReproPDF(
                 sourceFontSize: 7, rightX: CGFloat(rightX)
@@ -180,7 +180,7 @@ struct SearchableMergeProbeTests {
     /// Sweep candidate co-location / zero-advance mechanisms (1a family) to
     /// determine which produce a Layer 7/9 deficit, since run-boundary overlap (1b)
     /// is unreproducible (PDFKit bridges all same-line gaps — see gapSweep).
-    @Test("S01 deficit mechanism sweep")
+    @Test("Deficit mechanism sweep")
     func deficitSweep() async throws {
         let regions = TestFixtures.searchableMergeReproRegions()
         let candidates: [(name: String, lines: [String])] = [
@@ -194,7 +194,7 @@ struct SearchableMergeProbeTests {
             ("combining-on-space", ["A \u{0301}B C \u{0303}D E \u{0308}F"]),
             ("precomposed-accents", ["caf\u{00E9} \u{00E0} pi\u{00F1}ata b\u{00FC}ro na\u{00EF}ve"]),
         ]
-        print("===== S01 DEFICIT SWEEP =====")
+        print("===== DEFICIT SWEEP =====")
         for c in candidates {
             let placed = c.lines.enumerated().map { (i, t) in
                 (text: t, x: CGFloat(72), y: CGFloat(700 - i * 16))
@@ -202,7 +202,7 @@ struct SearchableMergeProbeTests {
             let fixture = SearchableMergeProbe.ctLinePDF(placed, fontSize: 9)
             let qm = try await SearchableMergeProbe.quickMeasure(fixture, regions: regions)
             print("\(c.name): \(qm)")
-            // BLOCKER §2: across every synthetic mechanism, output composed ≥
+            // Across every synthetic mechanism, output composed ≥
             // surviving — never a Layer-7 deficit (deficit = surviving − output ≤ 0).
             #expect(qm.deficit <= 0,
                     "deficitSweep \(c.name): output < surviving must never occur synthetically.")
@@ -228,7 +228,7 @@ struct SearchableMergeProbeTests {
             let fixture = SearchableMergeProbe.ctLinePDF(c.placed, fontSize: 9)
             let qm = try await SearchableMergeProbe.quickMeasure(fixture, regions: regions)
             print("\(c.name): \(qm)")
-            // BLOCKER §2: across every synthetic mechanism, output composed ≥
+            // Across every synthetic mechanism, output composed ≥
             // surviving — never a Layer-7 deficit (deficit = surviving − output ≤ 0).
             #expect(qm.deficit <= 0,
                     "deficitSweep \(c.name): output < surviving must never occur synthetically.")
@@ -239,7 +239,7 @@ struct SearchableMergeProbeTests {
     /// Probe the constructed-CharacterInfo reconstructor-merge path for the
     /// Layer 7 (count) + Layer 9 (lineage) failures the source→extraction
     /// pipeline cannot produce (PDFKit bridges all same-line gaps).
-    @Test("S01 constructed reconstructor-merge probe")
+    @Test("Constructed reconstructor-merge probe")
     func constructedMergeProbe() async throws {
         let verifier = SandwichVerification()
         let pageSize = CGSize(width: 612, height: 792)
@@ -251,7 +251,7 @@ struct SearchableMergeProbeTests {
             ("DEBITRECORDED", "5647382"),
             ("TRANSFERSENT", "8675309"),
         ]
-        print("===== S01 CONSTRUCTED MERGE PROBE =====")
+        print("===== CONSTRUCTED MERGE PROBE =====")
         for rightX in [134.0, 138.0, 140.0, 144.0, 150.0] {
             let surviving = SearchableMergeProbe.constructedTableSurviving(
                 rows: rows, advance: 4.2, rightX: CGFloat(rightX))
@@ -272,7 +272,7 @@ struct SearchableMergeProbeTests {
             // Even when the surviving set is constructed directly with born-digital
             // column gaps (bypassing PDFKit source-side bridging) so groupIntoRuns
             // DOES split and the 12pt redraw overlaps, PDFKit still re-extracts
-            // output composed ≥ surviving — no merge, no deficit (BLOCKER §2).
+            // output composed ≥ surviving — no merge, no deficit.
             #expect(rs.runCount > rows.count,
                     "constructedMergeProbe: groupIntoRuns must split the column table (the break the source path can't produce).")
             #expect(prof.totalNonZeroBounds >= surviving.count,
@@ -289,9 +289,9 @@ struct SearchableMergeProbeTests {
     /// composed-character re-extraction MERGE glyphs drawn at identical /
     /// overlapping positions into FEWER composed characters? Draws two N-glyph
     /// strings at increasing overlap and counts output composed chars.
-    @Test("S01 direct co-location merge test")
+    @Test("Direct co-location merge test")
     func directColocationTest() async throws {
-        print("===== S01 DIRECT CO-LOCATION TEST =====")
+        print("===== DIRECT CO-LOCATION TEST =====")
         // Two 8-glyph strings, second offset by `dx` from the first (dx=0 =
         // exact co-location). 16 glyphs drawn; how many composed chars come back?
         for dx in [0.0, 3.6, 7.2, 14.4, 28.8, 57.6] {
@@ -303,26 +303,25 @@ struct SearchableMergeProbeTests {
             let prof = SearchableMergeProbe.composedProfile(page)
             let drawn = SearchableMergeProbe.drawnGlyphOperandCount(page)
             print("dx=\(dx): drawn=\(drawn) outputComposedNonZero=\(prof.totalNonZeroBounds) zeroBounds=\(prof.zeroOrNegBoundsCount) (16 glyphs drawn; <16 composed ⇒ PDFKit merges)")
-            // DECISIVE (BLOCKER §3): even at dx=0 (exact co-location) PDFKit
-            // re-extracts ≥ the drawn glyph count — it does NOT merge co-located
-            // glyphs into fewer composed characters. This disproves the master
-            // plan's §1.3/§2.1 "PDFKit merges co-located glyphs" root-cause premise.
+            // DECISIVE: even at dx=0 (exact co-location) PDFKit re-extracts
+            // ≥ the drawn glyph count — it does NOT merge co-located glyphs
+            // into fewer composed characters. This disproves the "PDFKit
+            // merges co-located glyphs" root-cause premise.
             #expect(prof.totalNonZeroBounds >= drawn,
                     "directColocation dx=\(dx): composed < drawn would mean a merge — PDFKit does not merge on iOS 26.4.")
         }
         print("===== END DIRECT CO-LOCATION TEST =====")
     }
 
-    /// OQ-4 — FIX-A monotonic-cell prototype (TEST-LOCAL; does NOT modify the
+    /// FIX-A monotonic-cell prototype (TEST-LOCAL; does NOT modify the
     /// reconstructor). Draws the constructed column table through the by-hand
     /// `x_k = max(floor(srcMinX/cw)·cw, x_{k-1}+cw)` placement and re-measures.
     /// Contrast with `constructedMergeProbe` (current reconstructor: output
     /// composed > surviving, off-grid outliers possible). FIX-A's demonstrable
     /// value is on-grid 1:1 ADVANCES (helps Layer 6); its STATED Layer-7/9 merge-
     /// prevention benefit is moot because no merge occurs in the first place
-    /// (BLOCKER §3) — so whether FIX-A addresses the REAL Layer 7/9 deficit is
-    /// UNRESOLVED and needs the real doc (J-8).
-    @Test("S01 FIX-A monotonic-cell prototype (OQ-4)")
+    /// — so whether FIX-A addresses the REAL Layer 7/9 deficit remains open.
+    @Test("FIX-A monotonic-cell prototype")
     func fixAMonotonicPrototype() async throws {
         let pageSize = CGSize(width: 612, height: 792)
         let rows: [(left: String, right: String)] = [
@@ -330,7 +329,7 @@ struct SearchableMergeProbeTests {
             ("PENDINGCHARGE", "4567890"), ("CREDITENTRIES", "1029384"),
             ("DEBITRECORDED", "5647382"), ("TRANSFERSENT", "8675309"),
         ]
-        print("===== S01 FIX-A MONOTONIC PROTOTYPE =====")
+        print("===== FIX-A MONOTONIC PROTOTYPE =====")
         for rightX in [134.0, 140.0, 150.0] {
             let surviving = SearchableMergeProbe.constructedTableSurviving(
                 rows: rows, advance: 4.2, rightX: CGFloat(rightX))
@@ -342,7 +341,7 @@ struct SearchableMergeProbeTests {
             let drawn = SearchableMergeProbe.drawnGlyphOperandCount(page)
             print("rightX=\(rightX) surv=\(surviving.count) drawn=\(drawn) composedNonZero=\(prof.totalNonZeroBounds) deficit=\(surviving.count - prof.totalNonZeroBounds) offGrid=\(prof.offGridOutliers.count) zeroBounds=\(prof.zeroOrNegBoundsCount)")
             // FIX-A prototype invariants: 1:1 re-extraction (no deficit) and on-grid
-            // advances (no off-grid outlier). Pinned after S01 measurement (run-1).
+            // advances (no off-grid outlier). Pinned after direct measurement.
             #expect(prof.totalNonZeroBounds >= surviving.count,
                     "FIX-A prototype: monotonic placement must not lose characters (output composed ≥ surviving).")
             #expect(prof.offGridOutliers.count == 0,
@@ -351,18 +350,18 @@ struct SearchableMergeProbeTests {
         print("===== END FIX-A PROTOTYPE =====")
     }
 
-    /// Layer-9 (Character Lineage / idx8 / SVT-2) PROXY — **NON-FAITHFUL**.
+    /// Layer-9 (Character Lineage / idx8) PROXY — **NON-FAITHFUL**.
     ///
-    /// IMPORTANT (BLOCKER §4): this reproduces the lineage-mismatch SYMPTOM via
-    /// CONTENT RECOMPOSITION — a line that begins with a combining mark recomposes
+    /// IMPORTANT: this reproduces the lineage-mismatch SYMPTOM via CONTENT
+    /// RECOMPOSITION — a line that begins with a combining mark recomposes
     /// differently between the filter-side composed walk and the output composed
     /// walk, flipping the lineage hash. This is NOT the real doc's COUNT-driven
     /// lineage divergence, and FIX-A (monotonic cells) would NOT address it.
     /// It exists only to give downstream sessions a genuine Layer-9 FAIL produced
     /// by the strict engine (no verifier was weakened) to exercise the verifier
     /// path; it must NOT be treated as a faithful stand-in for validating FIX-A on
-    /// Layer 9. See the S01 findings appendix.
-    @Test("S01 Layer-9 lineage proxy (non-faithful — content recomposition)")
+    /// Layer 9.
+    @Test("Layer-9 lineage proxy (non-faithful — content recomposition)")
     func layer9LineageProxyContentRecomposition() async throws {
         let regions = TestFixtures.searchableMergeReproRegions()
         // Leading-combining lines: the mark recomposes with the line start.
@@ -371,9 +370,9 @@ struct SearchableMergeProbeTests {
             ("\u{0303}IJKLMNOP", 72, 684),
         ], fontSize: 9)
         let qm = try await SearchableMergeProbe.quickMeasure(fixture, regions: regions)
-        print("===== S01 LAYER-9 PROXY (non-faithful) ===== \(qm)")
+        print("===== LAYER-9 PROXY (non-faithful) ===== \(qm)")
         #expect(qm.l9Fail == true,
-                "Layer 9 lineage must FAIL on the leading-combining proxy (content recomposition, BLOCKER §4).")
+                "Layer 9 lineage must FAIL on the leading-combining proxy (content recomposition).")
     }
 
     private func statusTag(_ s: VerificationStatus) -> String {

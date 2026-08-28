@@ -1,12 +1,12 @@
 import SwiftUI
 import RedactionEngine
 
-// GAP §6.2: Hover popover content for detected regions on iPad.
+// Hover popover content for detected regions on iPad.
 // Shows badge, description, matched text (privacy-sensitive), and scan level.
 
 struct RegionInfoPopover: View {
     let metadata: RegionMetadata
-    /// WU-71 / [P10] path (a): forward-rationale carried by the region's
+    /// Forward-rationale carried by the region's
     /// `Source`. nil hides the disclosure entirely. When non-nil the row
     /// renders rule ID + final score so the reviewer sees the detector's
     /// own reasoning without opening a separate sheet.
@@ -52,10 +52,10 @@ struct RegionInfoPopover: View {
             }
             .accessibilityElement(children: .combine)
 
-            // WU-71 — forward rationale disclosure. Visible only when the
+            // Forward rationale disclosure. Visible only when the
             // region's `Source` carries a non-nil `MatchRationale` (i.e.
             // the region was applied from a search result that had detector
-            // reasoning attached). Distinct from the W9 reverse-rationale
+            // reasoning attached). Distinct from the reverse-rationale
             // path below — this one shows what the detector recorded at
             // detect time, not what `reverseRationale` synthesizes now.
             if let rationale {
@@ -87,7 +87,7 @@ struct RegionInfoPopover: View {
         .padding(ResectaTokens.Spacing.sm)
     }
 
-    /// WU-71: compact percentage formatter for the forward-rationale row.
+    /// Compact percentage formatter for the forward-rationale row.
     /// Mirrors `MatchRationaleSheet.formatScore` so the two surfaces show
     /// the same number for the same input.
     static func formatScore(_ score: Double) -> String {
@@ -95,7 +95,7 @@ struct RegionInfoPopover: View {
         return "\(pct)%"
     }
 
-    // F2-2: Match canvas overlay colors — uses SemanticColor tokens
+    // Match canvas overlay colors — uses SemanticColor tokens
     private var kindColor: Color {
         switch metadata.piiKind {
         case .pii: ResectaTokens.SemanticColor.badgePII

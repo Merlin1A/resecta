@@ -3,7 +3,7 @@ import UIKit
 import PDFKit
 @testable import ResectaApp
 
-// UXC-48 (D-123): the document view's zoom floor. `FitFlooredPDFView`
+// The document view's zoom floor. `FitFlooredPDFView`
 // pins `minScaleFactor` to `scaleFactorForSizeToFit` after every layout
 // and page change, so a pinch out stops at the page's fit size; zoom-in
 // keeps PDFKit's default ceiling. Views are hosted in a window so PDFKit

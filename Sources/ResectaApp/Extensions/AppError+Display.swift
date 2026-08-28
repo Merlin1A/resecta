@@ -2,8 +2,8 @@ import Foundation
 import SwiftUI
 import RedactionEngine
 
-// §A4h, §A9: Provides localizedTitle and localizedRecovery for FailedStateView.
-// All copy uses mechanism-description language per ARCH §1.3.
+// Provides localizedTitle and localizedRecovery for FailedStateView.
+// All copy uses mechanism-description language.
 
 extension PipelineError {
 
@@ -32,7 +32,7 @@ extension PipelineError {
                 "Detection Timed Out"
             case .visionError:
                 "Detection Could Not Complete"
-            // SEC-6 — mechanism-description per ARCH §1.3 / I6.
+            // Mechanism-description copy.
             case .detectionCorpusInvalid:
                 "Detection Corpus Verification Failed"
             }
@@ -75,15 +75,14 @@ extension PipelineError {
         case .importError(let f):
             switch f {
             case .corrupt:
-                // Q-UX-import-iofailure-mislabel (Pkg N): broadened copy
-                // covers the read-failure family — damaged file, file
-                // locked by another app, temporary I/O unavailability.
-                // Mechanism-description compliant: names what the engine
-                // observed (could-not-read), enumerates the common
-                // mechanisms without promising a root cause. V1.0-safe
-                // path; granular .ioError(reason:) case slot V1.1+
-                // (HARD-STOP per CLAUDE.md — PipelineError hierarchy is
-                // unchanged in this package).
+                // Broadened copy covers the read-failure family — damaged
+                // file, file locked by another app, temporary I/O
+                // unavailability. Mechanism-description compliant: names
+                // what the engine observed (could-not-read), enumerates
+                // the common mechanisms without promising a root cause.
+                // The PipelineError hierarchy in this package is fixed;
+                // a granular .ioError(reason:) case would be a future
+                // addition, not a change here.
                 "The file could not be read. It may be damaged, locked by another app, or temporarily unavailable."
             case .passwordProtected:
                 "Resecta does not support encrypted PDFs. Remove the password in another app, then import the file."
@@ -103,7 +102,7 @@ extension PipelineError {
                 "Page \(p + 1) took longer than expected to process. You can try again or draw regions manually."
             case .visionError(let p):
                 "Text recognition encountered an issue on page \(p + 1). You can try again or draw regions manually."
-            // SEC-6 — mechanism description, I6 vocabulary. Tells the user
+            // Mechanism description. Tells the user
             // what the engine did (signature check failed → corpus not
             // loaded → manual tools remain).
             case .detectionCorpusInvalid:
@@ -136,7 +135,7 @@ extension PipelineError {
             case .writeFailed:
                 "The document could not be written to storage. Try again, or check available storage."
             case .filePurged:
-                // KI-4: §A4h specific copy
+                // KI-4: copy specific to this failure case
                 "The temporary working copy is no longer accessible. iOS is designed to periodically reclaim temporary storage."
             }
         }

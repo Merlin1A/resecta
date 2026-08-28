@@ -1,13 +1,13 @@
 import SwiftUI
 import UIKit
 
-// ARCH §6.1: First-launch clickwrap. Verbatim legal text — do NOT modify (R9).
-// UI_UX §6.4: Full-screen cover, opaque background, no glass interference.
-// UI_UX §9.3: ScrollView wrapper for Dynamic Type accessibility (AX5).
-// ARCH §6.3: Legal text referenced from Legal.xcstrings catalog.
+// First-launch clickwrap. Verbatim legal text — do NOT modify.
+// Full-screen cover, opaque background, no glass interference.
+// ScrollView wrapper for Dynamic Type accessibility (AX5).
+// Legal text referenced from Legal.xcstrings catalog.
 
 struct EULAGateView: View {
-    // C10/D19: Versioned key — increment to _v2 to force re-acceptance on terms change.
+    // Versioned key — increment to _v2 to force re-acceptance on terms change.
     @AppStorage("disclaimerAccepted_v1") private var disclaimerAccepted = false
 
     // EULA acceptance-key history. The CURRENT key is
@@ -42,7 +42,7 @@ struct EULAGateView: View {
 
     var body: some View {
         VStack(spacing: ResectaTokens.Spacing.lg) {
-            // UI_UX §9.3: ScrollView activates only when content exceeds the
+            // ScrollView activates only when content exceeds the
             // available height (e.g., at AX5 Dynamic Type). The minHeight tied
             // to the scroll viewport centers content vertically when it fits and
             // yields to natural scrolling once content grows taller than the gate.
@@ -56,12 +56,12 @@ struct EULAGateView: View {
                             .foregroundStyle(.primary)
                             .accessibilityHidden(true)
 
-                        // ARCH §6.3: Legal string catalog reference
+                        // Legal string catalog reference
                         Text("eula_title", tableName: "Legal")
                             .font(.title2.weight(.semibold))
 
-                        // ARCH §6.1: Verbatim clickwrap text (R9 — do NOT modify).
-                        // ARCH §6.3: Referenced from Legal.xcstrings.
+                        // Verbatim clickwrap text (do NOT modify).
+                        // Referenced from Legal.xcstrings.
                         Text("eula_body", tableName: "Legal")
                             .font(.body)
                             .multilineTextAlignment(.center)
@@ -94,7 +94,7 @@ struct EULAGateView: View {
                 .scrollBounceBehavior(.basedOnSize)
             }
 
-            // UI_UX §9.3: "I Agree" button pinned at bottom, outside scroll.
+            // "I Agree" button pinned at bottom, outside scroll.
             // Standard `.borderedProminent` (system accent) — kept identical to the
             // app's other primary buttons (e.g. FailedStateView:80–83). Deliberately
             // NOT re-tinted, so every primary action shares one button language.
@@ -109,7 +109,7 @@ struct EULAGateView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .padding(.bottom, ResectaTokens.Spacing.md)
-            .accessibilityIdentifier("eulaAccept") // §A8
+            .accessibilityIdentifier("eulaAccept")
         }
         // Read-only document sheet OVER the gate. `.sheet(item:)`
         // so each document presents its own copy; dismissal clears the item
@@ -117,7 +117,7 @@ struct EULAGateView: View {
         .sheet(item: $presentedDocument) { document in
             LegalDocumentView(document: document)
         }
-        // UI_UX §6.4: opaque background (systemGroupedBackground is opaque) — keeps
+        // Opaque background (systemGroupedBackground is opaque) — keeps
         // legal text readable and matches the HomeView backdrop (HomeView.swift:34)
         // the gate gives way to. `.ignoresSafeArea()` lets the color fill edge-to-edge
         // while content stays within the safe area (prevents a top/bottom seam).

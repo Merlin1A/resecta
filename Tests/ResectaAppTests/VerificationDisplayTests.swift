@@ -5,13 +5,13 @@ import UIKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// UI_UX §4.1–§4.3a: Verification status display property tests.
+// Verification status display property tests.
 
 @Suite("VerificationStatus Display Properties", .tags(.display))
 @MainActor
 struct VerificationDisplayTests {
 
-    // MARK: - SF Symbols (ENGINE §6.8)
+    // MARK: - SF Symbols
 
     @Test("symbolName maps to correct SF Symbol",
           arguments: [
@@ -26,7 +26,7 @@ struct VerificationDisplayTests {
         #expect(status.symbolName == expected)
     }
 
-    // MARK: - Colors (UI_UX §4.1)
+    // MARK: - Colors
 
     @Test("color maps to correct SwiftUI color",
           arguments: [
@@ -41,7 +41,7 @@ struct VerificationDisplayTests {
         #expect(status.color == expected)
     }
 
-    // MARK: - Intermediate Colors (UI_UX §4.3a)
+    // MARK: - Intermediate Colors
 
     @Test("intermediateColor for pass is secondary (prevents premature confidence anchoring)")
     func intermediateColorPassIsSecondary() {
@@ -60,7 +60,7 @@ struct VerificationDisplayTests {
         #expect(status.intermediateColor == expected)
     }
 
-    // MARK: - Text tier reachability (UXC-27 / GAP-36)
+    // MARK: - Text tier reachability
 
     // `color` / `intermediateColor` above stay the GLYPH tier; `textColor`
     // is the SMALL-TEXT tier every non-glyph consumer routes through
@@ -79,7 +79,7 @@ struct VerificationDisplayTests {
         #expect(status.textColor == expected)
     }
 
-    // MARK: - UXC-27 consumer sweep: RedactedPreviewView's verdict capsule
+    // MARK: - Consumer sweep: RedactedPreviewView's verdict capsule
 
     // Found via an exhaustive grep of every `VerificationStatus`-typed
     // `.color` consumer (not just the three named glyph sites) — the
@@ -106,7 +106,7 @@ struct VerificationDisplayTests {
             encoding: .utf8)
     }
 
-    // MARK: - Titles (mechanism-description language, ARCH §1.3)
+    // MARK: - Titles (mechanism-description language)
 
     @Test("title is non-empty for all cases",
           arguments: [
@@ -134,7 +134,7 @@ struct VerificationDisplayTests {
         #expect(!status.subtitle.isEmpty)
     }
 
-    // VF-12: "Passed" is reserved for .pass — a WARN masthead that says
+    // "Passed" is reserved for .pass — a WARN masthead that says
     // "Passed" frames reduced assurance as a pass (the trust strip on the
     // same screen already refuses the completeness claim on WARN).
     @Test("WARN title says completed, never passed")
@@ -146,7 +146,7 @@ struct VerificationDisplayTests {
                 "\"Passed\" is reserved for the .pass verdict")
     }
 
-    // VF-12: the FAIL subtitle names the remediation path, not just the
+    // The FAIL subtitle names the remediation path, not just the
     // review instruction — and the masthead's own .fail arm speaks the
     // same sentence, so the two surfaces cannot drift apart.
     @Test("FAIL subtitle names the remediation path on both surfaces")
@@ -161,7 +161,7 @@ struct VerificationDisplayTests {
                 "The FAIL title is pinned — the preview verdict capsule quotes it")
     }
 
-    // MARK: - Accessibility (UI_UX §4.1)
+    // MARK: - Accessibility
 
     @Test("accessibilityLabel is non-empty for all cases",
           arguments: [
@@ -176,14 +176,14 @@ struct VerificationDisplayTests {
         #expect(!status.accessibilityLabel.isEmpty)
     }
 
-    // VF-12: the spoken WARN label follows the retitled masthead.
+    // The spoken WARN label follows the retitled masthead.
     @Test("WARN accessibilityLabel matches the completed-with-notes framing")
     func warnAccessibilityLabelCompletedFraming() {
         #expect(VerificationStatus.warn("w").accessibilityLabel
                 == "Verification completed with notes. Review the notes before sharing.")
     }
 
-    // MARK: - Status text tier (q41 / CD-15, 07-PALETTE §1)
+    // MARK: - Status text tier
 
     // Pins the five AA-validated text-tier tokens to their spec hexes in
     // BOTH trait collections. These values were contrast-gated (≥4.5:1 on
@@ -196,7 +196,7 @@ struct VerificationDisplayTests {
              0x7A6100, 0xFFD60A),
             ("failText", ResectaTokens.SemanticColor.failText, 0xC2262E, 0xFF7A72),
             ("infoText", ResectaTokens.SemanticColor.infoText, 0x1D5EBF, 0x6CB4EE),
-            // UXC-27 (GAP-36) — pink-family text tier for .attention,
+            // Pink-family text tier for .attention,
             // added alongside the five pre-existing tokens above.
             ("attentionText", ResectaTokens.SemanticColor.attentionText, 0xD40028, 0xFF6E8B),
           ])
@@ -223,7 +223,7 @@ struct VerificationDisplayTests {
         }
     }
 
-    // MARK: - Language Compliance (ARCH §1.3)
+    // MARK: - Language Compliance
 
     @Test("No outcome-promise language in display strings",
           arguments: [
@@ -241,11 +241,11 @@ struct VerificationDisplayTests {
 
         for word in bannedWords {
             #expect(!allText.contains(word),
-                    "Display text for \(status) contains banned word '\(word)' (ARCH §1.3)")
+                    "Display text for \(status) contains banned word '\(word)'")
         }
     }
 
-    // MARK: - Attention masthead (PD-17/PD-18 — residual tier)
+    // MARK: - Attention masthead (residual tier)
 
     @Test("ATTENTION title and subtitle are pinned")
     func attentionTitleSubtitlePinned() {
@@ -303,14 +303,14 @@ struct VerificationDisplayTests {
                     pageReferences: nil, durationSeconds: 0)
     }
 
-    // MARK: - Masthead subtitle presence (UXC-47, D-122)
+    // MARK: - Masthead subtitle presence
 
     // PASS renders the title alone in both pipeline modes — the
     // "All N verification checks completed without issues." line (and its
     // informational-notes tail) is gone; the Verification Details header
     // still carries the counts. Every verdict that asks for action keeps
     // its line. INFO never aggregates (kept nil for exhaustiveness).
-    @Test("UXC-47: PASS masthead has no subtitle — 5-check, 10-check, and INFO-bearing runs")
+    @Test("PASS masthead has no subtitle — 5-check, 10-check, and INFO-bearing runs")
     func passMastheadHasNoSubtitle() {
         let raster = VerificationReport(
             layers: Array(repeating: layer(.pass), count: 5),
@@ -335,7 +335,7 @@ struct VerificationDisplayTests {
         #expect(VerificationResultsView.mastheadSubtitle(report: info) == nil)
     }
 
-    @Test("UXC-47: every non-PASS verdict keeps a masthead subtitle",
+    @Test("Every non-PASS verdict keeps a masthead subtitle",
           arguments: [
             VerificationStatus.warn("w"),
             VerificationStatus.attention("a"),
@@ -381,7 +381,7 @@ struct VerificationDisplayTests {
 
     @Test("detailsSummaryText: an ATTENTION run reads passed + need-review segments")
     func detailsSummaryAttentionShape() {
-        // The PD-15 sample shape under PD-17: 2 residual layers, 1 warn,
+        // The residual-tier sample shape: 2 residual layers, 1 warn,
         // 3 info, 4 pass → passed counts pass+info.
         let report = VerificationReport(
             layers: [layer(.pass), layer(.pass), layer(.pass), layer(.pass),
@@ -409,7 +409,7 @@ struct VerificationDisplayTests {
     }
 }
 
-// PD-18: attention rows name the exact remaining text + the remedy.
+// Attention rows name the exact remaining text + the remedy.
 @Suite("Attention row composition", .tags(.display))
 @MainActor
 struct AttentionRowCompositionTests {

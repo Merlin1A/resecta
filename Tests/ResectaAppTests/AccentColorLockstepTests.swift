@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 @testable import ResectaApp
 
-// q40 / CD-19 — one-source-of-truth guard for the brand tint. The teal pair
+// One-source-of-truth guard for the brand tint. The teal pair
 // is unavoidably duplicated: once in the AccentColor colorset (system chrome,
 // NSAccentColorName) and once in ResectaTokens.BrandTeal.tint (the root
 // ambient .tint — the iOS 26.4 sim runtime does not adopt the colorset as
@@ -14,7 +14,7 @@ import UIKit
 // BundleContentsTests — a Bundle.main pointing at the xctest runner cannot
 // produce a false green).
 
-@Suite("AccentColor colorset ↔ BrandTeal.tint lockstep (q40/CD-19)")
+@Suite("AccentColor colorset ↔ BrandTeal.tint lockstep")
 struct AccentColorLockstepTests {
 
     private var appBundle: Bundle { Bundle(for: AppCoordinator.self) }
@@ -46,13 +46,13 @@ struct AccentColorLockstepTests {
     }
 }
 
-// UXC-42 — resolved-RGBA pin for the neutral support-text token. Same
+// Resolved-RGBA pin for the neutral support-text token. Same
 // mechanism as the lockstep suite above: resolve in both appearances and
 // compare components within 1/255, so the measured pair cannot drift
 // without a deliberate edit here (the measured contrast ratios live in
 // the token's comment in ResectaTokens.swift).
 
-@Suite("SemanticColor.supportText RGBA pin (UXC-42)")
+@Suite("SemanticColor.supportText RGBA pin")
 struct SupportTextTokenPinTests {
 
     @Test("supportText resolves to the measured pair in light and dark", arguments: [

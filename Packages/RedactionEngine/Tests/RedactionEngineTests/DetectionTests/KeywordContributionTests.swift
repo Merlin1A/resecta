@@ -2,13 +2,12 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// WU-76 / [P4] — load-bearing closed-vocabulary invariant + W5 audit-log
-// back-compat. The closed-vocabulary test (`keywordsClosedVocab`) is the
-// privacy-floor guard: without it, a future engine change could emit
-// page-extracted strings via the new detail signals. RR-31 / RR-40
-// pin the test in DEFINITION_OF_DONE and the test must run in CI.
+// Load-bearing closed-vocabulary invariant plus audit-log back-compat.
+// The closed-vocabulary test (`keywordsClosedVocab`) is the privacy-floor
+// guard: without it, a future engine change could emit page-extracted
+// strings via the new detail signals. This test must run in CI.
 
-@Suite("Context keyword contribution (WU-76)")
+@Suite("Context keyword contribution")
 struct KeywordContributionTests {
 
     // Synthetic profile with known keyword vocabularies — independent
@@ -27,10 +26,9 @@ struct KeywordContributionTests {
 
     @Test("Closed-vocabulary invariant — every keywordKey from gazetteer")
     func keywordsClosedVocab() throws {
-        // Load-bearing per RR-31 / RR-40 / DEFINITION_OF_DONE engine-WU.
-        // RR-40 mitigation: assert non-empty gazetteer load BEFORE
-        // validating containment — otherwise a future path drift could
-        // silently make the invariant vacuous.
+        // Load-bearing: assert non-empty gazetteer load before validating
+        // containment — otherwise a future path drift could silently make
+        // the invariant vacuous.
 
         // Step 1: load the production gazetteer. The loader maps the
         // `Resources/Gazetteers/context-keywords.json` resource into
@@ -40,10 +38,10 @@ struct KeywordContributionTests {
         // Step 2: pick a category that ships with global positive
         // keywords (MRN) and assert the set is non-empty.
         guard let mrn = loader.positiveKeywords(for: .medicalRecord, doctype: nil) else {
-            Issue.record("mrn keywords missing — gazetteer path drift suspected (RR-40)")
+            Issue.record("mrn keywords missing — gazetteer path drift suspected")
             return
         }
-        #expect(!mrn.isEmpty, "gazetteer must load non-empty keywords (RR-40 mitigation)")
+        #expect(!mrn.isEmpty, "gazetteer must load non-empty keywords")
 
         // Step 3: run the scorer against a text that contains at least
         // one gazetteer keyword adjacent to a match, then verify EVERY
@@ -79,7 +77,7 @@ struct KeywordContributionTests {
         for c in contributions {
             #expect(
                 mrn.contains(c.keywordKey),
-                "keywordKey '\(c.keywordKey)' not in closed gazetteer vocab — RR-31 violation"
+                "keywordKey '\(c.keywordKey)' not in closed gazetteer vocab"
             )
         }
     }
@@ -131,9 +129,9 @@ struct KeywordContributionTests {
         #expect(detail == nil)
     }
 
-    // MARK: - W5 audit back-compat
+    // MARK: - Audit back-compat
 
-    @Test("W5 audit decoder back-compat decodes blobs without new cases")
+    @Test("Audit decoder back-compat decodes blobs without new cases")
     func auditBackCompat() throws {
         // Fixture: an OLD rationale blob (no detail variants) must
         // continue to decode after the additive Signal cases land.

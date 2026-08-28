@@ -20,7 +20,7 @@ struct FileJSONBlobTests {
 
     // nonisolated: passed as the `T` of `FileJSONBlob<T: Codable & Sendable>`,
     // so its Codable conformance must be usable from a nonisolated (Sendable)
-    // context under the s04 SE-0466 MainActor-default flip (mirrors the
+    // context under the SE-0466 MainActor-default flip (mirrors the
     // UserDefaultsJSONBlobTests payload).
     nonisolated private struct Payload: Codable, Sendable, Equatable {
         var items: [String: Double]

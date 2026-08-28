@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// UXC-49 (D-124 / REV-14 — STATE-7 at the Apply seam). The editor's ONE
+// At the Apply seam, the editor's ONE
 // `.sheet(item:)` slot reads `redactionState.activeSearch` and sits above
 // the phase switch, so a Search/Scan session that survives Redact rides the
 // compact float over the progress card, the results screen and its pushes,
@@ -69,7 +69,7 @@ struct RedactionStateDismissActiveSearchTests {
                 "clearAll no longer inlines the teardown")
     }
 
-    @Test("Source pin: the results-screen Home routes through handleHomeTap (the REV-05 park route)")
+    @Test("Source pin: the results-screen Home routes through handleHomeTap")
     func verifiedHomeRoutesThroughHandleHomeTap() throws {
         let editor = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
         guard let id = editor.range(of: ".accessibilityIdentifier(\"verificationDoneButton\")") else {

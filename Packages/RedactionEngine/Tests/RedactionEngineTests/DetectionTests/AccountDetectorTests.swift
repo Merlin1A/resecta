@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Plan Phase 3 / §4 — Account: context-only digit strings.
+// Account: context-only digit strings.
 
 @Suite("Account detector (context-only)")
 struct AccountDetectorTests {
@@ -63,7 +63,7 @@ struct AccountDetectorTests {
         #expect(hasRegex)
     }
 
-    // L-05: detector guard relaxed from > 0.05 to > 0.0 so intermediate
+    // Detector guard relaxed from > 0.05 to > 0.0 so intermediate
     // dampened values reach PresetThresholdVector (the real per-preset gate)
     // instead of being filtered at the detector. Zero-signal matches are
     // still rejected.
@@ -79,7 +79,7 @@ struct AccountDetectorTests {
         }
     }
 
-    // MARK: - CND-10 (launch-fix-v2 S5) doctype-gate broadening
+    // MARK: - Doctype-gate broadening
     //
     // `PIIDetector.runsAccount(doctype:)` is `private static`, so these
     // exercise the gate through its only observable effect: the public
@@ -102,8 +102,8 @@ struct AccountDetectorTests {
     func accountDoctypeGateTruthTable() async {
         #expect(await accountRuns(doctype: .financial), "financial runs account (unchanged)")
         #expect(await accountRuns(doctype: .medical), "medical runs account (unchanged)")
-        #expect(await accountRuns(doctype: .court), "CND-10: court now runs account")
-        #expect(await accountRuns(doctype: .generic), "CND-10: generic now runs account")
+        #expect(await accountRuns(doctype: .court), "court now runs account")
+        #expect(await accountRuns(doctype: .generic), "generic now runs account")
         #expect(await accountRuns(doctype: nil), "nil doctype runs account unconditionally")
         #expect(!(await accountRuns(doctype: .foia)), "foia holds the account gate closed")
     }

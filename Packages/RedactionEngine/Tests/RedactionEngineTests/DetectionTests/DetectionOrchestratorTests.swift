@@ -5,7 +5,7 @@ import CoreGraphics
 
 // .serialized: Vision's VNImageRequestHandler.perform() blocks cooperative pool
 // threads synchronously. Running multiple Vision tests concurrently can exhaust
-// the pool and deadlock (F2-8). Serialize to keep one perform() active at a time.
+// the pool and deadlock. Serialize to keep one perform() active at a time.
 @Suite("Detection Orchestrator", .serialized)
 struct DetectionOrchestratorTests {
 
@@ -73,7 +73,7 @@ struct DetectionOrchestratorTests {
         #expect(result == nil)
     }
 
-    @Test("D05-F1: coalesced range unions the dropped tail's word box")
+    @Test("Coalesced range unions the dropped tail's word box")
     func boundingRectCoalescedRangeCoversTail() {
         let orchestrator = DetectionOrchestrator()
         // Two disjoint word boxes: a head word [0,11) and a tail word [11,16).
@@ -84,7 +84,7 @@ struct DetectionOrchestratorTests {
             (NSRange(location: 11, length: 5), tailBox),
         ]
         // The un-widened winner range [0,11) maps only to the head box, leaving
-        // a partially-overlapping loser's tail unredacted — the D05-F1 defect.
+        // a partially-overlapping loser's tail unredacted — the coalescing defect.
         let narrow = orchestrator.boundingRect(for: NSRange(location: 0, length: 11), in: bounds)
         #expect(narrow == headBox)
         // The coalesced group span [0,16) unions both word boxes, so the tail
@@ -93,7 +93,7 @@ struct DetectionOrchestratorTests {
         #expect(coalesced == headBox.union(tailBox))
     }
 
-    // MARK: - L-10: Face-detection doctype gate
+    // MARK: - Face-detection doctype gate
 
     @Test("Face detection skipped for .financial doctype")
     func faceDetectionSkippedForFinancialDoctype() {
@@ -134,11 +134,11 @@ struct DetectionOrchestratorTests {
         #expect(Set(runFor) == Set([.court, .medical, .foia, .generic]))
     }
 
-    // MARK: - Package H — Defense-in-depth pixel-cap gate (§5.3.a)
+    // MARK: - Defense-in-depth pixel-cap gate
 
     @Test("runOCR skips images that exceed the per-axis pixel cap")
     func testRunOCRSkipsOversizedWidthImage() async throws {
-        // Defense-in-depth (`03-security-perf-audit.md §5.3.a`). The engine-side
+        // Defense-in-depth. The engine-side
         // gate mirrors `DocumentSearcher.maxOCRPixelDimension = 10_000`. A
         // 10_001-wide blank image trips the per-axis cap and runOCR must
         // return an empty triple — no Vision call, no OCRInvocationCounter

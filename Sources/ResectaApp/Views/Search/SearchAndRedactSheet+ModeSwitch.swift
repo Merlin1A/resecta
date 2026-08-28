@@ -6,9 +6,9 @@ import RedactionEngine
 // sibling file so the toast composition + gating logic is testable
 // without driving a SwiftUI host.
 //
-// UXF-19 evolution: the original shape warned BEFORE the clear
+// The original shape warned BEFORE the clear
 // ("Switching mode will clear N unapplied matches.") and offered no
-// recovery; pack 01 also flagged that an all-applied result list cleared
+// recovery; it also missed that an all-applied result list cleared
 // with no toast at all (the warning gated on `unappliedCount > 0`).
 // Mode-switch clears route through a non-modal undo pattern
 // (originally shared with the old two-tap Done discard flow, which the
@@ -17,11 +17,11 @@ import RedactionEngine
 // prior mode and its results. The toast fires for ANY user-initiated
 // clear that dropped at least one result — applied-only lists included —
 // so no path clears silently. Programmatic transitions (saved-search
-// recall, ST-95) still skip both the clear and the toast by design.
+// recall) still skip both the clear and the toast by design.
 
 extension SearchAndRedactSheet {
 
-    /// WU-09: number of search results that have NOT been applied as
+    /// Number of search results that have NOT been applied as
     /// `RedactionRegion`s. Pure-data; safe to call from any actor since
     /// it reads only `searchState.results.count` and
     /// `searchState.appliedResultIDs.count`. Negative differences clamp
@@ -32,7 +32,7 @@ extension SearchAndRedactSheet {
         max(0, searchState.results.count - searchState.appliedResultIDs.count)
     }
 
-    /// UXF-19: the slice of session state a mode-switch clear destroys
+    /// The slice of session state a mode-switch clear destroys
     /// and the undo action restores. Value-type snapshot — lives in the
     /// toast's action closure and expires with the toast, mirroring the
     /// `+DiscardUndo` snapshot-lifetime contract (no long-lived field on
@@ -47,7 +47,7 @@ extension SearchAndRedactSheet {
     }
 
     /// Capture the pre-clear session slice. Must run BEFORE
-    /// `clearResults()` per [RR-04] reset-after-check ordering —
+    /// `clearResults()` for correct reset-after-check ordering —
     /// `previousMode` comes from the `.onChange(oldValue:)` parameter
     /// since `searchState.searchModeType` already holds the new mode
     /// when the handler fires.
@@ -66,7 +66,7 @@ extension SearchAndRedactSheet {
         )
     }
 
-    /// UXF-19: enqueue the post-clear undo toast when the gate admits it
+    /// Enqueue the post-clear undo toast when the gate admits it
     /// (user-initiated transition AND the clear dropped at least one
     /// result). The message names the unapplied count when unapplied
     /// matches were lost; an all-applied clear (the former silent
@@ -80,7 +80,7 @@ extension SearchAndRedactSheet {
     /// transition programmatic so the `.onChange` handler in the hub
     /// view preserves rather than re-clears — then re-applies the
     /// snapshotted results, applied markers, filter, and sort order.
-    /// BH-B-07 — the restore TARGET resolves at tap time, not enqueue
+    /// The restore TARGET resolves at tap time, not enqueue
     /// time: the toast deliberately outlives the sheet, and every sheet
     /// open mints a fresh `SearchState`, so the former
     /// `[weak searchState]` capture died with its session and the
@@ -130,7 +130,7 @@ extension SearchAndRedactSheet {
         )
     }
 
-    /// BH-B-07 — restore-target resolution at Undo-tap time. A pending
+    /// Restore-target resolution at Undo-tap time. A pending
     /// detection review owns the surface (restoring a search session
     /// under it would bury the review behind parked entry points), so
     /// the tap no-ops there. Otherwise the LIVE session — whichever
@@ -156,13 +156,13 @@ extension SearchAndRedactSheet {
         in searchState: SearchState
     ) {
         // Route the mode change through the existing programmatic hook
-        // (ST-95's reserved flag) so the hub's `.onChange` handler treats
+        // (the reserved flag) so the hub's `.onChange` handler treats
         // the restore like a saved-search recall — no re-clear, no toast.
         // Armed ONLY when the mode actually changes (mirrors
         // `SavedSearchListSheet.apply`): the `.onChange` consumer never
         // fires otherwise, and a stale `true` would mis-classify the
         // next USER transition as programmatic — reachable since
-        // BH-B-07's minted-target path can start at the snapshot mode.
+        // the minted-target path can start at the snapshot mode.
         searchState.isProgrammaticModeChange = searchState.searchModeType != snapshot.mode
         searchState.searchModeType = snapshot.mode
         searchState.results = snapshot.results

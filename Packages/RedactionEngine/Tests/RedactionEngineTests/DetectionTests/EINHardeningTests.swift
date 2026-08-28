@@ -2,18 +2,18 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// WS1 design 01 §5 — EIN hardening (item 1.9, 2026-06-10).
+// EIN hardening.
 //
 // Three new arms: hyphenated (unchanged), space-separated (context required),
 // no-separator (context required). Invalid-prefix rejection via
 // invalidEINPrefixes set verified against IRS IRM 21.7.13 (accessed 2026-06-11).
 //
-// NOTE: routingNumber overlap test (§5 "test_noSep_withStrongContext") omits
-// the routing-overlap half because PIICategory.routingNumber does not exist
-// in this task's scope (lands in a separate S2 agent task). The test asserts
-// only the .ein match with boosted confidence.
+// NOTE: the routingNumber overlap test ("test_noSep_withStrongContext") omits
+// the routing-overlap half because PIICategory.routingNumber was out of
+// scope for this test. The test asserts only the .ein match with boosted
+// confidence.
 
-@Suite("EIN hardening (design 01 §5, item 1.9)")
+@Suite("EIN hardening")
 struct EINHardeningTests {
 
     private func einMatches(in text: String) -> [PIIDetector.PIIMatch] {
@@ -52,13 +52,13 @@ struct EINHardeningTests {
         // theoretically fire. Only EIN is in scope here (routingNumber category not yet
         // shipped); we assert .ein match exists with boosted confidence.
         // NOTE: routingNumber overlap half omitted — PIICategory.routingNumber
-        // does not exist until item 1.8 (different agent).
+        // was not yet in scope for this test.
         let matches = einMatches(in: "payer's tin 123456789")
         let einMatch = matches.first(where: { $0.kind == .ein })
         #expect(einMatch != nil, "No-sep EIN with EIN keyword should be detected as .ein")
         if let m = einMatch {
             #expect(m.confidence == 0.85,
-                    "EIN keyword present → boostedConfidence 0.85 (§5 no-sep with strong context)")
+                    "EIN keyword present → boostedConfidence 0.85 (no-sep with strong context)")
         }
     }
 
@@ -127,7 +127,7 @@ struct EINHardeningTests {
 
     @Test("Hyphenated EIN with 'employer identification' phrase: boosted confidence")
     func hyphenated_withEmployerIdentificationKeyword_boosted() {
-        // "employer identification" is in einProfile.positiveKeywords (§5a).
+        // "employer identification" is in einProfile.positiveKeywords.
         // Note: bare "employer" alone is NOT a keyword — use the full phrase.
         let matches = einMatches(in: "employer identification 12-3456789")
         #expect(matches.count >= 1)

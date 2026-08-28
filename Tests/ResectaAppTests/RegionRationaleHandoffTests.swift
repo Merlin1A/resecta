@@ -4,13 +4,13 @@ import PDFKit
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-71 / [P10] path (a) — app-side propagation tests. Verifies that
-// The search origin of `applyFindings` threads the SearchResult's
+// App-side propagation tests. Verifies that
+// the search origin of `applyFindings` threads the SearchResult's
 // rationale into the region's `Source` so the iPad popover and iPhone
 // canvas action sheet can read it via
 // `RedactionState.rationale(forRegionID:)`.
 
-@Suite("Region rationale handoff (WU-71)", .tags(.search))
+@Suite("Region rationale handoff", .tags(.search))
 @MainActor
 struct RegionRationaleHandoffTests {
 
@@ -125,8 +125,8 @@ struct RegionRationaleHandoffTests {
 
         _ = await state.applyFindings(.selectedSearchResults, undoManager: nil)
 
-        // The audit pathway (MatchAuditSnapshot) already carried rationale
-        // pre-WU-71. WU-71 leaves that pathway intact and adds a parallel
+        // The audit pathway (MatchAuditSnapshot) already carried rationale;
+        // this leaves that pathway intact and adds a parallel
         // path via Source. Verify the audit snapshot still carries it.
         let snapshots = state.appliedMatchAuditSnapshots
         #expect(snapshots.count == 1)

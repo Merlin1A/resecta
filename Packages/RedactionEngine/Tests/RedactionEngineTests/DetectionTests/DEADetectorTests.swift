@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Plan Phase 3 / §4 — DEA registration checksum regression against
+// DEA registration checksum regression against
 // `Fixtures/vectors/dea_test_vectors.json`.
 
 @Suite("DEA detector + position-weighted checksum (G3)")
@@ -31,7 +31,7 @@ struct DEADetectorTests {
     /// Returns the first valid vector whose first letter is a documented DEA
     /// registrant-type code. The vector file contains checksums-valid entries with
     /// non-registrant letters (e.g. I, W, V, Z) — those are rejected by the
-    /// WS1 item 1.11 gate in detect(); tests that invoke detect() must use a
+    /// gate in detect(); tests that invoke detect() must use a
     /// vector with a registrant-type first letter.
     private func firstRegistrantValidVector(from vectors: [Vector]) -> Vector? {
         let registrantLetters = Set("ABCDEFGHJKLMPRSTU").union(["X"])
@@ -57,7 +57,7 @@ struct DEADetectorTests {
     func validDEASurfaces() throws {
         guard let vectors = try loadVectors() else { return }
         let detector = DEADetector()
-        // WS1 item 1.11: must use a vector with a valid registrant-type first letter;
+        // Must use a vector with a valid registrant-type first letter;
         // the vector file includes checksum-valid entries with non-registrant letters
         // (e.g. I, W, V, Z) that detect() correctly rejects.
         guard let sample = firstRegistrantValidVector(from: vectors) else { return }
@@ -117,7 +117,7 @@ struct DEADetectorTests {
         #expect(hasValidator)
     }
 
-    // MARK: - WS1 item 1.11: registrant-type first-letter validation
+    // MARK: - Registrant-type first-letter validation
 
     // CB1234563 checksum: (1+3+5) + 2*(2+4+6) = 9+24 = 33; last digit 3 == d7. Valid.
     // Suffix pattern B1234563 is checksum-valid for any two-letter prefix; used

@@ -2,9 +2,9 @@ import Foundation
 import Testing
 @testable import RedactionEngine
 
-// B03 — Swift<->Python context-feature parity (Swift side).
+// Swift<->Python context-feature parity (Swift side).
 //
-// The C1 scorer's 13 features must be computed identically wherever they are
+// The scorer's 13 features must be computed identically wherever they are
 // produced (the seam builder here, the File-5 fire dump, the Python trainer).
 // These fixed ASCII cases assert the production `contextFeatures(...)` builder
 // produces the GOLDEN 13-vectors — the language-agnostic feature contract. The

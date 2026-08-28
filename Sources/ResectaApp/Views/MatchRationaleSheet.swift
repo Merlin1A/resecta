@@ -1,14 +1,13 @@
 import SwiftUI
 import RedactionEngine
 
-// W1 — power-user rationale disclosure for a single PII hit.
+// Power-user rationale disclosure for a single PII hit.
 //
 // Presented as a sheet from the Details button a result row's chevron
 // expansion reveals. Renders the rule ID, the signals the detector
 // recorded, and the score journey from raw detector output to the final
-// score. UXC-46 (D-121): this sheet is the one home of the match
-// confidence and of the one-line rationale summary — the rows spell out
-// neither.
+// score. This sheet is the one home of the match confidence and of the
+// one-line rationale summary — the rows spell out neither.
 //
 // Language is strictly mechanism-descriptive:
 // describe what the detector observed, not what the app "guarantees".
@@ -52,10 +51,10 @@ struct MatchRationaleSheet: View {
             // Every number gets a noun. "Detector score" is the
             // detector's internal signal; "Required threshold" is the
             // cutoff it had to clear; "Match confidence" is the separate
-            // per-match quantity (UXC-46: this sheet is its only home —
-            // the row spells out no confidence). Labeling all three
-            // keeps a match confidence that differs from the detector
-            // score from reading as a contradiction.
+            // per-match quantity (this sheet is its only home — the row
+            // spells out no confidence). Labeling all three keeps a
+            // match confidence that differs from the detector score
+            // from reading as a contradiction.
             Section {
                 scoreRow(
                     label: "Detector score (before threshold)",
@@ -86,9 +85,9 @@ struct MatchRationaleSheet: View {
                 } header: {
                     Text("Signals")
                 } footer: {
-                    // UXC-46 (D-121): the one-line summary the row used
-                    // to show on expansion now closes this section, in
-                    // its existing format.
+                    // The one-line summary the row used to show on
+                    // expansion now closes this section, in its
+                    // existing format.
                     Text(SearchResultRow.inlineRationaleSummaryString(for: rationale))
                         .font(.caption2)
                 }
@@ -103,9 +102,9 @@ struct MatchRationaleSheet: View {
             Text(result.matchedText)
                 .font(.subheadline.monospaced())
                 .privacySensitive()
-            // UXC-46 (D-121): the same attributed window the row
-            // renders — the match run semibold-mono on the wash — so
-            // the sheet's context reads like the row that opened it.
+            // The same attributed window the row renders — the match
+            // run semibold-mono on the wash — so the sheet's context
+            // reads like the row that opened it.
             Text(SearchResultRow.attributedSnippet(
                 result.contextSnippet,
                 matchRange: result.matchRangeInSnippet,
@@ -188,10 +187,10 @@ struct MatchRationaleSheet: View {
 
     // MARK: - Signal rendering
 
-    /// WU-24 (session-11): visibility lifted from `private` to default
-    /// (`internal`) so `MatchRationaleSheetContextKeywordTests` can pin
-    /// the per-Signal descriptor format. The shape mirrors the row's
-    /// rendering primitives — symbol + tint + title + optional detail.
+    /// Visibility lifted from `private` to default (`internal`) so
+    /// `MatchRationaleSheetContextKeywordTests` can pin the per-Signal
+    /// descriptor format. The shape mirrors the row's rendering
+    /// primitives — symbol + tint + title + optional detail.
     struct SignalDescriptor: Equatable {
         let symbol: String
         let tint: Color
@@ -199,15 +198,14 @@ struct MatchRationaleSheet: View {
         let detail: String?
     }
 
-    /// WU-24: per-Signal descriptor for the rationale sheet's "Signals"
-    /// section. Existing case mappings are unchanged from WU-01;
-    /// promoted to `internal` so the test suite pins each scalar
-    /// format. The `@unknown default:` case provides forward-compat
-    /// with the future `.contextPositiveDetail` /
-    /// `.contextNegativeDetail` keyword-array variants from WU-76 —
-    /// when those land, this default becomes unreachable and the
-    /// switch picks them up explicitly. Strings classified SAFE under
-    /// §19 — every title + detail is mechanism description.
+    /// Per-Signal descriptor for the rationale sheet's "Signals"
+    /// section. Existing case mappings are unchanged; promoted to
+    /// `internal` so the test suite pins each scalar format. The
+    /// `@unknown default:` case provides forward-compat with future
+    /// `.contextPositiveDetail` / `.contextNegativeDetail` keyword-array
+    /// variants — when those land, this default becomes unreachable and
+    /// the switch picks them up explicitly. Every title + detail is
+    /// mechanism description, so the strings are safe to render verbatim.
     static func descriptor(for signal: MatchRationale.Signal) -> SignalDescriptor {
         switch signal {
         case .regexPattern(let name):
@@ -261,7 +259,7 @@ struct MatchRationaleSheet: View {
                                     title: "Custom never-flag term",
                                     detail: pattern)
         case .suppressedByOverlap(let winner, let loser):
-            // QW-5 — carry the loser's own category in the detail line so
+            // Carry the loser's own category in the detail line so
             // the row doesn't read as the winner's category.
             return SignalDescriptor(symbol: "rectangle.stack.badge.minus", tint: .gray,
                                     title: "Suppressed by overlap",
@@ -269,11 +267,10 @@ struct MatchRationaleSheet: View {
                                         "\($0.rawValue), winner: \(winner.rawValue)"
                                     } ?? "winner: \(winner.rawValue)")
         case .contextPositiveDetail(let keywords):
-            // WU-76 / [P4] — per-keyword breakdown. Keys come from the
-            // closed gazetteer vocabulary (RR-31), so rendering them
-            // verbatim is SAFE under §19. Contribution rendered as a
-            // signed delta so the band-adjustment direction reads at a
-            // glance.
+            // Per-keyword breakdown. Keys come from the closed gazetteer
+            // vocabulary, so rendering them verbatim is safe. Contribution
+            // rendered as a signed delta so the band-adjustment direction
+            // reads at a glance.
             var parts: [String] = []
             for entry in keywords {
                 let pct = Int((entry.contribution * 100).rounded())
@@ -298,10 +295,10 @@ struct MatchRationaleSheet: View {
                 detail: negParts.joined(separator: ", ")
             )
         case .negativeContextSuppressed(let keyword, let weight):
-            // Gazetteer negative-context
-            // suppression. The keyword comes from the closed gazetteer
-            // vocabulary (not document content), so rendering it verbatim
-            // is SAFE under §19, same as the detail variants above.
+            // Gazetteer negative-context suppression. The keyword comes
+            // from the closed gazetteer vocabulary (not document
+            // content), so rendering it verbatim is safe, same as the
+            // detail variants above.
             return SignalDescriptor(
                 symbol: "arrow.down.right.circle",
                 tint: .orange,
@@ -316,7 +313,7 @@ struct MatchRationaleSheet: View {
     }
 
 
-    /// WU-24: visibility lifted to `internal` so the score format is
+    /// Visibility lifted to `internal` so the score format is
     /// pinnable by tests. Unchanged formula.
     static func formatScore(_ value: Double) -> String {
         "\(Int((value * 100).rounded()))%"

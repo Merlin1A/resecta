@@ -3,8 +3,8 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// design 04 §4.6 — Last-Used Filter Settings persistence, plus the
-// WA-01 pins for the launch sweep that purges the excised
+// Last-Used Filter Settings persistence, plus
+// pins for the launch sweep that purges the excised
 // persisted-recents feature's retired storage keys.
 // All tests use a scratch UserDefaults suite so they don't pollute
 // UserDefaults.standard and can run in isolation without shared-state
@@ -21,7 +21,7 @@ private func makeScratchDefaults() -> (UserDefaults, suiteName: String) {
 
 // MARK: - LastFilterPersistenceTests
 
-@Suite("LastFilterPersistence — design 04 §4.6")
+@Suite("LastFilterPersistence")
 @MainActor
 struct LastFilterPersistenceTests {
 
@@ -52,7 +52,7 @@ struct LastFilterPersistenceTests {
 
     // MARK: appliedFilterNotRestored
 
-    @Test("appliedFilter is never persisted (document-specific per §4.6)")
+    @Test("appliedFilter is never persisted (document-specific)")
     func appliedFilterNotRestored() async {
         let (defaults, suiteName) = makeScratchDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -67,9 +67,9 @@ struct LastFilterPersistenceTests {
         #expect(second.appliedFilter == .all)
     }
 
-    // MARK: - BH-B-06 debounce floor
+    // MARK: - Debounce floor
 
-    @Test("BH-B-06: the debounce auto-run floor counts trimmed characters")
+    @Test("The debounce auto-run floor counts trimmed characters")
     func debounceFloorCountsTrimmedCharacters() {
         #expect(SearchAndRedactSheet.queryQualifiesForAutoRun("   ") == false)
         #expect(SearchAndRedactSheet.queryQualifiesForAutoRun("  a b  ") == true)
@@ -82,7 +82,7 @@ struct LastFilterPersistenceTests {
 
 // MARK: - RetiredRecentsPurgeTests
 
-@Suite("RetiredRecentsPurge — WA-01")
+@Suite("RetiredRecentsPurge")
 @MainActor
 struct RetiredRecentsPurgeTests {
 

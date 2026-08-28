@@ -2,22 +2,22 @@ import Testing
 import Vision
 @testable import RedactionEngine
 
-// S8 OCR Quality Program — configuration pins (design 04 Tier-5 test plan).
+// OCR configuration pins.
 // Each program step updates the DETECTION-preset assertions here in the
 // same commit that changes the preset; the Layer-2 pin has changed once
-// (approved revision-pin exception, 2026-06-28) and is otherwise frozen.
+// (a revision-pin exception) and is otherwise frozen.
 
 @Suite("OCR configuration program pins")
 struct OCRQualityProgramTests {
 
-    // MARK: - Layer-2 byte-identical pin (S8 exit criterion 3)
+    // MARK: - Layer-2 byte-identical pin
 
     /// The verifier's request must match the historical inline
     /// construction (.fast + usesLanguageCorrection=false) plus the pinned
-    /// Vision revision (charter exception, 2026-06-28); every other
-    /// knob stays at its Vision default. Compared field-by-field against a
-    /// virgin request so a future preset edit (minimumTextHeight,
-    /// customWords, languages) trips this pin loudly.
+    /// Vision revision; every other knob stays at its Vision default.
+    /// Compared field-by-field against a virgin request so a future
+    /// preset edit (minimumTextHeight, customWords, languages) trips
+    /// this pin loudly.
     @Test("Layer-2 verification request is byte-identical to historical params")
     func layer2RequestByteIdentical() {
         let request = OCRConfiguration.verificationLayer2.makeRequest()
@@ -27,13 +27,13 @@ struct OCRQualityProgramTests {
         #expect(request.recognitionLevel == .fast)
         #expect(request.usesLanguageCorrection == false)
 
-        // Charter exception (2026-06-28): revision pinned so Layer 2
-        // stays deterministic across OS updates — the Part A
-        // fill-hallucination class is Vision-revision-sensitive. Asserted
-        // on the preset, not the virgin default, so a silent unpin (nil)
-        // or bump fails here even on an OS whose default is still 3.
+        // Revision pinned so Layer 2 stays deterministic across OS
+        // updates — the Part A fill-hallucination class is
+        // Vision-revision-sensitive. Asserted on the preset, not the
+        // virgin default, so a silent unpin (nil) or bump fails here
+        // even on an OS whose default is still 3.
         #expect(OCRConfiguration.verificationLayer2.revision == VNRecognizeTextRequestRevision3,
-                "Layer-2 revision pin removed or changed (charter exception 2026-06-28)")
+                "Layer-2 revision pin removed or changed")
         #expect(request.revision == VNRecognizeTextRequestRevision3,
                 "Layer-2 request must carry the pinned revision")
 
@@ -48,8 +48,7 @@ struct OCRQualityProgramTests {
 
     // MARK: - Detection preset (program-step state)
 
-    /// Step state: steps 1–3 applied (design 04 §§5.4, 5.3, 5.2), each
-    /// with its measurement row in the S8 evidence.
+    /// Step state: steps 1–3 applied, each with its own measurement row.
     @Test("Detection request: revision pin + customWords + minimumTextHeight")
     func detectionRequestCurrentState() {
         let fast = OCRConfiguration.detection(recognitionLevel: .fast).makeRequest()
@@ -59,25 +58,26 @@ struct OCRQualityProgramTests {
         #expect(accurate.recognitionLevel == .accurate)
         #expect(fast.usesLanguageCorrection == true)
 
-        // Step 1 (§5.4):
+        // Step 1:
         #expect(fast.revision == VNRecognizeTextRequestRevision3)
         #expect(accurate.revision == VNRecognizeTextRequestRevision3)
 
-        // Step 2 (§5.3):
+        // Step 2:
         #expect(fast.customWords == OCRCustomWordsBuilder.financialCustomWords)
 
-        // Step 3 (§5.2):
+        // Step 3:
         #expect(fast.minimumTextHeight == 0.007)
         #expect(accurate.minimumTextHeight == 0.007)
     }
 
-    // MARK: - Step 2: customWords vocabulary (design §5.3 test plan)
+    // MARK: - Step 2: customWords vocabulary
 
     @Test("customWords list is loader-derived, in budget, and anchored")
     func customWordsListBuilt() throws {
         let words = OCRCustomWordsBuilder.financialCustomWords
 
-        // Design test plan: between 50 and 200; design body: ≤ 150.
+        // The vocabulary count must fall between 50 and 200, staying
+        // at or under 150 in practice.
         #expect(words.count >= 50, "vocabulary too small — loaders missing?")
         #expect(words.count <= OCRCustomWordsBuilder.wordBudget)
 
@@ -89,12 +89,12 @@ struct OCRQualityProgramTests {
         #expect(Set(lowered).count == lowered.count, "case-insensitive dup")
     }
 
-    // MARK: - Step 4: detection DPI policy (design §5.1 test plan)
+    // MARK: - Step 4: detection DPI policy
 
     /// Exhaustive over DoctypeClass + nil: financial renders at 200,
     /// everything else (and unseeded pages) keeps the shipped 150 —
     /// the measured step-4 shape (200-global tripped the doctype-gate /
-    /// face-detection interaction; see the S8 measurement evidence).
+    /// face-detection interaction).
     @Test("detectionDPI: financial 200, all other doctypes and nil 150")
     func detectionDPI200ForFinancial() {
         #expect(DetectionRenderPolicy.detectionDPI(for: .financial) == 200)
@@ -123,7 +123,7 @@ struct OCRQualityProgramTests {
                 "capped render must land on the 4096-px ceiling")
     }
 
-    // MARK: - Search preset (charter: DPI/accuracy untouched)
+    // MARK: - Search preset (DPI/accuracy untouched)
 
     @Test("Search request: revision pinned; other knobs at production state")
     func searchRequestCurrentState() {

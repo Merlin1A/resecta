@@ -2,7 +2,6 @@ import CoreGraphics
 import CoreText
 import Foundation
 
-// ENGINE §5C — Invisible text layer reconstruction.
 // Draws surviving characters as invisible (rendering mode 3) text in the
 // PDF context, positioned over the rasterized page image.
 //
@@ -10,12 +9,12 @@ import Foundation
 // Bland et al. glyph positioning attack vector reduced — Courier has uniform
 // advance widths and CTLineDraw produces only simple Tj operators. The J-12
 // layout (2026-06-09) derives one quantized pitch per line band from source
-// metrics (see §5C.2): the content-dependent channel this re-opens is the
+// metrics: the content-dependent channel this re-opens is the
 // band's quantized size class — bounded bits, redundant with the visible
-// raster — analyzed in §5C.4.
+// raster.
 
 /// Text run: a group of adjacent characters on the same line.
-/// See ENGINE §5C.1. Retained for the 12pt-era grid model that probe and
+/// Retained for the 12pt-era grid model that probe and
 /// unit tests still measure; the production draw path is line-based
 /// (`TextLayerLine`) as of J-12.
 struct TextRun {
@@ -25,7 +24,6 @@ struct TextRun {
 
 /// One assembled drawn line (J-12): same-band run groups merged X-ascending
 /// with whole-cell bridge spaces, at the band's pooled quantized pitch.
-/// See ENGINE §5C.1.
 struct TextLayerLine {
     let origin: CGPoint
     let fontSize: CGFloat
@@ -34,11 +32,10 @@ struct TextLayerLine {
 
 /// Reconstructs the invisible text layer for Searchable Redaction output.
 /// Must be called AFTER the page image has been drawn into the CGContext.
-/// See ENGINE §5C.1 for the drawing specification.
 public enum TextLayerReconstructor {
 
     /// Reference font size. The J-12 layout derives per-band sizes from
-    /// source metrics (§5C.2); this constant anchors the verifier's
+    /// source metrics; this constant anchors the verifier's
     /// tolerance scaling (`advanceWidthTolerancePerPoint` = 0.25 / 12) and
     /// the legacy 12pt-era grid model that tests and probes still measure.
     internal static let baseFontSize: CGFloat = 12.0
@@ -49,11 +46,11 @@ public enum TextLayerReconstructor {
     /// Font Metrics' 600-units-per-em Courier advance, 600/1000 = 0.6).
     /// The J-12 layout computes each band's cell as
     /// `courierAdvancePerPoint × bandFontSize`; this constant remains the
-    /// 12pt-era reference. ENGINE §5C.1.
+    /// 12pt-era reference.
     internal static let cellWidth: CGFloat =
         SandwichVerification.courierAdvancePerPoint * baseFontSize
 
-    /// Pitch quantization step (J-12, §5C.2/§5C.4): band sizes round to
+    /// Pitch quantization step (J-12): band sizes round to
     /// the nearest half point. Coarser steps leak fewer content-derived
     /// bits per band and bound the doc-wide distinct-size set (measured:
     /// 17 sizes across the 23-page real-document fixture at 0.5pt).
@@ -62,21 +59,20 @@ public enum TextLayerReconstructor {
     /// Lower bound on a derived band size.
     internal static let minimumFontSize: CGFloat = 1.0
 
-    // MARK: - Drawing (ENGINE §5C.1, J-12)
+    // MARK: - Drawing
 
     /// Draw surviving characters as invisible (rendering mode 3) text.
     ///
     /// Drawing order: image first (already drawn by caller), then invisible
     /// text on top. Matches standard sandwich PDF structure (ISO 32000).
-    /// See ENGINE §5C.3.
     ///
     /// - Parameters:
     ///   - context: The CGPDFContext for the current page (between beginPDFPage/endPDFPage).
     ///   - entries: Surviving characters from the character filter.
     ///   - pageWidth: Width of the output page in points — bounds the
-    ///     assembled-line fit clamp (§5C.2).
+    ///     assembled-line fit clamp.
     ///   - redactionRects: Redaction rectangles in PDF-point-space; a
-    ///     bridge never crosses one (§5C.1 — Layer 6 would rightly flag a
+    ///     bridge never crosses one (Layer 6 would rightly flag a
     ///     drawn space inside a region).
     ///
     /// The dead `pageHeight` parameter is removed — Y stays
@@ -92,7 +88,7 @@ public enum TextLayerReconstructor {
         guard !entries.isEmpty else { return }
 
         // PDF Tr mode 3 — text is invisible but selectable
-        context.setTextDrawingMode(.invisible)  // See ENGINE §5C.1
+        context.setTextDrawingMode(.invisible)
 
         let lines = layoutLines(
             entries, pageWidth: pageWidth, redactionRects: redactionRects)
@@ -100,7 +96,7 @@ public enum TextLayerReconstructor {
             context.saveGState()
             context.textMatrix = .identity
 
-            // ENGINE §5C.3: fresh Courier font instance — no relationship to
+            // Fresh Courier font instance — no relationship to
             // original document fonts, CMaps, or glyph tables. Designed to
             // close the ASD CMap leakage vector.
             let font = CTFontCreateWithName(
@@ -110,7 +106,7 @@ public enum TextLayerReconstructor {
                 string: line.text, attributes: attrs)
             let ctLine = CTLineCreateWithAttributedString(attrString)
 
-            // TL-3-1: Y stays source-aligned so the invisible layer
+            // Y stays source-aligned so the invisible layer
             // overlays the rasterized image (visible-region search still
             // resolves per-character).
             context.textPosition = line.origin
@@ -120,17 +116,17 @@ public enum TextLayerReconstructor {
         }
     }
 
-    // MARK: - Line layout (ENGINE §5C.1/§5C.2, J-12)
+    // MARK: - Line layout
 
     /// Assemble the drawn lines for a page's surviving set.
     ///
     /// J-12 layout (2026-06-09; measured on the committed real-document
-    /// fixture, RealDocProbeTests S06 rounds 1–8):
+    /// fixture, RealDocProbeTests rounds 1–8):
     ///
     ///  1. **Band pooling** — run groups band by the shared Y sweep
     ///     (`SandwichVerification.yBands`); each band draws at ONE pitch,
-    ///     so no same-band pitch junctions exist for the SVT-1 lattice to
-    ///     adjudicate.
+    ///     so no same-band pitch junctions exist for the spatial-tampering
+    ///     lattice to adjudicate.
     ///  2. **Sum-matched sizing** — the band's raw size reproduces its
     ///     total source glyph width (`Σ widths / (Σ composedLen × 0.6001)`),
     ///     keeping every drawn extent at its source extent. PDFKit's
@@ -141,8 +137,8 @@ public enum TextLayerReconstructor {
     ///     em-dashes, leader runs) otherwise blows past the line's
     ///     vertical envelope and the oversized glyphs entangle neighboring
     ///     lines' selections.
-    ///  4. **Quantization** — sizes round to `pitchQuantizationStep`
-    ///     (§5C.4 leakage bound).
+    ///  4. **Quantization** — sizes round to `pitchQuantizationStep`,
+    ///     bounding the leakage.
     ///  5. **Bridging** — same-band groups merge X-ascending into one
     ///     line, inter-group gaps filled with whole-cell invisible spaces
     ///     (count = the snapped gap), so every line tiles contiguously
@@ -205,7 +201,7 @@ public enum TextLayerReconstructor {
             let order = bandGroups[bi].sorted { infos[$0].rawX < infos[$1].rawX }
             guard !order.isEmpty else { continue }
 
-            // Band pitch: sum-matched, height-capped, quantized (§5C.2).
+            // Band pitch: sum-matched, height-capped, quantized.
             let lenSum = order.reduce(0) { $0 + infos[$1].composedLen }
             let wSum = order.reduce(CGFloat(0)) { $0 + infos[$1].sumW }
             var derived = wSum / (CGFloat(max(lenSum, 1)) * perPt)
@@ -261,7 +257,7 @@ public enum TextLayerReconstructor {
                         height: max(yHi, g.yMax) - min(yLo, g.yMin))
                     if gapRect.width > 0,
                        redactionRects.contains(where: { $0.intersects(gapRect) }) {
-                        // §5C.1: a bridge never crosses a redaction rect —
+                        // A bridge never crosses a redaction rect —
                         // the drawn line splits at the region instead.
                         close()
                         originX = target
@@ -292,7 +288,7 @@ public enum TextLayerReconstructor {
         return result
     }
 
-    // MARK: - Text Run Grouping (ENGINE §5C.1)
+    // MARK: - Text Run Grouping
 
     /// Group characters into contiguous member-index groups.
     /// Characters on the same line that are close together are merged.

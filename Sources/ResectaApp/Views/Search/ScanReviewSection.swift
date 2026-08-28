@@ -11,10 +11,10 @@ import RedactionEngine
 // replaces the standalone "Review Detections" triage sheet — one
 // review surface for both result origins.
 //
-// Carried from the retired sheet: the pipeline-side OCR-skip banner
-// (ST-83), the classification-diagnostic disclosure (G5), the
-// cross-page Grouped view with atomic group apply (DRAW-4/UXF-29), and
-// the per-row detector-evaluation entry (W9). Retired with it: the
+// Carried from the retired sheet: the pipeline-side OCR-skip banner,
+// the classification-diagnostic disclosure, the
+// cross-page Grouped view with atomic group apply, and
+// the per-row detector-evaluation entry. Retired with it: the
 // batch-actions menu (superseded by the footer Select All and the
 // Select-Where predicates) and the min-confidence slider (the same
 // review-side confidence idiom the per-run Confidence slider's
@@ -33,23 +33,23 @@ struct ScanReviewSection: View {
     /// single `activeModal` slot (the same `ReverseRationalePopover`
     /// search rows open from their context menu).
     let onRequestWhy: (ReverseRationaleRequest) -> Void
-    /// SA-3 rider (B-3): row-body tap navigates the canvas to the
+    /// Row-body tap navigates the canvas to the
     /// finding's page — the search rows' shipped idiom (page write +
-    /// compact drop live on the hub, which owns the detent). UXC-50
-    /// (D-128, RB-123 item 6): carries the detection's `normalizedRect`
+    /// compact drop live on the hub, which owns the detent). Carries
+    /// the detection's `normalizedRect`
     /// (0–1, bottom-left — the `DetectionResult` convention) so the hub
     /// can frame it.
     let onNavigateToFinding: (Int, CGRect) -> Void
 
     @State private var viewMode: ReviewViewMode = .byPage
-    // WP5b pattern carried: cached kind counts + filtered list so the
+    // Cached kind counts + filtered list so the
     // sort/filter work doesn't rerun per body evaluation.
     @State private var cachedKindsWithCounts: [(kind: DetectionResult.Kind, count: Int)] = []
     @State private var cachedFilteredFindings: [(page: Int, detection: DetectionResult)] = []
     @State private var cachedFilteredGroups: [CrossPageEntityGroup] = []
 
     /// View modes for the review list. The first three order individual
-    /// detection rows; `.grouped` (DRAW-4) replaces the per-detection list
+    /// detection rows; `.grouped` replaces the per-detection list
     /// with a per-`CrossPageEntityGroup` list. Orthogonal to the kind
     /// filter chips, which continue to apply in `.grouped` mode.
     enum ReviewViewMode: String, CaseIterable {
@@ -64,10 +64,10 @@ struct ScanReviewSection: View {
     }
 
     var body: some View {
-        // SA-2 (D-70): the List is the section's root and the fixed
+        // The List is the section's root and the fixed
         // chrome rides its top safe-area inset, so the List's UIKit
         // frame binds at the sheet top for cooperative scroll↔detent
-        // arbitration (18- §10 — chrome HEIGHT above the list, not
+        // arbitration (chrome HEIGHT above the list, not
         // chrome species, is what unbinds it). Both view modes get
         // the same treatment (the grouped branch roots a List
         // whenever groups exist; its empty placeholder has nothing to
@@ -110,16 +110,16 @@ struct ScanReviewSection: View {
 
     /// The review surface's fixed chrome — OCR-skip banner,
     /// classification diagnostics, and the view-mode/kind chip bar —
-    /// riding the review List's top safe-area inset (SA-2/D-70: chrome
+    /// riding the review List's top safe-area inset (chrome
     /// must not offset the List's frame from the sheet top or
-    /// cooperative arbitration unbinds; 18- §10). Opaque background —
-    /// rows scroll UNDER the inset region. UXC-45 (RB-109): the
+    /// cooperative arbitration unbinds). Opaque background —
+    /// rows scroll UNDER the inset region. The
     /// Select-Where row that closed this stack moved into the footer's
     /// "Add to selection" menu (the surface's single selection
     /// authority); its predicate items are unchanged there.
     private var reviewTopChrome: some View {
         VStack(spacing: 0) {
-            // ST-83 — pipeline-side OCR-skip disclosure: pages whose
+            // Pipeline-side OCR-skip disclosure: pages whose
             // raster exceeded the OCR pixel caps during the detection
             // run under review, so their image content was never
             // text-scanned.
@@ -127,7 +127,7 @@ struct ScanReviewSection: View {
                 ocrSkipBanner
             }
 
-            // Phase 3 G5: "Why this classification?" (in-memory only).
+            // "Why this classification?" disclosure (in-memory only).
             classificationDiagnosticPanel
 
             // View-mode picker + kind filter chips (one chip component).
@@ -140,7 +140,7 @@ struct ScanReviewSection: View {
 
     /// One review row through the shared family: detection badge,
     /// confidence bar on the shared absolute bands, selection bound to
-    /// `triageSelections` (explicit-entry contract), and the W9
+    /// `triageSelections` (explicit-entry contract), and the
     /// detector-evaluation entry in the trailing slot.
     @ViewBuilder
     private func reviewRow(page: Int, detection: DetectionResult) -> some View {
@@ -177,7 +177,7 @@ struct ScanReviewSection: View {
                     .background(detection.kind.badgeColor, in: Capsule())
             },
             trailing: {
-                // W9 — reverse rationale entry point (text kinds only).
+                // Reverse rationale entry point (text kinds only).
                 if detection.matchedText != nil {
                     Button {
                         presentReverseRationale(for: detection, page: page)
@@ -185,7 +185,7 @@ struct ScanReviewSection: View {
                         Image(systemName: "questionmark.circle")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
-                            // UXC-18: 14.4×14.4 measured — floor to
+                            // 14.4×14.4 measured — floor to
                             // the HIG minimum without growing the
                             // glyph itself.
                             .frame(
@@ -201,14 +201,15 @@ struct ScanReviewSection: View {
             }
         )
         .padding(.vertical, ResectaTokens.Spacing.xxs)
-        // SA-3 rider (B-3): row-body tap navigates the canvas —
+        // Row-body tap navigates the canvas —
         // parity with `SearchResultRow`'s contentShape+onTapGesture
-        // idiom. The inner selection circle and W9 button are
-        // Buttons, so they keep winning their own hit regions; the
-        // rest of the row navigates.
+        // idiom. The inner selection circle and the detector-evaluation
+        // button are Buttons, so they keep winning their own hit
+        // regions; the rest of the row navigates.
         .contentShape(Rectangle())
         .onTapGesture { onNavigateToFinding(page, detection.normalizedRect) }
-        // The family row's `.ignore` merge hides the trailing W9 button
+        // The family row's `.ignore` merge hides the trailing
+        // detector-evaluation button
         // from VoiceOver (the retired triage row's `.combine` surfaced
         // it implicitly) — expose it as a named action so the detector-
         // evaluation entry stays reachable non-visually. The builder
@@ -227,18 +228,18 @@ struct ScanReviewSection: View {
 
     @ViewBuilder
     private var reviewChipBar: some View {
-        // SA-2 (D-70): FlowLayout wrap replaces the horizontal
-        // ScrollView (B-1 — every control stays visible; at
+        // FlowLayout wrap replaces the horizontal
+        // ScrollView (every control stays visible; at
         // accessibility sizes rows wrap instead of panning
-        // off-screen), and the bar's two ARBITRATION POISONS are
-        // gone: the SA-2 bisect (18- §10 correction) isolated the
-        // menu-style Picker and the Divider as the elements that
-        // killed the sheet's cooperative scroll↔detent arbitration —
-        // the ScrollView container itself proved innocent. The
+        // off-screen), and the bar's two elements that broke the
+        // sheet's cooperative scroll↔detent arbitration are
+        // gone: the menu-style Picker and the Divider, isolated by
+        // bisection as the culprits — the ScrollView container itself
+        // proved innocent. The
         // view-mode control rides a Menu (the class proven innocent
-        // in every COOP probe run) wrapping the same inline Picker
-        // rows; the Divider is dropped — a wrapped flow needs no
-        // vertical separator.
+        // in every cooperation probe run) wrapping the same inline
+        // Picker rows; the Divider is dropped — a wrapped flow needs
+        // no vertical separator.
         FlowLayout(spacing: ResectaTokens.Spacing.sm) {
             Menu {
                 Picker("View", selection: $viewMode) {
@@ -254,7 +255,7 @@ struct ScanReviewSection: View {
                         .accessibilityHidden(true)
                 }
                 .font(.caption)
-                // UXC-18: 55.7×13.8 measured — this label carried no
+                // 55.7×13.8 measured — this label carried no
                 // padding at all. Floor the tap height; width stays
                 // content-driven (text + chevron).
                 .frame(minHeight: ResectaTokens.TouchTarget.minimum)
@@ -266,7 +267,7 @@ struct ScanReviewSection: View {
             .accessibilityValue(viewMode.rawValue)
 
             // Kind filter chips — narrow the visible list only
-            // (GATE-4 decouple carried: a filter change never
+            // (a filter change never
             // rewrites selections, so manual selection work
             // survives it; selection throughput lives in the
             // footer Select All + Select-Where).
@@ -294,7 +295,7 @@ struct ScanReviewSection: View {
         .accessibilityLabel("Detection filters")
     }
 
-    // MARK: - ST-83 OCR-Skip Banner (pipeline-side)
+    // MARK: - OCR-Skip Banner (pipeline-side)
 
     private var ocrSkipBanner: some View {
         let headline = Self.ocrSkipBannerHeadline(
@@ -318,7 +319,7 @@ struct ScanReviewSection: View {
         .accessibilityAddTraits(.isHeader)
     }
 
-    /// ST-83 banner copy. Pages are 0-indexed internally; rendered
+    /// Banner copy. Pages are 0-indexed internally; rendered
     /// 1-based. Mechanism description only — states what did not run and
     /// what the user can still do, no outcome promises.
     static func ocrSkipBannerHeadline(pages: [Int]) -> String {
@@ -422,7 +423,7 @@ struct ScanReviewSection: View {
         }
     }
 
-    // MARK: - W9 Reverse Rationale
+    // MARK: - Reverse Rationale
 
     /// Derive the context buffer from the page's text layer and route
     /// the request to the sheet's modal slot. Context window is bounded
@@ -459,7 +460,7 @@ struct ScanReviewSection: View {
         return ns.substring(with: NSRange(location: start, length: end - start))
     }
 
-    // MARK: - DRAW-4 Grouped view mode
+    // MARK: - Grouped view mode
 
     /// Cross-page entity group list. Each row collapses every member
     /// detection of one group into a single tap-target so accept applies
@@ -493,14 +494,14 @@ struct ScanReviewSection: View {
                                     undoManager: undoManager,
                                     documentState: documentState
                                 ) else { return }
-                                // UXF-29 — the apply pruned its members
+                                // The apply pruned its members
                                 // from `pendingTriage`; refresh so this
                                 // group's row (and its flat-list rows)
                                 // leave the screen. A second tap racing
                                 // this one resolves against the pruned
                                 // review and applies zero — benign.
                                 recomputeAll()
-                                // UXF-11 — commit feedback through the
+                                // Commit feedback through the
                                 // shared copy builder. The sheet-local
                                 // toast host renders it whether or not
                                 // the prune emptied the review (the
@@ -593,7 +594,7 @@ struct ScanReviewSection: View {
     /// Group visibility under the active kind filter. A group whose
     /// members are all gone from `pendingTriage` (already promoted by
     /// "Apply Group") is hidden — keeping its row invited a second tap
-    /// that used to double-create (UXF-29).
+    /// that used to double-create.
     static func filteredGroups(
         _ groups: [CrossPageEntityGroup],
         pending: [Int: [DetectionResult]]?,
@@ -619,7 +620,7 @@ struct ScanReviewSection: View {
     }
 }
 
-// MARK: - DRAW-4 CrossPageGroupRow
+// MARK: - CrossPageGroupRow
 
 /// Single-row view for a `CrossPageEntityGroup`. Surfaces canonical text,
 /// member count, and pages; "Apply Group" promotes every member in one

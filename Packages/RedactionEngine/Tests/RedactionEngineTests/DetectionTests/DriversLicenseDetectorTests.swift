@@ -2,10 +2,9 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// L-15 — dedicated DL-detector coverage: labeled-format recall, unlabeled
-// rejection, L-02 numeric-minimum regression, doctype-agnostic behavior, and
-// confidence calibration. Mirrors DetectionTests/BatesDetectorTests.swift
-// structure.
+// Dedicated DL-detector coverage: labeled-format recall, unlabeled
+// rejection, numeric-minimum regression, doctype-agnostic behavior, and
+// confidence calibration.
 
 @Suite("Driver's License detector")
 struct DriversLicenseDetectorTests {
@@ -35,7 +34,7 @@ struct DriversLicenseDetectorTests {
         #expect(matches.isEmpty, "Should not match without DL label prefix")
     }
 
-    // MARK: - L-02 regression: numeric minimum tightening (3 → 6)
+    // MARK: - Regression: numeric minimum tightening (3 → 6)
 
     @Test("DL regex rejects short numeric IDs (< 6 digits)", arguments: [
         "DL: 123",

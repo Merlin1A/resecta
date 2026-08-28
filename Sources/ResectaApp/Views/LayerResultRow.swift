@@ -1,12 +1,11 @@
 import SwiftUI
 import RedactionEngine
 
-// UI_UX §4.2: Per-layer result row with expand/collapse.
+// Per-layer result row with expand/collapse.
 // Shared between VerificationProgressView and VerificationResultsView.
 
 struct LayerResultRow: View {
-    // UXC-33 (RB-24, partial revival of DC-023): needed to route the
-    // detail-expansion `.move(edge:)` transition through
+    // Routes the detail-expansion `.move(edge:)` transition through
     // `Anim.resolvedTransition`.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -14,10 +13,10 @@ struct LayerResultRow: View {
     let layerIndex: Int
     let isExpanded: Bool
     let onTap: () -> Void
-    /// §4.3a: Use neutral gray for PASS during .verifying phase.
+    /// Use neutral gray for PASS during .verifying phase.
     var useIntermediateColors: Bool = false
 
-    /// GAP-4 §7.2: Called when a page reference number is tapped. Nil during .verifying phase
+    /// Called when a page reference number is tapped. Nil during .verifying phase
     /// (page navigation from in-progress verification is not supported).
     var onPageTap: ((Int) -> Void)? = nil
 
@@ -79,7 +78,7 @@ struct LayerResultRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    // GAP-4 §7.1: Tappable page reference chips (static fallback when onPageTap is nil)
+                    // Tappable page reference chips (static fallback when onPageTap is nil)
                     if let pages = layer.pageReferences, !pages.isEmpty {
                         if let onPageTap {
                             FlowLayout(spacing: ResectaTokens.Spacing.xs) {
@@ -104,9 +103,8 @@ struct LayerResultRow: View {
                 .padding(.horizontal, ResectaTokens.Spacing.sm)
                 .padding(.bottom, ResectaTokens.Spacing.sm)
                 .padding(.leading, 40) // Align with text, past 28pt icon + sm padding
-                // UXC-33 (RB-24, partial revival of DC-023): routed
-                // through the resolver so Reduce Motion swaps the slide
-                // for an opacity-only crossfade.
+                // Routed through the resolver so Reduce Motion swaps
+                // the slide for an opacity-only crossfade.
                 .transition(ResectaTokens.Anim.resolvedTransition(
                     standard: .opacity.combined(with: .move(edge: .top)),
                     reduceMotion: reduceMotion))
@@ -117,7 +115,7 @@ struct LayerResultRow: View {
         // a container, so VoiceOver can reach the detail text and the
         // "Go to page N" chips instead of having them flattened away.
         .accessibilityElement(children: isExpanded ? .contain : .combine)
-        .accessibilityIdentifier("layerResult_\(layerIndex - 1)") // §A8: zero-indexed
+        .accessibilityIdentifier("layerResult_\(layerIndex - 1)") // zero-indexed
     }
 
     // MARK: - Row subtitle (attention rows name the exact text)
@@ -126,7 +124,7 @@ struct LayerResultRow: View {
     /// display-only review term texts — the user reads exactly which text
     /// remains and how to remedy it; every other status shows the layer's
     /// own `shortDescription` unchanged. Static so the composition is
-    /// unit-testable without a SwiftUI host (Pkg J pattern).
+    /// unit-testable without a SwiftUI host.
     static func rowSubtitleText(layer: LayerResult) -> String {
         guard layer.status.isAttention,
               let terms = layer.reviewTermTexts, !terms.isEmpty else {
@@ -159,7 +157,7 @@ struct LayerResultRow: View {
             + "Use text search to redact remaining instances."
     }
 
-    // MARK: - Spoken strings (static for unit testability, Pkg J pattern)
+    // MARK: - Spoken strings (static for unit testability)
 
     /// Row label: layer ordinal + name + layer-scoped phrase + what the
     /// check reported. `shortDescription` is the payload for warn/fail/info

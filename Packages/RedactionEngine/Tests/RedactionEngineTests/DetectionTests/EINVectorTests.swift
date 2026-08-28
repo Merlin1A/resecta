@@ -2,14 +2,13 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// D-19 fixture-driven test for EIN detection. The DataPipeline-generated
+// Fixture-driven test for EIN detection. The DataPipeline-generated
 // vectors at Fixtures/vectors/ein_vectors.json carry a `valid` flag whose
 // rejection_reasons are length/shape mismatches — exactly what the
 // production shape gate (einPatternHyphen/Space/NoSep) filters. The audit
-// at cc-derive D-19 confirmed the fixture is schema-clean and
-// determinism-clean.
+// confirmed the fixture is schema-clean and determinism-clean.
 
-@Suite("EIN fixture-driven detector vectors (D-19)")
+@Suite("EIN fixture-driven detector vectors")
 struct EINVectorTests {
 
     struct Vectors: Decodable {
@@ -32,7 +31,7 @@ struct EINVectorTests {
         return try JSONDecoder().decode(Vectors.self, from: data).vectors
     }
 
-    @Test("D-19 fixture loads with rows")
+    @Test("Fixture loads with rows")
     func fixtureLoads() throws {
         guard let vectors = try loadVectors() else {
             Issue.record("ein_vectors.json not bundled")

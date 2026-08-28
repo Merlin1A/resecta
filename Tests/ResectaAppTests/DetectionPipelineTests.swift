@@ -3,13 +3,13 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// GAP §14.1a — Detection pipeline guard tests.
+// Detection pipeline guard tests.
 
 @Suite("Detection Pipeline Guards")
 @MainActor
 struct DetectionPipelineTests {
 
-    @Test("Detection blocked while triage is pending (F-3)")
+    @Test("Detection blocked while triage is pending")
     func pendingTriageGuard() {
         let coordinator = makeCoordinator()
         coordinator.redactionState.pendingTriage = [0: [.mock()]]

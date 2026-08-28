@@ -18,7 +18,7 @@ struct SavedRegexLibraryView: View {
     @State private var addError: String?
     @State private var addInFlight: Bool = false
 
-    // GATE-2 destructive-action confirmation symmetry (mirrors the
+    // Destructive-action confirmation symmetry (mirrors the
     // Settings Reset-to-Defaults dialog): the delete-all row confirms
     // before dropping the user-saved library.
     @State private var showClearAllConfirmation = false
@@ -33,7 +33,7 @@ struct SavedRegexLibraryView: View {
         }
         .navigationTitle("Saved regexes")
         .navigationBarTitleDisplayMode(.inline)
-        // GATE-2: destructive confirm. Copy names exactly what is
+        // Destructive confirm. Copy names exactly what is
         // cleared: user-saved patterns only — built-ins ship with the
         // app and are unaffected.
         .confirmationDialog(
@@ -148,7 +148,7 @@ struct SavedRegexLibraryView: View {
                 }
 
                 if let addError {
-                    // GAP-41 — small error text routes through the
+                    // Small error text routes through the
                     // measured text tier.
                     Text(addError)
                         .font(.caption)

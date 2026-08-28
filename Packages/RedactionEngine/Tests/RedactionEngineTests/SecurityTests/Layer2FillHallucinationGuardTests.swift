@@ -7,8 +7,7 @@ import CoreText
 import Testing
 @testable import RedactionEngine
 
-// PART A — Layer-2 fill-hallucination verifier false positive (S1: fixtures +
-// regression pair). See plans/resecta-partA-verifier-guard-2026-06-27/.
+// Layer-2 fill-hallucination verifier false positive (fixtures + regression pair).
 //
 // Secure Rasterization paints solid, pixel-exact, `verifyFill`-proven black bars.
 // Layer-2 then OCRs the rasterized output with the frozen `verificationLayer2`
@@ -18,27 +17,28 @@ import Testing
 // → `classifyPageOCR` returns `.textInRegion` → in `.secureRasterization` a FAIL
 // (`VerificationEngine.swift:738`). No surviving PII is involved — a verifier
 // false positive. Root cause confirmed off-device on the real PDF and on-device
-// on iOS 26.4 (~/Downloads/verification-bug/DIAGNOSIS.md).
+// on iOS 26.4.
 //
-// This suite ships in S1 (PR #1) with NO production-code change:
+// This suite ships with NO production-code change:
 //   • 3a characterization — GREEN today; documents the on-device false-positive
 //     precondition and anchors the fixture's reproduction.
-//   • 3b recall          — GREEN today, MUST stay green after the PR #2 guard:
-//     readable ink inside a declared region still FAILs (the precision-only floor
-//     — the guard must NEVER suppress a genuine in-region leak).
+//   • 3b recall          — GREEN today, MUST stay green after the fill-aware
+//     guard lands: readable ink inside a declared region still FAILs (the
+//     precision-only floor — the guard must NEVER suppress a genuine
+//     in-region leak).
 //   • 3c fill-only       — `.disabled` today (it FAILs on master = the bug);
-//     PR #2 removes the trait once the fill-aware guard converts the false FAIL.
+//     the trait is removed once the fill-aware guard converts the false FAIL.
 //
 // The grayscale fill-fraction helper + embedded-image walk are reused from
 // `RedactionMisplacementDiagnosisTests` Test 5 (the diagnostic stays uncommitted).
-// The full-RGB `makeSecureRasterPage(...)` builders are added here for S2/S3 to
+// The full-RGB `makeSecureRasterPage(...)` builders are added here to
 // construct chroma / edge-straddle / white-fill / thin-stroke fixtures at test
 // time (no extra committed binaries). All on-device tests pin iOS 26.4.
 //
 // Matched-text / coordinate logging is permitted here under the synthetic-fixture
 // exemption: the fixture is the redaction of the fully synthetic resecta-sample-doc
 // statement (the "DELIA HARTWELL" corpus identity) — no real PII. Production
-// logging rules (ARCH §12.2) are unchanged.
+// logging rules are unchanged.
 
 @Suite("Part A — Layer-2 fill-hallucination guard", .serialized)
 struct Layer2FillHallucinationGuardTests {
@@ -74,7 +74,7 @@ struct Layer2FillHallucinationGuardTests {
     /// of the real output with the frozen preset and counts per-page word boxes
     /// ≥ 50 % fill (the `classifyPageOCR` in-region drivers). Asserts the
     /// false-positive precondition — `(page2 ≥ 1 || page3 ≥ 1)` in-region drivers
-    /// AND `page1 == 0` — AND the §2e faithfulness property that every driver box
+    /// AND `page1 == 0` — AND the faithfulness property that every driver box
     /// is ≥ 0.5 inside a committed region rect (so regions.json represents the
     /// bars). Passes on master; keeps the fixture honest. Pin iOS 26.4.
     @Test("3a. Vision hallucinates readable tokens on the solid fill bars → in-region FAIL driver (pin iOS 26.4)")
@@ -104,7 +104,7 @@ struct Layer2FillHallucinationGuardTests {
         #expect(p1 == 0,
                 "page 1 should carry NO in-region driver (it did not FAIL for the user). \(detail)")
 
-        // §2e faithfulness: every fill-driver box must be ≥ 0.5 inside a committed
+        // Faithfulness: every fill-driver box must be ≥ 0.5 inside a committed
         // region rect (same coverage math the verifier uses). If this fails,
         // regions.json does not represent the bars the hallucinations land on.
         for (page, drivers) in perPage {
@@ -160,8 +160,8 @@ struct Layer2FillHallucinationGuardTests {
     /// fill-consistency guard demotes the false FAIL. Demotion tier updated
     /// 2026-07-09: the fixture folds to the fill-artifact INFO note — not a
     /// FAIL, not a WARN, and not a silent clean PASS either (the note stays
-    /// visible in Verification Details; suppressing it entirely is a policy
-    /// change reserved to the maintainer; the measured separation table lives in
+    /// visible in Verification Details; suppressing it entirely would be a
+    /// policy change, not a tuning; the measured separation table lives in
     /// `Layer2FillGuardBatteryTests`). An info-only run aggregates to overall
     /// PASS (`StatusDerivationTests` pins the aggregate rule; asserted here on
     /// the fixture run). 3a anchors that this runtime still hallucinates the
@@ -352,12 +352,12 @@ struct Layer2FillHallucinationGuardTests {
         return ctx.makeImage()
     }
 
-    // MARK: - helpers: synthetic full-RGB secure-raster page builder (for S2/S3)
+    // MARK: - helpers: synthetic full-RGB secure-raster page builder
 
     /// Build a one-page PDF whose single full-page embedded image (the secure-raster
     /// output shape) renders `text` over `backgroundColor`, optionally painting
     /// solid `fillColor` bars, and return it with a matching `regions` map. Full
-    /// RGB so S2/S3 can construct chroma (coloured ink/fill), edge-straddle (paint
+    /// RGB so tests can construct chroma (coloured ink/fill), edge-straddle (paint
     /// `barRects` offset from the declared `regionRects`), white-fill, and
     /// thin-stroke (pass a thin `font`) fixtures at test time.
     ///
@@ -367,12 +367,12 @@ struct Layer2FillHallucinationGuardTests {
     ///   (JPEG q0.92, single image XObject) so the verifier's `extractPageImages`
     ///   finds it and `coordinatesTrusted` holds (images.count == 1).
     /// - `text` is laid into the first region rect (or a default band if none);
-    ///   `textRect` overrides the placement (S3 battery — straddle geometry).
-    /// - `textOverBars: true` draws the text AFTER the bars (S3 battery — ink ON
+    ///   `textRect` overrides the placement (straddle geometry).
+    /// - `textOverBars: true` draws the text AFTER the bars (ink ON
     ///   a painted bar: chroma / thin / pale / reverse-video probes).
     /// - `strokeWidth` (CoreText convention: percent of font size, positive =
     ///   stroke-ONLY) renders knockout/outline glyphs whose body is unpainted —
-    ///   the bar shows through (S3 battery — F-REVERSE-VIDEO). `strokeColor`
+    ///   the bar shows through (F-REVERSE-VIDEO). `strokeColor`
     ///   defaults to `textColor`.
     static func makeSecureRasterPage(
         text: String,
@@ -452,7 +452,7 @@ struct Layer2FillHallucinationGuardTests {
     /// `ctx`. Sizes the font to fit the rect width and seats the baseline so the
     /// glyphs land within the rect (so the OCR word boxes are ≥ 0.5 inside it).
     /// `strokeWidth`/`strokeColor` map to the CoreText stroke attributes (percent
-    /// of font size; positive = stroke-only outline glyphs — S3 battery).
+    /// of font size; positive = stroke-only outline glyphs).
     private static func drawText(_ text: String, in rect: CGRect, color: CGColor, font: CTFont?,
                                  strokeWidth: CGFloat? = nil, strokeColor: CGColor? = nil,
                                  context ctx: CGContext) {
@@ -627,11 +627,11 @@ struct Layer2FillHallucinationGuardTests {
         #expect(!VerificationEngine.isFillConsistent(s), "chroma-aware guard KEEPS coloured ink that luminance would have demoted")
     }
 
-    // MARK: - Part A measurement (on-device, pin iOS 26.4) — §4 fixture fractions
+    // MARK: - Part A measurement (on-device, pin iOS 26.4) — fixture fractions
 
     /// OCR a secure-raster page and return every word box ≥ 0.5 inside `region`
     /// (no fill filter — used for the recall raster, whose ink is NOT ≥ 50 % fill).
-    /// Internal (not private) so the S3 battery suite reuses it.
+    /// Internal (not private) so the fill-guard battery suite reuses it.
     static func inRegionOCRBoxes(cgPage: CGPDFPage, region: CGRect) -> [(text: String, box: CGRect)] {
         guard let img = embeddedOrRendered(cgPage: cgPage) else { return [] }
         let req = VNRecognizeTextRequest()
@@ -656,7 +656,7 @@ struct Layer2FillHallucinationGuardTests {
     /// in-region hallucination driver on pages 2 & 3 of the fixture (must be
     /// fill-consistent ⇒ the guard demotes the false FAIL) AND for the readable ink
     /// in the recall raster's declared region (must NOT be fill-consistent ⇒ the
-    /// precision-only floor). Printed fractions are recorded in the PR body (§4).
+    /// precision-only floor). Printed fractions are recorded in the PR body.
     @Test("measure: real fill-hallucination drivers are fill-consistent; recall ink is KEPT (pin iOS 26.4)")
     func measure_fillConsistency_onDevice() async throws {
         let data = try TestFixtures.fillHallucinationRedactedPDF()

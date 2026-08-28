@@ -1,6 +1,6 @@
 import Foundation
 
-// W10: License-plate keyword profile for ContextWindowScorer.
+// License-plate keyword profile for ContextWindowScorer.
 // Scoped per-category per G4; used by PIIDetector.detectLicensePlate.
 
 /// License plate context keyword configuration.

@@ -3,22 +3,22 @@ import Foundation
 @testable import RedactionEngine
 
 // W-N — A21 (`Resources/Gazetteers/context-keywords.json`) loader tests.
-// Schema lives at `~/resecta-datapipeline/schemas/context_keywords.schema.json`.
+// Schema lives at resecta-datapipeline's `schemas/context_keywords.schema.json`.
 //
-// V1 ship is positive-only mechanical lift (Q3 DECIDED 2026-04-30 / STRAT
-// §1.5 row 14): the 4 retired `*ContextKeywords.swift` files keep their
-// `negativeKeywords:` arrays + threshold constants; only `positiveKeywords:`
-// becomes loader-driven. Negative arrays in those files are exercised by
-// the sibling `ContextProfileNegativesPreservedTests`.
+// V1 ship is positive-only mechanical lift: the 4 retired
+// `*ContextKeywords.swift` files keep their `negativeKeywords:` arrays +
+// threshold constants; only `positiveKeywords:` becomes loader-driven.
+// Negative arrays in those files are exercised by the sibling
+// `ContextProfileNegativesPreservedTests`.
 
 @Suite("ContextKeywordsLoader (W-N) — A21 schema + parity")
 struct ContextKeywordsLoaderTests {
 
     // MARK: - Smoke / loader contract
 
-    @Test("Loader exposes 192 entries across 9 categories (A21 post-S3 row count)")
+    @Test("Loader exposes 192 entries across 9 categories (A21 row count)")
     func smokeFullEntries() throws {
-        // S3 (search-impl, design 02 §§2.1/2.6): +5 ssn, +5 name, +6 ein.
+        // Doctype-scoped additions: +5 ssn, +5 name, +6 ein.
         // The bundled file carries 213 rows; the 21 bates rows are
         // engine-invisible (mapCategory has no bates case), so the loader
         // exposes 192.
@@ -50,7 +50,7 @@ struct ContextKeywordsLoaderTests {
         #expect(ContextKeywordsLoader.supportedVersions == 1...1)
     }
 
-    @Test("`weight(for:)` honors the F-50/F-51 five-case enum")
+    @Test("`weight(for:)` honors the five-case enum")
     func confidenceWeightMapping() {
         #expect(ContextKeywordsLoader.weight(for: "high") == 1.0)
         #expect(ContextKeywordsLoader.weight(for: "medium-high") == 0.85)
@@ -68,8 +68,8 @@ struct ContextKeywordsLoaderTests {
     func axis1SSN() throws {
         let loader = try ContextKeywordsLoader()
         let a21 = Set(loader.entries(for: .ssn).map { $0.term.lowercased() })
-        // 10 global + 5 financial-scoped (S3, design 02 §2.1).
-        #expect(a21.count == 15, "A21 SSN-positive count drifted off 15 — STOP per STRAT §5.1")
+        // 10 global + 5 financial-scoped.
+        #expect(a21.count == 15, "A21 SSN-positive count drifted off 15")
         for term in SSNContextKeywords.profile.positiveKeywords {
             #expect(a21.contains(term.lowercased()),
                     "SSN positive '\(term)' missing from A21 (axis 1)")
@@ -164,27 +164,25 @@ struct ContextKeywordsLoaderTests {
         let swiftSSNNegatives = SSNContextKeywords.profile.negativeKeywords
             .map { $0.lowercased() }
         let overlap = swiftSSNNegatives.filter { a5SSN.contains($0) }
-        // The ≤N cap is intentionally brittle — see STRAT §5.1 axis 2:
-        // when this number changes, the §2.2 A5-review process kicks in.
-        // S3 raised it 8 → 10 under the in-session §2.2 review: the S3
-        // additions put `claim number` into (ssn, financial) and the
-        // reviewed rebuild retains `case number`/`docket`/`docket number`
-        // (A5 keep-list trio, decision 2026-06-11) — double-coverage with
-        // the Swift hardcoded negatives is redundant, not harmful
-        // (design 02 §2.3 risk note).
+        // The ≤N cap is intentionally brittle: when this number changes, a
+        // review of the negative/positive keyword overlap is warranted. The
+        // cap was raised from 8 to 10 because `claim number` was added to
+        // (ssn, financial); the rebuild retains `case number`/`docket`/
+        // `docket number` (A5 keep-list trio) — double-coverage with the
+        // Swift hardcoded negatives is redundant, not harmful.
         #expect(overlap.count <= 10,
                 "SSN Swift-negative ↔ A5 overlap = \(overlap.count) > 10 (overlapping: \(overlap.sorted()))")
     }
 
     // MARK: - Doctype-scoped lookup
 
-    @Test("SSN positives: 10 globals plus the S3 doctype-scoped financial/foia rows")
+    @Test("SSN positives: 10 globals plus doctype-scoped financial/foia rows")
     func ssnPositivesDoctypeScoping() throws {
-        // Pre-S3 every ssn row was doctypes-global. S3 (design 02 §2.1)
-        // added 5 doctype-scoped rows: 4 financial-only plus
-        // "taxpayer identification number" on financial+foia. The loader
-        // layers scoped rows on top of the globals for a concrete doctype
-        // and returns only the globals for nil.
+        // Every ssn row was originally doctypes-global; 5 doctype-scoped
+        // rows were added later: 4 financial-only plus "taxpayer
+        // identification number" on financial+foia. The loader layers
+        // scoped rows on top of the globals for a concrete doctype and
+        // returns only the globals for nil.
         let loader = try ContextKeywordsLoader()
         let nilPositives = try #require(loader.positiveKeywords(for: .ssn, doctype: nil))
         #expect(nilPositives.count == 10, "global ssn positives drifted off 10")
@@ -204,26 +202,26 @@ struct ContextKeywordsLoaderTests {
 
     // MARK: - Optional flags surfaced through Entry struct
 
-    @Test("`detector_requires_secondary` exposed for F-47 bare DEA")
+    @Test("`detector_requires_secondary` exposed for bare DEA")
     func detectorRequiresSecondaryExposedForBareDEA() throws {
         let loader = try ContextKeywordsLoader()
         let flagged = loader.entries(for: .dea)
             .filter { $0.detectorRequiresSecondary == true }
         #expect(flagged.count == 1,
-                "Exactly one A21 row should carry detector_requires_secondary=true (F-47 bare DEA)")
+                "Exactly one A21 row should carry detector_requires_secondary=true (bare DEA)")
         #expect(flagged.first?.term.lowercased() == "dea")
     }
 
-    @Test("`detector_note` exposed for F-52 DOB windowed-matching family")
+    @Test("`detector_note` exposed for the DOB windowed-matching family")
     func detectorNoteExposedForDOBFamily() throws {
         let loader = try ContextKeywordsLoader()
         let dobNotes = loader.entries(for: .dateOfBirth)
             .filter { $0.detectorNote != nil }
         #expect(!dobNotes.isEmpty,
-                "DOB family must carry detector_note rows for F-52 windowed-matching")
+                "DOB family must carry detector_note rows for windowed-matching")
         for entry in dobNotes {
             #expect(entry.detectorNote?.contains("F-52") == true,
-                    "DOB detector_note should reference F-52 (got \(entry.detectorNote ?? "nil"))")
+                    "DOB detector_note should reference the windowed-matching caveat (got \(entry.detectorNote ?? "nil"))")
         }
     }
 }

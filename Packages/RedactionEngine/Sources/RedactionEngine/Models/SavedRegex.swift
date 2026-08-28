@@ -29,7 +29,6 @@ public struct SavedRegex: Codable, Sendable, Identifiable, Equatable, Hashable {
         self.isBuiltIn = isBuiltIn
     }
 
-    // Pkg G.2 — TRUST-savedregex-codable-decoder-bypass.
     // Explicit decoder locks the built-in invariant on the deserialization
     // boundary. Built-ins are merged in-process from `allBuiltIns` (see
     // `SavedRegexStore.regexes`), never deserialized; any incoming JSON is
@@ -53,7 +52,7 @@ public struct SavedRegex: Codable, Sendable, Identifiable, Equatable, Hashable {
         let rawPattern = try container.decode(String.self, forKey: .pattern)
         self.pattern = String(rawPattern.prefix(Self.patternLengthCap))
         self.createdAt = try container.decode(Date.self, forKey: .createdAt)
-        // Per Pkg G.2 / Jesse Q6 — locked, ignoring whatever the JSON
+        // Locked, ignoring whatever the JSON
         // payload claims. Built-ins are merged from in-process state, not
         // decoded.
         self.isBuiltIn = false
@@ -151,8 +150,8 @@ public extension SavedRegex {
     // ITIN area starts with 9; the non-capturing alternation
     // `(?:5\d|6[0-5]|7\d|8[0-8]|9[0-2]|9[4-9])` implements the IRS-
     // issued group buckets 50-65, 70-88, 90-92, 94-99 per IRS Publication
-    // 1915. The `5\d|6[0-5]` arm covers groups 50-65 per PIIDetector.swift
-    // §762. This pattern uses `\b` while abaRouting below uses digit
+    // 1915. The `5\d|6[0-5]` arm covers groups 50-65 per PIIDetector.swift.
+    // This pattern uses `\b` while abaRouting below uses digit
     // lookarounds — the style difference is an intentional
     // anchoring choice. The alternation group is not followed by an
     // unbounded quantifier, so the safety precheck passes.

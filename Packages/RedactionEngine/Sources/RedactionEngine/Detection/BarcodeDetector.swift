@@ -1,7 +1,7 @@
 import CoreGraphics
 import Vision
 
-// ENGINE §4.19 (DRAW-2) — Barcode / QR detection via Vision framework.
+// Barcode / QR detection via Vision framework.
 // Mirrors `FaceDetector.swift` shape: stateless `Sendable` struct with a
 // single `@concurrent` detect entry point. Holds no state across calls.
 
@@ -33,7 +33,7 @@ public struct BarcodeDetector: Sendable {
     /// and labels; 1D for inventory / patient identifiers).
     @concurrent
     public func detect(in image: CGImage) async throws -> [DetectionResult] {
-        // PERF-8 / CANCEL-005: entry-level cooperative cancellation ahead of
+        // Entry-level cooperative cancellation ahead of
         // the synchronous Vision wrap.
         try Task.checkCancellation()
         let request = VNDetectBarcodesRequest()

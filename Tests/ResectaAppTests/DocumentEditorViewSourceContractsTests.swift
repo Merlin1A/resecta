@@ -7,21 +7,21 @@ import Foundation
 // property with no pure-function seam to unit-test directly — mirrors
 // `HonestySurfacesTests.loadRepoFile`'s technique.
 //
-//  - UXC-26 (GAP-35): `DetectionSummaryBanner`'s glyph tint gates on
+//  - `DetectionSummaryBanner`'s glyph tint gates on
 //    `model.isWarning` instead of an unconditional `.orange`.
-//  - UXC-32 (GAP-45): the editor toolbar's routine actions render
+//  - The editor toolbar's routine actions render
 //    neutral (`.tint(.primary)` on the three `ToolbarItemGroup`s); the
 //    Redact button is the one designated emphasis action and carries
 //    the brand tint explicitly.
-//  - 1.1.0 Home swap (UXC-41): the iPhone overflow group leads with Home and the
+//  - 1.1.0 Home swap: the iPhone overflow group leads with Home and the
 //    former file-import entry is gone from the editor.
-//  - UXC-43: the home screen's Settings gear renders neutral (the UXC-32
+//  - The home screen's Settings gear renders neutral (the same toolbar
 //    rule applied to `HomeView.swift`).
 
-@Suite("DocumentEditorView source contracts (UXC-26 / UXC-32)")
+@Suite("DocumentEditorView source contracts")
 struct DocumentEditorViewSourceContractsTests {
 
-    @Test("UXC-26 — DetectionSummaryBanner glyph has no unconditional .orange and gates on isWarning")
+    @Test("DetectionSummaryBanner glyph has no unconditional .orange and gates on isWarning")
     func detectionSummaryBannerTintGatesOnIsWarning() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
         guard let structRange = source.range(of: "private struct DetectionSummaryBanner"),
@@ -37,7 +37,7 @@ struct DocumentEditorViewSourceContractsTests {
                 "the glyph tint must gate on model.isWarning and reference the warningTint token")
     }
 
-    @Test("UXC-32 — the three toolbar groups render neutral")
+    @Test("The three toolbar groups render neutral")
     func toolbarGroupsCarryNeutralTint() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
         let occurrences = source.components(separatedBy: ".tint(.primary)").count - 1
@@ -45,7 +45,7 @@ struct DocumentEditorViewSourceContractsTests {
                 "expected 3 neutral-tint toolbar groups (leading, trailing, secondaryAction); found \(occurrences)")
     }
 
-    @Test("UXC-32 — the Redact button is the one designated emphasis action")
+    @Test("The Redact button is the one designated emphasis action")
     func redactButtonCarriesBrandTint() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
         guard let buttonRange = source.range(of: "Button(\"Redact\", systemImage: \"scissors\")") else {
@@ -69,7 +69,7 @@ struct DocumentEditorViewSourceContractsTests {
                 "expected exactly 1 explicit brand-tint literal (the Redact button); found \(brandTintOccurrences)")
     }
 
-    @Test("1.1.0 Home swap (UXC-41) — the file-import entry is gone and Home leads the overflow group")
+    @Test("1.1.0 Home swap — the file-import entry is gone and Home leads the overflow group")
     func homeLeadsSecondaryActionGroup() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
         #expect(!source.contains("Open Document"),
@@ -94,7 +94,7 @@ struct DocumentEditorViewSourceContractsTests {
                 "Home must be the first of our items in the overflow group")
     }
 
-    @Test("UXC-43 — HomeView's Settings button renders neutral, like the editor toolbar")
+    @Test("HomeView's Settings button renders neutral, like the editor toolbar")
     func homeSettingsButtonCarriesNeutralTint() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/HomeView.swift")
         guard let buttonRange = source.range(of: "Button(\"Settings\", systemImage: \"gearshape\")") else {
@@ -108,7 +108,7 @@ struct DocumentEditorViewSourceContractsTests {
         ) ?? source.endIndex
         let window = source[buttonRange.upperBound..<windowEnd]
         #expect(window.contains(".tint(.primary)"),
-                "the home screen's Settings gear must carry the neutral tint (UXC-43, the UXC-32 rule)")
+                "the home screen's Settings gear must carry the neutral tint")
     }
 
     /// Mirrors `HonestySurfacesTests.loadRepoFile`.

@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import RedactionEngine
 
-// D11-config-golive-F6 Phase A — engine-side bundle-contents guard. The app
+// Engine-side bundle-contents guard. The app
 // target's BundleContentsTests can only resolve the APP bundle (Bundle(for:)),
 // so the two reviewed, drift-prone search-config resources that ship in the
 // RedactionEngine resource bundle get their semantic-invariant guard here. Both
@@ -14,7 +14,7 @@ import Testing
 // updates the shell constants once. Complementary to (not a copy of)
 // ContextScorerIdentityReproductionTests, which pins the per-family arithmetic.
 
-@Suite("Engine bundle contents (D11-F6 Phase A)")
+@Suite("Engine bundle contents")
 struct EngineBundleContentsTests {
 
     // Arity-13 non-zero feature vector so a calibrated promoted family

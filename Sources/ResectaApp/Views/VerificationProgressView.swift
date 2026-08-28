@@ -1,11 +1,11 @@
 import SwiftUI
 import RedactionEngine
 
-// UI_UX §4.3, C6, R1, R2, R3: Progressive reveal during verification.
-// §A4b: Full-screen view — verification is a distinct workflow phase (D6).
-// §4.3a: Intermediate colors prevent premature confidence anchoring.
-// §4.3b: "In Progress" banner with .thickMaterial persists until all layers complete.
-// Cancel is in the toolbar (§A3), not in this view.
+// Progressive reveal during verification.
+// Full-screen view — verification is a distinct workflow phase.
+// Intermediate colors prevent premature confidence anchoring.
+// "In Progress" banner with .thickMaterial persists until all layers complete.
+// Cancel is in the toolbar, not in this view.
 
 struct VerificationProgressView: View {
     @Environment(DocumentState.self) private var documentState
@@ -38,11 +38,11 @@ struct VerificationProgressView: View {
             VStack(spacing: ResectaTokens.Spacing.xl) {
                 shieldHero
 
-                // §4.3b: Persistent "Verification In Progress" banner — C6: .thickMaterial
+                // Persistent "Verification In Progress" banner using .thickMaterial
                 VStack(spacing: ResectaTokens.Spacing.xxs) {
                     Text("Verification In Progress")
                         .font(.headline)
-                    // R2: .contentTransition(.numericText()) for smooth digit transitions
+                    // .contentTransition(.numericText()) for smooth digit transitions
                     Text("\(completedLayers.count) of \(totalLayers) checks completed")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -55,7 +55,7 @@ struct VerificationProgressView: View {
                 .frame(maxWidth: columnMaxWidth)
 
                 VStack(spacing: ResectaTokens.Spacing.md) {
-                    // Completed layers — intermediate colors (§4.3a)
+                    // Completed layers — intermediate colors
                     ForEach(Array(completedLayers.enumerated()), id: \.offset) { index, layer in
                         LayerResultRow(
                             layer: layer,
@@ -65,8 +65,7 @@ struct VerificationProgressView: View {
                             useIntermediateColors: true,
                             isExpandable: false
                         )
-                        // UXC-33 (RB-24, partial revival of DC-023):
-                        // folded the hand-rolled reduceMotion ternary
+                        // Folded the hand-rolled reduceMotion ternary
                         // into the resolver — identical behavior, one
                         // canonical seam.
                         .transition(ResectaTokens.Anim.resolvedTransition(
@@ -101,7 +100,7 @@ struct VerificationProgressView: View {
                         .frame(maxWidth: columnMaxWidth)
                     }
 
-                    // R1: Phase 3E — Animated shimmer placeholders for remaining layers.
+                    // Animated shimmer placeholders for remaining layers.
                     // Reduced motion: static .quaternary fill (no animation).
                     let remainingStart = completedLayers.count + 1
                     if remainingStart < totalLayers {
@@ -111,7 +110,7 @@ struct VerificationProgressView: View {
                         }
                     }
 
-                    // Phase 4: trust strip below the shimmers — verification is
+                    // Trust strip below the shimmers — verification is
                     // the only multi-second wait in the app, so the privacy
                     // reassurance fits the moment. Mirrors HomeView's strip
                     // exactly; reuses TrustItem + FlowLayout.
@@ -126,9 +125,9 @@ struct VerificationProgressView: View {
 
     // MARK: - Subviews
 
-    // R3: shield stays `.secondary` / gray (not green — premature confidence
-    // anchoring). Phase 4 bumps size from 40pt → 56pt for parity with
-    // HomeView masthead; R3 constrains color, not size, so the bump is
+    // Shield stays `.secondary` / gray (not green — premature confidence
+    // anchoring). Size bumps from 40pt → 56pt for parity with
+    // HomeView masthead; color is constrained, not size, so the bump is
     // spec-neutral. `.hierarchical` rendering picks up the secondary tint.
     // VoiceOver: hidden — the banner ("Verification In Progress" + count)
     // and the running-layer label already convey the same state.
@@ -167,8 +166,8 @@ struct VerificationProgressView: View {
 
     /// Mirrors `HomeView.columnMaxWidth` (HomeView.swift:77-81) and
     /// `VerificationResultsView.columnMaxWidth`. Lifted to a static helper
-    /// so the gate is testable without a SwiftUI host (mirrors Session 1's
-    /// `shouldAutoReturnHome` and Session 2's `shouldAutoExpand`).
+    /// so the gate is testable without a SwiftUI host (mirrors
+    /// `shouldAutoReturnHome` and `shouldAutoExpand`).
     private var columnMaxWidth: CGFloat {
         Self.columnMaxWidth(for: horizontalSizeClass)
     }
@@ -182,7 +181,7 @@ struct VerificationProgressView: View {
     }
 }
 
-// MARK: - Shimmer Placeholder Row (Phase 3E)
+// MARK: - Shimmer Placeholder Row
 
 /// Animated shimmer row for not-yet-started verification layers.
 /// Reduced motion: static fill with no animation.
@@ -224,11 +223,11 @@ private struct VerificationShimmerRow: View {
             .frame(height: height)
             .overlay {
                 if !reduceMotion {
-                    // 04-ux-ui-audit.md §1.3.c: `.primary` resolves to
-                    // near-black in light mode and near-white in dark mode,
-                    // so the shimmer band reads against `.quaternary` in
-                    // both schemes (the prior `.white.opacity(0.15)` was
-                    // invisible on light-gray placeholders).
+                    // `.primary` resolves to near-black in light mode
+                    // and near-white in dark mode, so the shimmer band
+                    // reads against `.quaternary` in both schemes (the
+                    // prior `.white.opacity(0.15)` was invisible on
+                    // light-gray placeholders).
                     LinearGradient(
                         colors: [.clear, .primary.opacity(0.10), .clear],
                         startPoint: .leading,

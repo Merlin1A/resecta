@@ -7,7 +7,7 @@ import UIKit
 import os
 @testable import RedactionEngine
 
-// PERF-6 — Parallel verification base layers.
+// Parallel verification base layers.
 //
 // These tests mirror the dispatch contract implemented in
 // `Sources/ResectaApp/State/PipelineCoordinator.swift` (private
@@ -19,11 +19,9 @@ import os
 // shape, without coupling to the coordinator type (which lives in the
 // app target and is unreachable from this package's test bundle).
 //
-// Per plan §0.2 (base layers) and plan §4.4 / §4.5 (Layer 9 / Layer 10
-// additions), the post-M3 layer numbering is:
+// The layer numbering is:
 //   - Base layers 0/1/2 = Text Extraction, OCR, Binary Search → parallel
-//   - Layer 9 (M3 SVT-5) = Operator Re-Extraction (CGPDFScanner)
-//                                                              → parallel
+//   - Layer 9 = Operator Re-Extraction (CGPDFScanner)         → parallel
 //   - Base layers 3, 4  = Structure, Metadata                → sequential
 //   - Sandwich 5/6/7/8  = Spatial, CharCount, FontVerify,
 //                         Character Lineage                  → sequential
@@ -43,7 +41,7 @@ import os
 // execution would distort the readings; serializing also reduces the
 // CPU pressure that the suite contributes to neighbouring wall-clock-
 // sensitive tests (e.g., `RegexSearchHardeningTests.cancellationPropagatesQuickly`).
-@Suite("PERF-6 Parallel Layer Execution", .tags(.performance), .serialized)
+@Suite("Parallel Layer Execution", .tags(.performance), .serialized)
 struct ParallelLayerExecutionTests {
 
     // MARK: - Per-layer wall-clock harness
@@ -62,12 +60,11 @@ struct ParallelLayerExecutionTests {
 
     /// Re-implements the coordinator's parallel-dispatch contract for
     /// the test bundle. The production code path is in
-    /// `PipelineCoordinator.runVerification` (see PERF-6 plan §5).
+    /// `PipelineCoordinator.runVerification`.
     /// Returns timestamped results in layer-index ascending order.
     ///
-    /// M3 (plan §4.5 / ENGINE §6.9 PERF-6): accepts an arbitrary `[Int]`
-    /// so callers can dispatch the post-M3 Searchable batch `[0, 1, 2, 9]`
-    /// in addition to the pre-M3 contiguous `[0, 1, 2]` range.
+    /// Accepts an arbitrary `[Int]` so callers can dispatch the Searchable
+    /// batch `[0, 1, 2, 9]` in addition to the contiguous `[0, 1, 2]` range.
     static func runParallelBase(
         layers: [Int],
         verifier: VerificationEngine,
@@ -186,11 +183,11 @@ struct ParallelLayerExecutionTests {
         // Two layers "overlap" when one's [start, end] interval and the
         // other's intersect — i.e., neither finished before the other
         // started. Three layers produce 3 pairs; requiring >= 2 means at
-        // least two-thirds of the pairs must overlap, ruling out the
+        // least two-thirds of the pairs must overlap, which excludes the
         // near-serial schedule (exactly one incidental overlap) that the
-        // old >= 1 floor accepted (CAT-250). If this turns flaky under
+        // previous >= 1 floor accepted. If this turns flaky under
         // full-suite load, that is evidence of a real scheduling
-        // regression — do not re-widen without maintainer review.
+        // regression rather than justification to widen the floor.
         var overlappingPairs = 0
         for i in 0..<parallel.count {
             for j in (i + 1)..<parallel.count {
@@ -202,7 +199,7 @@ struct ParallelLayerExecutionTests {
         }
         #expect(
             overlappingPairs >= 2,
-            "Expected at least two overlapping pairs among layers 0/1/2 under withTaskGroup dispatch (saw \(overlappingPairs); >= 2 of 3 pairs per CAT-250)"
+            "Expected at least two overlapping pairs among layers 0/1/2 under withTaskGroup dispatch (saw \(overlappingPairs); >= 2 of 3 pairs required)"
         )
 
         // Layer-index ordering is preserved by the sort step in
@@ -240,7 +237,7 @@ struct ParallelLayerExecutionTests {
         #expect(layer4.layerIndex == 4)
         #expect(
             layer4.start >= layer3.end,
-            "Layer 4 should begin no earlier than Layer 3 ends — concurrent PDFDocument catalog parsing would contend (plan §0.2)"
+            "Layer 4 should begin no earlier than Layer 3 ends — concurrent PDFDocument catalog parsing would contend"
         )
     }
 
@@ -251,10 +248,9 @@ struct ParallelLayerExecutionTests {
         // Sandwich layers expect a Searchable-Redaction page with a
         // filter digest. Use the textLayerPDF fixture so the page has
         // a real text layer; pair with a stub digest sized for the
-        // page's extracted text. M1 (plan §4.4) added Layer 9
-        // (Character Lineage) to the sandwich-sequential set; M3 leaves
-        // it there and adds Layer 10 to the parallel base batch instead
-        // (plan §4.5, ENGINE §6.9 PERF-6).
+        // page's extracted text. Layer 9 (Character Lineage) belongs to
+        // the sandwich-sequential set; Layer 10 belongs to the parallel
+        // base batch instead.
         let (doc, url) = try await makeMultiPageSandwichPDF(pageCount: 3)
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -297,14 +293,14 @@ struct ParallelLayerExecutionTests {
 
     // MARK: - Test 3b — Layer 10 joins the parallel base batch (Searchable, M3)
 
-    @Test("Layer 10 overlaps base parallel batch in Searchable mode (M3)")
+    @Test("Layer 10 overlaps base parallel batch in Searchable mode")
     func testLayer10ParallelBaseOverlap() async throws {
-        // Plan §4.5 / ENGINE §6.9 PERF-6: Layer 10 (operator-semantic
-        // re-extraction, index 9 in the zero-indexed dispatcher) joins
-        // the base-parallel batch in Searchable mode. The layer walks
-        // each output page's content stream via CGPDFScanner — no
-        // catalog-handle contention with Layers 0/1/2 and no sequencing
-        // dependency on the sandwich-sequential layers (5–8).
+        // Layer 10 (operator-semantic re-extraction, index 9 in the
+        // zero-indexed dispatcher) joins the base-parallel batch in
+        // Searchable mode. The layer walks each output page's content
+        // stream via CGPDFScanner — no catalog-handle contention with
+        // Layers 0/1/2 and no sequencing dependency on the
+        // sandwich-sequential layers (5–8).
         //
         // The test dispatches `[0, 1, 2, 9]` via the same withTaskGroup
         // shape the coordinator uses (`PipelineCoordinator.runVerification`)
@@ -337,11 +333,11 @@ struct ParallelLayerExecutionTests {
                 "Expected four timed results (layers 0, 1, 2, 9)")
 
         // Same overlap predicate the layers-0/1/2 test uses. Four layers
-        // produce 6 pairs; requiring >= 2 rules out the near-serial
-        // schedule (exactly one incidental overlap) that the old >= 1
-        // floor accepted (CAT-250). If this turns flaky under full-suite
-        // load, that is evidence of a real scheduling regression — do not
-        // re-widen without maintainer review.
+        // produce 6 pairs; requiring >= 2 excludes the near-serial
+        // schedule (exactly one incidental overlap) that the previous
+        // >= 1 floor accepted. If this turns flaky under full-suite
+        // load, that is evidence of a real scheduling regression rather
+        // than justification to widen the floor.
         var overlappingPairs = 0
         for i in 0..<parallel.count {
             for j in (i + 1)..<parallel.count {
@@ -354,7 +350,7 @@ struct ParallelLayerExecutionTests {
         }
         #expect(
             overlappingPairs >= 2,
-            "Expected at least two overlapping pairs among layers 0/1/2/9 under withTaskGroup dispatch (saw \(overlappingPairs); >= 2 of 6 pairs per CAT-250)"
+            "Expected at least two overlapping pairs among layers 0/1/2/9 under withTaskGroup dispatch (saw \(overlappingPairs); >= 2 of 6 pairs required)"
         )
 
         // Sorted output preserves layer-index-ascending order so
@@ -364,23 +360,22 @@ struct ParallelLayerExecutionTests {
 
     // MARK: - Test 4 — Wall-clock under 50% of sequential baseline
 
-    // Wall-clock acceptance test per plan §5. Asserts that the parallel
-    // dispatch reduces verification wall-clock vs. the sequential
-    // baseline; reports the 0.5× strict target as a non-asserting log
-    // line. Same convention as the existing `SearchPerformanceTests`
-    // and `RegexSentinelCheckTests` env-skip entries
-    // (inherited-red triage 2026-05-08) — `.disabled` under default
-    // green-bar runs because Swift Testing schedules tests across CPU
-    // cores by default and parallel-scheduling contention with other
-    // wall-clock-budgeted suites distorts the ratio. Explicit
-    // invocation gate (same pattern as PERF-7 `make stress-baseline`):
+    // Wall-clock acceptance test. Asserts that the parallel dispatch
+    // reduces verification wall-clock vs. the sequential baseline;
+    // reports the 0.5× strict target as a non-asserting log line. Same
+    // convention as the existing `SearchPerformanceTests` and
+    // `RegexSentinelCheckTests` env-skip entries — `.disabled` under
+    // default green-bar runs because Swift Testing schedules tests
+    // across CPU cores by default and parallel-scheduling contention
+    // with other wall-clock-budgeted suites distorts the ratio.
+    // Explicit invocation gate:
     //   xcodebuild test -only-testing:'RedactionEngineTests/ParallelLayerExecutionTests/testVerifyWallClockUnderHalfBaseline()'
     @Test("Parallel verify wall-clock beats sequential baseline (acceptance gate)",
           .tags(.performance),
           .disabled("Parallel-scheduling contention with neighbouring wall-clock-budgeted suites distorts the ratio under default `xcodebuild test`. Run on demand via explicit `-only-testing` invocation."),
           .timeLimit(.minutes(4)))
     func testVerifyWallClockUnderHalfBaseline() async throws {
-        // 50-page document per the plan acceptance criterion (§5).
+        // 50-page document exercises the acceptance criterion.
         // Uses bitmap pages (engine reconstructor produces JPEG XObjects)
         // so Layer 1 OCR runs Vision on every page, AND the resulting
         // PDF byte stream is large enough that Layer 2's Aho-Corasick
@@ -417,7 +412,7 @@ struct ParallelLayerExecutionTests {
         }
 
         // Three iterations averaged to dampen scheduler noise. The
-        // 0.5× ratio target follows plan §5; sample averaging makes
+        // 0.5× ratio target is aspirational; sample averaging makes
         // the assertion robust to brief CPU contention from
         // neighbouring suites in the engine green-bar run.
         let iterations = 3
@@ -477,15 +472,14 @@ struct ParallelLayerExecutionTests {
         let sequentialAvg = trimmedSequential.reduce(0, +) / Double(trimmedSequential.count)
         let parallelAvg = trimmedParallel.reduce(0, +) / Double(trimmedParallel.count)
 
-        // Acceptance: plan §5 acceptance is "Total verification
-        // wall-clock reduced; correctness invariants preserved." The
-        // test asserts the "reduced" side (parallel beats sequential)
-        // and reports the 0.5× strict aspirational bar to the test
-        // log without asserting on it — the strict ratio depends on
-        // the per-layer work balance, which the synthetic fixture
-        // does not provide. Real-world documents with comparable
-        // text-extraction / OCR / byte-scan work tend to hit ≈ 0.5×
-        // per the plan body.
+        // Acceptance criterion: "Total verification wall-clock
+        // reduced; correctness invariants preserved." The test
+        // asserts the "reduced" side (parallel beats sequential) and
+        // reports the 0.5× strict aspirational bar to the test log
+        // without asserting on it — the strict ratio depends on the
+        // per-layer work balance, which the synthetic fixture does not
+        // provide. Real-world documents with comparable
+        // text-extraction / OCR / byte-scan work tend to hit ≈ 0.5×.
         let strictTarget = sequentialAvg * 0.5
         #expect(
             parallelAvg < sequentialAvg,
@@ -493,16 +487,16 @@ struct ParallelLayerExecutionTests {
             Parallel verify wall-clock did not beat sequential baseline.
             avg parallel (trimmed): \(parallelAvg)s
             avg sequential (trimmed): \(sequentialAvg)s
-            strict §5 target (0.5×): \(strictTarget)s
+            strict target (0.5×): \(strictTarget)s
             samples: seq=\(sequentialSamples), par=\(parallelSamples)
             """
         )
         // Non-asserting visibility into the strict-target achievement.
         let hitStrictTarget = parallelAvg < strictTarget
         let speedupPct = (1 - parallelAvg / sequentialAvg) * 100
-        print("[PERF-6] Parallel verify wall-clock speedup: " +
+        print("Parallel verify wall-clock speedup: " +
               "\(String(format: "%.1f", speedupPct))% " +
-              "(strict §5 0.5× target \(hitStrictTarget ? "hit" : "not hit") " +
+              "(strict 0.5× target \(hitStrictTarget ? "hit" : "not hit") " +
               "on synthetic fixture). " +
               "Sequential avg=\(sequentialAvg)s, parallel avg=\(parallelAvg)s.")
     }

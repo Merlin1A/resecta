@@ -1,7 +1,6 @@
 import XCTest
 
-/// UI tests for the Search & Redact sheet's detent-dependent layout
-/// (q18 / UXF-05, +UXF-17 cross-ref).
+/// UI tests for the Search & Redact sheet's detent-dependent layout.
 ///
 /// Three demonstrated defect classes, all driven end-to-end here:
 /// - ts5-02 / seq 134: at the expanded detent the pinned Dismiss /
@@ -18,24 +17,22 @@ import XCTest
 ///   landed on the footer. The test searches at the default medium
 ///   detent and asserts the first row's selection toggle is hittable
 ///   and actually toggles the footer count.
-/// - D-67 → D-70/SA-2: below the top detent, detent arbitration
-///   swallowed every pan starting on list content (D-67). The D-68
-///   `.scrolls` pin bought list scrolling by retiring scroll↔detent
-///   cooperation; SA-2 removed the two composition poisons
-///   (NavigationStack wrapper, chip H-ScrollViews — 18-SCROLL-ARCH
-///   §3) and retired that pin, so `.automatic` cooperates natively.
-///   The cooperative pins drive real in-list drags and assert the
-///   Maps-idiom contract: an in-list drag at medium EXPANDS the
-///   sheet (the D-68-era headerY-HELD assertion is deliberately
-///   INVERTED), content scrolls under drag at the top detent, a
-///   content-at-top down-drag steps the sheet back down — through
-///   medium to the compact strip — and the grabber path still
-///   resizes both directions.
+/// - Below the top detent, detent arbitration used to swallow every
+///   pan starting on list content. A `.scrolls` pin bought list
+///   scrolling by retiring scroll↔detent cooperation; removing the
+///   two composition poisons (NavigationStack wrapper, chip
+///   H-ScrollViews) retired that pin, so `.automatic` cooperates
+///   natively. The cooperative pins drive real in-list drags and
+///   assert the Maps-idiom contract: an in-list drag at medium
+///   EXPANDS the sheet (the earlier headerY-HELD assertion is
+///   deliberately INVERTED), content scrolls under drag at the top
+///   detent, a content-at-top down-drag steps the sheet back down —
+///   through medium to the compact strip — and the grabber path
+///   still resizes both directions.
 ///
-/// WA/D-75 also parks the editor page-bar pin here (the bar's
-/// first-ever coverage): chevron-only buttons + the "N of M" counter,
-/// driven on the same `--multipageDoc` fixture the results-list leg
-/// uses.
+/// The editor page-bar pin also lives here (the bar's first-ever
+/// coverage): chevron-only buttons + the "N of M" counter, driven on
+/// the same `--multipageDoc` fixture the results-list leg uses.
 ///
 /// nonisolated for the same reason as `SearchMarkForRedactionUITests`:
 /// an XCUITest drives a separate process and touches no @MainActor app
@@ -80,7 +77,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
     }
 
     /// Raise the sheet from the compact float back to medium via the
-    /// grabber path. The title-only handle (WA/D-75) hugs the bottom
+    /// grabber path. The title-only handle hugs the bottom
     /// of the screen, so the stroke starts just inside the sheet's
     /// top strip and releases at mid-screen, where medium is the
     /// nearest detent. One retry if the strip is still up after the
@@ -203,7 +200,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
     // Scan entry. --searchMode seeds the same interface the toolbar
     // Scan button opens, without the entry's auto-run (a run in
     // flight would disable the controls this test asserts against).
-    // Reshaped for D-63/UT: the retired chips strip + scope picker
+    // Reshaped: the retired chips strip + scope picker
     // are pinned ABSENT flag-dark, the occlusion class pins against
     // the NEW shipping chrome (the relocated ↻ + bookmark in the
     // search bar — the bookmark tap presenting the saved list is the
@@ -222,9 +219,8 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         dragSheetToExpanded()
         assertSheetExpanded()
 
-        // D-63 flag-off absence: the retired controls must not render
-        // (asserted at the expanded detent, where they WOULD be
-        // visible if present).
+        // The retired controls must not render (asserted at the
+        // expanded detent, where they WOULD be visible if present).
         XCTAssertFalse(
             segment("This page").exists,
             "The retired scope picker rendered on the Scan surface with the flag dark."
@@ -270,7 +266,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Tapping the bookmark did not present the saved list — the seq-134 occlusion no-op."
         )
 
-        // Reveal smoke (the D-63 revival path): relaunch with the
+        // Reveal smoke: relaunch with the
         // DEBUG reveal arg — the retired rows render again and the
         // run control collapses back to the chips-row ↻, still
         // exactly one.
@@ -321,8 +317,8 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         // Top pinned control of the Search surface.
         XCTAssertTrue(field.isHittable, "Search field not hittable at the expanded detent.")
 
-        // D-63 flag-off absence on the Search surface too — the
-        // scope picker was ONE shared row across both interfaces.
+        // The scope picker is retired on the Search surface too — it
+        // was ONE shared row across both interfaces.
         XCTAssertFalse(
             segment("This page").exists,
             "The retired scope picker rendered on the Search surface with the flag dark."
@@ -332,7 +328,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "The retired scope picker rendered on the Search surface with the flag dark."
         )
         // The Search side's field-side bookmark is untouched by the
-        // UT-04 relocation.
+        // relocation.
         XCTAssertTrue(
             app.buttons["Saved Searches"].exists,
             "The Search side's field-side bookmark went missing."
@@ -397,8 +393,8 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         field.typeText("Sample\n")
 
         // One match in the bundled fixture. Results arrive deselected and
-        // the footer states the count plainly ("0 of N selected" — UXC-45,
-        // one label family in every state).
+        // the footer states the count plainly ("0 of N selected" — one
+        // label family in every state).
         let footerCount = app.staticTexts["0 of 1 selected"]
         XCTAssertTrue(
             footerCount.waitForExistence(timeout: 15),
@@ -421,15 +417,13 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
         row.tap()
 
-        // WA/D-75 as amended by UXC-44 (D-116, RB-92/94): a row tap
-        // drops the sheet to the compact handle, which now carries the
-        // title AND the trailing ‹ k/N › cluster so the walk continues
-        // while the sheet is parked. The strip + title prove the drop
-        // landed; the cluster's presence + hittability at compact is
-        // the UXC-44 pin (pinned ABSENT under the D-75 title-only
-        // contract before it); the no-selection-toggle proof is
-        // asserted at medium after a grabber re-expand, one detent
-        // later.
+        // A row tap drops the sheet to the compact handle, which now
+        // carries the title AND the trailing ‹ k/N › cluster so the
+        // walk continues while the sheet is parked. The strip + title
+        // prove the drop landed; the cluster's presence + hittability
+        // at compact was pinned ABSENT under the earlier title-only
+        // contract; the no-selection-toggle proof is asserted at
+        // medium after a grabber re-expand, one detent later.
         let strip = app.descendants(matching: .any)
             .matching(identifier: "compactFloatStrip").firstMatch
         XCTAssertTrue(
@@ -443,7 +437,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         let compactNext = app.buttons["Next result"]
         XCTAssertTrue(
             compactNext.waitForExistence(timeout: 5),
-            "The Next-result chevron is missing from the compact handle (UXC-44 cluster)."
+            "The Next-result chevron is missing from the compact handle."
         )
         XCTAssertTrue(
             compactNext.isHittable,
@@ -451,11 +445,11 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
         XCTAssertTrue(
             app.buttons["Previous result"].isHittable,
-            "The Previous-result chevron is missing or not hittable on the compact handle (UXC-44 cluster)."
+            "The Previous-result chevron is missing or not hittable on the compact handle."
         )
         XCTAssertTrue(
             app.staticTexts["Result 1 of 1"].exists || app.staticTexts["1/1"].exists,
-            "The result counter is missing from the compact handle (UXC-44 cluster)."
+            "The result counter is missing from the compact handle."
         )
 
         // One detent later: the grabber expand restores the full
@@ -474,12 +468,12 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Row tap flipped the footer selection count — the tap landed on the footer's Select All."
         )
 
-        // D-63/UT chevron pin: the shared bar's trailing result-nav
-        // chevrons stay present and hittable with results on board
-        // (they had zero coverage pre-UT, and the UT-04 relocation
-        // reshaped their row's leading content). Since UXC-44 the
-        // cluster renders at compact too; this pin proves the medium+
-        // pair survives the expand (the sites are never co-mounted).
+        // Chevron pin: the shared bar's trailing result-nav chevrons
+        // stay present and hittable with results on board (they had
+        // zero coverage before the relocation, which reshaped their
+        // row's leading content). The cluster now renders at compact
+        // too; this pin proves the medium+ pair survives the expand
+        // (the sites are never co-mounted).
         let nextResult = app.buttons["Next result"]
         XCTAssertTrue(
             nextResult.waitForExistence(timeout: 10),
@@ -495,17 +489,16 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
     }
 
-    // MARK: - Result walk parks the sheet; the compact cluster keeps stepping (UXC-44)
+    // MARK: - Result walk parks the sheet; the compact cluster keeps stepping
 
-    /// UXC-44 (D-116, RB-92/94): a chevron tap steps the current
-    /// result AND parks the sheet at the compact float, where the
-    /// handle's trailing cluster keeps the walk going; the counter
-    /// survives the grabber re-expand. AX-text assertions only — the
-    /// on-page ring is pixel-only (region overlays are not served
-    /// through AX). Deterministic launch: the multipage fixture with
-    /// a seeded "Amount" query (151 hits) at the medium detent (the
-    /// UXF-05 arrival raise may lift it to large — either is a valid
-    /// start for the first tap).
+    /// A chevron tap steps the current result AND parks the sheet at
+    /// the compact float, where the handle's trailing cluster keeps
+    /// the walk going; the counter survives the grabber re-expand.
+    /// AX-text assertions only — the on-page ring is pixel-only
+    /// (region overlays are not served through AX). Deterministic
+    /// launch: the multipage fixture with a seeded "Amount" query
+    /// (151 hits) at the medium detent (an arrival raise may lift it
+    /// to large — either is a valid start for the first tap).
     func testResultNavChevron_parksAtCompactAndClusterKeepsStepping() {
         app.launchArguments = [
             "--uitesting", "--loadTestDocument", "--multipageDoc",
@@ -529,7 +522,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             .matching(identifier: "compactFloatStrip").firstMatch
         XCTAssertTrue(
             strip.waitForExistence(timeout: 10),
-            "The first chevron tap did not park the sheet at the compact float (RB-92)."
+            "The first chevron tap did not park the sheet at the compact float."
         )
         XCTAssertTrue(
             app.staticTexts["Result 1 of 151"].waitForExistence(timeout: 10),
@@ -538,7 +531,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         let compactNext = app.buttons["resultNavNext"]
         XCTAssertTrue(
             compactNext.waitForExistence(timeout: 5) && compactNext.isHittable,
-            "Next-result chevron is not hittable on the compact handle — the cluster is missing (RB-94)."
+            "Next-result chevron is not hittable on the compact handle — the cluster is missing."
         )
         compactNext.tap()
         XCTAssertTrue(
@@ -558,18 +551,17 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         attachScreenshot(named: "uxc44-result-walk")
     }
 
-    // MARK: - Per-item Apply on the compact handle (UXC-51)
+    // MARK: - Per-item Apply on the compact handle
 
-    /// UXC-51 (D-128, RB-123 items 3/4; REV-17): the compact handle
-    /// carries a leading Apply that marks ONLY the current match — one
-    /// `commitApply` step on the editor's per-window UndoManager, the
-    /// same stack the toolbar Undo/Redo pair drives. AX-only
-    /// assertions on the UXC-44 leg's fixture and recipe: absent at
-    /// medium, present and hittable once the walk parks the sheet; the
-    /// tap disables it (applied) and the page bar's region count for
-    /// the current page steps to one; the editor toolbar's Undo
-    /// removes the region and re-enables the button. RB-91 family —
-    /// run isolated on a quiet host.
+    /// The compact handle carries a leading Apply that marks ONLY the
+    /// current match — one `commitApply` step on the editor's
+    /// per-window UndoManager, the same stack the toolbar Undo/Redo
+    /// pair drives. AX-only assertions on the result-walk leg's
+    /// fixture and recipe: absent at medium, present and hittable
+    /// once the walk parks the sheet; the tap disables it (applied)
+    /// and the page bar's region count for the current page steps to
+    /// one; the editor toolbar's Undo removes the region and
+    /// re-enables the button. Run isolated on a quiet host.
     func testCompactHandle_applyMarksCurrentMatchAndUndoReEnables() {
         app.launchArguments = [
             "--uitesting", "--loadTestDocument", "--multipageDoc",
@@ -616,7 +608,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
         XCTAssertTrue(
             apply.waitForExistence(timeout: 5),
-            "The per-item Apply is missing from the compact handle (UXC-51)."
+            "The per-item Apply is missing from the compact handle."
         )
         XCTAssertTrue(apply.isHittable, "The per-item Apply exists but is not hittable on the compact handle.")
         XCTAssertTrue(apply.isEnabled, "The per-item Apply must be enabled for an un-applied current result.")
@@ -669,14 +661,14 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         return condition()
     }
 
-    // MARK: - Cooperative arbitration (D-70/SA-2)
+    // MARK: - Cooperative arbitration
 
-    // Reshaped from the D-68-era
+    // Reshaped from the earlier
     // `testMediumDetent_seededReviewDragScrollsListGrabberStillExpands`:
     // under `.scrolls` an in-list drag at medium scrolled content
     // while the header HELD. With the poisons removed and the pin
     // retired, `.automatic` cooperation makes the same stroke EXPAND
-    // the sheet (probe R6: headerY 447→95 on this sim class) — the
+    // the sheet (probe: headerY 447→95 on this sim class) — the
     // held-header assertion is deliberately INVERTED. The grabber
     // path must keep resizing in BOTH directions (it did in every
     // COOP probe run).
@@ -702,11 +694,11 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         let headerYAtMedium = normalizeSeededReviewToMedium(window: window, dismiss: dismiss)
         attachScreenshot(named: "sa2-arrival-medium")
 
-        // The D-67 stroke — a slow drag up inside the list body. Dead
+        // A slow drag up inside the list body. Dead
         // under the defect, scroll-in-place under `.scrolls`,
-        // cooperative EXPAND now. R7 transient guard: the FIRST pan
+        // cooperative EXPAND now. Transient guard: the FIRST pan
         // after presentation can be swallowed while custom-detent
-        // resolution settles (probe R7 expanded on drag-2; O-1
+        // resolution settles (probe: expanded on drag-2; O-1
         // class) — retry once ONLY if the header genuinely did not
         // move. A true dead regime fails the assertion on the retry;
         // a `.scrolls`-class regime scrolls content with the header
@@ -747,7 +739,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
     // Cooperative collapse: at the top detent with content at its
     // top edge (the six seeded rows fit entirely at large — nothing
     // to scroll), an in-list down-drag steps the sheet DOWN instead
-    // of dying (probe R6 "content-drag down at large collapses").
+    // of dying (probe: "content-drag down at large collapses").
     func testTopDetent_seededReviewContentAtTopDownDragCooperativelyCollapses() {
         app.launchArguments = ["--uitesting", "--loadTestDocument", "--seedTriage"]
         app.launch()
@@ -769,7 +761,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         let headerYAtMedium = normalizeSeededReviewToMedium(window: window, dismiss: dismiss)
 
         // Reach the top detent through the cooperative in-list path
-        // (R7 first-pan transient guard — see the expand pin).
+        // (first-pan transient guard — see the expand pin).
         dragInReviewList(from: 0.6, to: 0.15)
         sleep(2)
         if abs(dismiss.frame.minY - headerYAtMedium) < 10 {
@@ -799,7 +791,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
 
     // The down-chain's last step: from medium with content at top, a
     // further in-list down-drag reaches the compact float, where the
-    // BH-B-01 strip composition replaces the full chrome (probe R7:
+    // strip composition replaces the full chrome (probe:
     // full chain large → medium → compact strip).
     func testMediumDetent_seededReviewDownDragChainReachesCompactStrip() {
         app.launchArguments = ["--uitesting", "--loadTestDocument", "--seedTriage"]
@@ -822,7 +814,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         _ = normalizeSeededReviewToMedium(window: window, dismiss: dismiss)
 
         // Content is at its top edge on arrival — the in-list
-        // down-drag steps medium → compact. R7 first-pan transient
+        // down-drag steps medium → compact. First-pan transient
         // guard: retry once if the first stroke was swallowed (the
         // review list is still on screen exactly when the step has
         // not happened yet).
@@ -838,10 +830,9 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             strip.waitForExistence(timeout: 10),
             "Compact strip never appeared — the down-chain stalled above the compact float."
         )
-        // The full chrome yields to the strip at compact (the BH-B-01
-        // branch, title-only since WA/D-75): the interface title is
-        // the strip's whole composition — the old summary line must
-        // be gone.
+        // The full chrome yields to the strip at compact (title-only):
+        // the interface title is the strip's whole composition — the
+        // old summary line must be gone.
         XCTAssertFalse(
             reviewList.exists,
             "Review list still present at the compact float — the strip did not replace the full chrome."
@@ -852,19 +843,18 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
         XCTAssertFalse(
             app.staticTexts["0 of 6 selected"].exists,
-            "The retired compact summary line rendered — compact is title-only (WA/D-75)."
+            "The retired compact summary line rendered — compact is title-only."
         )
         attachScreenshot(named: "sa2-compact-chain-strip")
     }
 
-    // SA-3 rider (B-3): review-row canvas-navigation parity — a
-    // row-BODY tap drops the sheet to the compact float (the shipped
-    // search-row idiom; ST-105 keeps the canvas interactive behind
-    // it). WA/D-75 made compact title-only, so the no-selection
-    // proof moved one detent later: re-expand to medium and the
-    // footer must still read none-selected — a body tap must
-    // NAVIGATE, never toggle; the selection circle keeps its own
-    // hit region.
+    // Review-row canvas-navigation parity — a row-BODY tap drops the
+    // sheet to the compact float (the shipped search-row idiom keeps
+    // the canvas interactive behind it). Compact is title-only, so
+    // the no-selection proof moved one detent later: re-expand to
+    // medium and the footer must still read none-selected — a body
+    // tap must NAVIGATE, never toggle; the selection circle keeps
+    // its own hit region.
     func testMediumDetent_seededReviewRowBodyTapDropsToCompact() {
         app.launchArguments = ["--uitesting", "--loadTestDocument", "--seedTriage"]
         app.launch()
@@ -886,7 +876,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         _ = normalizeSeededReviewToMedium(window: window, dismiss: dismiss)
 
         // Tap the SSN row's matched-text area — row BODY, clear of
-        // the leading selection circle and the trailing W9 button.
+        // the leading selection circle and the trailing detector-evaluation button.
         let ssnRow = app.staticTexts["123-45-6789"].firstMatch
         XCTAssertTrue(ssnRow.waitForExistence(timeout: 10), "SSN row not found.")
         ssnRow.tap()
@@ -895,7 +885,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             .matching(identifier: "compactFloatStrip").firstMatch
         XCTAssertTrue(
             strip.waitForExistence(timeout: 10),
-            "Row-body tap did not drop the sheet to the compact float — B-3 navigation parity missing."
+            "Row-body tap did not drop the sheet to the compact float — navigation parity missing."
         )
         XCTAssertFalse(
             reviewList.exists,
@@ -907,14 +897,14 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
         XCTAssertFalse(
             app.staticTexts["0 of 6 selected"].exists,
-            "The retired compact summary line rendered — compact is title-only (WA/D-75)."
+            "The retired compact summary line rendered — compact is title-only."
         )
         attachScreenshot(named: "sa2-review-rowtap-compact")
 
-        // No-selection-toggle proof, one detent later (WA/D-75 B-2):
-        // the summary line no longer renders at compact, so re-expand
-        // to medium and assert the footer count is untouched — a
-        // toggling body tap would read "1 of 6 selected".
+        // No-selection-toggle proof, one detent later: the summary
+        // line no longer renders at compact, so re-expand to medium
+        // and assert the footer count is untouched — a toggling body
+        // tap would read "1 of 6 selected".
         expandCompactStripToMedium()
         XCTAssertTrue(
             reviewList.waitForExistence(timeout: 10),
@@ -927,7 +917,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
     }
 
     // The Search-results leg — cooperation re-proven on the list
-    // that carries the SA-1-cleaned gesture stack (the D-70 probe
+    // that carries the cleaned-up gesture stack (an earlier probe
     // proved the REVIEW list only; the caveat on record requires
     // this list's own proof). The 23-page fixture's "account" query
     // lands one match per page — 23 rows across 23 page sections
@@ -984,7 +974,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
 
         // Content scrolls under in-list drags at the top detent —
         // deep sections arrive from below the fold while the sheet
-        // header holds. Up to three strokes (R7 first-pan guard +
+        // header holds. Up to three strokes (first-pan guard +
         // per-stroke travel).
         var deepArrived = false
         for _ in 0..<3 {
@@ -1037,7 +1027,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         attachScreenshot(named: "sa2-results-cooperative-collapsed")
     }
 
-    // MARK: - Editor page bar (WA/D-75 R-2)
+    // MARK: - Editor page bar
 
     // First-ever coverage of the iPhone page-navigation bar, added
     // with the chevron-only reshape: the icon buttons carry the full
@@ -1064,8 +1054,8 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         XCTAssertTrue(next.exists, "Next chevron missing from the page bar.")
         XCTAssertTrue(next.isHittable, "Next chevron exists but is not hittable.")
 
-        // WA/D-75 R-2 copy: "N of M" without the word "Page" — the
-        // worded form is the regression assert.
+        // The copy is "N of M" without the word "Page" — the worded
+        // form is the regression assert.
         XCTAssertTrue(
             app.staticTexts["1 of 23"].waitForExistence(timeout: 5),
             "Compact page counter '1 of 23' missing from the page bar."

@@ -2,13 +2,13 @@ import Foundation
 import NaturalLanguage
 import OSLog
 
-// ENGINE §4.1, §4.3–§4.5 — PII detection via regex + NLTagger.
+// PII detection runs as regex-based passes plus NLTagger-based name detection.
 
 /// Detects PII patterns in OCR text. Stateless, runs on cooperative thread pool.
-/// See ENGINE §4.1 for the three-pass architecture.
+/// Detection runs regex-based passes first, then NLTagger-based name detection.
 public struct PIIDetector: Sendable {
 
-    // A6: SSN pipeline components — stored to avoid re-allocation per call.
+    // SSN pipeline components — stored to avoid re-allocation per call.
     private let ssnStateMachine = SSNStateMachine()
     private let ssnValidator = SSNStructuralValidator()
     private let contextScorer = ContextWindowScorer()
@@ -20,9 +20,9 @@ public struct PIIDetector: Sendable {
     private let accountDetector = AccountDetector()
     private let routingNumberDetector = RoutingNumberDetector()
 
-    // WS1 §5 — EIN ContextWindowScorer migration (item 1.9, 2026-06-10).
+    // EIN detection uses a ContextWindowScorer to weigh nearby keywords.
     private let einScorer = ContextWindowScorer()
-    // Visibility widened private→internal (B02): ContextFeatures.swift reads
+    // Visibility widened private→internal: ContextFeatures.swift reads
     // this shipped profile's keyword sets verbatim for the EIN family. Read-only.
     static let einProfile = KeywordProfile(
         positiveKeywords: [
@@ -30,11 +30,11 @@ public struct PIIDetector: Sendable {
             "fein", "federal ein", "payer's tin", "payer tin", "recipient tin",
             "box b", "employer's ein", "taxpayer id", "tax id number",
             "irs form", "w-2", "1099", "schedule c",
-            // Bare "employer" carries over from the pre-§5a inline keyword
-            // list (legacy recall pinned by SecurityTests "EIN context boost
-            // with distant label", 2026-04-01); the longer employer-* phrases
-            // above are subsumed by substring matching but kept for parity
-            // with the pipeline vocabulary.
+            // Bare "employer" carries over from the earlier inline keyword
+            // list (legacy recall pinned by a SecurityTests assertion on
+            // EIN context boost with a distant label); the longer
+            // employer-* phrases above are subsumed by substring matching
+            // but kept for parity with the pipeline vocabulary.
             "employer"
         ],
         negativeKeywords: [],   // WS2 will add; leave empty to avoid over-suppression pre-wiring
@@ -44,9 +44,9 @@ public struct PIIDetector: Sendable {
         floor: 0.25
     )
 
-    // WS1 §6 — ITIN ContextWindowScorer migration (item 1.10, 2026-06-10).
+    // ITIN detection uses a ContextWindowScorer to weigh nearby keywords.
     private let itinScorer = ContextWindowScorer()
-    // Visibility widened private→internal (B02): ContextFeatures.swift reads
+    // Visibility widened private→internal: ContextFeatures.swift reads
     // this shipped profile's keyword sets verbatim for the ITIN family. Read-only.
     static let itinProfile = KeywordProfile(
         positiveKeywords: [
@@ -61,15 +61,15 @@ public struct PIIDetector: Sendable {
         floor: 0.25
     )
 
-    // W2 — optional because NameGazetteer.init?() fails when bundled
+    // Optional because NameGazetteer.init?() fails when bundled
     // resources are stripped (test-bundle-only builds). `runNLTagger` reads
-    // this via `?.` so a nil gazetteer preserves the pre-W2 0.70 baseline.
+    // this via `?.` so a nil gazetteer preserves the 0.70 baseline.
     private let nameGazetteer: NameGazetteer?
 
     // DL pattern gazetteer (validation gate over the inline
     // label-prefix regex at line 643). Optional for the same reason as
     // nameGazetteer: dl_patterns.json may be absent in test-bundle-only
-    // builds. nil preserves pre-W1 pass-through behavior; non-nil enables
+    // builds. nil preserves pass-through behavior when absent; non-nil enables
     // per-state gating in detectDriversLicenses.
     private let dlPatternGazetteer: DLPatternGazetteer?
 
@@ -77,23 +77,23 @@ public struct PIIDetector: Sendable {
     // inline label-prefix regex in detectPassports). Optional for the
     // same reason as nameGazetteer/dlPatternGazetteer:
     // passport_patterns.json may be absent in test-bundle-only builds.
-    // nil preserves pre-W1 pass-through behavior; non-nil enables per-
+    // nil preserves pass-through behavior when absent; non-nil enables per-
     // issuer gating against the 11-issuer set (CA/CN/DO/GB/IN/KR/MX/PH/
     // SV/US/VN).
     private let passportPatternGazetteer: PassportPatternGazetteer?
 
-    // W-N — A21 context-keywords loader. Drives the positive-keyword set
-    // for the retired *ContextKeywords.swift files (SSN / MRN / LP). nil
-    // preserves the pre-W-N const arrays via the call-site `??` fallback
+    // Context-keywords loader. Drives the positive-keyword set for the
+    // retired *ContextKeywords.swift files (SSN / MRN / LP). nil
+    // preserves the const-array fallback via the call-site `??` fallback
     // in detectSSNs / detectMedicalRecords / detectLicensePlate, so
-    // test-bundle-only builds and any context that can't load A21 keep
-    // working with the engine-side baseline.
+    // test-bundle-only builds and any context that can't load the corpus
+    // keep working with the engine-side baseline.
     private let contextLoader: ContextKeywordsLoader?
 
-    // S3 §1.2 — negative-context gazetteer wired into the three scored
+    // Negative-context gazetteer wired into the three scored
     // detectors (SSN / MRN / LP). nil = no gazetteer suppression (the correct
     // fail-safe: detection continues without negative-context dampening).
-    // Header-anchor path deferred to S5; `suppressionScore(documentHeader:)`
+    // Header-anchor path is not yet wired here; `suppressionScore(documentHeader:)`
     // is live in the struct but not called here.
     private let negativeContextGazetteer: NegativeContextGazetteer?
 
@@ -120,22 +120,22 @@ public struct PIIDetector: Sendable {
         self.negativeContextGazetteer = negativeContextGazetteer
     }
 
-    // MARK: - SEC-7 — Explicit-degrade loader
+    // MARK: - Explicit-degrade loader
 
     /// Construct a `PIIDetector` from the supplied bundle, recording per-
     /// gazetteer load failures into a `GazetteerLoadDiagnostics` value. Each
     /// loader is invoked via its throwing variant so the underlying error
     /// description can be captured for the diagnostic; failures degrade the
     /// detector into nil-gazetteer pass-through behavior identical to the
-    /// pre-SEC-7 `try?` path (so non-gazetteer regex detectors — SSN, CC,
+    /// `try?` path (so non-gazetteer regex detectors — SSN, CC,
     /// email, phone, EIN, ITIN, DEA, NPI, address, DOB — still produce
     /// matches when corpus resources are missing or corrupted).
     ///
-    /// Plan reference: `plan.md §3 SEC-7`. The diagnostics value is consumed
+    /// The diagnostics value is consumed
     /// by `PipelineCoordinator.runDetectionPipeline` which posts a one-time
     /// warning toast and flips `RedactionState.autoDetectionDegraded = true`
     /// on first failure. The triage sheet renders a persistent top banner
-    /// while the flag is set (mechanism-description copy per I6).
+    /// while the flag is set (mechanism-description copy).
     public static func loadWithDiagnostics()
         -> (detector: PIIDetector, diagnostics: GazetteerLoadDiagnostics)
     {
@@ -152,13 +152,13 @@ public struct PIIDetector: Sendable {
     {
         var diagnostics = GazetteerLoadDiagnostics()
 
-        // SEC-6 — Verify the gazetteer manifest's Ed25519 signature before
+        // Verify the gazetteer manifest's Ed25519 signature before
         // trusting any bundled corpus. The verdict comes from the shared
         // memoized chokepoint (`GazetteerTrust`), the same one the public
         // `PIIDetector.init` default arguments consult. Failure short-
         // circuits the five signature-gated loaders below: each reports as
         // failed (with the signature-verification reason in
-        // `failureReasons`) so the existing SEC-7 banner / toast surface
+        // `failureReasons`) so the existing auto-detect-degraded banner / toast surface
         // fires unchanged. The detector is constructed with nil gazetteers —
         // non-gazetteer detectors (SSN state machine, regex-based DEA /
         // email / phone) keep running so manual redaction users retain
@@ -244,9 +244,9 @@ public struct PIIDetector: Sendable {
             )
         }
 
-        // 5. InstitutionGazetteer (S3 §2.10 visibility tracking; also fed
+        // 5. InstitutionGazetteer (visibility tracking; also fed
         //    into NegativeContextGazetteer below so the header-anchor path
-        //    gets a properly-constructed institution source when S5 wires it).
+        //    gets a properly-constructed institution source when that path is wired).
         let institution: InstitutionGazetteer?
         do {
             institution = try InstitutionGazetteer(bundle: bundle)
@@ -258,9 +258,9 @@ public struct PIIDetector: Sendable {
             )
         }
 
-        // 6. NegativeContextGazetteer (S3 §1.2). Pass the loaded
+        // 6. NegativeContextGazetteer. Pass the loaded
         //    InstitutionGazetteer so the header-anchor path is ready for
-        //    S5 wiring without re-loading the institution file.
+        //    future wiring without re-loading the institution file.
         let negCtx: NegativeContextGazetteer?
         do {
             negCtx = try NegativeContextGazetteer(bundle: bundle, institutions: institution)
@@ -272,7 +272,7 @@ public struct PIIDetector: Sendable {
             )
         }
 
-        // 7. AddressComponentsGazetteer (S3 §2.10 visibility only — the gazetteer
+        // 7. AddressComponentsGazetteer (visibility only — the gazetteer
         //    feeds AddressSpatialAssembler separately; no behavior change here).
         do {
             _ = try AddressComponentsGazetteer(bundle: bundle)
@@ -283,7 +283,7 @@ public struct PIIDetector: Sendable {
             )
         }
 
-        // 8. ZIPStateTableLoader (S3 §2.10 visibility only — feeds address
+        // 8. ZIPStateTableLoader (visibility only — feeds address
         //    validation separately; no behavior change here).
         do {
             _ = try ZIPStateTableLoader(bundle: bundle)
@@ -306,13 +306,13 @@ public struct PIIDetector: Sendable {
             diagnostics = diagnostics.appending(.documentTypeClassifier, reason: reason)
         }
 
-        // 10. NER name model availability (GAP-DEPTARGET-NER · D04-F3 == D11-F3).
+        // 10. NER name model availability.
         //     The `.nameType` model is OS-provisioned (a downloadable MobileAsset),
         //     not a bundled corpus. If absent on this device, ALL NER-sourced name
         //     matches are silently dropped; fold that into the same diagnostics that
-        //     drive the SEC-7 auto-detect-degraded banner so the user sees the same
+        //     drive the auto-detect-degraded banner so the user sees the same
         //     degraded indication as a corpus failure. Mechanism-only reason
-        //     (ARCH §12.2 — no document content / paths). Probe is side-effect-free
+        //     (no document content / paths reported). Probe is side-effect-free
         //     (no asset download); see `isNameNERAvailable()`.
         if !Self.isNameNERAvailable() {
             diagnostics = diagnostics.appending(
@@ -326,7 +326,7 @@ public struct PIIDetector: Sendable {
         //     `loadFromEngineBundle()`, which shares this loader). Any fallback
         //     to the identity scorer (missing / unreadable / hash-mismatched /
         //     invalid wire) previously reached OSLog only; folding it here
-        //     drives the same SEC-7 banner the corpus loaders use. The load is
+        //     drives the same auto-detect-degraded banner the corpus loaders use. The load is
         //     startup-cheap and idempotent; the instance is discarded.
         let (_, scorerReason) = ContextScorerWeights.loadWithDiagnostics(from: bundle)
         if let reason = scorerReason {
@@ -396,7 +396,7 @@ public struct PIIDetector: Sendable {
         public let range: NSRange
         public let kind: RedactionRegion.PIIKind
         public let confidence: Double
-        /// W1 — per-match explainability. Populated by detectors that emit
+        /// Per-match explainability. Populated by detectors that emit
         /// structured evidence (SSN, names); left nil otherwise so the
         /// detect() wrapper can fill in a generic `regexPattern` fallback.
         public let rationale: MatchRationale?
@@ -420,7 +420,7 @@ public struct PIIDetector: Sendable {
             PIICategory(piiKind: kind)
         }
 
-        /// W4 — return a copy with the rationale replaced. Used by the
+        /// Return a copy with the rationale replaced. Used by the
         /// threshold post-filter to annotate survivors without mutating
         /// PIIMatch's `let` fields.
         public func withRationale(_ rationale: MatchRationale) -> PIIMatch {
@@ -428,7 +428,7 @@ public struct PIIDetector: Sendable {
                      confidence: confidence, rationale: rationale)
         }
 
-        /// D05-F1 — return a copy replacing ONLY the `range` (mirrors
+        /// Return a copy replacing ONLY the `range` (mirrors
         /// `withRationale`'s initializer-copy; `PIIMatch`'s fields are `let`).
         /// Used to widen an overlap survivor to the coalesced group span so a
         /// partially-overlapping loser's non-overlapping tail still maps to a
@@ -443,12 +443,12 @@ public struct PIIDetector: Sendable {
 
     /// Detect all PII in the given text. Returns matches from all passes.
     /// Pass 1: Regex (SSN, CC, email, phone, EIN, ITIN, DL, passport, MRN).
-    /// Pass 2: NLTagger (names). See ENGINE §4.1.
+    /// Pass 2: NLTagger (names).
     ///
     /// Phase 3: `doctype` is an optional context hint that gates the new
     /// NPI/DEA/DOB/Account detectors. `nil` = run all (back-compat for
     /// pre-Phase-3 callers). When non-nil, medical/financial-only detectors
-    /// are activated per plan §4 gating rules.
+    /// are activated per the doctype gating rules below.
     ///
     /// `documentHeader` is an optional first-page text prefix used
     /// by the institution-anchor suppression path. When
@@ -468,15 +468,15 @@ public struct PIIDetector: Sendable {
         let nsText = text as NSString
         let fullRange = NSRange(location: 0, length: nsText.length)
 
-        // S3 §1.2 / S5 §2.7: capture doctype, negativeContextGazetteer, and
+        // Capture doctype, negativeContextGazetteer, and
         // documentHeader for threaded scorer calls in detectSSNs /
         // detectMedicalRecords / detectLicensePlate.
         let currentDoctype = doctype
         let negCtxGazetteer = negativeContextGazetteer
         let currentHeader = documentHeader
 
-        // Pass 1: Regex patterns (ENGINE §4.3–§4.4). Each detector wrapped
-        // with per-page timeout measurement (SEARCH_AND_REDACT.md §9.4).
+        // Pass 1: Regex patterns. Each detector wrapped
+        // with per-page timeout measurement.
         results.append(contentsOf: withPerPageTimeout("ssn") {
             detectSSNs(in: nsText, range: fullRange,
                        doctype: currentDoctype, gazetteer: negCtxGazetteer,
@@ -492,8 +492,8 @@ public struct PIIDetector: Sendable {
                 dobDetectorAdvanced.detect(in: nsText, range: fullRange)
             })
         } else if doctype == .financial {
-            // D4: financial gets label-anchored path only (detectDOBs emits 0.85, clears W4).
-            // ENGINE §4.10: legacy detectDOBs() uses dobPattern (PIIDetector.swift dobPattern).
+            // Financial doctype gets label-anchored path only (detectDOBs emits 0.85).
+            // Legacy detectDOBs() uses dobPattern (PIIDetector.swift dobPattern).
             results.append(contentsOf: withPerPageTimeout("dob.label") {
                 detectDOBs(in: nsText, range: fullRange)
             })
@@ -528,7 +528,7 @@ public struct PIIDetector: Sendable {
             })
         }
 
-        // Pass 2: NLTagger (ENGINE §4.5)
+        // Pass 2: NLTagger
         results.append(contentsOf: withPerPageTimeout("name") { detectNames(in: text) })
 
         return Self.ensureRationales(results, doctype: doctype)
@@ -539,11 +539,11 @@ public struct PIIDetector: Sendable {
     /// regex passes for categories not in the set.
     ///
     /// Phase 3: accepts optional doctype. When set, Phase-3 detectors are
-    /// gated per plan §4. When nil and the category is requested, the
+    /// gated per the doctype gating rules below. When nil and the category is requested, the
     /// detector runs unconditionally (back-compat for the user-search
     /// path which has no doctype context).
     ///
-    /// S5 §2.7: `documentHeader` mirrors the overload above.
+    /// `documentHeader` mirrors the overload above.
     @concurrent
     public func detect(
         in text: String,
@@ -579,8 +579,8 @@ public struct PIIDetector: Sendable {
                     dobDetectorAdvanced.detect(in: nsText, range: fullRange)
                 })
             } else if doctype == .financial {
-                // D4: financial gets label-anchored path only (detectDOBs emits 0.85, clears W4).
-                // ENGINE §4.10: legacy detectDOBs() uses dobPattern (PIIDetector.swift dobPattern).
+                // Financial doctype gets label-anchored path only (detectDOBs emits 0.85).
+                // Legacy detectDOBs() uses dobPattern (PIIDetector.swift dobPattern).
                 results.append(contentsOf: withPerPageTimeout("dob.label") {
                     detectDOBs(in: nsText, range: fullRange)
                 })
@@ -622,7 +622,7 @@ public struct PIIDetector: Sendable {
         return Self.ensureRationales(results, doctype: doctype)
     }
 
-    // MARK: - W1 rationale fallback
+    // MARK: - Rationale fallback
 
     /// Decorate any PIIMatch that didn't set its own rationale with a generic
     /// one carrying the rule ID, an optional doctype-gate signal, and the
@@ -693,19 +693,19 @@ public struct PIIDetector: Sendable {
         case .routingNumber:  "routingNumber.aba-checksum"
         case .name:           "name.nltagger"
         case .licensePlate:   "licensePlate.labeled"
-        case .barcode:        "barcode.vision"  // DRAW-2 — produced by BarcodeDetector via Vision.
-        // DRAW-3 — heuristic visual detector; never emitted via PIIDetector
+        case .barcode:        "barcode.vision"  // Produced by BarcodeDetector via Vision.
+        // Heuristic visual detector; never emitted via PIIDetector
         // but the switch is exhaustive over PIIKind.
         case .signatureCandidate: "signature.heuristic"
         case .other:          "pii.other"
         }
     }
 
-    // MARK: - Doctype Gating (Plan §4)
+    // MARK: - Doctype Gating
 
-    // ENGINE §4.16: DOB on .financial runs label-anchored path only (D4, 2026-06-10).
+    // DOB on .financial runs label-anchored path only.
     // Bare-date detection on financial stays suppressed until (dob,financial) negatives
-    // are wired and calibrated (WS2 + WS3). Non-financial: always run full DOBDetector.
+    // are wired and calibrated. Non-financial: always run full DOBDetector.
     private static func runsDOB() -> Bool {
         true  // gate removed; per-doctype branching moved into dispatch block
     }
@@ -730,12 +730,12 @@ public struct PIIDetector: Sendable {
     }
 
     /// Account: financial + medical + court + generic. nil doctype → run.
-    /// CND-10 (launch-fix-v2 S5): court and generic added to close the
+    /// Court and generic doctypes were added to close the
     /// account-recall doctype gap — bank/loan account numbers recur in court
     /// filings (garnishment, financial affidavits) and untyped uploads. The
     /// account context window (AccountDetector requires a label near the digit
     /// run) carries the false-positive load on these broader doctypes; the gate
-    /// only decides whether the detector runs at all. `.foia` stays held.
+    /// only governs whether the detector runs at all. `.foia` stays held.
     private static func runsAccount(doctype: DoctypeClass?) -> Bool {
         guard let doctype else { return true }
         return doctype == .financial || doctype == .medical
@@ -750,24 +750,24 @@ public struct PIIDetector: Sendable {
         return doctype == .financial || doctype == .generic
     }
 
-    /// MRN: medical only. nil doctype → run (W10).
+    /// MRN: medical only. nil doctype → run.
     private static func runsMRN(doctype: DoctypeClass?) -> Bool {
         guard let doctype else { return true }
         return doctype == .medical
     }
 
-    /// License plate: court + FOIA + generic. nil doctype → run (W10).
+    /// License plate: court + FOIA + generic. nil doctype → run.
     private static func runsLicensePlate(doctype: DoctypeClass?) -> Bool {
         guard let doctype else { return true }
         return doctype == .court || doctype == .foia || doctype == .generic
     }
 
-    // MARK: - SSN Detection (ENGINE §4.3)
+    // MARK: - SSN Detection
 
-    /// A6: SSN detection via linear-time state machine + structural validation + context scoring.
+    /// SSN detection via linear-time state machine + structural validation + context scoring.
     /// Replaces the regex-based approach for lower FP rate.
     ///
-    /// S3 §1.2: `doctype` and `gazetteer` enable per-(category, doctype) negative-context
+    /// `doctype` and `gazetteer` enable per-(category, doctype) negative-context
     /// suppression. Both default to nil for backward-compatibility with existing call sites
     /// and test-bundle-only builds. When nil, the scorer runs without the gazetteer layer.
     ///
@@ -782,11 +782,10 @@ public struct PIIDetector: Sendable {
     ) -> [PIIMatch] {
         let fullText = text as String
         let candidates = ssnStateMachine.scan(fullText)
-        // W-N: positive-keyword set sourced from A21 (`context-keywords.json`)
-        // when the loader is wired; engine-side const fallback otherwise.
-        // V1 ship is positive-only per Q3 — `negativeKeywords` and the
-        // confidence/window constants stay engine-side until V1.1+ A5
-        // absorption (STRAT §1.5 row 14 / §5.1 Q3 DECIDED 2026-04-30).
+        // Positive-keyword set sourced from the bundled corpus
+        // (`context-keywords.json`) when the loader is wired; engine-side const
+        // fallback otherwise. Negative keywords and the confidence/window
+        // constants stay engine-side for now.
         let baseline = SSNContextKeywords.profile
         let positives = contextLoader?.positiveKeywords(for: .ssn, doctype: nil)
             ?? baseline.positiveKeywords
@@ -804,7 +803,7 @@ public struct PIIDetector: Sendable {
             guard ssnValidator.isValid(candidate) else { return nil }
 
             // Context scoring: adjust confidence based on surrounding keywords.
-            // S3 §1.2 / S5 §2.7: pass doctype + gazetteer + documentHeader.
+            // Pass doctype + gazetteer + documentHeader.
             let confidence = contextScorer.score(
                 text: fullText,
                 matchRange: candidate.range,
@@ -830,7 +829,7 @@ public struct PIIDetector: Sendable {
             ) {
                 signals.append(contextSignal)
             }
-            // S3 §1.2: attach negativeContextSuppressed signal when gazetteer fired.
+            // Attach negativeContextSuppressed signal when gazetteer fired.
             // Note: header-anchor suppression has no keyword to attach here;
             // it is reflected only in the final score.
             if let gaz = gazetteer, let dt = doctype,
@@ -857,9 +856,9 @@ public struct PIIDetector: Sendable {
         }
     }
 
-    // MARK: - Credit Card Detection (ENGINE §4.4)
+    // MARK: - Credit Card Detection
 
-    // ENGINE §4.4: Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
+    // Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
     static let ccPattern = try! NSRegularExpression(
         pattern: #"(?<!\d)\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,7}(?!\d)"#
     )
@@ -868,14 +867,14 @@ public struct PIIDetector: Sendable {
         Self.ccPattern.matches(in: text as String, range: range).compactMap { match in
             let matchedText = text.substring(with: match.range)
             let digits = matchedText.filter(\.isWholeNumber)
-            // Triple gate: regex → Luhn → prefix (ENGINE §4.4)
+            // Triple gate: regex → Luhn → prefix
             guard Self.luhnCheck(digits), Self.hasValidCardPrefix(digits) else { return nil }
             return PIIMatch(text: matchedText, range: match.range, kind: .creditCard,
                            confidence: 0.95)
         }
     }
 
-    /// Luhn checksum validation (ENGINE §4.4).
+    /// Luhn checksum validation.
     public static func luhnCheck(_ number: String) -> Bool {
         let digits = number.filter(\.isWholeNumber)
         guard digits.count >= 13, digits.count <= 19 else { return false }
@@ -908,8 +907,8 @@ public struct PIIDetector: Sendable {
 
     // MARK: - Email Detection
 
-    // ENGINE §4: Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
-    // L-01: The local part is anchored on a non-dot character; subsequent
+    // Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
+    // The local part is anchored on a non-dot character; subsequent
     // dots are allowed only before an alphanumeric (forbids leading
     // and consecutive dots: `.a@b.co`, `a..b@c.co`). The domain anchors
     // on alphanumeric at both ends so leading-dot (`a@.b.co`) and
@@ -930,8 +929,8 @@ public struct PIIDetector: Sendable {
 
     // MARK: - Phone Detection
 
-    // ENGINE §4: Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
-    // L-04: Two alternations force balanced parentheses — either
+    // Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
+    // Two alternations force balanced parentheses — either
     // `(###) ###-####` or `### ###-####`. Bare `+` is dropped (only
     // `+1` leads). Unbalanced-paren inputs like `(555 123-4567` no
     // longer have their leading `(` absorbed into the match.
@@ -941,7 +940,7 @@ public struct PIIDetector: Sendable {
 
     /// Keywords that, when found near a 10-digit number, indicate a phone number
     /// rather than a case number, reference ID, or other numeric sequence.
-    // Visibility widened private→internal (B02): ContextFeatures.swift reads
+    // Visibility widened private→internal: ContextFeatures.swift reads
     // these two shipped phone keyword sets verbatim. Read-only; no behavior change.
     static let phoneContextKeywords = [
         "phone", "tel", "fax", "call", "contact", "mobile", "cell",
@@ -987,7 +986,7 @@ public struct PIIDetector: Sendable {
 
     // MARK: - EIN Detection
 
-    // WS1 §5 (item 1.9, 2026-06-10): Three format variants.
+    // Three format variants.
     // Primary: hyphenated (always runs, no extra FP risk).
     static let einPatternHyphen = try! NSRegularExpression(
         pattern: #"(?<!\d)\d{2}-\d{7}(?!\d)"#
@@ -997,7 +996,7 @@ public struct PIIDetector: Sendable {
         pattern: #"(?<!\d)\d{2} \d{7}(?!\d)"#
     )
     // No-separator (context required): MICR-derived; high FP risk without label.
-    // Note: overlaps with ABA routing numbers — context differentiates them (§5c).
+    // Note: overlaps with ABA routing numbers — context differentiates them.
     static let einPatternNoSep = try! NSRegularExpression(
         pattern: #"(?<!\d)\d{9}(?!\d)"#
     )
@@ -1013,7 +1012,7 @@ public struct PIIDetector: Sendable {
         "28", "29", "49", "69", "70", "78", "79", "89", "96", "97"
     ]
 
-    // WS1 §5d — updated detectEINs: three format arms with prefix validation and scorer.
+    // detectEINs: three format arms with prefix validation and scorer.
     func detectEINs(in text: NSString, range: NSRange) -> [PIIMatch] {
         var results: [PIIMatch] = []
         let fullText = text as String
@@ -1046,7 +1045,7 @@ public struct PIIDetector: Sendable {
     /// Detect US physical addresses. Matches patterns like
     /// "123 Main St, Anytown, CA 90210" or "456 Elm Avenue, Suite 7, NY 10001-2345".
     /// Limited to US-format addresses for v1; international deferred.
-    // ENGINE §4: Hardcoded constant pattern — try! safe
+    // Hardcoded constant pattern — try! safe
     // Fixed: [a-zA-Z\s] instead of [\w\s] to prevent digit-only street name
     // false positives. .{0,100}? bounds backtracking (real addresses never
     // exceed 100 chars between street suffix and state+zip).
@@ -1055,7 +1054,7 @@ public struct PIIDetector: Sendable {
         options: [.dotMatchesLineSeparators]
     )
 
-    // WS1 §10 (item 1.14, 2026-06-10): PO Box / rural-route / APO address arms.
+    // PO Box / rural-route / APO address arms.
 
     /// PO Box: "P.O. Box 123", "PO Box 4567", "Post Office Box 99"
     static let poBoxPattern = try! NSRegularExpression(
@@ -1080,7 +1079,7 @@ public struct PIIDetector: Sendable {
             PIIMatch(text: nsText.substring(with: match.range), range: match.range,
                     kind: .address, confidence: 0.70)
         }
-        // WS1 §10: PO Box / rural-route / APO arms. Fixed 0.70 confidence matches existing arm.
+        // PO Box / rural-route / APO arms. Fixed 0.70 confidence matches existing arm.
         for pattern in [Self.poBoxPattern, Self.ruralRoutePattern, Self.apofpoPattern] {
             for match in pattern.matches(in: fullText, range: range) {
                 let matchedText = nsText.substring(with: match.range)
@@ -1095,7 +1094,7 @@ public struct PIIDetector: Sendable {
 
     /// Detect date-of-birth patterns: "DOB:", "Date of Birth:", "Born:", "Birthdate:", etc.
     /// Common in legal and medical documents.
-    // ENGINE §4: Hardcoded constant pattern — try! safe
+    // Hardcoded constant pattern — try! safe
     static let dobPattern = try! NSRegularExpression(
         pattern: #"(?:D\.?O\.?B\.?|Date\s+of\s+Birth|Born|Birth\s*Date|Birthdate)\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\w+\s+\d{1,2},?\s+\d{4})"#,
         options: [.caseInsensitive]
@@ -1135,7 +1134,7 @@ public struct PIIDetector: Sendable {
     /// IRS-issued ITINs carry YY (positions 4-5 of the 9-digit area+group+serial)
     /// in one of four ranges: [50-65, 70-88, 90-92, 94-99]. Returns false when
     /// YY falls outside every range, so the detector emits no match for
-    /// structurally-shaped-but-unissued candidates. See plan M6.
+    /// structurally-shaped-but-unissued candidates.
     private static func isValidITINYY(_ match: Substring) -> Bool {
         let digits = match.filter { $0.isASCII && $0.isNumber }
         guard digits.count == 9 else { return false }
@@ -1150,12 +1149,12 @@ public struct PIIDetector: Sendable {
         let fullText = text as String
         return Self.itinPattern.matches(in: fullText, range: range).compactMap { match in
             let matchedText = text.substring(with: match.range)
-            // M6: enforce IRS YY-bucket ranges after the regex gate. The
+            // Enforce IRS YY-bucket ranges after the regex gate. The
             // regex only establishes the 9XX area and digit shape; the
             // bucket check distinguishes actually-issued ITINs from
             // structurally-similar-but-unissued numbers.
             guard Self.isValidITINYY(Substring(matchedText)) else { return nil }
-            // WS1 §6 (item 1.10, 2026-06-10): ContextWindowScorer migration.
+            // ContextWindowScorer migration.
             // Functionally equivalent to prior inline hasContext ternary (0.60/0.85);
             // verified: prior inline values were 0.60 base / 0.85 boosted — exact match
             // to itinProfile — no behavior change for existing matches.
@@ -1184,7 +1183,7 @@ public struct PIIDetector: Sendable {
     /// Detect driver's license numbers. Requires a label prefix (DL, Driver's License)
     /// to avoid false positives on generic alphanumeric sequences.
     // Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
-    // L-02: Tightened numeric lower bound from 3 to 6 digits. US DLs
+    // Tightened numeric lower bound from 3 to 6 digits. US DLs
     // are universally ≥ 6 characters; the label prefix gate narrowed
     // the blast radius but did not close it (e.g. "DL 123 Main St").
     static let driversLicensePattern = try! NSRegularExpression(
@@ -1204,10 +1203,10 @@ public struct PIIDetector: Sendable {
             // The inline regex above matches case-insensitively to
             // tolerate OCR-noise; JSON patterns are case-sensitive (most
             // state alphabets are A-Z), so the candidate is uppercased
-            // before lookup. F-35 SSN/DLN ambiguity (AR/HI/ID/LA/MS) is
+            // before lookup. SSN/DLN ambiguity (AR/HI/ID/LA/MS) is
             // preserved — multi-state hits keep the candidate. Confidence
-            // stays at the 0.80 baseline; W3 (state-conditioned scan
-            // with jurisdiction hint) is documented for V1.1+.
+            // stays at the 0.80 baseline; state-conditioned scanning
+            // with a jurisdiction hint is a possible future refinement.
             if let gazetteer = dlPatternGazetteer {
                 let normalized = matchedText.uppercased()
                 if gazetteer.matches(normalized, anyState: ()).isEmpty {
@@ -1245,11 +1244,11 @@ public struct PIIDetector: Sendable {
             // preserved silent — no confidence haircut, no audit log
             // (e.g. an 8-char 2L+6D matching CA-legacy or any 9-char
             // alphanumeric matching SV's permissive medium-confidence
-            // ceiling per W-R-4.1 §II.6). F-38 GB OGL attribution is
-            // V1-MOOT per Disposition §4 — GB matches like any other row.
-            // Confidence stays at the 0.80 baseline; W2 (issuer-conditioned
-            // scan with country-name hint passed by the orchestrator) is
-            // documented for V1.1+.
+            // ceiling). GB matches like any other row — no special-cased
+            // attribution.
+            // Confidence stays at the 0.80 baseline; issuer-conditioned
+            // scanning with a country-name hint from the orchestrator is a
+            // possible future refinement.
             if let gazetteer = passportPatternGazetteer {
                 let normalized = matchedText.uppercased()
                 if gazetteer.matches(normalized, anyIssuer: ()).isEmpty {
@@ -1261,10 +1260,10 @@ public struct PIIDetector: Sendable {
         }
     }
 
-    // MARK: - Medical Record Number Detection (W10)
+    // MARK: - Medical Record Number Detection
 
     /// MRN labeled by an explicit `MRN` / `MR#` prefix, followed by 5–12
-    /// alphanumerics. Plan deviation: widened from `\d{6,10}` — real-world
+    /// alphanumerics. Widened from `\d{6,10}` — real-world
     /// medical records (and 100 % of the G8 medical corpus) use prefixed
     /// alphanumeric IDs like `QD793210`. Context-window scoring dampens
     /// false positives on non-medical docs.
@@ -1291,10 +1290,10 @@ public struct PIIDetector: Sendable {
     /// scoring. Signature mirrors `detectSSNs(in:range:)` (no scorer/fullText
     /// param — derive inline, use `self.contextScorer`).
     ///
-    /// S3 §1.2: `doctype` and `gazetteer` enable per-(category, doctype) negative-context
+    /// `doctype` and `gazetteer` enable per-(category, doctype) negative-context
     /// suppression. Both default to nil for backward-compatibility.
     ///
-    /// S5 §2.7: `documentHeader` enables institution-anchor suppression. Nil = inactive.
+    /// `documentHeader` enables institution-anchor suppression. Nil = inactive.
     func detectMedicalRecords(
         in text: NSString,
         range: NSRange,
@@ -1308,12 +1307,12 @@ public struct PIIDetector: Sendable {
             (Self.mrnPatternPatientID, "mrn.patientID"),
             (Self.mrnPatternInstitution, "mrn.institution"),
         ]
-        // W-N: positive set from A21; engine-side const fallback. See
+        // Positive set from the bundled corpus; engine-side const fallback. See
         // detectSSNs for scope rationale (positive-only V1).
-        // W-B (c): sentinel-prefix tweak. Drop A21 MRN positives flagged
+        // Sentinel-prefix tweak: drop MRN positives flagged
         // `detector_requires_secondary` from the firing set so a sentinel
         // term does not score on its own; co-occurrence with a non-
-        // sentinel positive remains required. No-op until A21 ships
+        // sentinel positive remains required. No-op until the corpus ships
         // sentinel-flagged MRN entries (none currently).
         let baseline = MRNContextKeywords.profile
         var positives = contextLoader?.positiveKeywords(for: .medicalRecord, doctype: nil)
@@ -1335,7 +1334,7 @@ public struct PIIDetector: Sendable {
         var out: [PIIMatch] = []
         for (regex, ruleID) in patterns {
             for match in regex.matches(in: fullText, range: range) {
-                // S3 §1.2 / S5 §2.7: pass doctype + gazetteer + documentHeader.
+                // Pass doctype + gazetteer + documentHeader.
                 let confidence = contextScorer.score(
                     text: fullText, matchRange: match.range, profile: profile,
                     category: .medicalRecord, doctype: doctype, gazetteer: gazetteer,
@@ -1349,7 +1348,7 @@ public struct PIIDetector: Sendable {
                 ) {
                     signals.append(ctxSignal)
                 }
-                // S3 §1.2: attach negativeContextSuppressed signal when gazetteer fired.
+                // Attach negativeContextSuppressed signal when gazetteer fired.
                 if let gaz = gazetteer, let dt = doctype,
                    let suppSignal = contextScorer.gazetteerSignal(
                        text: fullText, matchRange: match.range,
@@ -1374,7 +1373,7 @@ public struct PIIDetector: Sendable {
         return out
     }
 
-    // MARK: - License Plate Detection (W10)
+    // MARK: - License Plate Detection
 
     /// License plate labels: accepts "License plate", "Plate No", "Tag #",
     /// "LP #", "Reg #", "Vehicle plate" followed by the plate value.
@@ -1385,10 +1384,10 @@ public struct PIIDetector: Sendable {
 
     /// Detect license plates (labeled only). Gated by `runsLicensePlate`.
     ///
-    /// S3 §1.2: `doctype` and `gazetteer` enable per-(category, doctype) negative-context
+    /// `doctype` and `gazetteer` enable per-(category, doctype) negative-context
     /// suppression. Both default to nil for backward-compatibility.
     ///
-    /// S5 §2.7: `documentHeader` enables institution-anchor suppression. Nil = inactive.
+    /// `documentHeader` enables institution-anchor suppression. Nil = inactive.
     func detectLicensePlate(
         in text: NSString,
         range: NSRange,
@@ -1398,7 +1397,7 @@ public struct PIIDetector: Sendable {
     ) -> [PIIMatch] {
         let fullText = text as String
         let ruleID = "licensePlate.labeled"
-        // W-N: positive set from A21; engine-side const fallback. See
+        // Positive set from the bundled corpus; engine-side const fallback. See
         // detectSSNs for scope rationale (positive-only V1).
         let baseline = LicensePlateContextKeywords.profile
         let positives = contextLoader?.positiveKeywords(for: .licensePlate, doctype: nil)
@@ -1412,7 +1411,7 @@ public struct PIIDetector: Sendable {
             floor: baseline.floor
         )
         return Self.licensePlateLabeled.matches(in: fullText, range: range).map { match in
-            // S3 §1.2 / S5 §2.7: pass doctype + gazetteer + documentHeader.
+            // Pass doctype + gazetteer + documentHeader.
             let confidence = contextScorer.score(
                 text: fullText, matchRange: match.range, profile: profile,
                 category: .licensePlate, doctype: doctype, gazetteer: gazetteer,
@@ -1426,7 +1425,7 @@ public struct PIIDetector: Sendable {
             ) {
                 signals.append(ctxSignal)
             }
-            // S3 §1.2: attach negativeContextSuppressed signal when gazetteer fired.
+            // Attach negativeContextSuppressed signal when gazetteer fired.
             if let gaz = gazetteer, let dt = doctype,
                let suppSignal = contextScorer.gazetteerSignal(
                    text: fullText, matchRange: match.range,
@@ -1449,11 +1448,11 @@ public struct PIIDetector: Sendable {
         }
     }
 
-    // MARK: - Name Detection via NLTagger (ENGINE §4.5)
+    // MARK: - Name Detection via NLTagger
 
     /// Detect names using NLTagger with ALL-CAPS workaround.
     ///
-    /// W2: the mixed-case pass runs non-strict (miss is neutral — baseline
+    /// The mixed-case pass runs non-strict (miss is neutral — baseline
     /// 0.70 stays). The shadow pass (nerShadow: title-casing + separator
     /// segmentation) runs strict — a candidate absent from both the surname
     /// and given-name blooms is suppressed, which is how we keep ALL-CAPS
@@ -1468,8 +1467,8 @@ public struct PIIDetector: Sendable {
         results.append(contentsOf: runNLTagger(
             on: text, original: text, strict: false, cache: &verdictCache))
 
-        // Pass 2: NER shadow (surfaces ALL-CAPS and label-glued names,
-        // ENGINE §4.5 + FIX-DESIGN Part B). Strict. The shadow preserves
+        // Pass 2: NER shadow (surfaces ALL-CAPS and label-glued names).
+        // Strict. The shadow preserves
         // UTF-16 offsets position-for-position, so each tagger hit anchors
         // at its own occurrence in `text` (see runNLTagger).
         let shadow = Self.nerShadow(text)
@@ -1515,7 +1514,7 @@ public struct PIIDetector: Sendable {
     #endif
 
     #if DEBUG
-    /// GAP-DEPTARGET-NER test seam — bind via
+    /// Test seam — bind via
     /// `$_nerAvailabilityOverride.withValue(_) { … }` to force
     /// `isNameNERAvailable()` in unit tests. Task-local (NOT a process-global)
     /// so Swift Testing's parallel execution can neither race the value nor
@@ -1524,7 +1523,7 @@ public struct PIIDetector: Sendable {
     @TaskLocal static var _nerAvailabilityOverride: Bool?
     #endif
 
-    /// GAP-DEPTARGET-NER (D04-F3 == D11-F3) — probe whether the OS-provisioned
+    /// Probe whether the OS-provisioned
     /// `.nameType` NER model is present. `.nameType` requires a downloadable
     /// MobileAsset that is point-release-gated; on a clean install of an in-range
     /// OS where the asset has not been provisioned, `availableTagSchemes(for:.word)`
@@ -1534,7 +1533,7 @@ public struct PIIDetector: Sendable {
     /// Side-effect-free: no `requestAssets` download is triggered (that would add a
     /// network-shaped operation the app forbids); read-only against the local asset
     /// catalog. The canary fallback uses a fixed literal name — never document
-    /// content (ARCH §12.2).
+    /// content.
     static func isNameNERAvailable() -> Bool {
         #if DEBUG
         if let override = _nerAvailabilityOverride { return override }
@@ -1570,7 +1569,7 @@ public struct PIIDetector: Sendable {
         var results: [PIIMatch] = []
 
         let originalNS = original as NSString
-        // Production invariant (FIX-DESIGN Part B / B2): Pass 1 passes
+        // Production invariant: Pass 1 passes
         // `original` itself and Pass 2 passes `nerShadow(original)`, which
         // substitutes and case-folds in place without inserting or removing
         // UTF-16 units — so a tagger range on `text` indexes `original`
@@ -1610,7 +1609,7 @@ public struct PIIDetector: Sendable {
                     ? originalNS.substring(with: nsRange)
                     : name
 
-                // W2 — consult gazetteer if available. Cache keyed on
+                // Consult gazetteer if available. Cache keyed on
                 // lowercased name so both passes pay the Levenshtein-1
                 // enumeration cost at most once per unique candidate.
                 let verdict: NameGazetteer.NameGazetteerVerdict
@@ -1628,13 +1627,13 @@ public struct PIIDetector: Sendable {
 
                 // Strict pass suppresses candidates the gazetteer didn't
                 // recognize. nil-gazetteer → fall through so stripped-bundle
-                // environments keep the pre-W2 behavior.
-                // P1-B1 gate shape: `unit: .word` delivers one-word candidates
+                // environments keep the same behavior.
+                // `unit: .word` delivers one-word candidates
                 // and `queryBoosted` treats a lone token as a surname query,
                 // so a given-name word ("Delia") tagged on a transaction line
                 // would be suppressed even once the tagger sees it. Accept a
                 // single-token candidate present in the given-name bloom; the
-                // W2 boost table is unchanged (given-only carries no boost).
+                // The boost table is unchanged (given-only carries no boost).
                 var givenNameOnlyHit = false
                 if strict, let gazetteer = nameGazetteer, !verdict.hadAnyHit {
                     givenNameOnlyHit = !name.contains(" ")
@@ -1737,7 +1736,7 @@ public struct PIIDetector: Sendable {
         return results
     }
 
-    // MARK: - ALL-CAPS Title-Casing (ENGINE §4.5)
+    // MARK: - ALL-CAPS Title-Casing
 
     private static let acronymWhitelist: Set<String> = [
         "FBI", "CIA", "SSN", "EIN", "DOJ", "DOD", "IRS", "SEC", "FTC",
@@ -1753,7 +1752,7 @@ public struct PIIDetector: Sendable {
     /// the observed leak class is label-glued colons/commas, not periods.
     private static let nerShadowSeparators: Set<Character> = [":", ";", ",", "/"]
 
-    /// FIX-DESIGN Part B (P1-B1) — build the Pass-2 NER shadow.
+    /// Build the Pass-2 NER shadow.
     ///
     /// The legacy single-space-split title-casing this replaced title-cased
     /// a label-glued token (`INDN:DELIA`) to `Indn:delia`, so the embedded
@@ -1770,7 +1769,7 @@ public struct PIIDetector: Sendable {
     ///   would change a character's UTF-16 width is skipped, so
     ///   `shadow.utf16.count == text.utf16.count` holds by construction and a
     ///   tagger range on the shadow indexes the original string directly (the
-    ///   B2 per-occurrence anchoring invariant consumed by `runNLTagger`).
+    ///   per-occurrence anchoring invariant consumed by `runNLTagger`).
     static func nerShadow(_ text: String) -> String {
         var chars = Array(text)
         for i in chars.indices where Self.nerShadowSeparators.contains(chars[i]) {
@@ -1817,7 +1816,7 @@ public struct PIIDetector: Sendable {
         }
     }
 
-    // MARK: - W9 Reverse Rationale
+    // MARK: - Reverse Rationale
     //
     // Snippet-as-page contract: the caller supplies a `fullContext` buffer
     // (≤500 chars recommended) that embeds `snippet`. Each private detector
@@ -1827,7 +1826,7 @@ public struct PIIDetector: Sendable {
     // the popover footer: (a) cross-page context is absent, (b) N-gram
     // neighbors outside the window are absent.
 
-    /// W9 — score `snippet` through every `PIICategory` detector and return
+    /// Score `snippet` through every `PIICategory` detector and return
     /// a `ReverseRationale` explaining why each detector matched or did not.
     /// Read-only — does not mutate state anywhere in the engine.
     @concurrent

@@ -2,10 +2,10 @@ import CoreGraphics
 import CryptoKit
 import Foundation
 
-// ENGINE §5B.1a, §5B.2 — Coordinate conversion and character filtering.
+// Coordinate conversion and character filtering.
 // Security-critical: over-redaction is safe, under-redaction is a breach.
 
-// MARK: - Coordinate Conversion (ENGINE §5B.1a)
+// MARK: - Coordinate Conversion
 
 /// Convert a normalized rectangle (0–1, bottom-left origin) to PDF page
 /// coordinates (bottom-left origin, in points).
@@ -24,7 +24,7 @@ import Foundation
 ///
 /// SECURITY NOTE: An incorrect conversion here is a data-leakage vulnerability —
 /// characters at redaction boundaries could survive filtering if coordinates
-/// are scaled wrong. See ENGINE §5B.1a.
+/// are scaled wrong.
 public func normalizedToPDFPageCoordinates(
     _ normalizedRect: CGRect,
     pageRect: CGRect  // target output-page frame (zero-origin displayed; see header)
@@ -38,16 +38,15 @@ public func normalizedToPDFPageCoordinates(
     )
 }
 
-// MARK: - Character Filtering (ENGINE §5B.2)
+// MARK: - Character Filtering
 
 /// Safety margin in PDF points applied to each edge of every redaction rectangle.
 /// Absorbs bounding-box imprecision, font descender/ascender overflow, and
 /// the PDFSelection workaround's reduced accuracy on iOS 18+.
-/// See ENGINE §5B.2.
 public let safetyMarginPoints: CGFloat = 3.0
 
 /// Result of character filtering. Records counts for testing without
-/// logging sensitive data (ARCH §12.2).
+/// logging sensitive data.
 public struct FilterResult: Sendable {
     public let surviving: [CharacterInfo]
     public let totalCharacters: Int
@@ -60,7 +59,7 @@ public struct FilterResult: Sendable {
     }
 }
 
-// MARK: - Polygon Geometry (DRAW-1)
+// MARK: - Polygon Geometry
 
 /// A redaction region in PDF-point-space, carrying both the safety-margin-
 /// expanded bounding rect and an optional polygon path. The character
@@ -70,12 +69,12 @@ public struct FilterResult: Sendable {
 /// nil`; polygon regions still carry the bounding rect so the pre-filter
 /// works uniformly across both shapes.
 ///
-/// DRAW-1: this is the engine-internal shape consumed by `filterCharacters`.
+/// This is the engine-internal shape consumed by `filterCharacters`.
 /// Callers in the coordinator convert `RedactionRegion` to this shape via
 /// `RegionShape.fromRegion(_:pageRect:)` so the conversion happens once per
 /// page instead of per character.
 ///
-/// PD-7: `bounds` is the UN-expanded region rect — the unconditional
+/// `bounds` is the UN-expanded region rect — the unconditional
 /// exclusion floor and the line-band gate both test against it, while
 /// `expandedBounds` carries the halo tier. A caller that omits `bounds`
 /// gets `bounds == expandedBounds`, under which both tiers coincide and
@@ -133,8 +132,8 @@ public func pointInPolygon(_ point: CGPoint, vertices: [CGPoint]) -> Bool {
 /// safety-margin-expanded redaction.
 ///
 /// SECURITY: keep this conservative. When in doubt, prefer to return
-/// `true` (over-redaction is safe; under-redaction is a breach — see
-/// ENGINE §5B.2). We do not attempt to detect "polygon strictly contains
+/// `true` (over-redaction is safe; under-redaction is a breach).
+/// We do not attempt to detect "polygon strictly contains
 /// rect" separately because vertex-in-rect or rect-corner-in-polygon
 /// already cover that case for any polygon whose interior touches a rect
 /// corner; pathological zero-area characters degrade safely to centre
@@ -275,7 +274,7 @@ internal func segmentsIntersect(
 }
 
 /// Union rect of the bounds of all characters sharing each `lineIndex` —
-/// the per-line band the PD-7 halo gate tests regions against. Computed
+/// the per-line band the halo gate tests regions against. Computed
 /// once per page per filter call.
 private func lineBandRects(_ characters: [CharacterInfo]) -> [Int: CGRect] {
     var bands: [Int: CGRect] = [:]
@@ -288,7 +287,7 @@ private func lineBandRects(_ characters: [CharacterInfo]) -> [Int: CGRect] {
 
 /// Filter characters against redaction regions with safety margin.
 ///
-/// Two-tier any-overlap exclusion (PD-7 line-aware halo). A character is
+/// Two-tier any-overlap exclusion (line-aware halo). A character is
 /// removed iff
 ///  (a) its bounding box intersects the UN-expanded region rect — the
 ///      unconditional floor; or
@@ -300,7 +299,7 @@ private func lineBandRects(_ characters: [CharacterInfo]) -> [Int: CGRect] {
 /// never under-excludes. What the band gate removes is the halo's reach
 /// across sub-point line gaps (measured 0.22–0.25pt on tabular fixtures)
 /// into lines the region does not touch — the over-removal that blanked
-/// neighboring lines and swallowed whole label blocks (RC-2). Within a
+/// neighboring lines and swallowed whole label blocks. Within a
 /// region's own lines the halo behaves exactly as before. No
 /// partial-overlap threshold. Over-redaction is safe, under-redaction is
 /// a breach.
@@ -313,7 +312,7 @@ private func lineBandRects(_ characters: [CharacterInfo]) -> [Int: CGRect] {
 /// (the expanded rect contains the un-expanded one) before the same
 /// intersects() checks.
 ///
-/// ENGINE §5B.2: deterministic, conservative, boundary-safe.
+/// Deterministic, conservative, boundary-safe.
 @concurrent
 public func filterCharacters(
     characters: [CharacterInfo],
@@ -396,8 +395,8 @@ public func filterCharacters(
     )
 }
 
-/// DRAW-1 polygon-aware filter. Same security contract as the rectangle
-/// overload: the PD-7 two-tier exclusion — an unconditional 0pt floor
+/// Polygon-aware filter. Same security contract as the rectangle
+/// overload: the two-tier exclusion — an unconditional 0pt floor
 /// against the un-expanded shape, plus the safety-margin halo gated on
 /// the region's un-expanded rect intersecting the character's line band.
 /// The Y-range pre-filter on bounding rects survives — every shape
@@ -406,7 +405,7 @@ public func filterCharacters(
 /// confirms each tier's overlap is not just a corner of the bounding
 /// rect; the halo tier keeps the H2 Minkowski char-expansion mechanics.
 ///
-/// ENGINE §5B.2 (DRAW-1 amended): rectangle regions pass through with no
+/// Rectangle regions pass through with no
 /// behaviour change; polygon regions consult `vertices` for the final
 /// intersection. Conservative — when in doubt, exclude.
 @concurrent
@@ -424,7 +423,7 @@ public func filterCharacters(
     var surviving: [CharacterInfo] = []
     var excludedCount = 0
 
-    // PERF-8 / CANCEL-004: per-character cooperative cancellation. See sibling
+    // Per-character cooperative cancellation. See sibling
     // overload above for cadence rationale (binary-search bounded inner body).
     for char in characters {
         try Task.checkCancellation()
@@ -446,7 +445,7 @@ public func filterCharacters(
         for j in 0..<lo {
             let shape = sorted[j]
             guard shape.expandedBounds.maxY >= charMinY else { continue }
-            // PD-7 halo gate: the halo tier applies only when the region's
+            // Halo gate: the halo tier applies only when the region's
             // un-expanded rect touches this character's line band. The 0pt
             // floor is unconditional. A character always contributes to
             // its own band; a missing band degrades to the halo applying
@@ -470,7 +469,7 @@ public func filterCharacters(
                 // safetyMarginPoints). H2 fix — vertices come UN-expanded
                 // from PageRasterizer; expanding the char produces the same
                 // set of excluded characters a vertex offset would, without
-                // the edge-normal / concave-corner pitfalls. See ENGINE §5B.2.
+                // the edge-normal / concave-corner pitfalls.
                 guard haloApplies else { continue }
                 let expandedChar = char.bounds.insetBy(
                     dx: -safetyMarginPoints, dy: -safetyMarginPoints
@@ -541,7 +540,7 @@ public func minEdgeDistance(_ charBounds: CGRect, to rect: CGRect) -> CGFloat {
     return max(dx, dy)
 }
 
-// MARK: - FilterResult → PageFilterDigest (ENGINE §5B.2)
+// MARK: - FilterResult → PageFilterDigest
 
 extension FilterResult {
     /// Compute the lightweight digest for Layer 7 verification.
@@ -552,14 +551,14 @@ extension FilterResult {
     ///   - pageIndex: The 0-based page index.
     ///   - redactionRects: Redaction rectangles in PDF-point-space (already converted
     ///     from normalized coordinates via normalizedToPDFPageCoordinates).
-    ///   - safetyMargin: The safety margin used during filtering (§5B.2).
+    ///   - safetyMargin: The safety margin used during filtering.
     public func toDigest(
         pageIndex: Int,
         redactionRects: [CGRect],
         safetyMargin: CGFloat
     ) -> PageFilterDigest {
         // Identify boundary characters: surviving characters within safetyMargin * 2
-        // of any redaction edge (the "near miss" zone). See ENGINE §5B.2.
+        // of any redaction edge (the "near miss" zone).
         let boundaryChars = surviving.compactMap { char -> BoundaryCharacterInfo? in
             let minDist = redactionRects.map { rect in
                 minEdgeDistance(char.bounds, to: rect)
@@ -586,16 +585,16 @@ extension FilterResult {
     /// X ascending within a band — mirroring `computeOutputLineageHash`'s
     /// canonical sort of the output units. PDFKit's string order on
     /// multi-baseline form rows is a layout heuristic no filter-side walk
-    /// reproduces (measured, RealDocProbeTests S06 on the committed real
+    /// reproduces (measured, RealDocProbeTests on the committed real
     /// document); anchoring both sides to the drawn geometry makes the
     /// hash independent of the composition heuristic. Each field is
     /// followed by a unit-separator (`0x1F`) so re-encoded boundaries
-    /// cannot collide. See ENGINE §6.6 SVT-2.
+    /// cannot collide.
     ///
     /// Hash domain (post-H1 redesign): `(character.utf8, globalPos)` where
     /// `globalPos` is a 0-indexed integer counter incremented per emitted
     /// composed sequence. Position fields are intentionally omitted —
-    /// Layer 6 SVT-1 owns spatial tampering (raw `selection.bounds`
+    /// Layer 6 owns spatial tampering (raw `selection.bounds`
     /// intersection against the redaction shapes), and Layer 9 owns
     /// content/ordering tampering (insertion / deletion / replacement /
     /// reordering of non-whitespace content). The pre-redesign domain
@@ -612,7 +611,7 @@ extension FilterResult {
     /// the output side (text-show operators on different lines emit
     /// `\n`-bearing `page.string` output even when the filter's surviving
     /// set has no newline `CharacterInfo`). Whitespace carries no PII
-    /// content; Layer 3 SVT-3 and Layer 10 SVT-5 surface any sensitive-
+    /// content; Layer 3 and Layer 10 surface any sensitive-
     /// term overlap. The residual is documented in N2.
     ///
     /// Iteration unit: NSString composed-character-sequence ranges over
@@ -657,7 +656,7 @@ extension FilterResult {
     /// PDFKit's `page.string` synthesizes inter-run whitespace asymmetrically
     /// between the source (`extractCharacters`) and output (reconstructed)
     /// views; skipping whitespace on both sides keeps the hash domain a
-    /// content/ordering signal. See ENGINE §6.6 SVT-2 (N2 residual).
+    /// content/ordering signal (N2 residual).
     static func isLineageWhitespace(_ charString: String) -> Bool {
         guard !charString.isEmpty else { return true }
         return charString.allSatisfy { $0.isWhitespace }

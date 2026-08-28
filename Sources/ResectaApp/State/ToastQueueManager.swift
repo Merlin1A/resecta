@@ -1,10 +1,10 @@
 import SwiftUI
 import UIKit
 
-// §A6: Toast severity system — severity-aware positioning, tinting, and animation.
+// Toast severity system — severity-aware positioning, tinting, and animation.
 // Injected via .environment(toastManager) at the ContentView level.
 
-// MARK: - §A6.1 Severity Enum
+// MARK: - Severity Enum
 
 enum ToastSeverity: Equatable {
     case info
@@ -21,7 +21,7 @@ enum ToastSeverity: Equatable {
         }
     }
 
-    // UXC-27 (GAP-36) — routed through the WCAG-AA text tier: ToastView
+    // Routed through the WCAG-AA text tier: ToastView
     // applies this to the action-button TEXT, the severity glyph, and a
     // 10%-opacity background fill. The text use is what mandates the
     // text tier; the glyph/fill ride along on the same value.
@@ -54,18 +54,18 @@ enum ToastPosition {
     case top, bottom
 }
 
-// MARK: - §A6.2 Updated ToastItem
+// MARK: - Updated ToastItem
 
 struct ToastItem: Identifiable, Equatable {
     let id = UUID()
     let message: String
     let severity: ToastSeverity
     let wordCount: Int
-    /// WU-19 (session-8): optional action button on the toast — used
+    /// Optional action button on the toast — used
     /// for undo affordances. `actionLabel` is the user-visible button
-    /// text (SAFE under §19); `actionHandler` is a @MainActor closure
+    /// text; `actionHandler` is a @MainActor closure
     /// invoked when the user taps the button. The closure captures
-    /// snapshot state per [RR-23]; it expires when the toast dismisses.
+    /// snapshot state at enqueue time; it expires when the toast dismisses.
     let actionLabel: String?
     let actionHandler: (@MainActor () -> Void)?
     // Icon is derived from severity — no optional icon field
@@ -83,7 +83,7 @@ struct ToastItem: Identifiable, Equatable {
         self.actionHandler = actionHandler
     }
 
-    /// Equality by message text and severity for coalescing (§A4f).
+    /// Equality by message text and severity for coalescing.
     /// Different-severity toasts with the same message are not coalesced.
     /// `actionLabel` and `actionHandler` are excluded from equality —
     /// closures are non-Equatable and equality drives only coalescing
@@ -95,7 +95,7 @@ struct ToastItem: Identifiable, Equatable {
     }
 }
 
-// MARK: - §A6.5, §A6.6 ToastQueueManager
+// MARK: - ToastQueueManager
 
 /// Manages toast lifecycle: enqueue, coalesce duplicates, severity-based duration,
 /// VoiceOver minimum 5s, auto-dismiss, per-position queue draining.
@@ -108,7 +108,7 @@ final class ToastQueueManager {
     /// activeToasts.map(\.id) on every render cycle.
     private(set) var toastVersion: Int = 0
 
-    /// UXC-51 (D-128, RB-123): extra bottom inset ContentView's bottom
+    /// Extra bottom inset ContentView's bottom
     /// host applies so a toast clears a Search/Scan sheet parked at the
     /// compact float. The sheet's own host yields there (an 80-pt float
     /// has no room for a toast), and the app-level copy — no longer
@@ -130,7 +130,7 @@ final class ToastQueueManager {
     private var topDismissTask: Task<Void, Never>?
     private var bottomDismissTask: Task<Void, Never>?
 
-    /// RES-03 (Pkg N): per-position queue cap. Without an upper bound, a
+    /// Per-position queue cap. Without an upper bound, a
     /// burst-y producer (e.g., a per-region nudge fire that triggers a
     /// toast for every match) can grow a queue past the user's
     /// attention span and stretch toast residency time past the
@@ -141,12 +141,12 @@ final class ToastQueueManager {
     /// is unaffected (still drains via the auto-dismiss tasks).
     static let perPositionQueueCap = 32
 
-    // §A6.5: Display duration from severity floor + word count + VoiceOver minimum.
+    // Display duration from severity floor + word count + VoiceOver minimum.
     // Action-bearing toasts (Undo, Re-run) additionally floor at
     // `actionFloorSeconds` — a short message otherwise expires in ~4s, which
     // in practice is too small a window to notice the affordance, reach for
-    // it, and tap. The action closure's lifetime IS the display window
-    // ([RR-23]), so the floor is what makes the affordance reachable.
+    // it, and tap. The action closure's lifetime IS the display window,
+    // so the floor is what makes the affordance reachable.
     static let actionFloorSeconds: Double = 8.0
 
     func displayDuration(for item: ToastItem) -> Double {
@@ -165,18 +165,18 @@ final class ToastQueueManager {
             .contains(where: { $0 == item })
     }
 
-    /// Add a toast to the queue. Duplicate messages are coalesced (§A4f).
+    /// Add a toast to the queue. Duplicate messages are coalesced.
     func enqueue(_ item: ToastItem) {
         guard !isDuplicate(item) else { return }
 
         let position = item.severity.position
-        // §A6.6: Different positions can display simultaneously
+        // Different positions can display simultaneously
         let positionOccupied = activeToasts.contains { $0.severity.position == position }
 
         if !positionOccupied {
             show(item)
         } else {
-            // RES-03 (Pkg N): cap each per-position queue at 32 entries.
+            // Cap each per-position queue at 32 entries.
             // On overflow drop the oldest queued entry so the latest
             // notification is the one that lands. The active toast is
             // not touched — only the buffered tail.
@@ -199,7 +199,7 @@ final class ToastQueueManager {
         enqueue(ToastItem(message: message, severity: severity))
     }
 
-    /// WU-19 (session-8): enqueue an action toast — convenience overload
+    /// Enqueue an action toast — convenience overload
     /// for the undo-toast pattern. `actionHandler` runs from MainActor
     /// when the user taps the button; the toast is dismissed after the
     /// handler runs. `ToastItem.equality` ignores the closure, so
@@ -229,12 +229,12 @@ final class ToastQueueManager {
             bottomDismissTask?.cancel()
         }
 
-        // WU-48: route through `Anim.resolved` so Reduce Motion swaps the
-        // toast-out easing to the §A2.2 opacity-only fallback. The queue
+        // Route through `Anim.resolved` so Reduce Motion swaps the
+        // toast-out easing to the opacity-only fallback. The queue
         // manager is a non-View service, so we read
         // `UIAccessibility.isReduceMotionEnabled` directly — same posture
         // RedactionOverlayView's CADisplayLink-driven handle animation uses
-        // for the WU-43 M-D.5 Reduce-Motion gate (see §S2.4a).
+        // for its Reduce-Motion gate.
         let reduceMotion = UIAccessibility.isReduceMotionEnabled
         withAnimation(
             ResectaTokens.Anim.resolved(ResectaTokens.Anim.toastOut, reduceMotion: reduceMotion)
@@ -243,7 +243,7 @@ final class ToastQueueManager {
         }
         toastVersion &+= 1
 
-        // §A6.6: 0.3s gap between consecutive toasts at the same position
+        // 0.3s gap between consecutive toasts at the same position
         let drainTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
@@ -279,10 +279,10 @@ final class ToastQueueManager {
         }
         toastVersion &+= 1
 
-        // WP4b: Light haptic on toast appearance
+        // Light haptic on toast appearance
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
-        // §A8: VoiceOver announcement on toast appearance
+        // VoiceOver announcement on toast appearance
         AccessibilityNotification.Announcement(item.message).post()
 
         let duration = displayDuration(for: item)
@@ -312,21 +312,20 @@ final class ToastQueueManager {
     }
 }
 
-// MARK: - UXF-11 Commit-feedback contract
+// MARK: - Commit-feedback contract
 
-/// One commit-feedback contract (UXF-11). Every path that promotes marks
+/// One commit-feedback contract. Every path that promotes marks
 /// into redaction regions — triage "Apply N", "Apply Group", Search &
 /// Redact's "Apply N" (including PII Scan mode), and the
 /// auto-apply-ON detection completion — builds its count message here, so
 /// the number the user sees is the count of regions actually created,
 /// never the raw detection or selection total.
 enum CommitFeedback {
-    /// UXC-24 (RB-39): appended to every non-nil `markedMessage` result —
+    /// Appended to every non-nil `markedMessage` result —
     /// "Marked" on its own reads as already-redacted, so the suffix
     /// names the step that still has to happen. Its own `static let` so
-    /// the pin below is exact-text. RW-F-003 class note: at AX3 the
-    /// 2-line toast cap may truncate this longer message — the ruling
-    /// accepted the length.
+    /// the pin below is exact-text. At AX3 the
+    /// 2-line toast cap may truncate this longer message; the length is accepted.
     static let notYetRedactedSuffix = ". Not redacted until you tap Redact."
 
     /// "Marked 3 for redaction (2 already covered). Not redacted until

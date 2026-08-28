@@ -4,7 +4,7 @@ import CoreGraphics
 import RedactionEngine
 @testable import ResectaApp
 
-// DRAW-6 (Phase 3) — lasso (rect-marquee) multi-select. When the
+// Lasso (rect-marquee) multi-select. When the
 // `isMultiSelectActive` toolbar toggle is on AND the user's touch-down
 // hits empty space, the drag is treated as a marquee. On touch-up, the
 // overlay intersects every region's `normalizedRect` against the
@@ -30,7 +30,7 @@ import RedactionEngine
 //    deleted regions (matching the user-visible "one Cmd-Z = undo
 //    delete" expectation).
 
-@Suite("Lasso multi-select (DRAW-6)")
+@Suite("Lasso multi-select")
 @MainActor
 struct LassoMultiSelectTests {
 

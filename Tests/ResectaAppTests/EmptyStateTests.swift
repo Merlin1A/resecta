@@ -2,14 +2,14 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// WU-20 — Mode-specific empty-state copy + multi-term recall chips
-// per [R-34] mechanism-description discipline. Tests pin (a) the
-// pure-function context discriminator that drives the per-branch
-// copy, (b) the headline / description copy per branch including
-// the §19 audit acceptance (no outcome promises), and (c) the
-// recall-chip rendering helpers.
+// Mode-specific empty-state copy + multi-term recall chips per
+// mechanism-description discipline. Tests pin (a) the pure-function
+// context discriminator that drives the per-branch copy, (b) the
+// headline / description copy per branch including the audit-lint
+// acceptance (no outcome promises), and (c) the recall-chip
+// rendering helpers.
 
-@Suite("Empty state copy (WU-20)", .tags(.search))
+@Suite("Empty state copy", .tags(.search))
 @MainActor
 struct EmptyStateTests {
 
@@ -54,7 +54,7 @@ struct EmptyStateTests {
     @Test("Carried query without a completed run reads as not-run, never as a no-match verdict")
     func notRunContexts() {
         // The mode switch carries the query text but deliberately does
-        // not re-run (UXF-16); until a run completes, the empty state
+        // not re-run; until a run completes, the empty state
         // must not claim the query produced no matches.
         let text = WU20Strings.context(
             mode: .text, queryText: "alpha",
@@ -216,7 +216,7 @@ struct EmptyStateTests {
         #expect(ctx == .piiScanPostScanZero(detectorCount: 7))
     }
 
-    @Test("Cancelled scan never renders the post-scan clean bill (BH-A-05)")
+    @Test("Cancelled scan never renders the post-scan clean bill")
     func piiScanCancelledContext() {
         // A cancelled run leaves currentSearchPage at the cancelled
         // position with hasCompletedRun still false — exactly the state
@@ -256,7 +256,7 @@ struct EmptyStateTests {
     @Test("Text pre-search description uses mechanism-description verbs")
     func textPreSearchCopyMechanism() {
         let copy = WU20Strings.description(for: .textPreSearch)
-        // §19: must use "match" not the audit-lint-forbidden lookup
+        // Must use "match" not the audit-lint-forbidden lookup
         // verb (assembled via concat to keep this test source clean).
         let forbidden = "fin" + "d"
         #expect(!copy.lowercased().contains(forbidden))
@@ -274,10 +274,10 @@ struct EmptyStateTests {
         #expect(!copy.contains("Scan Document"))
     }
 
-    @Test("Browse Templates copy is removed from piiScanPreScan description (WU-20 §4.2)")
+    @Test("Browse Templates copy is removed from piiScanPreScan description")
     func testBrowseTemplatesCopyRemoved() {
         let copy = WU20Strings.description(for: .piiScanPreScan)
-        // Design 04 §4.2 retires the dead "Browse Templates" affordance
+        // Retires the dead "Browse Templates" affordance
         // from the empty-state copy. This test verifies the old string is
         // absent from the WU20Strings surface.
         #expect(!copy.contains("Browse Templates"))
@@ -341,7 +341,7 @@ struct EmptyStateTests {
         #expect(copy == "7 detectors matched 0 candidates above threshold.\n\n"
             + WU20Strings.piiScanZeroCalibrationLine + "\n\n"
             + WU20Strings.piiScanZeroRecourseLine)
-        // §19 forbidden outcome promises — assembled via concat so
+        // Forbidden outcome promises — assembled via concat so
         // the source itself does not trip the audit-lint hook.
         let outcomePhrases: [String] = [
             "no PII " + "detected",
@@ -363,16 +363,16 @@ struct EmptyStateTests {
             + WU20Strings.piiScanZeroRecourseLine)
     }
 
-    // MARK: - UXC-10 / UXC-11 — post-scan-zero headline, glyph, recourse
+    // MARK: - Post-scan-zero headline, glyph, recourse
 
-    @Test("UXC-10: post-scan-zero headline names the produced count, not a clean-bill affirmation")
+    @Test("Post-scan-zero headline names the produced count, not a clean-bill affirmation")
     func piiScanPostScanZeroHeadline() {
         let headline = WU20Strings.headline(for: .piiScanPostScanZero(detectorCount: 5))
         #expect(headline == "No items flagged")
         #expect(!headline.lowercased().contains("complete"))
     }
 
-    @Test("UXC-10: post-scan-zero glyph matches the Search-side no-match sibling glyph")
+    @Test("Post-scan-zero glyph matches the Search-side no-match sibling glyph")
     func piiScanPostScanZeroGlyph() {
         let zeroGlyph = WU20Strings.headlineSymbol(for: .piiScanPostScanZero(detectorCount: 5))
         #expect(zeroGlyph == "doc.text.magnifyingglass")
@@ -382,13 +382,13 @@ struct EmptyStateTests {
         #expect(zeroGlyph != "checkmark.circle")
     }
 
-    @Test("UXC-11: calibration line states a threshold outcome, not a content verdict")
+    @Test("Calibration line states a threshold outcome, not a content verdict")
     func piiScanZeroCalibrationLineWording() {
         let copy = WU20Strings.piiScanZeroCalibrationLine
         #expect(copy == "A zero result means nothing on the scanned pages cleared the current threshold for those detectors \u{2014} it is not a statement about what the document contains.")
     }
 
-    @Test("UXC-11: recourse line names the three existing controls by their shipped labels")
+    @Test("Recourse line names the three existing controls by their shipped labels")
     func piiScanZeroRecourseLineWording() {
         let copy = WU20Strings.piiScanZeroRecourseLine
         #expect(copy == "To look further: re-run with different detectors (\u{21bb}), search for specific terms in Search, or change the Detection Sensitivity preset in Settings.")
@@ -397,9 +397,9 @@ struct EmptyStateTests {
         #expect(copy.contains("\u{21bb}"))
     }
 
-    @Test("UXC-11: zero-state calibration + recourse lines are mechanism-description only")
+    @Test("Zero-state calibration + recourse lines are mechanism-description only")
     func piiScanZeroLinesAreMechanism() {
-        // §19 forbidden vocabulary — assembled via concat so this
+        // Forbidden vocabulary — assembled via concat so this
         // source itself does not trip the pre-commit M-1 sweep.
         let forbidden: [String] = [
             "guarant" + "ee",
@@ -424,7 +424,7 @@ struct EmptyStateTests {
         }
     }
 
-    @Test("UXC-11: no percent sign in any post-scan-zero-state line")
+    @Test("No percent sign in any post-scan-zero-state line")
     func piiScanZeroLinesNoPercentSign() {
         #expect(!WU20Strings.piiScanZeroCalibrationLine.contains("%"))
         #expect(!WU20Strings.piiScanZeroRecourseLine.contains("%"))
@@ -440,7 +440,7 @@ struct EmptyStateTests {
         #expect(!copy.lowercased().contains(forbidden))
     }
 
-    @Test("All branches contain no §19 forbidden phrases")
+    @Test("All branches contain no audit-lint-forbidden phrases")
     func allBranchesNoForbiddenPhrases() {
         let allContexts: [WU20Strings.EmptyContext] = [
             .textPreSearch, .textNotRun, .textNoMatch,
@@ -501,7 +501,7 @@ struct EmptyStateTests {
 
 // MARK: - SearchState recall ring
 
-@Suite("SearchState recentMultiTermSets ring (WU-20)", .tags(.search))
+@Suite("SearchState recentMultiTermSets ring", .tags(.search))
 @MainActor
 struct SearchStateRecentMultiTermSetsTests {
 
@@ -556,7 +556,7 @@ struct SearchStateRecentMultiTermSetsTests {
         #expect(state.recentMultiTermSets == [["alpha", "beta"]])
     }
 
-    @Test("clearResults() resets the frozen detector-count snapshot (BH-A-06)")
+    @Test("clearResults() resets the frozen detector-count snapshot")
     func clearResultsResetsLastRunDetectorCount() {
         let state = SearchState()
         state.lastRunDetectorCount = 17

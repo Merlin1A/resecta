@@ -3,14 +3,14 @@ import Foundation
 import CoreGraphics
 @testable import RedactionEngine
 
-// WS1 item 1.6 — Spatial address posterior + gate + dedup tests.
+// Spatial address posterior + gate + dedup tests.
 //
 // Verifies that spatial addresses assembled by AddressSpatialAssembler now
-// participate in resolveOverlaps, posterior scoring, and W4 gating
-// (moved from the post-loop raw append to rawMatches BEFORE resolveOverlaps
+// participate in resolveOverlaps, posterior scoring, and posterior threshold
+// gating (moved from the post-loop raw append to rawMatches BEFORE resolveOverlaps
 // in DetectionOrchestrator.detectPage). Tests operate at the assembler
 // and resolver layers without Vision / OCR.
-@Suite("Spatial Address Gating (WS1 item 1.6)")
+@Suite("Spatial Address Gating")
 struct SpatialAddressGatingTests {
 
     // MARK: - Helpers
@@ -29,14 +29,14 @@ struct SpatialAddressGatingTests {
         )
     }
 
-    // MARK: - §3 Required Tests
+    // MARK: - Required Tests
 
-    // ADVERSARIAL (design §3 test plan): spatial address at confidence 0.55
+    // ADVERSARIAL: spatial address at confidence 0.55
     // with conservative preset threshold 0.75 → NOT in final detections.
-    // The test drives W4 gating directly via posterior + threshold comparison.
+    // The test drives the posterior threshold gate directly via posterior + threshold comparison.
     @Test("ADVERSARIAL: spatial address at 0.55 under conservative threshold 0.75 is suppressed")
     func testConservativePresetLowConfidenceSpatialSuppressed() throws {
-        // Mechanism: W4 gate drops matches where finalConfidence < cutoff.
+        // Mechanism: the posterior threshold gate drops matches where finalConfidence < cutoff.
         // At fresh priorMean = 0.5, posterior(0.55) ≈ 0.55.
         // Conservative threshold for address (if wired) or design-stated 0.75.
         let scorer = CalibratedScorer()
@@ -49,7 +49,7 @@ struct SpatialAddressGatingTests {
         // Use address wireName threshold if present; fall back to design-stated 0.75.
         let cutoff = vector.threshold(for: .address) ?? 0.75
 
-        // The W4 gate condition: suppressed when finalConfidence < cutoff.
+        // The posterior threshold gate condition: suppressed when finalConfidence < cutoff.
         #expect(posterior < cutoff)
     }
 

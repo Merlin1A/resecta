@@ -4,7 +4,7 @@ import NaturalLanguage
 import PDFKit
 @testable import RedactionEngine
 
-// FIX-DESIGN Part B (P1) — name recall on transaction lines + per-occurrence
+// Part B (P1) — name recall on transaction lines + per-occurrence
 // range anchoring.
 //
 // Two compounding defects left repeated / label-glued account-holder names
@@ -29,7 +29,7 @@ import PDFKit
 //
 // Synthetic Hartwell/Sablebrook cast only (repo test-data policy). The
 // packet fixture is fully synthetic with a public values manifest, so
-// matched text may be logged here (D31 exemption, as in PacketSnapshotTests).
+// matched text may be logged here (a synthetic-fixture exemption, as in PacketSnapshotTests).
 //
 // Privacy rule (audit-lint M-1): comments and test names use
 // locate/surface/resolve vocabulary.
@@ -45,7 +45,7 @@ struct NameRecallTransactionLinesTests {
 
     private static func skipNER(_ test: String) {
         print("[NLTagger gate] .nameType NER asset unavailable on this runtime; "
-              + "skipping \(test) (REDACTION_ENGINE.md §4.5; harness pin = iOS 26.4).")
+              + "skipping \(test) (harness pin = iOS 26.4).")
     }
 
     /// Every occurrence of `word` in `text` as an NSRange.
@@ -177,7 +177,7 @@ struct NameRecallTransactionLinesTests {
         #else
         guard Self.nerAvailable() else { Self.skipNER(#function); return }
         guard NameGazetteer() != nil else {
-            print("[W2 gate] NameGazetteer bundle missing; skipping bundled test.")
+            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
             return
         }
         let detector = PIIDetector()
@@ -201,7 +201,7 @@ struct NameRecallTransactionLinesTests {
     func b2SameNameThreeOffsetsYieldsThreeRanges() throws {
         guard Self.nerAvailable() else { Self.skipNER(#function); return }
         guard NameGazetteer() != nil else {
-            print("[W2 gate] NameGazetteer bundle missing; skipping bundled test.")
+            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
             return
         }
         let page = """
@@ -238,7 +238,7 @@ struct NameRecallTransactionLinesTests {
     func rangeMapsToOriginalAllCapsText() throws {
         guard Self.nerAvailable() else { Self.skipNER(#function); return }
         guard NameGazetteer() != nil else {
-            print("[W2 gate] NameGazetteer bundle missing; skipping bundled test.")
+            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
             return
         }
         let line = "INDN:DELIA HARTWELL CO ID:1364419872"
@@ -257,13 +257,13 @@ struct NameRecallTransactionLinesTests {
                 "the covering match must carry the original ALL-CAPS casing")
     }
 
-    /// W2 strict-gate preservation: candidates absent from BOTH blooms stay
+    /// Strict-gate preservation: candidates absent from BOTH blooms stay
     /// suppressed on the shadow pass (the gate widening is given-bloom-only).
     @Test("Strict shadow pass still suppresses unknown-cast candidates")
     func strictShadowPassStillSuppressesUnknownCast() throws {
         guard Self.nerAvailable() else { Self.skipNER(#function); return }
         guard let gazetteer = NameGazetteer() else {
-            print("[W2 gate] NameGazetteer bundle missing; skipping bundled test.")
+            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
             return
         }
         // 'korrin' / 'sablebrook' are in neither the surname nor the
@@ -288,7 +288,7 @@ struct NameRecallTransactionLinesTests {
     func givenNameOnlyCandidateSurfacesViaGivenBloom() throws {
         guard Self.nerAvailable() else { Self.skipNER(#function); return }
         guard NameGazetteer() != nil else {
-            print("[W2 gate] NameGazetteer bundle missing; skipping bundled test.")
+            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
             return
         }
         // 'katelyn': SSA given-name list yes; census surname list no
@@ -314,12 +314,12 @@ struct NameRecallTransactionLinesTests {
     /// the account-holder name at four offsets (one mixed-case header, two
     /// INDN transaction lines, one printed-name line). Pre-fix the resolver
     /// collapsed these onto the first occurrence. Prints the per-occurrence
-    /// map for the PR body; hard assertion is the anti-collapse floor.
+    /// map as evidence; the hard assertion is the anti-collapse floor.
     @Test("Packet ACH page: name occurrences anchor per-occurrence")
     func packetACHPageNameMeasurement() async throws {
         guard Self.nerAvailable() else { Self.skipNER(#function); return }
         guard NameGazetteer() != nil else {
-            print("[W2 gate] NameGazetteer bundle missing; skipping bundled test.")
+            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
             return
         }
         let data = try TestFixtures.loanPacketPDF()

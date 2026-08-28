@@ -8,7 +8,7 @@ import Testing
 // .runNLTagger: 0.70 base + ≤0.15 gazetteer boost; legal-prefix path 0.65). On
 // a fresh document the per-category prior mean is 0.5, so the calibrated
 // posterior equals the raw score (sigmoid(logit(raw) + logit(0.5)) == raw). A
-// 0.98 cutoff therefore dropped every name in DetectionOrchestrator's W4 gate
+// 0.98 cutoff therefore dropped every name in DetectionOrchestrator's posterior threshold gate
 // (`finalConfidence < cutoff` → drop), so no name reached the triage surface.
 //
 // These tests pin the SHIPPED Balanced `name` cutoff inside the detector's
@@ -33,7 +33,7 @@ struct NameThresholdSurfacingTests {
             "Balanced preset must carry a `name` cutoff"
         )
         // The cutoff must sit strictly below the unboosted-name confidence, or
-        // the W4 gate drops common (gazetteer-unconfirmed) names outright. This
+        // the posterior threshold gate drops common (gazetteer-unconfirmed) names outright. This
         // is the exact condition that regressed when the cutoff was 0.98.
         #expect(
             cutoff < Self.unboostedNameConfidence,
@@ -46,7 +46,7 @@ struct NameThresholdSurfacingTests {
         let bundle = PresetThresholdBundle.loadFromEngineBundle()
         let cutoff = try #require(bundle.presets[.balanced]?.threshold(forWireName: "name"))
 
-        // Reproduce DetectionOrchestrator.detectPage's W4 gate exactly: compose
+        // Reproduce DetectionOrchestrator.detectPage's posterior threshold gate exactly: compose
         // the raw score against the fresh-document prior, then compare to cutoff.
         let priorMean = PerCategoryPriors().mean(.name) // 0.5 on a fresh document
         let posterior = CalibratedScorer().posterior(
@@ -64,11 +64,11 @@ struct NameThresholdSurfacingTests {
         let bundle = PresetThresholdBundle.loadFromEngineBundle()
         let cutoff = try #require(bundle.presets[.balanced]?.threshold(forWireName: "name"))
 
-        // Reproduce DetectionOrchestrator.detectPage's W4 gate exactly, but at
+        // Reproduce DetectionOrchestrator.detectPage's posterior threshold gate exactly, but at
         // the TOP of the detector's reachable raw range — no name can score
         // higher than maxNameConfidence (0.70 base + the full 0.15 exact
         // surname+given gazetteer boost), so this posterior is the upper
-        // bound of what W4 ever sees for the `name` category.
+        // bound of what the posterior threshold gate ever sees for the `name` category.
         let priorMean = PerCategoryPriors().mean(.name) // 0.5 on a fresh document
         let posterior = CalibratedScorer().posterior(
             raw: Self.maxNameConfidence, priorMean: priorMean

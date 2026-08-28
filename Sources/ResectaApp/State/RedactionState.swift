@@ -39,7 +39,7 @@ class RedactionState {
     var outputURL: URL?
 
     /// Inputs of the redaction run that produced `outputURL`, retained so a
-    /// verify-only re-run (CANCEL-009) checks the same terms and reports the
+    /// verify-only re-run checks the same terms and reports the
     /// same per-page modes as the run that built the output. Without the
     /// snapshot, `runVerifyOnly` re-synthesized both: a uniform mode array
     /// erased a mixed run's per-page fallback record, and re-collected terms
@@ -51,7 +51,7 @@ class RedactionState {
     /// re-synthesis. Per-page filter digests are NOT retained: they cannot
     /// be rebuilt from the output PDF, by design.
     private(set) var lastRunPerPageModes: [PipelineMode]?
-    /// PD-5: sibling of `lastRunPerPageModes` — the run's per-page fallback
+    /// Sibling of `lastRunPerPageModes` — the run's per-page fallback
     /// reasons, retained so a verify-only re-run reports why each page
     /// rasterized, not just that it did.
     private(set) var lastRunPerPageFallbackReasons: [TextLayerDetector.FallbackReason?]?
@@ -71,7 +71,7 @@ class RedactionState {
     /// Deselection facts recorded for the run that produced `outputURL`:
     /// how many scan results the user left un-checked, out of how many
     /// total. Captured by `runFullPipeline` at run entry via
-    /// `runEntryDeselectionSnapshot()` — UXC-01: the apply-commit
+    /// `runEntryDeselectionSnapshot()` — the apply-commit
     /// snapshot (`pendingRunDeselection`) when one is pending, else the
     /// live search session's snapshot, same derivation the scan coverage
     /// panel renders (`SearchState.deselectionSnapshotForRun()`) — so
@@ -95,7 +95,7 @@ class RedactionState {
         lastRunDeselection = snapshot
     }
 
-    /// UXC-01 — the deselection facts of the search session the user
+    /// The deselection facts of the search session the user
     /// most recently *applied* results from, captured at the apply
     /// commit (`applySelectedSearchResultsOrigin`) rather than at
     /// pipeline run entry. Closes the common-path gap where the search
@@ -117,7 +117,7 @@ class RedactionState {
     /// `clearAll()`) clear it explicitly.
     private(set) var pendingRunDeselection: DeselectionSnapshot?
 
-    /// UXC-01 — the snapshot pipeline entry should record for this run:
+    /// The snapshot pipeline entry should record for this run:
     /// the apply-commit snapshot when one is pending (the common path —
     /// see `pendingRunDeselection`), falling back to the live search
     /// session's snapshot when nothing is pending (today's behavior,
@@ -135,7 +135,7 @@ class RedactionState {
     /// state from scratch.
     var autoDetectionDegraded: Bool = false
 
-    /// H-201 — engine-facing names of the loaders behind the current
+    /// Engine-facing names of the loaders behind the current
     /// degrade (`GazetteerLoadDiagnostics.failedGazetteers`). Drives the
     /// banner/toast copy branch: an NER-only degrade (OS model absent) is
     /// described as such instead of blaming the bundled corpus. Same
@@ -168,7 +168,7 @@ class RedactionState {
     /// Key: DetectionResult.id. Value: true = accepted, false = rejected.
     var triageSelections: [UUID: Bool] = [:]
 
-    /// UXF-06 — record of how the most recent detection run ended, for
+    /// Record of how the most recent detection run ended, for
     /// BOTH run origins: pipeline detection runs (staged for triage)
     /// and the sheet's Scan-interface runs (results listed in-sheet).
     /// Written on every run exit path (staged, nothing found, failed)
@@ -198,20 +198,20 @@ class RedactionState {
         let run: Int
         let outcome: Outcome
         let scanSummary: ScanRunSummary?
-        /// UXC-04 — pages whose raster exceeded the OCR pixel caps
+        /// Pages whose raster exceeded the OCR pixel caps
         /// during the run this record describes (pipeline:
         /// `ocrPixelCapSkippedPages`; Scan-interface:
         /// `SearchState.ocrSkippedPages`), snapshotted at record time so
         /// the verification screen reads a stable value instead of a
         /// live session set the sheet later clears.
         var ocrSkippedPages: Set<Int> = []
-        /// UXC-06 — the degrade-failure list active when this run was
+        /// The degrade-failure list active when this run was
         /// recorded; nil when the run was not degraded.
         var degradeFailures: [String]? = nil
     }
     var lastDetectionRun: DetectionRunRecord? = nil
 
-    /// UXF-06/UXF-29 — true once any pending detection from the current
+    /// True once any pending detection from the current
     /// run has been promoted to a region (sheet-level "Apply N" or a
     /// group apply). Gates the summary banner's "Review" re-entry action:
     /// re-staging `detectionResults` after a promotion would stage the
@@ -348,7 +348,7 @@ class RedactionState {
     /// Released on clearAll().
     var pageDiagnostics: [Int: ClassificationDiagnostic] = [:]
 
-    /// ST-83 — pages whose raster exceeded the OCR pixel caps during the
+    /// Pages whose raster exceeded the OCR pixel caps during the
     /// detection run, so Vision OCR never ran there (page-level
     /// `PageDetectionResult.ocrProvenance` reports `.pixelCapExceeded`).
     /// Populated by `PipelineCoordinator.runDetectionPipeline`; consumed
@@ -541,7 +541,7 @@ class RedactionState {
     func clearForNewDocument() {
         regionVersion += 1
         clearOutput()
-        // UXC-01 — a replacement document must not inherit the prior
+        // A replacement document must not inherit the prior
         // document's apply-commit deselection facts: the counts describe
         // search results on the PRIOR document, and `clearOutput()` above
         // deliberately leaves this field alone (it survives pipeline
@@ -873,12 +873,11 @@ class RedactionState {
         /// direct-apply entry, retained until a pipeline path needs it.
         case detectionResults([Int: [DetectionResult]])
         /// One result of `activeSearch.results`, addressed by id — the
-        /// compact handle's per-item Apply (UXC-51, D-128 / RB-123
-        /// item 3). Selection state is not consulted: the tap IS the
-        /// accept for that one result. Resolved against the live
-        /// results at call time, so a result the search has since
-        /// re-flushed (REV-09) refuses with zero mutations instead of
-        /// applying by index.
+        /// compact handle's per-item Apply. Selection state is not
+        /// consulted: the tap IS the accept for that one result.
+        /// Resolved against the live results at call time, so a result
+        /// the search has since re-flushed refuses with zero mutations
+        /// instead of applying by index.
         case searchResult(id: UUID)
     }
 
@@ -891,14 +890,14 @@ class RedactionState {
         let applied: Int
         /// Search origin only: selected results skipped for >80%
         /// overlap with an existing region. Skipped results earn no
-        /// applied badge and no audit entry (QW-1).
+        /// applied badge and no audit entry.
         let skippedOverlaps: Int
         /// Search origin only: the `SearchResult.id`s that produced a
         /// region this pass.
         let appliedResultIDs: Set<UUID>
-        /// Search origin only (BH-A-03): the `SearchResult.id`s
+        /// Search origin only: the `SearchResult.id`s
         /// dedup-skipped as already covered. No badge, no audit entry
-        /// (QW-1) — consumed only by the Apply-graying gate.
+        /// — consumed only by the Apply-graying gate.
         var coveredResultIDs: Set<UUID> = []
         /// Detection-map origin only: detections routed to the review
         /// instead of applied.
@@ -964,7 +963,7 @@ class RedactionState {
             let outcome = applyStagedDetectionsOrigin(undoManager: undoManager)
             if outcome != nil {
                 activeSearch?.userModifiedSelections = false
-                // UXC-39 — a full staged-review apply resolves the whole
+                // A full staged-review apply resolves the whole
                 // search sheet's selection context, same as the search
                 // origin above.
                 activeSearch?.hasUnreviewedPreselection = false
@@ -1045,7 +1044,7 @@ class RedactionState {
         let selected = search.results.filter(\.isSelected)
         guard !selected.isEmpty else {
             search.userModifiedSelections = false
-            // UXC-39 — an apply with nothing selected still resolves the
+            // An apply with nothing selected still resolves the
             // session's selection context (either it never carried a
             // preselect, or the user reviewed and deselected every
             // preselected result before tapping Apply); either way there
@@ -1084,7 +1083,7 @@ class RedactionState {
             recordsSearchApplyVersion: true,
             undoManager: undoManager
         )
-        // UXC-01 — capture the CAPTURED session's deselection facts at
+        // Capture the CAPTURED session's deselection facts at
         // the moment of commit, before the caller dismisses the sheet
         // and nils `activeSearch` out from under a later pipeline-entry
         // read. Last apply wins: this overwrites whatever a previous
@@ -1097,7 +1096,7 @@ class RedactionState {
         // prepare suspension (a dismissed-and-reopened sheet must not
         // inherit a stale apply's reset).
         search.userModifiedSelections = false
-        // UXC-39 — the applied selections (preselected or not) were just
+        // The applied selections (preselected or not) were just
         // committed; nothing unreviewed remains to protect from a silent
         // dismiss.
         search.hasUnreviewedPreselection = false
@@ -1114,7 +1113,7 @@ class RedactionState {
 
     /// The search origins' undo action name — "Redact N Instances of
     /// 'term'", singular at one. One construction for both origins
-    /// (UXC-51 added the grammar branch; the bulk origin reads the
+    /// (the singular grammar branch; the bulk origin reads the
     /// singular for a single selected result too).
     private static func searchApplyActionName(count: Int, term: String) -> String {
         count == 1
@@ -1122,10 +1121,10 @@ class RedactionState {
             : "Redact \(count) Instances of '\(term)'"
     }
 
-    /// Single-result search origin (UXC-51, D-128 / RB-123 item 3): the
+    /// Single-result search origin: the
     /// compact handle's per-item Apply. One result of the active search,
     /// addressed by id and resolved against `results` HERE — never by
-    /// index, never from a value captured at the tap (REV-09: a search
+    /// index, never from a value captured at the tap (a search
     /// still running re-flushes the array in batches, so the id can be
     /// gone by the time the apply turn arrives; a missing id refuses
     /// with zero mutations, and the handle's button state re-derives on
@@ -1138,10 +1137,10 @@ class RedactionState {
     /// `MatchAuditSnapshot` trio (same `.searchMatch(term:rationale:)`
     /// source, same rationale handoff, same overlap test — a result an
     /// existing region already covers is dedup-skipped as covered: no
-    /// badge, no audit entry, QW-1 / BH-A-03), the same `commitApply`
-    /// transaction recording the search apply-version marker (D06-F1),
+    /// badge, no audit entry), the same `commitApply`
+    /// transaction recording the search apply-version marker,
     /// the same action-name construction in its singular form, and the
-    /// same post-commit deselection snapshot (UXC-01, last apply wins).
+    /// same post-commit deselection snapshot (last apply wins).
     /// One result needs no detached prepare, so nothing suspends between
     /// the mutation guard in `applyFindings` and the commit — the
     /// post-suspension re-check the bulk origin needs has no window
@@ -1281,7 +1280,7 @@ class RedactionState {
     /// accepted decisions here (the members bypass the staged-review
     /// bookkeeping loop from now on), and prunes them from the review
     /// so the next full apply cannot double-create and the toolbar
-    /// count stays honest (UXF-29). Members no longer pending are
+    /// count stays honest. Members no longer pending are
     /// skipped silently; non-member detections stay pending for the
     /// normal review flow. If the prune empties the review, it closes —
     /// the same end state as a full apply.
@@ -1349,7 +1348,7 @@ class RedactionState {
             }
         }
 
-        // UXF-29 — prune the promoted members from `pendingTriage` and
+        // Prune the promoted members from `pendingTriage` and
         // drop their selection entries. Leaving them pending meant the
         // next full apply re-created a region for every member.
         var remaining = pending
@@ -1461,7 +1460,7 @@ class RedactionState {
         triageSelections = [:]
     }
 
-    /// UXC-49 (D-124 / REV-14 — STATE-7): tear the live Search & Redact
+    /// Tear the live Search & Redact
     /// session down. The editor's ONE `.sheet(item:)` slot reads
     /// `activeSearch`, so this dismisses the sheet (its `onDisappear`
     /// clears the results, the same outcome as its own Dismiss); the
@@ -1816,7 +1815,7 @@ class RedactionState {
         // after this method, so "regions modified since verification"
         // is logically false.
         clearOutput()
-        // UXC-01 — document close must not leave the apply-commit
+        // Document close must not leave the apply-commit
         // deselection facts (see `clearForNewDocument()`) around for a
         // next opened document to inherit.
         pendingRunDeselection = nil
@@ -1904,13 +1903,13 @@ struct PreparedApply: Sendable {
     let createdAudit: [UUID: MatchAuditSnapshot]
     let appliedCount: Int
     let skippedOverlaps: Int
-    /// QW-1 (D06-F3) — the `SearchResult.id`s that actually produced a
+    /// The `SearchResult.id`s that actually produced a
     /// region this pass. Overlap-skipped results are absent, so the
     /// sheet's `appliedResultIDs` union (the green "applied" badge state)
     /// matches the audit-backed set instead of the full selection.
     let appliedResultIDs: Set<UUID>
-    /// BH-A-03 — the `SearchResult.id`s dedup-SKIPPED for >80% overlap
-    /// with an existing region. QW-1 keeps them out of
+    /// The `SearchResult.id`s dedup-SKIPPED for >80% overlap
+    /// with an existing region. These are kept out of
     /// `appliedResultIDs` (no badge, no audit entry); the sheet unions
     /// them into `SearchState.coveredResultIDs` so `selectionFullyApplied`
     /// can gray Apply on a fully covered selection.
@@ -2054,7 +2053,7 @@ extension RedactionState {
                 normalizedRect: CGRect(x: 0.12, y: 0.50, width: 0.38, height: 0.035),
                 kind: .pii(.creditCard), confidence: 0.99, matchedText: "4111 1111 1111 1111"),
             // Second "Jordan Avery" so the Grouped view mode has a real
-            // cluster — "Apply Group" (UXF-29) is drivable on the sim.
+            // cluster — "Apply Group" is drivable on the sim.
             DetectionResult(
                 normalizedRect: CGRect(x: 0.52, y: 0.42, width: 0.40, height: 0.035),
                 kind: .pii(.name), confidence: 0.83, matchedText: "Jordan Avery"),
@@ -2065,7 +2064,7 @@ extension RedactionState {
         // as not accepted everywhere.
         triageSelections = [:]
         // Mirror the real staging path's sibling writes so the summary
-        // banner (UXF-06), its Review re-entry, and the Grouped view mode
+        // banner, its Review re-entry, and the Grouped view mode
         // are all drivable on the Simulator: `detectionResults` backs the
         // banner's Review action, `crossPageEntityGroups` backs "Apply
         // Group", and the run record drives the banner itself.
@@ -2076,9 +2075,9 @@ extension RedactionState {
 }
 #endif
 
-// MARK: - SEC-7 degrade copy (H-201)
+// MARK: - Detection-degrade copy
 
-/// Copy table for the SEC-7 detection-degrade surfaces (one-time toast +
+/// Copy table for the detection-degrade surfaces (one-time toast +
 /// persistent Scan-interface banner). An NER-only degrade — the OS-
 /// provisioned `.nameType` MobileAsset absent, bundled corpus healthy —
 /// is described as such: the corpus-blaming line would be false on a

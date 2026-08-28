@@ -8,22 +8,22 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// S01 — Searchable-Redaction merge measurement harness.
+// Searchable-Redaction merge measurement harness.
 //
 // Permanent re-creation of the prior session's Probe 2/4/5 diagnostics (which
 // were reverted after capture). Drives `TestFixtures.searchableMergeReproPDF`
 // through the real pipeline + all 10 `VerificationEngine.runLayer` calls and
-// measures the reconstructed output to settle the master plan's open questions
-// (the searchable-verify-fix plan, OQ-1/2/4).
+// measures the reconstructed output to settle open questions about the
+// searchable-verify fix.
 //
-// ARCH §12.2 (VERBATIM): never log/record document content, file paths, or
-// redaction coordinates. Every measurement below emits ONLY counts, ratios,
-// geometry (widths/deviations in points), and font *resource* names — exactly
-// the discipline of the engine's own count-only `PageFilterDigest`. Character
-// content is read internally (to categorize / count scalars) but never printed,
-// asserted-on, or returned as text.
+// Logging discipline (VERBATIM): never log/record document content, file
+// paths, or redaction coordinates. Every measurement below emits ONLY counts,
+// ratios, geometry (widths/deviations in points), and font *resource* names —
+// exactly the discipline of the engine's own count-only `PageFilterDigest`.
+// Character content is read internally (to categorize / count scalars) but
+// never printed, asserted-on, or returned as text.
 
-// MARK: - §12.2-safe measurement records
+// MARK: - Content-free measurement records
 
 /// One off-grid / near-zero composed-character advance observation. Carries
 /// geometry + font *resource* name + scalar count only — no character content.
@@ -35,7 +35,7 @@ struct AdvanceOutlier: Sendable {
     let deviation: Double
     let scalarCount: Int
     /// CoreText "Courier" horizontal advance summed over the grapheme's scalars
-    /// at 12pt (OQ-2): distinguishes a single-grapheme ~0-width glyph (genuine
+    /// at 12pt: distinguishes a single-grapheme ~0-width glyph (genuine
     /// residual) from a multi-scalar merge artifact.
     let courierAdvance12pt: Double
 }
@@ -80,7 +80,7 @@ struct FontResourceInfo: Sendable {
     let hasToUnicode: Bool
 }
 
-/// One-line §12.2-safe pipeline measurement: per-layer FAIL flags + count
+/// One-line, content-free pipeline measurement: per-layer FAIL flags + count
 /// deltas. `deficit > 0` is the ONLY thing that fails Layer 7 (output composed
 /// fewer characters than survived); a non-positive deficit means output ≥
 /// surviving (no loss). Counts/booleans only — no content.
@@ -140,8 +140,8 @@ enum SearchableMergeProbe {
 
     /// Surviving `[CharacterInfo]` per page under the SAME extract+filter the
     /// pipeline performs (deterministic), so this matches the exported layer's
-    /// input when called with the same `regions`. Needed for OQ-1 run-structure
-    /// and the filter-side category census.
+    /// input when called with the same `regions`. Needed for run-structure
+    /// analysis and the filter-side category census.
     static func survivingPerPage(
         _ fixtureData: Data,
         regions: [Int: [RedactionRegion]]
@@ -222,7 +222,7 @@ enum SearchableMergeProbe {
     }
 
     /// Category census of a sequence of composed-character strings. Content is
-    /// inspected to bucket; only counts are retained (ARCH §12.2).
+    /// inspected to bucket; only counts are retained.
     static func census<S: Sequence>(_ composed: S) -> CategoryCensus where S.Element == String {
         var c = CategoryCensus()
         for s in composed {
@@ -294,7 +294,7 @@ enum SearchableMergeProbe {
     }
 
     /// Emitted font dicts on an output page: BaseFont *resource* name +
-    /// /ToUnicode presence. Mirrors what Layer 8 SVT-4 inspects.
+    /// /ToUnicode presence. Mirrors what the Layer 8 check inspects.
     static func fontReport(_ page: PDFPage) -> [FontResourceInfo] {
         guard let pageRef = page.pageRef, let dict = pageRef.dictionary else { return [] }
         var resources: CGPDFDictionaryRef?
@@ -352,7 +352,7 @@ enum SearchableMergeProbe {
         return (try? Data(contentsOf: url)) ?? Data()
     }
 
-    /// One-line §12.2-safe summary of a fixture through the full pipeline +
+    /// One-line, content-free summary of a fixture through the full pipeline +
     /// the sandwich layers: which of Layers 6/7/8/9/10 FAIL, and the count
     /// deltas. Used to compare deficit mechanisms quickly.
     static func quickMeasure(_ fixture: Data, regions: [Int: [RedactionRegion]]) async throws -> QuickMeasure {
@@ -417,13 +417,13 @@ enum SearchableMergeProbe {
         return (try? Data(contentsOf: url)) ?? Data()
     }
 
-    /// OQ-4 FIX-A prototype (TEST-LOCAL — does NOT import or modify
+    /// FIX-A prototype (TEST-LOCAL — does NOT import or modify
     /// `TextLayerReconstructor`; draws into a throwaway CGPDFContext). Implements
-    /// the master plan §4.1 monotonic cell assignment by hand and draws EACH
+    /// a monotonic cell assignment by hand and draws EACH
     /// grapheme as its own positioned Courier-12pt unit:
     ///   `x_k = max(floor(srcMinX/cw)·cw, x_{k-1}+cw)` per line; reset on a new
-    /// line (Y change). This is the SHAPE S02 would put in the reconstructor —
-    /// prototyped here so S01 can validate it produces on-grid, 1:1,
+    /// line (Y change). This is the shape a future reconstructor change would
+    /// take — prototyped here to validate it produces on-grid, 1:1,
     /// non-overlapping placement before any production code is written.
     static func renderMonotonicPrototype(_ chars: [CharacterInfo], pageSize: CGSize) -> Data {
         let url = FileManager.default.temporaryDirectory
@@ -498,7 +498,7 @@ enum SearchableMergeProbe {
     }
 
     /// CoreText horizontal advance of `grapheme` summed over its UTF-16 units
-    /// in the given font. Used to classify near-zero output glyphs (OQ-2)
+    /// in the given font. Used to classify near-zero output glyphs
     /// without printing the grapheme.
     static func courierHorizontalAdvance(of grapheme: String, font: CTFont) -> Double {
         let utf16 = Array(grapheme.utf16)

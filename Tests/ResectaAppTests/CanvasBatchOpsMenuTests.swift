@@ -4,11 +4,11 @@ import CoreGraphics
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-39 — canvas batch-ops "More" menu in the toolbar.
+// Canvas batch-ops "More" menu in the toolbar.
 // Bundles Select All on Page / Deselect / Delete Selected behind one
 // chevron when at least one region is selected. The destructive Delete
 // Selected entry routes through the existing batch-delete confirmation
-// dialog (which now displays the WU-42 M-D.2 page-span line).
+// dialog (which now displays the page-span line).
 //
 // Three contracts pinned here without a SwiftUI host:
 // 1. Visibility predicate gates the menu on selection emptiness.
@@ -17,9 +17,9 @@ import RedactionEngine
 //    truth, no parallel mutation path.
 // 3. Delete Selected does NOT touch state directly; it asks for
 //    confirmation by flipping `showBatchDeleteConfirmation` so the
-//    WU-42 M-D.2 message renders.
+//    page-span message renders.
 
-@Suite("Canvas batch-ops menu (WU-39)")
+@Suite("Canvas batch-ops menu")
 @MainActor
 struct CanvasBatchOpsMenuTests {
 
@@ -98,7 +98,7 @@ struct CanvasBatchOpsMenuTests {
     func deleteSelectedDeferToDialog() {
         // The menu's destructive button only flips
         // `showBatchDeleteConfirmation` to true so the existing dialog
-        // (with the WU-42 M-D.2 page-span message) confirms before any
+        // (with the page-span message) confirms before any
         // deletion. State mutation lives behind that dialog's primary
         // button. This test pins the contract by checking the menu
         // body would NOT remove regions on its own — the regions stay
@@ -120,7 +120,7 @@ struct CanvasBatchOpsMenuTests {
         #expect(state.selectedRegionIDs.count == 4)
     }
 
-    // MARK: - UXC-31 (RB-40) — dialog-grammar normalization
+    // MARK: - Dialog-grammar normalization
 
     @Test("Batch-delete dialog title is a sentence-case question, singular-aware")
     func batchDeleteDialogTitlePinned() {
@@ -129,13 +129,13 @@ struct CanvasBatchOpsMenuTests {
         #expect(DocumentEditorView.batchDeleteDialogTitle(regionCount: 40) == "Delete 40 regions?")
     }
 
-    // MARK: - Cross-verify WU-42 M-D.2 message renders for this entry too
+    // MARK: - Cross-verify the page-span message renders for this entry too
 
     @Test("Delete Selected reuses the batch-delete dialog page-span line")
     func deleteSelectedRendersPageSpanMessage() {
         // Pin the cross-WU contract: the menu's "Delete Selected" entry
         // shares the same `showBatchDeleteConfirmation` dialog with the
-        // standalone deleteButton, so the M-D.2 page-span line ("Deleting
+        // standalone deleteButton, so the page-span line ("Deleting
         // N regions across M pages.") renders identically whether the
         // user routes through the toolbar trash icon or the More menu.
         let msg = DocumentEditorView.batchDeleteDialogMessage(

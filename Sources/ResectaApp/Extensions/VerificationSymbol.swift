@@ -1,7 +1,7 @@
 import SwiftUI
 import RedactionEngine
 
-/// VI (D-76 K-2): app-side router from verification-layer identity to the
+/// App-side router from verification-layer identity to the
 /// custom symbol assets in Resources/Assets.xcassets.
 ///
 /// Keyed on the layer's intrinsic `name`, never the stored `symbolName`:
@@ -11,7 +11,7 @@ import RedactionEngine
 /// symbol — that path is what keeps old persisted reports rendering.
 enum VerificationSymbol {
     /// Layer name → asset name. Names are the engine's
-    /// `VerificationEngine.layerName(at:)` strings (ENGINE §6.8 family);
+    /// `VerificationEngine.layerName(at:)` strings;
     /// VerificationSymbolTests pins the two lists against each other.
     static let layerAssets: [String: String] = [
         "Text Extraction": "resecta.verify.layer01",

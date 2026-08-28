@@ -2,7 +2,7 @@ import Foundation
 import UIKit
 import RedactionEngine
 
-// W5 — build audit records from live SearchResult + applied snapshots,
+// Build audit records from live SearchResult + applied snapshots,
 // write CSV + JSON to the temp directory, and present the iOS share
 // sheet. Temp files are cleaned up in the completion handler regardless
 // of whether the share sheet completes or is cancelled. No scratch file
@@ -101,10 +101,11 @@ enum MatchExportService {
         )
     }
 
-    /// W-I2 — translate engine ruleID through the A22 alias map and return
-    /// the catalog `version` string. Returns nil when the engine emits a
-    /// ruleID without a catalog mapping (synthetic `user.alwaysFlag`,
-    /// fallback `pii.other`) or when `RuleCatalog` failed to load.
+    /// Translate engine ruleID through the rule-catalog alias map and
+    /// return the catalog `version` string. Returns nil when the engine
+    /// emits a ruleID without a catalog mapping (synthetic
+    /// `user.alwaysFlag`, fallback `pii.other`) or when `RuleCatalog`
+    /// failed to load.
     private static func ruleVersion(for engineRuleID: String?) -> String? {
         guard let engineRuleID else { return nil }
         return RuleCatalog.shared?.entry(forEngineRuleID: engineRuleID)?.version
@@ -112,15 +113,15 @@ enum MatchExportService {
 
     // MARK: - Share
 
-    /// Pkg C / ERR-01 + ERR-02: copy surfaced when the triage CSV / JSON
-    /// pair fails to write — or when the JSON encoder itself throws (Pkg C
-    /// flipped `MatchAuditExporter.json` to a throwing signature). Mechanism
-    /// description per ARCH §1.3. Pinned by `MatchExportServiceFailureTests`.
+    /// Copy surfaced when the triage CSV / JSON pair fails to write, or when
+    /// the JSON encoder itself throws (the encoder call has a throwing
+    /// signature). Mechanism description — no outcome promise. Pinned by
+    /// `MatchExportServiceFailureTests`.
     static let triageWriteFailureToastMessage = "Could not save the match audit log."
 
-    /// Pkg C / ERR-04: copy surfaced when the WU-16 coverage-snapshot
-    /// CSV / JSON pair fails to write. Mechanism description per ARCH §1.3.
-    /// Pinned by `MatchExportServiceFailureTests`.
+    /// Copy surfaced when the coverage-snapshot CSV / JSON pair fails to
+    /// write. Mechanism description — no outcome promise. Pinned by
+    /// `MatchExportServiceFailureTests`.
     static let coverageSnapshotWriteFailureToastMessage = "Could not save the coverage snapshot."
 
     /// Copy surfaced when the share sheet is
@@ -137,13 +138,13 @@ enum MatchExportService {
     /// serialization + I/O.
     ///
     /// Audit-leak guard: the artifacts land in
-    /// `tempDirectory` (the SEC-2 `redacted_session_<UUID>/` subdirectory,
+    /// `tempDirectory` (the `redacted_session_<UUID>/` subdirectory,
     /// backup-excluded at directory level) instead of the bare
     /// `FileManager.default.temporaryDirectory`.
     ///
-    /// S6 / C10: `UIActivityViewController` is a UIKit surface outside
-    /// SwiftUI's `.privacySensitive()` / shield system entirely — the
-    /// available mitigation is the SEC-4-style intercept below: when
+    /// `UIActivityViewController` is a UIKit surface outside SwiftUI's
+    /// `.privacySensitive()` / shield system entirely — the available
+    /// mitigation is the intercept below: when
     /// `captureMonitor.isShielded` at the moment of presentation, the
     /// share is withheld, the just-written pair is unlinked, and an
     /// `.info` toast explains why.
@@ -186,16 +187,15 @@ enum MatchExportService {
             activityItems: [pair.csv, pair.json],
             applicationActivities: nil
         )
-        // C-K lifecycle contract (dossier §4): the pair is unlinked on share
-        // dismiss by this handler. If it does not fire (app killed before
-        // dismissal), `cleanOrphanedTempFiles()` removes the files at next
-        // launch within the 1-hour TTL — the enclosing `redacted_session_…/`
-        // subtree matches the `redacted_` prefix and `resecta_audit_*`
-        // matches the `resecta_` prefix. While they exist the files are
-        // protected at `.complete` (SEC-1, best-effort) and live in
-        // the SEC-2 backup-excluded session subdirectory. A `removeItem`
-        // failure here leaves the file at `.complete` until that sweep — a
-        // known-bounded residual (dossier §4 trace 4).
+        // The pair is unlinked on share dismiss by this handler. If it does
+        // not fire (app killed before dismissal), `cleanOrphanedTempFiles()`
+        // removes the files at next launch within the 1-hour TTL — the
+        // enclosing `redacted_session_…/` subtree matches the `redacted_`
+        // prefix and `resecta_audit_*` matches the `resecta_` prefix. While
+        // they exist the files are protected at `.complete` (best-effort)
+        // and live in the backup-excluded session subdirectory. A
+        // `removeItem` failure here leaves the file at `.complete` until
+        // that sweep — a known-bounded residual.
         activity.completionWithItemsHandler = { _, _, _, _ in
             try? FileManager.default.removeItem(at: pair.csv)
             try? FileManager.default.removeItem(at: pair.json)
@@ -204,13 +204,13 @@ enum MatchExportService {
         presenter.present(activity, animated: true)
     }
 
-    /// Pkg C / ERR-01 + ERR-02 testable seam: serialize records and write
-    /// the CSV / JSON pair to a caller-provided directory, surfacing a
-    /// `.error` toast on failure. Returns the URL pair on success, nil on
-    /// failure. Exposed `internal` so `MatchExportServiceFailureTests` can
-    /// pass a read-only directory or unencodable metadata and assert the
-    /// toast enqueue without invoking `UIActivityViewController`.
-    /// Production calls pass `TempExportDirectory.url` (S6 audit-leak fix).
+    /// Testable seam: serialize records and write the CSV / JSON pair to a
+    /// caller-provided directory, surfacing a `.error` toast on failure.
+    /// Returns the URL pair on success, nil on failure. Exposed `internal`
+    /// so `MatchExportServiceFailureTests` can pass a read-only directory or
+    /// unencodable metadata and assert the toast enqueue without invoking
+    /// `UIActivityViewController`. Production calls pass
+    /// `TempExportDirectory.url`.
     @MainActor
     static func writeTriageExport(
         records: [MatchAuditRecord],
@@ -236,13 +236,13 @@ enum MatchExportService {
                 )
                 try csvData.write(to: csvURL, options: [.atomic])
                 try jsonData.write(to: jsonURL, options: [.atomic])
-                // SEC-1: harden the just-written pair, best-effort.
+                // Harden the just-written pair, best-effort.
                 try? TempFileHardening.applyProtection(csvURL, level: .complete)
                 try? TempFileHardening.applyProtection(jsonURL, level: .complete)
-                // SEC-2: per-file backup exclusion. These
-                // already live in the SEC-2 `redacted_session_<UUID>/`
-                // subdirectory (excluded at the directory level), so the
-                // per-file flag is belt-and-suspenders for the share artifacts.
+                // Per-file backup exclusion. These already live in the
+                // `redacted_session_<UUID>/` subdirectory (excluded at the
+                // directory level), so the per-file flag is belt-and-suspenders
+                // for the share artifacts.
                 Self.excludeFromBackup(csvURL)
                 Self.excludeFromBackup(jsonURL)
                 return true
@@ -254,19 +254,19 @@ enum MatchExportService {
         }.value
 
         guard writeSucceeded else {
-            // Pkg C / ERR-01, ERR-02: previously a silent return — the
-            // share-sheet path was indistinguishable from a UI bug. Surface
-            // a Tier 1 `.error` toast (top, red). Covers both the file-write
-            // failure path and (post-Pkg-C) the JSON-encoder throw path.
+            // Previously a silent return — the share-sheet path was
+            // indistinguishable from a UI bug. Surface a Tier 1 `.error`
+            // toast (top, red). Covers both the file-write failure path and
+            // the JSON-encoder throw path.
             toastManager.enqueue(Self.triageWriteFailureToastMessage, severity: .error)
             return nil
         }
         return (csv: csvURL, json: jsonURL)
     }
 
-    // MARK: - WU-16 Coverage Snapshot Share
+    // MARK: - Coverage Snapshot Share
 
-    /// WU-16: serialize a `CoverageReport` to counts-only CSV. Matched
+    /// Serialize a `CoverageReport` to counts-only CSV. Matched
     /// text is never written here; the per-category section enumerates
     /// only `(category.rawValue, candidateCount, overlapSuppressedCount)`.
     /// Test invariant: assert no substring match against any
@@ -305,7 +305,7 @@ enum MatchExportService {
         return Data(lines.joined(separator: "\n").utf8)
     }
 
-    /// WU-16: serialize a `CoverageReport` to counts-only JSON. Same
+    /// Serialize a `CoverageReport` to counts-only JSON. Same
     /// privacy invariant as `coverageSnapshotCSV`.
     nonisolated static func coverageSnapshotJSON(
         _ report: CoverageReport,
@@ -335,7 +335,7 @@ enum MatchExportService {
         )) ?? Data()
     }
 
-    /// WU-16: write counts-only CSV+JSON to temp + present
+    /// Write counts-only CSV+JSON to temp + present
     /// `UIActivityViewController`. Mirrors `share` for the temp-file +
     /// activity-view-controller plumbing; payload is structurally
     /// different (no per-match data) so it ships through this dedicated
@@ -361,16 +361,15 @@ enum MatchExportService {
             activityItems: [csvURL, jsonURL],
             applicationActivities: nil
         )
-        // C-K lifecycle contract (dossier §4): the pair is unlinked on share
-        // dismiss by this handler. If it does not fire (app killed before
-        // dismissal), `cleanOrphanedTempFiles()` removes the files at next
-        // launch within the 1-hour TTL (the `resecta_` prefix matches
-        // `resecta_coverage_*`). While they exist the files are protected at
-        // `.complete` (SEC-1, best-effort) and excluded from backup
-        // per-file (SEC-2) — coverage shares write to flat
-        // `temporaryDirectory`, not a SEC-2 session subdirectory. A
-        // `removeItem` failure here leaves the file at `.complete` until that
-        // sweep — a known-bounded residual (dossier §4 trace 4).
+        // The pair is unlinked on share dismiss by this handler. If it does
+        // not fire (app killed before dismissal), `cleanOrphanedTempFiles()`
+        // removes the files at next launch within the 1-hour TTL (the
+        // `resecta_` prefix matches `resecta_coverage_*`). While they exist
+        // the files are protected at `.complete` (best-effort) and excluded
+        // from backup per-file — coverage shares write to flat
+        // `temporaryDirectory`, not a session subdirectory. A `removeItem`
+        // failure here leaves the file at `.complete` until that sweep — a
+        // known-bounded residual.
         activity.completionWithItemsHandler = { _, _, _, _ in
             try? FileManager.default.removeItem(at: csvURL)
             try? FileManager.default.removeItem(at: jsonURL)
@@ -379,12 +378,12 @@ enum MatchExportService {
         presenter.present(activity, animated: true)
     }
 
-    /// Pkg C / ERR-04 testable seam: serialize the coverage report and
-    /// write the CSV / JSON pair to a caller-provided directory, surfacing
-    /// a `.error` toast on failure. Returns the URL pair on success, nil
-    /// on failure. Exposed `internal` so `MatchExportServiceFailureTests`
-    /// can pass a read-only directory and assert the toast enqueue without
-    /// invoking `UIActivityViewController`. Production calls pass
+    /// Testable seam: serialize the coverage report and write the CSV /
+    /// JSON pair to a caller-provided directory, surfacing a `.error` toast
+    /// on failure. Returns the URL pair on success, nil on failure. Exposed
+    /// `internal` so `MatchExportServiceFailureTests` can pass a read-only
+    /// directory and assert the toast enqueue without invoking
+    /// `UIActivityViewController`. Production calls pass
     /// `FileManager.default.temporaryDirectory`.
     @MainActor
     static func writeCoverageSnapshot(
@@ -408,12 +407,12 @@ enum MatchExportService {
             do {
                 try csvData.write(to: csvURL, options: [.atomic])
                 try jsonData.write(to: jsonURL, options: [.atomic])
-                // SEC-1: harden the just-written pair, best-effort.
+                // Harden the just-written pair, best-effort.
                 try? TempFileHardening.applyProtection(csvURL, level: .complete)
                 try? TempFileHardening.applyProtection(jsonURL, level: .complete)
-                // SEC-2: per-file backup exclusion — coverage
-                // share files write to flat `temporaryDirectory` (no SEC-2
-                // session subdirectory), so the per-file flag is the exclusion.
+                // Per-file backup exclusion — coverage share files write to
+                // flat `temporaryDirectory` (no session subdirectory), so the
+                // per-file flag is the exclusion.
                 Self.excludeFromBackup(csvURL)
                 Self.excludeFromBackup(jsonURL)
                 return true
@@ -425,9 +424,9 @@ enum MatchExportService {
         }.value
 
         guard writeSucceeded else {
-            // Pkg C / ERR-04: previously a silent return — surface a Tier 1
-            // `.error` toast (top, red) so the user knows the coverage
-            // snapshot did not reach the share sheet.
+            // Previously a silent return — surface a Tier 1 `.error` toast
+            // (top, red) so the user knows the coverage snapshot did not
+            // reach the share sheet.
             toastManager.enqueue(Self.coverageSnapshotWriteFailureToastMessage, severity: .error)
             return nil
         }
@@ -451,12 +450,13 @@ enum MatchExportService {
 
     // MARK: - Helpers
 
-    /// SEC-2: exclude a single share-sheet temp file from
-    /// iCloud / local backup. The export share files are transient (unlinked
-    /// on dismiss) and have no `TempExportDirectory` lifecycle owner, so the
-    /// directory-level exclusion `TempExportDirectory.prepare()` applies is
-    /// unavailable here; the per-file flag is the chosen mechanism. Best-effort (`try?`),
-    /// mirroring the directory-level call in `TempExportDirectory.prepare()`.
+    /// Exclude a single share-sheet temp file from iCloud / local backup.
+    /// The export share files are transient (unlinked on dismiss) and have
+    /// no `TempExportDirectory` lifecycle owner, so the directory-level
+    /// exclusion `TempExportDirectory.prepare()` applies is unavailable
+    /// here; the per-file flag is the chosen mechanism. Best-effort
+    /// (`try?`), mirroring the directory-level call in
+    /// `TempExportDirectory.prepare()`.
     /// `nonisolated` so it can run inside the `Task.detached` write blocks.
     nonisolated private static func excludeFromBackup(_ url: URL) {
         var values = URLResourceValues()

@@ -1,6 +1,6 @@
 import Foundation
 
-// Plan §2 / A7 — exact-match surface-form propagation. After the user
+// Exact-match surface-form propagation. After the user
 // accepts or rejects a detection, the surface string ("123-45-6789",
 // "Dr. Jane Smith") is recorded here so later pages short-circuit to the
 // same decision without re-scoring.
@@ -16,7 +16,7 @@ public struct SurfaceFormDictionary: Sendable, Equatable {
 
     /// Maximum number of entries before insertion-LRU eviction kicks in.
     /// `internal` so tests may assert against it; not part of the public API.
-    /// Spec §7.7 F-11: hardcoded for V1; runtime configuration deferred.
+    /// Hardcoded for V1; runtime configuration deferred.
     internal static let capacity = 10_000
 
     private var map: [String: Decision]

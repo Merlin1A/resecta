@@ -4,9 +4,9 @@ import CoreGraphics
 import PDFKit
 @testable import RedactionEngine
 
-// CAT-369 — writtenPageCount postcondition.
+// writtenPageCount postcondition.
 //
-// Under draw-on-append (K=0, CND-11) each appendPage draws one page, except
+// Under draw-on-append (K=0) each appendPage draws one page, except
 // where the per-page decode guard drops it silently. `writtenPageCount` must
 // reflect the pages actually drawn so the coordinator can gate the atomic
 // rename on it (PipelineCoordinator: writtenPageCount == pages.count) and never
@@ -35,7 +35,7 @@ struct PDFStreamReconstructorDroppedPageTests {
                 "Every buffered page decoded, so all are written")
     }
 
-    @Test("finalize counts only pages that actually wrote (CAT-369)")
+    @Test("finalize counts only pages that actually wrote")
     func finalizeCountsWrittenPages() async throws {
         let url = makeTempURL()
         defer { try? FileManager.default.removeItem(at: url) }

@@ -1,6 +1,6 @@
 import Foundation
 
-// Plan §5 — union-find (DSU) over integer indices. Used by EntityClusterer
+// Disjoint-set union (DSU) over integer indices. Used by EntityClusterer
 // to merge name detections into equivalence classes.
 
 struct UnionFind {

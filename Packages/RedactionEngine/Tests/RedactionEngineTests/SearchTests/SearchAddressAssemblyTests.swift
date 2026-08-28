@@ -4,10 +4,10 @@ import PDFKit
 import CoreGraphics
 @testable import RedactionEngine
 
-// RC-4 — Search-leg spatial address assembly.
+// Search-leg spatial address assembly.
 //
 // The detection path (DetectionOrchestrator.detectPage Step 3a) has run
-// AddressSpatialAssembler over per-line records since WS1 item 1.6; both
+// AddressSpatialAssembler over per-line records; both
 // Search PII-scan legs ran only the flat single-line regex arms, so a
 // multi-line address block never became a Search candidate on either leg.
 // This suite pins the wiring on both legs — text leg over
@@ -20,7 +20,7 @@ import CoreGraphics
 // log matched text from it. The synthetic block fixtures reuse the same
 // disclosed values.
 
-@Suite("Search-leg address assembly (RC-4)", .tags(.search))
+@Suite("Search-leg address assembly", .tags(.search))
 struct SearchAddressAssemblyTests {
 
     // MARK: - Helpers
@@ -80,7 +80,7 @@ struct SearchAddressAssemblyTests {
         ], rootId: 1)
     }
 
-    /// Thread-safe accumulator for the W10 overlap sink.
+    /// Thread-safe accumulator for the overlap sink.
     private final class OverlapTally: @unchecked Sendable {
         private let lock = NSLock()
         private var accumulated: [PIICategory: Int] = [:]
@@ -214,7 +214,7 @@ struct SearchAddressAssemblyTests {
         #expect(gated.filter { $0.piiCategory == .address }.isEmpty,
                 "an address cutoff above 0.80 must gate the assembled candidate out")
 
-        // Nil vector: pre-W4 behavior, assembled candidate passes ungated.
+        // Nil vector: prior behavior, assembled candidate passes ungated.
         let ungated = await runPIIScan(doc: doc, categories: [.address], vector: nil)
         #expect(ungated.contains { $0.matchedText.contains("Wrenfield") && $0.piiConfidence == 0.80 },
                 "with no vector installed the assembled candidate passes through")
@@ -340,7 +340,7 @@ struct SearchAddressAssemblyTests {
         let winner = try #require(addressResults.first)
         #expect(winner.matchedText.contains("Box 512"))
         // The winner's range is widened to the coalesced group span, so its
-        // rect covers the whole seeded line (D05-F1 semantics).
+        // rect covers the whole seeded line.
         #expect(winner.normalizedRect.width >= 0.39,
                 "coalesced winner must cover the full line, got \(winner.normalizedRect)")
         #expect(tally.counts[.address] == 1,

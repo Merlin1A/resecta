@@ -1,20 +1,19 @@
 import Testing
 import Foundation
 
-// CAT-082 (D-10) — Apache License 2.0 Section 4(d) NOTICE.
+// Apache License 2.0 Section 4(d) NOTICE.
 //
-// ARCHITECTURE.md Section 1.3 asserts a NOTICE file "carries the propagated
-// entries" for the gazetteer / Bloom / classifier artifacts bundled in the iOS
-// app, but no NOTICE existed in the tree at the pin — an unmet attribution
-// obligation and a false spec claim. D-10: the NOTICE skeleton lands now with
-// the two confirmed pipeline rows (OpenStreetMap ODbL, OpenAddresses CC0);
-// The maintainer adds the MIT / courtesy rows at the V1.0 tag.
+// A NOTICE file carries the propagated attribution entries for the
+// gazetteer / Bloom / classifier artifacts bundled in the iOS app. The
+// NOTICE skeleton lands now with the two confirmed pipeline rows
+// (OpenStreetMap ODbL, OpenAddresses CC0); the MIT / courtesy rows land at
+// the version tag.
 //
 // These guards pin the file's existence and its two confirmed attributions so
 // the spec claim stays true and a future edit cannot silently drop them. The
 // NOTICE lives at the repo root (the Apache convention; it is a distribution /
 // source-tree file, not a bundled resource), so it is read via #filePath.
-@Suite("Apache NOTICE attribution (CAT-082)")
+@Suite("Apache NOTICE attribution")
 struct NoticeFileTests {
 
     private func noticeContents(file: StaticString = #filePath) throws -> String {
@@ -43,7 +42,7 @@ struct NoticeFileTests {
             "NOTICE missing the OpenAddresses (CC0 1.0) attribution row")
     }
 
-    // MARK: - Manifest-driven license classification (launch-fix-v2 · S3 · CND-07)
+    // MARK: - Manifest-driven license classification
     //
     // The name Bloom artifacts bundled in the app are built by
     // resecta-datapipeline from the upstream data sources named in
@@ -86,7 +85,7 @@ struct NoticeFileTests {
 
         // Explicit token -> license table, verified against
         // resecta-datapipeline/SOURCES.md (2026-06-23). NOTE: popnames is CC0,
-        // not the "public-domain" label the S3 brief approximated — CC0 is
+        // not "public-domain" as earlier approximated — CC0 is
         // likewise a no-attribution-required class, so the NOTICE needs no
         // popnames row. Only the MIT rows (paranames) drive a required substring.
         let sourceLicenses: [String: SourceLicense] = [
@@ -135,7 +134,7 @@ struct NoticeFileTests {
             "NOTICE dropped the es_ES Faker contributor co-attribution (Álvaro Mondéjar Rubio)")
     }
 
-    @Test("MIT inbound NOTICE rows are authored and discharged (RED until Jesse fills the TODO block)")
+    @Test("MIT inbound NOTICE rows are authored and discharged")
     func testMITInboundAttributionDischarged() throws {
         let contents = try noticeContents()
 
@@ -143,18 +142,11 @@ struct NoticeFileTests {
         // compliant MIT notice reproduces the permission grant verbatim.
         #expect(
             contents.contains("Permission is hereby granted, free of charge"),
-            "NOTICE lacks the MIT permission notice — the Faker / paranames rows are not yet authored (Jesse-owned, DEC-6)")
+            "NOTICE lacks the MIT permission notice — the Faker / paranames rows are not yet authored")
 
-        // The TODO(Jesse) checklist must be fully discharged: no unchecked row
-        // may remain once the MIT rows are authored and the artifacts confirmed.
-        let header = "TODO(Jesse)"
-        if let range = contents.range(of: header) {
-            let todoBlock = contents[range.lowerBound...]
-            #expect(
-                !todoBlock.contains("[ ]"),
-                "NOTICE still has unchecked TODO(Jesse) attribution rows — Jesse authors the MIT row text and checks the boxes before submission")
-        } else {
-            Issue.record("NOTICE TODO(Jesse) header not found — the MIT-inbound checklist block is missing")
-        }
+        // Every attribution checklist row must be discharged: no unchecked
+        // `[ ]` marker may remain anywhere in NOTICE once the MIT rows are
+        // authored and the artifacts confirmed.
+        #expect(!contents.contains("[ ]"), "NOTICE still has an unchecked attribution row — the MIT row text and checkboxes must be completed before submission")
     }
 }

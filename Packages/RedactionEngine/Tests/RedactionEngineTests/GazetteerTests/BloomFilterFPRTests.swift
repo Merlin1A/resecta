@@ -2,9 +2,9 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Plan Phase 2 / §G2 exit criterion — measure false-positive rate of the
-// production surname Bloom filter against a held-out non-name corpus.
-// Target: FPR ≤ 0.15% (plan §85). Manifest declares 0.1% FPR target.
+// Exit criterion — measure false-positive rate of the production surname
+// Bloom filter against a held-out non-name corpus. Target: FPR ≤ 0.15%.
+// Manifest declares 0.1% FPR target.
 //
 // This test is **gated on asset size**: when the bundled `surnames.bloom`
 // is still the Phase-1 scaffold (≤ 400 B, n ≤ 200), the assertion is
@@ -12,7 +12,7 @@ import Foundation
 // `DataPipeline/make install-assets` to drop the 285 KB / 162 292-entry
 // production filter into `Resources/Gazetteers/`.
 
-@Suite("BloomFilter FPR gate (G2 exit criterion)")
+@Suite("BloomFilter FPR gate")
 struct BloomFilterFPRTests {
 
     /// Common English words that are not names. ~500 entries, drawn from
@@ -140,16 +140,16 @@ struct BloomFilterFPRTests {
         "wherein", "whereby", "hereinafter", "heretofore", "herewith",
     ]
 
-    // B07 re-arm (report-only): the disabled decorator is removed so this test
-    // RUNS against the curated installed surname asset via Bundle.module. The
-    // membership probe of an English non-name word list against a multilingual
-    // name corpus does not reach the 0.0015 design target — the curated bar is
-    // ~0.184 (a shard-streamed/observed estimate, not artifact-re-derivable;
-    // 05-final-plan §3 C-9). The 0.0015 over-gate factor is the live 240× per
-    // 05-final-plan C-8 (the prior decorator text quoted a stale 84×). This
-    // probe is therefore REPORTED, not hard-asserted at 0.0015; only a
-    // well-formedness sanity check is asserted. The 0.0015 design-target gate
-    // remains tracked separately (see measureNameBloomMembershipFPR below).
+    // This report-only decorator runs the test against the curated installed
+    // surname asset via Bundle.module. The membership probe of an English
+    // non-name word list against a multilingual name corpus does not reach
+    // the 0.0015 design target — the curated bar is ~0.184 (a
+    // shard-streamed/observed estimate, not artifact-re-derivable). The
+    // 0.0015 over-gate factor is the live 240× (the prior decorator text
+    // quoted a stale 84×). This probe is therefore REPORTED, not
+    // hard-asserted at 0.0015; only a well-formedness sanity check is
+    // asserted. The 0.0015 design-target gate remains tracked separately
+    // (see measureNameBloomMembershipFPR below).
     @Test(
         "Surname Bloom membership FPR — report-only (curated asset, own bar)"
     )
@@ -181,9 +181,9 @@ struct BloomFilterFPRTests {
 
         let observedFPR = Double(membershipHits) / Double(samples.count)
         // Report-only: emit the observed membership rate (counts + rate only,
-        // no words, per ARCH §12.2). The curated bar (~0.184, a shard-streamed
-        // estimate) is over the 0.0015 design target by the live 240× factor
-        // (05-final-plan C-8); this probe does not hard-assert that target.
+        // no words). The curated bar (~0.184, a shard-streamed estimate) is
+        // over the 0.0015 design target by the live 240× factor; this probe
+        // does not hard-assert that target.
         print("[FPR gate] surname membership FPR (report-only): " +
               "\(membershipHits)/\(samples.count)=\(observedFPR) " +
               "rowCount=\(filter.rowCount)")
@@ -195,9 +195,9 @@ struct BloomFilterFPRTests {
                 "surname filter rowCount=\(filter.rowCount) looks like the scaffold")
     }
 
-    // MARK: - S3 baseline M1 — name-Bloom membership FPR measurement (emitter)
+    // MARK: - Baseline name-Bloom membership FPR measurement (emitter)
     //
-    // Pinned by the detection-baseline evaluation contract (File 3).
+    // Pinned by the detection-baseline evaluation contract.
     //
     // This is a STANDING MEASUREMENT, not the disabled gate above. It records
     // what fraction of the ~500-word English non-name set is reported present by
@@ -206,17 +206,17 @@ struct BloomFilterFPRTests {
     // a category-distinct quantity from a Bloom collision/false-positive rate.
     // Many ordinary English words (e.g. occupational or toponymic surnames) are
     // genuine corpus members, so a non-trivial membership rate here is expected
-    // and is NOT the 0.1% design FPR of the filter. The S3 work characterizes
-    // this number; it deliberately does NOT assert the 0.0015 threshold (that is
-    // the known red the disabled gate above tracks).
+    // and is NOT the 0.1% design FPR of the filter. This measurement
+    // characterizes that number; it deliberately does NOT assert the 0.0015
+    // threshold (that is the known red the disabled gate above tracks).
     //
     // Output: <base>_name_bloom_fpr.json via the shared RESECTA_BASELINE_OUT base.
-    // Emits counts + rates only (no words) per ARCH §12.2.
+    // Emits counts + rates only (no words).
 
     @Test("Measure name-Bloom membership FPR (surname + given) — emitter")
     func measureNameBloomMembershipFPR() throws {
         guard let gazetteer = NameGazetteer() else {
-            print("[M1 bloom-fpr] NameGazetteer resources absent; emit skipped " +
+            print("[bloom-fpr] NameGazetteer resources absent; emit skipped " +
                   "until `make install-assets` runs.")
             return
         }
@@ -259,7 +259,7 @@ struct BloomFilterFPRTests {
         let base = G8BaselineHarnessTests.baselineOutBase()
         try G8BaselineHarnessTests.writeJSON(report, to: "\(base)_name_bloom_fpr.json")
 
-        print("[M1 bloom-fpr] → \(base)_name_bloom_fpr.json " +
+        print("[bloom-fpr] → \(base)_name_bloom_fpr.json " +
               "surname \(surnameHits)/\(samples.count)=\(surnameFPR) " +
               "given \(givenHits)/\(samples.count)=\(givenFPR)")
 
@@ -275,7 +275,7 @@ struct BloomFilterFPRTests {
     }
 }
 
-// MARK: - S3 M1 output JSON (CONTRACT.md File 3)
+// MARK: - Output JSON
 
 struct NameBloomFPRReport: Encodable, Sendable {
     let schema_version: Int

@@ -1,6 +1,6 @@
 import Foundation
 
-// W10 — Cross-category overlap resolution.
+// Cross-category overlap resolution.
 //
 // When two detectors fire on the same (or overlapping) text range — e.g.
 // DEA `AB1234567` vs. Bates `AB1234567` — the resolver keeps one winner
@@ -52,13 +52,13 @@ extension DetectionOrchestrator {
         }
     }
 
-    /// D05-F2 — gate-aware ranking key for overlap winner selection. Lets the
+    /// Gate-aware ranking key for overlap winner selection. Lets the
     /// caller rank survivors by the post-posterior, preset-gate decision
     /// (`meetsThreshold`) and the floored posterior, rather than by raw
     /// detector confidence — so a sibling that will clear ITS own preset cutoff
-    /// is not suppressed by a raw-stronger sibling the W4 gate would then
+    /// is not suppressed by a raw-stronger sibling the preset-threshold gate would then
     /// reject. The orchestrator builds the key with the SAME posterior+cutoff
-    /// math the W4 gate applies (DetectionOrchestrator.swift), so resolver
+    /// math the preset-threshold gate applies (DetectionOrchestrator.swift), so resolver
     /// ranking and gating agree by construction.
     public struct SurvivabilityKey: Sendable, Equatable {
         public let meetsThreshold: Bool
@@ -77,17 +77,17 @@ extension DetectionOrchestrator {
     /// `.other` matches have no `PIICategory` (see
     /// `SearchTypes.swift:70`); losing `.other` members are not counted.
     ///
-    /// D05-F1 — the surviving match's range is widened to the COALESCED span of
+    /// The surviving match's range is widened to the COALESCED span of
     /// its overlap group, so a partially-overlapping loser's non-overlapping
     /// tail still maps to a redaction region (no-op when the group shares one
     /// range).
     ///
-    /// - Parameter survivability: D05-F2 — optional gate-aware ranking. When
+    /// - Parameter survivability: optional gate-aware ranking. When
     ///   supplied, the winner within each group is the member with the best
     ///   `SurvivabilityKey` (clears its preset cutoff → higher floored posterior
     ///   → higher `priorityRank`), so a raw-weaker but better-surviving sibling
-    ///   is not discarded before the W4 gate runs. `nil` → legacy
-    ///   raw-confidence ordering (with the D04-F4 near-tie dead-band).
+    ///   is not discarded before the preset-threshold gate runs. `nil` → legacy
+    ///   raw-confidence ordering (with a near-tie dead-band).
     public static func resolveOverlaps(
         _ matches: [PIIDetector.PIIMatch],
         survivability: (@Sendable (PIIDetector.PIIMatch) -> SurvivabilityKey)? = nil
@@ -125,13 +125,13 @@ extension DetectionOrchestrator {
                 // sort above orders the high-`priorityRank` member first.
                 let winner: PIIDetector.PIIMatch
                 if let survivability {
-                    // D05-F2 — rank by the post-posterior, gate-aware key:
+                    // Rank by the post-posterior, gate-aware key:
                     // prefer the member that will clear its own preset cutoff;
                     // then the higher floored posterior; then higher
                     // `priorityRank`. Supersedes raw-confidence ranking (and the
-                    // D04-F4 dead-band) on the production path, where the
+                    // near-tie dead-band below) on the production path, where the
                     // orchestrator supplies the same posterior+cutoff math the
-                    // W4 gate applies.
+                    // preset-threshold gate applies.
                     winner = group.max { lhs, rhs in
                         let l = survivability(lhs), r = survivability(rhs)
                         if l.meetsThreshold != r.meetsThreshold { return !l.meetsThreshold }
@@ -139,7 +139,7 @@ extension DetectionOrchestrator {
                         return priorityRank(for: lhs.kind) < priorityRank(for: rhs.kind)
                     }!
                 } else {
-                    // D04-F4 — dead-band so structural `priorityRank` governs a
+                    // Dead-band so structural `priorityRank` governs a
                     // near-tie (within epsilon), not only an exact tie, in the
                     // RAW-confidence fallback. resolveOverlaps arbitrates on RAW
                     // confidence BEFORE the posterior/preset layers
@@ -154,11 +154,11 @@ extension DetectionOrchestrator {
                         return priorityRank(for: lhs.kind) < priorityRank(for: rhs.kind)
                     }!
                 }
-                // D05-F1 — size the survivor to the COALESCED group span so a
+                // Size the survivor to the COALESCED group span so a
                 // partially-overlapping loser's non-overlapping tail still maps
                 // to a redaction region downstream (boundingRect unions every
                 // word box intersecting the range). Geometry only — kind,
-                // confidence, rationale, and text are unchanged, so the W4 gate,
+                // confidence, rationale, and text are unchanged, so the preset-threshold gate,
                 // the `.address` text-keyed spatial lookup, and the audit tally
                 // are all unaffected. `unionEnd` is the group's coalesced
                 // NSMaxRange computed above. Identical/contained ranges are the
@@ -198,7 +198,7 @@ extension DetectionOrchestrator {
     /// Append `.suppressedByOverlap(winnerCategory:loserCategory:)` to the
     /// loser's rationale (synthesizing a minimal rationale if it had none) so
     /// the audit exporter and diagnostics UI can surface why the match was
-    /// dropped. QW-5 (SRCH-ACCT-PHONE) — the signal carries the loser's OWN
+    /// dropped. The signal carries the loser's OWN
     /// category alongside the winner's, so downstream labels read
     /// "Account, suppressed via Phone overlap" instead of only the winner's
     /// category.
@@ -241,7 +241,7 @@ extension DetectionOrchestrator {
         case .routingNumber:  return 12
         case .npi:            return 11
         case .medicalRecord:  return 10
-        // DRAW-2 — Vision-detected barcode has machine-decoded payload; rank
+        // Vision-detected barcode has machine-decoded payload; rank
         // alongside structural detectors. Sits below medicalRecord (10) and
         // above licensePlate (8) so a barcode overlap claim is preferred
         // over the loosely-labeled rect-based detectors below.
@@ -255,7 +255,7 @@ extension DetectionOrchestrator {
         case .passport:       return 2
         case .driversLicense: return 1
         case .account:        return 1
-        // DRAW-3 — Heuristic-only kind; participates in overlap resolution
+        // Heuristic-only kind; participates in overlap resolution
         // (a text PII hit overlapping a signature box should win) but ranks
         // below any structured match. Same low rank as .other.
         case .signatureCandidate: return 0

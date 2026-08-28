@@ -4,7 +4,7 @@ import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// UI_UX §2.3: Coordinate transform tests.
+// Coordinate transform tests.
 // Security-critical — incorrect conversion = wrong pixels destroyed.
 
 @Suite("Overlay Coordinate Conversion", .tags(.critical, .overlay))
@@ -126,7 +126,7 @@ struct OverlayCoordinateTests {
         #expect(abs(roundTripped.height - testRect.height) < 0.01)
     }
 
-    // MARK: - UXC-44 (D-116, RB-93) — focused-highlight round-trip
+    // MARK: - Focused-highlight round-trip
 
     private func highlight(y: CGFloat, text: String) -> SearchResult {
         SearchResult(

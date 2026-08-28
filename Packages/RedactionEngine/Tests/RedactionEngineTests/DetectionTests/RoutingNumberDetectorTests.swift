@@ -2,11 +2,11 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Search-impl S2, design 01 §4 — ABA routing-number detector tests.
+// ABA routing-number detector tests.
 // Worked checksum vectors are from the design doc's regex sanity check
 // (021000021 / 322271627 / 124303120 verified by hand there).
 
-@Suite("RoutingNumberDetector (design 01 §4)")
+@Suite("RoutingNumberDetector")
 struct RoutingNumberDetectorTests {
 
     private let detector = RoutingNumberDetector()
@@ -46,7 +46,7 @@ struct RoutingNumberDetectorTests {
         }
     }
 
-    // MARK: - Detection envelope (design §4 test plan)
+    // MARK: - Detection envelope
 
     @Test("Valid ABA with routing context keyword boosts to 0.88")
     func validABAWithContext() {
@@ -61,7 +61,7 @@ struct RoutingNumberDetectorTests {
         let matches = detect("021000021")
         #expect(matches.count == 1)
         #expect(matches.first?.confidence == 0.50)
-        // The W4 gate (not the detector) suppresses this at balanced —
+        // The posterior threshold gate (not the detector) suppresses this at balanced —
         // EnvelopeReachabilityTests pins the threshold relationship.
         #expect((matches.first?.confidence ?? 1.0) < 0.60)
     }
@@ -85,7 +85,7 @@ struct RoutingNumberDetectorTests {
         #expect(detect("aba 0210000211").isEmpty)
     }
 
-    // MARK: - Adversarials (design §4)
+    // MARK: - Adversarials
 
     @Test("Luhn-style 9-digit Visa-prefix lookalike is rejected by the ABA prefix set")
     func visaLookalikeRejected() {

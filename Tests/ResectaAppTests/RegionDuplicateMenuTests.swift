@@ -4,14 +4,14 @@ import CoreGraphics
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-37 — Duplicate Region on the canvas context menu.
+// Duplicate Region on the canvas context menu.
 // The 0.02-offset clamp pre-existed in `RedactionState.duplicateRegion`;
-// this WU promotes it to the long-press menu, retitles the action
+// this promotes it to the long-press menu, retitles the action
 // "Duplicate Region", and overrides the inner addRegion undo name to
 // "Duplicate Redaction" so the iOS long-press Undo menu reads in the
-// existing "<verb> Redaction" pattern (see WU-41).
+// existing "<verb> Redaction" pattern.
 
-@Suite("Region duplicate menu (WU-37)")
+@Suite("Region duplicate menu")
 @MainActor
 struct RegionDuplicateMenuTests {
 

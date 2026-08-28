@@ -5,7 +5,7 @@ import UIKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// UI_UX §3.3: Full pipeline flow integration tests.
+// Full pipeline flow integration tests.
 // Tests the coordinator's orchestration logic: state transitions,
 // guard conditions, and cancellation. Pipeline success depends on
 // simulator resources — tests accept both success (.verified) and
@@ -17,7 +17,7 @@ struct FullPipelineFlowTests {
 
     // MARK: - Orchestration Logic (no real pipeline needed)
 
-    @Test("Full pipeline with no regions is no-op (AD-4-1)",
+    @Test("Full pipeline with no regions is no-op",
           .timeLimit(.minutes(1)))
     func fullPipelineNoRegionsIsNoOp() async throws {
         let coord = makeLoadedCoordinator()
@@ -48,9 +48,9 @@ struct FullPipelineFlowTests {
         coord.documentState.activePipelineTask = nil
     }
 
-    // MARK: - Pre-flight Validation (CAT-138 / D-34)
+    // MARK: - Pre-flight Validation
 
-    @Test("validatePage refuses an oversized page (CAT-138)",
+    @Test("validatePage refuses an oversized page",
           .timeLimit(.minutes(1)))
     func validatePageRefusesOversizedPage() async throws {
         let coord = makeOversizedCoordinator()
@@ -58,7 +58,7 @@ struct FullPipelineFlowTests {
 
         coord.runFullPipeline(documentOverride: .secureRasterization)
 
-        // The CAT-138 pre-flight throws almost immediately; poll for the
+        // The pre-flight check throws almost immediately; poll for the
         // terminal .failed transition with a cap so a regression that lets the
         // oversized page through ends the test instead of hanging.
         var failure: PipelineError?
@@ -71,7 +71,7 @@ struct FullPipelineFlowTests {
         }
 
         guard case .redactionError(.insufficientMemory) = failure else {
-            Issue.record("Expected .redactionError(.insufficientMemory) from the CAT-138 pre-flight, got \(String(describing: failure))")
+            Issue.record("Expected .redactionError(.insufficientMemory) from the pre-flight check, got \(String(describing: failure))")
             return
         }
     }
@@ -107,10 +107,10 @@ struct FullPipelineFlowTests {
     }
 
     /// A 1-page PDF whose page is 5,200 × 300 pt — past the 5,000-pt
-    /// validatePage dimension cap (ENGINE §2.6) but cheap to build. Loaded
+    /// validatePage dimension cap but cheap to build. Loaded
     /// directly onto the coordinator, which bypasses the import-time dimension
-    /// gate so the page reaches `PageRasterizer.rasterize`, where the CAT-138
-    /// pre-flight refuses it with `.insufficientMemory`.
+    /// gate so the page reaches `PageRasterizer.rasterize`, where the
+    /// pre-flight check refuses it with `.insufficientMemory`.
     private func makeOversizedPDFDocument() -> PDFDocument {
         let renderer = UIGraphicsPDFRenderer(
             bounds: CGRect(x: 0, y: 0, width: 5200, height: 300))

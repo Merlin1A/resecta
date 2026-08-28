@@ -18,8 +18,8 @@ import Foundation
 //
 // These tests assert the degrade behavior directly (deterministic) and drive
 // the whole pipeline end-to-end to assert it is crash-safe regardless of
-// whether the sim rasterize throws. The transition table itself is unchanged
-// (CLAUDE.md hard-stop); `transitionTableHasNoEditingToFailed` pins the
+// whether the sim rasterize throws. The transition table itself is unchanged;
+// `transitionTableHasNoEditingToFailed` pins the
 // invariant the fix relies on.
 
 @Suite("Detection error graceful degradation", .tags(.coordination))
@@ -51,7 +51,7 @@ struct DetectionErrorRecoveryTests {
         #expect(toasts.activeToasts.count == 1)
         #expect(toasts.activeToasts.first?.severity == .warning)
         #expect(toasts.activeToasts.first?.message == Self.degradeToast)
-        // UXF-06 — the failed outcome lands in the run record so the
+        // The failed outcome lands in the run record so the
         // summary banner keeps a trace after the toast expires.
         #expect(coordinator.redactionState.lastDetectionRun?.outcome == .failed)
     }
@@ -132,8 +132,8 @@ struct DetectionErrorRecoveryTests {
         // All mock detections land on page 0.
         #expect(pending?.keys.sorted() == [0])
         let page0 = pending?[0] ?? []
-        // 6 mocks — q14 added a second "Jordan Avery" so the Grouped view
-        // mode has a real cluster and "Apply Group" is drivable on-sim.
+        // 6 mocks — a second "Jordan Avery" mock gives the Grouped view
+        // mode a real cluster so "Apply Group" is drivable on-sim.
         #expect(page0.count == 6)
         // Review-first arrival: the seed stages an EMPTY selection map,
         // mirroring the real staging path — the one apply path reads an
@@ -144,7 +144,7 @@ struct DetectionErrorRecoveryTests {
         // A mix of kinds so the triage list, filters, and "Apply N" are exercised.
         let kinds = Set(page0.map { $0.kind })
         #expect(kinds.count >= 3)
-        // q14 — the seed now mirrors the real staging path's sibling
+        // The seed now mirrors the real staging path's sibling
         // writes so the banner, Review re-entry, and Grouped view are
         // drivable on the Simulator.
         #expect(redactionState.detectionResults[0]?.map(\.id) == page0.map(\.id))

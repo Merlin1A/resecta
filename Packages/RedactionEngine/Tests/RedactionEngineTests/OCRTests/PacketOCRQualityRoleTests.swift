@@ -4,7 +4,7 @@ import CryptoKit
 import Testing
 @testable import RedactionEngine
 
-// S06 -- INV-2 retirement checklist, ROLE 1 of 3.
+// Retirement checklist, role 1 of 3.
 //
 // The packet successor to `RealDocOCRQualityTests`. That suite runs the
 // production OCR->detect leg (PageRasterizer.renderPage at the policy DPI ->
@@ -13,15 +13,15 @@ import Testing
 // category COUNTS, asserting the structural invariants (page_count;
 // ocr_invocations == page_count). Its HARD per-category pins run on SYNTHETIC
 // fixtures (the 7/8/9 pt small-text doc; the 20-page memory/latency doc) which
-// are fixture-INDEPENDENT and survive F28 untouched -- so the fixture-specific
+// are fixture-INDEPENDENT and survive untouched -- so the fixture-specific
 // part of the role is exactly the born-digital/scan-sim SWEEP. This suite proves the
 // same SWEEP on the packet scan-sim, the degraded-scan proxy and the production
-// path for this packet (S05: text coverage 0.10-0.21 < 0.95 -> OCR leg).
+// path for this packet (text coverage 0.10-0.21 < 0.95 -> OCR leg).
 //
 // It REUSES the same instrument verbatim (`RealDocOCRQualityTests.sweep`), so
 // the measurement is genuinely the same; only the fixture changes.
 //
-// Cross-walk to S05 (the role transfers with measured-comparable counts): the
+// The role transfers with measured-comparable counts: the
 // committed-snapshot OCR leg (PacketPRHarnessTests, the same forced-OCR path)
 // measured STMT pages 3-5 OCR counts account 7 / phone 7 / address 3 / name 2 /
 // email 1 and OCR-leg region recall 0.565. A live scan-sim sweep is Vision- and
@@ -29,7 +29,7 @@ import Testing
 // a conservative non-emptiness floor and EMITS the per-category counts; the
 // deterministic per-category cross-walk lives in PacketPRHarnessTests.
 //
-// FACE-BLOCK (S05 result #1): pages 10 (GOV-ID) + 11 (VEH) classify non-
+// FACE-BLOCK: pages 10 (GOV-ID) + 11 (VEH) classify non-
 // financial, so detectPage runs the Vision face pass which throws Vision #9 on
 // the simulator. The sweep records those as page_errors and continues; the
 // deterministic ocr_invocations tally counts only pages that COMPLETE the
@@ -39,10 +39,10 @@ import Testing
 // MATCHED-TEXT LOGGING: counts and categories only (this reuses the same
 // instrument, which is counts-only by construction).
 
-@Suite("Packet OCR-quality role (S06 retirement checklist)", .serialized)
+@Suite("Packet OCR-quality role (retirement checklist)", .serialized)
 struct PacketOCRQualityRoleTests {
 
-    @Test("S06 scan-sim identity pin -- SHA-256 + page count")
+    @Test("Scan-sim identity pin -- SHA-256 + page count")
     func scanSimIdentityPin() throws {
         let data = try TestFixtures.loanPacketScanSimPDF()
         let hex = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()

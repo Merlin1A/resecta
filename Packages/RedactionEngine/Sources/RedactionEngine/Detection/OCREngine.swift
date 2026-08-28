@@ -1,7 +1,7 @@
 import CoreGraphics
 import Vision
 
-// ENGINE §4.2 — Vision OCR for PII detection pipeline.
+// Vision OCR for PII detection pipeline.
 
 /// Vision-based text recognition for PII detection.
 /// Stateless; uses @concurrent for cooperative thread pool execution.

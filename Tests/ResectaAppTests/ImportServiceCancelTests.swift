@@ -4,7 +4,7 @@ import PDFKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// CANCEL-006 (Pkg B): import-path cancellation tests. Verifies the
+// Import-path cancellation tests. Verifies the
 // transition-table change (`.importing → .empty`), the `activeImportTask`
 // registration / cancel path, and the per-page-loop surrender contract.
 

@@ -1,7 +1,7 @@
 #!/bin/bash
-# Pre-archive integrity fence (D11-config-golive-F6 Phase A). Asserts the two
-# reviewed, drift-prone search-config blobs match their Jesse-reviewed canonical
-# values. This is NOT a cryptographic gate (see SEC-6 Phase B); it pins the exact
+# Pre-archive integrity fence. Asserts the two reviewed, drift-prone
+# search-config blobs match their canonical values. This is NOT a
+# cryptographic gate (the signed gazetteer manifest is); it pins the exact
 # committed bytes so an accidental swap/clobber fails the archive, not the user.
 #
 # Run from anywhere in the repo.

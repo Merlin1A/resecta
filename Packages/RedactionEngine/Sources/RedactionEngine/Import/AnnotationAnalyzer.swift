@@ -3,7 +3,7 @@ import PDFKit
 
 // PDFKit annotation analysis and profile classification.
 // Uses PDFKit (PDFDocument, PDFAnnotation), NOT CGPDFDocument.
-// Profile detection is conservative — defaults to .unredacted (OQ-4).
+// Profile detection is conservative — defaults to .unredacted.
 
 /// Analyzes PDF annotations for profile classification and annotation detection.
 /// Stateless, nonisolated struct.
@@ -37,7 +37,7 @@ public struct AnnotationAnalyzer: Sendable {
                 entry.pages.insert(i)
                 typeCounts[subtype] = entry
 
-                // Profile detection (OQ-4, conservative):
+                // Profile detection (conservative):
                 if subtype == "Redact" {
                     redactMarkCount += 1
                 } else if isBlackFilledSquare(annotation) {

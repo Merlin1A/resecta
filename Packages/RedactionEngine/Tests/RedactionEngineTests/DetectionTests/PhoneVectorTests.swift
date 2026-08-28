@@ -2,14 +2,14 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// D-19 fixture-driven test for phone detection. The DataPipeline-generated
+// Fixture-driven test for phone detection. The DataPipeline-generated
 // vectors at Fixtures/vectors/phone_test_vectors.json carry the bare phone
 // value (no labeled-prefix context) — valid rows cover paren-balanced and
 // dotted/spaced separators. This test asserts the inline phonePattern
 // matches every valid row. Phone has no dedicated detector test file
 // today; this fixture-driven file is the first.
 
-@Suite("Phone fixture-driven vector tests (D-19)")
+@Suite("Phone fixture-driven vector tests")
 struct PhoneVectorTests {
 
     struct Vectors: Decodable {
@@ -32,7 +32,7 @@ struct PhoneVectorTests {
         return try JSONDecoder().decode(Vectors.self, from: data).vectors
     }
 
-    @Test("D-19 fixture loads with rows")
+    @Test("Fixture loads with rows")
     func fixtureLoads() throws {
         guard let vectors = try loadVectors() else {
             Issue.record("phone_test_vectors.json not bundled")

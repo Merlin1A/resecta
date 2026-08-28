@@ -2,8 +2,8 @@ import UIKit
 
 // Pure helpers and adaptive-stroke constants
 // for the canvas a11y polish bundle. Extracted from
-// `RedactionOverlayView.swift` to keep that file under the 1500 LOC hub
-// cap; the pattern mirrors `RedactionOverlayView+TagExemption.swift`.
+// `RedactionOverlayView.swift` so the hub file stays smaller and the
+// helpers are unit-testable without a UIView host.
 //
 //   `badgeOuterStrokeWidth`     (badge perimeter contrast)
 //   `selectionHandleOuterStrokeWidth` (handle ring against light bg)

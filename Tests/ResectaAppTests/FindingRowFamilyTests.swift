@@ -8,15 +8,15 @@ import SwiftUI
 // The unified row family's adapter contracts: one `FindingRowModel`
 // serves BOTH result origins (engine `SearchResult`s and staged
 // `DetectionResult`s), carrying each origin's deliberate asymmetries —
-// the a11y content policy (detection review rows speak matched text per
-// F-7; search rows never do) and the per-origin secondary line.
+// the a11y content policy (detection review rows speak matched text;
+// search rows never do) and the per-origin secondary line.
 //
-// UXC-45 (D-117): the search row (`SearchResultRow`) went context-first
+// The search row (`SearchResultRow`) went context-first
 // and no longer mounts `FindingRow` — the adapter keeps serving its
 // page-only a11y string, and the row's own contracts (tier-word
 // suppression, the spoken tier, the attributed context window) pin in
 // the "Search origin — context-first row" section below. The scan-side
-// pins are UNTOUCHED: they are the RB-100 freeze proof for the review
+// pins are UNTOUCHED: they are the freeze proof for the review
 // rows, which still render through `FindingRow`.
 
 @Suite("FindingRow family — adapter contracts")
@@ -72,7 +72,7 @@ struct FindingRowFamilyTests {
         #expect(!model.accessibilityDescription.contains("123-45-6789"))
     }
 
-    // MARK: - Search origin — context-first row (UXC-45, RB-98..104)
+    // MARK: - Search origin — context-first row
 
     private func makePIIResult(
         matchedText: String = "123-45-6789",
@@ -99,7 +99,7 @@ struct FindingRowFamilyTests {
         )
     }
 
-    @Test("UXC-45 / UXC-46 — search row a11y label: the adapter's page-only string, plus the spoken tier where the row is graded (spoken, never written)")
+    @Test("Search row a11y label: the adapter's page-only string, plus the spoken tier where the row is graded (spoken, never written)")
     func searchRowAccessibilityLabel() {
         let literal = makeSearchResult(matchedText: "123-45-6789")
         #expect(SearchResultRow.accessibilityLabel(for: literal, tier: .high, showsTier: false)
@@ -108,12 +108,12 @@ struct FindingRowFamilyTests {
         let pii = makePIIResult()
         let spoken = SearchResultRow.accessibilityLabel(for: pii, tier: .high, showsTier: true)
         #expect(spoken == "Search match, page 1, high confidence")
-        // F-7 LAW: never the matched text, never the window.
+        // Never the matched text, never the window.
         #expect(!spoken.contains("123-45-6789"))
         #expect(!spoken.contains("Taxpayer"))
     }
 
-    @Test("UXC-45 (RB-108) / UXC-46 — the spoken tier gates on for PII and OCR rows, off for literal text/regex/custom text-layer rows")
+    @Test("The spoken tier gates on for PII and OCR rows, off for literal text/regex/custom text-layer rows")
     func tierWordSuppression() {
         // PII (absolute bands) → spoken, whichever source.
         #expect(SearchResultRow.showsTierWord(for: makePIIResult()))
@@ -154,7 +154,7 @@ struct FindingRowFamilyTests {
         #expect(!SearchResultRow.showsTierWord(for: regex))
     }
 
-    @Test("UXC-45 (RB-102) — attributed window from the engine range: mono semibold primary run on the wash, base footnote secondary")
+    @Test("Attributed window from the engine range: mono semibold primary run on the wash, base footnote secondary")
     func attributedWindowFromEngineRange() {
         let match = "d.hartwell@example.net"
         let snippet = "…reach d.hartwell@example.net before the close…"
@@ -177,7 +177,7 @@ struct FindingRowFamilyTests {
         #expect(String(attributed.characters) == snippet)
     }
 
-    @Test("UXC-45 (RB-102) — nil or out-of-bounds range falls back to the first verbatim occurrence")
+    @Test("Nil or out-of-bounds range falls back to the first verbatim occurrence")
     func attributedWindowFallsBackToFirstOccurrence() {
         let snippet = "alpha MATCH beta MATCH"
         for range: Range<Int>? in [nil, 40..<45, -1..<4] {
@@ -190,7 +190,7 @@ struct FindingRowFamilyTests {
         }
     }
 
-    @Test("UXC-45 (RB-102) — no occurrence returns the plain base: one run, no wash")
+    @Test("No occurrence returns the plain base: one run, no wash")
     func attributedWindowWithoutOccurrenceIsPlain() {
         let attributed = SearchResultRow.attributedSnippet("alpha beta", matchRange: nil, matchedText: "gamma")
         let runs = Array(attributed.runs)
@@ -202,7 +202,7 @@ struct FindingRowFamilyTests {
         #expect(Array(empty.runs).count == 1)
     }
 
-    @Test("RB-113 — the collapsed window clamps to two lines through XXL and three from XXXL up")
+    @Test("The collapsed window clamps to two lines through XXL and three from XXXL up")
     func collapsedLineLimitByTypeSize() {
         #expect(SearchResultRow.collapsedLineLimit(for: .large) == 2)
         #expect(SearchResultRow.collapsedLineLimit(for: .xxLarge) == 2)
@@ -211,7 +211,7 @@ struct FindingRowFamilyTests {
         #expect(SearchResultRow.collapsedLineLimit(for: .accessibility5) == 3)
     }
 
-    @Test("UXC-45 — the content column's leading inset is the chassis geometry, not a literal; the applied slot counts only when shown")
+    @Test("The content column's leading inset is the chassis geometry, not a literal; the applied slot counts only when shown")
     func contentColumnLeadingInset() {
         let base = SearchRowConfidenceBar.width + ResectaTokens.Spacing.xs
             + ResectaTokens.TouchTarget.minimum + ResectaTokens.Spacing.sm
@@ -233,20 +233,20 @@ struct FindingRowFamilyTests {
         #expect(model.id == det.id)
         #expect(model.title == "123-45-6789")
         #expect(model.titleIsContent)
-        // UXC-22 — qualitative descriptor replaces "N% confidence".
+        // A qualitative descriptor replaces "N% confidence".
         // 0.97 clears the absolute high band (>= 0.9).
         #expect(model.secondaryText == "High confidence")
         #expect(!model.secondaryIsContent)
     }
 
-    @Test("detection adapter — a11y label speaks status, kind, matched text, page, confidence (F-7)")
+    @Test("detection adapter — a11y label speaks status, kind, matched text, page, confidence")
     func detectionAdapterAccessibilityPolicy() {
         let det = makeDetection(kind: .pii(.ssn), confidence: 0.97, matchedText: "123-45-6789")
         let deselected = FindingRowModel(
             page: 0, detection: det, isSelected: false, isAmbiguousSurname: false
         )
-        // F-7 deliberate asymmetry: the review context speaks content.
-        // UXC-22 — qualitative descriptor replaces "N% confidence".
+        // Deliberate asymmetry: the review context speaks content.
+        // A qualitative descriptor replaces "N% confidence".
         #expect(deselected.accessibilityDescription
                 == "Deselected. Social Security Number, 123-45-6789. Page 1. High confidence.")
         let selected = FindingRowModel(
@@ -274,7 +274,7 @@ struct FindingRowFamilyTests {
         )
         #expect(model.title == DetectionResult.Kind.face.fullName)
         #expect(!model.titleIsContent)
-        // UXC-22 — qualitative descriptor replaces "N% confidence".
+        // A qualitative descriptor replaces "N% confidence".
         // 0.8 sits in the absolute medium band (>= 0.7, < 0.9).
         #expect(model.secondaryText == "Medium confidence")
         // No matched text → the a11y label has no content clause.
@@ -291,7 +291,7 @@ struct FindingRowFamilyTests {
             )
             #expect(model.title == kind.fullName)
             #expect(!model.titleIsContent)
-            // UXC-22 — qualitative descriptor replaces "N% confidence".
+            // A qualitative descriptor replaces "N% confidence".
             // 0.66 is below the absolute medium floor (< 0.7).
             #expect(model.secondaryText == "Low confidence")
         }

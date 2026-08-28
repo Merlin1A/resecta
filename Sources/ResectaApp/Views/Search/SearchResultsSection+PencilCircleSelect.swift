@@ -111,7 +111,7 @@ extension SearchResultsSection {
         touchType == .pencil
     }
 
-    /// SA-1 (D-71) stroke-lifecycle gate transition for the row-frame
+    /// Stroke-lifecycle gate transition for the row-frame
     /// tracking gate: `.began` activates tracking, terminal states
     /// (`.ended`/`.cancelled`/`.failed`) deactivate it, and
     /// mid-stroke / idle states leave it unchanged (nil). Keeping the
@@ -224,7 +224,7 @@ final class PencilCircleSelectGestureRecognizer: UIPanGestureRecognizer {
 /// behavior — currently a no-op since the deployment target is iOS 26.
 struct PencilCircleSelectOverlay: UIViewRepresentable {
     var onLoopClose: ([CGPoint]) -> Void
-    /// SA-1: stroke-lifecycle callback driving the host's row-frame
+    /// Stroke-lifecycle callback driving the host's row-frame
     /// tracking gate — true on `.began`, false on terminal states, per
     /// `SearchResultsSection.pencilStrokeGateTransition(for:)`.
     var onStrokeActiveChanged: (Bool) -> Void
@@ -300,7 +300,7 @@ struct PencilCircleSelectOverlay: UIViewRepresentable {
                 }
                 onLoopClose(path)
             }
-            // SA-1: dispatch the stroke gate AFTER any loop-close so the
+            // Dispatch the stroke gate AFTER any loop-close so the
             // logical order reads "finish the stroke, then drop
             // tracking". Both callbacks are synchronous state writes;
             // the render that unmounts the GeometryReaders happens
@@ -390,7 +390,7 @@ extension View {
     /// Attach the Pencil circle-to-select overlay to a view.
     /// `rowFrames` is the host-maintained dictionary of row id →
     /// frame in the modifier's coordinate space. `onStrokeActiveChanged`
-    /// reports the recognizer's stroke lifecycle (SA-1 — the host
+    /// reports the recognizer's stroke lifecycle (the host
     /// gates its row-frame tracking on it). `onSelectionLoop`
     /// is invoked with the set of enclosed row IDs after a valid
     /// closed loop completes (start/end within 40pt, area ≥ 400
@@ -414,7 +414,7 @@ extension View {
     /// `SearchResultsSection.resultsList` observes the preference and
     /// updates `rowFrames` for the gesture overlay to consume.
     /// Background `Color.clear` keeps the row layout unaffected.
-    /// SA-1 (D-71): the GeometryReader mounts only while `isActive` —
+    /// The GeometryReader mounts only while `isActive` —
     /// the host's stroke gate — so the per-pixel preference
     /// re-aggregation that taxed every finger scroll exists only
     /// during a live Pencil stroke. Frames resolve on the render pass

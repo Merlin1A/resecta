@@ -6,16 +6,16 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// SEC-5 — Pixel buffer zeroize tests. The canonical security guard for the
-// engine's reusable bitmap buffers. See plan §3 SEC-5.
+// Pixel buffer zeroize tests. The canonical security guard for the
+// engine's reusable bitmap buffers.
 //
 // What these test:
 //   1. After `zeroizeBitmapBuffer` returns, every byte of the buffer is 0.
 //   2. The zeroize cost on a 300-DPI letter page stays under the 5 ms p95
-//      budget (plan §3 SEC-5 acceptance: "Per-page overhead recorded as a
-//      PERF-7 baseline." The 5 ms ceiling is the locked target.)
+//      budget ("Per-page overhead recorded as a baseline." The 5 ms
+//      ceiling is the locked target.)
 
-@Suite("Pixel Buffer Zeroize (SEC-5)", .tags(.security, .critical), .serialized)
+@Suite("Pixel Buffer Zeroize", .tags(.security, .critical), .serialized)
 struct PixelBufferZeroizeTests {
 
     // MARK: - makeImage independence (regression guard)
@@ -47,7 +47,7 @@ struct PixelBufferZeroizeTests {
             return
         }
 
-        // Wipe the source context — the path SEC-5 takes after makeImage.
+        // Wipe the source context — the path this guard takes after makeImage.
         PixelOperations.zeroizeBitmapBuffer(ctx)
 
         // Read the CGImage's pixel data via a NEW bitmap context. If the
@@ -67,7 +67,7 @@ struct PixelBufferZeroizeTests {
         #expect(buffer[offset] == 0, "B channel should be 0 (red)")
         #expect(buffer[offset + 1] == 0, "G channel should be 0 (red)")
         #expect(buffer[offset + 2] == 255,
-                "R channel should be 255 — CGImage data must survive zeroize of source context (SEC-5)")
+                "R channel should be 255 — CGImage data must survive zeroize of source context")
         #expect(buffer[offset + 3] == 255, "A channel should be 255")
     }
 
@@ -122,12 +122,12 @@ struct PixelBufferZeroizeTests {
     // MARK: - testZeroizeOverheadUnder5msFor300DPILetter
 
     /// Run `zeroizeBitmapBuffer` in a 50-iteration loop against a 300-DPI
-    /// US Letter bitmap. The plan §3 SEC-5 target is ≤ 5 ms p95 in
+    /// US Letter bitmap. The target is ≤ 5 ms p95 in
     /// isolated benchmarking (memset of ~33 MB at typical bandwidth ≈
     /// 3.4 ms). When the engine test suite runs in parallel, memory and
     /// CPU pressure inflate the wall clock — we set a 25 ms CI ceiling
     /// (5x the spec target) to absorb that noise while still detecting
-    /// pathological regressions (e.g., per-byte loop). PERF-7's stress
+    /// pathological regressions (e.g., per-byte loop). The stress
     /// baseline records the steady-state number.
     @Test("zeroize p95 within CI budget on 300-DPI letter page (50 iterations)")
     func testZeroizeOverheadUnder5msFor300DPILetter() throws {
@@ -163,7 +163,7 @@ struct PixelBufferZeroizeTests {
         // p95 = sample at the 95th percentile index (47 out of 50, 0-based).
         let p95Index = Int(Double(samples.count) * 0.95) - 1
         let p95 = samples[max(0, min(samples.count - 1, p95Index))]
-        // Spec target: ≤ 5 ms (plan §3 SEC-5). CI ceiling: 25 ms to
+        // Spec target: ≤ 5 ms. CI ceiling: 25 ms to
         // absorb concurrent-suite pressure on the simulator. A real
         // regression (per-byte loop, accidental hashing) would land in
         // the 100+ ms range — well outside this budget.
@@ -171,7 +171,7 @@ struct PixelBufferZeroizeTests {
 
         #expect(
             p95 <= ciCeiling,
-            "zeroize p95 on 300-DPI letter was \(p95) — CI ceiling is 25 ms (spec target 5 ms, plan §3 SEC-5)"
+            "zeroize p95 on 300-DPI letter was \(p95) — CI ceiling is 25 ms (spec target 5 ms)"
         )
     }
 }

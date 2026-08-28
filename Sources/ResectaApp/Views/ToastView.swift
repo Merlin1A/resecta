@@ -1,18 +1,18 @@
 import SwiftUI
 
-// §A6.3: Severity-aware toast capsule with tint overlay and position-based animation.
-// Displayed via dual-position overlays in ContentView (§A6.7).
+// Severity-aware toast capsule with tint overlay and position-based animation.
+// Displayed via dual-position overlays in ContentView.
 //
-// WU-19 (session-8): renders an optional trailing action button when
+// Renders an optional trailing action button when
 // `item.actionLabel` is set. Tapping the button invokes
 // `item.actionHandler` (the snapshot closure) and then dismisses the
-// toast through the injected `ToastQueueManager`. Per [RR-23], the
+// toast through the injected `ToastQueueManager`. The
 // closure captures the snapshot state and expires when the toast
 // dismisses.
 
 struct ToastView: View {
     let item: ToastItem
-    // ACCESSIBILITY.md §9.3 — toast line cap lifts at AX5 so long messages
+    // The toast line cap lifts at AX5 so long messages
     // don't truncate mid-sentence at the largest accessibility text size.
     // Mirrors the `InlineWarningBanner.lineLimit(for:)` pattern.
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -62,7 +62,7 @@ struct ToastView: View {
             min(length - 32, 360)
         }
         .background {
-            // Research Area 9: rounded rectangle with severity tinting
+            // Rounded rectangle with severity tinting
             ZStack {
                 RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.toast,
                                  style: .continuous)
@@ -76,8 +76,8 @@ struct ToastView: View {
         .accessibilityAddTraits(.isStaticText)
     }
 
-    /// ACCESSIBILITY.md §9.3 — toast line cap predicate. Below AX5 every
-    /// severity caps at 2 lines. The original §A6.3 compact-capsule
+    /// Toast line cap predicate. Below AX5 every
+    /// severity caps at 2 lines. The original compact-capsule
     /// contract held info/success to 1 line, but real shipped messages
     /// exceed one capsule line at standard text sizes (the text-layer
     /// notice and the dismissal-cleared counts truncated mid-sentence),

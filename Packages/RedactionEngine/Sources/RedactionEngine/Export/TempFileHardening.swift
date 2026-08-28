@@ -1,15 +1,15 @@
 import Foundation
 
-// SEC-1 — File protection on temp output.
+// File protection on temp output.
 //
 // Helper for setting iOS Data Protection class on URLs in the temp tree.
 // Producers (PipelineCoordinator, PDFStreamReconstructor, export copy site)
 // call applyProtection(_:level:) after every write or copy. Caller flips the
 // effective level via TempFileProtection on document close so background
 // cleanup (e.g., cleanOrphanedTempFiles) can still remove files after the
-// device locks. Mechanism-description language per ARCH §1.3 / shared §4 (I6):
-// this helper sets a level that is designed to reduce at-rest exposure on a
-// locked device; it is a best-effort hardening, not an outcome promise.
+// device locks. This helper sets a level that is designed to reduce
+// at-rest exposure on a locked device; it is a best-effort hardening, not
+// an outcome promise.
 
 /// Effective protection level for files in the temp tree.
 ///

@@ -1,12 +1,12 @@
 import Foundation
 
-// Plan §4 — SCF (Sectional Center Facility) prefix → state mapping, used by
+// SCF (Sectional Center Facility) prefix → state mapping, used by
 // AddressSpatialAssembler to reject ZIP/state inconsistencies ("X Main St,
 // TX 02134"). Source: USPS SCF public-domain assignments. Coverage aims to
 // answer "does state X own a ZIP starting with 3-digit prefix Y?" — regions
 // not in the switch return nil (no cross-check, rather than a false reject).
 //
-// L6 / C12 — primary source is now `zip_scf_states.json` via
+// The primary source is now `zip_scf_states.json` via
 // `ZIPStateTableLoader`. The hardcoded switch below remains as the
 // graceful-degradation fallback when the JSON is missing or fails to decode
 // (same pattern as `DocumentTypeClassifier.loadData(from:)`).

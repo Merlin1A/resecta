@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W9 — DoctypeExplanation + DocumentTypeClassifier.explain(...) tests.
+// DoctypeExplanation + DocumentTypeClassifier.explain(...) tests.
 // The kernel factoring in `computeLogits` is covered implicitly: if explain
 // disagrees with classify on the primary class or probabilities, the
 // shared-kernel invariant has broken.

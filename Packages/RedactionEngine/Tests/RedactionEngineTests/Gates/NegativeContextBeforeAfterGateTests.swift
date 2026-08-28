@@ -4,8 +4,6 @@ import PDFKit
 @testable import RedactionEngine
 
 // D1 Gate — NegativeContextBeforeAfterGateTests
-// Design reference: the negative-context-and-data design §12.
-// Verification gate: §4
 //
 // Two test methods sweep the same corpus twice. The ONLY delta is the
 // negativeContextGazetteer parameter:

@@ -5,21 +5,21 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// Rectangle draw-tool gesture surgery (1.1.0 draw-tool S1; D-109 / RB-74..76).
+// Rectangle draw-tool gesture surgery.
 //
-// Pins the six overlay-side fixes in `RedactionOverlayView`:
-//   S1-a  repaint on gesture end — `resetDragState()` ends with
-//         `setNeedsDisplay()`, so a rejected rubber band (DT-01) and the
-//         lifted look after a move/resize (DT-02) cannot outlive the gesture;
-//   S1-b  anchored-edge snapping while drawing (DT-03) — the new-region path
-//         snaps through `applyResizeSnapping` with `drawSnapHandle`, so only
-//         the two edges under the finger move and the origin corner is
-//         invariant;
-//   S1-c  the rubber band is clamped to the page (DT-08);
-//   S1-d  primary-touch identity (DT-10) — a foreign touch never moves,
-//         ends or cancels the primary's gesture;
-//   S1-e  the rect tracks the finger back inside the 8-pt start gate (DT-11);
-//   S1-f  the marquee never runs in draw mode (DT-07, overlay half).
+// Pins six overlay-side fixes in `RedactionOverlayView`:
+//   - repaint on gesture end — `resetDragState()` ends with
+//     `setNeedsDisplay()`, so a rejected rubber band and the
+//     lifted look after a move/resize cannot outlive the gesture;
+//   - anchored-edge snapping while drawing — the new-region path
+//     snaps through `applyResizeSnapping` with `drawSnapHandle`, so only
+//     the two edges under the finger move and the origin corner is
+//     invariant;
+//   - the rubber band is clamped to the page;
+//   - primary-touch identity — a foreign touch never moves,
+//     ends or cancels the primary's gesture;
+//   - the rect tracks the finger back inside the 8-pt start gate;
+//   - the marquee never runs in draw mode (overlay half).
 //
 // Geometry: a 400×400 overlay, so 1 overlay pt = 0.0025 normalized. Snap
 // targets are other regions' edges + midlines, the 16-pt page margins and
@@ -27,7 +27,7 @@ import Foundation
 // 10 pt. Every fixture keeps its unintended edges ≥ 10 pt clear of every
 // target so only the named snap can fire.
 
-@Suite("Rectangle draw gesture surgery (S1)")
+@Suite("Rectangle draw gesture surgery")
 @MainActor
 struct RectangleDrawGestureTests {
 
@@ -75,9 +75,9 @@ struct RectangleDrawGestureTests {
                 sourceLocation: sourceLocation)
     }
 
-    // MARK: - S1-a repaint on gesture end
+    // MARK: - Repaint on gesture end
 
-    @Test("S1-a: a rejected sub-threshold rubber band schedules a repaint on touch-up (DT-01)")
+    @Test("A rejected sub-threshold rubber band schedules a repaint on touch-up")
     func testRejectedDragRepaintsOnEnd() {
         let (overlay, coordinator) = makeOverlay()
         let touch = StubTouch(location: CGPoint(x: 100, y: 100), view: overlay)
@@ -100,7 +100,7 @@ struct RectangleDrawGestureTests {
                 "resetDragState must schedule the repaint that erases the ghost band, label and guides")
     }
 
-    @Test("S1-a: a move commit on a selected region schedules a repaint on touch-up (DT-02)")
+    @Test("A move commit on a selected region schedules a repaint on touch-up")
     func testMoveCommitRepaintsOnEnd() {
         // 200×200 overlay-pt region centred on the page (overlay rect
         // 100…300 × 100…300). The touch lands at its centre, ≥ 77 pt from
@@ -131,9 +131,9 @@ struct RectangleDrawGestureTests {
                 "resetDragState must schedule the repaint that drops the lifted look and restores the handles")
     }
 
-    // MARK: - S1-b anchored-edge snapping
+    // MARK: - Anchored-edge snapping
 
-    @Test("S1-b: drawSnapHandle maps the finger's quadrant to the handle whose two edges move")
+    @Test("drawSnapHandle maps the finger's quadrant to the handle whose two edges move")
     func testDrawSnapHandleQuadrants() {
         let origin = CGPoint(x: 100, y: 100)
         #expect(RedactionOverlayView.drawSnapHandle(
@@ -153,7 +153,7 @@ struct RectangleDrawGestureTests {
             origin: origin, point: CGPoint(x: 50, y: 100)) == .bottomLeft)
     }
 
-    @Test("S1-b: the far edge snaps to a neighbour's edge while the origin corner stays put (DT-03)")
+    @Test("The far edge snaps to a neighbour's edge while the origin corner stays put")
     func testFarEdgeSnapsWithoutMovingTheOrigin() {
         // Neighbour whose LEFT edge sits at x = 206, 6 pt short of the
         // drag's far edge (212) and nearer than the page-centre line (200,
@@ -175,7 +175,7 @@ struct RectangleDrawGestureTests {
         expectClose(committed.maxY, 1.0 - 60.0 / 400.0, "maxY")
     }
 
-    @Test("S1-b: a midline target near the band's centre no longer translates it")
+    @Test("A midline target near the band's centre no longer translates it")
     func testMidlineTargetDoesNotShiftTheRect() {
         // The drag spans x 60…185 (midX 122.5). A neighbour whose left
         // edge is at x = 126 sits 3.5 pt from that midpoint — the old
@@ -197,9 +197,9 @@ struct RectangleDrawGestureTests {
         expectClose(committed.maxY, 1.0 - 60.0 / 400.0, "maxY")
     }
 
-    // MARK: - S1-c page-bounds clamp
+    // MARK: - Page-bounds clamp
 
-    @Test("S1-c: a drag past the page edge commits the band clipped to the page (DT-08)")
+    @Test("A drag past the page edge commits the band clipped to the page")
     func testOffPageDragIsClampedToBounds() {
         let (overlay, coordinator) = makeOverlay()
         let touch = StubTouch(location: CGPoint(x: 300, y: 300), view: overlay)
@@ -224,9 +224,9 @@ struct RectangleDrawGestureTests {
                 "committed normalized rect must stay within [0, 1]")
     }
 
-    // MARK: - S1-d primary-touch identity
+    // MARK: - Primary-touch identity
 
-    @Test("S1-d: a second finger's move does not steer the rubber band (DT-10)")
+    @Test("A second finger's move does not steer the rubber band")
     func testForeignTouchMoveIsIgnored() {
         let (overlay, _) = makeOverlay()
         let primary = StubTouch(location: CGPoint(x: 60, y: 60), view: overlay)
@@ -250,7 +250,7 @@ struct RectangleDrawGestureTests {
         #expect(overlay.isActivelyDragging == false)
     }
 
-    @Test("S1-d: a second finger's lift neither commits nor ends the gesture; the primary's lift commits")
+    @Test("A second finger's lift neither commits nor ends the gesture; the primary's lift commits")
     func testForeignTouchEndIsIgnored() {
         let (overlay, coordinator) = makeOverlay()
         let primary = StubTouch(location: CGPoint(x: 60, y: 60), view: overlay)
@@ -274,9 +274,9 @@ struct RectangleDrawGestureTests {
         #expect(overlay.currentDragRect == nil)
     }
 
-    // MARK: - S1-e rect tracks the finger back
+    // MARK: - Rect tracks the finger back
 
-    @Test("S1-e: the band follows the finger back inside the start gate and a returned drag commits nothing (DT-11)")
+    @Test("The band follows the finger back inside the start gate and a returned drag commits nothing")
     func testRectTracksTheFingerBack() {
         let (overlay, coordinator) = makeOverlay()
         let touch = StubTouch(location: CGPoint(x: 100, y: 100), view: overlay)
@@ -302,9 +302,9 @@ struct RectangleDrawGestureTests {
         #expect(overlay.currentDragRect == nil)
     }
 
-    // MARK: - S1-f marquee never runs in draw mode
+    // MARK: - Marquee never runs in draw mode
 
-    @Test("S1-f: with Add to Selection left on, a draw-mode drag draws a region and never runs the marquee (DT-07)")
+    @Test("With Add to Selection left on, a draw-mode drag draws a region and never runs the marquee")
     func testMarqueeDoesNotRunInDrawMode() {
         let (overlay, coordinator) = makeOverlay()
         overlay.isMultiSelectActive = true

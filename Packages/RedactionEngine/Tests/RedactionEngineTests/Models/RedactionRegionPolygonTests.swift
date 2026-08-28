@@ -2,22 +2,21 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// DRAW-1 / plan §0.3 — RedactionRegion polygon Codable invariants.
+// RedactionRegion polygon Codable invariants.
 //
 // The schema change adds `public let vertices: [CGPoint]?` to the
 // top-level struct (NOT to the `Source` enum). For a top-level struct
 // optional field, synthesized struct Codable already decodes a missing
-// key as `nil` — the RR-42 custom Codable on `Source` only exists
+// key as `nil` — the custom Codable on `Source` only exists
 // because enum-with-optional-associated-value synthesis throws
-// `DecodingError.keyNotFound`. The struct's synthesized Codable stays
-// (see plan §0.3 and `escalation.md §1.2`).
+// `DecodingError.keyNotFound`. The struct's synthesized Codable stays.
 //
-// `testMissingVerticesKeyDecodesAsNil` is the canonical §0.3 guard:
+// `testMissingVerticesKeyDecodesAsNil` is the canonical guard:
 // if a future session "simplifies" the struct to a custom init(from:),
 // or adds a non-optional `vertices` field, the test fails immediately.
 // Do NOT remove this test.
 
-@Suite("RedactionRegion polygon Codable (DRAW-1)")
+@Suite("RedactionRegion polygon Codable")
 struct RedactionRegionPolygonTests {
 
     @Test("Codable round-trip preserves a 5-vertex polygon")
@@ -55,9 +54,9 @@ struct RedactionRegionPolygonTests {
         }
     }
 
-    @Test("Hand-crafted JSON without vertices key decodes with vertices = nil — §0.3 guard")
+    @Test("Hand-crafted JSON without vertices key decodes with vertices = nil")
     func testMissingVerticesKeyDecodesAsNil() throws {
-        // Load-bearing per plan §0.3 / escalation.md §1.2. Synthesized
+        // Load-bearing: synthesized
         // struct Codable handles missing optional keys natively — this
         // test pins that behaviour so a future "explicit Codable"
         // refactor cannot regress it without surfacing a test failure.

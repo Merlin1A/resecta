@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# update-context-scorer-hash.sh — B03 (C1 augment context scorer).
+# update-context-scorer-hash.sh — context-scorer hash pin.
 #
 # Rewrites the compiled-in SHA-256 self-check constant
 # (ContextScorerWeights.expectedSHA256) to the SHA-256 of the bundled
@@ -8,7 +8,7 @@
 # This value equals the DataPipeline asset_hashes.lock entry for
 # classifier/context_scorer.json — one number, two homes — because the bundled
 # file IS the emitted build artifact byte-for-byte (the coordinated PR pair).
-# Re-run whenever the bundled weights change (B04 candidates / B05 promotion).
+# Re-run whenever the bundled weights change (new candidates or a promotion).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

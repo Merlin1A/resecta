@@ -2,7 +2,7 @@ import Foundation
 
 // SRCH-S2 — D02-scorer-posterior-F1 (account, P1) + D02-scorer-posterior-F2 (phone, P2).
 //
-// The B05/B06 learned context scorer (context-scorer.json `fecd89b6`) composes a
+// The learned context scorer (context-scorer.json `fecd89b6`) composes a
 // standardized log-odds term into the detection posterior at two seams:
 //   • DetectionOrchestrator.detectPage (Auto-Detect)
 //   • DocumentSearcher.composedSurvivors (Search)
@@ -18,7 +18,7 @@ import Foundation
 // sourced from the CONSERVATIVE preset so the floor is preset-invariant. It is
 // pure code: it reads cutoffs already produced by PresetThresholdVector and edits
 // no model artifact. The deeper distribution mismatch (account `digit_run_length`
-// retrain / phone `has_separator` corpus recalibration) is the deferred B05/Jesse
+// retrain / phone `has_separator` corpus recalibration) is a deferred
 // blob retrain, not a launch change.
 //
 // DESIGN-DECISIONS DQ2 — the RAW-BAR form is the shipped default (the fixed
@@ -57,7 +57,7 @@ enum ContextPosteriorFloor {
 
     /// The CONSERVATIVE-preset cutoff for a wire family (a static
     /// PresetThresholdVector lookup, preset-invariant — NOT the active cutoff in
-    /// scope at the W4 gate / `composedSurvivors` guard).
+    /// scope at the preset-threshold gate / `composedSurvivors` guard).
     static func conservativeCutoff(forWire wire: String) -> Double {
         conservativeVector.threshold(forWireName: wire) ?? 1.0
     }

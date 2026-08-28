@@ -165,17 +165,17 @@ A stranger can clone, build, and start contributing in under an hour with these 
 
    Name and search tests exercise the system on-device name-recognition model (`NLTagger` `.nameType`), delivered as an on-demand OS asset. Run the app suites on a current iOS 26.x simulator runtime where that model is present; where the asset has not downloaded, those tests skip or report different counts rather than failing the build.
 
-5. **Read the contributor guide** in [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the branch model, commit format, audit checklist, and DCO sign-off requirement. Hard rules live in its "Hard Stops" section.
+5. **Read the contributor guide** in [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the branch model, commit format, audit checklist, and DCO sign-off requirement. The changes that need an agreed plan first are listed in its "Changes that need an agreed plan" section.
 
 ## Testing
 
-The test tree is larger than the source tree: roughly 57,000 lines of Swift source to roughly 77,000 lines of test code, about 1.4×. Counted from the current tree:
+The test tree is larger than the source tree: roughly 59,000 lines of Swift source to roughly 81,000 lines of test code, about 1.4×. Counted from the current tree:
 
-- **Engine package** (`Packages/RedactionEngine/Tests`) — 1,650 Swift Testing `@Test` functions across 216 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
-- **App target** (`Tests/ResectaAppTests`) — 1,306 `@Test` functions across 190 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
-- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 18 XCUITest methods that drive the built app on a simulator: the first-launch legal gate, detection review, and search-to-redaction flows.
+- **Engine package** (`Packages/RedactionEngine/Tests`) — 1,593 Swift Testing `@Test` functions across 211 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
+- **App target** (`Tests/ResectaAppTests`) — 1,494 `@Test` functions across 212 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
+- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 40 XCUITest methods that drive the built app on a simulator: the first-launch legal gate, detection review, and search-to-redaction flows.
 
-Together the suites carry about 6,500 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
+Together the suites carry about 7,100 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
 
 Run both suites:
 
@@ -188,7 +188,7 @@ The batched runner executes the app suites in serial batches on an iPhone 17 sim
 
 ## Contributing
 
-- Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the workflow, commit conventions, audit gates, and the Hard Stops that require maintainer sign-off.
+- Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the workflow, commit conventions, audit gates, and the changes that need an agreed plan before they land.
 - Security issues: please use [`SECURITY.md`](./SECURITY.md) — do not file public issues for vulnerabilities.
 - Feature work lands on `feat/*` branches.
 

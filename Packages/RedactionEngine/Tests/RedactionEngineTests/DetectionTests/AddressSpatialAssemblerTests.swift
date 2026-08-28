@@ -3,7 +3,7 @@ import CoreGraphics
 import Foundation
 @testable import RedactionEngine
 
-// Plan Phase 3 / §4 / §G6 — spatial address assembly tests.
+// Spatial address assembly tests.
 
 @Suite("AddressSpatialAssembler (G6)")
 struct AddressSpatialAssemblerTests {

@@ -3,7 +3,7 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// Phase 3 §A7 — priors + surface forms + ambiguity flag + clearAll.
+// Priors + surface forms + ambiguity flag + clearAll.
 // Reshaped to the unified apply path: the staged-review apply is the
 // stagedDetections origin of `applyFindings` (same bookkeeping
 // contract; entry renamed, call is async).
@@ -65,7 +65,7 @@ struct RedactionStatePriorsTests {
 
     @Test("clearAll persists+rehydrates priors; wipes surface forms, diagnostics, ambiguity flags")
     func clearAllResetsPhase3State() async {
-        // S7 / design 03 §3.6 behavior change: priors now SURVIVE clearAll
+        // Priors now SURVIVE clearAll
         // (saved before the wipe, rehydrated after) so triage history
         // accumulates across documents. Everything else still wipes.
         let suite = UUID().uuidString
@@ -89,7 +89,7 @@ struct RedactionStatePriorsTests {
         state.clearAll()
 
         #expect(state.priors.mean(.name) > 0.5,
-                "priors persist across clearAll by design (S7 §3.6)")
+                "priors persist across clearAll by design")
         #expect(state.priors.byCategory[.name]?.streakLen == 0,
                 "streaks are session-scoped and reset on rehydrate")
         #expect(defaults.dictionary(forKey: RedactionState.priorsStorageKey) != nil,
@@ -101,7 +101,7 @@ struct RedactionStatePriorsTests {
         #expect(state.regions.isEmpty)
     }
 
-    // MARK: - S7 / design 03 §3.6 — priors persistence
+    // MARK: - Priors persistence
 
     @Test("savePriors/loadPriors round-trip preserves alpha+beta, resets streaks")
     func priorsPersistenceRoundTrip() {

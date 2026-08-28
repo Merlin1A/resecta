@@ -15,7 +15,7 @@ import RedactionEngine
 
 // nonisolated: a stateless file persistence envelope, usable off-MainActor
 // on detached hydrate paths. Keep it out of the SE-0466 MainActor-default
-// pinned project-wide (fix-series s04 flip; mirrors UserDefaultsJSONBlob).
+// pinned project-wide (mirrors UserDefaultsJSONBlob).
 // Plain Sendable (not @unchecked): every stored property is Sendable —
 // unlike the UserDefaults sibling, which holds a class reference.
 nonisolated struct FileJSONBlob<T: Codable & Sendable>: Sendable {
@@ -115,7 +115,7 @@ nonisolated struct FileJSONBlob<T: Codable & Sendable>: Sendable {
 }
 
 // nonisolated: a Sendable Logger referenced from the nonisolated blob methods
-// (off-MainActor hydrate path). Globals default to MainActor under the s04 flip.
+// (off-MainActor hydrate path). Globals default to MainActor under the SE-0466 flip.
 nonisolated private let logger = Logger(subsystem: "app.resecta", category: "FileJSONBlob")
 
 /// Raw JSON tree for envelope rows the current decoder cannot

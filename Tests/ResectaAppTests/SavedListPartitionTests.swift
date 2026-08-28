@@ -63,7 +63,7 @@ struct SavedListPartitionTests {
 
     @Test("Save-prompt chrome follows the interface whose shape it captures")
     func savePromptChromePerInterface() {
-        // UXC-31 (RB-40): dialog-grammar normalization — sentence case.
+        // Dialog-grammar normalization — sentence case.
         #expect(SavedSearchListSheet.savePromptTitle(for: .search) == "Save current search")
         #expect(SavedSearchListSheet.savePromptTitle(for: .scan) == "Save current scan")
         #expect(SavedSearchListSheet.savePromptMessage(for: .search)
@@ -83,7 +83,7 @@ struct SavedListPartitionTests {
         SavedSearchListSheet.apply(scanEntry, to: state)
         #expect(state.searchModeType == .piiScan)
         #expect(state.searchModeType.interface == .scan)
-        // D-63/UT-05: with the category strip dark (the shipped 1.0
+        // With the category strip dark (the shipped 1.0
         // state, and this test process — no reveal arg), recall keeps
         // the full default set; the narrowed field persists but is
         // not applied. The dedicated no-narrow pin below carries the
@@ -102,7 +102,7 @@ struct SavedListPartitionTests {
         #expect(state.isProgrammaticModeChange == true)
     }
 
-    @Test("Recall does not narrow detectors while the category strip is dark (D-63/UT-05)")
+    @Test("Recall does not narrow detectors while the category strip is dark")
     func recallDoesNotNarrowWhileStripDark() {
         // Premise guard: this process launches without the DEBUG
         // reveal arg, so the strip is dark — the shipped 1.0 state.

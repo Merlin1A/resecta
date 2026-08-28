@@ -4,9 +4,9 @@ import RedactionEngine
 // Results list + empty / filtered-out states +
 // row helpers + live preview row + scope picker + keyboard shortcuts.
 // Lifted from `SearchAndRedactSheet.swift`; behavior unchanged.
-// UXC-45 (RB-105/109): the "Add to selection" predicate Menu moved out
+// The "Add to selection" predicate Menu moved out
 // of the results-header zone into `SearchFooterSection`, the surface's
-// single selection authority; UXC-46 (D-121) then removed the menu —
+// single selection authority; it was later removed entirely —
 // selection is per row or the footer's Select All.
 
 struct SearchResultsSection: View {
@@ -43,10 +43,10 @@ struct SearchResultsSection: View {
     /// Present the saved-searches list — the parent owns the single
     /// modal slot. Wired to the Scan-side bookmark on the scope row.
     let onShowSavedSearches: () -> Void
-    /// SA-3 rider (d): result navigation is ONE seam on the hub —
+    /// Result navigation is ONE seam on the hub —
     /// the J/K keyboard buttons call back through this instead of a
     /// section-side duplicate (the hub's copy also carries the
-    /// rect-level scroll-to-match half). UXC-44 (D-116, RB-92): the
+    /// rect-level scroll-to-match half). The
     /// Bool is the seam's `dropToCompact` — J/K pass `false` (the
     /// list stays readable while a keyboard user steps: large →
     /// medium only); the hub's chevrons / ⌘G pass `true` and park
@@ -77,7 +77,7 @@ struct SearchResultsSection: View {
     /// fall through to the List's native scroll path.
     @State private var rowFrames: [UUID: CGRect] = [:]
 
-    /// SA-1 (D-71): row-frame tracking is gated on a live Pencil
+    /// Row-frame tracking is gated on a live Pencil
     /// stroke. Ungated, every row's GeometryReader re-fired the
     /// preference aggregation + a section-dirtying `rowFrames` write on
     /// every scrolled pixel — a Pencil-only feature taxing every finger
@@ -97,11 +97,11 @@ struct SearchResultsSection: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        // SA-2 (D-70): when results render, the List is the section's
+        // When results render, the List is the section's
         // root and the section's own fixed chrome rides its top
         // safe-area inset (under the hub's sheet-chrome inset), so
         // the List's UIKit frame binds at the sheet top for
-        // cooperative scroll↔detent arbitration (18- §10 — chrome
+        // cooperative scroll↔detent arbitration (chrome
         // HEIGHT above the list unbinds it, not chrome species). The
         // empty / in-flight / filtered-out states keep plain stacked
         // chrome — nothing scrolls there.
@@ -141,12 +141,12 @@ struct SearchResultsSection: View {
 
     /// Everything that used to sit above the results list as fixed
     /// VStack chrome — banners, live preview, Select-Where — riding
-    /// the list's top safe-area inset under the hub's sheet chrome
-    /// (SA-2/D-70, 18- §10). Opaque background — rows scroll UNDER
+    /// the list's top safe-area inset under the hub's sheet chrome.
+    /// Opaque background — rows scroll UNDER
     /// the inset region.
     private var sectionTopChrome: some View {
         VStack(spacing: 0) {
-            // D06-F2 Part 2 — fold the live applied / deselected view-state
+            // Fold the live applied / deselected view-state
             // counts into the stored scan report so the panel AND the shared
             // audit snapshot (`shareCoverageSnapshot` below, which reads the
             // same `report`) reflect what the user has applied/deselected,
@@ -193,7 +193,7 @@ struct SearchResultsSection: View {
                 regexTimeoutBanner
             }
 
-            // ST-83 — per-page OCR-skip banner. Surfaces when
+            // Per-page OCR-skip banner. Surfaces when
             // `DocumentSearcher`'s OCR-skip sink fired for one or more
             // pages during the active scan: those pages exceeded the OCR
             // pixel caps, so their image content was never text-scanned.
@@ -206,19 +206,19 @@ struct SearchResultsSection: View {
 
             // Session-scoped navigation scope — the shared page-scope
             // control (it scopes J/K and Cmd+G result traversal, never
-            // the rendered list or counts). D-63/UT-02: retired for
+            // the rendered list or counts). Retired for
             // 1.0 in BOTH interfaces behind
             // `navigationScopeControlsEnabled` — its sole effect is
             // imperceptible outside a chevron walk, so it read as
             // broken. `navigationScope` then keeps its
             // `.wholeDocument` default by absence of writers. The
             // saved-searches bookmark that rode this row on the Scan
-            // interface relocated to the sheet's search-bar row
-            // (UT-04). Machinery and tests stay compiled; DC-210.
+            // interface relocated to the sheet's search-bar row.
+            // Machinery and tests stay compiled.
             if SearchState.navigationScopeControlsEnabled {
                 scopeRow
             }
-            // UXC-45 (RB-105): the "Add to selection" Menu that closed
+            // The "Add to selection" Menu that closed
             // this stack now rides the footer beside Select All — the
             // freed full-width row returns to the results viewport.
         }
@@ -239,7 +239,7 @@ struct SearchResultsSection: View {
                     if preview.regexInvalid {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(.red)
-                        // GAP-41 — small error TEXT routes through the
+                        // Small error TEXT routes through the
                         // measured text tier; the glyph above stays on
                         // the system-color tier.
                         Text("Regex: invalid")
@@ -265,7 +265,7 @@ struct SearchResultsSection: View {
         }
     }
 
-    /// BH-B-02 — the live preview is page-scoped (D10-F3), so its
+    /// The live preview is page-scoped, so its
     /// `totalCount` ≡ the current-page count and the former
     /// "Total: \(preview.totalCount)" contradicted the footer on any
     /// multi-page-match query ("Matches this page: 1 · Total: 1" beside
@@ -330,12 +330,12 @@ struct SearchResultsSection: View {
                 .disabled(searchState.isSearching)
                 .accessibilityLabel(WU23Strings.toggleCaseSensitive)
 
-                // D-63/UT-03: dark with the scope picker — with the
+                // Dark with the scope picker — with the
                 // picker retired this shortcut was a one-way door into
                 // page-scoped traversal with no readout and no way
                 // back. The banner and its two option legs stay; the
                 // model chain (`scopeToCurrentPage()`) stays compiled
-                // and unit-pinned. DC-211.
+                // and unit-pinned.
                 if SearchState.navigationScopeControlsEnabled {
                     Button {
                         scopeSaturatedSearchToCurrentPage()
@@ -408,7 +408,7 @@ struct SearchResultsSection: View {
         return "The active regex pattern timed out on \(pageNoun) \(list). Results may be incomplete."
     }
 
-    // MARK: - ST-83 OCR-Skip Banner
+    // MARK: - OCR-Skip Banner
 
     /// Surfaces when one or more pages exceeded the OCR pixel caps during
     /// the active scan, so OCR never ran there. Same shape as the
@@ -433,7 +433,7 @@ struct SearchResultsSection: View {
         .accessibilityLabel(headline)
     }
 
-    /// ST-83 banner headline. Pages are 0-indexed internally; rendered
+    /// Banner headline. Pages are 0-indexed internally; rendered
     /// as 1-based page numbers for the user. Mechanism description only.
     static func ocrSkipBannerHeadline(pages: [Int]) -> String {
         let oneBased = pages.map { $0 + 1 }
@@ -459,7 +459,7 @@ struct SearchResultsSection: View {
 
     /// The scope picker row (dark for 1.0 behind
     /// `navigationScopeControlsEnabled`; renders under the DEBUG
-    /// reveal). D-63/UT-04: the saved-searches bookmark that rode
+    /// reveal). The saved-searches bookmark that rode
     /// this row on the Scan interface moved permanently to the
     /// sheet's search-bar row — reachable at every detent, which
     /// this home never was at compact — so the reveal renders the
@@ -487,7 +487,7 @@ struct SearchResultsSection: View {
     /// surface. (While a review is active this section isn't rendered
     /// at all — the review section replaces it — so the gate is a belt
     /// on top of that structural rule.)
-    /// D-63/UT-04: DORMANT — no render site since the bookmark moved
+    /// DORMANT — no render site since the bookmark moved
     /// to the sheet's search-bar row (`SearchAndRedactSheet`'s
     /// `savedSearchesBookmark` is the live instance, both
     /// interfaces). Kept compiled per the hide-never-delete posture.
@@ -586,7 +586,7 @@ struct SearchResultsSection: View {
                         if let termResults = searchState.resultsByTerm[term] {
                             Section("\"\(term)\" — \(termResults.count) match\(termResults.count == 1 ? "" : "es")\(conjunctionSuffix)") {
                                 ForEach(termResults) { result in
-                                    // UXC-45 (RB-103): by-term sections are
+                                    // By-term sections are
                                     // the one page-UNSECTIONED list, so the
                                     // rows carry the page label here.
                                     resultRow(for: result, showTermLabel: false, showsPageLabel: true)
@@ -598,8 +598,7 @@ struct SearchResultsSection: View {
                     // Default: Group by page. Every `ResultSortOrder`
                     // keeps these page sections (`resultsByPage` groups
                     // the sorted list by page), so the section header
-                    // carries the page and no row shows `p.N` (UXC-45,
-                    // RB-99/103).
+                    // carries the page and no row shows `p.N`.
                     let pages = searchState.resultsByPage.keys.sorted()
                     ForEach(pages, id: \.self) { page in
                         Section("Page \(page + 1)") {
@@ -613,14 +612,14 @@ struct SearchResultsSection: View {
                 }
             }
         .listStyle(.plain)
-        // SA-2: stable handle for the cooperative-arbitration XCUI
+        // Stable handle for the cooperative-arbitration XCUI
         // pins' in-list drags — the results-list sibling of
         // `scanReviewList`.
         .accessibilityIdentifier("searchResultsList")
         .onChange(of: pendingAnchorID, initial: false) { (_: UUID?, newID: UUID?) in
             anchorTappedRow(newID: newID, proxy: proxy)
         }
-        // UXC-44 (D-116, RB-92): the list FOLLOWS the walk — every
+        // The list FOLLOWS the walk — every
         // step of the current result (chevron / ⌘G / J/K) re-anchors
         // the current row at the top, the way the row tap does. The
         // row-tap path writes the same id in the same tick, so the
@@ -645,7 +644,7 @@ struct SearchResultsSection: View {
         // gesture-end via `enclosedRowIDs(loop:rowFrames:)`. The
         // gesture is Pencil-only (filtered by
         // `allowedTouchTypes` on the recognizer); finger drags pass
-        // through to the List's native scroll. SA-1: tracking runs
+        // through to the List's native scroll. Tracking runs
         // only while `isPencilSelectStrokeActive` — the recognizer's
         // stroke lifecycle drives the gate via
         // `onStrokeActiveChanged`. The
@@ -669,7 +668,7 @@ struct SearchResultsSection: View {
                     searchState.userModifiedSelections = true
                 }
             }
-            // UXF-05 (ts2-04): at the medium detent the list's viewport
+            // At the medium detent the list's viewport
             // can shrink to a sliver; without clipping, row content
             // painted past the list frame under the footer — a
             // false affordance whose taps hit the footer. Clip so rows
@@ -700,7 +699,7 @@ struct SearchResultsSection: View {
     /// Safe binding for a search result by ID. Falls back to the snapshot
     /// if the result has been removed between render passes. The set
     /// side is the row circle — a user gesture — so it also flips the
-    /// conditional-dismiss touched tracker. SA-1: the get routes
+    /// conditional-dismiss touched tracker. The get routes
     /// through `SearchState.result(for:)` — O(1) via the version-keyed
     /// index map instead of the former per-call linear scan (re-hit
     /// several times per row body); removed-id and fallback semantics
@@ -738,10 +737,10 @@ struct SearchResultsSection: View {
             onNavigate: {
                 searchState.currentResultIndex = searchState.index(of: result.id)
                 documentState.currentPageIndex = result.pageIndex
-                // SA-3 rider: rect-level half — the tapped match
+                // Rect-level half — the tapped match
                 // scrolls into view when the canvas is zoomed past
                 // fit (engine-canonical conversion at the consumer).
-                // UXC-50 (D-128, RB-123): the row tap parks the sheet,
+                // The row tap parks the sheet,
                 // so it frames the match at the readability scale.
                 documentState.requestCanvasScroll(
                     toPageIndex: result.pageIndex,
@@ -749,7 +748,7 @@ struct SearchResultsSection: View {
                     zoom: .readability
                 )
                 // Tap-on-row drops to compact so the
-                // PDF gets max area. Since UXC-44 (D-116, RB-92) the
+                // PDF gets max area. The
                 // chevron / ⌘G walk parks the sheet the same way
                 // (`navigateToCurrentResult(dropToCompact: true)` on
                 // the hub); only J/K keep the large → medium rule. Set
@@ -874,7 +873,7 @@ struct SearchResultsSection: View {
             currentSearchPage: searchState.currentSearchPage,
             totalPages: searchState.totalPages,
             totalCount: searchState.totalCount,
-            // BH-A-06 — the completion copy describes the run that
+            // The completion copy describes the run that
             // executed (kickoff snapshot), not the live chip state.
             enabledPIICategoryCount: searchState.lastRunDetectorCount
                 ?? searchState.effectiveScanCategories.count,
@@ -1023,7 +1022,7 @@ enum WU20Strings {
         case .text:
             if queryText.isEmpty { return .textPreSearch }
             // A carried query the mode switch deliberately did not
-            // re-run (UXF-16) must not read as a no-match verdict.
+            // re-run must not read as a no-match verdict.
             return hasCompletedRun ? .textNoMatch : .textNotRun
         case .regex:
             if queryText.isEmpty { return .regexPreSearch }
@@ -1054,7 +1053,7 @@ enum WU20Strings {
             // leaves `currentSearchPage` at the cancelled position with
             // `hasCompletedRun` false — that state must never render
             // the "Scan complete" clean bill on a partially-scanned
-            // document (BH-A-05): it gets its own cancelled render.
+            // document: it gets its own cancelled render.
             if currentSearchPage > 0 && totalCount == 0 {
                 return hasCompletedRun
                     ? .piiScanPostScanZero(detectorCount: enabledPIICategoryCount)
@@ -1087,12 +1086,12 @@ enum WU20Strings {
         case .piiScanStartFailed:
             return "Scan didn't start"
         case .piiScanPreScan:
-            // UXF-02 — pre-scan headline must not read as a verdict.
+            // Pre-scan headline must not read as a verdict.
             // "Not scanned yet" states the actual condition; the
             // description below carries the role sentence.
             return "Not scanned yet"
         case .piiScanPostScanZero:
-            // UXC-10(b) — names what the run produced, not an
+            // Names what the run produced, not an
             // affirmation: matches the canvas banner's own voice
             // ("…flagged no items"). A checkmark-style "Scan complete"
             // read as a clean bill; this names the produced count
@@ -1109,7 +1108,7 @@ enum WU20Strings {
              .multiTermPreSearchWithRecents, .regexPreSearch,
              .textNotRun, .regexNotRun, .multiTermNotRun:
             return "magnifyingglass"
-        // UXC-10(a) — the post-scan-zero branch shares the neutral
+        // The post-scan-zero branch shares the neutral
         // no-match glyph with its Search-side siblings: a checkmark
         // read as an affirmative clean bill, which this state must
         // never imply.
@@ -1167,7 +1166,7 @@ enum WU20Strings {
             // stays true and names no retired control.
             return piiScanRoleSentence
         case .piiScanPostScanZero(let detectorCount):
-            // UXC-11 — the threshold-count sentence stays first,
+            // The threshold-count sentence stays first,
             // verbatim, then the calibration line and the recourse
             // pointer (both pinned builders below) so a zero result
             // never reads as an unqualified clean bill.
@@ -1183,7 +1182,7 @@ enum WU20Strings {
         }
     }
 
-    // MARK: Post-scan-zero recourse (UXC-11)
+    // MARK: Post-scan-zero recourse
     //
     // Fence-safe: copy + pointers to controls that already ship.
     // No near-threshold candidate display, no new detection surface,
@@ -1192,14 +1191,14 @@ enum WU20Strings {
     // `EmptyStateTests` so the wording stays testable without
     // decoding the composed string.
 
-    /// UXC-11(a) — calibration line: a zero result is a threshold
+    /// Calibration line: a zero result is a threshold
     /// outcome, not a verdict on document content. Mechanism
     /// description only — no outcome promise about what the document
     /// does or doesn't contain.
     static let piiScanZeroCalibrationLine =
         "A zero result means nothing on the scanned pages cleared the current threshold for those detectors \u{2014} it is not a statement about what the document contains."
 
-    /// UXC-11(b) — pointer line naming the three existing recourse
+    /// Pointer line naming the three existing recourse
     /// controls by their shipped labels/glyphs: the chips-row re-run
     /// affordance (\u{21bb}, accessibility label "Scan document for
     /// PII", `SearchToolbarSection.rescanButton`), the Search

@@ -1,7 +1,7 @@
 import SwiftUI
 import RedactionEngine
 
-// WU-71 / [P10] path (a) — canvas-side rationale viewer. Mirrors
+// Canvas-side rationale viewer. Mirrors
 // `RegionInfoPopover`'s "View rationale" disclosure but as a full sheet
 // for the iPhone canvas long-press flow. The view is presented from
 // `DocumentEditorView` via `.sheet(item:)` keyed on
@@ -94,7 +94,7 @@ struct RegionRationaleSheet: View {
         case .userAlwaysFlag:                      return "User always-flag pattern"
         case .userNeverFlag:                       return "User never-flag pattern"
         case .suppressedByOverlap(let winner, let loser):
-            // QW-5 — label the suppressed match as its own category when
+            // Label the suppressed match as its own category when
             // the signal carries it; older signals fall back to the
             // winner-only copy.
             if let loser {
@@ -102,7 +102,7 @@ struct RegionRationaleSheet: View {
             }
             return "Overlap winner: \(winner.rawValue)"
         case .contextPositiveDetail(let keywords):
-            // WU-76 / [P4] — keywordKey from gazetteer/profile (RR-31).
+            // keywordKey from gazetteer/profile.
             // Using a for-loop rather than .map { String(format:) } —
             // the closure form has surfaced a runtime crash in
             // simulator-test contexts; loop form is the workaround.

@@ -7,7 +7,7 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// PERF-4 — OCR confidence-based skip fast path.
+// OCR confidence-based skip fast path.
 //
 // Locked decision: skip Vision OCR for a page when BOTH:
 //   1. Selectable-text coverage > 0.95
@@ -19,7 +19,7 @@ import UIKit
 //
 // .serialized: shares Vision's perform() blocking semantics with the rest
 // of the detection suite (see DetectionOrchestratorTests).
-@Suite("PERF-4 — OCR Skip Fast Path", .serialized)
+@Suite("OCR Skip Fast Path", .serialized)
 struct OCRSkipFastPathTests {
 
     // MARK: - 1. Born-digital PDF skips OCR
@@ -221,7 +221,7 @@ struct OCRSkipFastPathTests {
         #expect(det.provenance == .ocrRan)
     }
 
-    // MARK: - ST-83 pixel-cap provenance (q13)
+    // MARK: - Pixel-cap provenance
 
     @Test("Pixel-cap page: page-level provenance reports pixelCapExceeded")
     func testPixelCapPageStampsPageProvenance() async throws {

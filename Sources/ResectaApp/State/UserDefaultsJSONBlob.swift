@@ -1,9 +1,9 @@
 import Foundation
 import OSLog
 
-// W4 — reusable envelope for persisting structured Codable values in
-// UserDefaults with a schema-version byte. Shared by W3 (user terms),
-// W4 (per-category threshold overrides), and W6 (saved regex library).
+// A reusable envelope for persisting structured Codable values in
+// UserDefaults with a schema-version byte. Shared by the user-terms
+// store, the per-category threshold overrides, and the saved-regex library.
 //
 // Schema mismatches and decode errors fall through to the provided
 // fallback rather than corrupting state. No automatic migration is
@@ -12,7 +12,7 @@ import OSLog
 
 // nonisolated: a stateless UserDefaults persistence envelope used off-MainActor
 // on detached hydrate paths (e.g. UserTermsStore.loadAndSanitize). Keep it out
-// of the SE-0466 MainActor-default pinned project-wide (fix-series s04 flip).
+// of the SE-0466 MainActor-default pinned project-wide.
 nonisolated struct UserDefaultsJSONBlob<T: Codable & Sendable>: @unchecked Sendable {
     let key: String
     let schemaVersion: UInt8
@@ -74,5 +74,5 @@ nonisolated struct UserDefaultsJSONBlob<T: Codable & Sendable>: @unchecked Senda
 }
 
 // nonisolated: a Sendable Logger referenced from the nonisolated blob methods
-// (off-MainActor hydrate path). Globals default to MainActor under the s04 flip.
+// (off-MainActor hydrate path). Globals default to MainActor under the SE-0466 flip.
 nonisolated private let logger = Logger(subsystem: "app.resecta", category: "UserDefaultsJSONBlob")

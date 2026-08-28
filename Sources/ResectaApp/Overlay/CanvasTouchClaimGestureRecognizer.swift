@@ -1,7 +1,7 @@
 import UIKit
 import UIKit.UIGestureRecognizerSubclass
 
-/// UXC-49 (D-124 / REV-13): a "canvas touch is in flight" flag for UIKit's
+/// A "canvas touch is in flight" flag for UIKit's
 /// gesture arbitration.
 ///
 /// `RedactionOverlayView` handles every canvas gesture through raw

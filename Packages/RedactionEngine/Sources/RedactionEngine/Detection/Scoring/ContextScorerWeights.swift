@@ -2,8 +2,8 @@ import CryptoKit
 import Foundation
 import OSLog
 
-// B03 — on-device consumer of the context-scorer wire (plan 04 §4.4;
-// DataPipeline specs/FORMAT_CONTRACTS.md §15). The C1 augment scorer is one
+// On-device consumer of the context-scorer wire format the datapipeline
+// emits. The context-scorer augment is one
 // additive log-odds term at the posterior seam:
 //
 //   finalConfidence = sigmoid(logit(raw) + logit(prior) + learnedContextLogit)
@@ -18,14 +18,14 @@ import OSLog
 //
 // Rollback is fail-open and whole-scorer: any missing resource / decode /
 // arity / scale / hash / version problem yields the identity scorer (every
-// learnedContextLogit is 0 ⇒ exactly the S3 baseline behavior). A per-family
+// learnedContextLogit is 0 ⇒ exactly the pre-augment baseline behavior). A per-family
 // `w_family == 0` is the finer, deliberate per-family off switch.
 //
-// B05 shipped the calibrated artifact (d2786a4) — the bundled weights are the
-// trained per-family values, no longer the B03 all-zero placeholder. A family
+// The calibrated artifact (d2786a4) is shipped — the bundled weights are the
+// trained per-family values, no longer an all-zero placeholder. A family
 // can still be switched off individually via `w_family == 0`.
 //
-// Privacy (ARCH §12.2): logs emit mechanism metadata + error.localizedDescription
+// Privacy: logs emit mechanism metadata + error.localizedDescription
 // only — never document text, PII values, or coordinates.
 
 struct ContextScorerWeights: Sendable {
@@ -78,7 +78,7 @@ struct ContextScorerWeights: Sendable {
         loadWithDiagnostics(from: bundle).scorer
     }
 
-    /// SEC-7 diagnostics variant: the scorer plus, on any fallback-to-identity,
+    /// Diagnostics variant: the scorer plus, on any fallback-to-identity,
     /// a mechanism-only reason string (no document content, no file paths).
     /// `PIIDetector.loadWithDiagnostics(bundle:)` folds the reason into
     /// `GazetteerLoadDiagnostics` so the identity fallback surfaces through the
@@ -168,7 +168,7 @@ struct ContextScorerWeights: Sendable {
     /// The additive log-odds term for one match: `w_family * (bias + Σ wᵢ·zᵢ)`,
     /// `zᵢ = (featuresᵢ − meansᵢ)/scalesᵢ`. Returns 0 for an unknown family, a
     /// disabled family (`w_family == 0`), or an arity mismatch — so it is exactly
-    /// 0 under the B03 placeholder (every family disabled).
+    /// 0 when every family is disabled.
     ///
     /// - Parameters:
     ///   - family: the wire-name family (`PresetThresholdVector.wireName(for:)`).

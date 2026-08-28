@@ -1,6 +1,6 @@
 import Foundation
 
-/// Lightweight pre-compile heuristic for catastrophic-backtracking shapes (L-17).
+/// Lightweight pre-compile heuristic for catastrophic-backtracking shapes.
 ///
 /// Runs before `RegexSentinelCheck.validate` detaches tasks — rejects obvious
 /// ReDoS shapes synchronously so adversarial patterns can't orphan the

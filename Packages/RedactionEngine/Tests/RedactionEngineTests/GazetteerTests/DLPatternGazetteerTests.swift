@@ -2,13 +2,13 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// D-13 — DLPatternGazetteer JSON loader + lookup tests. Mirrors
+// DLPatternGazetteer JSON loader + lookup tests. Mirrors
 // AddressComponentsGazetteerTests structure. Samples used as positive
 // controls are taken verbatim from the row's `sample` field in the
 // shipping artifact `dl_patterns.json` (DataPipeline commit 9940520,
 // SHA-256 b1966de…d25b5a).
 
-@Suite("DLPatternGazetteer (D-13)")
+@Suite("DLPatternGazetteer")
 struct DLPatternGazetteerTests {
 
     // MARK: - Smoke
@@ -197,7 +197,7 @@ struct DLPatternGazetteerTests {
 
     // MARK: - Metadata audit
 
-    @Test("Posture distribution matches d13-DONE record (11/26/3/11)")
+    @Test("Posture distribution matches the expected counts (11/26/3/11)")
     func testPostureDistribution() throws {
         let gazetteer = try DLPatternGazetteer()
         var counts: [String: Int] = [:]
@@ -211,7 +211,7 @@ struct DLPatternGazetteerTests {
         #expect(counts["aamva-envelope"] == 11)
     }
 
-    @Test("Version-fence rejects out-of-range version (W-O)")
+    @Test("Version-fence rejects out-of-range version")
     func versionFenceRejectsOutOfRange() throws {
         let tempBase = FileManager.default.temporaryDirectory
             .appending(path: "wo-followers-dl-\(UUID().uuidString)", directoryHint: .isDirectory)

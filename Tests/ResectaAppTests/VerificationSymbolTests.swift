@@ -3,12 +3,12 @@ import UIKit
 import RedactionEngine
 @testable import ResectaApp
 
-// VI (D-76): symbol-router pins. The router is keyed on layer identity
+// Symbol-router pins. The router is keyed on layer identity
 // (never the stored symbolName), so these pin (a) router ↔ engine name
 // agreement, (b) the fallback path for unmapped identities, and (c) all
 // 12 custom symbol assets resolving from the APP bundle (C-A pattern,
 // same Bundle(for:) resolution as BundleContentsTests).
-@Suite("Verification symbol router (VI)")
+@Suite("Verification symbol router")
 struct VerificationSymbolTests {
 
     private var appBundle: Bundle { Bundle(for: AppCoordinator.self) }

@@ -4,7 +4,7 @@ import PDFKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// GATE-3 (Pkg I) — Verification Done confirmation symmetry.
+// Verification Done confirmation symmetry.
 //
 // Done now lives in the top-left toolbar of `DocumentEditorView` for
 // the `.verified` phase; the legacy bottom `VerificationActionBar` was
@@ -25,10 +25,9 @@ import PDFKit
 //      + `documentState.sourceDocument = nil` — the same teardown the
 //      prior one-tap Done did.
 //
-// Plan reference: post-V1.0 improvements §3 Pkg I (GATE-3).
-// Mechanism-description copy per ARCH §1.3.
+// The confirmation copy is mechanism-description, not an outcome promise.
 
-@Suite("Verification Done confirmation (GATE-3, Pkg I)")
+@Suite("Verification Done confirmation")
 @MainActor
 struct VerificationActionBarDoneConfirmationTests {
 
@@ -120,7 +119,7 @@ struct VerificationActionBarDoneConfirmationTests {
         // The dialog title + message are hard-coded inline in
         // DocumentEditorView (lifted from the retired
         // VerificationActionBar). Pin the copy so it can't silently
-        // drift into outcome-promise language (R1 / ARCH §1.3).
+        // drift into outcome-promise language.
         let title = "Close this document?"
         let message = "Drawn regions and verification results will be cleared."
 

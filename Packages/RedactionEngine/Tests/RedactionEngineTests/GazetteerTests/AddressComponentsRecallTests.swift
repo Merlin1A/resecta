@@ -2,8 +2,8 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W-D engine paired (STRAT §5.8) — G8 address-heavy subset recall regression
-// guard for the A7 phase-1 BINDING `address_components.json` rebuild cutover.
+// G8 address-heavy subset recall regression guard for the A7 phase-1
+// BINDING `address_components.json` rebuild cutover.
 //
 // Loads `g8_corpus.json`, filters to the address-heavy subset (every G8 doc
 // containing ≥1 `category == "address"` span — by construction this is the
@@ -14,13 +14,12 @@ import Foundation
 // `AddressComponentsGazetteer.containsCity(_:)` ≥ the pre-cutover baseline.
 //
 // API note: `AddressComponentsGazetteer` exposes a lookup surface
-// (`containsCity` / `containsCounty`), not a `matches(in:)` scanner. The
-// An earlier draft cited a `matches(in:)` method that does not exist on
-// HEAD; this test re-anchors per framework §8 mode 2 (closest-defensible
-// interpretation: city-token recall against the lookup surface, since that
-// is what the gazetteer actually offers and is what `AddressSpatialAssembler`
-// will call once Routing insertion lands in phase 2). The defer-note in the
-// W-D awaiting-jesse handoff records this re-anchor.
+// (`containsCity` / `containsCounty`), not a `matches(in:)` scanner. An
+// earlier draft cited a `matches(in:)` method that does not exist on
+// HEAD; this test re-anchors on city-token recall against the lookup
+// surface (the closest-defensible interpretation), since that is what
+// the gazetteer actually offers and is what `AddressSpatialAssembler`
+// will call once routing insertion lands in phase 2.
 //
 // Regression model: the A7 phase-1 BINDING cutover keeps `address_components.json`
 // byte-equivalent between legacy and rebuilt artifacts (cutover-diff is
@@ -35,8 +34,8 @@ import Foundation
 // addresses in its template, and the floors are per-stratum so a regression
 // concentrated in one doctype family is visible.
 //
-// Floors are recorded in `engine-impl-W-D-engine-paired-awaiting-jesse.md`;
-// the post-data-side-W-D-merge re-run compares against the values below. If
+// Floors were recorded at the pre-cutover measurement; the post-cutover
+// re-run compares against the values below. If
 // the rebuild drops a load-bearing city the per-stratum recall slips and
 // this test fails — visible regression catch instead of silent recall
 // degradation.
@@ -45,26 +44,27 @@ import Foundation
 // `G8CorpusIngestionTests`); skipped cleanly if the maintainer has not yet run
 // `make install-assets` on the corpus path.
 
-@Suite("AddressComponentsGazetteer × G8 city-recall (W-D engine paired)")
+@Suite("AddressComponentsGazetteer × G8 city-recall")
 struct AddressComponentsRecallTests {
 
-    // MARK: - Baseline floors (pre-cutover, recorded in awaiting-jesse handoff)
+    // MARK: - Baseline floors (pre-cutover)
 
-    /// Pre-cutover address-heavy subset recall floor. Measured at
-    /// chain-author commit on `wip/w-d-engine-paired-binding-diff` against
-    /// the currently-bundled `address_components.json`. The actual baseline
-    /// is captured by the handoff doc; the floor below is set to a
-    /// conservative fraction (`>= 0.95`) so that a silent drop of a
-    /// load-bearing city (e.g., a state-capital missing from the rebuild)
-    /// fails the test, while incidental Faker-template drift on a single
-    /// city does not. The handoff doc records the actual measured value
-    /// for forensic comparison.
+    /// Pre-cutover address-heavy subset recall floor. Measured at the
+    /// pre-cutover commit against the currently-bundled
+    /// `address_components.json`. The actual baseline was recorded at
+    /// that measurement; the floor below is set to a conservative
+    /// fraction (`>= 0.95`) so that a silent drop of a load-bearing city
+    /// (e.g., a state-capital missing from the rebuild) fails the test,
+    /// while incidental Faker-template drift on a single city does not.
+    /// The measured value was recorded at that time for forensic
+    /// comparison.
     static let aggregateRecallFloor: Double = 0.95
 
     /// Per-stratum recall floors. Each is a conservative lower bound below
-    /// the measured pre-cutover rate (recorded in the handoff doc). Tightening
-    /// these to the exact measured rate is a V1.1+ followup once the
-    /// post-cutover re-run confirms the floors are stable.
+    /// the measured pre-cutover rate (recorded at the pre-cutover
+    /// measurement). Tightening these to the exact measured rate is a
+    /// V1.1+ followup once the post-cutover re-run confirms the floors
+    /// are stable.
     static let courtRecallFloor: Double = 0.95
     static let financialRecallFloor: Double = 0.95
     static let foiaRecallFloor: Double = 0.95
@@ -73,11 +73,10 @@ struct AddressComponentsRecallTests {
 
     // MARK: - Stratum size invariants (matches G8 plan counts)
 
-    // S4 calibration (2026-06-11) grew the bundled corpus by 100 financial
-    // W-2 documents (financial_tax templates, runbook steps 1-2), each
-    // carrying an address span: financial 200 → 300, total 1000 → 1100.
-    // The S3-era pins (200/1000) were authored before that corpus landed;
-    // updated here (S5) on the first full-suite run over the S4 fixture.
+    // The bundled corpus carries 100 financial W-2 documents beyond the
+    // original set (financial_tax templates), each carrying an address
+    // span: financial 200 → 300, total 1000 → 1100. The counts below
+    // reflect the current fixture.
     static let expectedCourtAddressDocCount = 300
     static let expectedFinancialAddressDocCount = 300
     static let expectedFOIAAddressDocCount = 150
@@ -91,7 +90,7 @@ struct AddressComponentsRecallTests {
     func aggregateAddressRecall() throws {
         let corpus = try loadCorpus()
         guard let corpus else {
-            print("[W-D] g8_corpus.json not bundled; test skipped until `make install-assets` runs.")
+            print("[address-recall] g8_corpus.json not bundled; test skipped until `make install-assets` runs.")
             return
         }
         let gazetteer = try AddressComponentsGazetteer()
@@ -100,24 +99,23 @@ struct AddressComponentsRecallTests {
 
         #expect(
             stats.addressDocCount == Self.expectedTotalAddressDocCount,
-            "address-heavy subset size drifted from G8 plan total (1100 docs post-S4)"
+            "address-heavy subset size drifted from the G8 plan total (1100 docs)"
         )
 
-        // Search-impl S3 (2026-06-11): the g8 corpus reached Bundle.module for
-        // the first time (D1 gate resource), un-gating this suite — measured
-        // aggregate recall is 0.875 against the 0.95 floor. Pre-existing gap,
-        // not an S3 regression: the GNIS city list ships junk entries with no
-        // TIGER PLACE cross-filter (design 02 §8, item 2.9 — S5 scope). The
-        // withKnownIssue pin keeps the measurement live and flips red when S5
-        // lands the cross-filter; remove the pin then.
-        withKnownIssue("city-recall below floor until S5 item 2.9 (GNIS/TIGER cross-filter)") {
+        // The g8 corpus is bundled via Bundle.module, un-gating this suite —
+        // measured aggregate recall is 0.875 against the 0.95 floor. This is
+        // a pre-existing gap: the GNIS city list ships junk entries with no
+        // TIGER PLACE cross-filter. The withKnownIssue pin keeps the
+        // measurement live and flips red when the cross-filter lands;
+        // remove the pin then.
+        withKnownIssue("city-recall below floor until the GNIS/TIGER cross-filter lands") {
             #expect(
                 stats.recall >= Self.aggregateRecallFloor,
                 "aggregate city-recall \(stats.recall) below pre-cutover floor \(Self.aggregateRecallFloor); rebuilt address_components.json may have dropped a load-bearing city entry"
             )
         }
 
-        print("[W-D baseline aggregate] addrDocs=\(stats.addressDocCount) " +
+        print("[address-recall baseline aggregate] addrDocs=\(stats.addressDocCount) " +
               "expectedSpans=\(stats.expectedSpanCount) matched=\(stats.matchedSpanCount) " +
               "recall=\(String(format: "%.4f", stats.recall))")
     }
@@ -126,7 +124,7 @@ struct AddressComponentsRecallTests {
     func perStratumAddressRecall() throws {
         let corpus = try loadCorpus()
         guard let corpus else {
-            print("[W-D] g8_corpus.json not bundled; test skipped until `make install-assets` runs.")
+            print("[address-recall] g8_corpus.json not bundled; test skipped until `make install-assets` runs.")
             return
         }
         let gazetteer = try AddressComponentsGazetteer()
@@ -147,17 +145,17 @@ struct AddressComponentsRecallTests {
                 "\(doctype) stratum size drifted from G8 plan count"
             )
 
-            // S3 (2026-06-11): un-gated with the corpus bundling; measured
-            // 0.85–0.88 per stratum vs the 0.95 floor — same S5 item-2.9
-            // (GNIS/TIGER) gap as the aggregate pin above.
-            withKnownIssue("city-recall below floor until S5 item 2.9 (GNIS/TIGER cross-filter)") {
+            // Un-gated with the corpus bundling; measured 0.85–0.88 per
+            // stratum vs the 0.95 floor — the same GNIS/TIGER gap as the
+            // aggregate pin above.
+            withKnownIssue("city-recall below floor until the GNIS/TIGER cross-filter lands") {
                 #expect(
                     stats.recall >= floor,
                     "\(doctype) city-recall \(stats.recall) below pre-cutover floor \(floor); rebuilt address_components.json may have dropped a city entry concentrated in this stratum"
                 )
             }
 
-            print("[W-D baseline \(doctype)] addrDocs=\(stats.addressDocCount) " +
+            print("[address-recall baseline \(doctype)] addrDocs=\(stats.addressDocCount) " +
                   "expectedSpans=\(stats.expectedSpanCount) matched=\(stats.matchedSpanCount) " +
                   "recall=\(String(format: "%.4f", stats.recall))")
         }

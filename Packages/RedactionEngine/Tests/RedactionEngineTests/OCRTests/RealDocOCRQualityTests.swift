@@ -5,25 +5,23 @@ import Testing
 import Vision
 @testable import RedactionEngine
 
-// S8 OCR Quality Program — measurement instrument.
-// Design reference: design/04-search-ocr-ux-security.md "Tier-5 OCR Quality
-// Program" + "Rollout Order and Measurement"; verification.md §6 ("measured,
-// not asserted").
+// OCR quality measurement instrument. Most of what this suite produces
+// is measured and reported, not asserted — see the two hard pins below.
 //
 // Runs the production OCR→detect leg (PageRasterizer.renderPage at the
 // detection DPI → DetectionOrchestrator.detectPage with embeddedText: nil,
 // which forces real Vision OCR) over:
-//   • 3-page synthetic small-text doc    (7/8/9 pt box labels, §5.2)
+//   • 3-page synthetic small-text doc    (7/8/9 pt box labels)
 //   • 20-page synthetic letter doc       (memory + latency revert criteria)
 //
 // Output: per-category COUNTS to RESECTA_OCR_MEASURE_OUT (default
 // /tmp/ocr_quality_measure.json) + [OCRQ] console lines. Counts and
-// categories only — never matched text (CLAUDE.md real-document rule).
+// categories only — never matched text.
 //
 // G6SyntheticRecallTests is the detector-side control: it never touches
 // Vision, so it must stay flat across every OCR config step.
 
-@Suite("S8 OCR quality measurement", .serialized)
+@Suite("OCR quality measurement", .serialized)
 struct RealDocOCRQualityTests {
 
     // MARK: - Production config mirror
@@ -132,8 +130,8 @@ struct RealDocOCRQualityTests {
         // DetectionOrchestrator.OCRInvocationCounter: that static is shared by
         // every suite in a batched xcodebuild invocation, so a concurrent
         // OCR-driving sibling (e.g. PacketSnapshotTests / PacketOCRQualityRole)
-        // inflates a global delta and breaks an exact-equality assert (the S01
-        // batch-fragility gotcha). The local tally is deterministic per sweep.
+        // inflates a global delta and breaks an exact-equality assert.
+        // The local tally is deterministic per sweep.
         var ocrInvocations = 0
         let clock = ContinuousClock()
 
@@ -157,10 +155,10 @@ struct RealDocOCRQualityTests {
             // embeddedText: nil forces the Vision OCR leg — the subject of
             // the program — even on born-digital pages. thresholdVector: nil
             // surfaces every match; balanced cutoffs are applied below so
-            // one sweep yields both raw and surfaced counts (D1-gate
-            // pattern). A throwing page is recorded (domain/code + pixel
-            // dims) and the sweep continues — page-level Vision failures
-            // are themselves measurements (the 200-DPI A/B surfaced one).
+            // one sweep yields both raw and surfaced counts. A throwing
+            // page is recorded (domain/code + pixel dims) and the sweep
+            // continues — page-level Vision failures are themselves
+            // measurements (the 200-DPI A/B surfaced one).
             let result: PageDetectionResult
             do {
                 result = try await orchestrator.detectPage(
@@ -203,7 +201,7 @@ struct RealDocOCRQualityTests {
                 if let cutoff = Self.cutoff(for: detection.kind) {
                     if detection.confidence >= cutoff { bucket.surfaced += 1 }
                 } else {
-                    bucket.surfaced += 1  // no wire name → passes W4 unfiltered
+                    bucket.surfaced += 1  // no wire name → passes the wire-name gate unfiltered
                 }
                 categories[key] = bucket
             }
@@ -246,7 +244,7 @@ struct RealDocOCRQualityTests {
         return nil
     }
 
-    // MARK: - §5.2 adversarial pin (design test plan)
+    // MARK: - Adversarial pin
 
     /// Hard gate: the detection config must keep recognizing 7/8/9 pt
     /// box-label rows. Baseline through step 3 measured one SSN + one EIN
@@ -271,7 +269,7 @@ struct RealDocOCRQualityTests {
         }
     }
 
-    // MARK: - 20-page memory + latency run (design §5.1 revert criterion)
+    // MARK: - 20-page memory + latency run
 
     @Test("20-page letter doc — peak footprint and per-page latency")
     func twentyPageMemoryLatency() async throws {

@@ -3,12 +3,12 @@ import Foundation
 import Darwin
 @testable import RedactionEngine
 
-// Search-impl S5 / design 02 §7 — NicknameGazetteer loader + lookup tests,
-// and NameGazetteer nickname-widening integration tests.
+// NicknameGazetteer loader + lookup tests, and NameGazetteer
+// nickname-widening integration tests.
 
 // MARK: - NicknameGazetteer unit tests
 
-@Suite("NicknameGazetteer (search-impl S5)")
+@Suite("NicknameGazetteer")
 struct NicknameGazetteerTests {
 
     // MARK: - Direct-init normalization
@@ -69,7 +69,7 @@ struct NicknameGazetteerTests {
 
     // MARK: - Version fence (direct-path; bundle-fixture path skipped — no test bundle infra needed)
 
-    @Test("Version-fence rejects unsupported version (W-O)")
+    @Test("Version-fence rejects unsupported version")
     func versionFence_rejectsOutOfRange() throws {
         let tempBase = FileManager.default.temporaryDirectory
             .appending(path: "wo-nicknames-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -137,7 +137,7 @@ struct NicknameGazetteerTests {
 
 // MARK: - NameGazetteer + NicknameGazetteer integration tests
 
-@Suite("NameGazetteer nickname integration (S5)")
+@Suite("NameGazetteer nickname integration")
 struct NameGazetteerNicknameIntegrationTests {
 
     // Helper: build a BloomFilter containing exactly the given keys.
@@ -231,7 +231,7 @@ struct NameGazetteerNicknameIntegrationTests {
 
     @Test("Adversarial: 'bob' tagged as personalName → canonical 'robert' in filter → boost fires")
     func testBobToRobertAdversarial() throws {
-        // This exercises the design's adversarial case (design line 1038):
+        // This exercises an adversarial case:
         // "bob jones" — bob is a name here (NLTagger context assumed), not a verb phrase.
         // Filter has "jones" (surname) and "robert" (given). Table maps bob → robert.
         let surnameFilter = try loadGoldenFilter()  // "jones" is in golden-1000

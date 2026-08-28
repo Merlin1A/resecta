@@ -4,12 +4,12 @@ import Foundation
 @testable import RedactionEngine
 
 // Dismissal helpers for the search sheet's one-tap Dismiss. Formerly
-// the WU-19 two-tap discard-via-undo-toast flow: the undo toast and
+// a two-tap discard-via-undo-toast flow: the undo toast and
 // its `enqueueDiscardUndoToast` / `restoreSelection` helpers are gone —
 // Dismiss now deselects in-place and closes in the same tap. Still
 // pinned here: the selection snapshot/clear helpers the Dismiss
 // handler runs, the shared Undo action label the mode-switch toast
-// reuses, and the UXF-27 dismissal message.
+// reuses, and the dismissal message.
 
 @Suite("Search dismiss selection helpers")
 @MainActor
@@ -22,7 +22,7 @@ struct DiscardUndoToastTests {
         #expect(SearchAndRedactSheet.discardUndoActionLabel == "Undo")
     }
 
-    @Test("Detection-results-dismissed toast is punctuated as a complete sentence (UXC-31/RB-40)")
+    @Test("Detection-results-dismissed toast is punctuated as a complete sentence")
     func detectionResultsDismissedToastPinned() {
         #expect(SearchAndRedactSheet.detectionResultsDismissedToast == "Detection results dismissed.")
     }
@@ -73,7 +73,7 @@ struct DiscardUndoToastTests {
         #expect(state.results[2].isSelected == false)
     }
 
-    // MARK: - Dismissal copy (UXF-27)
+    // MARK: - Dismissal copy
 
     @Test("dismissClearedMessage names the unapplied loss at the dismiss decision point")
     func dismissMessageNamesUnappliedLoss() {
@@ -83,9 +83,8 @@ struct DiscardUndoToastTests {
                 == "Search closed — 1 unapplied match cleared.")
     }
 
-    // BH-B-03 — the leading noun follows the interface (UP-era
-    // adaptive-copy posture): a Scan-interface dismissal must not say
-    // "Search closed".
+    // The leading noun follows the interface: a Scan-interface dismissal
+    // must not say "Search closed".
     @Test("dismissClearedMessage uses the Scan noun on the Scan interface")
     func dismissMessageScanNoun() {
         #expect(SearchAndRedactSheet.dismissClearedMessage(unappliedCount: 126, interface: .scan)

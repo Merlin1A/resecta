@@ -4,7 +4,7 @@ import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// UI_UX §8.2: Region manager tests.
+// Region manager tests.
 
 @Suite("RedactionState Region Manager")
 @MainActor
@@ -224,14 +224,14 @@ struct RegionManagerTests {
         state.clearOutput()
         #expect(state.outputURL == nil)
         #expect(state.textExtractionBuffer == nil)
-        // STATE-4 (Pkg N): clearOutput no longer touches the
+        // clearOutput no longer touches the
         // `regionsModifiedSinceVerification` flag. addRegion set the
         // flag to true above; clearOutput preserves it because the
         // regions are still modified relative to the last (now
         // discarded) verification. The flag resets only via
         // `markVerificationCurrent()` (called by the pipeline runner
         // after a successful verify) or `clearForNewDocument()` /
-        // `clearAll()` (full-document reset). See STATE-4.
+        // `clearAll()` (full-document reset).
         #expect(state.isVerificationStale == true)
     }
 
@@ -286,7 +286,7 @@ struct RegionManagerTests {
         #expect(state.regions[0]?[1].source == .detectedFace)
     }
 
-    // MARK: - Triage (GAP §2.2)
+    // MARK: - Triage
 
     @Test("Staged-review apply creates regions and metadata, undo/redo lifecycle")
     func triageApplyUndoMetadata() async {
@@ -338,7 +338,7 @@ struct RegionManagerTests {
         #expect(state.triageSelections.isEmpty)
     }
 
-    // MARK: - Remove Region Metadata Cleanup (F-2)
+    // MARK: - Remove Region Metadata Cleanup
 
     @Test("removeRegion cleans up regionMetadata and restores on undo")
     func removeRegionCleansUpMetadata() {
@@ -362,7 +362,7 @@ struct RegionManagerTests {
         #expect(state.regionMetadata[region.id] != nil)
     }
 
-    // MARK: - Full Reset (F-4)
+    // MARK: - Full Reset
 
     @Test("clearAll resets all state to initial values")
     func clearAllResetsState() {

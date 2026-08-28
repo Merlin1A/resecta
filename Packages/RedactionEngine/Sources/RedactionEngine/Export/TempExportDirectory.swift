@@ -1,23 +1,23 @@
 import Foundation
 
-// SEC-2 — Backup exclusion on temp dir.
+// Backup exclusion on temp dir.
 //
-// Per SEC-2, all export-pipeline temp writes live under a per-session
+// All export-pipeline temp writes live under a per-session
 // subdirectory `redacted_session_<UUID>/` inside `FileManager.temporaryDirectory`.
 // The subdirectory is flagged with `isExcludedFromBackup = true` at the
 // directory level (iCloud's documented unit for the exclusion flag) so the
 // transient redacted artifacts are not designed to be carried into iCloud
 // or local backups. The entire subdirectory is removed on session end.
 //
-// This helper owns the lifecycle. SEC-1's `TempFileHardening` (parallel
+// This helper owns the lifecycle. `TempFileHardening` (parallel
 // sibling) handles per-file protection-class flags; the two are intended to
 // be composed at the call sites in `PipelineCoordinator` and the export
 // finalize block.
 //
 // File location note: this type lives in the RedactionEngine package so it
 // can be exercised by the engine test suite (`BackupExclusionTests`).
-// The kickoff also offered folding into `TempFileHardening`; placing it
-// alongside in `Export/` is the reconciliation point.
+// It could instead be folded into `TempFileHardening`; placing it
+// alongside in `Export/` keeps the two together.
 
 /// Owns the lifecycle of a per-session temporary subdirectory inside
 /// `FileManager.default.temporaryDirectory`. The subdirectory is created

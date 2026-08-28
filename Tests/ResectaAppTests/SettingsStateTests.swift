@@ -96,7 +96,7 @@ final class SettingsStateTests {
         #expect(state.pipelineMode == .secureRasterization)
     }
 
-    // MARK: - S7 / design 03 §3.6 — detection preset + active vector
+    // MARK: - Detection preset + active vector
 
     @Test("detectionPreset defaults to balanced with no stored value")
     func detectionPresetDefault() {
@@ -229,12 +229,12 @@ final class SettingsStateTests {
         #expect(state.pipelineMode == .secureRasterization)
     }
 
-    @Test("resetToDefaults preserves successfulExportCount (lifetime review-gate metric, CAT-400)")
+    @Test("resetToDefaults preserves successfulExportCount (lifetime review-gate metric)")
     func resetPreservesSuccessfulExportCount() {
         let state = SettingsState(defaults: defaults)
         state.successfulExportCount = 5
         state.resetToDefaults()
-        // CAT-400: the count gates the StoreKit review prompt (fires once as it
+        // The count gates the StoreKit review prompt (fires once as it
         // crosses 2 -> 3). It is a lifetime metric, not a preference, so a
         // Settings reset must not zero it and re-arm the prompt.
         #expect(state.successfulExportCount == 5)

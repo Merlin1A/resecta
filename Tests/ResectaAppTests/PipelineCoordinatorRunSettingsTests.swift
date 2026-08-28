@@ -3,7 +3,7 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// STATE-5 — Settings snapshot at run entry.
+// Settings snapshot at run entry.
 //
 // `RunSettings` captures pipeline-affecting settings once at the top of
 // `runFullPipeline` / `runDetectionPipeline`, mirroring the existing
@@ -21,7 +21,7 @@ import Foundation
 // `DetectionPipelineTests` which already round-trip the run-entry
 // snapshot.
 
-@Suite("PipelineCoordinator.RunSettings (STATE-5)")
+@Suite("PipelineCoordinator.RunSettings")
 @MainActor
 struct PipelineCoordinatorRunSettingsTests {
 
@@ -73,7 +73,7 @@ struct PipelineCoordinatorRunSettingsTests {
         settings.autoVerify = false
 
         #expect(snapshot.autoVerify == true,
-                "Snapshot must be immutable after capture (STATE-5).")
+                "Snapshot must be immutable after capture.")
         #expect(settings.autoVerify == false,
                 "Live SettingsState reflects the user's toggle for the *next* run.")
     }
@@ -138,7 +138,7 @@ struct PipelineCoordinatorRunSettingsTests {
         let coord = makeCoordinator()
         coord.documentState.sourceDocument = makeTestPDFDocument()
 
-        // Stamp a region so the page survives the AD-4-1 sub-threshold filter.
+        // Stamp a region so the page survives the sub-threshold filter.
         let region = RedactionRegion.mock()
         coord.redactionState.regions[0] = [region]
 
@@ -190,8 +190,8 @@ struct PipelineCoordinatorRunSettingsTests {
         // Mark page 0 as rich so non-mode gates pass.
         coord.documentState.textLayerStatus[0] = .rich
 
-        // Live settings would allow OCR skip; snapshot forces .secureRasterization
-        // which is the OCR-skip "hard stop" — buildOCRSkipHint must return nil.
+        // Live settings would allow OCR skip; snapshot forces .secureRasterization,
+        // which unconditionally blocks OCR skip — buildOCRSkipHint must return nil.
         coord.settingsState.pipelineMode = .searchableRedaction
 
         let snapshot = PipelineCoordinator.RunSettings(
@@ -215,9 +215,9 @@ struct PipelineCoordinatorRunSettingsTests {
                 "Snapshot pipelineMode=.secureRasterization must hard-stop OCR skip even when live settingsState says .searchableRedaction.")
     }
 
-    // MARK: - CAT-041 (D-27b) — hint runs off the MainActor
+    // MARK: - Hint runs off the MainActor
 
-    @Test("buildOCRSkipHint is nonisolated and runs off the MainActor (CAT-041)")
+    @Test("buildOCRSkipHint is nonisolated and runs off the MainActor")
     func buildOCRSkipHintRunsOffMainActor() async {
         cleanSettingsDefaults()
         let coord = makeCoordinator()

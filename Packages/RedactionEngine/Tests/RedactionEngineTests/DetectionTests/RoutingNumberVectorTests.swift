@@ -2,11 +2,10 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Search-impl S2, design 01 §4 + interface table — fixture-driven routing
-// number vectors. The DataPipeline-generated fixture at
-// Fixtures/vectors/routing_number_vectors.json carries validity flags and
+// Fixture-driven routing number vectors. The DataPipeline-generated fixture
+// at Fixtures/vectors/routing_number_vectors.json carries validity flags and
 // context expectations; this suite pins the Swift detector to it the same
-// way EINVectorTests pins the EIN path (D-19 pattern).
+// way EINVectorTests pins the EIN path.
 
 @Suite("Routing number fixture-driven detector vectors")
 struct RoutingNumberVectorTests {

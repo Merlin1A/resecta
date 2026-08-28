@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W9 — scope contract. The same snippet scored against two different
+// Scope contract. The same snippet scored against two different
 // ≤500-char contexts can produce different scores because positive /
 // negative context keywords are bounded to the buffer. This test
 // documents that contract mechanically so the UI footer copy stays

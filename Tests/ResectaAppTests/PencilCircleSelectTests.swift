@@ -4,23 +4,23 @@ import CoreGraphics
 import UIKit
 @testable import ResectaApp
 
-// WU-77 — Apple Pencil circle-to-select. The pure
+// Apple Pencil circle-to-select. The pure
 // predicates (closed-loop, shoelace area, point-in-polygon, row
 // enclosure, touch-source discriminator, enclosed-row aggregator)
 // are testable without a UIView host; the actual gesture wiring
 // lives in `PencilCircleSelectOverlay` (UIViewRepresentable) which
-// requires a device for end-to-end verification per
-// `CHROME_AND_LAYOUT.md` §A11.5 manual checklist.
+// requires a device for end-to-end verification via a manual
+// checklist.
 //
-// Per [RR-36] the gesture-conflict matrix is the load-bearing
-// sub-deliverable and lives in the spec doc (not in tests). Per
-// [RR-37] iOS 26 API stability — recognizer path uses
+// The gesture-conflict matrix is the load-bearing
+// sub-deliverable and lives in the spec doc (not in tests).
+// iOS 26 API stability — recognizer path uses
 // `UIPanGestureRecognizer` + `allowedTouchTypes` which has been
 // stable since iOS 9; the `#available(iOS 26, *)` modifier gate
 // is a future-proofing marker since the deployment target is
 // already iOS 26.
 
-@Suite("Pencil circle-to-select predicates (WU-77)")
+@Suite("Pencil circle-to-select predicates")
 @MainActor
 struct PencilCircleSelectTests {
 
@@ -327,7 +327,7 @@ struct PencilCircleSelectTests {
         #expect(enclosed == [a, b, c])
     }
 
-    // MARK: - Stroke-lifecycle gate (SA-1, D-71)
+    // MARK: - Stroke-lifecycle gate
     //
     // Row-frame tracking mounts only while a Pencil stroke is live;
     // this pure transition function is the gate policy the overlay's
@@ -348,12 +348,12 @@ struct PencilCircleSelectTests {
     }
 }
 
-// q18 hit-test regression pins: the overlay view must NEVER claim a
+// Hit-test regression pins: the overlay view must NEVER claim a
 // hit (the pre-fix `event.allTouches` check never fired during
 // hit-testing, so the overlay stole every finger touch over the
 // results list — row taps and finger scroll were silent no-ops), and
 // the Pencil recognizer must ride the window, not the overlay.
-@Suite("Pencil overlay touch passthrough (q18)")
+@Suite("Pencil overlay touch passthrough")
 @MainActor
 struct PencilTouchPassthroughTests {
     @Test("Overlay view never claims hit-testing")

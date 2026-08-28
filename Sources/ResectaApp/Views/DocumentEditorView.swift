@@ -4,10 +4,10 @@ import StoreKit
 import PDFKit
 import RedactionEngine
 
-// §A2: Phase body router — switches on documentState.phase inside a ZStack.
-// §A3: Toolbar matrix — toolbar items driven by phaseKind.
-// C1: Replaces VerificationContainerView approach with full phase router.
-// Phase 1A: Export state + dialogs lifted here from VerificationResultsView.
+// Phase body router — switches on documentState.phase inside a ZStack.
+// Toolbar matrix — toolbar items driven by phaseKind.
+// Replaces VerificationContainerView approach with full phase router.
+// Export state + dialogs lifted here from VerificationResultsView.
 
 struct DocumentEditorView: View {
     @Environment(DocumentState.self) private var documentState
@@ -21,37 +21,36 @@ struct DocumentEditorView: View {
     @Environment(ToastQueueManager.self) private var toastManager
     @Environment(\.requestReview) private var requestReview
     // KI-4: scene-phase observer fires the proactive purge re-run toast
-    // on `.background → .active`. See `onScenePhaseChange(old:new:)` and
-    // `specs/ui/ERROR_UX.md §3.1`.
+    // on `.background → .active`. See `onScenePhaseChange(old:new:)`.
     @Environment(\.scenePhase) private var scenePhase
-    // SEC-3: Capture/mirroring privacy shield. When `isShielded` is true
+    // Capture/mirroring privacy shield. When `isShielded` is true
     // the phase-router body is replaced with `PrivacyShieldView` so the
     // canvas (.editing/.detecting/.redacting/.exporting) and verification
     // results (.verified) never reach a screen recorder or external display.
     @Environment(ScreenCaptureMonitor.self) private var captureMonitor
 
-    // UI_UX §6.2: View-local tool state — purely UI, no cross-view observation needed.
-    // D8: Persistent — toggled only by explicit tap, Escape, or Done.
+    // View-local tool state — purely UI, no cross-view observation needed.
+    // Persistent — toggled only by explicit tap, Escape, or Done.
     @State private var activeTool: DrawingTool? = nil
 
-    /// WU-38: iPhone "Select More" toolbar toggle. While on, a tap on a
+    /// iPhone "Select More" toolbar toggle. While on, a tap on a
     /// region toggles its membership in the selection instead of replacing
     /// the selection — iPhone parity for the iPad Shift+tap path. iPad
     /// Shift+tap continues to work whether the toggle is on or off.
     @State private var isMultiSelectActive: Bool = false
 
-    // UI_UX §5.6: Per-document pipeline mode override (nil = use global setting)
+    // Per-document pipeline mode override (nil = use global setting)
     @State private var documentOverride: PipelineMode?
 
-    // §A4.3: Brief status flash state for .verifying → .verified transition
+    // Brief status flash state for .verifying → .verified transition
     @State private var showBriefStatus = false
     @State private var briefStatus: VerificationStatus?
     @State private var dismissTask: Task<Void, Never>?
 
-    // GAP-7: Batch delete confirmation
+    // Batch delete confirmation
     @State private var showBatchDeleteConfirmation = false
 
-    // GATE-3 (Pkg I): Done confirmation for the verification results screen.
+    // Done confirmation for the verification results screen.
     // Lifted from VerificationActionBar when Done moved into the top-left
     // toolbar. The dialog gates only when drawn regions are present —
     // empty sessions close directly. Since the 1.1.0 Home swap the
@@ -59,7 +58,7 @@ struct DocumentEditorView: View {
     // `homeNeedsCloseConfirm`).
     @State private var showDoneConfirmation = false
 
-    /// REV-05 (RB-85): the shared close dialog cannot present while the
+    /// The shared close dialog cannot present while the
     /// editor's `.sheet(item:)` slot is presenting — UIKit refuses a second
     /// presentation on the same host and SwiftUI tears the sheet down
     /// instead (no dialog; a staged review discarded with the sheet).
@@ -68,7 +67,7 @@ struct DocumentEditorView: View {
     /// is actually down. A second Home tap during the park is absorbed.
     @State private var homeCloseAwaitsSheetDismissal = false
 
-    /// REV-05: true while a parked sheet carried the staged Scan review.
+    /// True while a parked sheet carried the staged Scan review.
     /// The review itself stays in `redactionState.pendingTriage` (only the
     /// sheet goes down, not the work); backing out of the dialog
     /// re-presents it through the review bridge
@@ -78,7 +77,7 @@ struct DocumentEditorView: View {
     /// the same outcome as its own Dismiss.
     @State private var homeCloseParkedReview = false
 
-    // UXC-14: drives the bespoke share-risk confirm sheet shown when a
+    // Drives the bespoke share-risk confirm sheet shown when a
     // Share tap reaches handleExportTap while the report is FAIL/ATTENTION
     // (not yet overridden), SKIPPED (not yet acknowledged), or an
     // incomplete-WARN (digest-dependent layers skipped, not yet
@@ -88,11 +87,11 @@ struct DocumentEditorView: View {
     // itself now says so rather than a convention across two Bools.
     @State private var shareRiskConfirmKind: ShareRiskConfirmKind?
 
-    // GAP §6.2: iPad hover popover state
+    // iPad hover popover state
     @State private var showHoverPopover = false
     @State private var hoveredMetadata: RegionMetadata?
 
-    // U4: Search sheet detent for auto-minimize on result navigation
+    // Search sheet detent for auto-minimize on result navigation
     @State private var searchSheetDetent: PresentationDetent = .medium
 
     // Detection summary banner
@@ -108,10 +107,10 @@ struct DocumentEditorView: View {
 
     enum DrawingTool {
         case rectangle
-        /// DRAW-1: tap-to-vertex polygon. Double-tap closes the loop and
+        /// Tap-to-vertex polygon. Double-tap closes the loop and
         /// commits via `coordinator?.addRegion(_:page:undoManager:)`.
         case polygon
-        /// DRAW-1: continuous-touch freeform stroke. On touch-up, the raw
+        /// Continuous-touch freeform stroke. On touch-up, the raw
         /// touch path is simplified via Douglas-Peucker to ≤ 32 vertices
         /// (tolerance 2 pt × 1/zoomScale) before commit.
         case freeform
@@ -143,7 +142,7 @@ struct DocumentEditorView: View {
         }
     }
 
-    /// DRAW-1: map a `DrawingTool` to the overlay's `ShapeTool`. `nil` is
+    /// Map a `DrawingTool` to the overlay's `ShapeTool`. `nil` is
     /// `.rectangle` (the overlay ignores `activeShapeTool` when
     /// `isDrawingMode == false`). Static so it is unit-testable.
     static func shapeTool(for tool: DrawingTool?) -> RedactionOverlayView.ShapeTool {
@@ -159,16 +158,16 @@ struct DocumentEditorView: View {
         documentOverride ?? settingsState.pipelineMode
     }
 
-    // MARK: - Body (§A2 Phase Router)
+    // MARK: - Body (Phase Router)
 
     var body: some View {
-        // §A2: ZStack with phase switch (FB91311311 workaround)
+        // ZStack with phase switch (FB91311311 workaround)
         ZStack {
-            // SEC-3: When capture/mirroring is active, swap the phase
+            // When capture/mirroring is active, swap the phase
             // router for the opaque shield. Empty state has no document
             // content, but we shield it anyway — this is the simplest
             // way to keep the threat model uniform (no doc-chrome leakage
-            // about whether a document is loaded) and matches the SEC-3
+            // about whether a document is loaded) and matches the shield's
             // posture against partial redaction.
             if captureMonitor.isShielded {
                 PrivacyShieldView()
@@ -184,9 +183,7 @@ struct DocumentEditorView: View {
                 // initial phase is `.empty` for a frame before
                 // ImportService.loadSampleDocument flips it to `.editing`).
                 // The gate confirms we're still genuinely idle before
-                // calling returnHome(). See plan
-                // `i-want-you-to-declarative-sparkle.md` Phase 1
-                // "Race analysis".
+                // calling returnHome().
                 Color.clear
                     .task {
                         try? await Task.sleep(for: .milliseconds(150))
@@ -199,8 +196,8 @@ struct DocumentEditorView: View {
                     .transition(.opacity)
 
             case .importing:
-                // Phase 3C: Styled import card matching PipelineProgressCard visual.
-                // CANCEL-006 / UX-import-cancel-affordance (Pkg B): import is
+                // Styled import card matching PipelineProgressCard visual.
+                // Import is
                 // now cancellable. The Cancel button routes through the same
                 // `cancelActivePipeline` path the scene-phase observer uses
                 // (see `ContentView.onChange(of: scenePhase)`); the import
@@ -231,7 +228,7 @@ struct DocumentEditorView: View {
                 .transition(.opacity)
 
             case .editing, .detecting, .redacting, .exporting:
-                // §A4.5: Shared PDFDocumentView mount — PipelineProgressCard overlay
+                // Shared PDFDocumentView mount — PipelineProgressCard overlay
                 PDFDocumentView(
                     isDrawingMode: activeTool != nil,
                     activeShapeTool: Self.shapeTool(for: activeTool),
@@ -247,13 +244,13 @@ struct DocumentEditorView: View {
                                 .transition(.opacity)
                         }
                     }
-                    // Detection summary banner (UXF-06: all run outcomes,
+                    // Detection summary banner (all run outcomes,
                     // not just success — zero/failed previously left no
                     // persistent record).
                     .overlay(alignment: .top) {
                         detectionBannerOverlay
                     }
-                    // C9/D11: InlineWarningBanner for background resume
+                    // InlineWarningBanner for background resume
                     // (cancel-from-detecting / cancel-from-redacting path).
                     .overlay(alignment: .top) {
                         if documentState.wasPausedByBackground,
@@ -288,8 +285,7 @@ struct DocumentEditorView: View {
                                     documentState.pausedFromPhase = nil
                                 }
                             )
-                            // UXC-33 (RB-24, partial revival of DC-023):
-                            // routed through the resolver so Reduce
+                            // Routed through the resolver so Reduce
                             // Motion swaps the slide for an opacity-only
                             // crossfade.
                             .transition(ResectaTokens.Anim.resolvedTransition(
@@ -329,8 +325,7 @@ struct DocumentEditorView: View {
                                     documentState.annotationNoticeDismissed = true
                                 }
                             }
-                            // UXC-33 (RB-24, partial revival of DC-023):
-                            // routed through the resolver so Reduce
+                            // Routed through the resolver so Reduce
                             // Motion swaps the slide for an opacity-only
                             // crossfade.
                             .transition(ResectaTokens.Anim.resolvedTransition(
@@ -339,18 +334,18 @@ struct DocumentEditorView: View {
                             .padding(.top, ResectaTokens.Spacing.toolbarClearance)
                         }
                     }
-                    // (CANCEL-009 note: the mid-verify background-resume
+                    // (Note: the mid-verify background-resume
                     // banner that used to chain here was structurally
                     // unreachable — it gated on `.verified(report: .skipped)`,
                     // a phase whose router branch renders
                     // `VerificationResultsView`, never this overlay chain.
                     // The recovery CTA now lives on the results screen as the
                     // Run Verification card; see `handleRunVerificationTap`.)
-                    // WU-42 M-C.8 / DRAW-1: drawing-mode caption — subtle
+                    // Drawing-mode caption — subtle
                     // banner names the active gesture for the rectangle
                     // tool, and for the polygon tool also surfaces the
                     // in-progress vertex count and Cancel / Close polygon
-                    // buttons (DRAW-1 §S2.2).
+                    // buttons.
                     .overlay(alignment: .bottom) {
                         if DocumentEditorView.drawingModeCaptionShouldShow(
                             activeTool: activeTool,
@@ -398,8 +393,8 @@ struct DocumentEditorView: View {
                     }
 
             case .verifying:
-                // D6: Full-screen replacement — verification is a distinct workflow phase
-                // UXC-33 (RB-24, partial revival of DC-023): folded the
+                // Full-screen replacement — verification is a distinct workflow phase
+                // Folded the
                 // hand-rolled reduceMotion ternary into the resolver —
                 // identical behavior, one canonical seam.
                 VerificationProgressView()
@@ -430,11 +425,11 @@ struct DocumentEditorView: View {
                 FailedStateView(error: error, returnPhase: returnPhase)
                     .transition(.opacity)
             }
-            } // SEC-3: end of `else` branch on captureMonitor.isShielded
+            } // End of `else` branch on captureMonitor.isShielded
         }
         .animation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.modeTransition, reduceMotion: reduceMotion),
                    value: documentState.phaseKind)
-        // SEC-3: also animate the shield in/out so the swap reads as a
+        // Also animate the shield in/out so the swap reads as a
         // deliberate transition rather than a flash.
         .animation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.modeTransition, reduceMotion: reduceMotion),
                    value: captureMonitor.isShielded)
@@ -445,13 +440,13 @@ struct DocumentEditorView: View {
         // Gate on `.background → .active` (not `.inactive → .active`, which
         // also fires on app-switcher and control-center transits) and only
         // when the current phase still holds an output reference. See
-        // `specs/ui/ERROR_UX.md §3.1` and `KNOWN_ISSUES.md` KI-4.
+        // `KNOWN_ISSUES.md` KI-4.
         .onChange(of: scenePhase) { oldPhase, newPhase in
             handleScenePhaseChange(old: oldPhase, new: newPhase)
         }
-        // Phase 5B: Consolidated phase change handler (was two separate .onChange)
+        // Consolidated phase change handler (was two separate .onChange)
         .onChange(of: documentState.phaseKind) { oldKind, newKind in
-            // §A4.3: Brief status flash for .verifying → .verified transition
+            // Brief status flash for .verifying → .verified transition
             if oldKind == .verifying, newKind == .verified,
                case .verified(let report) = documentState.phase {
                 withAnimation(ResectaTokens.Anim.colorTransition) {
@@ -469,7 +464,7 @@ struct DocumentEditorView: View {
                 }
             }
         }
-        // §A4.3: Brief status flash overlay
+        // Brief status flash overlay
         .overlay {
             if showBriefStatus, let status = briefStatus {
                 ZStack {
@@ -498,14 +493,13 @@ struct DocumentEditorView: View {
         }
         // P1.3: single `.sheet(item:)` slot for search / rationale.
         // Precedence search > rationale; the getter returns the
-        // highest-precedence active source. SEARCH-AND-REDACT §6.1
-        // (search), WU-71 / [P10] path (a) (rationale). Staged
+        // highest-precedence active source. Staged
         // detections ride the search case — the `pendingTriage`
         // observer below keeps `activeSearch` populated while
         // detections are pending. The slot sits ABOVE the phase
         // switch, so a live session would ride over every phase;
-        // STATE-7 keeps it out of the pipeline phases by tearing the
-        // session down at the Apply seam (`runFullPipeline`, UXC-49)
+        // The Apply seam keeps it out of the pipeline phases by tearing the
+        // session down at the Apply seam (`runFullPipeline`)
         // and on the purge re-run (`prepareForPurgeRerun`).
         .sheet(item: Binding<ActiveSheet?>(
             get: {
@@ -558,7 +552,7 @@ struct DocumentEditorView: View {
                 }
             }
         ), onDismiss: {
-            // REV-05: a sheet parked by `handleHomeTap()` hands off to the
+            // A sheet parked by `handleHomeTap()` hands off to the
             // close dialog here, once its presentation is actually down.
             guard homeCloseAwaitsSheetDismissal else { return }
             homeCloseAwaitsSheetDismissal = false
@@ -571,27 +565,26 @@ struct DocumentEditorView: View {
                     // modified selections this session, so the Dismiss
                     // button's confirmation dialog can't be bypassed.
                     // An untouched sheet swipes away freely (one-tap
-                    // dismiss rule). UXC-39: an unreviewed magic-wand
+                    // dismiss rule). An unreviewed magic-wand
                     // preselect also blocks the swipe now — a
                     // never-reviewed auto-selected set no longer drops
                     // silently.
                     .interactiveDismissDisabled(searchState.requiresDismissConfirmation)
                     // Compact float detent — a fixed hug for the
-                    // glanceable handle (`CompactFloatDetent.swift`,
-                    // WA/D-75 as amended by UXC-44 / D-116): title +
-                    // the result-nav cluster. The PDF surfaces behind;
+                    // glanceable handle (`CompactFloatDetent.swift`):
+                    // title + the result-nav cluster. The PDF surfaces behind;
                     // every OTHER control lives at medium/large.
                     // Tap-on-row AND the chevron / ⌘G walk drop to
-                    // compact (RB-92); only the J/K keyboard path keeps
+                    // compact; only the J/K keyboard path keeps
                     // the prior large → medium semantics so the list
                     // stays readable while a keyboard user steps.
                     .presentationDetents([.compactFloat, .medium, .large], selection: $searchSheetDetent)
-                    // WU-59: hide the system drag indicator so the custom
+                    // Hide the system drag indicator so the custom
                     // pulsing grabber inside `SearchAndRedactSheet` is the
                     // sole visual cue. Drag still works via the system
                     // gesture on the sheet's top area.
                     .presentationDragIndicator(.hidden)
-                    // BH-A-04 — the compact float exists so the user
+                    // The compact float exists so the user
                     // can interact with the document beneath it, but
                     // without a background-interaction grant UIKit
                     // routed EVERY outside tap (canvas or toolbar) to
@@ -601,23 +594,21 @@ struct DocumentEditorView: View {
                     // only up through the compact detent; medium/large
                     // keep the standard dimmed scrim.
                     .presentationBackgroundInteraction(.enabled(upThrough: .compactFloat))
-                    // D-70 supersession (SA-2): the D-68
-                    // `.presentationContentInteraction(.scrolls)` pin
-                    // is RETIRED. D-67 attributed the dead in-list
-                    // drags to the custom compact float mixed into the
-                    // detent set; the D-70 probe matrix
-                    // (18-SCROLL-ARCH §3) corrected the mechanism —
-                    // `.automatic` cooperation fails only while the
-                    // sheet content carries either of two composition
-                    // poisons: a NavigationStack wrapper, or a
-                    // horizontal chip ScrollView sibling above the
-                    // List. SA-2 removed both, so the system default
+                    // The `.presentationContentInteraction(.scrolls)` pin
+                    // is RETIRED. The dead in-list drags were attributed
+                    // to the custom compact float mixed into the
+                    // detent set; the probe matrix corrected the
+                    // mechanism — `.automatic` cooperation fails only
+                    // while the sheet content carries either of two
+                    // composition poisons: a NavigationStack wrapper, or
+                    // a horizontal chip ScrollView sibling above the
+                    // List. Both were removed, so the system default
                     // (.automatic) now arbitrates cooperatively: one
                     // continuous swipe scrolls the list AND grows or
                     // shrinks the sheet at content edges; the grabber
-                    // path still resizes; compactFloat, the BH-A-04
-                    // grant, and the hidden indicator are all proven
-                    // compatible (probe runs R6/R7). No explicit
+                    // path still resizes; compactFloat, the
+                    // background-interaction grant, and the hidden
+                    // indicator are all proven compatible. No explicit
                     // contentInteraction modifier — .automatic IS the
                     // arbitration of record.
             case .rationale(let regionID):
@@ -642,8 +633,8 @@ struct DocumentEditorView: View {
             guard hasPending else { return }
             presentReviewInScanInterface()
         }
-        // GAP §6.2: iPad hover popover — observe hoveredRegionID on RedactionState
-        // GAP-7: VoiceOver announcement on selection count change
+        // iPad hover popover — observe hoveredRegionID on RedactionState
+        // VoiceOver announcement on selection count change
         .onChange(of: redactionState.selectedRegionIDs.count) { oldCount, newCount in
             guard UIAccessibility.isVoiceOverRunning,
                   documentState.phaseKind == .editing else { return }
@@ -663,17 +654,17 @@ struct DocumentEditorView: View {
                 showHoverPopover = false
             }
         }
-        // WU-72 / [R-20]: manual-draw nearby-PII nudge observer. The
+        // [R-20]: manual-draw nearby-PII nudge observer. The
         // post-add hook on `RedactionState.addRegion` sets
         // `pendingManualDrawNudge` after a `.manual` region commits
         // adjacent (≤ 50 pt normalized) to an unapplied high-confidence
         // PII match. We enqueue a non-modal info toast with an "Add"
         // action that calls `acceptManualDrawNudge(_:undoManager:)`
-        // with the nudge captured by value — closure-capture per
-        // [RR-23] so the accept path survives the suppression mark
+        // with the nudge captured by value — closure-capture so the
+        // accept path survives the suppression mark
         // below clearing the pending field. The
         // `markManualDrawNudgeSuppressed()` call gates further toasts
-        // for the current search session; per [RR-29] the suppression
+        // for the current search session; the suppression
         // resets on any `activeSearch` transition + on `clearAll()` +
         // on `clearForNewDocument()`.
         .onChange(of: redactionState.pendingManualDrawNudge?.id) { _, _ in
@@ -690,7 +681,7 @@ struct DocumentEditorView: View {
             )
             redactionState.markManualDrawNudgeSuppressed()
         }
-        // DRAW-5: magic-wand "Select all instances" observer. The canvas
+        // Magic-wand "Select all instances" observer. The canvas
         // long-press menu sets `pendingMagicWandRequest` carrying the
         // escaped term; here we open (or re-use) the search sheet with
         // a pre-filled exact-match query so the engine runs the same
@@ -706,7 +697,7 @@ struct DocumentEditorView: View {
         }
         .popover(isPresented: $showHoverPopover, attachmentAnchor: .point(.center)) {
             if let metadata = hoveredMetadata {
-                // WU-71 — pass the region's forward-rationale, if any, into
+                // Pass the region's forward-rationale, if any, into
                 // the popover so the "View rationale" disclosure renders.
                 let rationale = redactionState.hoveredRegionID.flatMap {
                     redactionState.rationale(forRegionID: $0)
@@ -716,8 +707,8 @@ struct DocumentEditorView: View {
                     .presentationCompactAdaptation(.popover)
             }
         }
-        // GAP-7: Batch delete confirmation (mechanism-description language)
-        // UXC-31 (RB-40): dialog-grammar normalization — sentence-case
+        // Batch delete confirmation (mechanism-description language)
+        // Dialog-grammar normalization — sentence-case
         // question title, bare-verb destructive button.
         .confirmationDialog(
             DocumentEditorView.batchDeleteDialogTitle(
@@ -730,7 +721,7 @@ struct DocumentEditorView: View {
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            // WU-42 M-D.2: page-span line names how many pages the deletion
+            // Page-span line names how many pages the deletion
             // spans so the user can reckon scope before confirming.
             Text(DocumentEditorView.batchDeleteDialogMessage(
                 regionCount: redactionState.selectedRegionIDs.count,
@@ -740,16 +731,16 @@ struct DocumentEditorView: View {
                 )
             ))
         }
-        // GATE-3 (Pkg I): destructive-action confirmation symmetry for
+        // Destructive-action confirmation symmetry for
         // the verification-results Done. Same pattern as the Redact /
         // Delete N Regions / Pre-Export / Override-FAIL dialogs. Copy is
-        // mechanism-description (ARCH §1.3) — describes what Close does,
+        // mechanism-description — describes what Close does,
         // not an outcome promise. Pinned by
         // VerificationActionBarDoneConfirmationTests.testConfirmationCopyIsMechanismDescription.
         // Shared with the editing-phase Home entry (1.1.0 Home swap,
         // `handleHomeTap()`): title and buttons identical; only the
         // message switches on phase (`closeDialogMessage(phaseKind:)`).
-        // Presented through `doneConfirmationPresented` (REV-05): the
+        // Presented through `doneConfirmationPresented`: the
         // binding re-presents a review parked for this dialog when it
         // goes down without Close.
         .confirmationDialog(
@@ -765,7 +756,7 @@ struct DocumentEditorView: View {
         } message: {
             Text(DocumentEditorView.closeDialogMessage(phaseKind: documentState.phaseKind))
         }
-        // UXC-14: the bespoke share-risk confirm sheet (FAIL/ATTENTION,
+        // The bespoke share-risk confirm sheet (FAIL/ATTENTION,
         // SKIPPED, incomplete-WARN — see ShareRiskConfirmSheet for the
         // lifecycle commentary), extracted into ShareRiskConfirmPresentation.
         // Extraction keeps this body's modifier chain within the
@@ -788,22 +779,22 @@ struct DocumentEditorView: View {
             Self.clearUndoStackOnClose(undoManager)
         }
         .onAppear {
-            // GAP §3.2: Forward toast manager and undo manager to coordinator
+            // Forward toast manager and undo manager to coordinator
             coordinator.toastManager = toastManager
             coordinator.undoManager = undoManager
         }
         // Keyboard shortcuts for editing — handled via single onKeyPress to reduce body complexity
         .onKeyPress(phases: .down, action: handleKeyPress)
-        // UI_UX §6.5, §10.1: Page navigation bar on iPhone only (editing
-        // phase). UXC-40 shape C (RB-42): extracted to a small helper
+        // Page navigation bar on iPhone only (editing
+        // phase). Extracted to a small helper
         // property so the compact-float inset math stays out of this
         // long modifier chain — see the `.toolbar {}` note below on
         // this file's type-checker budget.
         .safeAreaInset(edge: .bottom) {
             pageNavigationBarInset
         }
-        // §A3: Phase-switched toolbar
-        // UXC-32 (GAP-45): the neutral group tint (routine actions
+        // Phase-switched toolbar
+        // The neutral group tint (routine actions
         // render via the primary/foreground tone) is applied INSIDE
         // each item-list computed property below, not chained onto the
         // `ToolbarItemGroup(...)` here — chaining an extra modifier
@@ -828,7 +819,7 @@ struct DocumentEditorView: View {
             }
 
             // Editing secondary actions (iPhone overflow menu)
-            // Phase 4A: undo/redo moved to trailing toolbar for visibility
+            // Undo/redo moved to trailing toolbar for visibility
             if documentState.phaseKind == .editing, horizontalSizeClass == .compact {
                 ToolbarItemGroup(placement: .secondaryAction) {
                     secondaryActionToolbarItems
@@ -839,9 +830,9 @@ struct DocumentEditorView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    // MARK: - Toolbar Leading Items (§A3)
+    // MARK: - Toolbar Leading Items
 
-    /// UXC-32 (GAP-45): routine actions render neutral — the group's
+    /// Routine actions render neutral — the group's
     /// ambient tint is `.primary`, applied here (inside the property,
     /// not at the `.toolbar {}` call site — see the comment above). Per-
     /// element overrides (the draw tools' `.tint(active ? BrandTeal.tint
@@ -853,14 +844,14 @@ struct DocumentEditorView: View {
         switch documentState.phaseKind {
         case .editing:
             // Drawing tools.
-            // §6.2 / iPhone nav-bar overflow: keep a CONSTANT-width glyph per draw tool
+            // iPhone nav-bar overflow: keep a CONSTANT-width glyph per draw tool
             // and signal "active" via .tint only. A wider active glyph (the former
             // rectangle.dashed.badge.checkmark / scribble.variable) grows the leading
             // ToolbarItemGroup past the bar width and collapses the whole group into the
             // system "…" overflow menu. Polygon keeps hexagon/hexagon.fill — fill variants
             // share advance width, so that selected cue is width-safe.
             Button("Rectangle", systemImage: "rectangle.dashed") {
-                // Draw wins (RB-75 / S2-a): entering the tool drops the
+                // Draw wins: entering the tool drops the
                 // selection and the Add-to-Selection toggle so the next
                 // drag draws instead of resizing or marquee-selecting.
                 let entering = activeTool != .rectangle
@@ -872,7 +863,7 @@ struct DocumentEditorView: View {
             .tint(activeTool == .rectangle ? ResectaTokens.BrandTeal.tint : nil)
             .accessibilityIdentifier("drawTool")
             .accessibilityValue(activeTool == .rectangle
-                                ? "Drawing mode active" : "Tap to enter drawing mode") // §A8
+                                ? "Drawing mode active" : "Tap to enter drawing mode")
 
             // V1.0: the polygon + freeform draw tools are gated off for
             // launch; see `advancedDrawToolsEnabled`. The engine, overlay,
@@ -880,12 +871,12 @@ struct DocumentEditorView: View {
             // Escape branches stay inert because `activeTool` can no longer
             // become `.polygon` / `.freeform` while the buttons are hidden.
             if Self.advancedDrawToolsEnabled {
-                // DRAW-1 (revised): polygon tool — tap-to-vertex. Close
+                // Polygon tool — tap-to-vertex. Close
                 // the loop by tapping the first vertex (a ring appears
                 // around it once count ≥ 3) or by tapping "Close polygon"
                 // in the bottom hint capsule. "Cancel" in the same capsule
                 // discards the in-progress vertex list; Escape does the
-                // same. See `CANVAS_OVERLAY.md` §S2.2 / DRAW-1.
+                // same.
                 Button("Polygon", systemImage: activeTool == .polygon
                        ? "hexagon.fill"
                        : "hexagon") {
@@ -897,7 +888,7 @@ struct DocumentEditorView: View {
                                     ? "Polygon drawing mode active"
                                     : "Tap to enter polygon drawing mode")
 
-                // DRAW-1: freeform tool — continuous-touch path simplified to
+                // Freeform tool — continuous-touch path simplified to
                 // ≤ 32 vertices on touch-up.
                 Button("Freeform", systemImage: "scribble") {
                     activeTool = activeTool == .freeform ? nil : .freeform
@@ -949,15 +940,15 @@ struct DocumentEditorView: View {
             .accessibilityIdentifier("searchRedact")
         case .verified:
             // Home lives top-left on the verification results screen
-            // (UXC-43: the former Done label/glyph became Home — the same
+            // (the former Done label/glyph became Home — the same
             // `house` glyph as the editor's overflow entry). The action is
             // the Done teardown, lifted from VerificationActionBar when the
-            // bottom bar was removed; the GATE-3 confirmation dialog (pinned
-            // by ARCH §1.3 and VerificationActionBarDoneConfirmationTests)
+            // bottom bar was removed; the confirmation dialog (pinned
+            // by VerificationActionBarDoneConfirmationTests)
             // still gates sessions that carry drawn regions. Identifier
-            // kept (plumbing). UXC-49 (D-124, RB-117 rider): routed through
+            // kept (plumbing). Routed through
             // `handleHomeTap()` so a sheet that is somehow still presented
-            // on this screen takes the REV-05 park-then-dialog route
+            // on this screen takes the park-then-dialog route
             // instead of the refused second presentation (a staged review
             // cannot be pending after an Apply, so the confirm gate
             // resolves to `hasDrawnRegions` here as before).
@@ -972,16 +963,16 @@ struct DocumentEditorView: View {
         .tint(.primary)
     }
 
-    // MARK: - Toolbar Trailing Items (§A3)
+    // MARK: - Toolbar Trailing Items
 
-    /// UXC-32 (GAP-45): same neutral-group rule as `leadingToolbarItems`
+    /// Same neutral-group rule as `leadingToolbarItems`
     /// above.
     @ViewBuilder
     private var trailingToolbarItems: some View {
         Group {
         switch documentState.phaseKind {
         case .editing:
-            // Phase 4A: Undo/redo always visible (both iPhone and iPad)
+            // Undo/redo always visible (both iPhone and iPad)
             undoRedoButtons
 
             // iPad: additional edit actions visible in toolbar
@@ -993,14 +984,14 @@ struct DocumentEditorView: View {
                 pipelineModePicker
             }
 
-            // Redact button — always visible. UXC-32 (GAP-45): the ONE
+            // Redact button — always visible. This is the ONE
             // designated emphasis action in this toolbar — explicit
             // brand tint so it stands out against the neutral group.
             Button("Redact", systemImage: "scissors") {
                 coordinator.runFullPipeline(documentOverride: documentOverride)
             }
             .tint(ResectaTokens.BrandTeal.tint)
-            // Pkg D / STATE-3: gate on the full pipeline-start predicate
+            // Gate on the full pipeline-start predicate
             // (phase + triage + active task) in addition to the existing
             // effective-regions check. `keyboardShortcut` on a Button
             // inherits the `.disabled` modifier, so Cmd-Shift-R is
@@ -1010,25 +1001,25 @@ struct DocumentEditorView: View {
             .keyboardShortcut("r", modifiers: [.command, .shift])
             .accessibilityIdentifier("redactButton")
             .accessibilityHint(redactionState.hasEffectiveRegions
-                               ? "" : "Draw regions or apply Scan or Search results first") // §A8
+                               ? "" : "Draw regions or apply Scan or Search results first")
 
             settingsButton
 
         case .detecting, .redacting:
-            // §A3: Single cancel button
+            // Single cancel button
             Button("Stop Processing", systemImage: "stop.circle") {
                 documentState.cancelActivePipeline(redactionState: redactionState)
             }
             .accessibilityIdentifier("stopProcessing")
-            .accessibilityHint("Stops processing. Your document is preserved.") // §A8
+            .accessibilityHint("Stops processing. Your document is preserved.")
 
         case .verifying:
-            // §A3: Single cancel button
+            // Single cancel button
             Button("Stop Verification", systemImage: "stop.circle") {
                 documentState.cancelActivePipeline(redactionState: redactionState)
             }
             .accessibilityIdentifier("stopProcessing")
-            .accessibilityHint("Stops processing. Your document is preserved.") // §A8
+            .accessibilityHint("Stops processing. Your document is preserved.")
 
         default:
             // .verified, .failed — settings gear only.
@@ -1050,7 +1041,7 @@ struct DocumentEditorView: View {
         .accessibilityIdentifier("settings-button")
     }
 
-    /// UXC-32 (GAP-45): iPhone overflow menu — same neutral-group rule.
+    /// iPhone overflow menu — same neutral-group rule.
     /// Extracted to its own property (mirrors `leadingToolbarItems` /
     /// `trailingToolbarItems`) so the tint is isolated from the
     /// `.toolbar {}` result-builder closure.
@@ -1089,7 +1080,7 @@ struct DocumentEditorView: View {
         let count = redactionState.selectedRegionIDs.count
         if count > 0 {
             Button(deleteButtonLabel, systemImage: "trash") {
-                // GAP-7: Batch delete confirmation for multi-selection
+                // Batch delete confirmation for multi-selection
                 if count > 1 {
                     showBatchDeleteConfirmation = true
                 } else {
@@ -1101,11 +1092,11 @@ struct DocumentEditorView: View {
         }
     }
 
-    // WU-39: "More" menu that bundles batch operations on the active
+    // "More" menu that bundles batch operations on the active
     // selection. Visible only when `selectedRegionIDs.isEmpty == false`,
     // gated by `batchOpsMenuShouldShow(selectedCount:)`. "Delete Selected"
     // routes through the existing `showBatchDeleteConfirmation` dialog
-    // so the WU-42 M-D.2 page-span message applies to this entry too.
+    // so the page-span message applies to this entry too.
     @ViewBuilder
     private var batchOpsMenu: some View {
         let selectedCount = redactionState.selectedRegionIDs.count
@@ -1132,7 +1123,7 @@ struct DocumentEditorView: View {
         }
     }
 
-    /// WU-39 visibility predicate. The "More" menu surfaces only when at
+    /// Visibility predicate. The "More" menu surfaces only when at
     /// least one region is selected. Pure function so the gate is testable
     /// without a SwiftUI host.
     static func batchOpsMenuShouldShow(selectedCount: Int) -> Bool {
@@ -1146,8 +1137,6 @@ struct DocumentEditorView: View {
     /// frame before `ImportService.loadSampleDocument` flips it to
     /// `.editing`. The `sourceDocument == nil` half also defends against
     /// a future bootstrap that mounts a document before flipping phase.
-    /// See plan `i-want-you-to-declarative-sparkle.md` Phase 1
-    /// "Race analysis".
     static func shouldAutoReturnHome(
         phaseKind: DocumentState.PhaseKind,
         sourceDocument: PDFDocument?
@@ -1155,7 +1144,7 @@ struct DocumentEditorView: View {
         phaseKind == .empty && sourceDocument == nil
     }
 
-    // WU-38: "Select More" toolbar toggle. While on, a tap on a region
+    // "Select More" toolbar toggle. While on, a tap on a region
     // adds to selection rather than replacing it — iPhone parity for
     // the iPad Shift+tap path. Visible only when the current page has
     // regions to select. Count surfaces in the label so the user sees
@@ -1168,7 +1157,7 @@ struct DocumentEditorView: View {
         if pageRegionCount > 0 {
             Button {
                 isMultiSelectActive.toggle()
-                // Mutual exclusion with the Rectangle tool (RB-75 / S2-a):
+                // Mutual exclusion with the Rectangle tool:
                 // whichever was activated last wins.
                 if isMultiSelectActive { activeTool = nil }
             } label: {
@@ -1187,7 +1176,7 @@ struct DocumentEditorView: View {
         }
     }
 
-    // GAP-7: Select All / Deselect All menu — touch-accessible on both platforms
+    // Select All / Deselect All menu — touch-accessible on both platforms
     @ViewBuilder
     private var selectionMenu: some View {
         let page = documentState.currentPageIndex
@@ -1206,9 +1195,9 @@ struct DocumentEditorView: View {
                     }
                 }
             } label: {
-                // UXF-22: verb-object menu label (was the bare noun
+                // Verb-object menu label (was the bare noun
                 // "Selection").
-                // GAP-42: the off state is a none-selected STATE
+                // The off state is a none-selected STATE
                 // indicator, not an action icon — plain "circle"
                 // instead of the unfilled checkmark glyph.
                 Label("Select Regions", systemImage: selectedCount > 0
@@ -1217,8 +1206,8 @@ struct DocumentEditorView: View {
         }
     }
 
-    /// UI_UX §6.5, §10.1: Page navigation bar on iPhone only (editing
-    /// phase). UXC-40 shape C (RB-42): while the search sheet floats at
+    /// Page navigation bar on iPhone only (editing
+    /// phase). While the search sheet floats at
     /// the compact detent, extra bottom padding lifts the bar clear of
     /// the compact strip — every control up through compact already
     /// reaches the canvas via the existing background-interaction
@@ -1240,7 +1229,7 @@ struct DocumentEditorView: View {
                     value: inset
                 )
         } else {
-            // UXC-50 (D-128, RB-123 item 5): the unified inset. With no
+            // The unified inset. With no
             // page bar (single-page docs) the same safe-area slot still
             // shrinks the canvas by the compact strip's hug while the
             // sheet is parked, so zoomed content structurally cannot
@@ -1269,7 +1258,7 @@ struct DocumentEditorView: View {
         redactionState.deleteSelected(undoManager: undoManager)
     }
 
-    // MARK: - WU-42 M-D.2 — Batch delete dialog page-span helpers
+    // MARK: - Batch delete dialog page-span helpers
 
     /// Page count spanned by a selection set. Looks each ID up via the
     /// caller-provided closure so the helper is testable without a full
@@ -1295,7 +1284,7 @@ struct DocumentEditorView: View {
             + "This removes the selected redaction regions. Use Undo to restore them."
     }
 
-    /// UXC-31 (RB-40): dialog-grammar normalization — sentence-case
+    /// Dialog-grammar normalization — sentence-case
     /// question title, singular-aware. The destructive button is now
     /// bare "Delete" (dominant grammar for this dialog family); the
     /// title alone carries the count.
@@ -1303,7 +1292,7 @@ struct DocumentEditorView: View {
         regionCount == 1 ? "Delete 1 region?" : "Delete \(regionCount) regions?"
     }
 
-    // MARK: - UXC-40 shape C (RB-42) — pager compact-float inset
+    // MARK: - Pager compact-float inset
 
     /// Bottom padding for the page nav bar while the search sheet floats
     /// at the compact detent — clears the compact strip
@@ -1318,7 +1307,7 @@ struct DocumentEditorView: View {
         return CompactFloatDetent.hugHeight
     }
 
-    /// UXC-50 (D-128, RB-123 item 5): bottom inset for the canvas when
+    /// Bottom inset for the canvas when
     /// NO page bar mounts — the same geometry as `pageBarCompactInset`
     /// (reads `CompactFloatDetent.hugHeight` symbolically, so a strip
     /// height change propagates), zero unless the sheet is parked at
@@ -1330,14 +1319,14 @@ struct DocumentEditorView: View {
         pageBarCompactInset(sheetPresented: sheetPresented, detent: detent)
     }
 
-    // MARK: - WU-42 M-C.8 — Drawing-mode caption helpers
+    // MARK: - Drawing-mode caption helpers
 
     /// Caption text shown while the rectangle drawing tool is active.
     /// Mechanism description: names the active gesture so the user knows
     /// what shape the touch will produce.
     static let drawingModeCaption = "Drawing — tap and drag"
 
-    /// DRAW-1 (revised): caption text shown while the polygon tool is
+    /// Caption text shown while the polygon tool is
     /// active, keyed on the in-progress vertex count. Three buckets
     /// match the close-mechanism floors:
     ///   - count 0   → invite first vertex
@@ -1358,10 +1347,10 @@ struct DocumentEditorView: View {
     }
 
     /// Caption is visible only when (a) a captioned drawing tool is
-    /// active (rectangle or polygon — DRAW-1) AND (b) the document is
+    /// active (rectangle or polygon) AND (b) the document is
     /// in the editing phase. Other phases blur the canvas underneath
     /// their own progress UI, so the caption would be stale.
-    /// Pure static behind the Rectangle button (RB-75 / S2-a): on ENTRY
+    /// Pure static behind the Rectangle button: on ENTRY
     /// the selection and the Add-to-Selection toggle are cleared; on exit
     /// nothing else changes.
     static func drawToolEntryEffects(
@@ -1378,7 +1367,7 @@ struct DocumentEditorView: View {
         return activeTool == .rectangle || activeTool == .polygon
     }
 
-    /// CANCEL-009 (results-screen card): which pipeline the Run Verification
+    /// Results-screen card: which pipeline the Run Verification
     /// card should drive. Verify-only re-runs the checks against the existing
     /// output; a stale or absent output needs the full pipeline (regions
     /// changed since the run, or the output is gone). Static so the routing
@@ -1417,7 +1406,7 @@ struct DocumentEditorView: View {
         }
     }
 
-    /// DRAW-1: pick the caption string for whichever drawing tool is
+    /// Pick the caption string for whichever drawing tool is
     /// active. Centralises the rectangle / polygon branch so the
     /// `.overlay` block and the accessibility label read the same
     /// string. Returns nil when no captioned tool is active.
@@ -1433,7 +1422,7 @@ struct DocumentEditorView: View {
         }
     }
 
-    /// DRAW-1: VoiceOver label for the bottom hint capsule. Mirrors the
+    /// VoiceOver label for the bottom hint capsule. Mirrors the
     /// visible caption so sighted and VoiceOver users hear the same
     /// mechanism description, with the polygon Cancel / Close buttons
     /// named when present (the buttons carry their own labels via
@@ -1458,7 +1447,7 @@ struct DocumentEditorView: View {
         return caption + " Cancel button available."
     }
 
-    // UI_UX §5.6: Pipeline mode picker (per-document override)
+    // Pipeline mode picker (per-document override)
     @ViewBuilder
     private var pipelineModePicker: some View {
         Menu {
@@ -1472,21 +1461,21 @@ struct DocumentEditorView: View {
                     .tag(PipelineMode.searchableRedaction)
             }
         } label: {
-            // UXF-22: verb-object menu label (was the bare noun "Mode").
+            // Verb-object menu label (was the bare noun "Mode").
             Label { Text("Switch Mode") } icon: { effectivePipelineMode.glyph }
         }
         .disabled(documentState.phaseKind != .editing)
         .accessibilityIdentifier("pipelineMode")
     }
 
-    /// 1.1.0 Home swap (UXC-41, tester feedback; replaces the former
+    /// 1.1.0 Home swap (replaces the former
     /// file-import entry): closes the open document and returns to HomeView. Rides the
     /// verification-screen Done teardown behind the shared "Close this
     /// document?" dialog when the session carries work (`handleHomeTap()`);
     /// the return itself is the existing `.empty` auto-return
     /// (`shouldAutoReturnHome`). iPhone only — the enclosing group is
     /// mounted for `.editing` + compact width. No tint of its own: the
-    /// group's neutral tint is the pinned UXC-32 contract.
+    /// group's neutral tint is the pinned toolbar-tint contract.
     @ViewBuilder
     private var homeButton: some View {
         Button("Home", systemImage: "house") {
@@ -1495,12 +1484,12 @@ struct DocumentEditorView: View {
         .accessibilityIdentifier("editorHomeButton")
     }
 
-    // MARK: - DRAW-5 Magic Wand
+    // MARK: - Magic Wand
 
-    /// DRAW-5: open / re-use the SearchAndRedactSheet with the magic-wand
+    /// Open / re-use the SearchAndRedactSheet with the magic-wand
     /// term pre-filled and `exactMatch` engaged. Reuses
-    /// the search-origin apply (plan §0.4 hard stop — do not
-    /// introduce a new apply method). If a search session is already
+    /// the search-origin apply — do not
+    /// introduce a new apply method. If a search session is already
     /// active we mutate it in place; otherwise a fresh `SearchState` is
     /// created via the existing `redactionState.activeSearch = ...`
     /// path that drives the `.sheet(isPresented:)` binding.
@@ -1522,7 +1511,7 @@ struct DocumentEditorView: View {
         // reads "Not run yet", which is honest.
         state.clearResults()
         state.options.exactMatch = true
-        // DRAW-5 — auto-select every match so the user can apply with one
+        // Auto-select every match so the user can apply with one
         // tap. Flag is consumed by `SearchState.appendResult` for every
         // result the engine streams in; `triggerSearch` resets it after
         // kickoff so a later non-magic-wand search in the same sheet
@@ -1534,7 +1523,7 @@ struct DocumentEditorView: View {
         }
     }
 
-    // MARK: - Verification Done (GATE-3 / Pkg I — lifted from VerificationActionBar)
+    // MARK: - Verification Done (lifted from VerificationActionBar)
 
     /// True when the session carries at least one drawn region. Gates
     /// the Done confirmation dialog on the verification-results screen —
@@ -1545,18 +1534,18 @@ struct DocumentEditorView: View {
         redactionState.regions.values.contains { !$0.isEmpty }
     }
 
-    /// SEC-1 + F-4: tear down the verified session. Lifted verbatim from
+    /// Tear down the verified session. Lifted verbatim from
     /// `VerificationActionBar.performDoneCloseSession()` — the bar is
     /// gone; the close path now hangs off the top-left Done button.
     /// Extracted so the empty-regions direct path and the
     /// confirmed-with-regions path share one implementation. The
     /// editing-phase Home entry (`handleHomeTap()`) shares this exact path.
     private func performDoneCloseSession() {
-        // REV-05: a sheet parked for the close dialog goes down with the
+        // A sheet parked for the close dialog goes down with the
         // session — nothing is re-presented after the teardown.
         homeCloseAwaitsSheetDismissal = false
         homeCloseParkedReview = false
-        // SEC-1: downgrade temp-file protection before tearing down
+        // Downgrade temp-file protection before tearing down
         // the session state. Done before clearAll() so the path
         // walked still matches the live session's outputURL.
         coordinator.downgradeTempProtectionOnSessionClose()
@@ -1572,14 +1561,14 @@ struct DocumentEditorView: View {
         documentState.transition(to: .empty)
     }
 
-    // MARK: - Home (1.1.0 Home swap, UXC-41 — shares the Done close path)
+    // MARK: - Home (1.1.0 Home swap — shares the Done close path)
 
     /// Editing-phase Home: confirm through the shared close dialog when
     /// the session carries work, else tear down directly — the same
     /// two-way split the verification-screen Done button makes, on Done's
     /// own teardown (`performDoneCloseSession()`). The return to HomeView
     /// is the existing `.empty` auto-return; nothing here calls
-    /// `appCoordinator.returnHome()` directly. REV-05 (RB-85): while the
+    /// `appCoordinator.returnHome()` directly. While the
     /// sheet slot is presenting, the confirm route parks the sheet first
     /// (`parkEditorSheetForHomeClose()`) and the dialog presents from the
     /// slot's `onDismiss`.
@@ -1601,9 +1590,9 @@ struct DocumentEditorView: View {
         }
     }
 
-    /// How a Home tap reaches the teardown (REV-05, RB-85). No confirm
+    /// How a Home tap reaches the teardown. No confirm
     /// owed → the direct teardown, sheet or not (a presented sheet drops
-    /// with it — the idle path proven at D-111). Confirm owed with the
+    /// with it — the idle path already proven). Confirm owed with the
     /// sheet slot idle → the dialog. Confirm owed while the slot is
     /// presenting → park the sheet first; the dialog presents from the
     /// slot's `onDismiss`, since UIKit refuses two presentations on one
@@ -1668,7 +1657,7 @@ struct DocumentEditorView: View {
         presentReviewInScanInterface()
     }
 
-    /// `$showDoneConfirmation` with one hook (REV-05): when the dialog goes
+    /// `$showDoneConfirmation` with one hook: when the dialog goes
     /// down without Close — the Cancel row, or the tap-outside dismissal
     /// of the iOS 26 popover — a parked review comes back. Deferred one
     /// runloop turn: the setter runs inside SwiftUI's dismiss transaction,
@@ -1688,7 +1677,7 @@ struct DocumentEditorView: View {
 
     /// Pure gate for the Home close confirm (mirrors
     /// `batchOpsMenuShouldShow` / `shareNeedsFailConfirm`): drawn or
-    /// applied regions — Done's GATE-3 gate — or a staged Scan review
+    /// applied regions — the gate Done uses — or a staged Scan review
     /// awaiting the user (`pendingTriage`), the one editing-only work
     /// state Done never sees. An active search session with nothing
     /// applied is transient, not work — no confirm.
@@ -1700,7 +1689,7 @@ struct DocumentEditorView: View {
     /// verification screen names verification results (the literal pinned
     /// by `VerificationActionBarDoneConfirmationTests`); every other
     /// phase — the editing-phase Home entry — names detection results,
-    /// the sentence the D12 Replace dialog already uses
+    /// the sentence the Replace dialog already uses
     /// (`RedactWorkspaceView`; byte-identity pinned by
     /// `DocumentEditorHomeCloseTests`).
     static func closeDialogMessage(phaseKind: DocumentState.PhaseKind) -> String {
@@ -1712,12 +1701,12 @@ struct DocumentEditorView: View {
         }
     }
 
-    // MARK: - Export (Phase 1A — lifted from VerificationResultsView)
+    // MARK: - Export (lifted from VerificationResultsView)
 
-    // Q1 / §4.4a defense-in-depth export gate. Lifted from
+    // Defense-in-depth export gate. Lifted from
     // VerificationActionBar so the bar and the Phase 2 action card share
     // one source of truth.
-    /// §3.4 FAIL override / "Option B": a standing FAIL verdict (not yet
+    /// FAIL override / "Option B": a standing FAIL verdict (not yet
     /// user-overridden) means Share must route through a one-time "Share
     /// Anyway" confirmation before exporting — it no longer hard-blocks the
     /// Share card. Pure + `static` so the predicate is one source of truth and
@@ -1726,11 +1715,11 @@ struct DocumentEditorView: View {
     /// An ATTENTION verdict (un-redacted residual text) keeps the same
     /// one-time confirm: the tier re-class changes presentation, not the
     /// share-time acknowledgment. WARN and PASS stay confirm-free.
-    /// UXC-13 (RB-22 + RB-45): `report` alone can no longer answer whether
+    /// `report` alone can no longer answer whether
     /// the confirm is needed — `report.userOverrodeFailure` is a write-only
     /// mirror now (see `DocumentState.failShareAcknowledged`), because a
     /// value that lived and died with the report couldn't be re-armed when
-    /// the user backed out of the share sheet without sending (GAP-12).
+    /// the user backed out of the share sheet without sending.
     /// The predicate takes `acknowledged` as an explicit parameter instead,
     /// sourced at the call site from `DocumentState.failShareAcknowledged`
     /// — `acknowledged == true` makes the confirm a no-op for THIS send
@@ -1746,7 +1735,7 @@ struct DocumentEditorView: View {
     /// `shareNeedsFailConfirm(report:acknowledged:)`: pure + `static` so it
     /// is unit-testable without a SwiftUI host, and the acknowledgement
     /// conjunct makes it one-time per attempt. WARN and PASS deliberately
-    /// stay confirm-free. UXC-13: `acknowledged` is sourced at the call site
+    /// stay confirm-free. `acknowledged` is sourced at the call site
     /// from `DocumentState.skippedShareAcknowledged` — see
     /// `shareNeedsFailConfirm(report:acknowledged:)`'s doc comment for why
     /// the report's own `userAcknowledgedSkippedShare` is a write-only
@@ -1755,7 +1744,7 @@ struct DocumentEditorView: View {
         report.overallStatus.isSkipped && !acknowledged
     }
 
-    /// UXC-14 / GAP-14: incomplete-WARN share-risk confirm predicate. A WARN
+    /// Incomplete-WARN share-risk confirm predicate. A WARN
     /// report whose aggregate carries zero real WARN layers but at least one
     /// SKIPPED layer is the digest-less verify-only degrade
     /// (`VerificationResultsView.mastheadSubtitle`'s "Completed with N of M
@@ -1766,7 +1755,7 @@ struct DocumentEditorView: View {
     /// confirm (`warnCount == 0` fails) — that combination has no approved
     /// copy and stays confirm-free, same as any other routine WARN. `report`
     /// alone can't carry the acknowledgement (`VerificationReport` lives in
-    /// the C-5-fenced Packages/RedactionEngine), so unlike its two siblings
+    /// the fenced Packages/RedactionEngine), so unlike its two siblings
     /// this predicate takes `acknowledged` as an explicit parameter, sourced
     /// at the call site from `DocumentState.incompleteWarnShareAcknowledged`.
     /// Pure + `static` for the same testability reason as the two siblings.
@@ -1780,7 +1769,7 @@ struct DocumentEditorView: View {
     }
 
     private func canExport(report: VerificationReport) -> Bool {
-        // §3.4 FAIL override / "Option B": a standing FAIL no longer disables
+        // FAIL override / "Option B": a standing FAIL no longer disables
         // the Share card — it stays enabled (red-tinted via
         // VerificationResultsView.shouldTintShareRed(report:)) and routes through the
         // one-time "Share Anyway" confirm in handleExportTap. Enablement now
@@ -1810,9 +1799,9 @@ struct DocumentEditorView: View {
     /// or absent URL degrades to ContentUnavailableView rather than crashing.
     private var previewAvailable: Bool { outputFileExists }
 
-    /// UXC-14: title for the bespoke share-risk confirm sheet. One title
+    /// Title for the bespoke share-risk confirm sheet. One title
     /// across all three confirm families (FAIL/ATTENTION, SKIPPED,
-    /// incomplete-WARN) — RB-34 D3; only one title is approved copy, and
+    /// incomplete-WARN); only one title is approved copy, and
     /// re-scoping a second one is out of the sprint's timeline.
     static let shareRiskConfirmTitle = "Share with reported issues?"
 
@@ -1822,7 +1811,7 @@ struct DocumentEditorView: View {
 
     /// At-risk item lines for the FAIL/ATTENTION confirm family: every
     /// failed- or attention-flagged layer's `shortDescription` — already
-    /// content-free by ARCH §12.2 (page numbers / key names only, never
+    /// content-free (page numbers / key names only, never
     /// matched text). Replaces the retired `shareAnywayConfirmMessage`,
     /// which quoted only the aggregate's first failing layer; this lists
     /// every at-risk layer. Static so the derivation is unit-testable
@@ -1850,20 +1839,20 @@ struct DocumentEditorView: View {
             : "\(count) flagged items were deselected before redaction."
     }
 
-    /// UXC-14: engagement-control completion label (the slide track's
+    /// Engagement-control completion label (the slide track's
     /// visible + accessible text).
     static let shareRiskConfirmSlideLabel = "Slide to share anyway"
 
     /// Test seam: overridable in tests to assert the confirm's haptic fired
     /// without CoreHaptics/hardware (mirrors the "Test seam:" convention
     /// already used elsewhere, e.g. PipelineCoordinator's replay-order
-    /// hooks). `playExportConfirmation()` is the RB-33 minimal DC-022
-    /// revival — see ResectaTokens.swift.
+    /// hooks). `playExportConfirmation()` is a minimal revival —
+    /// see ResectaTokens.swift.
     static var shareRiskConfirmHaptic: () -> Void = {
         ResectaTokens.Haptics.playExportConfirmation()
     }
 
-    /// UXC-14 confirm-sheet completion. Records the acknowledgement for
+    /// Confirm-sheet completion. Records the acknowledgement for
     /// whichever family presented (routes through the same three
     /// DocumentState methods the old two `.alert`s used, plus the new
     /// third), fires the haptic seam once, then re-reads `documentState
@@ -1894,7 +1883,7 @@ struct DocumentEditorView: View {
     }
 
     private func handleExportTap(report: VerificationReport) {
-        // §3.4 FAIL override / "Option B": a standing FAIL/ATTENTION verdict
+        // FAIL override / "Option B": a standing FAIL/ATTENTION verdict
         // (not yet overridden) routes the Share tap through the bespoke
         // share-risk confirm sheet before any export. WARN/INFO/PASS (and an
         // already-overridden FAIL/ATTENTION) fall straight through to the
@@ -1917,7 +1906,7 @@ struct DocumentEditorView: View {
             shareRiskConfirmKind = .skipped(report)
             return
         }
-        // UXC-14 / GAP-14: incomplete-WARN confirm — a WARN whose
+        // Incomplete-WARN confirm — a WARN whose
         // digest-dependent layers were skipped, not yet acknowledged.
         // Mutually exclusive with both branches above by overallStatus.
         if Self.shareNeedsIncompleteWarnConfirm(
@@ -1930,24 +1919,24 @@ struct DocumentEditorView: View {
         beginExport(report: report)
     }
 
-    // MARK: - Post-share acknowledgment (UXC-36 / RB-41) + re-arm (UXC-13)
+    // MARK: - Post-share acknowledgment + re-arm
 
-    /// UXC-36: toast enqueued when the share sheet reports the document was
+    /// Toast enqueued when the share sheet reports the document was
     /// actually sent (`completed == true`) — confirms the app's own action
     /// (handing the file to the share sheet) went through, without naming
     /// which destination the user chose. Never enqueued on cancel — see
     /// `handleShareSheetCompletion`.
     static let sharedAcknowledgmentToast = "Shared."
 
-    /// UXC-13 (RB-22 + RB-45): the share sheet's `completionWithItemsHandler`
+    /// The share sheet's `completionWithItemsHandler`
     /// routes through this pure static so the re-arm / announce /
     /// record-export decision is unit-testable without
     /// `UIActivityViewController`. `completed == false` means the user
     /// backed out of the sheet without sending — the share-risk confirms
     /// are spent only for a send that actually happened, so a cancelled
     /// attempt re-arms all three (`DocumentState.rearmShareRiskConfirms()`)
-    /// for the next Share tap on the same report (GAP-12). `completed ==
-    /// true` announces the share (UXC-36) and then records it — the
+    /// for the next Share tap on the same report. `completed ==
+    /// true` announces the share and then records it — the
     /// `successfulExportCount` bump / App Store review-request check,
     /// unchanged from the prior inline body — leaving the confirms spent
     /// for this report; a fresh report re-arms via `transition(to:)`'s
@@ -1988,9 +1977,9 @@ struct DocumentEditorView: View {
 
         documentState.transition(to: .exporting)
 
-        // UI_UX §5.4: Timestamped filename, no original name (could be sensitive)
+        // Timestamped filename, no original name (could be sensitive)
         let exportName = "redacted_\(Self.exportFormatter.string(from: Date())).pdf"
-        // SEC-2: place the share-export copy inside the per-session
+        // Place the share-export copy inside the per-session
         // backup-excluded subdirectory so the user-facing filename surfaces
         // in the share sheet from the same protected location as the
         // pipeline output.
@@ -2015,7 +2004,7 @@ struct DocumentEditorView: View {
             return
         }
 
-        // SEC-1: Apply `.complete` protection to the export copy. The
+        // Apply `.complete` protection to the export copy. The
         // session is still live (user is sharing now). Best-effort —
         // failures are non-fatal but logged via the system trace if any.
         try? TempFileHardening.applyProtection(exportURL, level: .complete)
@@ -2030,7 +2019,7 @@ struct DocumentEditorView: View {
         activityVC.completionWithItemsHandler = { _, completed, _, _ in
             try? FileManager.default.removeItem(at: exportURL)
             documentState.transition(to: .verified(report: currentReport))
-            // Order matters (UXC-13): the transition above restores the
+            // Order matters: the transition above restores the
             // captured report onto `.verified` FIRST, then re-arm/announce
             // reads or mutates that live phase.
             DocumentEditorView.handleShareSheetCompletion(
@@ -2059,7 +2048,7 @@ struct DocumentEditorView: View {
         guard let topVC = MatchExportService.topViewController() else {
             try? FileManager.default.removeItem(at: exportURL)
             documentState.transition(to: .verified(report: currentReport))
-            // UXC-13: the share sheet never presented, so no send
+            // The share sheet never presented, so no send
             // happened — re-arm exactly as a cancelled share would.
             DocumentEditorView.handleShareSheetCompletion(
                 completed: false,
@@ -2080,7 +2069,7 @@ struct DocumentEditorView: View {
     // MARK: - KI-4 Scene-phase observer
 
     /// Toast copy for the KI-4 proactive purge re-run prompt. Mechanism-
-    /// description per ARCH §1.3: names what
+    /// description: names what
     /// iOS did (reclaimed the temp file) and what the user can do (Re-run).
     static let purgeRerunToastMessage =
         "Pipeline output was reclaimed by iOS while the app was in the background. Tap Re-run to regenerate."
@@ -2109,8 +2098,8 @@ struct DocumentEditorView: View {
     /// but `runFullPipeline` guards `canStartPipeline(with:)` which requires
     /// `.editing` — without this round-trip the "Re-run" button silently no-ops
     /// and strands the user (the output is gone and Share is disabled). The
-    /// `verified -> editing` transition is legal (UI_UX §1.2 transition table).
-    /// activeSearch is torn down first (Pkg D / STATE-7): the Search & Redact
+    /// `verified -> editing` transition is legal.
+    /// activeSearch is torn down first: the Search & Redact
     /// sheet mutates `redactionState.regions` and is incompatible with the
     /// `.redacting` / `.verifying` phases the re-run enters.
     @MainActor
@@ -2138,7 +2127,7 @@ struct DocumentEditorView: View {
     }
 
     /// Detent the Review route raises the search sheet to. `.compactFloat`
-    /// shows only the title-only handle (WA/D-75) — the coverage panel
+    /// shows only the title-only handle — the coverage panel
     /// mounts topmost in `SearchResultsSection`, which `.medium` reveals.
     static let deselectionReviewDetent: PresentationDetent = .medium
 
@@ -2245,7 +2234,7 @@ struct DocumentEditorView: View {
 
     // MARK: - Detection Summary
 
-    /// UXF-06 — banner overlay, extracted from `body` (the inline closure
+    /// Banner overlay, extracted from `body` (the inline closure
     /// pushed the type-checker past its budget). The record observer
     /// lives on the always-installed `Group` — driven by the run record,
     /// not the .detecting → .editing phase edge, because a page-0
@@ -2260,7 +2249,7 @@ struct DocumentEditorView: View {
                 DetectionSummaryBanner(
                     model: banner,
                     // Review re-entry is additionally gated on the promotion
-                    // flag (UXF-29 family): re-staging `detectionResults`
+                    // flag: re-staging `detectionResults`
                     // after an apply would stage the already-promoted
                     // detections a second time.
                     showsReviewAction: banner.showsReview
@@ -2271,7 +2260,7 @@ struct DocumentEditorView: View {
                         withAnimation { detectionBanner = nil }
                     }
                 )
-                // UXC-33 (RB-24, partial revival of DC-023): routed
+                // Routed
                 // through the resolver so Reduce Motion swaps the slide
                 // for an opacity-only crossfade.
                 .transition(ResectaTokens.Anim.resolvedTransition(
@@ -2296,7 +2285,7 @@ struct DocumentEditorView: View {
         }
     }
 
-    /// Phase 1C: Re-populate pendingTriage from stored detectionResults to
+    /// Re-populate pendingTriage from stored detectionResults to
     /// re-open the review — now the search sheet's Scan interface, not
     /// the retired standalone triage sheet.
     private func handleBannerReview() {
@@ -2360,7 +2349,7 @@ struct DocumentEditorView: View {
                 state.piiCategoryFilter = nil
                 state.sortOrder = .discoveryOrder
                 state.userModifiedSelections = false
-                // UXC-39 — the arriving review is a fresh all-deselected
+                // The arriving review is a fresh all-deselected
                 // context; a stale unreviewed-preselect flag from the
                 // cleared session must not carry into it.
                 state.hasUnreviewedPreselection = false
@@ -2387,7 +2376,7 @@ struct DocumentEditorView: View {
         return "Detection review opened — \(unappliedCount) unapplied match\(suffix) cleared."
     }
 
-    /// UXF-06 — rebuild the banner when a detection run records its
+    /// Rebuild the banner when a detection run records its
     /// outcome. Success outcomes keep the pre-existing 5 s auto-dismiss;
     /// zero/failed records stay until dismissed or the next run replaces
     /// them — a failure notice that vanishes on a timer is no record at all.
@@ -2405,7 +2394,7 @@ struct DocumentEditorView: View {
             scanSummary: record.scanSummary,
             pendingTriage: redactionState.pendingTriage,
             // Scan-interface runs disclose OCR skips through the
-            // sheet's own per-page banner (ST-83); the pipeline-side
+            // sheet's own per-page banner; the pipeline-side
             // skip count belongs to pipeline records only.
             ocrSkippedPageCount: record.scanSummary != nil
                 ? 0 : redactionState.ocrPixelCapSkippedPages.count
@@ -2422,7 +2411,7 @@ struct DocumentEditorView: View {
         }
     }
 
-    /// UXF-06 — view model for the detection summary banner. One value per
+    /// View model for the detection summary banner. One value per
     /// run outcome; pure data so `detectionBannerModel` is unit-testable
     /// without a SwiftUI host (`DetectionBannerModelTests`).
     struct DetectionBannerModel: Equatable {
@@ -2492,7 +2481,7 @@ struct DocumentEditorView: View {
         case .nothingFound(let pageCount):
             var message = "Detection ran on \(pageCount) page\(pageCount == 1 ? "" : "s") and flagged no items."
             if ocrSkippedPageCount > 0 {
-                // ST-83 family — a zero-found run never opens the triage
+                // A zero-found run never opens the triage
                 // sheet, so its OCR-skip banner can't carry this; the
                 // coverage gap must be disclosed here instead.
                 message += " \(ocrSkippedPageCount) page\(ocrSkippedPageCount == 1 ? " was" : "s were") too large to scan for text \u{2014} review \(ocrSkippedPageCount == 1 ? "it" : "them") manually."
@@ -2512,15 +2501,15 @@ struct DocumentEditorView: View {
     // MARK: - Keyboard Shortcuts
 
     private func handleKeyPress(_ press: KeyPress) -> KeyPress.Result {
-        // GATE-6 (Pkg N): keyboard-shortcut entry point honors the
-        // phase gate. The `phaseKind == .editing` guard mirrors Pkg D's
+        // Keyboard-shortcut entry point honors the
+        // phase gate. The `phaseKind == .editing` guard mirrors the
         // `canStartPipeline` / `canMutateRegions` discipline so a
         // mid-pipeline arrow / Escape / Cmd-A press cannot mutate
         // `redactionState.regions` while `.detecting / .redacting /
         // .verifying` owns it. Every key-handler delegate
         // (handleEscapeKey, handleSelectAllKey, nudgeSelection)
         // re-asserts the same guard for defense-in-depth. Spot-check
-        // passed in Pkg N — no behavioral change needed.
+        // passed — no behavioral change needed.
         guard documentState.phaseKind == .editing else { return .ignored }
 
         switch press.key {
@@ -2548,7 +2537,7 @@ struct DocumentEditorView: View {
             redactionState.selectedRegionIDs = []
             return .handled
         }
-        // DRAW-1 / §S2.2: with the polygon tool active and at least
+        // With the polygon tool active and at least
         // one vertex laid, Escape discards the in-progress vertex list
         // without dropping the tool itself — matches the Cancel button
         // in the bottom hint capsule. Must precede the `activeTool !=
@@ -2577,7 +2566,7 @@ struct DocumentEditorView: View {
     // MARK: - Keyboard Nudge
 
     /// Nudge amount in normalized coordinates: ONE PDF point on the
-    /// current page (S2-d / DT-15), i.e. 1/pageWidth × 1/pageHeight from
+    /// current page, i.e. 1/pageWidth × 1/pageHeight from
     /// the page's crop box; the pre-1.1.0 0.0025 stands in when no page
     /// geometry is available.
     static let nudgeFallback: CGFloat = 0.0025
@@ -2630,7 +2619,7 @@ struct DocumentEditorView: View {
 
 // MARK: - Detection Summary Banner
 
-/// Inline banner recording how the last detection run ended (UXF-06):
+/// Inline banner recording how the last detection run ended:
 /// found-and-staged, auto-applied, nothing found, or failed. The warning
 /// variants swap the icon; layout and styling are shared.
 private struct DetectionSummaryBanner: View {
@@ -2648,7 +2637,7 @@ private struct DetectionSummaryBanner: View {
             Image(systemName: model.isWarning
                 ? "exclamationmark.triangle.fill"
                 : "doc.viewfinder")
-                // UXC-26 (GAP-35) — the glyph tint now gates on the same
+                // The glyph tint now gates on the same
                 // `isWarning` flag the symbol itself switches on: neutral
                 // for routine outcomes (an unearned-alarm budget), warn
                 // tint only when there is actually something to flag.
@@ -2660,7 +2649,7 @@ private struct DetectionSummaryBanner: View {
                 .font(.subheadline)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
-            // Phase 1C: Review button re-opens triage sheet
+            // Review button re-opens triage sheet
             if showsReviewAction {
                 Button("Review") {
                     onReview()
@@ -2684,7 +2673,7 @@ private struct DetectionSummaryBanner: View {
     }
 }
 
-// MARK: - Share-risk confirm sheet (UXC-14)
+// MARK: - Share-risk confirm sheet
 
 /// The three families of confirm that route through the bespoke share-risk
 /// confirm sheet, each carrying the report that triggered it (for display —
@@ -2693,13 +2682,13 @@ private struct DetectionSummaryBanner: View {
 /// `handleExportTap` sets at most one, gated by `overallStatus`, which can
 /// never simultaneously satisfy more than one of the three predicates.
 enum ShareRiskConfirmKind: Identifiable {
-    /// §3.4 FAIL override / "Option B", widened to ATTENTION (PD-17
-    /// residual tier — the tier re-class changes presentation, not the
+    /// FAIL override / "Option B", widened to ATTENTION (the residual
+    /// tier — the tier re-class changes presentation, not the
     /// share-time acknowledgment).
     case failOrAttention(VerificationReport)
     /// Verification never ran (any `SkipReason`).
     case skipped(VerificationReport)
-    /// GAP-14: WARN whose digest-dependent layers were skipped.
+    /// WARN whose digest-dependent layers were skipped.
     case incompleteWarn(VerificationReport)
 
     var id: String {
@@ -2718,8 +2707,8 @@ enum ShareRiskConfirmKind: Identifiable {
     }
 
     /// Accessibility identifier of the element that completes the share —
-    /// the hidden-but-accessible Button inside `SlideToShareControl` (RB-32
-    /// / D6). `shareAnywayConfirm` / `shareSkippedConfirm` are the former
+    /// the hidden-but-accessible Button inside `SlideToShareControl`.
+    /// `shareAnywayConfirm` / `shareSkippedConfirm` are the former
     /// `.alert` Share buttons' identifiers, kept stable across the
     /// alert→sheet restructure; `shareIncompleteWarnConfirm` is new.
     var accessibilityIdentifier: String {
@@ -2736,9 +2725,9 @@ enum ShareRiskConfirmKind: Identifiable {
 /// budget (mirrors the former two-.alert `ShareConfirmAlerts` this
 /// replaces).
 ///
-/// UXC-14: replaces the former text-variant system `.alert`s for
-/// FAIL/ATTENTION and SKIPPED, and adds the third incomplete-WARN family
-/// (GAP-14), with one EV-P1-11-shaped content-engaging step: the confirm
+/// Replaces the former text-variant system `.alert`s for
+/// FAIL/ATTENTION and SKIPPED, and adds the third incomplete-WARN family,
+/// with one content-engaging step: the confirm
 /// names the specific at-risk items and requires a swipe-class engagement
 /// (never type-to-confirm) rather than a single default-focused alert
 /// button. "Slide to share anyway" records the acknowledgement on
@@ -2773,8 +2762,8 @@ private struct ShareRiskConfirmPresentation: ViewModifier {
     }
 }
 
-/// UXC-14 confirm-sheet content. Title is shared across all three families
-/// (RB-34 D3); body content is family-specific. The deselected-items line
+/// Confirm-sheet content. Title is shared across all three families;
+/// body content is family-specific. The deselected-items line
 /// is cross-cutting — it renders whenever `shouldShowDeselectionRow` is
 /// true, regardless of which family presented.
 struct ShareRiskConfirmSheet: View {
@@ -2819,9 +2808,9 @@ struct ShareRiskConfirmSheet: View {
                         Text(DocumentEditorView.shareRiskConfirmSkipFactLine)
                             .font(.subheadline)
                     case .incompleteWarn(let report):
-                        // RB-34 D4: reuse the masthead's own skip-induced-WARN
+                        // Reuse the masthead's own skip-induced-WARN
                         // sentence verbatim — no new string. The helper is
-                        // optional only for PASS (UXC-47, title-only
+                        // optional only for PASS (title-only
                         // masthead); a WARN report always carries a line.
                         if let line = VerificationResultsView.mastheadSubtitle(report: report) {
                             Text(line)
@@ -2860,8 +2849,8 @@ struct ShareRiskConfirmSheet: View {
     }
 }
 
-/// UXC-14 engagement control: a swipe-class, cheap-but-physical slide track
-/// (never type-to-confirm). RB-32 / D6: the visible track is the touch
+/// Engagement control: a swipe-class, cheap-but-physical slide track
+/// (never type-to-confirm). The visible track is the touch
 /// path; a hidden-but-accessible `Button` overlaid at a single point off
 /// the track's hit area carries the family's stable accessibility
 /// identifier and is the VoiceOver / XCUI completion path — VoiceOver
@@ -2906,7 +2895,7 @@ struct SlideToShareControl: View {
             }
         )
         .accessibilityHidden(true)
-        // RB-55: the completion Button is sized to
+        // The completion Button is sized to
         // `ResectaTokens.TouchTarget.minimum` — a real touch target, not
         // a 1×1 point — because the 1×1 target proved unreliable for a
         // coordinate-driven activation (XCUITest's `.tap()` on a

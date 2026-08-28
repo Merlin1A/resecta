@@ -1,12 +1,11 @@
 import Foundation
 
-// W-P — Custom Terms × shipped-asset merge layer per §D16 = P1
-// (user always wins). V1 flat-N1 special case: every entry keys on
-// (category: nil, doctype: nil, surfaceForm: term.pattern.normalized)
-// because the V1 UserTerm model is (pattern, isRegex) — see STRAT §1.5
-// "UserTerm shape" + §5.3 stop-conditions. Per-(category, doctype)
-// keying surface is reserved for V1.1+ when UserTerm grows
-// `category: PIICategory?` / `doctype: DoctypeClass?` fields.
+// Custom Terms × shipped-asset merge layer (user always wins). V1
+// flat-N1 special case: every entry keys on (category: nil, doctype:
+// nil, surfaceForm: term.pattern.normalized) because the V1 UserTerm
+// model is (pattern, isRegex). Per-(category, doctype) keying surface
+// is reserved for V1.1+ when UserTerm grows `category: PIICategory?` /
+// `doctype: DoctypeClass?` fields.
 
 public struct UserTermsIndex: Sendable {
 

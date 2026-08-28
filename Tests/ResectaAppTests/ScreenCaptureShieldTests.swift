@@ -4,7 +4,7 @@ import UIKit
 import SwiftUI
 @testable import ResectaApp
 
-// SEC-3 — Screen-capture / mirroring privacy shield.
+// Screen-capture / mirroring privacy shield.
 //
 // These tests pin the dual-trigger logic on `ScreenCaptureMonitor`:
 // * `UIScreen.capturedDidChangeNotification` flips `isCaptured`
@@ -21,7 +21,7 @@ import SwiftUI
 // re-reads the platform flag — re-reading is asserted by
 // `refreshFromPlatform()` plus the value seam).
 
-@Suite("ScreenCaptureMonitor (SEC-3)")
+@Suite("ScreenCaptureMonitor")
 @MainActor
 struct ScreenCaptureShieldTests {
 
@@ -104,20 +104,20 @@ struct ScreenCaptureShieldTests {
         #expect(monitor.isCaptured == UIScreen.main.isCaptured)
     }
 
-    @Test("Shield copy uses mechanism-description language (I6)")
+    @Test("Shield copy uses mechanism-description language")
     func testShieldCopyIsMechanismDescription() {
         // Render the view's text content via Mirror is fragile; instead,
         // assert the canonical copy contract by pinning the source
         // string the view embeds. If the literal in PrivacyShieldView
         // ever drifts, update both sides intentionally.
         let copy = "Document hidden \u{2014} screen capture or mirroring detected"
-        // I6: banned vocabulary check on the visible copy. The literal list
+        // Banned vocabulary check on the visible copy. The literal list
         // below contains the banned words intentionally so the assertion
         // can prove their absence in the visible copy. LegalPhrases:safe
         let banned = ["guaranteed", "ensures", "100%", "impossible", "completely"] // LegalPhrases:safe
         for word in banned {
             #expect(!copy.lowercased().contains(word.lowercased()),
-                    "Shield copy must not contain banned I6 word: \(word)")
+                    "Shield copy must not contain a banned word: \(word)")
         }
         // Affirmative checks — confirm the mechanism is described.
         #expect(copy.lowercased().contains("screen capture"))
@@ -137,7 +137,7 @@ struct ScreenCaptureShieldTests {
 // the view level: `PrivacyShieldView` uses `Color(uiColor: .systemBackground)`
 // with `.ignoresSafeArea()` and no document content, by construction.
 
-// MARK: - S6 / C10 — sheet-level shield (design 04 §C10)
+// MARK: - Sheet-level shield
 //
 // The Search & Redact and Detection Triage sheets present modally ABOVE
 // `DocumentEditorView`'s shield swap, so each carries its own
@@ -148,7 +148,7 @@ struct ScreenCaptureShieldTests {
 // evidence). Rendering the full sheets here would require the complete
 // environment graph and is not what this suite is for.
 
-@Suite("ShieldedSheetContent (S6 / C10)")
+@Suite("ShieldedSheetContent")
 @MainActor
 struct ShieldedSheetContentTests {
 
@@ -198,18 +198,18 @@ struct ShieldedSheetContentTests {
     }
 }
 
-@Suite("PrivacyShieldView structure (SEC-3)")
+@Suite("PrivacyShieldView structure")
 @MainActor
 struct PrivacyShieldViewStructureTests {
 
     @Test("Shield view instantiates without document state")
     func testShieldHidesCanvas() {
-        // The shield deliberately takes no document state — that's the
-        // SEC-3 contract. If a future refactor accidentally injects
-        // document content, this test stays green only by virtue of the
-        // shield resolving without environment values. The visual
-        // property (uniform fill, no leakage) is structural: the view
-        // body is an opaque `Color` + an SF Symbol + a label.
+        // The shield deliberately takes no document state. If a future
+        // refactor accidentally injects document content, this test
+        // stays green only by virtue of the shield resolving without
+        // environment values. The visual property (uniform fill, no
+        // leakage) is structural: the view body is an opaque `Color` +
+        // an SF Symbol + a label.
         let view = PrivacyShieldView()
         // Force the body to evaluate. SwiftUI body evaluation here just
         // confirms the view type compiles + resolves; the visual

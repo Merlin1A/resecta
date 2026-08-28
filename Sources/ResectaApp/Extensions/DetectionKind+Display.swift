@@ -1,7 +1,7 @@
 import SwiftUI
 import RedactionEngine
 
-// §4.2-§4.3: Shared display properties for DetectionResult.Kind.
+// Shared display properties for DetectionResult.Kind.
 // Used by ScanReviewSection (kind filter chips, review-row badges).
 
 extension DetectionResult.Kind {
@@ -29,7 +29,7 @@ extension DetectionResult.Kind {
             case .routingNumber: "RTN"
             case .licensePlate: "LP"
             case .barcode: "Code"
-            // DRAW-3 — short label for triage filter chip + canvas badge.
+            // Short label for triage filter chip + canvas badge.
             case .signatureCandidate: "Sig"
             case .other: "PII"
             }
@@ -61,7 +61,7 @@ extension DetectionResult.Kind {
             case .routingNumber: "ABA Routing Number"
             case .licensePlate: "License Plate"
             case .barcode: "Barcode / QR"
-            // DRAW-3 — mechanism-description copy (I6): the detector
+            // Mechanism-description copy: the detector
             // suggests; the user confirms in triage.
             case .signatureCandidate: "Possible Signature"
             case .other: "Personal Information"
@@ -95,7 +95,7 @@ extension DetectionResult.Kind {
             case .routingNumber: 15
             case .licensePlate: 16
             case .barcode: 17
-            // DRAW-3 — distinct chip slot between barcode and .other.
+            // Distinct chip slot between barcode and .other.
             case .signatureCandidate: 18
             case .other: 19
             }
@@ -106,7 +106,7 @@ extension DetectionResult.Kind {
 
     /// Badge background color for the detection kind.
     var badgeColor: Color {
-        // F2-2: UIColor.system* for accessibility increased-contrast compatibility.
+        // UIColor.system* for accessibility increased-contrast compatibility.
         switch self {
         case .pii: Color(uiColor: .systemOrange)
         case .face: Color(uiColor: .systemPurple)

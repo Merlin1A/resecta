@@ -144,7 +144,7 @@ struct ScanReviewAbsorptionTests {
         #expect(counts[1].count == 1)
     }
 
-    @Test("filteredGroups hides fully-promoted groups (UXF-29) and honors the kind filter")
+    @Test("filteredGroups hides fully-promoted groups and honors the kind filter")
     func groupVisibility() {
         let a = makeDetection(page: 0, kind: .pii(.name), matchedText: "Jordan Avery")
         let b = makeDetection(page: 2, kind: .pii(.name), matchedText: "Jordan Avery")

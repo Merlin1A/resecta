@@ -4,7 +4,7 @@ Thanks for your interest in contributing. This document covers the workflow, com
 
 ## Project organization
 
-Resecta is open-source and AI-assisted. External contributors file a PR against `master` and the maintainer routes it.
+Resecta is open-source and AI-assisted. External contributors file a PR against `main` and the maintainer routes it.
 
 - **App target:** `Sources/ResectaApp/` — iOS 26, Swift 6.2, MainActor default.
 - **Engine package:** `Packages/RedactionEngine/` — SPM library, non-MainActor with `@concurrent`, Swift 6.2 strict concurrency. Import-friendly for non-app consumers.
@@ -24,12 +24,12 @@ After adding new Swift files to `Sources/`, run `./regenerate.sh` to refresh the
 
 ## Branch model
 
-- **`master`** — the line shipped to users.
+- **`main`** — the line shipped to users.
 - **`feat/<topic>`** — feature work.
 - **`refactor/<topic>-YYYY-MM`** — in-flight refactor chains.
 - **`fix/<topic>`** — bug fixes.
 
-Push to your branch, then open a pull request against `master`.
+Push to your branch, then open a pull request against `main`.
 
 ## Commit format
 
@@ -51,7 +51,7 @@ Audit:
 - [x] Tests pass: ResectaApp + RedactionEngine on iPhone 17 sim (per M-10)
 - [x] Privacy floor: no document-derived data persisted (per M-11)
 - [x] No new dependencies (per M-12)
-- [x] No Hard Stops crossed (per M-13)
+- [x] No plan-first change without an agreed plan (per M-13)
 
 Signed-off-by: Your Name <you@example.com>
 ```
@@ -92,7 +92,8 @@ The hook (`Scripts/audit-lint.sh`) runs on every commit and blocks the commit on
 - **M-10.** Test suites pass on the iPhone 17 simulator (both schemes).
 - **M-11.** Privacy floor: no document-derived data persisted.
 - **M-12.** No new dependencies (even Apple-first-party beyond the current set).
-- **M-13.** No Hard Stops crossed (see "Hard Stops" below).
+- **M-13.** No plan-first change without an agreed plan (see "Changes that need an agreed plan" below).
+- Documented counts: `Scripts/doc-metrics.sh --check` passes whenever a change moves the line or test counts that README.md and ENGINEERING.md quote.
 
 ## Mechanism-description language
 
@@ -102,9 +103,9 @@ The rules cover six claim categories — security, technical architecture, compa
 
 When a legitimate Swift control-flow keyword triggers M-1 (typical case is a `do { try ... }` error-handling block), add `LegalPhrases:safe` as a trailing comment on the same line. The override is rare; if it appears more than a few times in a single change, the language is probably drifting and needs a rewrite.
 
-## Hard Stops
+## Changes that need an agreed plan
 
-The following changes require maintainer sign-off before any code lands:
+The following changes land only after a written plan — the change, the reason, and how it will be verified — has been proposed and the maintainer has agreed to it; the edit follows the agreement, not the other way round:
 
 - Any change to the `Phase` enum or transition table.
 - Any modification to the `PipelineError` type hierarchy.
@@ -113,9 +114,9 @@ The following changes require maintainer sign-off before any code lands:
 - Any change to the privacy manifest.
 - Any uncertainty about whether existing code matches the spec.
 
-If a PR crosses one of these, mark it as draft and open an issue so the maintainer can route review.
+If a PR crosses one of these, mark it as draft and open an issue that states the plan so the maintainer can agree to it before the edit lands.
 
-This list is the canonical Hard Stops source for all contributors, including AI-assisted ones.
+This list is the canonical source for all contributors, including AI-assisted ones.
 
 ## Security
 
@@ -140,8 +141,6 @@ The batched runner builds once, then runs the app suites in serial batches (perf
 The pre-push hook that `install-hooks.sh` installs runs both schemes on the simulator through the same batched runner before any push and blocks the push on a gating red (exit 1) or an incomplete run (exit 2); `SKIP_TESTS=1 git push` skips the gate and logs the skip to stderr.
 
 Name and search tests exercise the system on-device name-recognition model (`NLTagger` `.nameType`), delivered as an on-demand OS asset. For the app suites, use a current iOS 26.x simulator runtime where that model is present (the runner picks an available iPhone 17 simulator automatically); where the asset has not downloaded, those tests skip or report different counts rather than failing the build.
-
-Some comments and test names carry short tags — `CAT-123`, `VF-04`, `D-19`, `q17`, `WU-33`, and similar. They are stable identifiers from the maintainer's defect ledger and work log, kept where they tie a regression test to the defect or decision that motivated it; references of the form `design 01 §4` or `plan §5` point into the same private design notes. None of these resolve to files in this repository — treat them as opaque, stable labels.
 
 ## Questions
 

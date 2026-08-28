@@ -5,7 +5,7 @@ import CoreText
 import PDFKit
 @testable import RedactionEngine
 
-// CAT-370 — Layer-2 OCR throughput (cluster C-D).
+// Layer-2 OCR throughput.
 //
 // F1: the per-page OCR loop in `runLayer2OCR` now runs in a width-bounded task
 // group (`VerificationEngine.ocrParallelism`), folding per-page results into the
@@ -64,9 +64,9 @@ struct Layer2OCRParallelismTests {
         // Render large text on an oversized (>4096 px) page so the engine's F2
         // downsample is exercised on the real Layer-2 path. Text under a covering
         // region must still be detected — downsampling for throughput must not drop
-        // readable leaked text. Under D08-F2 a readable in-region hit in Secure
-        // Rasterization is a leak → FAIL (was WARN before D08-F2); either way the
-        // point holds: the downsampled text is surfaced, never silently PASSed.
+        // readable leaked text. A readable in-region hit in Secure Rasterization is
+        // a leak → FAIL (previously WARN); either way the point holds: the
+        // downsampled text is surfaced, never silently PASSed.
         let img = try Self.textImage("CONFIDENTIAL", width: 5000, height: 3000, fontSize: 520)
         let (doc, url) = try await Self.makeMultiImagePDF([img], size: CGSize(width: 5000, height: 3000))
         defer { try? FileManager.default.removeItem(at: url) }
@@ -81,7 +81,7 @@ struct Layer2OCRParallelismTests {
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
         #expect(result.status.isFail,
-                "oversize-image in-region text must still be detected post-downsample (D08-F2 FAIL); got \(result.status)")
+                "oversize-image in-region text must still be detected post-downsample (FAIL); got \(result.status)")
     }
 
     // MARK: - F1 order-independence + a rotated page in the set
@@ -89,7 +89,7 @@ struct Layer2OCRParallelismTests {
     @Test("Layer-2 result is deterministic and complete under the bounded group, incl. a rotated page")
     func resultIsOrderIndependentAndComplete() async throws {
         // Four single-image text pages, each under a covering region → each
-        // classifies textInRegion, now FAIL in Secure Rasterization (D08-F2; was
+        // classifies textInRegion, FAIL in Secure Rasterization (previously
         // WARN). With ocrParallelism = 3 the first chunk's three pages OCR
         // concurrently and can complete out of order; the engine sorts the page
         // list, so the message lists every page ascending regardless of completion
@@ -123,7 +123,7 @@ struct Layer2OCRParallelismTests {
 
         let first = await run()
         let second = await run()
-        #expect(first.isFail, "all four in-region text pages must FAIL (D08-F2); got \(first)")
+        #expect(first.isFail, "all four in-region text pages must FAIL; got \(first)")
         let firstMsg = Self.message(of: first)
         #expect(firstMsg == Self.message(of: second),
                 "the page list must be identical across runs (sorted, order-independent)")
@@ -160,7 +160,7 @@ struct Layer2OCRParallelismTests {
         }
         let (doc, url) = try await Self.makeMultiImagePDF(imgs, size: CGSize(width: 1100, height: 1400))
         defer { try? FileManager.default.removeItem(at: url) }
-        doc.page(at: n / 2)?.rotation = 90   // one rotated page in the set (F15)
+        doc.page(at: n / 2)?.rotation = 90   // one rotated page in the set
 
         let region = RedactionRegion(
             id: UUID(),
@@ -211,7 +211,7 @@ struct Layer2OCRParallelismTests {
         let sP50 = p50(serial), pP50 = p50(parallel)
         let speedup = sP50 > 0 ? (1 - pP50 / sP50) * 100 : 0
         print(String(
-            format: "[CAT-370] Layer-2 OCR wall-clock (%d pages, sim — directional): "
+            format: "Layer-2 OCR wall-clock (%d pages, sim — directional): "
                   + "serial p50=%.3fs, parallel p50=%.3fs, speed-up %.1f%%",
             n, sP50, pP50, speedup))
 

@@ -2,9 +2,9 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// L4 / C10 — InstitutionGazetteer loader, exact lookup, and doctype anchoring.
+// InstitutionGazetteer loader, exact lookup, and doctype anchoring.
 
-@Suite("InstitutionGazetteer (L4 / C10)")
+@Suite("InstitutionGazetteer")
 struct InstitutionGazetteerTests {
 
     // MARK: - Bundle loader
@@ -47,7 +47,7 @@ struct InstitutionGazetteerTests {
         #expect(gazetteer.institution(named: "Clearly Made-Up Agency Of Nothing") == nil)
     }
 
-    // MARK: - Doctype anchoring (C10 headline test)
+    // MARK: - Doctype anchoring
 
     @Test("SOCIAL SECURITY ADMINISTRATION header anchors to .foia doctype")
     func testDoctypeAnchoring() throws {
@@ -113,7 +113,7 @@ struct InstitutionGazetteerTests {
         #expect(InstitutionGazetteer.anchoredDoctype(for: entry) == nil)
     }
 
-    @Test("Version-fence rejects out-of-range version (W-O)")
+    @Test("Version-fence rejects out-of-range version")
     func versionFenceRejectsOutOfRange() throws {
         let tempBase = FileManager.default.temporaryDirectory
             .appending(path: "wo-followers-institutions-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -144,12 +144,11 @@ struct InstitutionGazetteerTests {
 
 // MARK: - NegativeContextGazetteer × InstitutionGazetteer integration
 
-// Package J — TEST-neg-ctx-test-target-wiring (`05-implementer-handoff.md §3
-// Package J`). The test target's `Bundle.module` previously did not contain
+// The test target's `Bundle.module` previously did not contain
 // `Resources/Gazetteers/`; Package.swift now mirrors the gazetteer resources
 // into the test target via a parent-relative `.copy(...)` entry, so the
 // `bundle: .module` calls below resolve to a bundle with `negative_context.json`.
-@Suite("NegativeContextGazetteer institution anchoring (L4 / C10)")
+@Suite("NegativeContextGazetteer institution anchoring")
 struct NegativeContextInstitutionAnchorTests {
 
     @Test("Federal-agency header dampens SSN suppression below the keyword-only baseline")

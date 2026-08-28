@@ -1,12 +1,12 @@
 import Foundation
 
-// Pkg G.3 — multi-term TextField submission validation.
+// Multi-term TextField submission validation.
 //
-// TRUST-multiterm-no-length-cap: the multi-term TextField previously
+// The multi-term TextField previously
 // accepted arbitrary-length input that bypassed
 // `DocumentSearcher.maxRegexPatternLength = 200`. The length check
 // runs BEFORE the duplicate check so an over-cap dup-of-existing entry
-// surfaces the more specific length-cap copy from S2 §L.6 rather than
+// surfaces the more specific length-cap copy rather than
 // the duplicate copy.
 //
 // The validator is a pure (input → outcome) function so the
@@ -40,10 +40,10 @@ extension SearchAndRedactSheet {
     /// the duplicate check so an over-cap dup-of-existing entry surfaces
     /// the more specific length-cap copy.
     ///
-    /// Banner copy is S2 §L.6 verbatim per Jesse decision Q4 (resolved).
+    /// Banner copy is fixed verbatim, matching the exact wording above.
     ///
     /// `nonisolated` because the body is pure string + array work and
-    /// the Pkg G.3 unit tests call it off the main thread. Without this,
+    /// unit tests call it off the main thread. Without this,
     /// the implicit @MainActor inherited from the SwiftUI View extension
     /// trips Swift 6.2's runtime executor check inside the
     /// `contains(where:)` closure.

@@ -3,12 +3,12 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-36 / [D-34] OQ-07: pins the pure-function bin derivation that
+// Pins the pure-function bin derivation that
 // `CoverageReportView.perCategoryRow` uses to render the inline
 // confidence histogram inside the per-category sub-disclosure.
-// View-side derivation per [D-34] OQ-07; engine package untouched.
+// View-side derivation; engine package untouched.
 
-@Suite("Coverage histogram bin derivation (WU-36 / D-34 OQ-07)", .tags(.search))
+@Suite("Coverage histogram bin derivation", .tags(.search))
 @MainActor
 struct CoverageHistogramTests {
 
@@ -100,11 +100,10 @@ struct CoverageHistogramTests {
         let start = Date()
         let bins = CoverageReportView.confidenceBinCounts(results: results, category: .ssn)
         let elapsed = Date().timeIntervalSince(start)
-        // Acceptance bar per WORK_UNITS.md WU-36 is <50ms. Widened to 100ms
-        // here per the flake-watch posture — simulator host
-        // variance has produced timing-sensitive failures historically
-        // (OQ-24 / OQ-25 / OQ-27 precedent). The helper itself is O(n) and
-        // comfortably under the target in steady-state.
+        // Acceptance bar is <50ms. Widened to 100ms here per the
+        // flake-watch posture — simulator host variance has produced
+        // timing-sensitive failures historically. The helper itself is
+        // O(n) and comfortably under the target in steady-state.
         #expect(elapsed < 0.1, "10k results binned in \(elapsed * 1000)ms")
         #expect(bins.count == CoverageReportView.confidenceHistogramBandCount)
         #expect(bins.reduce(0, +) > 0)

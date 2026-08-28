@@ -8,31 +8,29 @@ import CoreGraphics
 import os
 @testable import RedactionEngine
 
-// PERF-3 — Detection ↔ rasterization pipeline-overlap regression suite.
+// Detection ↔ rasterization pipeline-overlap regression suite.
 //
-// PERF-3 contract: depth-2
-// lookahead via structured concurrency. While the orchestrator detects
-// page N, the next page's render-for-detection (`renderPageForDetection`
-// in `PipelineCoordinator`) runs concurrently via `async let`. At the
-// start of iteration N+1, the prefetched image is already in hand —
-// detect for the next page begins without waiting for a fresh rasterize.
+// Depth-2 lookahead via structured concurrency. While the orchestrator
+// detects page N, the next page's render-for-detection
+// (`renderPageForDetection` in `PipelineCoordinator`) runs concurrently
+// via `async let`. At the start of iteration N+1, the prefetched image
+// is already in hand — detect for the next page begins without waiting
+// for a fresh rasterize.
 //
-// Why this lives in the Engine test target (PERF-2 precedent §13 of the
-// shared-context says "when reality contradicts the plan, surface in the
-// handoff"). The orchestrating code (`runDetectionPipeline`) is owned by
-// `PipelineCoordinator` in the app target. The PERF-2 suite ran into the
-// same coupling and parked its tests in the app target. PERF-3's agent
-// body asked for the engine path; rather than relocate, this suite
-// MIRRORS the dispatch contract locally — same `async let` shape, same
-// per-iteration overlap — and asserts overlap on engine-accessible
-// primitives (`PageRasterizer.renderPage` + `DetectionOrchestrator.detectPage`).
-// A peer app-target suite drives the actual `PipelineCoordinator` end
-// of the contract; both share the same overlap-rate metric definition.
+// This lives in the Engine test target even though the orchestrating
+// code (`runDetectionPipeline`) is owned by `PipelineCoordinator` in the
+// app target: that type is unreachable from this package's test bundle,
+// so this suite MIRRORS the dispatch contract locally — same
+// `async let` shape, same per-iteration overlap — and asserts overlap on
+// engine-accessible primitives (`PageRasterizer.renderPage` +
+// `DetectionOrchestrator.detectPage`). A peer app-target suite drives
+// the actual `PipelineCoordinator` end of the contract; both share the
+// same overlap-rate metric definition.
 //
 // .serialized: the wall-clock measurements would distort if multiple
 // tests in this suite ran concurrently (each saturates rasterize +
 // detect threads). Suite-level serialization keeps the readings stable.
-@Suite("PERF-3 Detection-Rasterize Overlap", .tags(.performance), .serialized)
+@Suite("Detection-Rasterize Overlap", .tags(.performance), .serialized)
 struct DetectionRasterizeOverlapTests {
 
     // MARK: - Per-phase interval (timed by Date)
@@ -41,7 +39,7 @@ struct DetectionRasterizeOverlapTests {
     /// rasterize-for-detection (`renderPageForDetection`) from detect
     /// (`orchestrator.detectPage`). Dates come from the same `Date()`
     /// source on both ends so subtraction is meaningful across concurrent
-    /// Tasks (matches the PERF-6 pattern in `ParallelLayerExecutionTests`).
+    /// Tasks (matches the pattern in `ParallelLayerExecutionTests`).
     struct Interval: Sendable {
         enum Kind: Sendable { case rasterize, detect }
         let pageIndex: Int
@@ -85,9 +83,9 @@ struct DetectionRasterizeOverlapTests {
     /// bundle. The production code path lives in
     /// `Sources/ResectaApp/State/PipelineCoordinator.swift` (private
     /// `runDetectionPipeline`). The shape MUST stay aligned with that
-    /// code — see PERF-3 plan §5 "Hard stops". Returns the collected
-    /// intervals in start-time order (the collector preserves arrival
-    /// order, which is start-time order for begin-stamps).
+    /// code. Returns the collected intervals in start-time order (the
+    /// collector preserves arrival order, which is start-time order for
+    /// begin-stamps).
     ///
     /// `failInjector != nil` simulates a rasterize failure at the
     /// targeted page index; `pageImageFor` is the rasterize step
@@ -234,7 +232,7 @@ struct DetectionRasterizeOverlapTests {
         .timeLimit(.minutes(2))
     )
     func testDetectionStartsBeforeRasterizeEnds() async throws {
-        // 10-page fixture matches plan §5 acceptance criterion.
+        // 10-page fixture matches the acceptance criterion.
         let (doc, url) = try makeTextLayerPDF(pages: 10)
         defer { try? FileManager.default.removeItem(at: url) }
         let pages: [PDFPage] = (0..<doc.pageCount).compactMap { doc.page(at: $0) }
@@ -243,16 +241,15 @@ struct DetectionRasterizeOverlapTests {
         let collector = Collector()
         let rasterizer = PageRasterizer()
         let orchestrator = DetectionOrchestrator()
-        // PERF-4 — supply an embedded-text source so the orchestrator
-        // takes the OCR-skip fast path. Vision OCR is unreliable on the
-        // iOS Simulator (it sporadically returns "Could not create
+        // Supply an embedded-text source so the orchestrator takes the
+        // OCR-skip fast path. Vision OCR is unreliable on the iOS
+        // Simulator (it sporadically returns "Could not create
         // inference context"); the SKIP path keeps detect deterministic.
         // To exercise a realistic overlap shape we then add a short
         // `Task.sleep` inside the detect closure so detect-N is
         // observably long enough for rasterize-(N+1) to start before
-        // detect-N ends. This stand-in is consistent with the locked
-        // decision: PERF-3 overlap is about scheduling, not about
-        // which detect branch fires (plan §6 PERF-3 ↔ PERF-4 row).
+        // detect-N ends. The overlap under test is about scheduling,
+        // not about which detect branch fires.
         let stub = makeStubEmbedded(
             text: "Alice Smith SSN 123-45-6789 at 742 Evergreen."
         )
@@ -288,7 +285,7 @@ struct DetectionRasterizeOverlapTests {
             collector: collector
         )
 
-        // Overlap-rate metric (plan §5 PERF-3 acceptance):
+        // Overlap-rate metric:
         //
         //   numerator   = number of consecutive (detect(K), rasterize(K+1))
         //                 pairs whose intervals intersect in time
@@ -319,7 +316,7 @@ struct DetectionRasterizeOverlapTests {
             pairs += 1
             // Two intervals overlap when [a.start, a.end] ∩ [b.start, b.end]
             // is non-empty: a.start < b.end AND b.start < a.end. Mirrors
-            // the PERF-6 overlap test (ParallelLayerExecutionTests).
+            // the overlap test in `ParallelLayerExecutionTests`.
             if detectK.start < rasterKplus1.end
                 && rasterKplus1.start < detectK.end {
                 overlapping += 1
@@ -352,11 +349,11 @@ struct DetectionRasterizeOverlapTests {
         .timeLimit(.minutes(2))
     )
     func testCancellationCancelsLookaheadDetect() async throws {
-        // Plan §5 PERF-3 "Hard stops": on rasterize failure for page N,
-        // the in-flight detect for the prior page must complete or be
-        // cancelled, and the lookahead detect for the failed page MUST
-        // NOT produce results. We assert: when rasterize(3) throws,
-        // detect(3) and detect(4) never appear in the result vector.
+        // On rasterize failure for page N, the in-flight detect for the
+        // prior page must complete or be cancelled, and the lookahead
+        // detect for the failed page MUST NOT produce results. We
+        // assert: when rasterize(3) throws, detect(3) and detect(4)
+        // never appear in the result vector.
         let (doc, url) = try makeTextLayerPDF(pages: 6)
         defer { try? FileManager.default.removeItem(at: url) }
         let pages: [PDFPage] = (0..<doc.pageCount).compactMap { doc.page(at: $0) }
@@ -406,8 +403,8 @@ struct DetectionRasterizeOverlapTests {
         // Detect for pages 3, 4, 5 must NOT have run — iteration 3
         // never began because we threw before reaching it. Iteration 2
         // (detect(2)) may have run before or after the throw; both are
-        // acceptable correctness-wise (overlap is a perf change, not
-        // a correctness change — plan §5 PERF-3 Hard stops).
+        // acceptable correctness-wise (overlap is a perf change, not a
+        // correctness change).
         let detects = collector.intervals.filter { $0.kind == .detect }
         let detectIndices = Set(detects.map { $0.pageIndex })
         #expect(!detectIndices.contains(3),
@@ -418,21 +415,21 @@ struct DetectionRasterizeOverlapTests {
                 "Detect for page 5 must NOT run — the lookahead chain stopped at the rasterize(3) failure")
     }
 
-    // MARK: - Test 3: Overlap is benign when OCR is skipped (PERF-4 fast path)
+    // MARK: - Test 3: Overlap is benign when OCR is skipped (fast path)
 
     @Test(
         "OCR-skip pages still pipeline: detect(N) is short, overlap is benign",
         .timeLimit(.minutes(2))
     )
     func testNoOverlapWhenOCRSkipped() async throws {
-        // PERF-4 + PERF-3 cross-cutting risk (plan §6): when detect(N)
-        // is on the OCR-skip fast path, it is far shorter than a normal
-        // detect — the lookahead rasterize for page N+1 may finish
-        // before detect(N) does, so the overlap is largely no-op for
-        // that page. The pair `(detect(K), rasterize(K+1))` is STILL a
-        // benign overlap — it does not run any extra work — and the
-        // detection set parity is preserved. The acceptance criterion
-        // is the LATTER: no spurious work AND correctness held.
+        // When detect(N) is on the OCR-skip fast path, it is far
+        // shorter than a normal detect — the lookahead rasterize for
+        // page N+1 may finish before detect(N) does, so the overlap is
+        // largely no-op for that page. The pair
+        // `(detect(K), rasterize(K+1))` is STILL a benign overlap — it
+        // does not run any extra work — and the detection set parity is
+        // preserved. The acceptance criterion is the LATTER: no
+        // spurious work AND correctness held.
         let (doc, url) = try makeTextLayerPDF(pages: 6)
         defer { try? FileManager.default.removeItem(at: url) }
         let pages: [PDFPage] = (0..<doc.pageCount).compactMap { doc.page(at: $0) }
@@ -443,9 +440,9 @@ struct DetectionRasterizeOverlapTests {
         let orchestrator = DetectionOrchestrator()
 
         // Synthesize an EmbeddedTextSource per page so the OCR path is
-        // skipped for every page (mirrors PERF-4 `coverage > 0.95`).
-        // The PERF-4 orchestrator path stamps provenance on every
-        // detection — we re-use that path here.
+        // skipped for every page (mirrors an embedded-text coverage
+        // above 0.95). The OCR-skip orchestrator path stamps provenance
+        // on every detection — we re-use that path here.
         let imageFor: @Sendable (PDFPage, Int) async throws -> CGImage = { page, idx in
             nonisolated(unsafe) let unsafePage = page
             return try await rasterizer.renderPage(
@@ -467,7 +464,7 @@ struct DetectionRasterizeOverlapTests {
                 ocrSkipReason: .coverageHighEnough
             )
             // Every detection on a skipped page records OCR-skipped
-            // provenance (PERF-4 contract).
+            // provenance.
             for d in res.detections {
                 #expect(d.provenance.ocrSkipped == true,
                         "OCR-skip path must stamp provenance.ocrSkipped")
@@ -500,14 +497,13 @@ struct DetectionRasterizeOverlapTests {
         .timeLimit(.minutes(3))
     )
     func testCorrectnessUnchanged() async throws {
-        // Plan §5 PERF-3 "Hard stops": overlap is a perf optimization,
-        // not a correctness change. The detected-PII set must be
-        // byte-for-byte identical to the no-overlap baseline. We
-        // compare per-page detection counts (UUIDs are fresh per run,
-        // so a deeper byte-level compare is not meaningful — the
-        // orchestrator's text+geometry inputs are identical between
-        // the two paths, so the count + ordering is the right
-        // invariant to assert).
+        // Overlap is a perf optimization, not a correctness change. The
+        // detected-PII set must be byte-for-byte identical to the
+        // no-overlap baseline. We compare per-page detection counts
+        // (UUIDs are fresh per run, so a deeper byte-level compare is
+        // not meaningful — the orchestrator's text+geometry inputs are
+        // identical between the two paths, so the count + ordering is
+        // the right invariant to assert).
         let (doc, url) = try makeTextLayerPDF(pages: 10)
         defer { try? FileManager.default.removeItem(at: url) }
         let pages: [PDFPage] = (0..<doc.pageCount).compactMap { doc.page(at: $0) }

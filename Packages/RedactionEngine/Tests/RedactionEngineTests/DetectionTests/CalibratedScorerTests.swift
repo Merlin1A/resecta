@@ -1,7 +1,7 @@
 import Testing
 @testable import RedactionEngine
 
-// Plan Phase 3 / §6 — CalibratedScorer math.
+// CalibratedScorer math.
 
 @Suite("CalibratedScorer")
 struct CalibratedScorerTests {
@@ -21,7 +21,7 @@ struct CalibratedScorerTests {
         #expect(strong > weak)
     }
 
-    // MARK: - S7 / design 03 §3.6 — absorbing-state floor
+    // MARK: - Absorbing-state floor
 
     @Test("Floored prior rescues account raw max at balanced (design math pin)")
     func absorbingStateFloorRescuesAccountAtBalanced() {
@@ -40,7 +40,7 @@ struct CalibratedScorerTests {
         #expect(unfloored < 0.60, "unfloored worst case stays absorbed: \(unfloored)")
 
         #expect(DetectionOrchestrator.absorbingStateFloor == 0.35,
-                "shipped floor value is the Jesse-decided 0.35")
+                "shipped floor value is 0.35")
     }
 
     @Test("Five consecutive rejections then floor: posterior clears balanced")
@@ -66,11 +66,11 @@ struct CalibratedScorerTests {
                 "account raw max must resurface at balanced after the floor: \(posterior)")
     }
 
-    // MARK: - SRCH-S2 D02-scorer-posterior-F1/F2 — under-redaction raw-bar floor
+    // MARK: - Under-redaction raw-bar floor
     //
     // The learned context term collapses a structurally-valid, keyword-confirmed
     // account/phone below the gate on one length/separator feature. The
-    // ContextPosteriorFloor raw-bar form (DESIGN-DECISIONS DQ2) re-floors a match
+    // ContextPosteriorFloor raw-bar form re-floors a match
     // whose raw cleared 0.70 to its CONSERVATIVE-preset cutoff, capped at raw.
     // CORRECTED cutoffs (the proposals said 0.55/0.70/0.85 — WRONG): shipped
     // 28921a52 is account 0.01/0.6/0.7 and phone 0.55/0.7/0.75.
@@ -89,7 +89,7 @@ struct CalibratedScorerTests {
 
     @Test("Post-floor: keyword-confirmed phone AND account survive every preset (one raw-bar helper)")
     func flooredPhoneAndAccountSurvive() {
-        // DQ2 §453 — the single raw-bar helper satisfies BOTH families.
+        // The single raw-bar helper satisfies BOTH families.
         // Phone: raw 0.80 → min(0.80, 0.75) = 0.75 → survives 0.55 / 0.7 / 0.75.
         let phone = ContextPosteriorFloor.apply(0.0006, family: "phone", raw: 0.80, conservativeCutoff: 0.75)
         #expect(abs(phone - 0.75) < 1e-9, "phone floors to 0.75; got \(phone)")

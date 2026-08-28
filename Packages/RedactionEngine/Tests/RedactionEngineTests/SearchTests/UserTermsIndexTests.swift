@@ -3,15 +3,14 @@ import PDFKit
 import Foundation
 @testable import RedactionEngine
 
-// W-P — UserTermsIndex × shipped-asset merge layer per §D16 = P1
-// (user always wins).
+// UserTermsIndex × shipped-asset merge layer: user terms always win.
 //
 // V1 ships flat-N1 keying: every entry lands at
 // (category: nil, doctype: nil, surfaceForm: term.pattern.normalized)
 // because the V1 UserTerm model is (pattern, isRegex) only. Per-(category,
-// doctype) keying is V1.1+. STRAT §5.3 stop-conditions; impl-plan v5.1 §W-P.
+// doctype) keying is V1.1+.
 
-@Suite("UserTermsIndex (W-P custom-terms merge)", .tags(.search))
+@Suite("UserTermsIndex (custom-terms merge)", .tags(.search))
 struct UserTermsIndexTests {
 
     // MARK: - Decision API (V1 flat-N1)
@@ -216,11 +215,11 @@ struct UserTermsIndexTests {
         #expect(synthetic?.rationale?.finalScore == 1.0)
     }
 
-    // MARK: - W-P timing-equivalence regression (v5)
+    // MARK: - Timing-equivalence regression (v5)
 
-    @Test("W-P regression: never-flag for a structurally-valid SSN keeps SSN out of output")
+    @Test("Regression: never-flag for a structurally-valid SSN keeps SSN out of output")
     func timingEquivalenceRegression() async {
-        // Locks the W-P pre-threshold suppression contract: a structurally
+        // Locks the pre-threshold suppression contract: a structurally
         // valid SSN that fires the shipped detector AND matches a user
         // never-flag must NOT appear in `searchPII()` output, regardless of
         // whether the engine runs the suppression pre- or post-threshold.
@@ -243,9 +242,9 @@ struct UserTermsIndexTests {
                 "never-flag must keep the SSN out of search output entirely")
 
         // Snapshot: no rationale ruleID flowing through the threshold pass
-        // for the suppressed text. Pre-W-P (post-threshold) timing would
-        // briefly admit the hit through the threshold-pass set; W-P drops
-        // it before that. Either way the user-facing output is empty —
+        // for the suppressed text. Earlier (post-threshold) timing would
+        // briefly admit the hit through the threshold-pass set; this fix
+        // drops it before that. Either way the user-facing output is empty —
         // this assertion locks the user-visible promise.
         let ssnRuleIDs = results
             .compactMap { $0.rationale?.ruleID }

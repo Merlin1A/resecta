@@ -1,10 +1,10 @@
 import Testing
 @testable import RedactionEngine
 
-// L-17 — Pre-compile ReDoS heuristic. Parametric across OWASP-cited
+// Pre-compile ReDoS heuristic. Parametric across OWASP-cited
 // catastrophic patterns plus known-safe shapes.
 
-@Suite("Regex Safety Precheck (L-17)")
+@Suite("Regex Safety Precheck")
 struct RegexSafetyPrecheckTests {
 
     // MARK: - Pathological (must flag)

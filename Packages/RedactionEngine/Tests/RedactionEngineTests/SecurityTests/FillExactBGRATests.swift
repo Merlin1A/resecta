@@ -4,8 +4,7 @@ import CoreGraphics
 import UIKit
 #endif
 
-// EXP-008 migrated: Fill Exact BGRA Byte Verification
-// Audit: AA-1-1 (Critical), PD-3-1 (High), AA-11, AA-2
+// Fill Exact BGRA Byte Verification.
 // Validates the #1 security boundary: pixel-exact redaction fill.
 
 @Suite("Fill Exact BGRA Verification", .tags(.security, .critical))
@@ -24,7 +23,7 @@ struct FillExactBGRATests {
         )!
     }
 
-    // --- AA-1-1: Black fill must produce exactly B=0 G=0 R=0 A=255 ---
+    // --- Black fill must produce exactly B=0 G=0 R=0 A=255 ---
     @Test("Black fill produces exact BGRA(0,0,0,255)")
     func blackFillExactBGRA() {
         let ctx = createResectaBitmapContext(width: 100, height: 100)
@@ -51,7 +50,7 @@ struct FillExactBGRATests {
                 "Black fill must be byte-exact B=0 G=0 R=0 A=255 across all \(80*80) pixels")
     }
 
-    // --- AA-1-1: White fill must produce exactly B=255 G=255 R=255 A=255 ---
+    // --- White fill must produce exactly B=255 G=255 R=255 A=255 ---
     @Test("White fill produces exact BGRA(255,255,255,255)")
     func whiteFillExactBGRA() {
         let ctx = createResectaBitmapContext(width: 100, height: 100)
@@ -94,7 +93,7 @@ struct FillExactBGRATests {
         #expect(buffer[offset+3] == 255, "Byte 3 = A = 255 for red")
     }
 
-    // --- AA-2: CGBitmapContext y=0 → memory row 0 mapping ---
+    // --- CGBitmapContext y=0 → memory row 0 mapping ---
     @Test("Context y=0 maps to memory row 0 (buffer start)")
     func memoryLayoutYMapping() {
         let ctx = createResectaBitmapContext(width: 100, height: 100)
@@ -117,7 +116,7 @@ struct FillExactBGRATests {
         #expect(row0B == 255, "Memory row 0 (top) must be white (B=255), not red")
     }
 
-    // --- AA-11: Anti-aliasing disabled = no edge blending ---
+    // --- Anti-aliasing disabled = no edge blending ---
     @Test("No anti-aliasing edge blending with setShouldAntialias(false)")
     func noAntiAliasingEdgeBlending() {
         let ctx = createResectaBitmapContext(width: 200, height: 200)

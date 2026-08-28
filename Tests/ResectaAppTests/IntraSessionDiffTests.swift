@@ -3,22 +3,22 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-67 / [D-27] / [D-28] / OQ-29: pins the intra-session diff feature.
+// Pins the intra-session diff feature.
 // Three load-bearing invariants pinned here:
-//   1. `fingerprintNoMatchedText` — [RR-25] privacy floor; the fingerprint
-//      string NEVER contains matched-text-derived bytes. Geometry +
-//      category only per [D-27].
-//   2. `clearPathsAsymmetric` — WU-67's documented carve-out from [D-28].
-//      `clear()` wipes; `clearResults()` PRESERVES. Without the
+//   1. `fingerprintNoMatchedText` — the privacy floor; the fingerprint
+//      string never contains matched-text-derived bytes. Geometry +
+//      category only.
+//   2. `clearPathsAsymmetric` — the documented carve-out: `clear()`
+//      wipes; `clearResults()` preserves. Without the
 //      asymmetry, `captureFingerprintsBeforeScan()` → `clearResults()`
 //      in `triggerSearch` would immediately wipe the snapshot and the
 //      diff would always be nil. The asymmetry is intentional and
-//      logged as OQ-29 for user review.
+//      logged for user review.
 //   3. `diffArithmetic` — happy-path set arithmetic over known prior +
 //      current fingerprint sets; matches the (added, removed, unchanged)
-//      contract from ACTION-WU-67.
+//      contract.
 
-@Suite("Intra-session result diff (WU-67 / D-27 / OQ-29)", .tags(.search))
+@Suite("Intra-session result diff", .tags(.search))
 @MainActor
 struct IntraSessionDiffTests {
 
@@ -65,13 +65,13 @@ struct IntraSessionDiffTests {
         #expect(state.diffSinceLastScan() == nil)
     }
 
-    // MARK: - RR-25 privacy floor (load-bearing)
+    // MARK: - Privacy floor (load-bearing)
 
-    @Test("Fingerprint contains no matched-text substring per [RR-25]")
+    @Test("Fingerprint contains no matched-text substring")
     func fingerprintNoMatchedText() {
-        // RR-25 load-bearing: hashing matched text — even into an
-        // in-memory Set<String> — is document-derived retention under
-        // §S2. The fingerprint MUST be geometry + category only.
+        // Load-bearing: hashing matched text — even into an
+        // in-memory Set<String> — is document-derived retention.
+        // The fingerprint must be geometry + category only.
         let result = SearchResult(
             pageIndex: 3,
             normalizedRect: CGRect(x: 0.10, y: 0.20, width: 0.05, height: 0.02),
@@ -124,12 +124,12 @@ struct IntraSessionDiffTests {
         #expect(fp.contains("Name"))
     }
 
-    // MARK: - RR-26 / D-28 carve-out (load-bearing)
+    // MARK: - Carve-out (load-bearing)
 
     @Test("clearPathsAsymmetric: clear() wipes; clearResults() preserves")
     func clearPathsAsymmetric() {
-        // WU-67 / OQ-29: documents the deliberate carve-out from
-        // [D-28] / [RR-26]'s "both clear paths wipe" mandate. Without
+        // Documents the deliberate carve-out from the "both clear
+        // paths wipe" mandate. Without
         // this asymmetry, capture-before-clear in triggerSearch would
         // be immediately undone and the diff feature would never
         // surface a non-trivial result.
@@ -171,7 +171,7 @@ struct IntraSessionDiffTests {
 
     // MARK: - Fingerprint format
 
-    @Test("Geometry rounds to 3 decimal places per [D-27]")
+    @Test("Geometry rounds to 3 decimal places")
     func geometryRoundsTo3Decimals() {
         let result = makeResult(
             pageIndex: 0,
@@ -215,7 +215,7 @@ struct IntraSessionDiffTests {
     func captureAndDiff5kResultsUnderTwoHundredMs() {
         let state = SearchState()
         let categories: [PIICategory] = [.ssn, .email, .phone, .name]
-        // 5k synthetic results — half of the WU-36 perf-test size; the
+        // 5k synthetic results — half the perf-test size; the
         // diff feature operates on completed scans, not 10k cap territory.
         state.results = (0..<5_000).map { i in
             makeResult(
@@ -246,9 +246,9 @@ struct IntraSessionDiffTests {
         let diffElapsed = Date().timeIntervalSince(diffStart)
 
         #expect(diff != nil)
-        // CAT-238: widened to 500ms to absorb simulator-host jitter under
-        // full-suite load (same fragility class as the OQ-24 / OQ-25 / OQ-27
-        // timing tests). This is a performance-budget ceiling, not a tight
+        // Widened to 500ms to absorb simulator-host jitter under
+        // full-suite load (same fragility class as other timing tests
+        // under load). This is a performance-budget ceiling, not a tight
         // latency gate — the 5k capture/diff routinely lands well under it; the
         // ceiling only flags a gross algorithmic regression.
         #expect(captureElapsed < 0.5, "5k capture took \(captureElapsed * 1000)ms")

@@ -4,7 +4,7 @@ import Foundation
 
 // W-N — V1 negative-keyword preservation regression guard.
 //
-// Per Q3 DECIDED 2026-04-30 / STRAT §1.5 row 14: the W-N V1 ship is
+// The W-N V1 ship is
 // positive-only mechanical lift. Only `positiveKeywords:` becomes
 // loader-driven (via `ContextKeywordsLoader` → A21); `negativeKeywords:`
 // stays engine-side as a `let` constant on each
@@ -14,7 +14,7 @@ import Foundation
 // that was Agent-2-validated for SSN's 57-entry list. This file is the
 // regression guard.
 //
-// Sunset: when V1.1+ lands A5 absorption per STRAT §1.5 row 14, this
+// Sunset: when V1.1+ lands A5 absorption, this
 // file is deleted in the same PR that strips the negative arrays.
 
 @Suite("Context profile negatives preserved engine-side (W-N V1 partial-retire scope)")
@@ -22,8 +22,8 @@ struct ContextProfileNegativesPreservedTests {
 
     @Test("V1 negative-keyword arrays remain populated engine-side")
     func negativeArraysStillEngineSide() {
-        // Thresholds: verified counts (57 / 11 / 5 / 6 per STRAT §5.1
-        // read targets) minus a small slack for benign edits (e.g.
+        // Thresholds: verified counts (57 / 11 / 5 / 6) minus a small
+        // slack for benign edits (e.g.
         // single-row dedupe). When V1.1+ A5 absorption lands, this test
         // is deleted, not relaxed.
         #expect(SSNContextKeywords.profile.negativeKeywords.count >= 50,
@@ -39,7 +39,7 @@ struct ContextProfileNegativesPreservedTests {
         // The 4 *ContextKeywords.profile values are KeywordProfile
         // structs; only the `positiveKeywords:` field becomes loader-
         // driven in V1. The remaining fields stay as engine-side
-        // constants per Q3 — a future PR that swaps them out without
+        // constants — a future PR that swaps them out without
         // paired calibration will trip this test before it lands.
         for profile in [
             SSNContextKeywords.profile,

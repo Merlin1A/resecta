@@ -6,9 +6,7 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// S8 OCR Quality Program — scan-simulation fixture support.
-// Design reference: design/04-search-ocr-ux-security.md §5.4 "Scanned fixture
-// acquisition" + "OCR Quality Program: Rollout Order and Measurement".
+// Scan-simulation fixture support.
 //
 // Born-digital and scanned PDFs exercise Vision OCR differently. The in-repo
 // PDF-to-raster builder that once lived here was superseded by the sd
@@ -27,7 +25,7 @@ enum ScanSimulatorFixtureBuilder {
 // MARK: - Synthetic small-text fixture (minimumTextHeight adversarial)
 
 /// Builds a deterministic 3-page letter-size document — one page per font
-/// size (7 pt, 8 pt, 9 pt), the tax-form box-label sizes design 04 §5.2
+/// size (7 pt, 8 pt, 9 pt), the tax-form box-label sizes this suite
 /// targets. One size per page makes per-size attribution trivial (page
 /// index), with no rect-band bookkeeping. All content is synthetic
 /// (G8-style fake identifiers); safe to log.
@@ -54,7 +52,7 @@ enum SmallTextFixtureBuilder {
                 let font = UIFont.systemFont(ofSize: size)
                 let attrs: [NSAttributedString.Key: Any] = [.font: font]
                 // Form-box style label + value rows, mimicking 1099/W-2
-                // box labels (the design's stated recall target).
+                // box labels.
                 let rows = [
                     "Box 1a Employer identification number EIN 12-3456789",
                     "Box 1b Recipient social security number SSN \(ssnToken)",
@@ -75,8 +73,8 @@ enum SmallTextFixtureBuilder {
 
 // MARK: - Synthetic 20-page memory/latency document
 
-/// Deterministic 20-page letter-size text document for the design's
-/// memory revert criterion ("peak memory during detection … on a 20-page
+/// Deterministic 20-page letter-size text document for the memory revert
+/// criterion ("peak memory during detection … on a 20-page
 /// letter-page document") and the latency budget run. Body text at 11 pt
 /// with sparse synthetic PII tokens — content is constant across runs so
 /// 150-vs-200 DPI deltas isolate the render/OCR cost.

@@ -1,12 +1,12 @@
 import SwiftUI
 import RedactionEngine
 
-// UI_UX §4.1–§4.3a: Display properties for verification status.
+// Display properties for verification status.
 // App target only — engine package has zero UI dependencies.
 
 extension VerificationStatus {
 
-    // MARK: - SF Symbols (ENGINE §6.8)
+    // MARK: - SF Symbols
 
     var symbolName: String {
         switch self {
@@ -19,12 +19,12 @@ extension VerificationStatus {
         }
     }
 
-    // MARK: - Colors (UI_UX §4.1)
+    // MARK: - Colors
 
     var color: Color {
         switch self {
         case .pass:      .green
-        case .warn:      .orange   // A5.1: Changed from .yellow — contrast improvement
+        case .warn:      .orange   // Changed from .yellow — contrast improvement
         case .info:      ResectaTokens.SemanticColor.searchableMode
         case .attention: .pink     // urgent family, distinct from warn orange / fail red
         case .fail:      .red
@@ -32,12 +32,12 @@ extension VerificationStatus {
         }
     }
 
-    /// §4.3a: Neutral gray for PASS during .verifying phase to prevent
+    /// Neutral gray for PASS during .verifying phase to prevent
     /// premature confidence anchoring. FAIL/WARN shown immediately.
     var intermediateColor: Color {
         switch self {
         case .pass:      .secondary
-        case .warn:      .orange   // A5.1: Changed from .yellow
+        case .warn:      .orange   // Changed from .yellow
         case .info:      ResectaTokens.SemanticColor.searchableMode
         case .attention: .pink
         case .fail:      .red
@@ -45,7 +45,7 @@ extension VerificationStatus {
         }
     }
 
-    /// UXC-27 (GAP-36) — WCAG-AA text tier for SMALL STATUS TEXT. `color`
+    /// WCAG-AA text tier for SMALL STATUS TEXT. `color`
     /// / `intermediateColor` above stay the GLYPH tier (system hues,
     /// which measure too low a contrast for small text in some
     /// combinations); this routes through the measured
@@ -63,7 +63,7 @@ extension VerificationStatus {
         }
     }
 
-    // MARK: - Titles (UI_UX §4.1 — mechanism-description language, R1)
+    // MARK: - Titles
 
     var title: String {
         switch self {
@@ -92,7 +92,7 @@ extension VerificationStatus {
         }
     }
 
-    // MARK: - Accessibility (UI_UX §4.1)
+    // MARK: - Accessibility
 
     var accessibilityLabel: String {
         switch self {
@@ -108,7 +108,7 @@ extension VerificationStatus {
     /// Layer-scoped VoiceOver phrase for a single check. `accessibilityLabel`
     /// above describes the OVERALL run ("All checks completed without
     /// issues.") — spoken per-row or per-layer mid-run, that phrasing is the
-    /// same premature-confidence anchoring §4.3a's intermediateColor exists
+    /// same premature-confidence anchoring problem intermediateColor exists
     /// to prevent. Per-layer surfaces (LayerResultRow, the coordinator's
     /// layer-completion announcements) speak this instead.
     var layerAccessibilityPhrase: String {

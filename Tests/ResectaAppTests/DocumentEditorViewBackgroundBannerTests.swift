@@ -3,7 +3,7 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// Pkg L (CANCEL-009) — reworked for the results-screen Run Verification card.
+// Reworked for the results-screen Run Verification card.
 //
 // The mid-verify background-resume banner this suite used to cover was
 // structurally unreachable: it gated on `.verified(report: .skipped)`, a phase
@@ -129,7 +129,7 @@ struct DocumentEditorViewBackgroundBannerTests {
         )
     }
 
-    // MARK: - CAT-277: KI-4 purge re-run round-trips verified -> editing
+    // MARK: - KI-4 purge re-run round-trips verified -> editing
 
     /// The purge re-run toast fires only from `.verified`, but
     /// `runFullPipeline` guards `canStartPipeline(with:)` which requires
@@ -152,7 +152,7 @@ struct DocumentEditorViewBackgroundBannerTests {
         #expect(doc.canStartPipeline(with: redaction) == true)   // guard now passes
     }
 
-    // MARK: - CAT-260: editing-phase resume banner picks the matching pipeline
+    // MARK: - Editing-phase resume banner picks the matching pipeline
 
     /// A detect-pause must offer the detect-only resume — partial detection
     /// results were discarded on cancel, and the user intends to resume

@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Plan Phase 3 / §4 — DOBDetector with age-proximity + label boosts.
+// DOBDetector with age-proximity + label boosts.
 
 @Suite("DOB detector (structured)")
 struct DOBDetectorTests {
@@ -57,7 +57,7 @@ struct DOBDetectorTests {
         #expect(DOBDetector.isStructurallyValid("3/15/25"))   // 2025
     }
 
-    // L-03 / L-16 — per-month day caps + Gregorian leap-year rule
+    // Per-month day caps + Gregorian leap-year rule
 
     @Test("Feb 29 accepted in Gregorian leap years", arguments: [
         "2/29/2020",
@@ -142,13 +142,13 @@ struct DOBDetectorTests {
         #expect(!DOBDetector.isStructurallyValid(input))
     }
 
-    // MARK: - D04-F2 A1 — numeric-DOB base-confidence margin
+    // MARK: - A1 — numeric-DOB base-confidence margin
 
     @Test("Numeric labeled DOB clears the 0.30 Balanced/Conservative cutoff with margin")
     func numericLabeledClearsWithMargin() {
         let c = confidence(of: "DOB: 01/15/1985", matching: "01/15/1985")
         #expect(c != nil)
-        // Must clear 0.30 and NOT by a sub-0.02 razor - guards base/boost retunes (D04-F2 A1).
+        // Must clear 0.30 and NOT by a sub-0.02 razor - guards base/boost retunes (A1).
         // After A1: base 0.05 + 0.30 label = 0.35 (was 0.31, a 0.01 razor).
         #expect((c ?? 0) >= 0.30 + 0.02)
     }
@@ -158,7 +158,7 @@ struct DOBDetectorTests {
         // 'on January 15, 1985 she filed' - no dob/born/age keyword in window.
         let c = confidence(of: "on January 15, 1985 she filed the claim",
                            matching: "January 15, 1985")
-        // FLIP this assertion only if Variant A2 (J-DOB-SCOPE) ever ships.
+        // FLIP this assertion only if Variant A2 ever ships.
         #expect((c ?? 0) < 0.30)
     }
 

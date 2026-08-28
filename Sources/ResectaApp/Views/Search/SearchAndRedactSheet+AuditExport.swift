@@ -6,19 +6,18 @@ import RedactionEngine
 // "<500 LOC sheet"). Pure structural lift; no behavior change. Called
 // from the main sheet's export confirmation dialog.
 //
-// WU-33 (session-12) extends the call surface with `schema:` so the
+// The call surface extends with `schema:` so the
 // confirmation dialog can thread the chosen `AuditSchemaVersion`
 // through to `ExportMetadata.schemaVersion` at construction time.
 // Engine reality: `ExportMetadata.init(schemaVersion: 4)` is the
-// default since W-I2 — v4 emits `ruleVersion` +
+// default — v4 emits `ruleVersion` +
 // `gazetteerManifestVersion` columns. V1.0 ships v4 only; a v3
-// column-subset emit path on `MatchAuditExporter` is V1.1+ scope
-// per [OQ-26].
+// column-subset emit path on `MatchAuditExporter` is deferred scope.
 
-/// Audit-export schema selector for the W5 confirmation dialog.
+/// Audit-export schema selector for the confirmation dialog.
 /// v4 is the engine's current default (ships `ruleVersion` +
 /// `gazetteerManifestVersion` columns) and the only schema V1.0
-/// exports. See [OQ-26] for the deferred v3 column-subset path.
+/// exports. The deferred v3 column-subset path is not yet built.
 enum AuditSchemaVersion: String, Sendable, Equatable, CaseIterable {
     case v4
 
@@ -33,7 +32,7 @@ enum AuditSchemaVersion: String, Sendable, Equatable, CaseIterable {
 
 extension SearchAndRedactSheet {
 
-    // MARK: - W5 Audit Export
+    // MARK: - Audit Export
 
     func exportAudit(includeSensitive: Bool, schema: AuditSchemaVersion = .v4) async {
         guard let presenter = MatchExportService.topViewController() else {
@@ -56,7 +55,7 @@ extension SearchAndRedactSheet {
             appVersion: Bundle.main.appVersion,
             presetName: "Default",
             perCategoryOverrides: [:],
-            documentName: "document",  // filenames kept generic per UI_UX §5.4
+            documentName: "document",  // filenames kept generic
             totalMatches: records.count,
             appliedMatches: records.filter(\.wasApplied).count
         )
@@ -65,10 +64,10 @@ extension SearchAndRedactSheet {
             metadata: metadata,
             includeSensitive: includeSensitive,
             documentName: "document",
-            // S6 audit-leak fix: artifacts land in the SEC-2 hardened
+            // Artifacts land in the hardened
             // per-session directory, not the bare temp root.
             tempDirectory: pipelineCoordinator.tempExportDirectory,
-            // S6 / C10: share presentation is withheld while shielded.
+            // Share presentation is withheld while shielded.
             captureMonitor: captureMonitor,
             toastManager: toastManager,
             from: presenter

@@ -1,7 +1,7 @@
 import XCTest
 
-/// UI tests for the H-74 duplicate-name rejection on BOTH saved-search
-/// collision paths (RW-F-005, ruled D-86).
+/// UI tests for the duplicate-name rejection on BOTH saved-search
+/// collision paths.
 ///
 /// Pre-fix, the collision handlers re-armed presentation from INSIDE the
 /// alert's own button action, so the tap's dismissal swallowed the
@@ -27,7 +27,7 @@ nonisolated final class SavedSearchCollisionUITests: XCTestCase {
 
     private var app: XCUIApplication!
 
-    /// H-74 pinned rejection copy (`SavedSearchListSheet.duplicateNameMessage`).
+    /// Pinned rejection copy (`SavedSearchListSheet.duplicateNameMessage`).
     private let rejectionCopy = "That name is already in use — choose a different name."
 
     override func setUp() {
@@ -72,7 +72,7 @@ nonisolated final class SavedSearchCollisionUITests: XCTestCase {
 
         XCTAssertTrue(
             app.alerts.staticTexts[rejectionCopy].waitForExistence(timeout: 10),
-            "Duplicate-name rejection alert never presented on the save path (RW-F-005)."
+            "Duplicate-name rejection alert never presented on the save path."
         )
         app.alerts.buttons["Cancel"].tap()
 
@@ -84,7 +84,7 @@ nonisolated final class SavedSearchCollisionUITests: XCTestCase {
         deleteRows(named: ["Text: Sample"])
     }
 
-    /// Rename path (the W4 extension): renaming one row to another row's
+    /// Rename path: renaming one row to another row's
     /// exact name must present the rejection alert; the row keeps its old
     /// name; a non-colliding rename still commits (success control). The
     /// second row is created by editing the name in the save prompt itself
@@ -109,7 +109,7 @@ nonisolated final class SavedSearchCollisionUITests: XCTestCase {
         renameRow(named: "Rename Me", to: "Text: Sample")
         XCTAssertTrue(
             app.alerts.staticTexts[rejectionCopy].waitForExistence(timeout: 10),
-            "Duplicate-name rejection alert never presented on the rename path (RW-F-005 W4 extension)."
+            "Duplicate-name rejection alert never presented on the rename path."
         )
         app.alerts.buttons["Cancel"].tap()
 

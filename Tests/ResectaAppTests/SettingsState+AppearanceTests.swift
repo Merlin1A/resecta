@@ -3,7 +3,7 @@ import Foundation
 import SwiftUI
 @testable import ResectaApp
 
-// 02-dark-mode-design.md §2, §3, §6.4 — Coverage for the Appearance
+// Coverage for the Appearance
 // preference: defaults to .system, persists across init via the
 // `appearancePreference.v1` UserDefaults key, and is restored to
 // .system by `resetToDefaults()`.

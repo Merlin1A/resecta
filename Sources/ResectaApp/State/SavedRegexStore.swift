@@ -15,7 +15,7 @@ import RedactionEngine
 /// installs migrate off the `savedRegexes.v1` `UserDefaults` key once).
 // nonisolated: persisted via `FileJSONBlob<T: Codable & Sendable>` and
 // read off-MainActor; keep its Codable conformance nonisolated under
-// the s04 SE-0466 MainActor-default flip (mirrors UserTermsBlob).
+// the SE-0466 MainActor-default flip (mirrors UserTermsBlob).
 nonisolated struct SavedRegexEnvelope: Codable, Sendable, Equatable {
     let schemaVersion: Int
     let userSavedRegexes: [SavedRegex]
@@ -82,7 +82,7 @@ nonisolated private struct FailableSavedRegex: Decodable {
 @MainActor
 final class SavedRegexStore {
 
-    // CONC-1 (Pkg N): `nonisolated` constants for the detached-task
+    // `nonisolated` constants for the detached-task
     // hydrate path. Compile-time constants, never mutated.
     // `storageKey` is the pre-file `UserDefaults` location, retained as
     // the one-shot migration source (see `migrateLegacyDefaultsIfNeeded`).

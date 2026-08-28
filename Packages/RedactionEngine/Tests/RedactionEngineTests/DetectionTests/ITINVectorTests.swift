@@ -2,15 +2,15 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// D-19 fixture-driven test for ITIN detection. The DataPipeline-generated
+// Fixture-driven test for ITIN detection. The DataPipeline-generated
 // vectors at Fixtures/vectors/itin_vectors.json carry a `valid` flag whose
 // rejection_reasons cover the IRS YY-bucket gate ([50–65], [70–88], [90–92],
 // [94–99]) on top of the regex shape. This test asserts the detector
-// honours both gates. The audit at cc-derive D-19 confirmed the fixture is
-// schema-clean and determinism-clean. ITINDetectorTests.swift covers
-// other surfaces; this file is fixture-driven specifically.
+// honours both gates. The audit confirmed the fixture is schema-clean and
+// determinism-clean. ITINDetectorTests.swift covers other surfaces; this
+// file is fixture-driven specifically.
 
-@Suite("ITIN fixture-driven detector vectors (D-19)")
+@Suite("ITIN fixture-driven detector vectors")
 struct ITINVectorTests {
 
     struct Vectors: Decodable {
@@ -33,7 +33,7 @@ struct ITINVectorTests {
         return try JSONDecoder().decode(Vectors.self, from: data).vectors
     }
 
-    @Test("D-19 fixture loads with rows")
+    @Test("Fixture loads with rows")
     func fixtureLoads() throws {
         guard let vectors = try loadVectors() else {
             Issue.record("itin_vectors.json not bundled")

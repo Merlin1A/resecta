@@ -13,7 +13,7 @@ import RedactionEngine
 // AX5) would truncate it. Same visual grammar — warning triangle,
 // tinted card, icon-only dismiss.
 //
-// Copy is mechanism-description only (I6 / ARCH §1.3): it states what
+// Copy is mechanism-description only: it states what
 // the app builds and what the export contains, never an outcome promise.
 
 struct ImportAnnotationNoticeBanner: View {
@@ -90,6 +90,6 @@ struct ImportAnnotationNoticeBanner: View {
         // dismiss Button stays its own accessibility element so it is
         // individually hittable.
         .accessibilityIdentifier("importAnnotationNotice")
-        .accessibilityAddTraits(.isHeader) // §A8: VoiceOver announces on appearance
+        .accessibilityAddTraits(.isHeader) // VoiceOver announces on appearance
     }
 }

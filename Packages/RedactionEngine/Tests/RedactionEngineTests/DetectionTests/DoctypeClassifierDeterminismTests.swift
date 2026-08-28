@@ -1,7 +1,7 @@
 import Testing
 @testable import RedactionEngine
 
-// Calibration design 03 §3.5 — classify(...) must be deterministic under
+// classify(...) must be deterministic under
 // exactly tied logits. Before the rawValue tie-break, ties fell to
 // Dictionary iteration order, which is per-launch randomized: the same
 // page could gate under a different doctype across launches.
@@ -56,7 +56,7 @@ struct DoctypeClassifierDeterminismTests {
         #expect(result.runnerUp == .medical)
     }
 
-    @Test("explain() agrees with classify() on tied logits (W9)")
+    @Test("explain() agrees with classify() on tied logits")
     func explainAgreesOnTies() async {
         let classifier = DocumentTypeClassifier()
         let classified = await classifier.classify(pageText: tiedText)

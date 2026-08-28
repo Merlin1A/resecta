@@ -3,7 +3,7 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// GATE-2 (Pkg I) — Settings → Reset to Defaults confirmation symmetry.
+// Settings → Reset to Defaults confirmation symmetry.
 //
 // The Reset-to-Defaults button is routed through a
 // `.confirmationDialog`. The dialog itself is a SwiftUI-only construct,
@@ -19,10 +19,9 @@ import Foundation
 //      contract the prior one-tap button did — so the dialog adds a
 //      safety tap without changing the underlying reset semantics.
 //
-// Plan reference: post-V1.0 improvements §3 Pkg I (GATE-2).
-// Mechanism-description copy per ARCH §1.3.
+// The confirmation copy is mechanism-description, not an outcome promise.
 
-@Suite("Settings Reset to Defaults confirmation (GATE-2, Pkg I)")
+@Suite("Settings Reset to Defaults confirmation")
 @MainActor
 struct SettingsViewResetConfirmationTests {
 
@@ -111,7 +110,7 @@ struct SettingsViewResetConfirmationTests {
     func testConfirmationCopyIsMechanismDescription() {
         // The dialog title + message are hard-coded inline in
         // SettingsView. Pin the copy so it can't silently drift into
-        // outcome-promise language (R1 / ARCH §1.3).
+        // outcome-promise language.
         let title = "Reset all settings?"
         let message = "All settings return to their default values. Custom Terms and Saved Regexes are not affected."
 

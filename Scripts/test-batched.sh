@@ -15,8 +15,8 @@
 #   Scripts/test-batched.sh RedactionEngine|ResectaApp [--batch-size N] [--timeout-mins M]
 #
 # Exit codes:
-#   0  all reds (if any) are on the §3 exclusion list, no incomplete batches
-#   1  at least one red outside the §3 exclusion list (offenders printed)
+#   0  all reds (if any) are on the exclusion list, no incomplete batches
+#   1  at least one red outside the exclusion list (offenders printed)
 #   2  no gating reds, but >=1 invocation wedged or hit a test-host launch
 #      refusal twice — those suites are unverified, coverage incomplete
 #
@@ -36,14 +36,14 @@ GREP=/usr/bin/grep
 #
 # PERF-ALONE: suites asserting wall-clock / ratio / percentile budgets.
 # Excluded from batches; each runs completely alone AFTER the batches,
-# REPORT-ONLY (their reds never set the exit status — adjudicate per
-# verification.md §3). "Completely alone" is load-bearing: StressCorpusTests
+# REPORT-ONLY (their reds never set the exit status — a red here is read by
+# hand, never gated). "Completely alone" is load-bearing: StressCorpusTests
 # has been red when paired with even one other suite.
 PERF_ALONE_RedactionEngine="CancellationLatencyTests PixelBufferZeroizeTests ReverseRationalePerformanceTests StressCorpusTests ApplyPhaseMemoryStressTests ParallelLayerExecutionTests DetectionRasterizeOverlapTests Layer2OCRParallelismTests"
 PERF_ALONE_ResectaApp="PageParallelRasterizationTests"
 
-# §3 exclusion list (suite granularity): reds here do not gate the exit
-# status even inside normal batches. Mirrors verification.md §3 bullet 1.
+# Exclusion list (suite granularity): reds here do not gate the exit
+# status even inside normal batches.
 NON_GATING="ScreenCaptureShieldTests PageParallelRasterizationTests StressCorpusTests ImportServiceCancelTests"
 # ──────────────────────────────────────────────────────────────────────────
 
@@ -339,7 +339,7 @@ run_invocation() { # label mode suite...
     echo "  $label: state=$state tests=$1 passed=$2 failed=$3 skipped=$4 known-issues=$5 (${R_SECS[${#R_SECS[@]}-1]}s)"
     echo "  xcresult: $xc"
     if [ "$mode" = "report-only" ] && [ "$3" != "0" ] && [ "$3" != "-1" ]; then
-        echo "  REPORT-ONLY red — adjudicate per verification.md §3 (never gates locally)"
+        echo "  REPORT-ONLY red — never gates locally; read it by hand"
     fi
 }
 
@@ -388,7 +388,7 @@ while [ "$j" -lt "${#R_LABEL[@]}" ]; do
     j=$((j + 1))
 done
 
-# Gating offenders: failed suites from gating invocations, off the §3 list.
+# Gating offenders: failed suites from gating invocations, off the exclusion list.
 OFFENDERS=""
 EXCUSED=""
 if [ -s "$FAILURES_FILE" ]; then
@@ -405,7 +405,7 @@ fi
 
 echo ""
 echo "totals: tests=$TOT_TESTS suites=$TOT_SUITES failed=$TOT_FAILED known-issues=$TOT_KNOWN wedged=$WEDGED"
-[ -n "$EXCUSED" ] && echo "non-gating reds (perf-alone / §3-listed — adjudicate per verification.md §3):$EXCUSED"
+[ -n "$EXCUSED" ] && echo "non-gating reds (perf-alone or on the exclusion list — never gate locally):$EXCUSED"
 [ -s "$FAILURES_FILE" ] && { echo "failure detail:"; sed 's/^/  /' "$FAILURES_FILE"; }
 [ -n "$WEDGED_LABELS" ] && echo "incomplete invocations (suites NOT verified — re-run or salvage):$WEDGED_LABELS"
 

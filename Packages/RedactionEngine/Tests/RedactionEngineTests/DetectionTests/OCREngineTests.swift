@@ -6,7 +6,7 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// .serialized: VNImageRequestHandler.perform() blocks cooperative pool threads (F2-8).
+// .serialized: VNImageRequestHandler.perform() blocks cooperative pool threads.
 @Suite("OCR Engine", .serialized)
 struct OCREngineTests {
 

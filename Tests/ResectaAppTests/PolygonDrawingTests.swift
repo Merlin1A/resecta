@@ -4,7 +4,7 @@ import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// DRAW-1 — Polygon + freeform drawing gesture tests.
+// Polygon + freeform drawing gesture tests.
 //
 // The polygon tool collects vertices on each tap; once `count >= 3`,
 // a tap inside `polygonCloseRadius` of the first vertex closes the
@@ -24,7 +24,7 @@ import CoreGraphics
 // — a quiet under-redaction. The "tapSequenceBuildsVertices" test
 // pins the vertex count; the freeform tests pin the simplification.
 
-@Suite("Polygon + Freeform Drawing (DRAW-1)")
+@Suite("Polygon + Freeform Drawing")
 @MainActor
 struct PolygonDrawingTests {
 
@@ -111,7 +111,7 @@ struct PolygonDrawingTests {
         #expect(DocumentEditorView.shapeTool(for: .freeform) == .freeform)
     }
 
-    // MARK: - DRAW-1 polygon caption (pure function)
+    // MARK: - Polygon caption (pure function)
 
     @Test("polygonCaption returns nil when polygon tool is not active")
     func testPolygonCaptionReturnsNilForOtherTools() {
@@ -161,7 +161,7 @@ struct PolygonDrawingTests {
     // the base class's private `activeOverlays` so the tool-switch discard
     // path can be exercised without the PDFKit delegate callback) and
     // `StubTouch` live in the shared `Fixtures/CanvasTouchHarness.swift`
-    // (one internal copy since the 1.1.0 draw-tool S1 session).
+    // (one internal copy shared across the draw-tool test suites).
 
     // MARK: - Polygon test helper
 

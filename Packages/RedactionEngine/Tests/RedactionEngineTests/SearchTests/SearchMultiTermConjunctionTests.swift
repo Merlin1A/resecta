@@ -5,7 +5,7 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// Design 04 §4.5 — AND mode for multi-term search.
+// AND mode for multi-term search.
 //
 // Verifies that `SearchOptions.multiTermConjunction = true` restricts
 // results to pages where EVERY queried term has at least one match,

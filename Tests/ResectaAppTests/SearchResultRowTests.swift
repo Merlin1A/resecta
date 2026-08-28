@@ -3,24 +3,24 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-06 — purple "Custom" capsule on result rows whose rationale signals
+// The purple "Custom" capsule on result rows whose rationale signals
 // contain `.userAlwaysFlag(...)`. Branch ordering protects against future
 // engine emissions that combine `.userAlwaysFlag` with a piiCategory:
-// the Custom branch fires first per [RR-10]. The view-side check lives
+// the Custom branch fires first. The view-side check lives
 // in `SearchResultRow.isCustomTermHit(_:)` — pure-function contract,
 // directly testable without a SwiftUI host.
 //
-// WU-14 extends this suite with confidence-bar grading
+// This suite also covers confidence-bar grading
 // cases (PII against threshold; OCR against floor; text/regex/Custom
 // rows pin the literal-match high tier) and the OCR percentage capsule
 // format. Bar grading lives on `SearchResultRow.confidenceTier(...)`;
-// tooltip on text/regex rows pins the [D-37]-resolved string verbatim.
+// the tooltip on text/regex rows pins its resolved string verbatim.
 
-@Suite("SearchResultRow rendering — Custom badge + confidence bar (WU-06, WU-14)", .tags(.search))
+@Suite("SearchResultRow rendering — Custom badge + confidence bar", .tags(.search))
 @MainActor
 struct SearchResultRowTests {
 
-    // MARK: - WU-06: Custom badge precedence
+    // MARK: - Custom badge precedence
 
     @Test("userAlwaysFlag signal triggers the Custom badge branch")
     func customTermBadgeRenders() {
@@ -48,7 +48,7 @@ struct SearchResultRowTests {
         #expect(SearchResultRow.isCustomTermHit(result) == false)
     }
 
-    @Test("PII row whose signals include userAlwaysFlag still renders Custom (RR-10 ordering)")
+    @Test("PII row whose signals include userAlwaysFlag still renders Custom")
     func userAlwaysFlagBeatsPIICategoryBranch() {
         // Hypothetical future emission: a row with both a piiCategory AND
         // a `.userAlwaysFlag` signal must render as Custom because the
@@ -72,7 +72,7 @@ struct SearchResultRowTests {
         #expect(SearchResultRow.isCustomTermHit(result) == false)
     }
 
-    // MARK: - WU-63: Regex source capsule
+    // MARK: - Regex source capsule
 
     @Test("regex-mode hit with .regexPattern signal renders Regex capsule")
     func regexBadgeRenders() {
@@ -89,7 +89,7 @@ struct SearchResultRowTests {
         // PII Scan results often carry .regexPattern in their rationale
         // signals (the PII detector uses regex sub-passes internally).
         // The mode gate keeps the Regex capsule from rendering on PII
-        // rows — pinned per [RR-19] visual-distinguish floor.
+        // rows — this keeps the visual-distinguish floor intact.
         let result = makeResult(
             term: "123-45-6789",
             piiCategory: .ssn,
@@ -134,7 +134,7 @@ struct SearchResultRowTests {
     func customBeatsRegexOnBothSignals() {
         // A user-flagged regex term — rationale carries BOTH
         // `.userAlwaysFlag` AND `.regexPattern`. Branch order
-        // Custom → Regex → category/source per [RR-10]; Custom
+        // Custom → Regex → category/source; Custom
         // wins so the user always sees their own term as
         // responsible for the hit.
         let result = makeResult(
@@ -152,7 +152,7 @@ struct SearchResultRowTests {
         #expect(SearchResultRow.isRegexHit(result, searchMode: .regex) == true)
     }
 
-    // MARK: - WU-14: Confidence-bar tier grading [R-05]
+    // MARK: - Confidence-bar tier grading
 
     @Test("confidenceTier — text-layer literal match is high (no piiCategory, not Custom)")
     func textLayerLiteralIsHigh() {
@@ -285,16 +285,16 @@ struct SearchResultRowTests {
         ) == .medium)
     }
 
-    // MARK: - WU-14: Confidence-bar tooltip [D-37]
+    // MARK: - Confidence-bar tooltip
 
-    @Test("confidenceBarTooltip — text row surfaces D-37 literal-match string verbatim")
+    @Test("confidenceBarTooltip — text row surfaces the literal-match string verbatim")
     func tooltipTextRowMatchesD37() {
         let result = makeResult(term: "alpha", piiCategory: nil, signals: nil)
         #expect(SearchResultRow.confidenceBarTooltip(for: result)
                 == "Literal match — strength matches the input text.")
     }
 
-    @Test("confidenceBarTooltip — Custom hit surfaces D-37 literal-match string verbatim")
+    @Test("confidenceBarTooltip — Custom hit surfaces the literal-match string verbatim")
     func tooltipCustomHitMatchesD37() {
         let result = makeResult(
             term: "patient_id",
@@ -339,7 +339,7 @@ struct SearchResultRowTests {
         #expect(SearchResultRow.ocrCapsuleLabel(confidence: 0.495) == "OCR")
     }
 
-    // MARK: - UXC-22: qualitative descriptors replace "N% confidence"
+    // MARK: - Qualitative descriptors replace "N% confidence"
 
     @Test("ConfidenceTier.descriptor is the exact lowercase mid-sentence form")
     func confidenceTierDescriptorExactText() {
@@ -387,7 +387,7 @@ struct SearchResultRowTests {
         #expect(SearchResultRow.ocrCapsuleAccessibilityLabel(tier: tier) == expected)
     }
 
-    @Test("UXC-22 — no new confidence string carries a percent sign")
+    @Test("No new confidence string carries a percent sign")
     func uxc22NoPercentAnywhere() {
         let piiSample = SearchResultRow.piiBadgeAccessibilityLabel(
             for: makeResult(term: "x", piiCategory: .ssn, signals: nil, piiConfidence: 0.9),

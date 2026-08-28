@@ -49,7 +49,7 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// workspace's lifetime. Nil means "use the dynamic bound"; `1`
     /// collapses to sequential behavior. Set to `1` by the
     /// memory-warning observer below.
-    /// CANCEL-010 — once raised to `1` we do NOT gradually re-raise: the
+    /// Once raised to `1` we do NOT gradually re-raise: the
     /// cap holds until workspace teardown (by design). The cap
     /// survives cancel + restart inside the same workspace; only
     /// `RedactWorkspace.tearDown()` drops it.
@@ -111,7 +111,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         let outputURL: URL
         let filterDigests: [PageFilterDigest?]
         let perPageModes: [PipelineMode]
-        /// PD-5: sibling of `perPageModes` — the effective per-page fallback
+        /// Sibling of `perPageModes` — the effective per-page fallback
         /// reason from each RasterizeResult (nil = kept searchable mode or
         /// secure-raster-mode run).
         let perPageFallbackReasons: [TextLayerDetector.FallbackReason?]
@@ -164,7 +164,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         // collapse rasterization parallelism to 1 until workspace teardown.
         // @MainActor-isolated Task so the writes are in-actor and the
         // weak-self capture is region-safe under Swift 6.2 strict concurrency.
-        // CANCEL-010 — once collapsed to 1 we do not re-raise: dpiCap +
+        // Once collapsed to 1 we do not re-raise: dpiCap +
         // parallelismOverride persist across cancel + restart within the
         // workspace, dropping only when `tearDown()` (called by
         // `RedactWorkspace.tearDown` / scene tear-down) deallocates the
@@ -244,7 +244,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         // the triage-sheet check and phase-must-be-`.editing` rule.
         guard documentState.canStartPipeline(with: redactionState) else { return }
 
-        // UXC-49 (D-124 / REV-14 — STATE-7 at the Apply seam): the Search &
+        // At the Apply seam, the Search &
         // Redact sheet mutates `redactionState.regions` and is incompatible
         // with the `.redacting` / `.verifying` phases this run enters, and
         // the editor's ONE `.sheet(item:)` slot sits above its phase
@@ -301,7 +301,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             // `processDocument` returns, so a non-PipelineError throw can be
             // attributed to the redaction stage vs. the verification stage.
             // The published `outputURL` cannot serve as that discriminator —
-            // CANCEL-008 registers it eagerly, BEFORE `processDocument` runs.
+            // it is registered eagerly, BEFORE `processDocument` runs.
             var redactionSucceeded = false
             do {
                 coordinator.documentState.lastUsedPipelineMode = effectiveMode
@@ -316,7 +316,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // the counts the user saw when they pressed Redact — a
                 // programmatic or user re-selection during `.redacting` /
                 // `.verifying` cannot drift what the results screen reports.
-                // UXC-01: `runEntryDeselectionSnapshot()` prefers the
+                // `runEntryDeselectionSnapshot()` prefers the
                 // apply-commit snapshot (set at the moment the user last
                 // applied selected search results, even if the sheet has
                 // since dismissed and nil'd `activeSearch`) and falls back
@@ -336,7 +336,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 let outputURL = try coordinator.tempExportDirectory.childURL(
                     named: "redacted_\(UUID().uuidString).pdf")
 
-                // CANCEL-008 — register `outputURL` on `redactionState` BEFORE
+                // Register `outputURL` on `redactionState` BEFORE
                 // the `processDocument` → `replaceItemAt` race window. If the
                 // pipeline throws (cancellation, reconstruction failure) after
                 // `replaceItemAt` has already promoted the file but before this
@@ -377,14 +377,14 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // contract.
                 try? TempFileHardening.applyProtection(outputURL, level: .complete)
 
-                // CANCEL-008 — `outputURL` was already registered above. The
+                // `outputURL` was already registered above. The
                 // explicit re-assignment here is intentional: if a redactionState
                 // mutation occurred between the eager register and `processDocument`
                 // returning, we restore the canonical published value. Idempotent.
                 coordinator.redactionState.outputURL = outputURL
                 coordinator.redactionState.clearTextExtractionBuffer()
                 // Retain the run's verification inputs beside the output so
-                // a verify-only re-run (CANCEL-009) checks the terms the
+                // a verify-only re-run checks the terms the
                 // artifact was built with and reports the true per-page
                 // modes, instead of re-synthesizing both (see
                 // RedactionState.lastRunPerPageModes).
@@ -450,7 +450,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // newer run's state.
                 guard coordinator.documentState.activeRunId == runId else { return }
                 // Classify by the FAILING STAGE, not by outputURL presence.
-                // CANCEL-008 registers `outputURL` eagerly (before
+                // `outputURL` registers eagerly (before
                 // `processDocument`), so a non-nil URL no longer means
                 // "redaction succeeded" — every throw after run start sees it
                 // set. A redaction/import-stage error means the output was
@@ -497,8 +497,8 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// import/detection/redaction-stage errors mean it had not. Untyped
     /// throws fall back to `redactionSucceeded` — whether `processDocument`
     /// had returned when the error was thrown. The published
-    /// `redactionState.outputURL` deliberately plays no part: CANCEL-008
-    /// registers it eagerly, before `processDocument` runs, so it is
+    /// `redactionState.outputURL` deliberately plays no part: it
+    /// registers eagerly, before `processDocument` runs, so it is
     /// non-nil for every throw after run start.
     ///
     /// `nonisolated static` seam so the stage discrimination is
@@ -518,7 +518,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         }
     }
 
-    // MARK: - Verify-Only Re-Run (CANCEL-009)
+    // MARK: - Verify-Only Re-Run
 
     /// Re-run verification against the existing `outputURL` without
     /// re-rasterizing. Used by the background-resume banner when the
@@ -598,7 +598,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 let perPageModes: [PipelineMode] = coordinator.redactionState
                     .lastRunPerPageModes
                     ?? Array(repeating: effectiveMode, count: pageCount)
-                // PD-5: same retention contract as the mode array — the
+                // Same retention contract as the mode array — the
                 // retained reasons preserve a mixed run's fallback record on
                 // re-verify; the all-nil synthesis matches the digest
                 // fallback (per-page rasterize artifacts are unavailable).
@@ -715,7 +715,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             perPageModes.append(
                 result.filterDigest != nil ? .searchableRedaction : .secureRasterization
             )
-            // PD-5: collected beside the mode so the two arrays stay
+            // Collected beside the mode so the two arrays stay
             // index-aligned by construction.
             perPageFallbackReasons.append(result.fallbackReason)
             try await reconstructor.appendPage(result.pageOutput)
@@ -818,9 +818,9 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// pooled fill context + redactedImage; see `PageRasterizer`). The DEBUG
     /// `maxResidentResults` counter (`inFlight + pending.count + 1`) is an
     /// accounting bound on completed-result residency, NOT this full census.
-    /// Liveness rests on the L-19 10,000-pt pre-flight + finiteness of
+    /// Liveness rests on the 10,000-pt pre-flight + finiteness of
     /// `drawPDFPage` (NOT the 30 s render timeout — it cannot interrupt the
-    /// uninterruptible render child; see PageRasterizer L-19 comments).
+    /// uninterruptible render child; see PageRasterizer's pre-flight comments).
     ///
     /// Each parallel task wraps the rasterize call in
     /// `rasterizeWithRetry`, so the per-page half-DPI retry on
@@ -832,7 +832,7 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// from `os_proc_available_memory()` (so the bound shrinks under
     /// pressure even before a `didReceiveMemoryWarningNotification` fires).
     /// `parallelismOverride == 1` (set on memory warning) collapses to
-    /// sequential behavior until workspace teardown (CANCEL-010).
+    /// sequential behavior until workspace teardown.
     ///
     /// Progress UI is updated as each task COMPLETES (`currentPage` reflects
     /// the count of finished pages, not the most recently scheduled one) —
@@ -992,7 +992,7 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// from 2× to a conservative 3×; intentionally tighter than `selectDPI`'s
     /// 2× factor, which counts only render + fill). `parallelismOverride`
     /// (set to 1 on `didReceiveMemoryWarningNotification`) clamps the result
-    /// to 1 until workspace teardown (CANCEL-010).
+    /// to 1 until workspace teardown.
     ///
     /// `internal` rather than `private` so the dedicated page-parallel test suite
     /// can assert the bound math directly without driving the full pipeline.
@@ -1126,7 +1126,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             // diagnostic; no Phase change, no PipelineError, no user string.
             #if DEBUG
             Logger(subsystem: "com.resecta.app", category: "verification").debug(
-                "CAT-363: per-layer verification document provisioning failed; running base layers sequentially on the shared document"
+                "per-layer verification document provisioning failed; running base layers sequentially on the shared document"
             )
             #endif
             var collected: [(Int, LayerResult)] = []
@@ -1555,7 +1555,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // detectionResults is only written on success.
                 var accumulatedResults: [Int: [DetectionResult]] = [:]
                 var accumulatedDiagnostics: [Int: ClassificationDiagnostic] = [:]
-                // ST-83 — pages whose page-level provenance reports the
+                // Pages whose page-level provenance reports the
                 // OCR pixel-cap skip; written to redactionState with the
                 // other accumulators on success.
                 var accumulatedOCRCapSkips: Set<Int> = []
@@ -1598,8 +1598,8 @@ final class PipelineCoordinator: @unchecked Sendable {
                         // start. Return to a safe `.editing` state with a
                         // mechanism-description toast instead of the illegal
                         // `editing → failed` transition that previously crashed
-                        // here (the transition table has no editing→failed pair; CLAUDE.md
-                        // hard-stop forbids adding one). MainActor.run hop for
+                        // here (the transition table has no editing→failed pair, and
+                        // none is added). MainActor.run hop for
                         // the same reason as the error handler below — the
                         // degrade touches MainActor-isolated state + the toast
                         // queue and this Task can be off the MainActor.
@@ -1739,13 +1739,13 @@ final class PipelineCoordinator: @unchecked Sendable {
                             if let diag = pageResult.classificationDiagnostic {
                                 accumulatedDiagnostics[i] = diag
                             }
-                            // ST-83 — record the page-level OCR pixel-cap
+                            // Record the page-level OCR pixel-cap
                             // skip so the triage banner can surface it.
                             if pageResult.ocrProvenance.ocrSkipReason == .pixelCapExceeded {
                                 accumulatedOCRCapSkips.insert(i)
                             }
 
-                            // CANCEL-007: cooperative check between
+                            // Cooperative check between
                             // the just-completed detect await and the
                             // upcoming lookahead await. Without this a
                             // cancel arriving here would otherwise wait for
@@ -1807,7 +1807,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                             if let diag = pageResult.classificationDiagnostic {
                                 accumulatedDiagnostics[i] = diag
                             }
-                            // ST-83 — record the page-level OCR pixel-cap
+                            // Record the page-level OCR pixel-cap
                             // skip so the triage banner can surface it.
                             if pageResult.ocrProvenance.ocrSkipReason == .pixelCapExceeded {
                                 accumulatedOCRCapSkips.insert(i)
@@ -1816,7 +1816,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                     }
                 }
 
-                // CANCEL-007: cooperative check between detect
+                // Cooperative check between detect
                 // loop completion and Jaro-Winkler / cross-page clustering.
                 // Both clusterers are synchronous O(n²) in the worst case;
                 // a cancel arriving here without this check would otherwise
@@ -1839,7 +1839,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 }
                 let clusterReport = clusterer.cluster(names: clusterInputs)
 
-                // CANCEL-007: second cooperative check between the
+                // Second cooperative check between the
                 // two clustering passes.
                 try Task.checkCancellation()
 
@@ -1862,7 +1862,7 @@ final class PipelineCoordinator: @unchecked Sendable {
 
                 if allResults.values.allSatisfy({ $0.isEmpty }) {
                     // No detections — transition to editing. The run record
-                    // drives the persistent summary banner (UXF-06): the
+                    // drives the persistent summary banner: the
                     // prior info toast was the only trace and expired in
                     // seconds, leaving no way to tell "ran and found
                     // nothing" from "never ran".
@@ -1918,7 +1918,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // so we degrade rather than perform the illegal `editing →
                 // failed` transition that crashed here when the throw occurred
                 // during the page-0 bootstrap (before the per-page loop entered
-                // `.detecting`). CLAUDE.md hard-stop: transition table unchanged.
+                // `.detecting`). Transition table unchanged.
                 //
                 // MainActor.run: a thrown error can resume this handler OFF the
                 // MainActor — the real-doc crash backtrace shows it on
@@ -1942,8 +1942,8 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// Graphics (e.g. the Simulator) — the source document is intact, so we
     /// degrade (the user can retry or draw redactions manually) rather than
     /// perform an illegal `editing → failed` transition. The transition table
-    /// has no `editing → failed` pair and CLAUDE.md's hard-stop
-    /// forbids adding one. The `!= .editing` guard keeps the transition legal
+    /// has no `editing → failed` pair, and none is added.
+    /// The `!= .editing` guard keeps the transition legal
     /// when the failure happened mid-detection (`.detecting → .editing`) and is
     /// a no-op when the page-0 bootstrap failed before the per-page loop
     /// entered `.detecting` (phase still `.editing`). Mirrors the
@@ -1953,9 +1953,9 @@ final class PipelineCoordinator: @unchecked Sendable {
         if documentState.phaseKind != .editing {
             documentState.transition(to: .editing)
         }
-        // UXF-06 — the failed outcome also lands in the run record so the
+        // The failed outcome also lands in the run record so the
         // summary banner keeps a dismissable trace after this toast expires.
-        // UXC-04 — ocrSkippedPages stays at its default empty set here: a
+        // ocrSkippedPages stays at its default empty set here: a
         // run that did not complete never reached the write at line 1842,
         // so `ocrPixelCapSkippedPages` on state may still hold a prior
         // run's pages, and this outcome must not carry that value forward.
@@ -2151,7 +2151,7 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// a `nonisolated static` seam so it is unit-testable without a live
     /// coordinator.
     ///
-    /// Two contributions per region (PD-3):
+    /// Two contributions per region:
     /// - The region's search TERM, only when the region came from a typed
     ///   query (text / regex / multi-term row) — there the term IS the
     ///   sensitive text the user searched for. Detector and user-term rows
@@ -2238,7 +2238,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             } ?? []
 
             let pageMode: PipelineMode
-            // PD-5: the pre-flight reason is recorded (not just nil-checked)
+            // The pre-flight reason is recorded (not just nil-checked)
             // and threaded through the run so the verification report can say
             // why a page rasterized. Reasons exist only for Searchable-mode
             // runs — a secure-raster-mode run rasterizes every page by
@@ -2272,7 +2272,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // A sparse/no-text page in a Searchable-mode run is also a
                 // per-page fallback the report should explain; the trigger
                 // check never ran, but the reason is the same fact the
-                // sparse/none classification records (PD-5).
+                // sparse/none classification records.
                 if effectiveMode == .searchableRedaction {
                     fallbackReason = .noExtractableText
                 }
@@ -2323,7 +2323,7 @@ final class PipelineCoordinator: @unchecked Sendable {
     ///   * Selectable-text coverage > 0.95
     ///
     /// In `.secureRasterization` mode the embedded text is not used by the
-    /// pipeline, so OCR runs unconditionally — this is a hard stop.
+    /// pipeline, so OCR always runs there regardless of settings.
     ///
     /// `runSettings` is the run-entry snapshot used by
     /// `runDetectionPipeline`.

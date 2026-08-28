@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// W9 — PIIDetector.reverseRationale(...) tests. Each fixture covers one
+// PIIDetector.reverseRationale(...) tests. Each fixture covers one
 // resolution path: doctype-gated, user-never-flag, user-always-flag,
 // no-match, above/below threshold.
 

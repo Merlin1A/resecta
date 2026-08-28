@@ -6,7 +6,7 @@ import UIKit
 import ImageIO
 @testable import RedactionEngine
 
-// TEST §2.1 — Programmatic PDF fixture construction.
+// Programmatic PDF fixture construction.
 // Builds minimal valid PDFs by hand-constructing byte streams.
 
 /// A PDF object with its reference ID and serialized content.
@@ -17,7 +17,6 @@ struct PDFObject {
 
 /// Build a raw PDF from hand-constructed objects.
 /// Returns valid PDF data that can be written to a URL and opened with PDFDocument.
-/// See TESTING_AND_CI.md §2.1 for the specification.
 ///
 /// Offsets are recorded in UTF-8 byte units so the xref entries align with
 /// the actual bytes PDFKit sees — the header carries four non-ASCII bytes
@@ -69,7 +68,7 @@ func buildRawPDF(objects: [PDFObject], rootId: Int, infoId: Int? = nil) -> Data 
 
 enum TestFixtures {
 
-    /// Minimal valid 1-page PDF (TEST §2.2).
+    /// Minimal valid 1-page PDF.
     static func blankPage(width: Int = 612, height: Int = 792) -> Data {
         buildRawPDF(objects: [
             PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
@@ -84,7 +83,7 @@ enum TestFixtures {
     }
 
     /// Minimal 1-page PDF whose page dictionary has NO /Resources entry at all
-    /// (blankPage carries an empty-but-present `/Resources << >>`). CAT-380A:
+    /// (blankPage carries an empty-but-present `/Resources << >>`).
     /// Layer 8 must WARN — not .pass — when a page has no page-level /Resources.
     static func pageWithoutResources() -> Data {
         buildRawPDF(objects: [
@@ -98,7 +97,7 @@ enum TestFixtures {
         ], rootId: 1)
     }
 
-    /// PDF with /JavaScript action in catalog (TEST §2.3).
+    /// PDF with /JavaScript action in catalog.
     /// Layer 4 structural check must FAIL on this.
     static func withJavaScript() -> Data {
         buildRawPDF(objects: [
@@ -172,7 +171,7 @@ enum TestFixtures {
     }
 
     /// PDF carrying an XMP /Metadata stream but NO /Info dictionary (no infoId).
-    /// CAT-378: the Layer 5 XMP byte-scan must run even when /Info is absent.
+    /// The Layer 5 XMP byte-scan must run even when /Info is absent.
     /// The raw bytes contain the `<?xpacket` marker the scan looks for.
     static func withXMPNoInfo() -> Data {
         let xmp = "<?xpacket begin=\"\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>"
@@ -196,7 +195,7 @@ enum TestFixtures {
         ], rootId: 1)  // no infoId → no /Info dictionary
     }
 
-    /// Minimal JPEG byte stream for CAT-357 Part B tests: SOI, one APP1 segment
+    /// Minimal JPEG byte stream for the APP1/EXIF byte-scan tests: SOI, one APP1 segment
     /// per entry in `app1Payloads` (each = length-prefixed `Exif\0\0` + the
     /// entry's UTF-8 bytes), then EOI. `truncateLastLengthTo`, when set, writes
     /// the LAST segment's declared length as that value WITHOUT trimming bytes —
@@ -223,7 +222,7 @@ enum TestFixtures {
     /// /DCTDecode` and the given raw bytes as its stream — so CGPDFStreamCopyData
     /// reports `.jpegEncoded` and extractRawJPEGStreams returns these exact
     /// bytes (APP1/EXIF intact). Built as Data (not the String buildRawPDF)
-    /// because the stream is binary. CAT-357 Part B.
+    /// because the stream is binary.
     static func pdfWithDCTImageStream(_ jpeg: Data) -> Data {
         var body = Data()
         func append(_ s: String) { body.append(s.data(using: .utf8)!) }
@@ -278,11 +277,10 @@ enum TestFixtures {
         case invalidPDF
     }
 
-    // MARK: - Sandwich Pipeline Fixtures (TEST §2.8–§2.10)
+    // MARK: - Sandwich Pipeline Fixtures
 
     /// PDF with known text at known positions for testing the Searchable
     /// Redaction pipeline. Uses UIGraphicsPDFRenderer for real text layer.
-    /// See TEST §2.8.
     static func textLayerPDF(
         text: String = "John Smith SSN 123-45-6789 lives at 742 Evergreen Terrace",
         fontSize: CGFloat = 24
@@ -300,8 +298,8 @@ enum TestFixtures {
     }
 
     /// PDF with text positioned for boundary testing — characters at exact
-    /// redaction boundaries test the 2-point safety margin (ENGINE §5B.2).
-    /// Uses Courier for predictable per-character widths. See TEST §2.9.
+    /// redaction boundaries test the 2-point safety margin.
+    /// Uses Courier for predictable per-character widths.
     static func boundaryCharacterPDF() -> Data {
         let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
@@ -317,7 +315,6 @@ enum TestFixtures {
     }
 
     /// PDF with CJK text — may trigger fallback if >5% U+FFFD in extracted text.
-    /// See TEST §2.10.
     static func cjkTextPDF() -> Data {
         let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
@@ -333,7 +330,7 @@ enum TestFixtures {
         }
     }
 
-    /// PDF with no text — only a drawn shape. See TEST §2.10.
+    /// PDF with no text — only a drawn shape.
     static func imageOnlyPDF() -> Data {
         let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
@@ -348,7 +345,6 @@ enum TestFixtures {
 
     /// PDF with visible text covered by a black annotation — the Manafort/Calipari
     /// attack vector. Text remains extractable despite visual concealment.
-    /// See TEST §2.4.
     static func fakeRedaction(text: String = "CLASSIFIED SECRET") -> Data {
         let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
@@ -366,7 +362,7 @@ enum TestFixtures {
             fatalError("Failed to create fake redaction fixture")
         }
 
-        // Black-filled square annotation covering the text — see TEST §2.4
+        // Black-filled square annotation covering the text.
         let textBounds = CGRect(x: 70, y: 690, width: 300, height: 40)
         let annotation = PDFAnnotation(bounds: textBounds, forType: .square, withProperties: nil)
         annotation.color = .black
@@ -382,7 +378,7 @@ enum TestFixtures {
     }
 
     /// PDF with incremental update — original objects remain after %%EOF,
-    /// potentially recoverable. Tests Layer 4 %%EOF counter. See TEST §2.5.
+    /// potentially recoverable. Tests Layer 4 %%EOF counter.
     static func incrementalUpdate(
         originalText: String = "ORIGINAL SECRET",
         updatedText: String = "REDACTED"
@@ -419,7 +415,7 @@ enum TestFixtures {
         return base
     }
 
-    /// JPEG image with EXIF GPS metadata. See TEST §2.6.
+    /// JPEG image with EXIF GPS metadata.
     static func jpegWithGPS(
         latitude: Double = 38.8977,
         longitude: Double = -77.0365,
@@ -461,7 +457,7 @@ enum TestFixtures {
     /// PDF whose single page embeds the `jpegWithGPS` JPEG as a DCTDecode
     /// image XObject via JPEG-data-provider passthrough (same mechanism as
     /// `twoImageJPEGPagePDF`), so the EXIF/GPS APP1 segment survives into the
-    /// source PDF's image stream verbatim. q34 (QD-15): source fixture for the
+    /// source PDF's image stream verbatim. Source fixture for the
     /// export-side metadata pin — the test asserts the metadata IS present in
     /// this source before asserting it is absent from the pipeline output.
     static func gpsJPEGPagePDF(
@@ -486,7 +482,7 @@ enum TestFixtures {
     }
 
     /// PDF whose single page carries TWO JPEG (DCTDecode) image XObjects, each
-    /// rendered from text. CAT-377: `extractPageImages` must return both, and
+    /// rendered from text. `extractPageImages` must return both, and
     /// runLayer2OCR must OCR each. Images are wrapped via a JPEG data provider
     /// so CGPDFContext embeds them as DCTDecode (passthrough), which is what
     /// `extractPageImages` filters on.
@@ -539,7 +535,6 @@ enum TestFixtures {
     }
 
     /// PDF with non-zero origin mediaBox — tests cropBox origin handling.
-    /// See TEST §2.11.
     static func nonZeroOriginPDF() -> Data {
         buildRawPDF(objects: [
             PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
@@ -562,8 +557,8 @@ enum TestFixtures {
     /// Non-zero-origin PDF whose text sits at a user-space X *smaller* than the
     /// cropBox origin, so the absolute and cropBox-local coordinate frames are
     /// discriminable. MediaBox origin (200, 200); text drawn at user-space
-    /// `220 700 Td` → local minX ≈ 20 ≪ origin.x 200. F13/CAT-366 (ADV-2 A2-6):
-    /// the existing `nonZeroOriginPDF` (origin 50, text at 100) cannot tell the
+    /// `220 700 Td` → local minX ≈ 20 ≪ origin.x 200. The existing
+    /// `nonZeroOriginPDF` (origin 50, text at 100) cannot tell the
     /// frames apart — local minX 50 and absolute 100 both clear its `≥ 49`
     /// assert — so the origin-frame probe and the CropBox-local correction guard
     /// run against THIS fixture instead.
@@ -587,7 +582,7 @@ enum TestFixtures {
     }
 
 
-    /// PDF with /Rotate key — tests rotation-aware rendering. See TEST §2.11.
+    /// PDF with /Rotate key — tests rotation-aware rendering.
     static func rotatedPDF(rotation: Int = 90) -> Data {
         buildRawPDF(objects: [
             PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
@@ -604,7 +599,7 @@ enum TestFixtures {
 
     /// PDF with OCG hidden layer containing extractable text.
     /// page.string extracts hidden OCG text, which would leak into the output
-    /// text layer if not caught. See TEST §2.12.
+    /// text layer unless excluded.
     static func ocgHiddenLayerPDF(hiddenText: String = "HIDDEN SECRET") -> Data {
         let streamContent = "/OC /OC1 BDC\nBT /F1 24 Tf 72 720 Td (\(hiddenText)) Tj ET\nEMC"
         return buildRawPDF(objects: [
@@ -629,7 +624,6 @@ enum TestFixtures {
 
     /// PDF with PII terms embedded in fictional context for sensitive term
     /// absence testing. Wraps textLayerPDF with terms in natural context.
-    /// See OQ-3 resolution, TEST §3.1.
     static func documentWithPII(terms: [String]) -> Data {
         let context = "Jane A. Sample of 742 Evergreen Terrace, Springfield, IL 62704. "
             + "SSN: 123-45-6789. Credit Card: 4111-1111-1111-1111. "
@@ -638,7 +632,7 @@ enum TestFixtures {
     }
 
     /// Geometry of `rotatedTextPDF`, in UNROTATED page/user space (y-up). Shared
-    /// with the S15 CAT-353 matrix so a region can target a known word. Two words
+    /// with the coordinate-matrix tests so a region can target a known word. Two words
     /// sit in different quadrants so every rotation — and every mirror error — is
     /// detectable. Absolute Td = `cropBoxOrigin` + local.
     static let rotatedTextBaseSize = CGSize(width: 612, height: 792)
@@ -646,7 +640,7 @@ enum TestFixtures {
     static let rotatedTextMarkerLocal = CGPoint(x: 360, y: 90)   // "MARKER" lower-right
 
     /// Rotated PDF with visible, **asymmetrically placed** extractable text — for
-    /// the S15 E1 selection-frame probe and the CAT-353 (T_rot) coordinate matrix.
+    /// the selection-frame probe and the rotation coordinate matrix.
     ///
     /// Built raw so the MediaBox origin (`cropBoxOrigin`) and `/Rotate` are
     /// byte-exact and the text stays extractable via `page.string` /
@@ -654,7 +648,7 @@ enum TestFixtures {
     /// selectable text on a non-zero-origin page (`nonZeroOriginPDF`, exercised by
     /// `nonZeroCropBoxSelectionFrameProbe`). For `cropBoxOrigin == .zero` the
     /// MediaBox is `[0 0 612 792]`; the two existing `rotation:`-only callers are
-    /// unaffected. See TEST §2.11, ENGINE §5B, ADV-2 A2-7.
+    /// unaffected.
     static func rotatedTextPDF(rotation: Int = 90, cropBoxOrigin: CGPoint = .zero) -> Data {
         let ox = Int(cropBoxOrigin.x.rounded())
         let oy = Int(cropBoxOrigin.y.rounded())
@@ -758,18 +752,15 @@ enum TestFixtures {
         return doc.dataRepresentation()!
     }
 
-    // MARK: - Searchable Trust-Parity Fixtures (SVT-* tightenings)
-    //
-    // See the trust-parity plan §6 and the Red-Team table at §5 for the
-    // attack class each fixture exercises.
+    // MARK: - Searchable Trust-Parity Fixtures
 
     /// PDF where the reconstructed Courier `/Font` dict carries a
     /// `/ToUnicode` CMap on an ACCEPTED Courier-suffixed `/BaseFont`.
-    /// Originally the RT-4 attack fixture (EXP-E5.1 era: any CMap FAILed);
-    /// since the J-5 SVT-4 refinement (2026-06-09, EXP-E6.2: the writer
-    /// emits load-bearing CMaps for encoding-external glyphs) this shape is
+    /// Originally an attack fixture (an earlier era failed on any CMap);
+    /// since the writer began emitting load-bearing CMaps for
+    /// encoding-external glyphs (measured 2026-06-09) this shape is
     /// INTENTIONALLY tolerated — it now backs the documented-residual tests
-    /// (`rt4AcceptedSubsetCMapResidualNote`, RT-6). The re-pointed attack
+    /// (`rt4AcceptedSubsetCMapResidualNote`). The re-pointed attack
     /// fixture is `withToUnicodeOnUnacceptedFont()`.
     static func withToUnicodeOnReconstructedFont() -> Data {
         let toUnicode = """
@@ -800,11 +791,11 @@ enum TestFixtures {
     }
 
     /// PDF where a `/ToUnicode` CMap rides on a font whose `/BaseFont` is
-    /// NOT an accepted CGPDFContext monospace subset. The RT-4-class
-    /// structural detection that survives the J-5 SVT-4 refinement
+    /// NOT an accepted CGPDFContext monospace subset. The structural
+    /// detection that survives the writer's CMap-emission refinement
     /// (2026-06-09): the `/BaseFont` accept-check FAILs this font with or
     /// without the CMap, so a CMap smuggled on an unaccepted font is still
-    /// reported. See RT-4 (re-pointed), fix-plan §3.4 / §4.2 Branch B.
+    /// reported.
     static func withToUnicodeOnUnacceptedFont() -> Data {
         let toUnicode = """
         /CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n\
@@ -836,9 +827,8 @@ enum TestFixtures {
     /// PDF with a sensitive term written as a literal string inside a
     /// text-show operator. Layer 3's raw-byte scan excludes stream ranges,
     /// so a term whose only occurrence is inside a content stream slips
-    /// past the structural pass. The SVT-3 tightening (§4.1) re-scans
+    /// past the structural pass. A later tightening re-scans
     /// PDFKit's decoded `page.string`, which surfaces the term.
-    /// See RT-7 (basic case).
     static func withSensitiveTermInTextStream(term: String) -> Data {
         let stream = "BT /F1 24 Tf 100 700 Td (\(term)) Tj ET"
         return buildRawPDF(objects: [
@@ -884,7 +874,7 @@ enum TestFixtures {
 
     /// Three-page PDF with a sensitive term in a text-show content stream on
     /// pages 1 and 3 (0-based 0 and 2); page 2 is blank. Multi-page variant
-    /// of `withSensitiveTermInTextStream` — Layer 3's SVT-3 decoded-page
+    /// of `withSensitiveTermInTextStream` — Layer 3's decoded-page
     /// re-scan (and Layer 1's selectable-text pass in Secure Rasterization)
     /// must report BOTH pages in one run.
     static func withSensitiveTermOnFirstAndThirdPages(term: String) -> Data {
@@ -920,7 +910,7 @@ enum TestFixtures {
     /// inside a text-show literal string. Raw bytes carry the surrogate
     /// halves directly via `\NNN` octal escapes (PDF 1.7 §7.9.2.2 Literal
     /// String). PDFKit's `page.string` and `CGPDFStringCopyTextString` both
-    /// decode the surrogate halves; Layer 3 SVT-3 and Layer 10 SVT-5 each
+    /// decode the surrogate halves; Layer 3 and Layer 10 each
     /// surface the decoded term via their respective Aho-Corasick passes.
     ///
     /// The fixture wraps the term in a UTF-16BE encoded literal: a `\xFE\xFF`
@@ -929,7 +919,6 @@ enum TestFixtures {
     /// 16-bit code units (surrogate pairs); BMP characters occupy one. This
     /// shape is the canonical PDF literal-text encoding that
     /// `CGPDFStringCopyTextString` is documented to decode.
-    /// See RT-7 (surrogate-pair variant), plan §4.5 / §6.
     static func withSurrogatePairSensitiveTerm(term: String) -> Data {
         // UTF-16BE bytes prefixed with the BOM `\xFE\xFF` (PDF text-string
         // encoding marker). Each UTF-16 code unit is emitted as two octal
@@ -972,9 +961,9 @@ enum TestFixtures {
     /// shape — Name objects can be passed where a string is expected and
     /// the PDF parser accepts the name's bytes as the operand. PDFKit's
     /// `page.string` and Layer 1 do not surface the Name's bytes as text;
-    /// only the operator-semantic re-extraction layer (Layer 10 SVT-5,
+    /// only the operator-semantic re-extraction layer (Layer 10,
     /// M3) walks the content stream and surfaces it via the
-    /// `CGPDFStringCopyTextString` decoder. See RT-8, plan §4.5.
+    /// `CGPDFStringCopyTextString` decoder.
     static func withNameObjectTermInjection(term: String) -> Data {
         let stream = "BT /F1 24 Tf 100 700 Td /\(term) Tj ET"
         return buildRawPDF(objects: [
@@ -999,10 +988,9 @@ enum TestFixtures {
     /// PDF with a sensitive term encoded via PDF octal escape sequences in
     /// a text-show literal string. Raw bytes show the `\NNN\NNN…` escape
     /// form; PDFKit decodes them to the original characters when serving
-    /// `page.string`. The SVT-3 tightening surfaces the decoded term where
+    /// `page.string`. The same tightening surfaces the decoded term where
     /// the raw-byte scan misses both the term (encoded form) and the
     /// stream-data range (excluded).
-    /// See RT-7 (octal-escape variant), plan §4.1.
     static func withOctalEscapedSensitiveTerm(term: String) -> Data {
         let encoded = term.utf8
             .map { String(format: "\\%03o", $0) }
@@ -1142,8 +1130,8 @@ enum TestFixtures {
     /// Bland–Iyer–Levchenko 2023 attack pattern (sub-pixel glyph-position
     /// shifts via `TJ` kerning). The M2 reconstructor itself emits only
     /// `Tj` operators (CTLineDraw default); this fixture exercises the
-    /// detection surface — Layer 6 SVT-1 reports per-character bounds that
-    /// deviate from the Courier monospace advance. See RT-1 and plan §4.2.
+    /// detection surface — Layer 6 reports per-character bounds that
+    /// deviate from the Courier monospace advance.
     static func withBlandKerningInjection(
         text: String = "ABCDEFGH",
         displacement: Int = -300
@@ -1151,7 +1139,7 @@ enum TestFixtures {
         // Build a TJ array with kerning between every adjacent glyph pair:
         // [(A) -300 (B) -300 (C) -300 …] TJ
         // Negative units in TJ move text origin backward in 1/1000-em
-        // space (PDF spec §9.4.3 Table 109).
+        // space (PDF specification, Table 109).
         var tj = "["
         for (i, char) in text.enumerated() {
             if i > 0 { tj += " \(displacement) " }
@@ -1203,22 +1191,21 @@ enum TestFixtures {
         return doc.dataRepresentation()!
     }
 
-    // MARK: - S01 Searchable-Redaction merge-repro fixture
+    // MARK: - Searchable-Redaction merge-repro fixture
     //
-    // See the searchable-verify-fix plan §2 and the corresponding note.
     // Stands in for a real 23-page born-digital tax PDF (which must never
-    // enter the repo, plan §9 / risk R7) so every later session can validate a fix
+    // enter the repo) so every later session can validate a fix
     // on a committed synthetic regression substrate.
 
     /// Synthetic born-digital fixture engineered to reproduce the
     /// Searchable-Redaction verification-failure cluster on the UNMODIFIED engine:
-    /// Layer 6 (SVT-1 advance), Layer 7 (count deficit), Layer 8 (SVT-4
-    /// `/ToUnicode`), and Layer 9 (SVT-2 lineage) FAIL, while Layer 10 (SVT-5)
+    /// Layer 6 (advance), Layer 7 (count deficit), Layer 8 (
+    /// `/ToUnicode`), and Layer 9 (lineage) FAIL, while Layer 10
     /// stays PASS. Built as a REAL Courier text layer via `UIGraphicsPDFRenderer`
     /// (like `multiLineTextLayerPDF`), each line on its own baseline so
     /// `groupIntoRuns` sees distinct lines.
     ///
-    /// Three failure substrates (plan §2):
+    /// Three failure substrates:
     ///   • **1b run-boundary merge** — table rows whose two columns are separated
     ///     by a gap that breaks the run (`groupIntoRuns`: gap ≥ 1.5×prev.width)
     ///     yet is narrow enough that the reconstructor's pinned-12pt redraw
@@ -1228,18 +1215,18 @@ enum TestFixtures {
     ///     sequence diverges (Layer 9). At `sourceFontSize` 9pt the source
     ///     advance is 0.60009765625×9 ≈ 5.40pt, so the redraw drifts
     ///     (7.20−5.40)=1.80pt per glyph and overruns a ~2-space gap after ~6
-    ///     glyphs — the `letter −54` mechanism the plan infers is dominant.
+    ///     glyphs — the `letter −54` per-glyph drift is the dominant mechanism.
     ///   • **1a combining marks** — NFD-decomposed graphemes (base + U+03xx
     ///     combining mark) that CoreText lays out with a ~0-advance combining
     ///     glyph; on re-extraction this can surface as a near-zero positive-width
-    ///     composed char that trips the SVT-1 advance crosscheck (Layer 6, plan
-    ///     §3.5 case (b)). They also force fallback substitution (below).
+    ///     composed char that trips the advance crosscheck (Layer 6). They
+    ///     also force fallback substitution (below).
     ///   • **2 Courier-uncovered codepoints** — glyphs the embedded Courier subset
     ///     lacks, so CoreText substitutes a fallback subset that CGPDFContext
-    ///     emits WITH a `/ToUnicode` CMap (Layer 8 SVT-4). EXP-E5.1's "no
+    ///     emits WITH a `/ToUnicode` CMap (Layer 8). The earlier "no
     ///     `/ToUnicode`" attestation holds only for the primary subset.
     ///
-    /// ARCH §12.2: synthetic tokens only — contains no real PII. The redaction
+    /// Synthetic tokens only — contains no real PII. The redaction
     /// box for this fixture belongs in the empty bottom margin (away from the
     /// text), so it filters ≈0 characters — matching the real-doc run where the
     /// failures are reconstruction-fidelity artifacts, redaction-independent.
@@ -1284,8 +1271,8 @@ enum TestFixtures {
         // cover (accented + math + box-drawing). CoreText substitutes a
         // fallback subset both in the source render and, decisively, in the
         // reconstructor's 12pt redraw, where CGPDFContext emits the substituted
-        // subset WITH a /ToUnicode CMap (Layer 8 SVT-4). These also seed the
-        // off-grid advance glyphs Layer 6 SVT-1 reports.
+        // subset WITH a /ToUnicode CMap (Layer 8). These also seed the
+        // off-grid advance glyphs Layer 6 reports.
         let fallbackLines = [
             "caf\u{00E9} \u{00E0} pi\u{00F1}ata b\u{00FC}ro",
             "na\u{00EF}ve r\u{00E9}sum\u{00E9} \u{00F4}t\u{00E9}",
@@ -1330,7 +1317,7 @@ enum TestFixtures {
 
     /// Redaction region for `searchableMergeReproPDF`: a small box in the empty
     /// bottom margin (normalized, bottom-left origin) so it filters ≈0 source
-    /// characters while still giving the page a region so Layer 6 SVT-1 engages
+    /// characters while still giving the page a region so Layer 6 engages
     /// (verifySpatialExclusion short-circuits to `.pass` when a page has no
     /// region). Returned as a `[Int: [RedactionRegion]]` keyed to page 0.
     static func searchableMergeReproRegions() -> [Int: [RedactionRegion]] {
@@ -1341,7 +1328,7 @@ enum TestFixtures {
         )]]
     }
 
-    /// VQ-22: structural bytes carrying the letters "stream" inside a Name
+    /// Structural bytes carrying the letters "stream" inside a Name
     /// token (`/Downstream`) AHEAD of a sensitive term in structural data,
     /// plus a real (keyword-EOL-correct) content stream after both. Before
     /// the EOL gate, the "stream" inside "Downstream" opened a phantom
@@ -1366,7 +1353,7 @@ enum TestFixtures {
         ], rootId: 1)
     }
 
-    /// VQ-22 fallback pin: the document's ONLY `stream` keyword is malformed
+    /// Fallback pin: the document's ONLY `stream` keyword is malformed
     /// (followed by a bare CR — not the CR LF / LF that ISO 32000-2 §7.3.8
     /// requires), and a sensitive term sits inside that stream's data. The
     /// strict pass yields no ranges, so the permissive fallback must engage
@@ -1386,7 +1373,7 @@ enum TestFixtures {
     }
 
     /// Two blank pages sharing one empty content stream. Base document for
-    /// the VQ-23 unopenable-page tests (see `UnopenablePageDocument` in
+    /// the unopenable-page tests (see `UnopenablePageDocument` in
     /// VerificationEngineTests — PDFKit synthesizes a PDFPage even for a
     /// broken /Kids entry, so the unopenable condition is modeled by an
     /// override, not by fixture bytes).
@@ -1406,7 +1393,7 @@ enum TestFixtures {
     }
 
     /// Solid mid-gray JPEG of the given pixel size (no text, no metadata).
-    /// VQ-32: source data for the Layer-2 decode-cap pin — large enough that
+    /// Source data for the Layer-2 decode-cap pin — large enough that
     /// an uncapped decode would exceed `ocrMaxPixelDimension`.
     static func solidJPEG(width: Int, height: Int) -> Data {
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!

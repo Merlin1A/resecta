@@ -27,11 +27,11 @@ struct FindingRowModel: Identifiable, Equatable {
     let secondaryText: String?
     /// True when `secondaryText` is document-derived content.
     let secondaryIsContent: Bool
-    /// Phase 3 §A5 — bare-surname cluster hint row.
+    /// Bare-surname cluster hint row.
     let showsAmbiguousSurnameHint: Bool
     /// Accessibility label for the combined row. The two origins keep
     /// their deliberate asymmetry: detection review rows speak matched
-    /// text (F-7 — an active PII-review context where VoiceOver users
+    /// text (an active PII-review context where VoiceOver users
     /// need the same content visibility as sighted users); search rows
     /// never speak matched text.
     let accessibilityDescription: String
@@ -65,12 +65,12 @@ extension FindingRowModel {
         isAmbiguousSurname: Bool
     ) {
         let hasText = detection.matchedText != nil
-        // F-7: detection review rows deliberately include matched text
+        // Detection review rows deliberately include matched text
         // in VoiceOver output — the user is actively examining PII
         // content to make accept/reject decisions.
         let status = isSelected ? "Selected" : "Deselected"
         let text = detection.matchedText.map { ", \($0)" } ?? ""
-        // UXC-22 (RB-44) — qualitative descriptor replaces the raw
+        // A qualitative descriptor replaces the raw
         // percent; `absoluteConfidenceTier` is the one threshold source.
         let descriptorLabel = SearchResultRow.absoluteConfidenceTier(detection.confidence).descriptorLabel
         self.init(
@@ -121,7 +121,7 @@ struct FindingRow<Leading: View, Badge: View, Trailing: View>: View {
                         .contentTransition(.symbolEffect(.replace))
                 }
                 .buttonStyle(.plain)
-                // UXC-18: floor the effective hit area to the HIG
+                // Floor the effective hit area to the HIG
                 // minimum on BOTH axes — the prior `width: 28` slot
                 // did not extend the hit frame (no height constraint
                 // at all), so the row's tallest sibling governed the
@@ -134,7 +134,7 @@ struct FindingRow<Leading: View, Badge: View, Trailing: View>: View {
                     height: ResectaTokens.TouchTarget.minimum
                 )
                 .contentShape(Rectangle())
-                .sensoryFeedback(.selection, trigger: isSelected) // §4.6: haptic on toggle
+                .sensoryFeedback(.selection, trigger: isSelected) // haptic on toggle
 
                 badge()
 
@@ -165,20 +165,20 @@ struct FindingRow<Leading: View, Badge: View, Trailing: View>: View {
     }
 }
 
-/// SA-1 (D-71): the row's Equatable-value content column, extracted
+/// The row's Equatable-value content column, extracted
 /// so a `.equatable()` fast path keyed on the (Equatable)
 /// `FindingRowModel` can skip re-running the text stack on
 /// section-wide invalidations that leave the row's model unchanged.
 /// Shared by BOTH row families through `FindingRow`. Interactive
 /// elements (selection circle, accessory slots) stay outside the
-/// equality — closures never enter the comparison (B-3).
+/// equality — closures never enter the comparison.
 struct FindingRowContentColumn: View, Equatable {
     let model: FindingRowModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             if model.titleIsContent {
-                // §4.5: .privacySensitive() redacts in captures.
+                // .privacySensitive() redacts in captures.
                 Text(model.title)
                     .font(.subheadline.monospaced())
                     .lineLimit(1)
@@ -203,7 +203,7 @@ struct FindingRowContentColumn: View, Equatable {
                 }
             }
 
-            // Phase 3 §A5: bare-surname cluster hint.
+            // Bare-surname cluster hint.
             if model.showsAmbiguousSurnameHint {
                 Label {
                     Text("Common surname — verify context")

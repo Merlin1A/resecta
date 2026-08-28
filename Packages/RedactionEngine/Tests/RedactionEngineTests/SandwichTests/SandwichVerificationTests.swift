@@ -3,14 +3,14 @@ import PDFKit
 import CoreGraphics
 @testable import RedactionEngine
 
-// Tests for ENGINE §6.6 — Sandwich-specific verification layers 6–8.
+// Tests for Sandwich-specific verification layers 6–8.
 
 @Suite("Sandwich Verification", .tags(.security))
 struct SandwichVerificationTests {
 
     let verifier = SandwichVerification()
 
-    // MARK: - Layer 6: Spatial Exclusion (ENGINE §6.6)
+    // MARK: - Layer 6: Spatial Exclusion
 
     @Test("Spatial verification passes when no text overlaps redaction",
           .timeLimit(.minutes(1)))
@@ -68,11 +68,11 @@ struct SandwichVerificationTests {
         #expect(result == .pass)
     }
 
-    @Test("SVT-1 lattice runs on a region-less page (CAT-358)")
+    @Test("Layer 6 lattice runs on a region-less page")
     func svt1LatticeRunsOnRegionlessPage() async throws {
         // Region-less page → regionShapes == []. Pre-fix the guard
         // `count > 0, !regionShapes.isEmpty` short-circuited to .pass before the
-        // SVT-1 lattice ran, so glyph-position tampering on a region-less page
+        // Layer 6 lattice ran, so glyph-position tampering on a region-less page
         // evaded the only positional check. The tampered half is the red→green.
 
         // Correctly-pitched Courier (10 invisible words) → .pass.
@@ -89,10 +89,10 @@ struct SandwichVerificationTests {
         let badResult = try await verifier.verifySpatialExclusion(
             outputPage: badPage, regionShapes: [], pageIndex: 0)
         #expect(badResult.isFail,
-                "TJ-kerning tampering on a region-less page must FAIL the SVT-1 lattice; got \(badResult)")
+                "TJ-kerning tampering on a region-less page must FAIL the Layer 6 lattice; got \(badResult)")
     }
 
-    // MARK: - SVT-1 pitch-flip acceptance (J-14, BH-A-02 ≡ BH-B-05)
+    // MARK: - Layer 6 pitch-flip acceptance
 
     /// Draw invisible Courier lines writer-style (mode-3 CTLineDraw, one
     /// size per line) at the given sizes/origins and return the PDF bytes.
@@ -123,7 +123,7 @@ struct SandwichVerificationTests {
         return try Data(contentsOf: url)
     }
 
-    /// Read back the page and require the SVT-1 walk to see BOTH point
+    /// Read back the page and require the Layer 6 walk to see BOTH point
     /// sizes inside ONE y-band — the writer-band junction the pitch-flip
     /// rule adjudicates. Guards the acceptance tests against vacuity (two
     /// read-back bands would never reach the flip site).
@@ -170,13 +170,13 @@ struct SandwichVerificationTests {
             "read-back must pool both sizes \(sizes) into one band — adjust test geometry")
     }
 
-    @Test("SVT-1 accepts a writer-grammar pitch flip inside a pooled band (J-14)",
+    @Test("Layer 6 accepts a writer-grammar pitch flip inside a pooled band",
           .tags(.critical))
     func svt1PitchFlipAtWriterQuantizedSizesPasses() async throws {
-        // The C1/BH shape: two writer bands at quantized pitches (5.0pt,
-        // 5.5pt) whose read-back line boxes pool into one verifier band.
-        // Pre-J-14 this FAILed as "Non-uniform glyph advance" on every
-        // ordinary searchable export of such a page.
+        // Two writer bands at quantized pitches (5.0pt, 5.5pt) whose
+        // read-back line boxes pool into one verifier band. Before this fix
+        // it FAILed as "Non-uniform glyph advance" on every ordinary
+        // searchable export of such a page.
         let data = try writerStyleTwoLinePDF(
             first: ("MEMBER FDIC.", 5.0, CGPoint(x: 60, y: 100)),
             second: ("RESERVE NOTICE", 5.5, CGPoint(x: 120, y: 100)))
@@ -189,10 +189,10 @@ struct SandwichVerificationTests {
                 "quantized-pitch writer-band junction must not FAIL; got \(result)")
     }
 
-    @Test("SVT-1 still fails a pitch flip to an off-lattice foreign size",
+    @Test("Layer 6 still fails a pitch flip to an off-lattice foreign size",
           .tags(.critical))
     func svt1PitchFlipAtForeignSizeFails() async throws {
-        // A foreign text object at 5.3pt — not a §5C.2-emittable size —
+        // A foreign text object at 5.3pt — not a writer-emittable size —
         // must still read as output this writer did not produce.
         let data = try writerStyleTwoLinePDF(
             first: ("MEMBER FDIC.", 5.0, CGPoint(x: 60, y: 100)),
@@ -203,10 +203,10 @@ struct SandwichVerificationTests {
         let result = try await verifier.verifySpatialExclusion(
             outputPage: page, regionShapes: [], pageIndex: 0)
         #expect(result.isFail,
-                "off-lattice pitch flip must FAIL the SVT-1 check; got \(result)")
+                "off-lattice pitch flip must FAIL the Layer 6 check; got \(result)")
     }
 
-    @Test("isWriterQuantizedPitch matches the §5C.2 emittable set")
+    @Test("isWriterQuantizedPitch matches the writer-emittable set")
     func writerQuantizedPitchPredicate() {
         #expect(SandwichVerification.isWriterQuantizedPitch(5.0))
         #expect(SandwichVerification.isWriterQuantizedPitch(5.5))
@@ -218,7 +218,7 @@ struct SandwichVerificationTests {
                 "below minimumFontSize is not writer-emittable")
     }
 
-    // MARK: - Layer 7: Character Count Cross-Check (ENGINE §6.6)
+    // MARK: - Layer 7: Character Count Cross-Check
 
     @Test("Character count matches digest when counts agree")
     func characterCountMatches() async throws {
@@ -267,7 +267,7 @@ struct SandwichVerificationTests {
                 "Should fail when character count doesn't match")
     }
 
-    // MARK: - Layer 8: Font Verification (ENGINE §6.6)
+    // MARK: - Layer 8: Font Verification
 
     @Test("Font verification passes for blank page (no fonts)")
     func fontVerificationBlankPage() async throws {
@@ -279,7 +279,7 @@ struct SandwichVerificationTests {
         #expect(result == .pass)
     }
 
-    @Test("Font verification WARNs when a page has no /Resources (CAT-380A)")
+    @Test("Font verification WARNs when a page has no /Resources")
     func fontVerificationWarnsWhenNoPageResources() async throws {
         // blankPage() carries an empty-but-present `/Resources << >>` (→ .pass at
         // the no-/Font guard). This fixture omits /Resources entirely; Layer 8

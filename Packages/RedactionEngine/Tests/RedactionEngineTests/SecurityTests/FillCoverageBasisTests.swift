@@ -3,7 +3,7 @@ import Foundation
 import CoreGraphics
 @testable import RedactionEngine
 
-// §3.2a — fill coverage when the raster dimension is not an integer multiple
+// Fill coverage when the raster dimension is not an integer multiple
 // of the page's point size. `renderPageFromCGPage` sizes the bitmap
 // `ceil(points × dpi/72)` while the content is drawn spanning exactly
 // `points × dpi/72`, so a rect scaled by the BITMAP dimension can sit up to
@@ -19,7 +19,7 @@ import CoreGraphics
 // the fill misses stays black and the assert sees it — a black fill would
 // render the residue invisible against the bar's own ink.
 
-@Suite("Fill coverage across raster bases (§3.2a)")
+@Suite("Fill coverage across raster bases")
 struct FillCoverageBasisTests {
 
     private enum FixtureError: Error { case contextFailed }

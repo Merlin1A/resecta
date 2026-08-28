@@ -2,11 +2,11 @@ import SwiftUI
 import SafariServices
 import RedactionEngine
 
-// ARCH §7: Settings screen. SwiftUI Form gets Liquid Glass styling on iOS 26.
-// R1: Mechanism-description language only — no outcome-promise phrasing.
+// Settings screen. SwiftUI Form gets Liquid Glass styling on iOS 26.
+// Mechanism-description language only — no outcome-promise phrasing.
 
 struct SettingsView: View {
-    // ACCESSIBILITY.md §9.2 — VoiceOver hint strings exposed as `static`
+    // VoiceOver hint strings are exposed as `static`
     // constants so the contract can be pinned by unit tests without
     // rendering the form. Mirrors the `InlineWarningBanner.lineLimit(for:)`
     // pattern used for the AX5 line-cap predicate.
@@ -24,7 +24,7 @@ struct SettingsView: View {
     }
 
     @Environment(SettingsState.self) private var settingsState
-    // GATE-1 — DocumentState may be absent (e.g., from HomeView before any
+    // DocumentState may be absent (e.g., from HomeView before any
     // document is loaded). When nil the banner never renders, matching the
     // "no pipeline can be in flight without a document" contract.
     @Environment(DocumentState.self) private var documentState: DocumentState?
@@ -36,19 +36,19 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var safariURL: URL?
-    // GATE-2 (Pkg I): destructive-action confirmation symmetry. The
+    // Destructive-action confirmation symmetry. The
     // Reset-to-Defaults button is wired through a `.confirmationDialog`
     // so a stray tap doesn't wipe user preferences. Custom Terms and
     // Saved Regexes are persisted by separate stores and are not
     // affected by `resetToDefaults()`; the dialog copy names that so
     // the user knows what is and isn't in scope.
     @State private var showResetConfirmation = false
-    /// UXF-32: Reset Detection History confirms before dropping the
+    /// Reset Detection History confirms before dropping the
     /// persisted priors, mirroring the sibling Reset-to-Defaults dialog.
     @State private var showResetHistoryConfirmation = false
 
-    /// GATE-1 — True while a pipeline run is mid-flight. The companion
-    /// STATE-5 snapshot in `PipelineCoordinator` already locks the run's
+    /// True while a pipeline run is mid-flight. The companion
+    /// settings snapshot in `PipelineCoordinator` already locks the run's
     /// behavior to the entry-time settings; this flag drives the banner
     /// that describes that mechanism to the user.
     private var isPipelineActive: Bool {
@@ -56,10 +56,10 @@ struct SettingsView: View {
         return Self.isPipelineActive(phaseKind: documentState.phaseKind)
     }
 
-    /// GATE-1 — Phase-kind predicate exposed as a static so unit tests
+    /// Phase-kind predicate exposed as a static so unit tests
     /// can pin the banner's visibility contract without hosting the view.
     /// The banner renders in `.detecting / .redacting / .verifying`; the
-    /// run-entry STATE-5 snapshot already covers behavior locking, so
+    /// run-entry settings snapshot already covers behavior locking, so
     /// the banner is purely informational (not a gate).
     static func isPipelineActive(phaseKind: DocumentState.PhaseKind) -> Bool {
         switch phaseKind {
@@ -75,16 +75,16 @@ struct SettingsView: View {
             ScrollViewReader { proxy in
             Form {
                 if isPipelineActive {
-                    pipelineActiveBanner  // GATE-1
+                    pipelineActiveBanner
                 }
-                processingSection     // §A4g: renamed from "Redaction Mode"
-                exportQualitySection  // §A4g: renamed from "Output"
+                processingSection     // renamed from "Redaction Mode"
+                exportQualitySection  // renamed from "Output"
                 workflowSection
                     .id("workflowSection")
-                appearanceSection     // 02-dark-mode-design.md §6.2
-                paranoidModeSection   // SEC-8 (plan §3, escalation §1.3)
-                privacySection        // §A4g: split from "About"
-                supportSection        // §A4g: split from "About"
+                appearanceSection
+                paranoidModeSection
+                privacySection        // split from "About"
+                supportSection        // split from "About"
 
                 Section {
                     Button("Reset to Defaults", role: .destructive) {
@@ -94,9 +94,9 @@ struct SettingsView: View {
                 }
             }
             #if DEBUG
-            // S7 sim-verification hook (read-only MCP — no scroll gestures):
+            // Sim-verification hook (read-only MCP — no scroll gestures):
             // jump to the Workflow section so the detection-preset picker
-            // and search-history rows are screenshotable. verification.md §6.
+            // and search-history rows are screenshotable.
             .onAppear {
                 if CommandLine.arguments.contains("--settingsScrollToWorkflow") {
                     Task { @MainActor in
@@ -119,10 +119,10 @@ struct SettingsView: View {
                 SafariView(url: url)
                     .ignoresSafeArea()
             }
-            // GATE-2 (Pkg I): mirrors the established
+            // Mirrors the established
             // confirmation-dialog pattern used at Redact /
             // Delete N Regions / Pre-Export / Override-FAIL.
-            // Copy is mechanism-description per ARCH §1.3.
+            // Copy is mechanism-description language only.
             .confirmationDialog(
                 "Reset all settings?",
                 isPresented: $showResetConfirmation,
@@ -139,15 +139,15 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - GATE-1 — Pipeline-active banner (STATE-5 companion)
+    // MARK: - Pipeline-active banner
 
     /// Non-blocking banner shown while the pipeline is `.detecting`,
     /// `.redacting`, or `.verifying`. The pipeline-affecting
     /// controls below (`pipelineMode`, `autoVerify`,
     /// `paranoidMode`, plus `fillColor` / `exportDPI`) remain functional;
-    /// the banner describes the mechanism (STATE-5: settings snapshot
+    /// the banner describes the mechanism (the settings snapshot
     /// captured at run entry) without promising an outcome.
-    /// Mechanism-description language only (I6 / ARCH §1.3).
+    /// Mechanism-description language only.
     private var pipelineActiveBanner: some View {
         Section {
             HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
@@ -170,12 +170,12 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Processing (§A4g — renamed from "Redaction Mode")
+    // MARK: - Processing
 
     private var processingSection: some View {
         Section {
-            // Phase 4D: Description text rows hide separators for visual clarity
-            // ARCH §7: Picker with descriptions per mode
+            // Description text rows hide separators for visual clarity
+            // Picker with descriptions per mode
             Picker(selection: Binding(
                 get: { settingsState.pipelineMode },
                 set: { settingsState.pipelineMode = $0 }
@@ -185,12 +185,12 @@ struct SettingsView: View {
             } label: {
                 Text("Default Mode")
             }
-            // ACCESSIBILITY.md §9.2 — VoiceOver users miss the descriptive
+            // VoiceOver users miss the descriptive
             // mode rows below the picker. Mirror the mechanism-description
             // copy as a hint so the trade-off is audible.
             .accessibilityHint(Self.defaultModeAccessibilityHint)
 
-            // ARCH §7: Description for current selection
+            // Description for current selection
             switch settingsState.pipelineMode {
             case .secureRasterization:
                 Text("Produces image-only output with all text removed. The simplest approach \u{2014} recommended when redaction confidence is the top priority.")
@@ -206,17 +206,17 @@ struct SettingsView: View {
         } header: {
             Label("Processing", systemImage: "cpu")
         } footer: {
-            // ARCH §7: Footer note
+            // Footer note
             Text("Both modes use the same pixel-destruction process for redacted regions.")
         }
     }
 
-    // MARK: - Export Quality (§A4g — renamed from "Output")
+    // MARK: - Export Quality
 
     private var exportQualitySection: some View {
         Section {
-            // ARCH §7: DPI picker
-            // Phase 4D: Description text hides separator
+            // DPI picker
+            // Description text hides separator
             Picker(selection: Binding(
                 get: { settingsState.exportDPI },
                 set: { settingsState.exportDPI = $0 }
@@ -235,7 +235,7 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
                 .listRowSeparator(.hidden)
 
-            // ARCH §7: Fill color picker. Leading swatch (Q8) renders the
+            // Fill color picker. Leading swatch renders the
             // currently selected fill color directly (.black / .white) so the
             // user sees what they're choosing; the picker's value chevron and
             // VoiceOver announcement already carry the label → value semantics.
@@ -255,7 +255,7 @@ struct SettingsView: View {
                         .accessibilityHidden(true)
                 }
             }
-            // ACCESSIBILITY.md §9.2 — pin the purpose so VoiceOver users
+            // Pin the purpose so VoiceOver users
             // hear what the picker controls before drilling into options.
             .accessibilityHint(Self.fillColorAccessibilityHint)
         } header: {
@@ -263,13 +263,13 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Workflow (ARCH §7 + GAP §8.1)
+    // MARK: - Workflow
 
     private var workflowSection: some View {
         Section {
             Toggle(isOn: Binding(
                 get: {
-                    // SEC-8 override #2: paranoid mode forces verification on.
+                    // Override #2: paranoid mode forces verification on.
                     // The toggle reads as on (and is .disabled below) while
                     // paranoid is enabled, regardless of the stored setting.
                     settingsState.paranoidMode || settingsState.autoVerify
@@ -283,15 +283,15 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                     // Consequence line for the off position — names what
                     // exporting looks like without the checks (mechanism
-                    // description, ARCH §1.3; the copy states what the app
+                    // description; the copy states what the app
                     // does, not an outcome).
                     Text("Off: documents export without the post-redaction checks. The results screen will show Verification Skipped.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
-            .disabled(settingsState.paranoidMode) // SEC-8 override #2
-            // ACCESSIBILITY.md §9.2 — when paranoid mode forces the toggle
+            .disabled(settingsState.paranoidMode) // override #2
+            // When paranoid mode forces the toggle
             // on, swap the hint copy so VoiceOver explains *why* the
             // control reads as disabled instead of the default mechanism
             // description.
@@ -331,9 +331,9 @@ struct SettingsView: View {
             }
             .accessibilityHint("Clears the on-device record of accepted and rejected detections used to weight future scans")
             .accessibilityIdentifier("resetDetectionHistoryButton")
-            // UXF-32: destructive confirm mirroring the GATE-2
+            // Destructive confirm mirroring the
             // Reset-to-Defaults dialog below. Copy is
-            // mechanism-description per ARCH §1.3.
+            // mechanism-description language only.
             .confirmationDialog(
                 "Reset detection history?",
                 isPresented: $showResetHistoryConfirmation,
@@ -349,13 +349,12 @@ struct SettingsView: View {
                 Text("The on-device record of accepted and rejected detections is cleared. Future scans start from the uniform default weighting.")
             }
 
-            // DRAW-7 UI removed 1.1.0 (D-109/RB-77): the snap-to-text
+            // The snap-to-text UI was removed in 1.1.0: the
             // assist has no OCR feed in production — revival = wire
-            // `RedactionOverlayView.ocrTextBlockNormalizedRects` (the
-            // 1.1 draw-tool packet, §4.1, in the planning estate), then
+            // `RedactionOverlayView.ocrTextBlockNormalizedRects`, then
             // restore the snap-to-text Toggle here.
             // `SettingsState.snapToTextEnabled` and the overlay machinery
-            // stay compiled and tested (DC-005 pattern).
+            // stay compiled and tested.
 
             // Always-flag / never-flag custom keyword lists.
             NavigationLink("Custom Terms") {
@@ -379,12 +378,12 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Appearance (02-dark-mode-design.md §6)
+    // MARK: - Appearance
 
     /// Three-option appearance picker. `.menu` style matches iOS Settings →
     /// Display & Brightness. Section sits between Workflow and Paranoid
-    /// Mode per 02-dark-mode-design.md §6.2. Footer copy is mechanism
-    /// description only — no outcome promise (I6 / ARCH §1.3).
+    /// Mode. Footer copy is mechanism
+    /// description only — no outcome promise.
     private var appearanceSection: some View {
         Section {
             Picker(selection: Binding(
@@ -407,10 +406,10 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Paranoid Mode (SEC-8 — plan §3, escalation §1.3)
+    // MARK: - Paranoid Mode
 
-    /// SEC-8 paranoid-mode toggle. Off by default. Copy uses
-    /// mechanism-description language only (I6 / ARCH §1.3): each item
+    /// Paranoid-mode toggle. Off by default. Copy uses
+    /// mechanism-description language only: each item
     /// describes what the app does, not an outcome promise. The three
     /// listed behaviors land as a bundle — there are no per-behavior
     /// sub-toggles by locked design.
@@ -436,7 +435,7 @@ struct SettingsView: View {
             .accessibilityHint("When enabled, the app applies three behavior overrides described below")
 
             // Explicit list of the three enforced behaviors. Phrased in
-            // mechanism-description language (I6). Each row hides its
+            // mechanism-description language. Each row hides its
             // separator for visual continuity with the toggle row.
             VStack(alignment: .leading, spacing: 4) {
                 Text("While on:")
@@ -460,7 +459,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Privacy (§A4g — split from "About")
+    // MARK: - Privacy
 
     private var privacySection: some View {
         Section {
@@ -472,7 +471,7 @@ struct SettingsView: View {
                 Text("Jesse Brookins")
             }
 
-            // R3 compliant: SFSafariViewController runs in Safari's process,
+            // SFSafariViewController runs in Safari's process,
             // no URLSession in our binary.
             Button("Privacy Policy") {
                 safariURL = Links.privacyPolicy
@@ -484,15 +483,15 @@ struct SettingsView: View {
         } header: {
             Label("Privacy", systemImage: "lock.shield")
         } footer: {
-            // UXF-26: the unsaved-work reality named once, in an honest
+            // The unsaved-work reality named once, in an honest
             // place. Nothing persists across a quit by design — the same
             // property the privacy posture rests on. Mechanism
-            // description only; no outcome promise (ARCH §1.3).
+            // description only; no outcome promise.
             Text("Resecta doesn't store your documents or edits. In-progress work is cleared when the app closes — export to keep the redacted copy.")
         }
     }
 
-    // MARK: - Support (§A4g — split from "About")
+    // MARK: - Support
 
     private var supportSection: some View {
         Section {
@@ -514,7 +513,7 @@ struct SettingsView: View {
         } header: {
             Label("Support", systemImage: "questionmark.circle")
         } footer: {
-            // §A4g: Safari warning footer
+            // Safari warning footer
             Text("These links open in Safari. Resecta itself makes no network connections.")
         }
     }
@@ -525,12 +524,12 @@ struct SettingsView: View {
     /// `internal` (not `private`) so `LegalLinkExistenceTests` can assert the
     /// host / org via `@testable import`.
     ///
-    /// CND-03 (launch-fix-v2 · S2): Privacy Policy and EULA point at the hosted
+    /// Privacy Policy and EULA point at the hosted
     /// resecta.app pages, moved off the prior
     /// `github.com/Merlin1A/resecta/blob/master/…` form — that embedded a
     /// brittle default-branch segment and showed a reviewer raw Markdown. The
     /// pages must be live before submission (a legal & transparency launch gate).
-    /// CND-05: `sourceCode` / `reportIssue` use the canonical public org
+    /// `sourceCode` / `reportIssue` use the canonical public org
     /// `Merlin1A/resecta` (the repo is made public at submission, so these 404
     /// until then); `reportIssue` deep-links the issue tracker.
     enum Links {
@@ -542,10 +541,10 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - SFSafariViewController Wrapper (ARCH §7)
+// MARK: - SFSafariViewController Wrapper
 
 /// Wraps SFSafariViewController for use in SwiftUI `.sheet`.
-/// R3: SafariServices networking runs in Safari's process, not our app binary.
+/// SafariServices networking runs in Safari's process, not our app binary.
 struct SafariView: UIViewControllerRepresentable {
     let url: URL
 

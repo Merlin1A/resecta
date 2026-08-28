@@ -2,7 +2,7 @@ import SwiftUI
 
 // Shared tappable page pill button — extracted from LayerResultRow inline styling.
 // Used in LayerResultRow.
-// VERIFICATION_UI §7.1: 1-indexed display, 0-indexed data.
+// 1-indexed display, 0-indexed data.
 
 struct PageChip: View {
     let pageIndex: Int  // 0-indexed

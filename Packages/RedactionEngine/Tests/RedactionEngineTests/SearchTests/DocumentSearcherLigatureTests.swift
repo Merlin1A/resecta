@@ -2,26 +2,23 @@ import Testing
 import PDFKit
 @testable import RedactionEngine
 
-// BUG-006-norm-drift — F-006 sibling at findTextMatches / findOCRMatches.
-//
 // Pre-fix, `matchedText` was sourced from the original page text using
 // normalized-space Character offsets. TextNormalizer expands Latin ligatures
 // (e.g. U+FB01 ﬁ → "fi"), so the offsets drifted on ligature pages,
-// producing corrupted substrings (Case A) or an out-of-bounds trap on
-// heavy-ligature pages (Case B). Post-fix, `matchedText` is sourced from
-// the normalized form; REDACTION_ENGINE.md §9.6 pins the display contract.
+// producing corrupted substrings or an out-of-bounds trap on heavy-ligature
+// pages. Post-fix, `matchedText` is sourced from the normalized form.
 //
 // Whether the underlying PDF text layer round-trips the ligature codepoint
 // is font/PDFKit dependent. When it does, the search path exercises the
 // crash class pre-fix. When PDFKit pre-decomposes to "fi", the test still
 // pins the new normalized-form contract.
 
-@Suite("DocumentSearcher Ligature (BUG-006-norm-drift)", .tags(.search))
+@Suite("DocumentSearcher Ligature", .tags(.search))
 struct DocumentSearcherLigatureTests {
 
     @Test("Ligature page SSN search returns matchedText and non-empty rect")
     func ligaturePageSSNMatch() async {
-        // Audit §1.4.a Case A/B fixture: two ligatures preceding an SSN.
+        // Fixture: two ligatures precede an SSN.
         let data = TestFixtures.textLayerPDF(text: "ﬁle ﬁle 123-45-6789")
         guard let doc = PDFDocument(data: data) else {
             Issue.record("Failed to create PDFDocument")
@@ -49,7 +46,7 @@ struct DocumentSearcherLigatureTests {
                 "normalizedRect from PDFKit selection must be non-empty")
     }
 
-    @Test("Ligature query returns normalized matchedText per §9.6")
+    @Test("Ligature query returns normalized matchedText")
     func ligatureQueryReturnsNormalized() async {
         let data = TestFixtures.textLayerPDF(text: "ﬁle ﬁle 123-45-6789")
         guard let doc = PDFDocument(data: data) else {
@@ -71,7 +68,7 @@ struct DocumentSearcherLigatureTests {
 
         #expect(!results.isEmpty, "'file' should match the ligature page")
         // Result rows display the normalized (ligature-decomposed, lowered)
-        // form even when the source contains U+FB01 ﬁ. §9.6.
+        // form even when the source contains U+FB01 ﬁ.
         #expect(results.first?.matchedText == "file")
     }
 }

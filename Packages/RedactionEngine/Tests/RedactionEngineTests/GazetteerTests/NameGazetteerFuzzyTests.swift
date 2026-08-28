@@ -2,10 +2,10 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// Plan Phase 2 / §G6 — unit tests for Levenshtein-1 gazetteer fallback,
-// including the unidirectional "rn" → "m" special case.
+// Unit tests for Levenshtein-1 gazetteer fallback, including the
+// unidirectional "rn" → "m" special case.
 
-@Suite("NameGazetteer fuzzyContains (G6)")
+@Suite("NameGazetteer fuzzyContains")
 struct NameGazetteerFuzzyTests {
 
     // MARK: - Helpers

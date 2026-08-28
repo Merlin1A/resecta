@@ -2,9 +2,9 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// G2a: NameGazetteer failable init, lookup methods, TextNormalizer integration.
+// NameGazetteer failable init, lookup methods, TextNormalizer integration.
 
-@Suite("NameGazetteer (G2a)")
+@Suite("NameGazetteer")
 struct NameGazetteerTests {
 
     // MARK: - Failable Init
@@ -19,7 +19,7 @@ struct NameGazetteerTests {
         if gazetteer == nil {
             // Expected in scaffold phase (no real .bloom files bundled)
         } else {
-            // Valid once production filters are built (G2b)
+            // Valid once production filters are built
         }
     }
 
@@ -76,7 +76,7 @@ struct NameGazetteerTests {
         case notFound
     }
 
-    // MARK: - WS1 item 1.12: suffix stripping + hyphenated-surname component lookup
+    // MARK: - Suffix stripping + hyphenated-surname component lookup
 
     // All tests in this section use the golden-1000 bloom as both surname and
     // given-name filters (the NameGazetteer test init wires them identically).
@@ -160,9 +160,9 @@ struct NameGazetteerTests {
             "Given 'John' is not in filter; surname all-components-hit → boost 0.10")
     }
 
-    // MARK: - W-O version fence
+    // MARK: - Version fence
 
-    @Test("Version-fence rejects out-of-range manifest version (W-O Q2 path B)")
+    @Test("Version-fence rejects out-of-range manifest version")
     func versionFenceRejectsOutOfRange() throws {
         let tempBase = FileManager.default.temporaryDirectory
             .appending(path: "wo-followers-name-\(UUID().uuidString)", directoryHint: .isDirectory)

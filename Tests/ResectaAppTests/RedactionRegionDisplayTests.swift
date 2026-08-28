@@ -4,14 +4,14 @@ import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// UI_UX §2.5: Visual distinction by region type.
-// UI_UX §9.2: Accessible names for PII detection types.
+// Visual distinction by region type.
+// Accessible names for PII detection types.
 
 @Suite("RedactionRegion Display Properties", .tags(.display))
 @MainActor
 struct RedactionRegionDisplayTests {
 
-    // MARK: - Display Colors (UI_UX §2.5)
+    // MARK: - Display Colors
 
     @Test("Selected region is always systemBlue regardless of source",
           arguments: [
@@ -54,7 +54,7 @@ struct RedactionRegionDisplayTests {
         #expect(region.displayColor(isSelected: false) == .systemPurple)
     }
 
-    // UXC-30 (RB-23): the prior per-source tests above never covered
+    // The prior per-source tests above never covered
     // `.searchMatch` — the dominant flow's own color, reached by every
     // Scan-applied AND Search-applied region. Full 4-source ×
     // selected/unselected table pin so the render contract stays frozen
@@ -80,9 +80,9 @@ struct RedactionRegionDisplayTests {
         #expect(region.displayColor(isSelected: isSelected) == expected)
     }
 
-    // MARK: - PII Kind Accessibility Names (UI_UX §9.2)
+    // MARK: - PII Kind Accessibility Names
 
-    // MARK: - Twin display tables (UXC-45 / CX-09)
+    // MARK: - Twin display tables
 
     /// Every `DetectionResult.Kind` the app can stage. The exhaustive
     /// switch below stops compiling when a PII case is added, so this
@@ -104,14 +104,14 @@ struct RedactionRegionDisplayTests {
         return pii.map { .pii($0) } + [.face, .searchMatch(term: "term")]
     }()
 
-    @Test("RegionMetadata's kind tables mirror DetectionKind+Display for every kind (F2-1 parity; UXC-45 / CX-09)")
+    @Test("RegionMetadata's kind tables mirror DetectionKind+Display for every kind")
     func regionMetadataMirrorsDisplayTables() {
         for kind in Self.everyKind {
             let metadata = RegionMetadata(
                 piiKind: kind, confidence: 0.95, matchedText: nil, recognitionLevel: .fast
             )
             #expect(metadata.badgeLabel == kind.badge, "badge label drift for \(kind)")
-            // UXC-22: "<full name>, <tier descriptor>" — 0.95 is the high band.
+            // "<full name>, <tier descriptor>" — 0.95 is the high band.
             #expect(metadata.accessibilityDescription == "\(kind.fullName), high confidence",
                     "full-name drift for \(kind)")
         }

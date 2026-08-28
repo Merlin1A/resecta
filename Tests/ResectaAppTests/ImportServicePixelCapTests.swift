@@ -5,7 +5,7 @@ import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// Pkg G.1 / TRUST-import-image-pixel-vs-point-cap: the 5000-dimension cap on
+// The 5000-dimension cap on
 // imported images was checking POINT dimensions (`image.size.width`) instead
 // of PIXEL dimensions. A `UIImage` with `scale: 3.0` and 4000×4000 pt size
 // is 12000×12000 px = 144 MP and slipped through; the renderer would then

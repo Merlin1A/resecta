@@ -1,6 +1,6 @@
 import Foundation
 
-// W4 — preset-threshold post-filter for the search path.
+// Preset-threshold post-filter for the search path.
 //
 // Used by `DocumentSearcher` to gate raw PIIMatches against a
 // `PresetThresholdVector` (preset defaults merged with any per-category
@@ -14,7 +14,7 @@ import Foundation
 // helper. Keeping the two paths visually distinct is deliberate — the
 // searcher filters raw, the orchestrator filters post-posterior.
 //
-// B06 — Site-B / Search parity: the five scored families
+// Site-B / Search parity: the five scored families
 // {account, phone, mrn, ein, itin} no longer reach this raw gate at the
 // `DocumentSearcher` call sites. `DocumentSearcher.composedSurvivors(...)`
 // composes the SAME posterior + learned-context term the orchestrator applies
@@ -23,7 +23,7 @@ import Foundation
 // below unchanged. `partitionedByScoredFamily()` is the split that routes them.
 
 extension Array where Element == PIIDetector.PIIMatch {
-    /// D06-F2 Part 1 — drop matches whose raw confidence is below the
+    /// Drop matches whose raw confidence is below the
     /// per-category cutoff in `thresholdVector`, and return the number of
     /// matches dropped for falling below their per-category cutoff.
     /// Annotates survivors with `appliedThreshold` and a
@@ -59,7 +59,7 @@ extension Array where Element == PIIDetector.PIIMatch {
         return (survivors, dropped)
     }
 
-    /// B06 — split the matches into the five scored families
+    /// Split the matches into the five scored families
     /// (`ContextFeatureContract.scoredFamilies`, keyed by `wireName(for:)`) and
     /// everything else, each preserving relative order. The scored partition
     /// routes through `DocumentSearcher.composedSurvivors(...)` (posterior +

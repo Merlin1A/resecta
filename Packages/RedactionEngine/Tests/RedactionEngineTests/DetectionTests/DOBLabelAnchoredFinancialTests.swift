@@ -2,20 +2,20 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// WS1 design 01 §1 — DOB label-anchored financial path (D4, 2026-06-10).
+// DOB label-anchored financial path.
 //
-// Two kill sites for DOB on financial documents are addressed in S2:
+// Two kill sites for DOB on financial documents are addressed here:
 //   1. runsDOB() gate: now branches to the label-anchored path (detectDOBs)
 //      for .financial instead of suppressing entirely.
-//   2. Envelope: detectDOBs emits fixed 0.85, clearing the W4 gate under
-//      the new preset thresholds (aggressive=0.30, balanced=0.40,
-//      conservative=0.45 — all strictly < 0.85).
+//   2. Envelope: detectDOBs emits fixed 0.85, clearing the posterior
+//      threshold gate under the new preset thresholds (aggressive=0.30,
+//      balanced=0.40, conservative=0.45 — all strictly < 0.85).
 //
 // The "dob.label" string in withPerPageTimeout("dob.label") is a TIMING
 // label only, never emitted as a ruleID. The match picks up the default
 // ruleID "dob.regex" (already aliased in RuleCatalog.engineToCatalog).
 
-@Suite("DOB label-anchored financial path (design 01 §1, D4)")
+@Suite("DOB label-anchored financial path")
 struct DOBLabelAnchoredFinancialTests {
 
     private func detectMatches(in text: String, doctype: DoctypeClass? = nil) async -> [PIIDetector.PIIMatch] {
@@ -32,7 +32,7 @@ struct DOBLabelAnchoredFinancialTests {
         #expect(matches.count >= 1, "Label-anchored DOB should be detected on financial document")
         if let match = matches.first {
             #expect(match.confidence == 0.85,
-                    "Label-anchored path emits fixed 0.85 (design 01 §1)")
+                    "Label-anchored path emits fixed 0.85")
         }
     }
 
@@ -50,7 +50,7 @@ struct DOBLabelAnchoredFinancialTests {
         // DOBDetector (full path) is also suppressed for .financial.
         let matches = await detectMatches(in: "03/15/1985", doctype: .financial)
         #expect(matches.count == 0,
-                "Bare date without label must not surface on financial document (design 01 §1)")
+                "Bare date without label must not surface on financial document")
     }
 
     // MARK: - Non-financial path still uses DOBDetector
@@ -83,11 +83,11 @@ struct DOBLabelAnchoredFinancialTests {
         _ = matches  // structural: no assertion on count — DOBDetector scope
     }
 
-    // MARK: - Confidence clears W4 gate
+    // MARK: - Confidence clears the posterior threshold gate
 
-    @Test("Financial DOB confidence 0.85 clears W4 under all presets (balanced threshold = 0.40)")
+    @Test("Financial DOB confidence 0.85 clears the posterior threshold gate under all presets (balanced threshold = 0.40)")
     func financialDOB_clearsW4() async {
-        // design 01 §1 / §12 S2 task 9: dob thresholds are 0.30/0.40/0.45.
+        // DOB thresholds are 0.30/0.40/0.45.
         // 0.85 > 0.45 (conservative), so the label-anchored candidate always
         // clears the gate.  This mirrors EnvelopeReachabilityTests for dob.
         let matches = await detectMatches(in: "DOB: 03/15/1985", doctype: .financial)

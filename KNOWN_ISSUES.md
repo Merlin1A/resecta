@@ -91,7 +91,7 @@ While drawing, rectangle edges align to other boxes and page guides; alignment t
 ## Fixed
 
 ### KI-6: Multi-Selection State Model Missing (Low–Medium) — FIXED (entry moved 2026-08-25)
-**Resolution:** `RedactionState.selectedRegionIDs` is a `Set<UUID>`; Select All / Deselect All, Shift-tap on iPad and the iPhone "Add to Selection" toggle operate on the set (DRAW-6 / WU-38). The entry was stale.
+**Resolution:** `RedactionState.selectedRegionIDs` is a `Set<UUID>`; Select All / Deselect All, Shift-tap on iPad and the iPhone "Add to Selection" toggle operate on the set. The entry was stale.
 
 ---
 
@@ -112,8 +112,7 @@ at runtime and fall back to `doc.viewfinder` if unavailable.
 **Spec ref:** `ExportFailure.filePurged` (Export — File purged row)
 
 **Resolution:** Proactive purge re-run toast wired into
-`DocumentEditorView.handleScenePhaseChange(old:new:)` (Package E,
-quality-pass-2026-05). The handler observes `\.scenePhase`; on a
+`DocumentEditorView.handleScenePhaseChange(old:new:)`. The handler observes `\.scenePhase`; on a
 `.background → .active` transition while the current phase is
 `.verified(report)`, the handler checks
 `FileManager.default.fileExists(atPath: redactionState.outputURL?.path ?? "")`

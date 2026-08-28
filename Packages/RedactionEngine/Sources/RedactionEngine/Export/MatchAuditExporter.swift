@@ -1,6 +1,6 @@
 import Foundation
 
-// W5 — turn `[SearchResult]` joined with apply state into CSV / JSON
+// Turn `[SearchResult]` joined with apply state into CSV / JSON
 // audit artifacts. Engine-owned so both serializers share the exact same
 // column set and rationale-summary format. All redaction happens here
 // (never in the caller). Under `includeSensitive=false` every
@@ -29,8 +29,8 @@ public enum MatchAuditExporter {
         "piiConfidence",
         "term",
         "ruleID",
-        "ruleVersion",                // W-I2 schema v4
-        "gazetteerManifestVersion",   // W-I2 schema v4
+        "ruleVersion",                // schema v4
+        "gazetteerManifestVersion",   // schema v4
         "finalScore",
         "appliedThreshold",
         "rationaleSummary",
@@ -117,7 +117,7 @@ public enum MatchAuditExporter {
     /// LibreOffice / Sheets; rendered literally by Numbers). Applied to EVERY
     /// column at the serialization choke point, so every current and future
     /// column is routed through the same defusing. Reversible: a consumer
-    /// strips one leading `'`. D07-F1.
+    /// strips one leading `'`.
     private static func neutralizeFormulaLead(_ field: String) -> String {
         guard let first = field.first,
               formulaLeadCharacters.contains(first) else {
@@ -129,7 +129,7 @@ public enum MatchAuditExporter {
     /// Wrap in double quotes when the field contains any of
     /// `,`, `"`, `\r`, `\n`; double internal quotes per RFC 4180.
     private static func csvEscape(_ field: String) -> String {
-        // D07-F1: neutralize formula / DDE leads FIRST so a defused field is
+        // Neutralize formula / DDE leads FIRST so a defused field is
         // then RFC-4180-quoted normally. Order matters — quoting alone does
         // not stop formula evaluation; the leading-apostrophe transform does.
         let safe = neutralizeFormulaLead(field)
@@ -168,7 +168,7 @@ public enum MatchAuditExporter {
     /// Top-level envelope: `{ "metadata": ExportMetadata, "records": [...] }`.
     /// Pretty-printed + sorted keys for diff-friendly output.
     ///
-    /// Pkg C / ERR-02: `throws` so encoder errors propagate to the caller
+    /// `throws` so encoder errors propagate to the caller
     /// (`MatchExportService.share`) where they wire into a Tier 1 `.error`
     /// toast. The prior `(try? …) ?? Data()` shape silently produced an
     /// empty `Data` on failure, leaving the share-sheet path
@@ -189,7 +189,7 @@ public enum MatchAuditExporter {
                     source: record.source,
                     piiCategory: record.piiCategory,
                     piiConfidence: record.piiConfidence,
-                    // S6 audit-leak fix: same term/rationale policy as csvRow.
+                    // Audit-leak fix: same term/rationale policy as csvRow.
                     term: redactedTerm(record.term, piiCategory: record.piiCategory),
                     ruleID: record.ruleID,
                     finalScore: record.finalScore,
@@ -246,17 +246,16 @@ public enum MatchAuditExporter {
         return redactedMatchedText(term)
     }
 
-    /// S6 audit-leak fix: strip the raw pattern out of
+    /// Audit-leak fix: strip the raw pattern out of
     /// `userAlwaysFlag(<pattern>)` / `userNeverFlag(<pattern>)` signal
     /// descriptions while keeping the signal's presence visible as
     /// `userFlag([redacted])`. All other signals (validator, threshold,
     /// bloom, context) are metadata and pass through unchanged.
     ///
     /// The closing-paren match is anchored to a signal boundary
-    /// (`\)` followed by `";"` or end-of-string) rather than the design
-    /// draft's `[^)]*\)` so a user pattern that itself contains `)` is
-    /// still stripped in full instead of leaking its tail. Flagged for
-    /// the batched security review alongside the policy table.
+    /// (`\)` followed by `";"` or end-of-string) rather than a naive
+    /// `[^)]*\)` so a user pattern that itself contains `)` is
+    /// still stripped in full instead of leaking its tail.
     static func sanitizedRationaleSummary(_ summary: String) -> String {
         let range = NSRange(summary.startIndex..., in: summary)
         var result = userFlagSignalRegex.stringByReplacingMatches(
@@ -312,15 +311,15 @@ public enum MatchAuditExporter {
         case .userNeverFlag(let pattern):
             return "userNeverFlag(\(pattern))"
         case .suppressedByOverlap(let winner, let loser):
-            // QW-5 — name the loser as itself so the summary can't read as
+            // Name the loser as itself so the summary can't read as
             // if the suppressed row belonged to the winner's category.
-            // Pre-QW-5 signals (no loserCategory) keep the legacy format.
+            // Older signals (no loserCategory) keep the legacy format.
             if let loser {
                 return "suppressedByOverlap(\(loser.rawValue) via \(winner.rawValue))"
             }
             return "suppressedByOverlap(\(winner.rawValue))"
         case .contextPositiveDetail(let keywords):
-            // WU-76 / [P4] — flatten the per-keyword breakdown into a
+            // Flatten the per-keyword breakdown into a
             // compact summary string. Format: `ctx+detail(k1=0.05;k2=0.05)`.
             // Uses a for-loop rather than .map { ... formatDouble ... } —
             // the closure form has surfaced a simulator-test crash; loop

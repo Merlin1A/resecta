@@ -6,7 +6,7 @@ import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// SEC-8 — paranoid-mode toggle tests.
+// Paranoid-mode toggle tests.
 //
 // The toggle is off by default and persists via UserDefaults. When on,
 // the remaining behavior overrides apply as a bundle (no per-behavior
@@ -23,7 +23,7 @@ import CoreGraphics
 // `testParanoidModeOffPreservesNormalBehavior` is the explicit negative
 // counterpart: with paranoid off, none of the remaining overrides apply.
 
-@Suite("SettingsState.paranoidMode (SEC-8)")
+@Suite("SettingsState.paranoidMode")
 @MainActor
 final class SettingsParanoidModeTests {
 
@@ -102,7 +102,7 @@ final class SettingsParanoidModeTests {
     func testParanoidModeStripsLivePhotoAux() {
         // Direct unit-level confirmation that the helper drops the
         // `kCGImagePropertyMakerAppleDictionary` key from the property
-        // dictionary; this is the building block the SEC-8 import-path
+        // dictionary; this is the building block the paranoid-mode import-path
         // gate consumes when `settingsState.paranoidMode == true`.
         let stripper = LivePhotoAuxStripper()
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1))
@@ -150,7 +150,7 @@ final class SettingsParanoidModeTests {
         #expect(gate == false)
     }
 
-    // MARK: - Three-overrides copy guard (CAT-104 / CAT-153-H3 · D-13)
+    // MARK: - Three-overrides copy guard
 
     /// Paranoid mode enforces THREE behaviors, not four. The
     /// "verification-report copy step" was parked on the overflow menu and
@@ -164,13 +164,13 @@ final class SettingsParanoidModeTests {
         let source = try loadSettingsViewSource()
         #expect(
             !source.contains("verification-report copy"),
-            "SettingsView still references the never-shipped 'verification-report copy step' (CAT-104).")
+            "SettingsView still references the never-shipped 'verification-report copy step'.")
         #expect(
             !source.contains("applies four behavior overrides"),
-            "Paranoid-mode accessibility hint still says 'four' behavior overrides (CAT-104).")
+            "Paranoid-mode accessibility hint still says 'four' behavior overrides.")
         #expect(
             source.contains("applies three behavior overrides"),
-            "Paranoid-mode accessibility hint should say 'three' behavior overrides (CAT-104).")
+            "Paranoid-mode accessibility hint should say 'three' behavior overrides.")
     }
 
     private func loadSettingsViewSource(file: StaticString = #filePath) throws -> String {

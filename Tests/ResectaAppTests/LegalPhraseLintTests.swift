@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// ARCHITECTURE §1.3 — walks every localized value in `Legal.xcstrings`
+// Walks every localized value in `Legal.xcstrings`
 // and fails on any case-insensitive match against `LegalPhrases.bannedTerms`.
 // Loads the raw `.xcstrings` JSON from the source tree via `#filePath` so the
 // lint sees the authoring artifact, not the compiled `.lproj` strings (which

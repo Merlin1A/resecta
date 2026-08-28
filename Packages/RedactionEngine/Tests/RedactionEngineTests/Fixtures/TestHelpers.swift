@@ -4,7 +4,7 @@ import PDFKit
 import CoreGraphics
 @testable import RedactionEngine
 
-// TEST §2.13, PHASE_12_PLAN — Shared test tags, mock factories, and pipeline helper.
+// Shared test tags, mock factories, and pipeline helper.
 
 // MARK: - Shared Tags
 
@@ -17,7 +17,7 @@ extension Tag {
     @Tag static var sandwich: Self
 }
 
-// MARK: - Mock Factories (TEST §2.13)
+// MARK: - Mock Factories
 
 extension RedactionRegion {
     /// Create a mock manual redaction region.
@@ -29,7 +29,7 @@ extension RedactionRegion {
 }
 
 extension LayerResult {
-    /// Create a mock layer result for status derivation tests (TEST §4.7).
+    /// Create a mock layer result for status derivation tests.
     static func mock(status: VerificationStatus) -> LayerResult {
         LayerResult(
             name: "Mock Layer",
@@ -43,12 +43,12 @@ extension LayerResult {
     }
 }
 
-// MARK: - Sample bank-statement fixture (S01)
+// MARK: - Sample bank-statement fixture
 
-/// The shipped first-run demo statement (`~/resecta/Resources/SampleDocument.pdf`,
-/// produced by the `~/resecta-sample-doc` generator), committed here as an
-/// engine fixture so the dual-leg Stage-1 detection snapshot — revision-plan G1
-/// / handoff H2 — can run (`SampleStatementSnapshotTests`). FROZEN: byte-
+/// The shipped first-run demo statement (the app bundle's
+/// `SampleDocument.pdf`, produced by the sample-document generator),
+/// committed here as an engine fixture so the dual-leg Stage-1 detection
+/// snapshot can run (`SampleStatementSnapshotTests`). FROZEN: byte-
 /// identical to the app-bundle copy (three names, ONE SHA — app
 /// `SampleDocument.pdf` · engine `sample-bank-statement.pdf` · generator
 /// `sample-bank-statement.pdf`). The dual-copy identity guard spans the engine
@@ -57,8 +57,9 @@ extension LayerResult {
 ///
 /// Unlike a real-document tax fixture, this statement is FULLY SYNTHETIC with a
 /// public, fixture-disclosed value set, so test
-/// diagnostics MAY log matched text here (the W2 logging exemption — see the
-/// snapshot suite header). Production logging rules (ARCH §12.2) are unchanged.
+/// diagnostics MAY log matched text here (the synthetic-fixture logging
+/// exemption — see the snapshot suite header). Production logging rules
+/// are unchanged.
 extension TestFixtures {
 
     enum SampleStatementFixtureError: Error { case missingResource }
@@ -84,21 +85,21 @@ extension TestFixtures {
     }
 }
 
-// MARK: - Hartwell loan-packet fixture (S05)
+// MARK: - Hartwell loan-packet fixture
 
 /// The synthetic Hartwell loan/mortgage application packet (12 pp), emitted by
-/// the `~/resecta-sample-doc` generator (`python -m packet.build_packet`) and
-/// committed here as the engine's primary labeled test corpus (INV-2).
+/// the sample-document generator (`python -m packet.build_packet`) and
+/// committed here as the engine's primary labeled test corpus.
 /// One-pass BYTE-DETERMINISTIC: a committed fixture must
-/// match a fresh generator run (S04). Page order (0-indexed): 0,1 URLA-B |
+/// match a fresh generator run. Page order (0-indexed): 0,1 URLA-B |
 /// 2 URLA-A | 3,4,5 STMT (embedded frozen statement) | 6,7 T1040 | 8 ACH |
 /// 9 W-2 | 10 GOV-ID | 11 VEH (.generic).
 ///
 /// Three committed companions in `TestResources/`:
 ///  - `packet.pdf`                    -- the pristine born-digital packet.
 ///  - `packet-scan-sim-150dpi.pdf`    -- image-only render (0 extractable text);
-///                                       the OCR-leg path (S06 OCR role).
-///  - `packet-ground-truth.json`      -- the draw-time D21 ground truth: 106
+///                                       the OCR-leg path.
+///  - `packet-ground-truth.json`      -- the draw-time ground truth: 106
 ///    drawn occurrences (`occurrences[]`) + 20 carried STMT classes
 ///    (`carried_stmt[]`). bbox is normalized 0-1, BOTTOM-LEFT origin, CORNER
 ///    form `[x0,y0,x1,y1]` (NOT the engine's origin+size `normalizedRect`
@@ -107,8 +108,8 @@ extension TestFixtures {
 ///    (must_fire / must_not_fire / should_fire / watch).
 ///
 /// Fully synthetic with a public values manifest, so
-/// test diagnostics MAY log matched text here (D31; same exemption as the
-/// sample statement). Production logging rules (ARCH 12.2) are unchanged.
+/// test diagnostics MAY log matched text here (same exemption as the
+/// sample statement). Production logging rules are unchanged.
 extension TestFixtures {
 
     enum LoanPacketFixtureError: Error { case missingResource }
@@ -144,7 +145,7 @@ extension TestFixtures {
         return try Data(contentsOf: url)
     }
 
-    /// Load the draw-time D21 ground-truth JSON (consumed by the P/R harness).
+    /// Load the draw-time ground-truth JSON (consumed by the P/R harness).
     static func loanPacketGroundTruthJSON() throws -> Data {
         guard let url = Bundle.module.url(
             forResource: "packet-ground-truth",
@@ -155,7 +156,7 @@ extension TestFixtures {
     }
 }
 
-// MARK: - Layer-2 fill-hallucination fixture (Part A, S1)
+// MARK: - Layer-2 fill-hallucination fixture (Part A)
 
 /// The Secure-Rasterization OUTPUT that reproduces the Part A Layer-2
 /// fill-hallucination verifier false positive: the bars are solid, pixel-exact,
@@ -169,12 +170,11 @@ extension TestFixtures {
 ///
 /// PROVENANCE: the redaction of the synthetic `resecta-sample-doc` bank statement
 /// (the standard "DELIA HARTWELL" corpus identity) — NOT a real document. PII-gated
-/// before commit (S1 §2b): 0 selectable text on every page; only Apple auto-injected
+/// before commit: 0 selectable text on every page; only Apple auto-injected
 /// metadata (`Producer`/`CreationDate`/`ModDate`); no email/SSN/phone-shaped bytes;
 /// the only residual visible text is the synthetic Sablebrook Bank "SAMPLE DOCUMENT"
-/// content (no real person). Permanent regression fixture (maintainer-approved 2026-06-27).
+/// content (no real person). Permanent regression fixture.
 /// SHA-256 ed85bcbc1405b5263e387c6c543863e3494a821308ae81d71105a0c0a337999d.
-/// See plans/resecta-partA-verifier-guard-2026-06-27/.
 extension TestFixtures {
 
     enum FillHallucinationFixtureError: Error { case missingResource }
@@ -193,7 +193,7 @@ extension TestFixtures {
     /// 0-indexed; normalized bottom-left, RedactionRegion.normalizedRect form).
     /// The fixture is output-only (no redaction session), so Layer-2's `regions:`
     /// argument is supplied from these. Extracted once from the solid-fill
-    /// components of each page image and visually verified (S1 §2e).
+    /// components of each page image and visually verified.
     static func fillHallucinationRegionsJSON() throws -> Data {
         guard let url = Bundle.module.url(
             forResource: "secureraster-fill-hallucination-regions",
@@ -204,7 +204,7 @@ extension TestFixtures {
     }
 }
 
-// MARK: - TestPipeline (PHASE_12_PLAN)
+// MARK: - TestPipeline
 
 /// Pipeline helper for integration and security regression tests.
 /// Runs the full rasterize → reconstruct pipeline on fixture data
@@ -230,7 +230,7 @@ enum TestPipeline {
     ///   - mode: Pipeline mode (default: secureRasterization).
     ///   - regions: Per-page regions. If nil, a default center-strip region is created per page.
     ///   - fillColor: Fill color for redaction (default: black).
-    ///   - dpi: Render DPI (default: 150 for test speed). See PHASE_12_PLAN.
+    ///   - dpi: Render DPI (default: 150 for test speed).
     /// - Returns: URL to the output PDF. Caller must clean up with `defer`.
     static func processAndExport(
         _ fixtureData: Data,
@@ -281,7 +281,7 @@ enum TestPipeline {
             }
             ctx.draw(renderedImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 
-            // Apply and verify fills (ENGINE §3.1, §3.4)
+            // Apply and verify fills
             try applyRedactionFills(context: ctx, regions: pageRegions, fillColor: fillColor)
 
             for region in pageRegions {
@@ -309,7 +309,7 @@ enum TestPipeline {
                 let extractor = TextLayerExtractor()
                 if let characters = try? await extractor.extractCharacters(from: page),
                    !characters.isEmpty {
-                    // CAT-353/366 (D-34): region basis is the zero-origin
+                    // Region basis is the zero-origin
                     // DISPLAYED output page (effectiveSize), matching the
                     // rotation-applied cropBox-local character bounds
                     // extractCharacters now produces — mirrors production
@@ -359,7 +359,7 @@ enum TestPipeline {
     ///
     /// `processAndExport` returns only the output URL and discards the filter
     /// digests; Layers 7 (Character Count) and 9 (Character Lineage) require
-    /// the per-page `PageFilterDigest`, so the S01 measurement harness surfaces
+    /// the per-page `PageFilterDigest`, so the measurement harness surfaces
     /// them here via `FilterResult.toDigest(pageIndex:redactionRects:safetyMargin:)`.
     /// Test-only and purely additive — the production helper is unchanged.
     static func searchableDigests(
@@ -390,7 +390,7 @@ enum TestPipeline {
             }
             guard let characters = try? await extractor.extractCharacters(from: page),
                   !characters.isEmpty else { continue }
-            // CAT-353/366 (D-34): zero-origin DISPLAYED region basis, mirroring
+            // Zero-origin DISPLAYED region basis, mirroring
             // processAndExport and production PageRasterizer (see above).
             let regionBasis = CGRect(
                 origin: .zero,

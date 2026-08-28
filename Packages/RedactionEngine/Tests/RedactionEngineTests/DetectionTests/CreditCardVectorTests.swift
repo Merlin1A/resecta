@@ -2,14 +2,14 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// D-19 fixture-driven test for credit-card detection. The DataPipeline-
+// Fixture-driven test for credit-card detection. The DataPipeline-
 // generated vectors at Fixtures/vectors/credit_card_vectors.json carry a
 // `valid` flag whose truth follows from luhnCheck + hasValidCardPrefix.
 // This test asserts the detector surfaces every valid sample and rejects
-// every invalid one. The audit at cc-derive D-19 confirmed the fixture is
-// schema-clean and determinism-clean.
+// every invalid one. The audit confirmed the fixture is schema-clean and
+// determinism-clean.
 
-@Suite("Credit-card fixture-driven detector vectors (D-19)")
+@Suite("Credit-card fixture-driven detector vectors")
 struct CreditCardVectorTests {
 
     struct Vectors: Decodable {
@@ -32,7 +32,7 @@ struct CreditCardVectorTests {
         return try JSONDecoder().decode(Vectors.self, from: data).vectors
     }
 
-    @Test("D-19 fixture loads with rows")
+    @Test("Fixture loads with rows")
     func fixtureLoads() throws {
         guard let vectors = try loadVectors() else {
             Issue.record("credit_card_vectors.json not bundled")

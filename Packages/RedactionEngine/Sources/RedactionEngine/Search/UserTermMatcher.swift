@@ -1,6 +1,6 @@
 import Foundation
 
-// W3 — compiled representation of the user's custom keyword lists.
+// Compiled representation of the user's custom keyword lists.
 //
 // Built once per scan kickoff from the `[UserTerm]` pair persisted in
 // `SettingsState.customUserTerms`, then installed on `DocumentSearcher`
@@ -29,12 +29,12 @@ struct CompiledUserTerm: Sendable {
 }
 
 /// Per-page result of `alwaysFlagHits`. Carries the match list plus any
-/// user-authored patterns whose enumeration bailed on the §S4 per-page
+/// user-authored patterns whose enumeration bailed on the per-page
 /// wall-clock budget so the call site can route a non-error per-term-
-/// per-page skip signal (custom-terms timeout toast — REDACTION_ENGINE.md
-/// §9.4). Order in `timedOutPatterns` matches enumeration order; the
-/// outer loop's budget check breaks before any subsequent terms run, so
-/// at most one entry per page is expected in practice.
+/// per-page skip signal (a custom-terms timeout toast). Order in
+/// `timedOutPatterns` matches enumeration order; the outer loop's budget
+/// check breaks before any subsequent terms run, so at most one entry
+/// per page is expected in practice.
 struct AlwaysFlagPageResult {
     let hits: [(range: NSRange, pattern: String)]
     let timedOutPatterns: [String]
@@ -85,7 +85,7 @@ public struct UserTermMatcher: Sendable {
         }
     }
 
-    /// W9 — mirror of `shouldSuppress(_:)` against the always-flag list.
+    /// Mirror of `shouldSuppress(_:)` against the always-flag list.
     /// Returns the user-authored pattern that matches `matchedText`, or nil.
     /// Used by `PIIDetector.reverseRationale` to report why a snippet would
     /// be promoted to a match regardless of detector outcome.
@@ -157,7 +157,7 @@ public struct UserTermMatcher: Sendable {
     ///
     /// Returns `AlwaysFlagPageResult.timedOutPatterns` populated with the
     /// user-authored patterns whose `enumerateMatches` bailed on the per-
-    /// page budget. F-001 — `[.reportProgress]` lets the engine fire the
+    /// page budget. `[.reportProgress]` lets the engine fire the
     /// closure between match attempts on long alternation walks, so the
     /// `Task.isCancelled` + `ContinuousClock` checks below sample inside
     /// a single `enumerateMatches` invocation. Catastrophic backtracking

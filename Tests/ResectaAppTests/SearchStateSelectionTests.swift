@@ -3,15 +3,15 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-17 — `SearchState`'s predicate-driven selection primitive.
+// `SearchState`'s predicate-driven selection primitive.
 // `setSelection(where:)` is the REPLACE primitive
 // (`isSelected := predicate(result)`); `toggleSelectAll` composes with
-// it for its filtered-only select/deselect-all contract. UXC-46
-// (D-121): the "Add to selection…" footer menu and its additive
-// `addToSelection(where:)` sibling (RB-21/UXC-12) retired together with
+// it for its filtered-only select/deselect-all contract. The
+// "Add to selection…" footer menu and its additive
+// `addToSelection(where:)` sibling retired together with
 // their predicate pins and the 10k perf gate that rode on them.
 
-@Suite("SearchState selection primitives (WU-17; select-where retired under UXC-46)", .tags(.search))
+@Suite("SearchState selection primitives (select-where retired)", .tags(.search))
 @MainActor
 struct SearchStateSelectionTests {
 
@@ -114,7 +114,7 @@ struct SearchStateSelectionTests {
         #expect(state.results.first(where: { $0.id == ocrHit.id })?.isSelected == true)
     }
 
-    // MARK: - §4.3 J/K Filter Respect
+    // MARK: - J/K Filter Respect
 
     @Test("J/K navigation skips OCR results when sourceFilter is .textOnly")
     func jkNavigationRespectsSourceFilter() {
@@ -264,7 +264,7 @@ struct SearchStateSelectionTests {
         #expect(state.currentResult?.id == textP1.id)
     }
 
-    // MARK: - result(for:) O(1) lookup (SA-1, D-71)
+    // MARK: - result(for:) O(1) lookup
 
     @Test("result(for:) returns the live value by id and nil for absent ids")
     func resultForIDLookup() {

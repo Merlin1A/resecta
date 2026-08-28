@@ -2,30 +2,29 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// WU-71 / [P10] path (a) — Codable round-trip + the load-bearing
-// missing-key decode invariant per RR-42. The optional `rationale`
+// Codable round-trip + the load-bearing
+// missing-key decode invariant. The optional `rationale`
 // associated value on `RedactionRegion.Source.detectedPII` /
 // `.searchMatch` MUST decode as `nil` when the encoded JSON omits the
 // key — the synthesized Codable shape would throw
 // `DecodingError.keyNotFound(.rationale, ...)` instead, which is why
 // the source file uses a custom `init(from:)` with `decodeIfPresent`.
 //
-// Test rename: was `backCompatDecode()`. Renamed per audit-3 because
+// Test rename: was `backCompatDecode()`. Renamed because
 // `RedactionRegion` was never previously Codable — there are no shipped
 // fixtures to be back-compatible with. The new name reflects the
 // actual assertion: a hand-crafted JSON without the rationale key
 // decodes successfully with `rationale == nil`.
 
-@Suite("RedactionRegion rationale Codable (WU-71)")
+@Suite("RedactionRegion rationale Codable")
 struct RedactionRegionRationaleTests {
 
     @Test("Hand-crafted JSON without rationale key decodes with rationale = nil")
     func missingRationaleKeyDecodesAsNil() throws {
-        // Load-bearing per RR-42. Synthesized Codable would throw
+        // Load-bearing: synthesized Codable would throw
         // `DecodingError.keyNotFound(.rationale, ...)` for this payload.
         // The custom `init(from:)` uses `decodeIfPresent` so a missing
-        // key surfaces as `nil`. Test pin per DEFINITION_OF_DONE
-        // engine-WU section.
+        // key surfaces as `nil`.
         //
         // Encode a "rationale-less" region via Codable so the test
         // tracks Apple's CGRect wire format rather than hand-coding it.

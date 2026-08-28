@@ -2,12 +2,12 @@ import Testing
 import PDFKit
 @testable import RedactionEngine
 
-// F-001 — Sync `validateRegexPattern` rejects catastrophic shapes that
+// `validateRegexPattern` rejects catastrophic shapes that
 // compile cleanly under the legacy `hasNestedQuantifiers` heuristic, plus
 // a cancellation-propagation check that exercises the `.reportProgress`
 // path through the full-scan branch.
 
-@Suite("Regex search hardening (F-001)", .tags(.search))
+@Suite("Regex search hardening", .tags(.search))
 struct RegexSearchHardeningTests {
 
     // MARK: - Validation rejects catastrophic shapes
@@ -131,7 +131,7 @@ struct RegexSearchHardeningTests {
         #expect(!observed.isEmpty, "expected timeout sink to fire on at least one page; observed=\(observed)")
     }
 
-    // MARK: - Package C — `UserTermMatcher.alwaysFlagHits` runtime defense
+    // MARK: - `UserTermMatcher.alwaysFlagHits` runtime defense
 
     /// Build a `UserTermMatcher` whose always-flag list bypasses
     /// `validateRegexPattern` so a known-pathological shape (catastrophic
@@ -156,14 +156,14 @@ struct RegexSearchHardeningTests {
 
     @Test("alwaysFlagHits surfaces a timeout via the `.reportProgress` path")
     func alwaysFlagHitsTimesOutOnPathologicalPattern() {
-        // The F-001 anchor mandates `[.reportProgress]` so the enumerator
-        // fires the per-match closure BETWEEN match attempts on long
-        // walks. This test pins that wiring: a simple `a` pattern over a
+        // `[.reportProgress]` is what lets the enumerator fire the
+        // per-match closure BETWEEN match attempts on long walks. This
+        // test pins that wiring: a simple `a` pattern over a
         // long `aaaa…` body produces many fast match attempts; the
         // closure's `ContinuousClock` check trips somewhere mid-walk and
         // the timeout exit records the pattern in `timedOutPatterns`. A
-        // wiring regression that drops `[.reportProgress]` (the audit's
-        // §1.1.a defect) makes the closure never fire on long alternation
+        // wiring regression that drops `[.reportProgress]` makes the
+        // closure never fire on long alternation
         // walks — the function runs to completion and `timedOutPatterns`
         // stays empty.
         //

@@ -94,7 +94,7 @@ struct TextNormalizerTests {
         #expect(TextNormalizer.normalize("\u{FB01}") == "fi")
     }
 
-    // MARK: - S7 / design 04 §4.4 — Smart Punctuation
+    // MARK: - Smart Punctuation
 
     @Test("Smart single quotes fold to apostrophes")
     func smartQuotesNormalized() {
@@ -116,7 +116,7 @@ struct TextNormalizerTests {
                 "1:1 map must preserve UTF-16 length for NSRange validity")
     }
 
-    // MARK: - S7 / design 04 §4.4 — Separator Strip + Offset Map
+    // MARK: - Separator Strip + Offset Map
 
     @Test("Separator strip on hyphenated SSN with exact offset map")
     func separatorStrip() {
@@ -139,14 +139,14 @@ struct TextNormalizerTests {
         #expect(map.isEmpty)
     }
 
-    @Test("SO-01 — comma strips as a digit separator with an exact offset map")
+    @Test("Comma strips as a digit separator with an exact offset map")
     func separatorStripComma() {
         let (normalized, map) = TextNormalizer.stripSeparators("1,234,567")
         #expect(normalized == "1234567")
         #expect(map == [0, 2, 3, 4, 6, 7, 8])
     }
 
-    @Test("SO-01 — comma-grouped number matches through the pipeline; rects map to the original span")
+    @Test("Comma-grouped number matches through the pipeline; rects map to the original span")
     func commaGroupedNumberMatchesWithOffsetsIntact() {
         let ext = TextNormalizer.applySearchExtensions(
             pageText: "total 1,234,567 due",
@@ -169,7 +169,7 @@ struct TextNormalizerTests {
         #expect(String(baseChars[baseStart..<baseEndExclusive]) == "1,234,567")
     }
 
-    // MARK: - S7 / design 04 §4.4 — Diacritic Fold + Offset Map
+    // MARK: - Diacritic Fold + Offset Map
 
     @Test("Diacritic folding maps Muñoz to Munoz")
     func diacriticFolding() {
@@ -230,7 +230,7 @@ struct TextNormalizerTests {
         #expect(map == [0, 1, 2])
     }
 
-    // MARK: - S7 / design 04 §4.4 — Map Composition + Extension Pipeline
+    // MARK: - Map Composition + Extension Pipeline
 
     @Test("Composed maps resolve through both length-changing steps")
     func composeOffsetMaps() {

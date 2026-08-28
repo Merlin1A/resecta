@@ -6,7 +6,7 @@ import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// CAT-217 — PipelineCoordinator security-path coverage.
+// PipelineCoordinator security-path coverage.
 //
 // The engine's PixelDestructionTests exercise fill/verify on a bare CGContext
 // via TestPipeline, deliberately sidestepping PipelineCoordinator (the
@@ -26,13 +26,13 @@ import CoreGraphics
 // pre-JPEG fill internally (a mis-wired region/mode either throws
 // fillVerificationFailed — no outputURL — or lands the fill in the wrong place,
 // which the shape assertions flag). Output rendering uses PDFPage.thumbnail —
-// NOT PDFPage.draw(), which carries the double-offset bug per CLAUDE.md.
+// NOT PDFPage.draw(), which carries the double-offset bug.
 @Suite("PipelineCoordinator security path (coordinator wiring)", .tags(.critical, .coordination))
 @MainActor
 struct PipelineCoordinatorSecurityTests {
 
     @Test(
-        "Coordinator runFullPipeline pixel-destroys every redaction region in the output (CAT-217)",
+        "Coordinator runFullPipeline pixel-destroys every redaction region in the output",
         .timeLimit(.minutes(3))
     )
     func testCoordinatorPathFillsRegionsPixelDestructively() async throws {
@@ -48,7 +48,7 @@ struct PipelineCoordinatorSecurityTests {
         await coord.documentState.activePipelineTask?.value
 
         guard let outputURL = coord.redactionState.outputURL else {
-            // CAT-229 precedent: surface the no-output path rather than bare-return
+            // Surface the no-output path rather than bare-return
             // (a bare return would pass with zero pixel assertions).
             Issue.record("outputURL was nil — coordinator did not produce output; pixel destruction was never asserted")
             return
@@ -128,7 +128,7 @@ struct PipelineCoordinatorSecurityTests {
     }
 
     @Test(
-        "Coordinator secure-rasterization output exposes no extractable text layer (CAT-217)",
+        "Coordinator secure-rasterization output exposes no extractable text layer",
         .timeLimit(.minutes(3))
     )
     func testCoordinatorPathDoesNotLeakTextInRegions() async throws {
@@ -155,7 +155,7 @@ struct PipelineCoordinatorSecurityTests {
         // Secure rasterization re-renders each page to an image, so the output
         // carries no text layer and the seeded token cannot survive as
         // extractable text. Boolean assertions only — never interpolate page
-        // text into output (ARCH §12.2 / protocol §10).
+        // text into output.
         for i in 0..<pageCount {
             guard let page = outputDoc.page(at: i) else {
                 Issue.record("Output page \(i) missing"); continue
@@ -233,8 +233,8 @@ struct PipelineCoordinatorSecurityTests {
     }
 
     /// Rasterize a PDF page into an engine-style bottom-left-origin bitmap
-    /// context for pixel sampling. Uses thumbnail (NOT PDFPage.draw(), per
-    /// CLAUDE.md). The context retains its backing buffer, so the returned
+    /// context for pixel sampling. Uses thumbnail (NOT PDFPage.draw(),
+    /// which carries the double-offset bug). The context retains its backing buffer, so the returned
     /// context is safe to sample via verifyFill while it stays in scope.
     private func renderToBitmapContext(_ page: PDFPage, scale: CGFloat) -> CGContext? {
         let box = PDFDisplayBox.mediaBox

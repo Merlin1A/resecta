@@ -3,17 +3,17 @@ import Foundation
 import RedactionEngine
 @testable import ResectaApp
 
-// WU-09 → q16/UXF-19 — mode-switch discard routed through the undo-toast
+// Mode-switch discard is routed through the undo-toast
 // pattern. The .onChange handler inside SearchAndRedactSheet snapshots
-// the session BEFORE `clearResults()` ([RR-04] reset-after-check
+// the session before `clearResults()` (reset-after-check
 // ordering), clears, then calls
 // `SearchAndRedactSheet.enqueueModeSwitchUndoToast(...)`. The toast fires
-// for ANY user-initiated clear that dropped at least one result — the
-// all-applied list that formerly cleared silently (pack 01 carve-out B)
-// included. Programmatic transitions (saved-search recall, ST-95) skip
+// for any user-initiated clear that dropped at least one result — the
+// all-applied list that formerly cleared silently (carve-out B)
+// included. Programmatic transitions (saved-search recall) skip
 // both the clear and the toast by design (carve-out A — deliberate).
 
-@Suite("Mode-switch discard undo toast (WU-09 / UXF-19)", .tags(.search))
+@Suite("Mode-switch discard undo toast", .tags(.search))
 @MainActor
 struct ModeSwitchToastTests {
 
@@ -123,7 +123,7 @@ struct ModeSwitchToastTests {
         let rs = RedactionState()
         let state = SearchState()
         state.results = [makeResult(page: 0), makeResult(page: 0), makeResult(page: 1)]
-        // 3 unapplied, but the transition is programmatic (ST-95 recall).
+        // 3 unapplied, but the transition is programmatic (a saved-search recall).
         state.isProgrammaticModeChange = true
 
         let snapshot = SearchAndRedactSheet.modeSwitchSnapshot(of: state, previousMode: .text)
@@ -175,8 +175,8 @@ struct ModeSwitchToastTests {
         #expect(state.appliedResultIDs.isEmpty)
 
         // Tap Undo via the toast's action handler. The restore is
-        // deferred one runloop turn (CAT-396 F10 deferral pattern).
-        // BH-B-07 — the target resolves through the LIVE activeSearch.
+        // deferred one runloop turn.
+        // The target resolves through the LIVE activeSearch.
         rs.activeSearch = state
         let toast = try! #require(manager.activeToasts.first)
         toast.actionHandler?()
@@ -184,7 +184,7 @@ struct ModeSwitchToastTests {
 
         #expect(state.searchModeType == .piiScan)
         #expect(state.isProgrammaticModeChange == true,
-                "the restore routes through the ST-95 programmatic hook so the .onChange handler preserves rather than re-clears")
+                "the restore routes through the saved-search-recall programmatic hook so the .onChange handler preserves rather than re-clears")
         #expect(state.results.map(\.id) == [r1.id, r2.id])
         #expect(state.appliedResultIDs == [r1.id])
         #expect(state.piiCategoryFilter == [.name])
@@ -193,9 +193,9 @@ struct ModeSwitchToastTests {
                 "clearResults() resets the applied-state chip to .all; the restore puts it back")
     }
 
-    // MARK: - BH-B-07 restore-target resolution
+    // MARK: - Restore-target resolution
 
-    @Test("BH-B-07: Undo after sheet reopen restores into the NEW live SearchState")
+    @Test("Undo after sheet reopen restores into the NEW live SearchState")
     func undoRestoresIntoReopenedSession() async {
         let manager = ToastQueueManager()
         let rs = RedactionState()
@@ -227,7 +227,7 @@ struct ModeSwitchToastTests {
         #expect(reopened.results.map(\.id) == [r1.id])
     }
 
-    @Test("BH-B-07: Undo with no live sheet mints a session and presents it")
+    @Test("Undo with no live sheet mints a session and presents it")
     func undoMintsAndPresentsWhenNoSheetIsUp() async {
         let manager = ToastQueueManager()
         let rs = RedactionState()
@@ -256,7 +256,7 @@ struct ModeSwitchToastTests {
         #expect(presented.results.map(\.id) == [r1.id])
     }
 
-    @Test("BH-B-07: Undo no-ops while a detection review is pending")
+    @Test("Undo no-ops while a detection review is pending")
     func undoNoOpsDuringPendingReview() async {
         let manager = ToastQueueManager()
         let rs = RedactionState()
@@ -308,7 +308,7 @@ struct ModeSwitchToastTests {
         #expect(manager.activeToasts.count == 1)
     }
 
-    @Test("BH-B-07: restore arms the programmatic flag only when the mode actually changes")
+    @Test("Restore arms the programmatic flag only when the mode actually changes")
     func restoreFlagOnlyOnRealModeChange() {
         let state = SearchState()
         let sameMode = state.searchModeType
@@ -339,7 +339,7 @@ struct ModeSwitchToastTests {
         #expect(SearchAndRedactSheet.unappliedMatchCount(in: state) == 0)
     }
 
-    // CAT-396 (C-J1, the "F10 deferral pattern"): the KI-4 purge re-run toast's
+    // The KI-4 purge re-run toast's
     // actionHandler defers `activeSearch = nil` + the pipeline kick-off one
     // runloop turn via `Task { @MainActor }`, so the @Observable teardown does
     // not co-mutate with `toastManager.dismiss(item)`'s synchronous
@@ -348,7 +348,7 @@ struct ModeSwitchToastTests {
     // pins that the two mutations are sequential, not simultaneous.
     // (runFullPipeline is not invoked here — the contract under test is the
     // deferral of the @Observable teardown; production defers both together.)
-    @Test("KI-4 Re-run action defers activeSearch teardown past the synchronous toast dismiss (CAT-396)")
+    @Test("KI-4 Re-run action defers activeSearch teardown past the synchronous toast dismiss")
     func ki4RerunActionDefersActiveSearchTeardown() async {
         let manager = ToastQueueManager()
         let state = RedactionState()

@@ -72,7 +72,7 @@ public struct TextNormalizer: Sendable {
     /// Separator characters removed by digit-format-insensitive matching
     /// ("123456789" matches "123-45-6789"). NFKC has already mapped
     /// NBSP → space upstream, so a plain space entry covers it.
-    /// SO-01: "," is a member — the canonical thousands separator was
+    /// "," is a member — the canonical thousands separator was
     /// the one grouping character missing from the set ("1234567"
     /// missed "1,234,567" with the toggle on). Decimal-comma risk is
     /// asymmetric by precedent: "." was always stripped.
@@ -146,7 +146,7 @@ public struct TextNormalizer: Sendable {
         public let offsetMap: [Int]?
     }
 
-    /// Apply the §4.4 recall extensions on top of an already
+    /// Apply the recall extensions on top of an already
     /// NFKC-normalized page/query pair, honoring the SearchOptions
     /// flags. Order matters: smart punctuation first (1:1, folds dashes
     /// so the separator set sees plain "-"), then diacritic fold, then

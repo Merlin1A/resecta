@@ -4,8 +4,8 @@ import PDFKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// CAT-363 — guard suite for the per-layer `PDFDocument` provisioning of the
-// parallel verification base batch. Co-located with the PERF-2 orchestration
+// Guard suite for the per-layer `PDFDocument` provisioning of the
+// parallel verification base batch. Co-located with the orchestration
 // suite (`PageParallelRasterizationTests`) and driving the same kind of
 // internal coordinator seam directly (`collectParallelBaseLayerResults`).
 //
@@ -31,7 +31,7 @@ private nonisolated final class DispatchRecorder: @unchecked Sendable {
     }
 }
 
-@Suite("CAT-363 Per-Layer Verification Documents", .tags(.critical, .coordination))
+@Suite("Per-Layer Verification Documents", .tags(.critical, .coordination))
 @MainActor
 struct ParallelVerificationDocumentTests {
 
@@ -51,7 +51,7 @@ struct ParallelVerificationDocumentTests {
 
         let recorder = DispatchRecorder()
         var verifier = VerificationEngine()
-        // ADV-2 A2-10: install the spy on the verifier VALUE before it crosses
+        // Install the spy on the verifier VALUE before it crosses
         // into the seam; the per-task copies the fan-out makes carry the closure.
         verifier.onRunLayerDispatch = { layer, id in recorder.record(layer, id) }
 

@@ -4,7 +4,7 @@ import PDFKit
 import CoreGraphics
 @testable import RedactionEngine
 
-// ARCH §3.2: Per-page pipeline mode selection based on text layer detection.
+// Per-page pipeline mode selection based on text layer detection.
 
 @Suite("Pipeline Mode Selection", .tags(.critical))
 struct PipelineModeSelectionTests {
@@ -125,11 +125,11 @@ struct PipelineModeSelectionTests {
         #expect(status == .rich || status == .sparse || status == .none)
     }
 
-    // MARK: - Gate with fallback triggers (s15: D2 rotation stopgap REMOVED; ENGINE §5A)
+    // MARK: - Gate with fallback triggers
     //
     // Mirrors the production gate in PipelineCoordinator.buildPDFPageData
     // (app target — the end-to-end tests live in PipelineCoordinatorTests).
-    // Keep this helper in lockstep with that gate. CAT-353 (D-34/D-35) removed
+    // Keep this helper in lockstep with that gate. A later fix removed
     // the `page.rotation == 0` conjunct once T_rot completed the canonical
     // coordinate contract.
 
@@ -152,7 +152,7 @@ struct PipelineModeSelectionTests {
         #expect(selectPageMode(effectiveMode: .searchableRedaction, page: page) == .searchableRedaction)
     }
 
-    @Test("RTL page forces secureRasterization (ENGINE §5A per-page fallback)")
+    @Test("RTL page forces secureRasterization (per-page fallback)")
     func rtlPageForcesSecureRasterization() throws {
         let doc = makeTextPDF(text: "هذا مستند تجريبي باللغة العربية للتحقق من مسار التراجع")
         let page = try #require(doc.page(at: 0))
@@ -160,11 +160,11 @@ struct PipelineModeSelectionTests {
         #expect(selectPageMode(effectiveMode: .searchableRedaction, page: page) == .secureRasterization)
     }
 
-    @Test("CAT-353 (s15): rotated rich page now takes searchableRedaction", arguments: [90, 180, 270])
+    @Test("Rotated rich page now takes searchableRedaction", arguments: [90, 180, 270])
     func rotatedPageTakesSearchable(rotation: Int) throws {
-        // s15 stopgap removal (D-34/D-35): the canonical coordinate contract
+        // Stopgap removal: the canonical coordinate contract
         // (T_rot) makes rotated rich pages safe for searchable mode; the former
-        // D2 stopgap that forced secureRasterization here is gone.
+        // rotation stopgap that forced secureRasterization here is gone.
         let doc = makeTextPDF(text: "Sufficient plain English text for rich detection in this page.")
         let page = try #require(doc.page(at: 0))
         page.rotation = rotation
@@ -179,9 +179,9 @@ struct PipelineModeSelectionTests {
         #expect(selectPageMode(effectiveMode: .searchableRedaction, page: page) == .searchableRedaction)
     }
 
-    @Test("Sample statement selects searchable on all three pages (RC-9 regression)")
+    @Test("Sample statement selects searchable on all three pages")
     func sampleStatementAllPagesSearchable() throws {
-        // Before the PD-5 diversity floor, the length-confounded ratio
+        // Before the diversity floor, the length-confounded ratio
         // rasterized the sample doc's dense pages (p2, p3) — a Searchable-mode
         // run reported "1 Searchable, 2 Rasterized" on a fully born-digital
         // document. All three pages must take searchable mode through the

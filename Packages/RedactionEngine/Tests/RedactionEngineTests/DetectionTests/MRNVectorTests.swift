@@ -2,14 +2,14 @@ import Testing
 import Foundation
 @testable import RedactionEngine
 
-// D-19 fixture-driven test for MRN detection. The DataPipeline-generated
+// Fixture-driven test for MRN detection. The DataPipeline-generated
 // vectors at Fixtures/vectors/mrn_test_vectors.json carry three labeled
 // shapes (MRN-prefix, Patient-ID-prefix, institution-prefix). This test
 // asserts that every valid row's text matches at least one of the three
 // inline MRN patterns. MRNDetectorTests.swift covers other surfaces;
 // this file is fixture-driven specifically.
 
-@Suite("MRN fixture-driven vector tests (D-19)")
+@Suite("MRN fixture-driven vector tests")
 struct MRNVectorTests {
 
     struct Vectors: Decodable {
@@ -32,7 +32,7 @@ struct MRNVectorTests {
         return try JSONDecoder().decode(Vectors.self, from: data).vectors
     }
 
-    @Test("D-19 fixture loads with rows")
+    @Test("Fixture loads with rows")
     func fixtureLoads() throws {
         guard let vectors = try loadVectors() else {
             Issue.record("mrn_test_vectors.json not bundled")

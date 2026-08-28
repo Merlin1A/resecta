@@ -6,7 +6,7 @@ import UIKit
 #endif
 @testable import RedactionEngine
 
-// TEST §3.8 — Fill verification edge cases.
+// Fill verification edge cases.
 // memcmp equivalence, bounds clamping, and minimum dimension filtering.
 
 @Suite("Fill Verification Edge Cases")
@@ -94,9 +94,9 @@ struct FillVerificationEdgeTests {
         // Region extends past page edge: x=0.95, width=0.1 → maxX=1.05
         let overflowing = CGRect(x: 0.95, y: 0.95, width: 0.1, height: 0.1)
         let result = normalizedToFillPixels(overflowing, bitmapWidth: bw, bitmapHeight: bh)
-        // The normalized input is clamped to [0,1] BEFORE scaling; the §3.2a
+        // The normalized input is clamped to [0,1] BEFORE scaling; the
         // 1-px outward expansion then overhangs the bitmap by exactly one
-        // pixel (fills clip at the bitmap, verifyFill clamps — PD-4-1).
+        // pixel (fills clip at the bitmap, verifyFill clamps).
         #expect(result.maxX == CGFloat(bw) + 1, "Clamp then 1-px expansion")
         #expect(result.maxY == CGFloat(bh) + 1, "Clamp then 1-px expansion")
         #expect(result.minX >= 0, "Interior origin stays inside the bitmap")
@@ -108,7 +108,7 @@ struct FillVerificationEdgeTests {
         let bw = 100, bh = 100
         let valid = CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4)
         let result = normalizedToFillPixels(valid, bitmapWidth: bw, bitmapHeight: bh)
-        // Direct scaling, pixel-aligned, then the §3.2a expansion.
+        // Direct scaling, pixel-aligned, then the 1-px outward expansion.
         let expected = CGRect(
             x: 0.1 * CGFloat(bw), y: 0.2 * CGFloat(bh),
             width: 0.3 * CGFloat(bw), height: 0.4 * CGFloat(bh)

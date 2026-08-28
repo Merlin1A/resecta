@@ -4,13 +4,11 @@ import CoreGraphics
 import RedactionEngine
 @testable import ResectaApp
 
-// DRAW-4 — Cross-page entity linking. Tests the locked normalize-and-
+// Cross-page entity linking. Tests the locked normalize-and-
 // exact-match clustering across all PII categories and the atomic
 // "accept group" undo behavior in the entity-group origin of `applyFindings`.
 //
-// Decision references:
-//   - plan.md §4 DRAW-4
-//   - decisions.md Batch 7 Q2 (normalize-and-exact-match over fuzzy)
+// The clustering design chose normalize-and-exact-match over fuzzy matching.
 //
 // Hard stops these tests pin:
 //   - Clustering is **within the same PII category only** — same canonical
@@ -20,7 +18,7 @@ import RedactionEngine
 //   - The triage sheet exposes a "Grouped" view mode peer to byPage /
 //     byType / byConfidence (four view modes total).
 
-@Suite("Cross-page entity linking (DRAW-4)")
+@Suite("Cross-page entity linking")
 @MainActor
 struct CrossPageEntityLinkingTests {
 
@@ -203,7 +201,7 @@ struct CrossPageEntityLinkingTests {
         let groups = CrossPageEntityGroup.clusters(from: state.pendingTriage ?? [:])
 
         // Expect two groups — one per category — not a single merged
-        // cluster. Hard stop in DRAW-4: clustering is within-category only.
+        // cluster: clustering stays within-category only.
         #expect(groups.count == 2)
         let categories = Set(groups.map(\.category))
         #expect(categories == Set([.name, .address]))
@@ -215,9 +213,9 @@ struct CrossPageEntityLinkingTests {
         }
     }
 
-    // MARK: - 6. UXF-29 — Apply Group then Apply N must not double-create
+    // MARK: - 6. Apply Group then Apply N must not double-create
 
-    @Test("Apply Group followed by Apply N creates one region per accepted detection (UXF-29)")
+    @Test("Apply Group followed by Apply N creates one region per accepted detection")
     func testGroupApplyThenTriageApplyCreatesEachDetectionOnce() async {
         let state = RedactionState()
         seedPending(state, items: [
@@ -257,9 +255,9 @@ struct CrossPageEntityLinkingTests {
         #expect(state.regions[2]?.count == 1)
     }
 
-    // MARK: - 7. UXF-29 — repeated Apply Group taps must not re-create
+    // MARK: - 7. Repeated Apply Group taps must not re-create
 
-    @Test("A second Apply Group tap creates no additional regions (UXF-29)")
+    @Test("A second Apply Group tap creates no additional regions")
     func testRepeatedGroupApplyIsIdempotent() async {
         let state = RedactionState()
         seedPending(state, items: [
