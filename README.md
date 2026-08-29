@@ -6,7 +6,7 @@ On-device iOS 26 PDF and image redaction. Free, open-source, zero data collectio
 
 **License:** [Apache License 2.0](./LICENSE)
 
-**Version:** 1.0 — see the [CHANGELOG](./CHANGELOG.md).
+**Version:** 1.1.0 — see the [CHANGELOG](./CHANGELOG.md).
 
 Every pull request builds the app and both test bundles, runs the audit and claims lints on the diff, and checks the shipped-asset hashes; the full engine suite and the simulator suite run on demand and on release tags.
 
@@ -54,25 +54,25 @@ flowchart LR
 
 _All stages run on-device; the redaction pipeline makes no network calls. Verification is a check, not a substitute for human review of the output._
 
-## V1.0 known limitations
+## Known limitations
 
-V1.0 ships the core workflow described above. The following items
+Resecta ships the core workflow described above. The following items
 were deliberately deferred to a future release:
 
 - **No "Compose" search sub-mode.** The app ships two marking
   interfaces: Scan, which runs the on-device PII text detectors, and
   Search, with three modes (Text, Regex, Multi-term). A Compose mode
-  for stacked filter combinations is V1.1+ scope.
+  for stacked filter combinations is deferred to a future release.
 - **No per-region exemption tagging.** User-defined detection terms
   live in a flat `UserTermsStore` (always-flag / never-flag lists)
   and `SavedRegexStore` (saved-regex library). Per-region FOIA
-  exemption labels are V1.1+ scope.
+  exemption labels are deferred to a future release.
 - **No audit export.** The match-audit export surface is disabled in
   V1.0. Its v4 wire schema (`schemaVersion = 4`) ships in code for a
-  future release; a v3 column-subset export path is V1.1+ scope.
+  future release; a v3 column-subset export path is deferred as well.
 - **Single-entry Custom Terms CRUD.** Bulk operations (paste-many,
-  CSV import / export, share-profile) are V1.1+ scope.
-- **Secure-enclave-backed persistence is V1.1+ scope.** V1.0 already
+  CSV import / export, share-profile) are deferred to a future release.
+- **Secure-enclave-backed persistence is deferred to a future release.** Resecta already
   retains Custom Terms (`UserTermsStore` always-flag / never-flag lists)
   and the saved-regex library (`SavedRegexStore`) across app launches by
   storing them in `UserDefaults` (keys `userTerms.v1` / `savedRegexes.v1`).
@@ -126,7 +126,7 @@ App source lives in `Sources/ResectaApp/`. The redaction engine is an SPM packag
 
 ## Contributor quickstart
 
-A stranger can clone, build, and start contributing in under an hour with these steps:
+A stranger can clone, build, and start contributing with these steps:
 
 1. **Clone and install hooks.**
 
@@ -184,7 +184,6 @@ Scripts/test-batched.sh ResectaApp
 cd Packages/RedactionEngine && swift test --no-parallel
 ```
 
-The batched runner executes the app suites in serial batches on an iPhone 17 simulator and ends with a `VERDICT:` line; the engine package runs serially via SwiftPM on the Mac host. Output markers, exit codes, and the on-device name-model note are in the Tests section of [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Contributing
 

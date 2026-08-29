@@ -16,7 +16,7 @@ When reproducing a report, please use the synthetic test corpus bundled with the
 Please report suspected vulnerabilities through either of the following channels:
 
 - **Email:** `security@resecta.app`.
-- **GitHub Security Advisories:** open a private advisory on the Resecta repository's *Security* tab (available once the repository is public).
+- **GitHub Security Advisories:** open a private advisory on the Resecta repository's *Security* tab.
 
 Please **do not** file public GitHub issues for security reports until the issue has been addressed and coordinated disclosure has been agreed upon.
 

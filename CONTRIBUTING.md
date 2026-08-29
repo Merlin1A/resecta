@@ -4,7 +4,7 @@ Thanks for your interest in contributing. This document covers the workflow, com
 
 ## Project organization
 
-Resecta is open-source and AI-assisted. External contributors file a PR against `main` and the maintainer routes it.
+Resecta is open-source and AI-assisted.
 
 - **App target:** `Sources/ResectaApp/` — iOS 26, Swift 6.2, MainActor default.
 - **Engine package:** `Packages/RedactionEngine/` — SPM library, non-MainActor with `@concurrent`, Swift 6.2 strict concurrency. Import-friendly for non-app consumers.
@@ -78,7 +78,7 @@ The audit checklist has two halves: mechanical checks the local pre-commit hook 
 
 The hook (`Scripts/audit-lint.sh`) runs on every commit and blocks the commit on:
 
-- **M-1.** Forbidden-token matches in staged `.swift`, `.xcstrings`, or `.md` diff lines. The regex pattern lives in `Scripts/audit-lint.sh`; the rules are summarized in the "Mechanism-description language" section below. Override on the same line with `LegalPhrases:safe` only when a legitimate Swift control-flow keyword is the trigger (rare).
+- **M-1.** Forbidden-token matches in staged `.swift`, `.xcstrings`, or `.md` diff lines. The regex pattern lives in `Scripts/audit-lint.sh`; the rules are summarized in the "Mechanism-description language" section below.
 - **M-3.** Banned networking symbols in `Sources/` or `Packages/`. Override with `Networking:exempt SafariView` on the same line for SafariView-adjacent helpers.
 - **M-4.** `@AppStorage` declarations inside `@Observable` class bodies.
 - **M-5.** Banned APIs (`PKCanvasView`, `PDFPage.draw`).
@@ -99,7 +99,7 @@ The hook (`Scripts/audit-lint.sh`) runs on every commit and blocks the commit on
 
 User-facing strings, doc comments, and commit messages describe what the code does (the mechanism), not what the user experiences (the outcome). Outcome claims create express warranty risk.
 
-The rules cover six claim categories — security, technical architecture, comparative, use-case, AI-preparation, and feature — each pairing an unsafe phrasing with a mechanism-description rewrite. Read this section before adding user-facing strings; the pre-commit hook is the mechanical floor, and a manual review pass is required for borderline cases.
+Read this section before adding user-facing strings; the pre-commit hook is the mechanical floor, and a manual review pass is required for borderline cases.
 
 When a legitimate Swift control-flow keyword triggers M-1 (typical case is a `do { try ... }` error-handling block), add `LegalPhrases:safe` as a trailing comment on the same line. The override is rare; if it appears more than a few times in a single change, the language is probably drifting and needs a rewrite.
 
@@ -146,4 +146,4 @@ Name and search tests exercise the system on-device name-recognition model (`NLT
 
 - Build or test issues: open a GitHub issue.
 - Security disclosures: see [`SECURITY.md`](./SECURITY.md).
-- Conduct or other concerns: route through the security disclosure address listed in [`SECURITY.md`](./SECURITY.md) until a separate channel is published.
+- Conduct or other concerns: see [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md).
