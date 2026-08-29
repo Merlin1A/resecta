@@ -8,6 +8,10 @@ The entries below follow the Keep-a-Changelog index format.
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation: shorter code of conduct; README/CONTRIBUTING/SECURITY trimmed and corrected.
+
 ## [1.1.0] — 2026-08-28
 
 ### Added

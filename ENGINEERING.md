@@ -266,7 +266,7 @@ assets. The contract between the two repos is enforced, not eyeballed:
   key, both produced by the pipeline's signing step. Stated plainly: **the
   signature covers the manifest file itself** — it proves the manifest is the
   one the pipeline signed, and it does not hash every asset's bytes at load.
-  Extending the manifest to carry per-asset content hashes is on the post-1.0
+  Extending the manifest to carry per-asset content hashes is on the deferred
   list. On any verification failure, detection degrades with a visible banner
   — never silently.
 - What that verdict governs, precisely: the manifest enumerates the two Bloom

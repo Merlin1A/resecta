@@ -47,13 +47,6 @@ python build_bloom.py \
     --manifest-version 1.0.0
 ```
 
-### Validate FPR (after building)
-
-```bash
-python fpr_validation.py \
-    --filters-dir ../../Packages/RedactionEngine/Sources/RedactionEngine/Resources/Gazetteers
-```
-
 ## Binary Format (RSBF v1)
 
 See `BloomFilter.swift` for the full specification. Summary:

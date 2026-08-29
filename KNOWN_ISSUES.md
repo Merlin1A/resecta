@@ -63,6 +63,8 @@ deferred to post-v1.
 
 **Workaround:** Manually delete duplicate regions before applying redaction.
 
+---
+
 ### KI-9: Per-Page Render Timeout Reports, Not Bounds (Low–Medium)
 **Affects:** Redaction pipeline (page rasterization)
 

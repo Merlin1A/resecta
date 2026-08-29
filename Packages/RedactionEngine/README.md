@@ -12,7 +12,7 @@ SwiftUI surface.
 V1.x. Public surface is stable for in-tree consumers; external SPM
 consumption is supported and the package follows semantic versioning
 from 1.0.0, matching the `.package(url: ..., from: "1.0.0")` pin below. A
-per-symbol DocC catalog is deferred to V1.1+; package-level orientation
+per-symbol DocC catalog is deferred to a future release; package-level orientation
 lives in this README.
 
 ## Public surface
@@ -42,7 +42,7 @@ shared types.
   release-build implementation compiles to no-ops.
 - **Models** — Defines public data structures for the pipeline:
   detection results, page output, document profile (PDF annotation
-  classification — unrelated to the removed `RedactionProfile` type),
+  classification),
   keyword profiles (per-detector context-window tuning), pipeline modes,
   and verification metadata that cross subdirectory boundaries. User
   term and saved-regex persistence lives in the app target
@@ -113,8 +113,7 @@ set:
 4. Add a local invariant test (run on iPhone 17 simulator before
    release) that the file's keywords are drawn from the closed
    vocabulary — this blocks accidental introduction of document-derived
-   strings into the bundled corpus. There are no automated CI gates;
-   manual verification gates each release.
+   strings into the bundled corpus.
 
 ## Concurrency
 
