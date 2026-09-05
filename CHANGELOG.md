@@ -11,6 +11,7 @@ The entries below follow the Keep-a-Changelog index format.
 ### Changed
 
 - Documentation: shorter code of conduct; README/CONTRIBUTING/SECURITY trimmed and corrected.
+- Documentation: the README links the App Store listing and resecta.app.
 
 ## [1.1.0] — 2026-08-28
 

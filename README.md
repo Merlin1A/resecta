@@ -2,7 +2,11 @@
 
 [![ci](https://github.com/Merlin1A/resecta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Merlin1A/resecta/actions/workflows/ci.yml)
 
+[![Download on the App Store](https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1786492800)](https://apps.apple.com/us/app/resecta/id6786922787)
+
 On-device iOS 26 PDF and image redaction. Free, open-source, zero data collection — all processing happens on your device.
+
+**App Store:** [apps.apple.com/us/app/resecta/id6786922787](https://apps.apple.com/us/app/resecta/id6786922787) · **Website:** [resecta.app](https://resecta.app)
 
 **License:** [Apache License 2.0](./LICENSE)
 
