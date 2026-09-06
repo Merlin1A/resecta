@@ -491,3 +491,106 @@ struct AttentionRowCompositionTests {
         #expect(label.contains("'DELIA' is still readable on pages 2 and 3."))
     }
 }
+
+// MARK: - Search Re-check query lines
+
+@Suite("Search Re-check query lines", .tags(.display))
+@MainActor
+struct SearchRecheckQueryLineDisplayTests {
+
+    private func recheckLayer(
+        status: VerificationStatus,
+        queryLines: [SearchRecheckQueryLine]?,
+        reviewTermTexts: [String]? = nil,
+        pages: [Int]? = nil
+    ) -> LayerResult {
+        LayerResult(
+            name: VerificationLayer.searchRecheck.name,
+            symbolName: VerificationLayer.searchRecheck.symbolName,
+            status: status,
+            shortDescription: "engine short line", detailDescription: "engine detail",
+            pageReferences: pages, durationSeconds: 0,
+            reviewTermTexts: reviewTermTexts, layer: .searchRecheck,
+            queryLines: queryLines)
+    }
+
+    @Test("queryLineTexts composes label · found · applied · remain, the badges, the cap, and per-term sub-lines")
+    func queryLineComposition() {
+        let plain = SearchRecheckQueryLine(
+            label: "\u{201C}Delia\u{201D}", foundCount: 9, foundHitCap: false,
+            appliedCount: 9, remainingCount: 0, route: .ocr)
+        let badged = SearchRecheckQueryLine(
+            label: "\u{201C}Delia\u{201D}", foundCount: 3, foundHitCap: false,
+            appliedCount: 2, remainingCount: 1, route: .textLayer,
+            optionBadges: ["case-sensitive", "whole word"])
+        let capped = SearchRecheckQueryLine(
+            label: "\u{201C}\\d{3}-\\d{2}-\\d{4}\u{201D}", foundCount: 1000, foundHitCap: true,
+            appliedCount: 12, remainingCount: 3, route: .mixed(textPages: 1, ocrPages: 2))
+        let multi = SearchRecheckQueryLine(
+            label: "alpha, beta, gamma +1", foundCount: 6, foundHitCap: false,
+            appliedCount: 4, remainingCount: 1, route: .textLayer,
+            perTerm: [
+                .init(term: "alpha", found: nil, applied: nil, remaining: 0),
+                .init(term: "beta", found: 4, applied: 2, remaining: 1),
+            ])
+
+        #expect(LayerResultRow.queryLineText(plain) == "\u{201C}Delia\u{201D} · found 9 · applied 9 · 0 remain")
+        #expect(LayerResultRow.queryLineText(badged)
+                == "\u{201C}Delia\u{201D} · found 3 · applied 2 · 1 remain · case-sensitive · whole word")
+        #expect(LayerResultRow.queryLineText(capped)
+                == "\u{201C}\\d{3}-\\d{2}-\\d{4}\u{201D} · found 1,000+ · applied 12 · 3 remain")
+        #expect(LayerResultRow.perTermLineTexts(plain).isEmpty)
+        #expect(LayerResultRow.perTermLineTexts(multi)
+                == ["\u{201C}alpha\u{201D} · 0 remain", "\u{201C}beta\u{201D} · found 4 · applied 2 · 1 remain"])
+
+        let layer = recheckLayer(status: .pass, queryLines: [plain, multi])
+        #expect(LayerResultRow.queryLineTexts(layer: layer) == [
+            "\u{201C}Delia\u{201D} · found 9 · applied 9 · 0 remain",
+            "alpha, beta, gamma +1 · found 6 · applied 4 · 1 remain",
+            "\u{201C}alpha\u{201D} · 0 remain",
+            "\u{201C}beta\u{201D} · found 4 · applied 2 · 1 remain",
+        ])
+        // No lines on the INFO row and on every other layer.
+        #expect(LayerResultRow.queryLineTexts(layer: recheckLayer(status: .info("x"), queryLines: nil)).isEmpty)
+        #expect(LayerResultRow.queryLineTexts(layer: recheckLayer(status: .pass, queryLines: [])).isEmpty)
+        // Vocabulary fence: the composed lines carry none of the app's
+        // banned outcome terms (the same list `LegalPhraseLintTests` guards).
+        for text in LayerResultRow.queryLineTexts(layer: layer) {
+            let lowered = text.lowercased()
+            for term in LegalPhrases.bannedTerms {
+                #expect(!lowered.contains(term.lowercased()), "query line carries a banned term: \(term)")
+            }
+        }
+    }
+
+    @Test("An attention re-check row reuses reviewRowText verbatim and still exposes its query lines")
+    func attentionRowReusesReviewRowText() {
+        let line = SearchRecheckQueryLine(
+            label: "\u{201C}Delia\u{201D}", foundCount: 9, foundHitCap: false,
+            appliedCount: 8, remainingCount: 1, route: .ocr)
+        let layer = recheckLayer(
+            status: .attention("Re-ran 1 search — 1 match remains on page 2"),
+            queryLines: [line], reviewTermTexts: ["Delia"], pages: [1])
+
+        // The collapsed subtitle IS the Layer-3 sentence — no copy fork.
+        #expect(LayerResultRow.rowSubtitleText(layer: layer)
+                == LayerResultRow.reviewRowText(termTexts: ["Delia"], pages: [1]))
+        #expect(LayerResultRow.rowSubtitleText(layer: layer)
+                == "'Delia' is still readable on page 2. It matches text you redacted elsewhere. "
+                + "Use text search to redact remaining instances.")
+        let spoken = LayerResultRow.accessibilityLabel(layerIndex: 6, layer: layer)
+        #expect(spoken.hasPrefix("Layer 6, Search Re-check, Check needs review. 'Delia' is still readable on page 2."))
+        #expect(spoken.contains("1 affected page"))
+        // The expanded detail's query line names the counts.
+        #expect(LayerResultRow.queryLineTexts(layer: layer) == ["\u{201C}Delia\u{201D} · found 9 · applied 8 · 1 remain"])
+        // The masthead names the text once even when Layer 3 reports it too.
+        let layer3 = LayerResult(
+            name: "Binary String Search", symbolName: "shield",
+            status: .attention("Text matching your redactions is still readable on 1 page: 2 (1 instance)"),
+            shortDescription: "", detailDescription: "",
+            pageReferences: [1], durationSeconds: 0, reviewTermTexts: ["Delia"])
+        let report = VerificationReport(
+            layers: [layer3, layer], overallStatus: .attention("x"), durationSeconds: 0)
+        #expect(VerificationResultsView.mastheadSubtitle(report: report) == "Unredacted text remains: 'Delia'")
+    }
+}

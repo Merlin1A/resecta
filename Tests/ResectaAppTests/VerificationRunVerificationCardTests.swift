@@ -147,7 +147,8 @@ struct VerificationRunVerificationCardTests {
         redaction.recordLastRunInputs(
             perPageModes: [.searchableRedaction, .secureRasterization],
             perPageFallbackReasons: [nil, .rtlText],
-            sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")])
+            sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")],
+            appliedSearches: [])
         #expect(redaction.lastRunPerPageModes == [.searchableRedaction, .secureRasterization])
         #expect(redaction.lastRunPerPageFallbackReasons == [nil, .rtlText])
         #expect(redaction.lastRunSensitiveTerms == [SensitiveTerm(text: "Delia Hartwell")])
@@ -165,7 +166,8 @@ struct VerificationRunVerificationCardTests {
         redaction.recordLastRunInputs(
             perPageModes: [.secureRasterization],
             perPageFallbackReasons: [nil],
-            sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")])
+            sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")],
+            appliedSearches: [])
         redaction.clearForNewDocument()
         #expect(redaction.lastRunPerPageModes == nil)
         #expect(redaction.lastRunPerPageFallbackReasons == nil)
@@ -198,7 +200,8 @@ struct VerificationRunVerificationCardTests {
         redactionState.recordLastRunInputs(
             perPageModes: originalModes,
             perPageFallbackReasons: originalReasons,
-            sensitiveTerms: [])
+            sensitiveTerms: [],
+            appliedSearches: [])
         documentState.lastUsedPipelineMode = .secureRasterization
         documentState.phase = .verified(report: .skipped)
 
@@ -237,7 +240,8 @@ struct VerificationRunVerificationCardTests {
         redactionState.recordLastRunInputs(
             perPageModes: [.secureRasterization],
             perPageFallbackReasons: [nil],
-            sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")])
+            sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")],
+            appliedSearches: [])
         documentState.lastUsedPipelineMode = .secureRasterization
         documentState.phase = .verified(report: .skipped)
 

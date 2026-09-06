@@ -95,9 +95,14 @@ struct SearchRedactIntegrationTests {
 
         await redactionState.applyFindings(.selectedSearchResults, undoManager: undoManager)
         #expect(redactionState.regions[0]?.count == 2)
+        #expect(redactionState.appliedMatchAudit.count == 2)
 
         undoManager.undo()
         #expect(redactionState.regions[0]?.isEmpty ?? true)
+        // The stamped audit snapshots leave with their regions — the
+        // snapshot is the undo unit, so no orphaned record can feed a
+        // later run's applied-search derivation.
+        #expect(redactionState.appliedMatchAudit.isEmpty)
     }
 
     @Test("Redo restores search-originated regions")
@@ -114,6 +119,99 @@ struct SearchRedactIntegrationTests {
 
         undoManager.redo()
         #expect(redactionState.regions[0]?.count == 1)
+        // Redo restores the same stamped snapshot, record included.
+        let restored = redactionState.regions[0].flatMap(\.first).flatMap { redactionState.appliedMatchAudit[$0.id] }
+        #expect(restored?.searchRecord == search.appliedSearchRecord())
+    }
+
+    // MARK: - Applied-search record stamp (the Search Re-check seam)
+
+    @Test("Bulk apply stamps every search-origin snapshot with the session's applied-search record")
+    func bulkApplyStampsSearchRecord() async {
+        let redactionState = RedactionState()
+        let search = SearchState()
+        search.searchModeType = .text
+        search.queryText = "secret"
+        var options = SearchOptions()
+        options.caseSensitive = true
+        search.options = options
+        // Three found, two selected: found counts the session's results,
+        // applied counts the regions the apply creates.
+        search.results = [
+            makeResult(pageIndex: 0, term: "secret"),
+            makeResult(pageIndex: 1, term: "secret"),
+            makeResult(pageIndex: 1, term: "secret", isSelected: false,
+                       normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.3, height: 0.04))
+        ]
+        redactionState.activeSearch = search
+
+        let outcome = await redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
+
+        #expect(outcome?.applied == 2)
+        let expected = AppliedSearchRecord(
+            query: AppliedSearchQuery(kind: .text("secret"), options: options),
+            foundCount: 3)
+        #expect(search.appliedSearchRecord() == expected)
+        let snapshots = redactionState.appliedMatchAuditSnapshots
+        #expect(snapshots.count == 2)
+        #expect(snapshots.allSatisfy { $0.searchRecord == expected },
+                "every snapshot of the pass carries the same record")
+        // The derivation the coordinator runs at run entry sees one request.
+        let requests = PipelineCoordinator.appliedSearches(
+            fromRegions: redactionState.regions, audit: redactionState.appliedMatchAudit)
+        #expect(requests == [SearchRecheckRequest(record: expected, appliedCount: 2, appliedPages: [0, 1])])
+    }
+
+    @Test("Single-result apply stamps the record too")
+    func singleResultApplyStampsSearchRecord() async {
+        let redactionState = RedactionState()
+        let search = SearchState()
+        search.searchModeType = .regex
+        search.queryText = "sec.et"
+        let result = makeResult(pageIndex: 0, term: "sec.et", isSelected: false)
+        search.results = [result, makeResult(pageIndex: 1, term: "sec.et")]
+        redactionState.activeSearch = search
+
+        let outcome = await redactionState.applyFindings(.searchResult(id: result.id), undoManager: nil)
+
+        #expect(outcome?.applied == 1)
+        let snapshot = redactionState.regions[0]?.first.flatMap { redactionState.appliedMatchAudit[$0.id] }
+        #expect(snapshot?.searchRecord
+                == AppliedSearchRecord(
+                    query: AppliedSearchQuery(kind: .regex("sec.et"), options: SearchOptions()),
+                    foundCount: 2))
+    }
+
+    @Test("A piiScan session stamps nil — a detector run is not a typed search")
+    func piiScanSessionStampsNil() async {
+        let redactionState = RedactionState()
+        let search = SearchState()
+        search.searchModeType = .piiScan
+        search.results = [makeResult(pageIndex: 0, term: "Name", piiCategory: .name)]
+        redactionState.activeSearch = search
+
+        await redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
+
+        #expect(search.appliedSearchRecord() == nil)
+        #expect(redactionState.appliedMatchAudit.count == 1)
+        #expect(redactionState.appliedMatchAudit.values.allSatisfy { $0.searchRecord == nil })
+        #expect(PipelineCoordinator.appliedSearches(
+            fromRegions: redactionState.regions, audit: redactionState.appliedMatchAudit).isEmpty)
+    }
+
+    @Test("An empty query stamps nil — nothing was searched")
+    func emptyQueryStampsNil() async {
+        let redactionState = RedactionState()
+        let search = SearchState()
+        search.searchModeType = .multiTerm
+        search.searchTerms = []
+        search.results = [makeResult(pageIndex: 0, term: "test")]
+        redactionState.activeSearch = search
+
+        await redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
+
+        #expect(redactionState.appliedMatchAudit.count == 1)
+        #expect(redactionState.appliedMatchAudit.values.allSatisfy { $0.searchRecord == nil })
     }
 
     // MARK: - Applied-badge honesty
@@ -259,7 +357,8 @@ struct SearchRedactIntegrationTests {
                 makeResult(term: "wrenfield"),
             ],
             existingRectsByPage: [:],
-            appliedAt: Date())
+            appliedAt: Date(),
+            searchRecord: nil)
 
         let kinds = prepared.createdMetadata.values.map(\.piiKind)
         #expect(kinds.contains(.pii(.name)),
@@ -276,7 +375,8 @@ struct SearchRedactIntegrationTests {
                 makeResult(term: "wrenfield"),
             ],
             existingRectsByPage: [:],
-            appliedAt: Date())
+            appliedAt: Date(),
+            searchRecord: nil)
 
         let labels = Set(prepared.createdMetadata.values.map(\.badgeLabel))
         #expect(labels == ["Phone", "Find"],  // LegalPhrases:safe (UI label constant)

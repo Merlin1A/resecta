@@ -61,6 +61,14 @@ nonisolated struct MatchAuditSnapshot: Sendable, Equatable {
     /// run has no typed query.
     let term: String?
     let appliedAt: Date
+    /// The applied-search record of the search session this snapshot
+    /// was applied from — typed-search origin only. Nil for scan-origin
+    /// records, for `.piiScan` sessions, and for nudge-accepted regions.
+    /// Read at run entry by the coordinator's present-region join
+    /// (`PipelineCoordinator.appliedSearches(fromRegions:audit:)`) to
+    /// build the Search Re-check requests. The display texts inside are
+    /// never logged or persisted; the export surfaces do not read it.
+    let searchRecord: AppliedSearchRecord?
 
     /// Scan-origin builder: the truthful subset a `DetectionResult`
     /// records, with `regionID` populated like every snapshot.
@@ -92,6 +100,7 @@ nonisolated struct MatchAuditSnapshot: Sendable, Equatable {
         self.rationale = nil
         self.term = nil
         self.appliedAt = appliedAt
+        self.searchRecord = nil
     }
 
     /// Search-origin memberwise shape (field-for-field what
@@ -107,7 +116,8 @@ nonisolated struct MatchAuditSnapshot: Sendable, Equatable {
         piiConfidence: Double?,
         rationale: MatchRationale?,
         term: String?,
-        appliedAt: Date
+        appliedAt: Date,
+        searchRecord: AppliedSearchRecord? = nil
     ) {
         self.origin = origin
         self.resultID = resultID
@@ -120,5 +130,6 @@ nonisolated struct MatchAuditSnapshot: Sendable, Equatable {
         self.rationale = rationale
         self.term = term
         self.appliedAt = appliedAt
+        self.searchRecord = searchRecord
     }
 }

@@ -457,6 +457,35 @@ struct ApplySeamUndoTests {
                 "the marker handler reads this inequality as a real undo")
     }
 
+    @Test("The applied-search stamp rides the lockstep undo: gone on undo, back on redo, byte-equal")
+    func searchRecordRidesLockstepUndo() async {
+        let state = RedactionState()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        let search = SearchState()
+        search.searchModeType = .text
+        search.queryText = "123-45-6789"
+        search.results = [makeSearchResult(piiCategory: nil), makeSearchResult(y: 0.3, piiCategory: nil)]
+        state.activeSearch = search
+        let expected = search.appliedSearchRecord()
+        #expect(expected != nil, "precondition: a typed query yields a record")
+
+        undo.beginUndoGrouping()
+        _ = await state.applyFindings(.selectedSearchResults, undoManager: undo)
+        undo.endUndoGrouping()
+        let stamped = state.appliedMatchAudit
+        #expect(stamped.count == 2)
+        #expect(stamped.values.allSatisfy { $0.searchRecord == expected })
+
+        undo.undo()
+        #expect(state.appliedMatchAudit.isEmpty, "undo drops the stamped snapshots with their regions")
+        #expect(state.regions.values.flatMap { $0 }.isEmpty)
+
+        undo.redo()
+        #expect(state.appliedMatchAudit == stamped, "redo restores the identical snapshots, record included")
+        #expect(state.regions.values.flatMap { $0 }.count == 2)
+    }
+
     @Test("Batch delete undo bumps regionVersion on the restore leg")
     func removeRegionsUndoBumpsVersion() {
         let state = RedactionState()

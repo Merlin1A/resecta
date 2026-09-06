@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import SwiftUI
 import RedactionEngine
 @testable import ResectaApp
 
@@ -23,6 +24,68 @@ struct SearchStateTests {
         #expect(state.isSearching == false)
         #expect(state.currentSearchPage == 0)
         #expect(state.totalPages == 0)
+    }
+
+    @Test("appliedSearchRecord() derives the query buildSearchMode() runs, for the three typed modes; nil for scan and empty")
+    func appliedSearchRecordAgreesWithBuildSearchMode() {
+        let search = SearchState()
+        var options = SearchOptions()
+        options.caseSensitive = true
+        options.wholeWord = true
+        search.options = options
+        // The sheet reads only `searchState` in `buildSearchMode()`; no body
+        // evaluation, so the environment objects are never resolved.
+        let sheet = SearchAndRedactSheet(searchState: search, selectedDetent: .constant(.medium))
+        func sameMode(_ a: SearchMode?, _ b: SearchMode) -> Bool {
+            switch (a, b) {
+            case (.text(let q1, let o1)?, .text(let q2, let o2)): return q1 == q2 && o1 == o2
+            case (.regex(let p1, let o1)?, .regex(let p2, let o2)): return p1 == p2 && o1 == o2
+            case (.multiTerm(let t1, let o1)?, .multiTerm(let t2, let o2)): return t1 == t2 && o1 == o2
+            default: return false
+            }
+        }
+
+        search.searchModeType = .text
+        search.queryText = "Delia"
+        #expect(sameMode(search.appliedSearchRecord()?.query.searchMode, sheet.buildSearchMode()))
+        #expect(search.appliedSearchRecord()?.query.optionBadges == ["case-sensitive", "whole word"])
+
+        search.searchModeType = .regex
+        search.queryText = "\\d{3}-\\d{2}-\\d{4}"
+        #expect(sameMode(search.appliedSearchRecord()?.query.searchMode, sheet.buildSearchMode()))
+
+        search.searchModeType = .multiTerm
+        search.searchTerms = ["alpha", "beta"]
+        #expect(sameMode(search.appliedSearchRecord()?.query.searchMode, sheet.buildSearchMode()))
+
+        // The run's result count and coverage facts ride on the record.
+        search.results = [
+            SearchResult(pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+                         matchedText: "alpha", contextSnippet: "…", source: .textLayer, term: "alpha"),
+            SearchResult(pageIndex: 3, normalizedRect: CGRect(x: 0.1, y: 0.5, width: 0.2, height: 0.03),
+                         matchedText: "beta", contextSnippet: "…", source: .ocr(confidence: 0.8), term: "beta"),
+        ]
+        search.resultsAtCap = true
+        search.recordOCRSkip(page: 3)
+        search.recordRegexTimeout(page: 1)
+        let record = search.appliedSearchRecord()
+        #expect(record?.foundCount == 2)
+        #expect(record?.foundHitCap == true)
+        #expect(record?.ocrSkippedPages == [3])
+        #expect(record?.regexTimeoutPages == [1])
+
+        // Scan is a detector run, not a typed search; an empty query or
+        // term set searched nothing.
+        search.searchModeType = .piiScan
+        #expect(search.appliedSearchRecord() == nil)
+        search.searchModeType = .text
+        search.queryText = ""
+        #expect(search.appliedSearchRecord() == nil)
+        search.searchModeType = .regex
+        #expect(search.appliedSearchRecord() == nil)
+        search.searchModeType = .multiTerm
+        search.searchTerms = []
+        #expect(search.appliedSearchRecord() == nil)
     }
 
     @Test("toggleSelectAll selects all when some deselected")

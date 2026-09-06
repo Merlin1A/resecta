@@ -56,16 +56,26 @@ class RedactionState {
     /// rasterized, not just that it did.
     private(set) var lastRunPerPageFallbackReasons: [TextLayerDetector.FallbackReason?]?
     private(set) var lastRunSensitiveTerms: [SensitiveTerm]?
+    /// Sibling of `lastRunSensitiveTerms` — the Search Re-check requests
+    /// the run was verified with (one per distinct applied query), so a
+    /// verify-only re-run re-checks the searches the artifact was built
+    /// with even if regions changed since. Nil means no completed run this
+    /// session; the verify-only path then re-derives the set from the live
+    /// match audit (`PipelineCoordinator.collectAppliedSearches()`).
+    /// In-memory only — nothing is persisted.
+    private(set) var lastRunAppliedSearches: [SearchRecheckRequest]?
 
     /// Record the inputs of a completed redaction run alongside `outputURL`.
     /// Called by `PipelineCoordinator` at the same point the output URL is
     /// re-asserted after `processDocument` returns.
     func recordLastRunInputs(perPageModes: [PipelineMode],
                              perPageFallbackReasons: [TextLayerDetector.FallbackReason?],
-                             sensitiveTerms: [SensitiveTerm]) {
+                             sensitiveTerms: [SensitiveTerm],
+                             appliedSearches: [SearchRecheckRequest]) {
         lastRunPerPageModes = perPageModes
         lastRunPerPageFallbackReasons = perPageFallbackReasons
         lastRunSensitiveTerms = sensitiveTerms
+        lastRunAppliedSearches = appliedSearches
     }
 
     /// Deselection facts recorded for the run that produced `outputURL`:
@@ -639,6 +649,7 @@ class RedactionState {
         lastRunPerPageModes = nil
         lastRunPerPageFallbackReasons = nil
         lastRunSensitiveTerms = nil
+        lastRunAppliedSearches = nil
         lastRunDeselection = nil
     }
 
@@ -1057,12 +1068,18 @@ class RedactionState {
         // off-MainActor without re-entering actor state.
         let existingRectsByPage: [Int: [CGRect]] = regions.mapValues { $0.map(\.normalizedRect) }
         let appliedAt = Date()
+        // The session's applied-search record, read on MainActor before
+        // the detached prepare like the rects snapshot: it is stamped on
+        // every search-origin audit snapshot so the Search Re-check can
+        // re-run this query on the output. Nil for a `.piiScan` session.
+        let searchRecord = search.appliedSearchRecord()
 
         let prepared = await Task.detached(priority: .userInitiated) {
             prepareApply(
                 selected: selected,
                 existingRectsByPage: existingRectsByPage,
-                appliedAt: appliedAt
+                appliedAt: appliedAt,
+                searchRecord: searchRecord
             )
         }.value
 
@@ -1161,7 +1178,8 @@ class RedactionState {
         let prepared = prepareApply(
             selected: [result],
             existingRectsByPage: existingRectsByPage,
-            appliedAt: Date()
+            appliedAt: Date(),
+            searchRecord: search.appliedSearchRecord()
         )
         let outcome = ApplyOutcome(
             applied: prepared.appliedCount,
@@ -1768,7 +1786,11 @@ class RedactionState {
             piiConfidence: nudge.piiConfidence,
             rationale: nudge.rationale,
             term: nudge.term,
-            appliedAt: Date()
+            appliedAt: Date(),
+            // A nudge is a PII-scan-origin match by predicate (the
+            // detector's category, never a typed query) — no search to
+            // re-run, so the Search Re-check never sees it.
+            searchRecord: nil
         )
         addRegion(region, page: nudge.pageIndex, undoManager: undoManager)
         regionMetadata[region.id] = metadata
@@ -1930,10 +1952,18 @@ struct PreparedApply: Sendable {
 /// dispatched off MainActor via `Task.detached` (the search-origin apply) so a
 /// large apply does not freeze the actor — so it must stay nonisolated. No
 /// actor state is read; all inputs are Sendable snapshots passed by value.
+///
+/// `searchRecord` is the session's applied-search record
+/// (`SearchState.appliedSearchRecord()`, read on MainActor by the caller),
+/// stamped on every audit snapshot this pass creates so the Search
+/// Re-check can re-run the query on the output; nil for a `.piiScan`
+/// session. It rides the snapshot through `commitApply`'s two-leg undo
+/// untouched — the snapshot is the undo unit.
 nonisolated func prepareApply(
     selected: [SearchResult],
     existingRectsByPage: [Int: [CGRect]],
-    appliedAt: Date
+    appliedAt: Date,
+    searchRecord: AppliedSearchRecord?
 ) -> PreparedApply {
     var createdRegions: [Int: [RedactionRegion]] = [:]
     var createdMetadata: [UUID: RegionMetadata] = [:]
@@ -2000,7 +2030,8 @@ nonisolated func prepareApply(
             piiConfidence: result.piiConfidence,
             rationale: result.rationale,
             term: result.term,
-            appliedAt: appliedAt
+            appliedAt: appliedAt,
+            searchRecord: searchRecord
         )
     }
 

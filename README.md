@@ -173,13 +173,13 @@ A stranger can clone, build, and start contributing with these steps:
 
 ## Testing
 
-The test tree is larger than the source tree: roughly 59,000 lines of Swift source to roughly 81,000 lines of test code, about 1.4×. Counted from the current tree:
+The test tree is larger than the source tree: roughly 60,000 lines of Swift source to roughly 83,000 lines of test code, about 1.4×. Counted from the current tree:
 
 - **Engine package** (`Packages/RedactionEngine/Tests`) — 1,625 Swift Testing `@Test` functions across 215 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
-- **App target** (`Tests/ResectaAppTests`) — 1,500 `@Test` functions across 213 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
-- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 40 XCUITest methods that drive the built app on a simulator: the first-launch legal gate, detection review, and search-to-redaction flows.
+- **App target** (`Tests/ResectaAppTests`) — 1,522 `@Test` functions across 217 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
+- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 41 XCUITest methods that drive the built app on a simulator: the first-launch legal gate, detection review, search-to-redaction flows, and the search re-check on the results screen.
 
-Together the suites carry about 7,300 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
+Together the suites carry about 7,500 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
 
 Run both suites:
 

@@ -118,8 +118,10 @@ final class PipelineCoordinator: @unchecked Sendable {
         let sensitiveTerms: [SensitiveTerm]
         /// The applied searches the Search Re-check re-runs on the output
         /// (one request per distinct applied query), beside `sensitiveTerms`.
-        /// Empty ⇒ the re-check reports INFO. Filled from the match audit
-        /// at run entry (the apply-seam capture); `[]` until that lands.
+        /// Empty ⇒ the re-check reports INFO. Derived at run entry by
+        /// `collectAppliedSearches()` (present regions joined to the match
+        /// audit); the verify-only path re-feeds the retained
+        /// `lastRunAppliedSearches` or re-derives the same way.
         let appliedSearches: [SearchRecheckRequest]
     }
 
@@ -313,6 +315,10 @@ final class PipelineCoordinator: @unchecked Sendable {
                 let pages = coordinator.buildPDFPageData(
                     effectiveMode: effectiveMode, runSettings: runSettings)
                 let sensitiveTerms = coordinator.collectSensitiveTerms()
+                // The applied searches, read at the same point and from the
+                // same present-region set: the Search Re-check re-runs
+                // exactly the queries whose regions this run redacts.
+                let appliedSearches = coordinator.collectAppliedSearches()
 
                 // Capture the run's deselection facts at run entry,
                 // before any pipeline work. The value is recorded onto
@@ -370,7 +376,8 @@ final class PipelineCoordinator: @unchecked Sendable {
 
                 let runContext = try await coordinator.processDocument(
                     pages, outputURL: outputURL,
-                    sensitiveTerms: sensitiveTerms)
+                    sensitiveTerms: sensitiveTerms,
+                    appliedSearches: appliedSearches)
                 redactionSucceeded = true
 
                 // Re-apply `.complete` to the promoted output URL.
@@ -396,7 +403,8 @@ final class PipelineCoordinator: @unchecked Sendable {
                 coordinator.redactionState.recordLastRunInputs(
                     perPageModes: runContext.perPageModes,
                     perPageFallbackReasons: runContext.perPageFallbackReasons,
-                    sensitiveTerms: runContext.sensitiveTerms)
+                    sensitiveTerms: runContext.sensitiveTerms,
+                    appliedSearches: runContext.appliedSearches)
                 // Record the run-entry deselection snapshot beside the run
                 // inputs (nil clears a previous run's record). Cleared with
                 // the output in `clearOutput()`.
@@ -593,6 +601,12 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // re-synthesis when absent (resumed old session).
                 let sensitiveTerms = coordinator.redactionState.lastRunSensitiveTerms
                     ?? coordinator.collectSensitiveTerms()
+                // Same retention contract for the Search Re-check requests:
+                // the retained set when the run recorded one, else the same
+                // derivation from the live audit (nothing is persisted; no
+                // relaunch-restore path exists to consume a serialized copy).
+                let appliedSearches = coordinator.redactionState.lastRunAppliedSearches
+                    ?? coordinator.collectAppliedSearches()
                 let pageCount = coordinator.documentState.pageCount
                 // Per-page rasterize artifacts are not available on this
                 // path; sandwich layers detect missing entries and skip.
@@ -617,7 +631,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                     perPageModes: perPageModes,
                     perPageFallbackReasons: perPageFallbackReasons,
                     sensitiveTerms: sensitiveTerms,
-                    appliedSearches: []
+                    appliedSearches: appliedSearches
                 )
 
                 try await coordinator.runVerification(
@@ -665,7 +679,8 @@ final class PipelineCoordinator: @unchecked Sendable {
     private func processDocument(
         _ pages: [PDFPageData],
         outputURL: URL,
-        sensitiveTerms: [SensitiveTerm]
+        sensitiveTerms: [SensitiveTerm],
+        appliedSearches: [SearchRecheckRequest]
     ) async throws -> PipelineRunContext {
         let rasterizer = PageRasterizer()
         // Surface the active rasterizer to the memory-warning
@@ -753,7 +768,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             perPageModes: perPageModes,
             perPageFallbackReasons: perPageFallbackReasons,
             sensitiveTerms: sensitiveTerms,
-            appliedSearches: []
+            appliedSearches: appliedSearches
         )
     }
 
@@ -2209,6 +2224,87 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// True when `text` is a single whitespace-delimited token.
     nonisolated static func isSingleToken(_ text: String) -> Bool {
         text.split(whereSeparator: { $0.isWhitespace }).count <= 1
+    }
+
+    // MARK: - Applied-Search Collection
+
+    /// Collect the Search Re-check requests for this run — one per
+    /// distinct query the user applied from the Search interface whose
+    /// regions are still present. Read at run entry beside
+    /// `collectSensitiveTerms()`; the verify-only path re-feeds the
+    /// retained copy or calls this again.
+    func collectAppliedSearches() -> [SearchRecheckRequest] {
+        Self.appliedSearches(
+            fromRegions: redactionState.regions,
+            audit: redactionState.appliedMatchAudit
+        )
+    }
+
+    /// Pure core of `collectAppliedSearches`: join the PRESENT regions to
+    /// the match audit and group the search-origin records by their stamped
+    /// query. Split out as a `nonisolated static` seam so it is
+    /// unit-testable without a live coordinator (the
+    /// `sensitiveTerms(fromAppliedRegions:metadata:)` shape).
+    ///
+    /// Why the join, not the audit alone: `removeRegion` / `removeRegions`
+    /// drop the region and its metadata but leave the audit entry, so an
+    /// orphaned audit entry means "deleted" — and deletion is the user's
+    /// intent. A query whose regions were all deleted is not re-checked.
+    /// Out by construction: scan-origin records, `.piiScan` sessions and
+    /// nudge-accepted regions (no stamped record), manual regions (no
+    /// audit entry). Overlap-skipped results never wrote an audit entry,
+    /// so they count in the record's `foundCount` but not in `appliedCount`.
+    ///
+    /// Per query: `appliedCount` = present regions citing it; `appliedPages`
+    /// = the pages carrying them (the region dictionary's key is the page
+    /// of record); the record itself — `foundCount` and the coverage facts
+    /// — is the LATEST apply's by `appliedAt`, since a later run of the same
+    /// query reports the newer result count. Requests come back in
+    /// first-seen order over pages ascending, then region order within the
+    /// page, so two derivations over the same state are equal.
+    nonisolated static func appliedSearches(
+        fromRegions regions: [Int: [RedactionRegion]],
+        audit: [UUID: MatchAuditSnapshot]
+    ) -> [SearchRecheckRequest] {
+        struct Group {
+            var record: AppliedSearchRecord
+            var recordAppliedAt: Date
+            var appliedCount: Int
+            var appliedPages: Set<Int>
+        }
+        var groups: [AppliedSearchQuery: Group] = [:]
+        var order: [AppliedSearchQuery] = []
+        for (page, pageRegions) in regions.sorted(by: { $0.key < $1.key }) {
+            for region in pageRegions {
+                guard let snapshot = audit[region.id],
+                      snapshot.origin == .search,
+                      let record = snapshot.searchRecord else { continue }
+                let query = record.query
+                if var group = groups[query] {
+                    group.appliedCount += 1
+                    group.appliedPages.insert(page)
+                    if snapshot.appliedAt > group.recordAppliedAt {
+                        group.record = record
+                        group.recordAppliedAt = snapshot.appliedAt
+                    }
+                    groups[query] = group
+                } else {
+                    groups[query] = Group(
+                        record: record,
+                        recordAppliedAt: snapshot.appliedAt,
+                        appliedCount: 1,
+                        appliedPages: [page])
+                    order.append(query)
+                }
+            }
+        }
+        return order.compactMap { query in
+            guard let group = groups[query] else { return nil }
+            return SearchRecheckRequest(
+                record: group.record,
+                appliedCount: group.appliedCount,
+                appliedPages: group.appliedPages)
+        }
     }
 
     // MARK: - Build PDFPageData
