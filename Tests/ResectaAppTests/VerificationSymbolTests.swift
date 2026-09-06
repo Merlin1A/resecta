@@ -37,6 +37,30 @@ struct VerificationSymbolTests {
         #expect(VerificationSymbol.assetName(forLayerNamed: "doc.text.magnifyingglass") == nil)
     }
 
+    @Test("the search re-check has no custom asset yet: identity-keyed lookup falls back to its SF symbol")
+    func searchRecheckFallsBackToSFSymbol() {
+        #expect(VerificationEngine().layerName(at: 10) == VerificationLayer.searchRecheck.name)
+        #expect(VerificationSymbol.assetName(forLayerNamed: VerificationLayer.searchRecheck.name) == nil)
+        let recheck = LayerResult(
+            name: VerificationLayer.searchRecheck.name,
+            symbolName: VerificationLayer.searchRecheck.symbolName,
+            status: .pass, shortDescription: "", detailDescription: "",
+            pageReferences: nil, durationSeconds: 0, layer: .searchRecheck)
+        #expect(VerificationSymbol.assetName(for: recheck) == nil)
+        #expect(recheck.symbolName == "text.page.badge.magnifyingglass")
+        // Identity outranks the stored name; a result without identity keys on its name.
+        let stamped = LayerResult(
+            name: "Legacy Name", symbolName: "x", status: .pass, shortDescription: "",
+            detailDescription: "", pageReferences: nil, durationSeconds: 0, layer: .ocrCheck)
+        #expect(VerificationSymbol.assetName(for: stamped) == "resecta.verify.layer02")
+        let legacy = LayerResult(
+            name: "OCR Check", symbolName: "x", status: .pass, shortDescription: "",
+            detailDescription: "", pageReferences: nil, durationSeconds: 0)
+        #expect(VerificationSymbol.assetName(for: legacy) == "resecta.verify.layer02")
+        // The router still maps exactly the ten custom assets (pin unchanged).
+        #expect(VerificationSymbol.layerAssets.count == 10)
+    }
+
     @Test("mode glyphs route to the two custom mode assets")
     func modeAssetNames() {
         #expect(PipelineMode.searchableRedaction.symbolAssetName == "resecta.verify.mode.searchable")

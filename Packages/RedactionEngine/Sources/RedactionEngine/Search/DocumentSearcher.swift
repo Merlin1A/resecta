@@ -17,6 +17,8 @@ private extension NSImage {
 
 // Engine-layer document search with text-layer,
 // regex, and OCR paths. Returns results via AsyncStream for progressive UI.
+// C-5 seam, 1.1.1: page coverage reporting for the verification re-check
+// (`setPageCoverageSink`) — reporting-only, no change to what is yielded.
 
 /// Performs text search across a PDF document with dual-path
 /// (text layer + OCR) support.
@@ -187,6 +189,15 @@ public actor DocumentSearcher {
     // supplied (production); absent-status callers (default `[:]`) never fire it.
     // Side-effect only — never changes which results are yielded.
     private var scannedRegionNotAnalyzedSink: (@Sendable (Int) -> Void)?
+
+    // C-5 seam (1.1.1): per-page coverage reporting for the verification
+    // search re-check. Fires for every page a search visits with which
+    // evidence the page was read from (text layer · OCR) or why it was not
+    // read (OCR pixel cap · OCR unavailable · unopenable page). Reporting-
+    // only: it never changes which results are yielded, and it is nil in
+    // every caller except the re-check. May fire more than once per page
+    // (the multi-term OCR path runs per term); consumers dedupe by page.
+    private var pageCoverageSink: (@Sendable (PageSearchCoverage) -> Void)?
 
     // MARK: - Per-Session Caches
 
@@ -531,6 +542,13 @@ public actor DocumentSearcher {
     /// because OCR was disabled for the scan. Pass nil to disable.
     public func setScannedRegionNotAnalyzedSink(_ sink: (@Sendable (Int) -> Void)?) {
         self.scannedRegionNotAnalyzedSink = sink
+    }
+
+    /// Install the per-page coverage sink — the search-side seam for the
+    /// verification search re-check (C-5, 1.1.1). Reporting-only; pass nil
+    /// to disable. See `PageSearchCoverage`.
+    public func setPageCoverageSink(_ sink: (@Sendable (PageSearchCoverage) -> Void)?) {
+        self.pageCoverageSink = sink
     }
 
     /// Actor-isolated reader so the `nonisolated previewMatches`
@@ -981,11 +999,15 @@ public actor DocumentSearcher {
             await Task.yield()
             progress(pageIndex + 1, pageCount)
 
-            guard let page = doc.page(at: pageIndex) else { continue }
+            guard let page = doc.page(at: pageIndex) else {
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
+                continue
+            }
             let pageText = page.string ?? ""
 
             if !pageText.isEmpty && pageHasRichTextLayer(pageIndex) {
                 // Text-layer path
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
                 let results = findTextMatches(
                     pageText: pageText, query: query, options: options,
                     page: page, pageIndex: pageIndex, term: query
@@ -1139,7 +1161,10 @@ public actor DocumentSearcher {
             await Task.yield()
             progress(pageIndex + 1, pageCount)
 
-            guard let page = doc.page(at: pageIndex) else { continue }
+            guard let page = doc.page(at: pageIndex) else {
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
+                continue
+            }
             let pageText = page.string ?? ""
             guard !pageText.isEmpty && pageHasRichTextLayer(pageIndex) else {
                 // Mirror the text-search OCR fallback:
@@ -1165,6 +1190,8 @@ public actor DocumentSearcher {
                 }
                 continue
             }
+
+            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
 
             // PDFPage isn't Sendable; the `enumerateMatches` closure below
             // captures the page reference and the compiler (Swift 6.2 / Xcode
@@ -1283,11 +1310,15 @@ public actor DocumentSearcher {
                 await Task.yield()
                 progress(pageIndex + 1, pageCount)
 
-                guard let page = doc.page(at: pageIndex) else { continue }
+                guard let page = doc.page(at: pageIndex) else {
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
+                continue
+            }
                 let pageText = page.string ?? ""
                 // Text-layer fast path only for `.rich`/unknown
                 // pages; `.sparse`/`.none` fall through to OCR per term.
                 let useTextLayer = !pageText.isEmpty && pageHasRichTextLayer(pageIndex)
+                if useTextLayer { pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer)) }
 
                 for term in terms {
                     if Task.isCancelled || accumulated.count >= Self.maxResults { break }
@@ -1350,11 +1381,15 @@ public actor DocumentSearcher {
             await Task.yield()
             progress(pageIndex + 1, pageCount)
 
-            guard let page = doc.page(at: pageIndex) else { continue }
+            guard let page = doc.page(at: pageIndex) else {
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
+                continue
+            }
             let pageText = page.string ?? ""
             // Text-layer fast path only for `.rich`/unknown
             // pages; `.sparse`/`.none` fall through to OCR per term.
             let useTextLayer = !pageText.isEmpty && pageHasRichTextLayer(pageIndex)
+            if useTextLayer { pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer)) }
 
             for term in terms {
                 if Task.isCancelled || totalYielded >= Self.maxResults { break }
@@ -1410,11 +1445,15 @@ public actor DocumentSearcher {
             if Task.isCancelled || totalYielded >= Self.maxResults { break }
             progress(pageIndex + 1, pageCount)
 
-            guard let page = doc.page(at: pageIndex) else { continue }
+            guard let page = doc.page(at: pageIndex) else {
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
+                continue
+            }
             let pageText = page.string ?? ""
 
             if !pageText.isEmpty && pageHasRichTextLayer(pageIndex) {
                 // Text-layer path: run PIIDetector on extracted text,
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
                 // then map NSRange → bounding rect via PDFKit selection.
                 var rawMatches = await piiDetector.detect(in: pageText, categories: categories)
                 // Spatial address assembly on the text leg. The line
@@ -1616,6 +1655,7 @@ public actor DocumentSearcher {
                 // Report the skip so the app layer can tell the
                 // user this page's image content was never text-scanned.
                 ocrSkipSink?(pageIndex)
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrSkippedOversize))
                 return []
             }
 
@@ -1626,7 +1666,10 @@ public actor DocumentSearcher {
             let thumbnail = await Task.detached(priority: .userInitiated) {
                 sendablePage.page.thumbnail(of: thumbnailSize, for: .cropBox)
             }.value
-            guard let cgImage = thumbnail.cgImage else { return [] }
+            guard let cgImage = thumbnail.cgImage else {
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
+                return []
+            }
 
             do {
                 let lines = try await ocrEngine.recognizeText(
@@ -1638,10 +1681,12 @@ public actor DocumentSearcher {
                 ocrCache[pageIndex] = lines
                 textLines = lines
             } catch {
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
                 return []
             }
         }
 
+        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
         guard !textLines.isEmpty else { return [] }
 
         // PII detection reads the normalized parallel
@@ -1925,6 +1970,7 @@ public actor DocumentSearcher {
                 // Report the skip so the app layer can tell the
                 // user this page's image content was never text-scanned.
                 ocrSkipSink?(pageIndex)
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrSkippedOversize))
                 return []
             }
 
@@ -1935,7 +1981,10 @@ public actor DocumentSearcher {
             let thumbnail = await Task.detached(priority: .userInitiated) {
                 sendablePage.page.thumbnail(of: thumbnailSize, for: .cropBox)
             }.value
-            guard let cgImage = thumbnail.cgImage else { return [] }
+            guard let cgImage = thumbnail.cgImage else {
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
+                return []
+            }
 
             do {
                 let lines = try await ocrEngine.recognizeText(
@@ -1947,9 +1996,12 @@ public actor DocumentSearcher {
                 ocrCache[pageIndex] = lines
                 textLines = lines
             } catch {
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
                 return []
             }
         }
+
+        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
 
         // Search within OCR results
         var results: [SearchResult] = []
@@ -2112,6 +2164,7 @@ public actor DocumentSearcher {
         if let cached = ocrCache[pageIndex] {
             ocrAccessCounter += 1
             ocrCacheAccess[pageIndex] = ocrAccessCounter
+            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
             return cached
         }
 
@@ -2126,6 +2179,7 @@ public actor DocumentSearcher {
             // Report the skip so the app layer can tell the
             // user this page's image content was never text-scanned.
             ocrSkipSink?(pageIndex)
+            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrSkippedOversize))
             return []
         }
 
@@ -2133,7 +2187,10 @@ public actor DocumentSearcher {
         let thumbnail = await Task.detached(priority: .userInitiated) {
             sendablePage.page.thumbnail(of: thumbnailSize, for: .cropBox)
         }.value
-        guard let cgImage = thumbnail.cgImage else { return [] }
+        guard let cgImage = thumbnail.cgImage else {
+            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
+            return []
+        }
 
         do {
             let lines = try await ocrEngine.recognizeText(
@@ -2145,8 +2202,10 @@ public actor DocumentSearcher {
             ocrAccessCounter += 1
             ocrCacheAccess[pageIndex] = ocrAccessCounter
             ocrCache[pageIndex] = lines
+            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
             return lines
         } catch { // LegalPhrases:safe (Swift keyword)
+            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
             return []
         }
     }

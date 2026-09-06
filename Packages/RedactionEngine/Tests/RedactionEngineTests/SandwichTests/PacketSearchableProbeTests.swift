@@ -63,15 +63,15 @@ struct PacketSearchableProbeTests {
         print("PKT-ID [\(RealDocProbe.runtimeTag)] sha=\(hex.prefix(16))… pages=\(doc?.pageCount ?? -1)")
     }
 
-    // MARK: 2 — Preflight (the 10-layer matrix)
+    // MARK: 2 — Preflight (the 11-layer matrix)
 
-    /// Run the full searchable-redaction pipeline + all 10 verification layers
+    /// Run the full searchable-redaction pipeline + all 11 verification layers
     /// on the 12-page packet and transcribe the matrix. The preflight passes
     /// when no layer FAILs (INFO/WARN are recorded, not regressions). A FAIL
     /// here is a real result — the dense form pages overrunning the
     /// reconstruction, or the embedded statement perturbed by embedding — and
     /// is surfaced as a red, not tuned away.
-    @Test("Preflight — 12-page searchable-redaction 10-layer matrix")
+    @Test("Preflight — 12-page searchable-redaction 11-layer matrix")
     func g3Preflight() async throws {
         let fixture = try TestFixtures.loanPacketPDF()
         let pageCount = TestFixtures.loanPacketPageCount
@@ -90,7 +90,7 @@ struct PacketSearchableProbeTests {
             let run = try await RealDocProbe.run(fixture, regions: regions)
             defer { try? FileManager.default.removeItem(at: run.outputURL) }
 
-            #expect(run.layers.count == 10, "Searchable mode must run all 10 layers.")
+            #expect(run.layers.count == 11, "Searchable mode must run all 11 layers.")
             #expect(run.outputDocument.pageCount == 12, "Output must keep 12 pages.")
 
             // Transcribe the per-layer verdict matrix and derive OVERALL.
@@ -146,11 +146,12 @@ struct PacketSearchableProbeTests {
                 print("PKT [\(rt)] config=\(label) page1 width-proxy outlierCount=\(n)")
             }
 
-            // Pass criterion for the 9 layers other than Layer 5: each must be non-FAIL.
+            // Pass criterion for the 10 layers other than Layer 5: each must be non-FAIL
+            // (the search re-check reports INFO here — the probe applies no search).
             // The dense URLA/T1040 long-line reconstruction keeps every glyph
             // on the page (Layer 6 count + Layer 8 lineage non-FAIL = no loss),
             // and the embedded STMT pages 3-5 verify within the packet.
-            for idx in [0, 1, 2, 3, 4, 6, 7, 8, 9] {
+            for idx in [0, 1, 2, 3, 4, 6, 7, 8, 9, 10] {
                 #expect(run.layers[idx]?.status.isFail == false,
                         "config=\(label): layer idx\(idx) must not FAIL on the packet.")
             }

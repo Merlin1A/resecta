@@ -31,10 +31,18 @@ enum VerificationSymbol {
         layerAssets[name]
     }
 
+    /// Asset name for a result: the engine's layer identity first, the
+    /// stored name as the fallback for results built without one (legacy
+    /// persisted reports). Nil for an identity without a custom asset (the
+    /// Search Re-check ships on its SF symbol until its glyph lands).
+    static func assetName(for layer: LayerResult) -> String? {
+        assetName(forLayerNamed: layer.layer?.name ?? layer.name)
+    }
+
     /// Row icon: custom asset by identity, stored-symbol fallback for
     /// unmapped identities (legacy persisted reports, future layers).
     static func icon(for layer: LayerResult) -> Image {
-        if let asset = assetName(forLayerNamed: layer.name) {
+        if let asset = assetName(for: layer) {
             return Image(asset)
         }
         return Image(systemName: layer.symbolName)

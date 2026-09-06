@@ -180,4 +180,14 @@ struct StatusDerivationTests {
         let verifier = VerificationEngine()
         #expect(verifier.aggregateStatus(layers).isFail)
     }
+
+    @Test("An INFO search re-check beside PASS layers aggregates PASS")
+    func infoRecheckBesidePassAggregatesPass() {
+        let layers = [
+            LayerResult.mock(status: .pass),
+            LayerResult.mock(status: .info(SearchRecheck.infoMessage)),
+        ]
+        let verifier = VerificationEngine()
+        #expect(verifier.aggregateStatus(layers) == .pass)
+    }
 }

@@ -135,6 +135,46 @@ struct ParallelVerificationDocumentTests {
                 "all requested layer results must be present after fallback")
     }
 
+    // MARK: - G1c: the identity overload
+
+    @Test("The identity overload dispatches each parallel layer on its own instance and stamps identity")
+    func identityOverloadReceivesDistinctInstances() async throws {
+        let layers: [VerificationLayer] = [.textExtraction, .ocrCheck, .binaryStringSearch]
+        let url = try makeOutputFixtureURL(pages: 3)
+        defer { try? FileManager.default.removeItem(at: url) }
+        guard let doc = PDFDocument(url: url) else {
+            Issue.record("Failed to load output fixture"); return
+        }
+        let wrapped = SendablePDFDocument(doc)
+        let coord = makeCoordinator()
+        let recorder = DispatchRecorder()
+        var verifier = VerificationEngine()
+        verifier.onRunLayerDispatch = { layer, id in recorder.record(layer, id) }
+
+        let results = try await coord.collectParallelBaseLayerResults(
+            layers: layers,
+            outputURL: url,
+            shared: wrapped,
+            verifier: verifier,
+            sourcePageCount: doc.pageCount,
+            regions: [:],
+            sensitiveTerms: [],
+            pipelineMode: .secureRasterization,
+            filterDigests: [],
+            perPageModes: Array(repeating: .secureRasterization, count: doc.pageCount)
+        )
+
+        #expect(Set(results.map { $0.0 }) == Set(layers))
+        #expect(results.allSatisfy { $0.1.layer == $0.0 }, "every result carries its layer identity")
+        #expect(results.allSatisfy { $0.1.name == $0.0.name })
+        let identities = recorder.snapshot.map(\.doc)
+        #expect(Set(identities).count == layers.count,
+                "parallel layers must each receive a distinct PDFDocument instance")
+        #expect(!identities.contains(ObjectIdentifier(wrapped.document)))
+        // The dispatch seam reports the ordinal in the mode's order.
+        #expect(Set(recorder.snapshot.map(\.layer)) == Set([0, 1, 2]))
+    }
+
     // MARK: - Helpers
 
     private func status(of layer: Int, in results: [(Int, LayerResult)]) -> VerificationStatus? {

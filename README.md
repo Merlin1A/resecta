@@ -35,8 +35,8 @@ The core workflow is:
 
 ## Two modes
 
-- **Secure Rasterization** — produces image-only output and is the simplest approach for high-sensitivity documents. Verification runs as a 5-layer check.
-- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to remove glyph-positioning side channels identified in academic research. Non-redacted text includes text the page does not visibly show (for example, text beneath boxes or stamps in the source). Verification runs as a 10-layer check (the five additional checks cover the preserved-text layer).
+- **Secure Rasterization** — produces image-only output and is the simplest approach for high-sensitivity documents. Verification runs as a 6-layer check.
+- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to remove glyph-positioning side channels identified in academic research. Non-redacted text includes text the page does not visibly show (for example, text beneath boxes or stamps in the source). Verification runs as an 11-layer check (the five additional checks cover the preserved-text layer; both modes end with a re-run of your applied searches on the output).
 
 Both modes share the same pixel-destruction core. Mode choice is per-document.
 
@@ -50,8 +50,8 @@ flowchart LR
   B --> C[Mark: scan, search, or draw regions]
   C --> D[Apply: rasterize / flatten / strip metadata]
   D --> E{Export mode}
-  E -->|Secure Rasterization| F[Verify - 5-layer pass]
-  E -->|Searchable| G[Verify - 10-layer pass]
+  E -->|Secure Rasterization| F[Verify - 6-layer pass]
+  E -->|Searchable| G[Verify - 11-layer pass]
   F --> H[Export]
   G --> H[Export]
 ```
@@ -118,7 +118,7 @@ Each load-bearing claim in this README is paired with a mechanical check in this
 | Claim | Check |
 | --- | --- |
 | Marked regions are destroyed, not covered | Per-region pixel readback after every fill — one wrong pixel fails the export (`Pipeline/PageRasterizer.swift`); the classic annotation-over-text attacks are constructed and destroyed in `SecurityTests/FakeRedactionTests.swift` |
-| The exported file is re-checked independently | The 5/10-layer verification pass re-opens the output and scans text, OCR, raw bytes across seven encodings, structure, and metadata (`Verification/VerificationEngine.swift`) |
+| The exported file is re-checked independently | The 6/11-layer verification pass re-opens the output and scans text, OCR, raw bytes across seven encodings, structure, and metadata, and re-runs each applied search on the output (`Verification/VerificationEngine.swift`) |
 | Placement survives rotated pages | A rotation × crop-box-origin test matrix positions its regions with a transform written independently of the production code (`SecurityTests/RotatedPageCoordinateTests.swift`) |
 | No network requests of its own | A source grep for networking symbols returns no code references (the sole hit is a comment); the pre-commit hook rejects those symbols in any staged diff (`Scripts/audit-lint.sh`) |
 | The app's own copy doesn't overclaim | A banned-vocabulary lint walks every localized string and the shipping docs (`Tests/ResectaAppTests/LegalPhraseLintTests.swift`, `Scripts/claims-lint.sh`) |
@@ -175,11 +175,11 @@ A stranger can clone, build, and start contributing with these steps:
 
 The test tree is larger than the source tree: roughly 59,000 lines of Swift source to roughly 81,000 lines of test code, about 1.4×. Counted from the current tree:
 
-- **Engine package** (`Packages/RedactionEngine/Tests`) — 1,593 Swift Testing `@Test` functions across 211 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
-- **App target** (`Tests/ResectaAppTests`) — 1,494 `@Test` functions across 212 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
+- **Engine package** (`Packages/RedactionEngine/Tests`) — 1,625 Swift Testing `@Test` functions across 215 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
+- **App target** (`Tests/ResectaAppTests`) — 1,500 `@Test` functions across 213 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
 - **UI / end-to-end** (`Tests/ResectaAppUITests`) — 40 XCUITest methods that drive the built app on a simulator: the first-launch legal gate, detection review, and search-to-redaction flows.
 
-Together the suites carry about 7,100 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
+Together the suites carry about 7,300 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
 
 Run both suites:
 

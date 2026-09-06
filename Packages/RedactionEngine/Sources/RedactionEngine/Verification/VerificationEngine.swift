@@ -8,9 +8,10 @@ import UIKit  // PDFPage.thumbnail(of:for:) returns UIImage
 import AppKit  // macOS tooling destination: thumbnail returns NSImage
 #endif
 
-// Verification engine with 5 base layers
-// (+ 3 sandwich-specific in Phase 7; +Layer 9 lineage in M1; +Layer 10
-// operator re-extraction in M3 — Searchable only, total 10).
+// Verification engine. Each check is a `VerificationLayer` case; the
+// per-mode order and count come from `layers(for:)` (Secure Rasterization
+// runs six checks, Searchable Redaction eleven; the search re-check is last
+// in both), never from an index table.
 
 /// Stateless verification engine. Runs individual layers on output PDFs.
 public struct VerificationEngine: Sendable {
@@ -71,49 +72,50 @@ public struct VerificationEngine: Sendable {
     /// per-task copies the fan-out makes each carry the closure.
     public var onRunLayerDispatch: (@Sendable (Int, ObjectIdentifier) -> Void)?
 
+    /// Canonical per-mode layer order: every `VerificationLayer` that applies
+    /// to `mode`, in declaration order (`searchRecheck` last in both modes).
+    /// Counts, ordinals and the coordinator's schedule derive from this list.
+    public func layers(for mode: PipelineMode) -> [VerificationLayer] {
+        VerificationLayer.allCases.filter { $0.appliesTo(mode) }
+    }
+
     /// Total layer count for a given pipeline mode (never hardcoded).
     public func layerCount(for mode: PipelineMode) -> Int {
-        switch mode {
-        case .secureRasterization: 5
-        case .searchableRedaction: 10
-        }
+        layers(for: mode).count
     }
 
-    /// Human-readable name for the layer at the given index.
+    /// Human-readable name for the layer at `index` in `mode`'s order.
+    public func layerName(at index: Int, mode: PipelineMode) -> String {
+        let ordered = layers(for: mode)
+        return ordered.indices.contains(index) ? ordered[index].name : "Unknown Layer"
+    }
+
+    /// SF Symbol name for the layer at `index` in `mode`'s order.
+    public func layerSymbol(at index: Int, mode: PipelineMode) -> String {
+        let ordered = layers(for: mode)
+        return ordered.indices.contains(index) ? ordered[index].symbolName : "questionmark.circle"
+    }
+
+    /// Index-only adapter over the Searchable order (`VerificationLayer
+    /// .allCases`): indices 0–9 are identical in both modes; index 10 is the
+    /// Search Re-check. Kept for index-keyed callers; new code reads
+    /// `layerName(at:mode:)` or the layer's own `name`.
     public func layerName(at index: Int) -> String {
-        switch index {
-        case 0: "Text Extraction"
-        case 1: "OCR Check"
-        case 2: "Binary String Search"
-        case 3: "Structure Check"
-        case 4: "Metadata Check"
-        case 5: "Spatial Verification"
-        case 6: "Character Count"
-        case 7: "Font Verification"
-        case 8: "Character Lineage"
-        case 9: "Operator Re-Extraction"
-        default: "Unknown Layer"
-        }
+        let all = VerificationLayer.allCases
+        return all.indices.contains(index) ? all[index].name : "Unknown Layer"
     }
 
-    /// SF Symbol name for the layer.
+    /// Index-only adapter, symbol counterpart of `layerName(at:)`.
     public func layerSymbol(at index: Int) -> String {
-        switch index {
-        case 0: "doc.text.magnifyingglass"
-        case 1: "text.viewfinder"
-        case 2: "01.rectangle.fill"
-        case 3: "rectangle.3.group"
-        case 4: "info.circle"
-        case 5: "character.textbox"
-        case 6: "number"
-        case 7: "textformat"
-        case 8: "checkmark.seal"
-        case 9: "doc.text.below.ecg"
-        default: "questionmark.circle"
-        }
+        let all = VerificationLayer.allCases
+        return all.indices.contains(index) ? all[index].symbolName : "questionmark.circle"
     }
 
-    /// Run a single verification layer.
+    /// Run a single verification layer by its index in `pipelineMode`'s
+    /// order (`layers(for:)`). Adapter over `runLayer(_ layer:…)` for the
+    /// index-keyed callers; the range check is the same fail-fast
+    /// precondition (a silent `.pass` on an out-of-range index would let
+    /// caller bugs masquerade as verification success).
     @concurrent
     public func runLayer(
         _ layerIndex: Int,
@@ -125,21 +127,53 @@ public struct VerificationEngine: Sendable {
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode]
     ) async -> LayerResult {
-        // The valid layer-index range is mode-dependent
-        // (5 for .secureRasterization, 10 for .searchableRedaction). A
-        // silent .pass on an out-of-range index would let caller bugs
-        // masquerade as verification success. Fail fast instead.
+        let ordered = layers(for: pipelineMode)
         precondition(
-            layerIndex >= 0 && layerIndex < layerCount(for: pipelineMode),
+            layerIndex >= 0 && layerIndex < ordered.count,
             "runLayer called with out-of-range layerIndex \(layerIndex) for mode \(pipelineMode)"
         )
+        return await runLayer(
+            ordered[layerIndex],
+            outputDocument: outputDocument,
+            sourcePageCount: sourcePageCount,
+            regions: regions,
+            sensitiveTerms: sensitiveTerms,
+            pipelineMode: pipelineMode,
+            filterDigests: filterDigests,
+            perPageModes: perPageModes
+        )
+    }
+
+    /// Run a single verification layer. `appliedSearches` feeds the Search
+    /// Re-check only (every other layer ignores it); empty ⇒ that layer
+    /// reports INFO.
+    @concurrent
+    public func runLayer(
+        _ layer: VerificationLayer,
+        outputDocument: SendablePDFDocument,
+        sourcePageCount: Int,
+        regions: [Int: [RedactionRegion]],
+        sensitiveTerms: [SensitiveTerm],
+        pipelineMode: PipelineMode,
+        filterDigests: [PageFilterDigest?],
+        perPageModes: [PipelineMode],
+        appliedSearches: [SearchRecheckRequest] = []
+    ) async -> LayerResult {
+        // A layer that does not apply to the mode is a caller bug; a silent
+        // .pass would masquerade as verification success. Fail fast instead.
+        let ordered = layers(for: pipelineMode)
+        precondition(
+            ordered.contains(layer),
+            "runLayer called with layer \(layer) that does not apply to mode \(pipelineMode)"
+        )
+        let ordinal = ordered.firstIndex(of: layer) ?? 0
 
         let start = CFAbsoluteTimeGetCurrent()
         let doc = outputDocument.document
 
         // Guard seam: record which document instance this layer was
         // dispatched against. No-op in production (closure is nil).
-        onRunLayerDispatch?(layerIndex, ObjectIdentifier(doc))
+        onRunLayerDispatch?(ordinal, ObjectIdentifier(doc))
 
         let sandwichVerifier = SandwichVerification()
 
@@ -148,6 +182,11 @@ public struct VerificationEngine: Sendable {
         // Display-only term texts behind an `.attention` result (Layers 3 and
         // 10) — threaded into LayerResult.reviewTermTexts; nil elsewhere.
         var layerReviewTerms: [String]? = nil
+        // A layer that supplies its own PASS/ATTENTION/WARN copy (the
+        // Search Re-check; the Layer-7 promotion below is the precedent).
+        var copyOverride: SearchRecheck.Copy? = nil
+        // Display-only per-query lines (Search Re-check only).
+        var layerQueryLines: [SearchRecheckQueryLine]? = nil
 
         // Each layer method calls
         // `try Task.checkCancellation()` on entry (and within long inner
@@ -157,12 +196,12 @@ public struct VerificationEngine: Sendable {
         // `try Task.checkCancellation()` then surrenders the pipeline.
         // Keeps `runLayer`'s public signature non-throwing.
         do { // LegalPhrases:safe (Swift keyword usage below)
-            switch layerIndex {
-            case 0:
+            switch layer {
+            case .textExtraction:
                 let (s0, pages0) = try runLayer1TextExtraction(doc, pipelineMode: pipelineMode)
                 status = s0
                 layerPageReferences = pages0
-            case 1:
+            case .ocrCheck:
                 // Layer 2's OCR gate applies the same per-term boundary
                 // discipline as the byte layers (String-space mirror in
                 // `containsTerm`), so a boundary-required name term cannot
@@ -173,43 +212,43 @@ public struct VerificationEngine: Sendable {
                     perPageModes: perPageModes)
                 status = s1
                 layerPageReferences = pages1
-            case 2:
+            case .binaryStringSearch:
                 let (s2, pages2, terms2) = try runLayer3BinarySearch(doc, sensitiveTerms: sensitiveTerms)
                 status = s2
                 layerPageReferences = pages2
                 layerReviewTerms = terms2
-            case 3:
+            case .structureCheck:
                 let (s, pages) = try runLayer4Structural(doc)
                 status = s
                 layerPageReferences = pages
-            case 4:
+            case .metadataCheck:
                 status = try runLayer5Metadata(doc)
             // Layers 6–10: Sandwich-specific.
             // Only run for Searchable Redaction pages.
-            case 5:
+            case .spatialVerification:
                 let (s5, pages5) = try await runLayer6SpatialVerification(
                     doc, regions: regions, perPageModes: perPageModes,
                     verifier: sandwichVerifier)
                 status = s5
                 layerPageReferences = pages5
-            case 6:
+            case .characterCount:
                 let (s6, pages6) = try await runLayer7CharacterCount(
                     doc, filterDigests: filterDigests, perPageModes: perPageModes,
                     verifier: sandwichVerifier)
                 status = s6
                 layerPageReferences = pages6
-            case 7:
+            case .fontVerification:
                 let (s7, pages7) = try await runLayer8FontVerification(
                     doc, perPageModes: perPageModes, verifier: sandwichVerifier)
                 status = s7
                 layerPageReferences = pages7
-            case 8:
+            case .characterLineage:
                 let (s8, pages8) = try await runLayer9CharacterLineage(
                     doc, filterDigests: filterDigests, perPageModes: perPageModes,
                     verifier: sandwichVerifier)
                 status = s8
                 layerPageReferences = pages8
-            case 9:
+            case .operatorReExtraction:
                 // Layer 10 — operator-semantic re-extraction.
                 // Independent of `regions`, `perPageModes`, `filterDigests`, and
                 // `sourcePageCount`: walks the output content streams directly.
@@ -221,37 +260,52 @@ public struct VerificationEngine: Sendable {
                 status = l10.status
                 layerPageReferences = l10.pageReferences
                 layerReviewTerms = l10.reviewTermTexts
-            default:
-                preconditionFailure("Unreachable — precondition at top of runLayer enforces range")
+            case .searchRecheck:
+                // Search Re-check — re-runs every applied search on the
+                // output through the search engine itself (text layer or the
+                // searcher's own OCR path per page). Supplies its own
+                // PASS/ATTENTION/WARN copy; INFO when nothing was applied.
+                let outcome = try await SearchRecheck().run(
+                    outputDocument: outputDocument,
+                    requests: appliedSearches,
+                    perPageModes: perPageModes
+                )
+                status = outcome.status
+                layerPageReferences = outcome.pageReferences
+                layerReviewTerms = outcome.reviewTermTexts
+                copyOverride = outcome.copyOverride
+                layerQueryLines = outcome.queryLines
             }
         } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
             let duration = CFAbsoluteTimeGetCurrent() - start
-            let name = layerName(at: layerIndex)
-            let symbol = layerSymbol(at: layerIndex)
+            let name = layer.name
+            let symbol = layer.symbolName
             return LayerResult(
                 name: name, symbolName: symbol, status: .skipped,
                 shortDescription: "Skipped.",
                 detailDescription: "\(name) was not run because the operation was cancelled.",
-                pageReferences: nil, durationSeconds: duration
+                pageReferences: nil, durationSeconds: duration,
+                layer: layer
             )
         } catch { // LegalPhrases:safe (Swift keyword)
             // Unexpected non-cancellation error — surface as fail so caller sees
             // something went wrong rather than silently passing.
             let duration = CFAbsoluteTimeGetCurrent() - start
-            let name = layerName(at: layerIndex)
-            let symbol = layerSymbol(at: layerIndex)
+            let name = layer.name
+            let symbol = layer.symbolName
             return LayerResult(
                 name: name, symbolName: symbol,
                 status: .fail("Layer threw unexpected error"),
                 shortDescription: "Layer threw unexpected error.",
                 detailDescription: "\(name) threw an unexpected error while checking the document.",
-                pageReferences: nil, durationSeconds: duration
+                pageReferences: nil, durationSeconds: duration,
+                layer: layer
             )
         }
 
         let duration = CFAbsoluteTimeGetCurrent() - start
-        let name = layerName(at: layerIndex)
-        let symbol = layerSymbol(at: layerIndex)
+        let name = layer.name
+        let symbol = layer.symbolName
 
         var shortDesc: String
         var detailDesc: String
@@ -280,7 +334,7 @@ public struct VerificationEngine: Sendable {
         // when passing — helps users understand near-miss proximity to redacted regions.
         // Promoted to .info so the row lands in the METADATA group rather than
         // silently inflating the "passed" count.
-        if layerIndex == 6, status == .pass {
+        if layer == .characterCount, status == .pass {
             let totalBoundary = filterDigests.compactMap { $0 }
                 .reduce(0) { $0 + $1.boundaryCharacters.count }
             if totalBoundary > 0 {
@@ -290,11 +344,21 @@ public struct VerificationEngine: Sendable {
             }
         }
 
+        // A layer-supplied copy replaces the generic composition for the
+        // status it was composed for (PASS / ATTENTION / WARN); INFO, FAIL and
+        // skipped always use the generic lines.
+        if let copyOverride, status == .pass || status.isAttention || status.isWarn {
+            shortDesc = copyOverride.short
+            detailDesc = copyOverride.detail
+        }
+
         return LayerResult(
             name: name, symbolName: symbol, status: status,
             shortDescription: shortDesc, detailDescription: detailDesc,
             pageReferences: layerPageReferences, durationSeconds: duration,
-            reviewTermTexts: layerReviewTerms
+            reviewTermTexts: layerReviewTerms,
+            layer: layer,
+            queryLines: layerQueryLines
         )
     }
 
@@ -2524,7 +2588,7 @@ public struct VerificationEngine: Sendable {
 // "on 1 page(s): 1" form both dodged the plural and repeated the count
 // as the list. Verdict levels and thresholds at every call site are
 // untouched.
-private func pagePhrase(_ pages: [Int], list: String) -> String {
+func pagePhrase(_ pages: [Int], list: String) -> String {
     pages.count == 1 ? "page \(list)" : "\(pages.count) pages: \(list)"
 }
 
