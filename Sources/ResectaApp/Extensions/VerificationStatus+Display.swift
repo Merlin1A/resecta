@@ -128,7 +128,7 @@ extension LayerResult {
     /// (PipelineCoordinator's `UIAccessibility.post(.announcement, …)`
     /// sites). warn/fail/info append `shortDescription` — for those rows it
     /// IS the payload ("OCR could not be run on 1 page."); pass/skipped stay
-    /// a plain phrase so a 10-layer run isn't ten sentences of filler.
+    /// a plain phrase so an eleven-layer run isn't eleven sentences of filler.
     func completionAnnouncement(layerNumber: Int) -> String {
         switch status {
         case .warn, .fail, .info, .attention:

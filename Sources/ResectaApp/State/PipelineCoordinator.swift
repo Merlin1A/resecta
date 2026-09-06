@@ -116,6 +116,11 @@ final class PipelineCoordinator: @unchecked Sendable {
         /// secure-raster-mode run).
         let perPageFallbackReasons: [TextLayerDetector.FallbackReason?]
         let sensitiveTerms: [SensitiveTerm]
+        /// The applied searches the Search Re-check re-runs on the output
+        /// (one request per distinct applied query), beside `sensitiveTerms`.
+        /// Empty ⇒ the re-check reports INFO. Filled from the match audit
+        /// at run entry (the apply-seam capture); `[]` until that lands.
+        let appliedSearches: [SearchRecheckRequest]
     }
 
     /// Snapshot of pipeline-affecting settings, captured once
@@ -552,7 +557,7 @@ final class PipelineCoordinator: @unchecked Sendable {
             progress: .init(
                 currentLayer: 1,
                 totalLayers: totalLayers,
-                layerName: verifier.layerName(at: 0),
+                layerName: verifier.layerName(at: 0, mode: effectiveMode),
                 completedLayers: []
             )
         ))
@@ -611,7 +616,8 @@ final class PipelineCoordinator: @unchecked Sendable {
                     filterDigests: filterDigests,
                     perPageModes: perPageModes,
                     perPageFallbackReasons: perPageFallbackReasons,
-                    sensitiveTerms: sensitiveTerms
+                    sensitiveTerms: sensitiveTerms,
+                    appliedSearches: []
                 )
 
                 try await coordinator.runVerification(
@@ -746,7 +752,8 @@ final class PipelineCoordinator: @unchecked Sendable {
             filterDigests: filterDigests,
             perPageModes: perPageModes,
             perPageFallbackReasons: perPageFallbackReasons,
-            sensitiveTerms: sensitiveTerms
+            sensitiveTerms: sensitiveTerms,
+            appliedSearches: []
         )
     }
 
@@ -1080,26 +1087,33 @@ final class PipelineCoordinator: @unchecked Sendable {
     nonisolated static func loadParallelLayerDocuments(
         _ url: URL, layers: [Int]
     ) -> [Int: SendablePDFDocument]? {
-        var docs: [Int: SendablePDFDocument] = [:]
-        docs.reserveCapacity(layers.count)
-        for layer in layers {
+        loadParallelLayerDocuments(url, keys: layers)
+    }
+
+    /// Identity-keyed counterpart of the index form above.
+    nonisolated static func loadParallelLayerDocuments(
+        _ url: URL, layers: [VerificationLayer]
+    ) -> [VerificationLayer: SendablePDFDocument]? {
+        loadParallelLayerDocuments(url, keys: layers)
+    }
+
+    private nonisolated static func loadParallelLayerDocuments<Key: Hashable>(
+        _ url: URL, keys: [Key]
+    ) -> [Key: SendablePDFDocument]? {
+        var docs: [Key: SendablePDFDocument] = [:]
+        docs.reserveCapacity(keys.count)
+        for key in keys {
             guard let doc = PDFDocument(url: url) else { return nil }
-            docs[layer] = SendablePDFDocument(doc)
+            docs[key] = SendablePDFDocument(doc)
         }
         return docs
     }
 
     /// Seam: run the parallel base-layer batch and return the
-    /// `(layerIndex, LayerResult)` pairs in completion order. Extracted from
-    /// `runVerification` so a guard test can drive the fan-out directly and
-    /// assert each parallel layer receives its own `PDFDocument` instance
-    /// (mirrors the deliberate `internal` precedent of `rasterizePagesInParallel`).
-    /// `runVerification` keeps the `.verifying` transitions, result ordering,
-    /// accessibility announcements, and the deferred-Layer-10 handling.
-    ///
-    /// `nonisolated`: the per-layer document provisioning (added below) is
-    /// CPU-bound on large outputs and runs off MainActor; the layer fan-out is
-    /// `@concurrent`. All parameters are `Sendable` value types.
+    /// `(layerIndex, LayerResult)` pairs in completion order. Index adapter
+    /// over the identity form below (indices in `pipelineMode`'s
+    /// `layers(for:)` order) — kept for the guard test that drives the seam
+    /// by index.
     nonisolated func collectParallelBaseLayerResults(
         layers: [Int],
         outputURL: URL,
@@ -1112,9 +1126,49 @@ final class PipelineCoordinator: @unchecked Sendable {
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode]
     ) async throws -> [(Int, LayerResult)] {
+        let ordered = verifier.layers(for: pipelineMode)
+        let identities = layers.map { ordered[$0] }
+        let results = try await collectParallelBaseLayerResults(
+            layers: identities,
+            outputURL: outputURL,
+            shared: shared,
+            verifier: verifier,
+            sourcePageCount: sourcePageCount,
+            regions: regions,
+            sensitiveTerms: sensitiveTerms,
+            pipelineMode: pipelineMode,
+            filterDigests: filterDigests,
+            perPageModes: perPageModes
+        )
+        return results.map { (ordered.firstIndex(of: $0.0) ?? 0, $0.1) }
+    }
+
+    /// Seam: run the parallel base-layer batch and return the
+    /// `(layer, LayerResult)` pairs in completion order. Extracted from
+    /// `runVerification` so a guard test can drive the fan-out directly and
+    /// assert each parallel layer receives its own `PDFDocument` instance
+    /// (mirrors the deliberate `internal` precedent of `rasterizePagesInParallel`).
+    /// `runVerification` keeps the `.verifying` transitions, the canonical
+    /// report ordering and the accessibility announcements.
+    ///
+    /// `nonisolated`: the per-layer document provisioning is CPU-bound on
+    /// large outputs and runs off MainActor; the layer fan-out is
+    /// `@concurrent`. All parameters are `Sendable` value types.
+    nonisolated func collectParallelBaseLayerResults(
+        layers: [VerificationLayer],
+        outputURL: URL,
+        shared: SendablePDFDocument,
+        verifier: VerificationEngine,
+        sourcePageCount: Int,
+        regions: [Int: [RedactionRegion]],
+        sensitiveTerms: [SensitiveTerm],
+        pipelineMode: PipelineMode,
+        filterDigests: [PageFilterDigest?],
+        perPageModes: [PipelineMode]
+    ) async throws -> [(VerificationLayer, LayerResult)] {
         // Provision one PDFDocument instance per parallel layer off
         // MainActor. nil ⇒ at least one re-open failed.
-        let perLayerDocs: [Int: SendablePDFDocument]? = await Task.detached {
+        let perLayerDocs: [VerificationLayer: SendablePDFDocument]? = await Task.detached {
             Self.loadParallelLayerDocuments(outputURL, layers: layers)
         }.value
 
@@ -1129,10 +1183,10 @@ final class PipelineCoordinator: @unchecked Sendable {
                 "per-layer verification document provisioning failed; running base layers sequentially on the shared document"
             )
             #endif
-            var collected: [(Int, LayerResult)] = []
-            for layerIndex in layers {
+            var collected: [(VerificationLayer, LayerResult)] = []
+            for layer in layers {
                 let result = await verifier.runLayer(
-                    layerIndex,
+                    layer,
                     outputDocument: shared,
                     sourcePageCount: sourcePageCount,
                     regions: regions,
@@ -1141,20 +1195,20 @@ final class PipelineCoordinator: @unchecked Sendable {
                     filterDigests: filterDigests,
                     perPageModes: perPageModes
                 )
-                collected.append((layerIndex, result))
+                collected.append((layer, result))
             }
             return collected
         }
 
-        return try await withThrowingTaskGroup(of: (Int, LayerResult).self) { group in
-            for layerIndex in layers {
+        return try await withThrowingTaskGroup(of: (VerificationLayer, LayerResult).self) { group in
+            for layer in layers {
                 // Each parallel layer runs against its own instance; `shared`
                 // is only a defensive fallback for an absent map entry (the
                 // map is complete whenever provisioning succeeded).
-                let layerDoc = perLayerDocs[layerIndex] ?? shared
+                let layerDoc = perLayerDocs[layer] ?? shared
                 group.addTask {
                     let result = await verifier.runLayer(
-                        layerIndex,
+                        layer,
                         outputDocument: layerDoc,
                         sourcePageCount: sourcePageCount,
                         regions: regions,
@@ -1163,10 +1217,10 @@ final class PipelineCoordinator: @unchecked Sendable {
                         filterDigests: filterDigests,
                         perPageModes: perPageModes
                     )
-                    return (layerIndex, result)
+                    return (layer, result)
                 }
             }
-            var collected: [(Int, LayerResult)] = []
+            var collected: [(VerificationLayer, LayerResult)] = []
             for try await pair in group {
                 collected.append(pair)
             }
@@ -1233,49 +1287,41 @@ final class PipelineCoordinator: @unchecked Sendable {
         }
 
         let verifier = VerificationEngine()
-        // Layer count is mode-dependent, NEVER hardcoded
-        let globalLayerCount = verifier.layerCount(for: effectiveMode)
+        // The schedule is the mode's layer list grouped by execution phase
+        // (`VerificationLayer.phase`) — identity, never index arithmetic.
+        // `layers` is the canonical (report) order; the count is derived.
+        let layers = verifier.layers(for: effectiveMode)
+        let globalLayerCount = layers.count
+        // Published progress: results in completion order (the progress UI
+        // reads `completedLayers` incrementally). The REPORT is assembled in
+        // canonical order from `resultsByLayer` once every phase has run, so
+        // a layer that completes early in the parallel batch (Operator
+        // Re-Extraction) still lands at its ordinal in the results list.
         var completedLayers: [LayerResult] = []
-        // Result for Layer 10 (Operator Re-Extraction),
-        // dispatched in the parallel base batch but held back until the
-        // sandwich loop finishes so completedLayers stays layer-index-
-        // ascending. Nil in modes whose layerCount is < 10.
-        var deferredLayer10Result: LayerResult? = nil
+        var resultsByLayer: [VerificationLayer: LayerResult] = [:]
         let startTime = CFAbsoluteTimeGetCurrent()
 
         let sourcePageCount = documentState.pageCount
 
-        // Base layers 0/1/2 (Text Extraction, OCR, Binary Search) run
-        // in parallel via withTaskGroup — independent reads against the output
-        // document with no shared mutable state. Layers 3, 4 (Structure,
-        // Metadata) run sequentially after because both parse the
-        // `PDFDocument` catalog; concurrent CGPDFDictionary traversal would
-        // contend on the same catalog handle. Sandwich layers 5–8 also run
-        // sequentially — the inter-layer character-count baseline (Layer 7)
-        // depends on Layer 6's extraction work and must remain ordered.
-        //
-        // Searchable Layer 10 (operator
-        // re-extraction, index 9) joins the base-parallel batch when the
-        // mode's layer count reaches 10. The layer walks each output page's
-        // content stream via `CGPDFContentStream` (a fresh stream object per
-        // page), so it has no catalog-handle contention with layers 0/1/2
-        // and no sequencing dependency on the sandwich-sequential layers
-        // (5–8). Its result is held back from `completedLayers` until the
-        // sandwich loop finishes so the slot-indexed layer list stays
-        // layer-index-ascending for downstream consumers (Views iterate via
-        // `report.layers.enumerated()` and label rows by ordinal position).
-        let parallelBaseLayers: [Int]
-        let sandwichLayers: [Int]
-        let sequentialBaseLayers = Array(3..<min(5, globalLayerCount))
-        if globalLayerCount >= 10 {
-            parallelBaseLayers = [0, 1, 2, 9]
-            sandwichLayers = Array(5..<9)
-        } else if globalLayerCount > 5 {
-            parallelBaseLayers = Array(0..<min(3, globalLayerCount))
-            sandwichLayers = Array(5..<globalLayerCount)
-        } else {
-            parallelBaseLayers = Array(0..<min(3, globalLayerCount))
-            sandwichLayers = []
+        // Phases. The parallel base batch (Text Extraction, OCR, Binary
+        // String Search, and in Searchable mode Operator Re-Extraction) runs
+        // via withTaskGroup — independent reads against the output document
+        // with no shared mutable state, each layer on its own PDFDocument
+        // instance. Structure and Metadata run sequentially after because
+        // both parse the `PDFDocument` catalog; concurrent CGPDFDictionary
+        // traversal would contend on the same catalog handle. The sandwich
+        // checks run sequentially — the inter-layer character-count baseline
+        // depends on Spatial Verification's extraction work and must remain
+        // ordered. The post-sequential checks (the Search Re-check) run last:
+        // page-parallel inside the layer at Layer 2's width, never overlapped
+        // with Layer 2's own Vision pass.
+        let parallelBaseLayers = layers.filter { $0.phase == .parallelBase }
+        let catalogLayers = layers.filter { $0.phase == .catalogSequential }
+        let sandwichLayers = layers.filter { $0.phase == .sandwichSequential }
+        let postLayers = layers.filter { $0.phase == .postSequential }
+        // 1-based ordinal in the mode's order (the progress and row label).
+        func ordinal(_ layer: VerificationLayer) -> Int {
+            (layers.firstIndex(of: layer) ?? 0) + 1
         }
 
         // Snapshot MainActor-isolated inputs once so the @concurrent
@@ -1285,8 +1331,9 @@ final class PipelineCoordinator: @unchecked Sendable {
         let sensitiveTermsSnapshot = runContext.sensitiveTerms
         let filterDigestsSnapshot = runContext.filterDigests
         let perPageModesSnapshot = runContext.perPageModes
+        let appliedSearchesSnapshot = runContext.appliedSearches
 
-        // --- Base layers 0/1/2: parallel batch ---
+        // --- Parallel base batch ---
         if let firstLayer = parallelBaseLayers.first {
             try Task.checkCancellation()
             // Surface the first parallel-batch layer in the progress UI.
@@ -1295,9 +1342,9 @@ final class PipelineCoordinator: @unchecked Sendable {
             // fire as each layer completes below.
             documentState.transition(to: .verifying(
                 progress: .init(
-                    currentLayer: firstLayer + 1,
+                    currentLayer: ordinal(firstLayer),
                     totalLayers: globalLayerCount,
-                    layerName: verifier.layerName(at: firstLayer),
+                    layerName: firstLayer.name,
                     completedLayers: completedLayers
                 )
             ))
@@ -1315,97 +1362,50 @@ final class PipelineCoordinator: @unchecked Sendable {
                 perPageModes: perPageModesSnapshot
             )
 
-            // Restore canonical (layer-index ascending) order so
-            // `completedLayers` matches the historical sequential contract
-            // — downstream consumers index by layer slot.
-            let orderedParallel = parallelResults.sorted { $0.0 < $1.0 }
-            for (layerIndex, result) in orderedParallel {
-                if layerIndex == 9 {
-                    // Layer 10 dispatched in the
-                    // base-parallel batch for wall-clock reasons; appended
-                    // after the sandwich loop so completedLayers stays
-                    // layer-index-ascending.
-                    deferredLayer10Result = result
-                    continue
-                }
+            // Canonical order within the batch so the announcements and the
+            // published progress read ascending.
+            let orderedParallel = parallelResults.sorted { ordinal($0.0) < ordinal($1.0) }
+            for (layer, result) in orderedParallel {
+                resultsByLayer[layer] = result
                 completedLayers.append(result)
-                let layerAnnouncement = result.completionAnnouncement(layerNumber: layerIndex + 1)
+                let layerAnnouncement = result.completionAnnouncement(layerNumber: ordinal(layer))
                 await MainActor.run {
                     UIAccessibility.post(notification: .announcement, argument: layerAnnouncement)
                 }
             }
         }
 
-        // --- Base layers 3, 4: sequential (shared CGPDFDocument catalog) ---
-        for layerIndex in sequentialBaseLayers {
-            try Task.checkCancellation()
-            documentState.transition(to: .verifying(
-                progress: .init(
-                    currentLayer: layerIndex + 1,
-                    totalLayers: globalLayerCount,
-                    layerName: verifier.layerName(at: layerIndex),
-                    completedLayers: completedLayers
+        // --- Sequential phases: catalog readers → sandwich checks → post checks ---
+        for phaseLayers in [catalogLayers, sandwichLayers, postLayers] {
+            for layer in phaseLayers {
+                try Task.checkCancellation()
+                documentState.transition(to: .verifying(
+                    progress: .init(
+                        currentLayer: ordinal(layer),
+                        totalLayers: globalLayerCount,
+                        layerName: layer.name,
+                        completedLayers: completedLayers
+                    )
+                ))
+
+                let result = await verifier.runLayer(
+                    layer,
+                    outputDocument: wrappedDoc,
+                    sourcePageCount: sourcePageCount,
+                    regions: regionsSnapshot,
+                    sensitiveTerms: sensitiveTermsSnapshot,
+                    pipelineMode: effectiveMode,
+                    filterDigests: filterDigestsSnapshot,
+                    perPageModes: perPageModesSnapshot,
+                    appliedSearches: appliedSearchesSnapshot
                 )
-            ))
+                resultsByLayer[layer] = result
+                completedLayers.append(result)
 
-            let result = await verifier.runLayer(
-                layerIndex,
-                outputDocument: wrappedDoc,
-                sourcePageCount: sourcePageCount,
-                regions: regionsSnapshot,
-                sensitiveTerms: sensitiveTermsSnapshot,
-                pipelineMode: effectiveMode,
-                filterDigests: filterDigestsSnapshot,
-                perPageModes: perPageModesSnapshot
-            )
-            completedLayers.append(result)
-
-            let layerAnnouncement = result.completionAnnouncement(layerNumber: layerIndex + 1)
-            await MainActor.run {
-                UIAccessibility.post(notification: .announcement, argument: layerAnnouncement)
-            }
-        }
-
-        // --- Sandwich layers 5–8: sequential (inter-layer baselines) ---
-        for layerIndex in sandwichLayers {
-            try Task.checkCancellation()
-            documentState.transition(to: .verifying(
-                progress: .init(
-                    currentLayer: layerIndex + 1,
-                    totalLayers: globalLayerCount,
-                    layerName: verifier.layerName(at: layerIndex),
-                    completedLayers: completedLayers
-                )
-            ))
-
-            let result = await verifier.runLayer(
-                layerIndex,
-                outputDocument: wrappedDoc,
-                sourcePageCount: sourcePageCount,
-                regions: regionsSnapshot,
-                sensitiveTerms: sensitiveTermsSnapshot,
-                pipelineMode: effectiveMode,
-                filterDigests: filterDigestsSnapshot,
-                perPageModes: perPageModesSnapshot
-            )
-            completedLayers.append(result)
-
-            let layerAnnouncement = result.completionAnnouncement(layerNumber: layerIndex + 1)
-            await MainActor.run {
-                UIAccessibility.post(notification: .announcement, argument: layerAnnouncement)
-            }
-        }
-
-        // --- Layer 10 (parallel base, deferred-append) ---
-        // The result was computed in the parallel batch; appending here
-        // keeps completedLayers layer-index-ascending so the slot-indexed
-        // UI display (`report.layers.enumerated()`) labels each row by its
-        // canonical layer ordinal.
-        if let l10 = deferredLayer10Result {
-            completedLayers.append(l10)
-            let layerAnnouncement = l10.completionAnnouncement(layerNumber: 10)
-            await MainActor.run {
-                UIAccessibility.post(notification: .announcement, argument: layerAnnouncement)
+                let layerAnnouncement = result.completionAnnouncement(layerNumber: ordinal(layer))
+                await MainActor.run {
+                    UIAccessibility.post(notification: .announcement, argument: layerAnnouncement)
+                }
             }
         }
 
@@ -1417,10 +1417,14 @@ final class PipelineCoordinator: @unchecked Sendable {
         // handler as the in-loop checkpoints above; no new error handling.
         try Task.checkCancellation()
 
+        // The report lists every layer in canonical order: the results UI
+        // labels rows by ordinal position (`report.layers.enumerated()`).
+        let orderedResults = layers.compactMap { resultsByLayer[$0] }
+
         let elapsed = CFAbsoluteTimeGetCurrent() - startTime
         let report = VerificationReport(
-            layers: completedLayers,
-            overallStatus: verifier.aggregateStatus(completedLayers),
+            layers: orderedResults,
+            overallStatus: verifier.aggregateStatus(orderedResults),
             durationSeconds: elapsed,
             perPageModes: runContext.perPageModes,
             perPageFallbackReasons: runContext.perPageFallbackReasons

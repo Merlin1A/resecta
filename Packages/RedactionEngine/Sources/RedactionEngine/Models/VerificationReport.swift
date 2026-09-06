@@ -128,11 +128,22 @@ public struct LayerResult: Sendable {
     /// solely for in-app display composition and is never logged or
     /// persisted. Nil for every other status.
     public let reviewTermTexts: [String]?
+    /// Identity of the check that produced this result, when known. Nil for
+    /// results built without one (synthetic rows, legacy persisted reports);
+    /// consumers key on identity first and fall back to `name`.
+    public let layer: VerificationLayer?
+    /// Display-only: the Search Re-check's per-query lines (label · found ·
+    /// applied · remaining · route). Like `reviewTermTexts`, this field
+    /// exists solely for in-app display composition and is never logged or
+    /// persisted. Nil for every other layer.
+    public let queryLines: [SearchRecheckQueryLine]?
 
     public init(name: String, symbolName: String, status: VerificationStatus,
                 shortDescription: String, detailDescription: String,
                 pageReferences: [Int]?, durationSeconds: Double,
-                reviewTermTexts: [String]? = nil) {
+                reviewTermTexts: [String]? = nil,
+                layer: VerificationLayer? = nil,
+                queryLines: [SearchRecheckQueryLine]? = nil) {
         self.name = name
         self.symbolName = symbolName
         self.status = status
@@ -141,5 +152,69 @@ public struct LayerResult: Sendable {
         self.pageReferences = pageReferences
         self.durationSeconds = durationSeconds
         self.reviewTermTexts = reviewTermTexts
+        self.layer = layer
+        self.queryLines = queryLines
+    }
+}
+
+/// One per-query line of the Search Re-check's expanded detail: the query
+/// label, the original run's found count, the applied count, the remaining
+/// count on the output, and which evidence the pages were read from.
+/// Display-only — composed by the results row, never logged or persisted.
+public struct SearchRecheckQueryLine: Sendable, Equatable {
+    /// Which evidence backed the pages this query was re-run on.
+    public enum Route: Sendable, Equatable {
+        case textLayer
+        case ocr
+        /// Both, by page count. `(0, 0)` when no page could be read.
+        case mixed(textPages: Int, ocrPages: Int)
+    }
+
+    /// Per-term breakdown of a multi-term query. `found` and `applied` are
+    /// nil until the record carries per-term counts; `remaining` is
+    /// measured on the output.
+    public struct PerTerm: Sendable, Equatable {
+        public let term: String
+        public let found: Int?
+        public let applied: Int?
+        public let remaining: Int
+
+        public init(term: String, found: Int?, applied: Int?, remaining: Int) {
+            self.term = term
+            self.found = found
+            self.applied = applied
+            self.remaining = remaining
+        }
+    }
+
+    public let label: String
+    public let foundCount: Int
+    /// The original run stopped at the result cap ("found 1,000+").
+    public let foundHitCap: Bool
+    public let appliedCount: Int
+    public let remainingCount: Int
+    public let route: Route
+    /// "case-sensitive" / "whole word", in that order, when set.
+    public let optionBadges: [String]
+    public let perTerm: [PerTerm]?
+
+    public init(
+        label: String,
+        foundCount: Int,
+        foundHitCap: Bool,
+        appliedCount: Int,
+        remainingCount: Int,
+        route: Route,
+        optionBadges: [String] = [],
+        perTerm: [PerTerm]? = nil
+    ) {
+        self.label = label
+        self.foundCount = foundCount
+        self.foundHitCap = foundHitCap
+        self.appliedCount = appliedCount
+        self.remainingCount = remainingCount
+        self.route = route
+        self.optionBadges = optionBadges
+        self.perTerm = perTerm
     }
 }

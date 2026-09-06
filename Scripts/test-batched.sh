@@ -39,7 +39,7 @@ GREP=/usr/bin/grep
 # REPORT-ONLY (their reds never set the exit status — a red here is read by
 # hand, never gated). "Completely alone" is load-bearing: StressCorpusTests
 # has been red when paired with even one other suite.
-PERF_ALONE_RedactionEngine="CancellationLatencyTests PixelBufferZeroizeTests ReverseRationalePerformanceTests StressCorpusTests ApplyPhaseMemoryStressTests ParallelLayerExecutionTests DetectionRasterizeOverlapTests Layer2OCRParallelismTests"
+PERF_ALONE_RedactionEngine="CancellationLatencyTests PixelBufferZeroizeTests ReverseRationalePerformanceTests StressCorpusTests ApplyPhaseMemoryStressTests ParallelLayerExecutionTests DetectionRasterizeOverlapTests Layer2OCRParallelismTests SearchRecheckParallelismTests"
 PERF_ALONE_ResectaApp="PageParallelRasterizationTests"
 
 # Exclusion list (suite granularity): reds here do not gate the exit

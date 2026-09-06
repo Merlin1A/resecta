@@ -54,16 +54,19 @@ you share.
 
 After export, a verification engine re-opens the output *as a file* and hunts
 for residue (`Verification/VerificationEngine.swift`). Secure Rasterization
-output gets five layers: text extraction over every page; OCR of the rendered
+output gets six layers: text extraction over every page; OCR of the rendered
 output with word-level boxes gated against the redacted regions; a byte-level
 sweep of the raw file for the sensitive terms that were redacted; structural
 checks for active content and tampering (JavaScript, automatic actions,
 embedded files, form dictionaries, encryption, and multiple end-of-file
 markers — the signature of an incremental update appended after redaction);
-and metadata checks. Searchable Redaction adds five more over the preserved
-text layer: spatial exclusion (no character geometry inside a redacted
-region), character count cross-checks, font verification, character lineage,
-and an operator-level re-extraction that decodes the output's content streams
+metadata checks; and a search re-check that re-runs each search you applied
+through the search engine itself against the output — OCR of the rendered
+pages in this mode — and reports what it observed per search. Searchable
+Redaction adds five more over the preserved text layer (eleven in total):
+spatial exclusion (no character geometry inside a redacted region),
+character count cross-checks, font verification, character lineage, and an
+operator-level re-extraction that decodes the output's content streams
 directly — a second decoder cross-checking the byte-level sweep, sharing no
 code with the toolkit extraction.
 
@@ -78,10 +81,10 @@ Details a reviewer should know exist:
   pathological term set exceeds the bound, the automaton degrades to a no-op
   **and reports itself degraded** so the layer surfaces incomplete coverage —
   it does not silently pass.
-- Checks that cannot run say so. Pages skipped by OCR resource caps, layers
-  that could not execute, and per-page fallbacks are threaded through to the
-  results UI as explicit "could not verify" states rather than folded into a
-  pass.
+- Checks that cannot run say so. Pages skipped by OCR resource caps, pages
+  whose OCR did not run for the search re-check, layers that could not
+  execute, and per-page fallbacks are threaded through to the results UI as
+  explicit "could not verify" states rather than folded into a pass.
 - The verdict tiers are calibrated against alarm fatigue: conditions that are
   expected under the chosen mode are informational notes, while every
   could-not-verify condition keeps its severity. A warning tier that fires on
@@ -95,10 +98,12 @@ Details a reviewer should know exist:
 **The honest limits:** OCR-based checking is bounded by OCR itself — recall on
 degraded scans is materially lower than on digital text, which is one reason
 the product treats verification as a check on your review, not a substitute
-for it (`README.md`, threat model). The five Searchable-mode layers inspect
-the text layer the app itself rebuilt; they are strong against construction
-bugs, weaker against threat classes nobody has named yet. That is the standing
-posture everywhere: mechanism claims, not outcome promises.
+for it (`README.md`, threat model). The search re-check on image-only output
+is OCR-bounded the same way and says so in its row. The five text-layer checks
+in Searchable mode inspect the text layer the app itself rebuilt; they are
+strong against construction bugs, weaker against threat classes nobody has
+named yet. That is the standing posture everywhere: mechanism claims, not
+outcome promises.
 
 ## 3. The classic fake-redaction failures are pinned by name
 

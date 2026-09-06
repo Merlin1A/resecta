@@ -40,7 +40,7 @@ class DocumentState {
 
     struct VerificationProgress: Sendable {
         var currentLayer: Int       // 1-based layer index
-        var totalLayers: Int        // Mode-dependent: 5 or 8 (never hardcoded)
+        var totalLayers: Int        // Mode-dependent: the mode's `layers(for:)` count (never hardcoded)
         var layerName: String
         var completedLayers: [LayerResult]
         var subPhase: SubPhase = .verifying

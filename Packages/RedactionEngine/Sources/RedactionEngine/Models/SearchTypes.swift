@@ -162,7 +162,7 @@ public enum SearchNavigationScope: String, CaseIterable, Sendable, Equatable {
 }
 
 /// Configuration options for search behavior.
-public struct SearchOptions: Sendable, Equatable {
+public struct SearchOptions: Sendable, Equatable, Hashable {
     public var caseSensitive: Bool = false
     public var wholeWord: Bool = false
     public var includeOCR: Bool = true

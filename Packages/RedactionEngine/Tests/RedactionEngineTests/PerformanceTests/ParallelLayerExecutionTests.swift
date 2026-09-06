@@ -317,8 +317,14 @@ struct ParallelLayerExecutionTests {
         let digests: [PageFilterDigest?] = (0..<pageCount).map { _ in nil }
         let perPageModes = Array(repeating: PipelineMode.searchableRedaction, count: pageCount)
 
+        // The coordinator's parallel batch = the ordinals of the
+        // `.parallelBase` layers in the mode's order (identity, not literals).
+        let parallelOrdinals = verifier.layers(for: .searchableRedaction).enumerated()
+            .filter { $0.element.phase == .parallelBase }.map(\.offset)
+        #expect(parallelOrdinals == [0, 1, 2, 9])
+
         let parallel = await Self.runParallelBase(
-            layers: [0, 1, 2, 9],
+            layers: parallelOrdinals,
             verifier: verifier,
             doc: SendablePDFDocument(doc),
             sourcePageCount: pageCount,
@@ -329,8 +335,8 @@ struct ParallelLayerExecutionTests {
             perPageModes: perPageModes
         )
 
-        #expect(parallel.count == 4,
-                "Expected four timed results (layers 0, 1, 2, 9)")
+        #expect(parallel.count == parallelOrdinals.count,
+                "Expected one timed result per parallel-base layer (\(parallelOrdinals))")
 
         // Same overlap predicate the layers-0/1/2 test uses. Four layers
         // produce 6 pairs; requiring >= 2 excludes the near-serial
@@ -355,7 +361,7 @@ struct ParallelLayerExecutionTests {
 
         // Sorted output preserves layer-index-ascending order so
         // downstream slot-based consumers (UI list rows) read correctly.
-        #expect(parallel.map { $0.layerIndex } == [0, 1, 2, 9])
+        #expect(parallel.map { $0.layerIndex } == parallelOrdinals)
     }
 
     // MARK: - Test 4 — Wall-clock under 50% of sequential baseline

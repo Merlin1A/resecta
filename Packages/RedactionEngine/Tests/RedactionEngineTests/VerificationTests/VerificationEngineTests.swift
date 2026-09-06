@@ -12,11 +12,15 @@ struct VerificationEngineTests {
 
     // MARK: - Layer Count (never hardcoded)
 
-    @Test("Secure Rasterization has 5 layers, Searchable has 10")
+    @Test("Secure Rasterization has 6 layers, Searchable has 11")
     func layerCounts() {
         let engine = VerificationEngine()
-        #expect(engine.layerCount(for: .secureRasterization) == 5)
-        #expect(engine.layerCount(for: .searchableRedaction) == 10)
+        #expect(engine.layerCount(for: .secureRasterization) == 6)
+        #expect(engine.layerCount(for: .searchableRedaction) == 11)
+        // The eleventh Searchable layer (index 10) is the search re-check.
+        #expect(engine.layerName(at: 10) == "Search Re-check")
+        #expect(engine.layerName(at: 10, mode: .searchableRedaction) == "Search Re-check")
+        #expect(engine.layerName(at: 5, mode: .secureRasterization) == "Search Re-check")
     }
 
     // MARK: - Layer Names and Symbols
@@ -559,7 +563,7 @@ struct VerificationEngineTests {
 
     // MARK: - End-to-End: Reconstruct then Verify
 
-    @Test("Full 5-layer verification passes on reconstructed output")
+    @Test("Full raster verification passes on reconstructed output")
     func fullVerificationOnReconstructedPDF() async throws {
         let (doc, url) = try await makeCleanPDF()
         defer { try? FileManager.default.removeItem(at: url) }
@@ -567,9 +571,9 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         var layers: [LayerResult] = []
 
-        for i in 0..<5 {
+        for layer in engine.layers(for: .secureRasterization) {
             let result = await engine.runLayer(
-                i, outputDocument: SendablePDFDocument(doc),
+                layer, outputDocument: SendablePDFDocument(doc),
                 sourcePageCount: 1, regions: [:], sensitiveTerms: [],
                 pipelineMode: .secureRasterization,
                 filterDigests: [], perPageModes: [.secureRasterization]
