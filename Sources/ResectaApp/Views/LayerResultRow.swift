@@ -78,6 +78,28 @@ struct LayerResultRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
+                    // Search Re-check per-query lines (display-only, like
+                    // `reviewTermTexts`): one line per applied query with
+                    // its found / applied / remaining counts, per-term
+                    // sub-lines beneath a multi-term query. Each `Text`
+                    // is its own reachable element inside the expanded
+                    // `.contain` container.
+                    if let lines = layer.queryLines, !lines.isEmpty {
+                        VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
+                            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                                Text(Self.queryLineText(line))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                ForEach(Array(Self.perTermLineTexts(line).enumerated()), id: \.offset) { _, text in
+                                    Text(text)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .padding(.leading, ResectaTokens.Spacing.sm)
+                                }
+                            }
+                        }
+                    }
+
                     // Tappable page reference chips (static fallback when onPageTap is nil)
                     if let pages = layer.pageReferences, !pages.isEmpty {
                         if let onPageTap {
@@ -155,6 +177,46 @@ struct LayerResultRow: View {
             : "They match text you redacted elsewhere."
         return "\(quoted) \(verb) still readable \(location). \(matchClause) "
             + "Use text search to redact remaining instances."
+    }
+
+    // MARK: - Search Re-check query lines (static for unit testability)
+
+    /// The per-query line as displayed: "{label} · found {N} · applied {M}
+    /// · {R} remain", then the option badges ("case-sensitive", "whole
+    /// word") when set. "found 1,000+" when the original run stopped at
+    /// the result cap. The label is the engine's display label (quoted
+    /// query / pattern, or the multi-term form); the route is not
+    /// repeated here — the layer's detail sentence carries it once.
+    static func queryLineText(_ line: SearchRecheckQueryLine) -> String {
+        let found = line.foundHitCap ? "1,000+" : String(line.foundCount)
+        var text = "\(line.label) · found \(found) · applied \(line.appliedCount) · \(line.remainingCount) remain"
+        for badge in line.optionBadges {
+            text += " · \(badge)"
+        }
+        return text
+    }
+
+    /// A multi-term query's per-term sub-lines: "“term” · {R} remain", with
+    /// "found {n} · applied {m}" ahead of the remaining count when the
+    /// record carries per-term counts. Empty for single-query lines.
+    static func perTermLineTexts(_ line: SearchRecheckQueryLine) -> [String] {
+        (line.perTerm ?? []).map { term in
+            var text = "\u{201C}\(term.term)\u{201D}"
+            if let found = term.found { text += " · found \(found)" }
+            if let applied = term.applied { text += " · applied \(applied)" }
+            text += " · \(term.remaining) remain"
+            return text
+        }
+    }
+
+    /// Every query-line text the expanded row renders, in display order:
+    /// each query line followed by its per-term sub-lines. Empty when the
+    /// layer carries no query lines (every layer but the Search Re-check,
+    /// and the re-check's INFO row).
+    static func queryLineTexts(layer: LayerResult) -> [String] {
+        (layer.queryLines ?? []).flatMap { line in
+            [queryLineText(line)] + perTermLineTexts(line)
+        }
     }
 
     // MARK: - Spoken strings (static for unit testability)
