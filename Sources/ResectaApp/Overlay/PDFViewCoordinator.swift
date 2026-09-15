@@ -7,9 +7,10 @@ import RedactionEngine
 // Region coordinates are sensitive data — never logged.
 
 /// Coordinator for PDFDocumentView. Serves as PDFPageOverlayViewProvider,
-/// NotificationCenter observer for page/scale changes, and Scribble suppressor.
+/// PDFViewDelegate (the link policy), NotificationCenter observer for
+/// page/scale changes, and Scribble suppressor.
 @MainActor
-class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, UIScribbleInteractionDelegate {
+class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate, UIScribbleInteractionDelegate {
 
     weak var pdfView: PDFView?
     var redactionState: RedactionState?
@@ -124,6 +125,40 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, UIScribbleIntera
 
     deinit {
         if let o = pageChangeObserver { NotificationCenter.default.removeObserver(o) }
+    }
+
+    // MARK: - Link policy (PDFViewDelegate)
+
+    /// Installs this coordinator as the view's delegate.
+    /// `PDFDocumentView.makeUIView` calls this BEFORE the document is
+    /// assigned so no annotation in the document is ever live under
+    /// PDFKit's default handling.
+    func applyLinkPolicy(to pdfView: PDFView) {
+        pdfView.delegate = self
+    }
+
+    /// Assigns the document to the view and turns data detectors off for
+    /// it. Both `PDFDocumentView` assignment sites route through here.
+    ///
+    /// Data detectors add temporary link annotations for URLs and phone
+    /// numbers found in the page text. The switch lives on the document,
+    /// where it is ON by default (measured on iOS 26.4: a fresh
+    /// `PDFDocument` reports it enabled), but the iOS SDK declares only
+    /// the view property, deprecated on iOS 18, which reads and writes
+    /// the flag of the view's CURRENT document — with no document it is
+    /// inert, and a newly assigned document arrives with its own default.
+    /// So the write has to follow every assignment, which is why the
+    /// assignment itself is here.
+    func assign(_ document: PDFDocument?, to pdfView: PDFView) {
+        pdfView.document = document
+        pdfView.enableDataDetectors = false
+    }
+
+    /// Link annotations inside the source document are not followed: the
+    /// app opens no URL from document content (PDFKit's default without
+    /// a delegate is to open it). The body is intentionally empty and
+    /// touches no state, hence nonisolated.
+    nonisolated func pdfViewWillClick(onLink sender: PDFView, with url: URL) {
     }
 
     // MARK: - PDFPageOverlayViewProvider

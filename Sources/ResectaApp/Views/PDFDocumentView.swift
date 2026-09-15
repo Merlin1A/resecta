@@ -96,8 +96,14 @@ struct PDFDocumentView: UIViewRepresentable {
 
         // Set overlay provider BEFORE assigning document
         pdfView.pageOverlayViewProvider = context.coordinator
+        // Link policy BEFORE assigning document: the coordinator is the
+        // delegate whose link hook does nothing, so a tap on a link
+        // annotation in the document opens nothing. The assignment goes
+        // through the coordinator, which turns the document's data
+        // detectors off (see `PDFViewCoordinator.assign(_:to:)`).
+        context.coordinator.applyLinkPolicy(to: pdfView)
 
-        pdfView.document = documentState.sourceDocument
+        context.coordinator.assign(documentState.sourceDocument, to: pdfView)
 
         // Navigate to current page
         if let doc = pdfView.document,
@@ -112,9 +118,10 @@ struct PDFDocumentView: UIViewRepresentable {
     func updateUIView(_ pdfView: FitFlooredPDFView, context: Context) {
         let coordinator = context.coordinator
 
-        // Update document if changed (new import)
+        // Update document if changed (new import). Through the
+        // coordinator so the new document's data detectors are off.
         if pdfView.document !== documentState.sourceDocument {
-            pdfView.document = documentState.sourceDocument
+            coordinator.assign(documentState.sourceDocument, to: pdfView)
         }
 
         // Sync page navigation — avoid re-navigation if already on correct page
