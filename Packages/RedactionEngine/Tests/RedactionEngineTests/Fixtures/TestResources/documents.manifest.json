@@ -365,7 +365,7 @@
         150.13,
         150.11
       ],
-      "registration_run": "/Users/maria/resecta-1.2-planning/evidence/8bbf5c8c/capture/20260829-0955-register",
+      "registration_run": "evidence/8bbf5c8c/capture/20260829-0955-register",
       "note": "class is null because one document spans C1..C4 (per-page classes in page_classes; the L-19 null precedent); polygons ride beside bbox in the sidecar"
     }
   },
@@ -484,7 +484,7 @@
         300.27,
         300.24
       ],
-      "registration_run": "/Users/maria/resecta-1.2-planning/evidence/8bbf5c8c/capture/20260829-0955-register",
+      "registration_run": "evidence/8bbf5c8c/capture/20260829-0955-register",
       "note": "class is null because one document spans C1..C4 (per-page classes in page_classes; the L-19 null precedent); polygons ride beside bbox in the sidecar"
     }
   },
@@ -533,7 +533,7 @@
         150.07,
         150.1
       ],
-      "registration_run": "/Users/maria/resecta-1.2-planning/evidence/8bbf5c8c/capture/20260829-0955-register",
+      "registration_run": "evidence/8bbf5c8c/capture/20260829-0955-register",
       "note": "class is null because one document spans C1..C4 (per-page classes in page_classes; the L-19 null precedent); polygons ride beside bbox in the sidecar"
     }
   },
@@ -582,7 +582,7 @@
         150.06,
         150.09
       ],
-      "registration_run": "/Users/maria/resecta-1.2-planning/evidence/8bbf5c8c/capture/20260829-0955-register",
+      "registration_run": "evidence/8bbf5c8c/capture/20260829-0955-register",
       "note": "class is null because one document spans C1..C4 (per-page classes in page_classes; the L-19 null precedent); polygons ride beside bbox in the sidecar"
     }
   },
@@ -701,7 +701,7 @@
         150.05,
         150.05
       ],
-      "registration_run": "/Users/maria/resecta-1.2-planning/evidence/8bbf5c8c/capture/20260825-2000-register-synthetic",
+      "registration_run": "evidence/8bbf5c8c/capture/20260825-2000-register-synthetic",
       "note": "class is null because one document spans C1..C4 (per-page classes in page_classes; the L-19 null precedent); polygons ride beside bbox in the sidecar"
     }
   },
@@ -820,7 +820,7 @@
         300.05,
         300.05
       ],
-      "registration_run": "/Users/maria/resecta-1.2-planning/evidence/8bbf5c8c/capture/20260825-2000-register-synthetic",
+      "registration_run": "evidence/8bbf5c8c/capture/20260825-2000-register-synthetic",
       "note": "class is null because one document spans C1..C4 (per-page classes in page_classes; the L-19 null precedent); polygons ride beside bbox in the sidecar"
     }
   }
