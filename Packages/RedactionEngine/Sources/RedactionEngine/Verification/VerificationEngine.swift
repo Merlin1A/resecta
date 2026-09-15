@@ -199,7 +199,8 @@ public struct VerificationEngine: Sendable {
         do { // LegalPhrases:safe (Swift keyword usage below)
             switch layer {
             case .textExtraction:
-                let (s0, pages0) = try runLayer1TextExtraction(doc, pipelineMode: pipelineMode)
+                let (s0, pages0) = try runLayer1TextExtraction(
+                    doc, pipelineMode: pipelineMode, perPageModes: perPageModes)
                 status = s0
                 layerPageReferences = pages0
             case .ocrCheck:
@@ -414,9 +415,15 @@ public struct VerificationEngine: Sendable {
     /// first offending page — so a multi-page problem surfaces in one run,
     /// and the 0-based page list feeds the tappable page chips in the UI.
     /// Document-level findings (bookmarks, AcroForm) carry nil references.
+    /// The selectable-text test keys on each page's OWN mode
+    /// (`perPageModes`, falling back to the document mode for pages beyond
+    /// the array): a page that fell back to Secure Rasterization inside a
+    /// Searchable run was written image-only and must carry no text layer —
+    /// the same per-page reading Layer 2 makes.
     private func runLayer1TextExtraction(
         _ doc: PDFDocument,
-        pipelineMode: PipelineMode
+        pipelineMode: PipelineMode,
+        perPageModes: [PipelineMode]
     ) throws -> (VerificationStatus, [Int]?) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
@@ -434,9 +441,10 @@ public struct VerificationEngine: Sendable {
                 continue
             }
 
-            // Check for selectable text
+            // Check for selectable text against the page's own mode.
             if let text = page.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                if pipelineMode == .secureRasterization {
+                let pageMode = i < perPageModes.count ? perPageModes[i] : pipelineMode
+                if pageMode == .secureRasterization {
                     selectableTextPages.append(i)
                 }
                 // Searchable Redaction: text is expected, but verify none in redacted areas
@@ -2450,7 +2458,10 @@ public struct VerificationEngine: Sendable {
 
     /// Dispatch spatial verification across all Searchable Redaction pages.
     /// Collects all failing pages for tappable navigation chips.
-    /// Skips pages that fell back to Secure Rasterization.
+    /// A page declared Secure Rasterization is not position-checked, but it
+    /// is probed for a text layer: image-only output must carry none (the
+    /// writer draws no text on such a page), so a text layer there FAILs
+    /// the layer outright — a tampered or foreign output, never a skip.
     ///
     /// When any region on the page carries `vertices`, the spatial
     /// exclusion check uses polygon-or-rect intersection (rect for
@@ -2466,19 +2477,37 @@ public struct VerificationEngine: Sendable {
         try Task.checkCancellation()
         var failingPages: [Int] = []
         var firstFailMessage: String?
-        // Positional edge grazes (per-page WARN from the exclusion pass):
-        // fold below FAIL and above the unreadable-page WARN.
-        var grazePages: [Int] = []
-        var firstGrazeMessage: String?
+        // Pages declared Secure Rasterization that still carry a text
+        // layer. Image-only output must carry none, so this FAIL outranks
+        // every other outcome of the layer.
+        var secureDeclaredTextPages: [Int] = []
+        // Per-page WARNs from the exclusion pass (a positional edge graze,
+        // or characters whose position could not be measured): fold below
+        // FAIL and above the unreadable-page WARN, first message in page
+        // order.
+        var exclusionWarnPages: [Int] = []
+        var firstExclusionWarnMessage: String?
         // Eligible pages PDFKit cannot open surface as a WARN when the
         // layer would otherwise PASS — see runLayer1TextExtraction.
         var unreadablePages: [Int] = []
 
         for i in 0..<doc.pageCount {
             try Task.checkCancellation()
-            // Skip pages that fell back to Secure Rasterization
-            guard i < perPageModes.count, perPageModes[i] == .searchableRedaction else {
+            // Pages beyond `perPageModes` are reported by the coverage arm
+            // below. A page declared Secure Rasterization is probed for a
+            // text layer — an image-only page must carry none — and is not
+            // position-checked; the switch is exhaustive so a new mode
+            // cannot be skipped silently.
+            guard i < perPageModes.count else { continue }
+            switch perPageModes[i] {
+            case .secureRasterization:
+                if let text = doc.page(at: i)?.string,
+                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    secureDeclaredTextPages.append(i)
+                }
                 continue
+            case .searchableRedaction:
+                break
             }
             guard let page = doc.page(at: i) else {
                 unreadablePages.append(i)
@@ -2538,18 +2567,25 @@ public struct VerificationEngine: Sendable {
                 failingPages.append(i)
                 if firstFailMessage == nil { firstFailMessage = msg }
             } else if case .warn(let msg) = result {
-                grazePages.append(i)
-                if firstGrazeMessage == nil { firstGrazeMessage = msg }
+                exclusionWarnPages.append(i)
+                if firstExclusionWarnMessage == nil { firstExclusionWarnMessage = msg }
             }
+        }
+        // A text layer on a page written as image-only outranks every other
+        // outcome: the page was declared to carry none.
+        if !secureDeclaredTextPages.isEmpty {
+            let list = secureDeclaredTextPages.map { String($0 + 1) }.joined(separator: ", ")
+            return (.fail("A page written as image-only still carries a text layer on \(pagePhrase(secureDeclaredTextPages, list: list))"),
+                    secureDeclaredTextPages)
         }
         if let msg = firstFailMessage {
             return (.fail(msg), failingPages)
         }
-        // Graze WARN outranks the unreadable-page WARN (mirror of FAIL's
-        // masking above; the combined case is rare and the graze message is
-        // the more actionable of the two).
-        if let msg = firstGrazeMessage {
-            return (.warn(msg), grazePages)
+        // The exclusion pass's WARN outranks the unreadable-page WARN
+        // (mirror of FAIL's masking above; the combined case is rare and the
+        // exclusion message is the more actionable of the two).
+        if let msg = firstExclusionWarnMessage {
+            return (.warn(msg), exclusionWarnPages)
         }
         if !unreadablePages.isEmpty {
             return (unreadablePagesWarn(unreadablePages), unreadablePages)

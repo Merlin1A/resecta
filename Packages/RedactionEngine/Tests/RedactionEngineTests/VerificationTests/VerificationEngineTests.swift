@@ -744,6 +744,103 @@ struct VerificationEngineTests {
             layerIndex: 8, label: "Layer 9", coveredMode: .secureRasterization)
     }
 
+    // MARK: - Per-page mode on pages declared Secure Rasterization
+
+    @Test("Layer 6 FAILs a secure-declared page that carries a text layer")
+    func layer6SecureDeclaredPageWithTextFails() async throws {
+        // A real text layer on a page the run declared image-only: the
+        // writer never draws text on such a page, so this is a tampered or
+        // foreign output — a FAIL, not a skip.
+        let (doc, url) = try TestFixtures.writeTempPDF(
+            TestFixtures.textLayerPDF(text: "Hello World"), prefix: "l6_secure_text_")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let engine = VerificationEngine()
+        let result = await engine.runLayer(
+            5, outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: 1, regions: [:], sensitiveTerms: [],
+            pipelineMode: .searchableRedaction,
+            filterDigests: [nil],
+            perPageModes: [.secureRasterization])
+        #expect(result.status.isFail,
+                "a page declared image-only that carries a text layer must FAIL, not be skipped; got \(result.status)")
+        if case .fail(let msg) = result.status {
+            #expect(msg.contains("image-only"), "got: \(msg)")
+            #expect(msg.contains("page 1"), "copy prints the 1-based page number; got: \(msg)")
+        }
+        #expect(result.pageReferences == [0],
+                "0-based reference to the offending page; got \(String(describing: result.pageReferences))")
+    }
+
+    @Test("Layer 6 still skips a secure-declared page with no text")
+    func layer6SecureDeclaredBlankPagePasses() async throws {
+        let (doc, url) = try makeBlankPDF(pageCount: 1)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let engine = VerificationEngine()
+        let result = await engine.runLayer(
+            5, outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: 1, regions: [:], sensitiveTerms: [],
+            pipelineMode: .searchableRedaction,
+            filterDigests: [nil],
+            perPageModes: [.secureRasterization])
+        #expect(result.status == .pass,
+                "an image-only page with no text layer is not position-checked and passes; got \(result.status)")
+        #expect(result.pageReferences == nil,
+                "got \(String(describing: result.pageReferences))")
+    }
+
+    @Test("Layer 6 reports unmeasured-position characters as a WARN with the page referenced")
+    func layer6ZeroBoundsUnitsWarnWithReference() async throws {
+        // Page 1 is a normal text page; page 2 carries glyphs PDFKit cannot
+        // place. The per-page WARN from the exclusion pass reaches the layer
+        // result with the offending page referenced (below FAIL, above the
+        // unreadable-page and coverage WARNs).
+        let (doc, url) = try TestFixtures.writeTempPDF(
+            TestFixtures.zeroBoundsGlyphPDF(text: "AB"), prefix: "l6_zero_bounds_")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let engine = VerificationEngine()
+        let result = await engine.runLayer(
+            5, outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: 1, regions: [:], sensitiveTerms: [],
+            pipelineMode: .searchableRedaction,
+            filterDigests: [nil],
+            perPageModes: [.searchableRedaction])
+        #expect(result.status.isWarn, "got \(result.status)")
+        if case .warn(let msg) = result.status {
+            #expect(msg.contains("had no measurable position"), "got: \(msg)")
+            #expect(msg.contains("not position-checked"), "got: \(msg)")
+        }
+        #expect(result.pageReferences == [0],
+                "got \(String(describing: result.pageReferences))")
+    }
+
+    @Test("Layer 1 keys on the per-page mode, not the document mode")
+    func layer1KeysOnPerPageMode() async throws {
+        // Two text pages in a Searchable run; page 2 fell back to Secure
+        // Rasterization. Only that page's text is reported — page 1's text
+        // is expected under its own (Searchable) mode.
+        let (doc, url) = try TestFixtures.writeTempPDF(
+            TestFixtures.textPagesPDF(["Alpha page", "Beta page"]), prefix: "l1_perpage_")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let engine = VerificationEngine()
+        let result = await engine.runLayer(
+            0, outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: 2, regions: [:], sensitiveTerms: [],
+            pipelineMode: .searchableRedaction,
+            filterDigests: [nil, nil],
+            perPageModes: [.searchableRedaction, .secureRasterization])
+        #expect(result.status.isFail,
+                "text on the page declared image-only must FAIL; got \(result.status)")
+        if case .fail(let msg) = result.status {
+            #expect(msg.contains("Selectable text found on page 2"), "got: \(msg)")
+        }
+        #expect(result.pageReferences == [1],
+                "only the secure-declared page is referenced; got \(String(describing: result.pageReferences))")
+    }
+
     /// Two-page blank document, a one-entry `perPageModes` (page 0 covered
     /// with `coveredMode`, page 1 beyond the array), all-nil digests:
     /// the layer must WARN with "not checked" and reference page 1.
@@ -1552,8 +1649,12 @@ struct VerificationEngineTests {
         }
     }
 
-    @Test("Layer 1 accumulates selectable-text pages across the document and returns 0-based references")
+    @Test("Layer 1 accumulates selectable-text pages across the document by per-page mode and returns 0-based references")
     func layer1SelectableTextPagesAccumulatedWithReferences() async throws {
+        // Text on pages 1 and 3, page 2 blank. The per-page modes declare
+        // pages 1 and 3 image-only (page 2 Searchable): both text pages are
+        // reported, accumulated across the document rather than stopping at
+        // the first.
         let (doc, url) = try TestFixtures.writeTempPDF(
             TestFixtures.withSensitiveTermOnFirstAndThirdPages(term: "Acme"),
             prefix: "l1_text_pages_")
@@ -1565,9 +1666,9 @@ struct VerificationEngineTests {
             sourcePageCount: 3, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [],
-            perPageModes: Array(repeating: .secureRasterization, count: 3))
+            perPageModes: [.secureRasterization, .searchableRedaction, .secureRasterization])
         #expect(result.status.isFail,
-                "selectable text on a Secure-Rasterized output must FAIL; got \(result.status)")
+                "selectable text on pages declared image-only must FAIL; got \(result.status)")
         #expect(result.pageReferences == [0, 2],
                 "both text pages must be referenced 0-based; got \(String(describing: result.pageReferences))")
         if case .fail(let msg) = result.status {
