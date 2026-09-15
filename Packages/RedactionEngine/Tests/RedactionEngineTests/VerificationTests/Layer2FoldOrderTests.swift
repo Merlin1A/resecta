@@ -3,15 +3,16 @@ import Foundation
 @testable import RedactionEngine
 
 // Cross-page Layer-2 fold precedence.
+// A redacted term still readable OUTSIDE every region folds to ATTENTION on
+// both page modes, above the WARN tier (the report aggregate ranks attention
+// above warn) and with the matched term texts threaded for the results row.
 // The warnable out-of-region arm (unmappable coordinates) returns ahead of
 // the Part-A fill-artifact note, so a multi-signal document folds to the
 // warning. Within the note tier the order stays specificity (fill artifact >
 // generic outside text); the unchecked arm keeps its long-standing position
-// below the expected-state notes. The dedicated sensitive-term-outside WARN
-// arm is de-escalated: `pageBucket(for:effectiveMode:)`
-// folds that finding to the generic outside bucket on both page modes, so the
-// secure-raster informational is the record surface for it (mapping matrix +
-// record string pinned below).
+// below the expected-state notes. The generic outside-text informational is
+// the record surface for the page's own un-redacted content only (mapping
+// matrix + record string pinned below).
 
 @Suite("Layer 2 fold arm order")
 struct Layer2FoldOrderTests {
@@ -20,11 +21,13 @@ struct Layer2FoldOrderTests {
     private func fold(
         _ outcomes: [(page: Int, bucket: Bucket)],
         mode: PipelineMode = .searchableRedaction,
-        hasRegions: Bool = true
-    ) -> (status: VerificationStatus, pages: [Int]?) {
+        hasRegions: Bool = true,
+        terms: [Int: [String]] = [:]
+    ) -> (status: VerificationStatus, pages: [Int]?, terms: [String]?) {
         let result = VerificationEngine.foldLayer2PageOutcomes(
-            outcomes, pipelineMode: mode, documentHasRegions: hasRegions)
-        return (result.0, result.1)
+            outcomes, pipelineMode: mode, documentHasRegions: hasRegions,
+            reviewTermsByPage: terms)
+        return (result.0, result.1, result.2)
     }
 
     private func message(_ status: VerificationStatus) -> String {
@@ -44,74 +47,86 @@ struct Layer2FoldOrderTests {
             (1, .sensitiveTermInRegion),
             (2, .textInRegionSecureRaster),
             (3, .textInRegionSearchable),
+            (4, .sensitiveTermOutsideRegions),
             (5, .unmappable),
             (6, .fillArtifactInRegion),
             (7, .textOutsideRegionsOnly),
             (8, .unchecked),
             (9, .clean),
         ]
+        let terms = [4: ["CONFIDENTIAL"]]
 
-        var r = fold(outcomes)
+        var r = fold(outcomes, terms: terms)
         #expect(r.status.isFail, "term in region outranks every arm — got \(r.status)")
         #expect(message(r.status).contains("Sensitive text detected within a redacted region"))
         #expect(r.pages == [0])
+        #expect(r.terms == nil, "only the attention arm carries term texts")
 
         outcomes.removeAll { $0.bucket == .sensitiveTermInRegion }
-        r = fold(outcomes)
+        r = fold(outcomes, terms: terms)
         #expect(r.status.isFail, "in-region text on a rasterized page FAILs next — got \(r.status)")
         #expect(message(r.status).contains("Readable text detected within a redacted region"))
         #expect(r.pages == [1])
 
         outcomes.removeAll { $0.bucket == .textInRegionSecureRaster }
-        r = fold(outcomes)
+        r = fold(outcomes, terms: terms)
         #expect(r.status.isWarn, "in-region text on a Searchable page WARNs next — got \(r.status)")
         #expect(message(r.status).contains("OCR detected text within a redacted region"))
         #expect(r.pages == [2])
 
-        // The warnable out-of-region arm returns ahead of the fill-artifact
-        // note: a multi-signal document folds to the warning. (The dedicated
-        // sensitive-term-outside arm that once sat here is de-escalated —
-        // see the mapping-matrix pin below.)
+        // A redacted term readable outside every region: ATTENTION, above the
+        // WARN tier (the aggregate ranks attention above warn), with the term
+        // texts threaded and the message content-free.
         outcomes.removeAll { $0.bucket == .textInRegionSearchable }
-        r = fold(outcomes)
+        r = fold(outcomes, terms: terms)
+        #expect(r.status.isAttention, "term-outside ATTENTION returns ahead of the WARN tier — got \(r.status)")
+        #expect(message(r.status).contains("still readable"))
+        #expect(!message(r.status).contains("CONFIDENTIAL"), "the message never echoes a term")
+        #expect(r.pages == [3])
+        #expect(r.terms == ["CONFIDENTIAL"])
+
+        // The warnable out-of-region arm returns ahead of the fill-artifact
+        // note: a multi-signal document folds to the warning.
+        outcomes.removeAll { $0.bucket == .sensitiveTermOutsideRegions }
+        r = fold(outcomes, terms: terms)
         #expect(r.status.isWarn, "unmappable WARN returns ahead of the fill note — got \(r.status)")
         #expect(message(r.status).contains("could not be mapped to page space"))
         #expect(r.pages == [4])
+        #expect(r.terms == nil)
 
         // Note tier, most specific first: fill artifact ahead of generic
         // outside text; both ahead of the unchecked arm (long-standing).
         outcomes.removeAll { $0.bucket == .unmappable }
-        r = fold(outcomes)
+        r = fold(outcomes, terms: terms)
         #expect(r.status.isInfo, "fill note wins the note tier — got \(r.status)")
         #expect(message(r.status).contains("no readable text recovered"))
         #expect(r.pages == [5])
 
         outcomes.removeAll { $0.bucket == .fillArtifactInRegion }
-        r = fold(outcomes)
+        r = fold(outcomes, terms: terms)
         #expect(r.status.isInfo, "generic outside-text note is next — got \(r.status)")
         #expect(message(r.status).contains("expected for Searchable Redaction mode"))
         #expect(r.pages == [6])
 
         outcomes.removeAll { $0.bucket == .textOutsideRegionsOnly }
-        r = fold(outcomes)
+        r = fold(outcomes, terms: terms)
         #expect(r.status.isWarn, "unchecked pages WARN once no note arm fires — got \(r.status)")
         #expect(message(r.status).contains("OCR could not be run"))
         #expect(r.pages == [7])
 
         outcomes.removeAll { $0.bucket == .unchecked }
-        r = fold(outcomes)
+        r = fold(outcomes, terms: terms)
         #expect(r.status == .pass, "clean pages alone fold to PASS — got \(r.status)")
         #expect(r.pages == nil)
+        #expect(r.terms == nil)
     }
 
-    /// The record shape is byte-exact: term-outside
-    /// pages reach the fold already de-escalated into the generic outside
-    /// bucket (pages 2–3 here beside page 1's ordinary readable content), so
-    /// a secure-raster document with regions folds to the record
-    /// informational — full-string equality so any wording or page-list
-    /// drift reads red here.
-    @Test("de-escalated term-outside pages fold to the secure-raster record informational, byte-exact")
-    func termOutside_deescalatesToRecordInformational() {
+    /// The generic record string is byte-exact: pages carrying only the
+    /// page's own un-redacted content (no term match) on a secure-raster
+    /// document with regions fold to the record informational — full-string
+    /// equality so any wording or page-list drift reads red here.
+    @Test("outside-text-only pages fold to the secure-raster record informational, byte-exact")
+    func textOutsideOnly_recordInformationalByteExact() {
         let r = fold([
             (1, .textOutsideRegionsOnly),
             (2, .textOutsideRegionsOnly),
@@ -122,6 +137,51 @@ struct Layer2FoldOrderTests {
             "Unredacted page content remains readable on 3 pages: 1, 2, 3 — expected for this mode.",
             "the record string must render byte-exact — got \(message(r.status))")
         #expect(r.pages == [0, 1, 2])
+        #expect(r.terms == nil)
+    }
+
+    /// The term-outside arm: ATTENTION on BOTH page modes with a byte-exact,
+    /// content-free message; it outranks the unmappable WARN on a
+    /// multi-signal document (single-outcome fold, as a FAIL masks every
+    /// lower arm); the review terms are the union of the per-page texts in
+    /// page order, deduplicated; the page list is sorted and 0-based.
+    @Test("term-outside pages fold to ATTENTION with review terms; attention outranks the unmappable WARN; review terms deduped in page order")
+    func termOutside_foldsToAttentionWithReviewTerms() {
+        for mode in [PipelineMode.secureRasterization, .searchableRedaction] {
+            let r = fold([
+                (3, .sensitiveTermOutsideRegions),
+                (2, .unmappable),
+                (1, .sensitiveTermOutsideRegions),
+                (4, .textOutsideRegionsOnly),
+            ], mode: mode, hasRegions: true,
+               terms: [3: ["CONFIDENTIAL", "INTERNAL"], 1: ["INTERNAL"]])
+            #expect(r.status.isAttention, "\(mode): got \(r.status)")
+            #expect(message(r.status) ==
+                "Text matching your redactions is still readable on 2 pages: 1, 3 — read by OCR outside every redacted region",
+                "\(mode): the attention message must render byte-exact — got \(message(r.status))")
+            #expect(!message(r.status).contains("CONFIDENTIAL") && !message(r.status).contains("INTERNAL"),
+                    "the message never echoes a term")
+            #expect(r.pages == [0, 2], "\(mode): 0-based, sorted, term-outside pages only")
+            #expect(r.terms == ["INTERNAL", "CONFIDENTIAL"], "\(mode): page order, deduplicated")
+        }
+
+        // A single page, the singular phrase; the arm does not key on
+        // documentHasRegions — the term came from an applied region even
+        // when THIS page carries none.
+        let single = fold([(2, .sensitiveTermOutsideRegions)],
+                          mode: .secureRasterization, hasRegions: false,
+                          terms: [2: ["CONFIDENTIAL"]])
+        #expect(single.status.isAttention, "got \(single.status)")
+        #expect(message(single.status) ==
+            "Text matching your redactions is still readable on page 2 — read by OCR outside every redacted region")
+        #expect(single.pages == [1])
+        #expect(single.terms == ["CONFIDENTIAL"])
+
+        // No term texts supplied (fold-only caller): still ATTENTION, terms nil
+        // so the results row falls back to the layer's own description.
+        let bare = fold([(1, .sensitiveTermOutsideRegions)], mode: .secureRasterization)
+        #expect(bare.status.isAttention, "got \(bare.status)")
+        #expect(bare.terms == nil)
     }
 
     @Test("multi-signal document folds to the unmappable WARN over the fill note")
@@ -164,13 +224,12 @@ struct Layer2FoldOrderTests {
         #expect(r.pages == [0, 1, 2])
     }
 
-    /// The signal→bucket mapping matrix. The
-    /// de-escalation lives in this seam: `.sensitiveTermOutsideRegions` folds
-    /// to the generic outside bucket on BOTH page modes, while in-region
-    /// findings keep their mode-keyed buckets. Red→green pinned against the
-    /// pre-fix behaviour (the earlier engine returned the dedicated WARN on
-    /// the secure-raster leg).
-    @Test("finding→bucket mapping: term-outside de-escalates on both modes; in-region stays mode-keyed")
+    /// The signal→bucket mapping matrix. `.sensitiveTermOutsideRegions` keeps
+    /// its own bucket on BOTH page modes (the attention arm), the generic
+    /// outside-text signal folds generic, and in-region signals keep their
+    /// mode-keyed buckets. Red→green pinned against the earlier engine, which
+    /// folded the term-outside signal into the generic outside bucket.
+    @Test("signal→bucket mapping: term-outside keeps its own bucket on both modes; in-region stays mode-keyed")
     func pageBucketMapping() {
         typealias Finding = VerificationEngine.PageOCRFinding
         func bucket(_ f: Finding, _ m: PipelineMode) -> Bucket {
@@ -179,8 +238,8 @@ struct Layer2FoldOrderTests {
         for mode in [PipelineMode.secureRasterization, .searchableRedaction] {
             #expect(bucket(.sensitiveTermInRegion, mode) == .sensitiveTermInRegion)
             #expect(bucket(.fillArtifactInRegion, mode) == .fillArtifactInRegion)
-            #expect(bucket(.sensitiveTermOutsideRegions, mode) == .textOutsideRegionsOnly,
-                    "the term-outside signal folds generic on \(mode)")
+            #expect(bucket(.sensitiveTermOutsideRegions, mode) == .sensitiveTermOutsideRegions,
+                    "the term-outside signal keeps its own bucket on \(mode)")
             #expect(bucket(.textOutsideRegionsOnly, mode) == .textOutsideRegionsOnly)
             #expect(bucket(Finding.none, mode) == .clean)
         }

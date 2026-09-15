@@ -1097,8 +1097,8 @@ struct VerificationEngineTests {
         // for could-not-verify conditions) but never silent PASS either: regions
         // were present, so the note records what remained readable. The leak this
         // arm's old WARN chased is carried by the specific arms: a redacted term
-        // surviving out-of-region WARNs, in-region survivors FAIL. PASS is
-        // preserved only when no regions are present
+        // surviving out-of-region raises ATTENTION (pins below), in-region
+        // survivors FAIL. PASS is preserved only when no regions are present
         // (layer2ScopedOCR_textOutsideRegions_noRegions_passes).
         #expect(result.status.isInfo,
                 "SR out-of-region text with regions present is an INFO note; got \(result.status)")
@@ -1394,17 +1394,18 @@ struct VerificationEngineTests {
         }
     }
 
-    @Test("Layer 2: SR page, region clean, term readable elsewhere → record informational")
-    func layer2ScopedOCR_termOutsideRegion_secure_staysRecordInfo() async throws {
+    @Test("Layer 2: SR page, region clean, term readable elsewhere → ATTENTION naming the term for the results row")
+    func layer2ScopedOCR_termOutsideRegion_secure_raisesAttention() async throws {
         let size = CGSize(width: 600, height: 800)
         let term = "CONFIDENTIAL"   // synthetic, non-PII
         // Term at the top of the page; the region (bottom-right) is faithfully
         // blank — a redacted term surviving outside every region on a
-        // rasterized page is de-escalated: out-of-region content is the
-        // page's own un-redacted text, so the layer folds to the
-        // secure-raster informational (the certified record posture) —
-        // byte-exact, term never echoed. In-region survivors still FAIL
-        // (pins above).
+        // rasterized page is ATTENTION: the redaction is intact but an
+        // un-redacted occurrence of the term survives, and on a rasterized
+        // page this layer is the only one that can see it. The message is
+        // byte-exact and never echoes the term; the term rides
+        // `reviewTermTexts` for the results row. In-region survivors still
+        // FAIL (pins above).
         let image = try renderTextPageImage(
             [(term, CGPoint(x: 30, y: 680), 64)], size: size)
         let (doc, url) = try await makeImagePDF(image, size: size)
@@ -1417,18 +1418,21 @@ struct VerificationEngineTests {
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
-        #expect(result.status.isInfo,
-                "a term readable outside every region on an SR page folds to the record informational; got \(result.status)")
-        if case .info(let msg) = result.status {
-            #expect(msg == "Unredacted page content remains readable on page 1 — expected for this mode.",
-                    "the record informational must render byte-exact; got \(msg)")
+        #expect(result.status.isAttention,
+                "a term readable outside every region on an SR page raises ATTENTION; got \(result.status)")
+        if case .attention(let msg) = result.status {
+            #expect(msg == "Text matching your redactions is still readable on page 1 — read by OCR outside every redacted region",
+                    "the attention message must render byte-exact; got \(msg)")
             #expect(!msg.localizedCaseInsensitiveContains(term),
                     "the message must never echo the matched term")
         }
+        #expect(result.pageReferences == [0])
+        #expect(result.reviewTermTexts == [term],
+                "the matched term rides reviewTermTexts for the results row; got \(String(describing: result.reviewTermTexts))")
     }
 
-    @Test("Layer 2: Searchable page, term readable outside regions → INFO unchanged (L3/L10 own the text layer)")
-    func layer2ScopedOCR_termOutsideRegion_searchable_staysInfo() async throws {
+    @Test("Layer 2: Searchable page, term readable outside regions → ATTENTION too (same tier as L3/L10; the masthead dedups the name)")
+    func layer2ScopedOCR_termOutsideRegion_searchable_raisesAttention() async throws {
         let size = CGSize(width: 600, height: 800)
         let term = "CONFIDENTIAL"   // synthetic, non-PII
         let image = try renderTextPageImage(
@@ -1443,11 +1447,18 @@ struct VerificationEngineTests {
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: [.searchableRedaction])
-        // On a Searchable page the text layer is verified by Layers 3/10; the
-        // pixel-side term signal is bucketed back to the generic outside path,
-        // so behavior is unchanged (INFO continuity).
-        #expect(result.status.isInfo,
-                "Searchable out-of-region term keeps the INFO continuity; got \(result.status)")
+        // On a Searchable page Layers 3/10 read the same text from the text
+        // layer; the pixel-side signal reports the same tier so the layer's
+        // verdict does not depend on the page's mode, and the results
+        // masthead names the text once across layers.
+        #expect(result.status.isAttention,
+                "Searchable out-of-region term raises ATTENTION; got \(result.status)")
+        if case .attention(let msg) = result.status {
+            #expect(msg == "Text matching your redactions is still readable on page 1 — read by OCR outside every redacted region")
+            #expect(!msg.localizedCaseInsensitiveContains(term))
+        }
+        #expect(result.pageReferences == [0])
+        #expect(result.reviewTermTexts == [term])
     }
 
     // MARK: - Page references for Layers 1/2/3

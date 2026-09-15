@@ -583,14 +583,27 @@ struct SearchRecheckQueryLineDisplayTests {
         #expect(spoken.contains("1 affected page"))
         // The expanded detail's query line names the counts.
         #expect(LayerResultRow.queryLineTexts(layer: layer) == ["\u{201C}Delia\u{201D} · found 9 · applied 8 · 1 remain"])
-        // The masthead names the text once even when Layer 3 reports it too.
+        // The masthead names the text once even when Layers 2 and 3 report
+        // it too: the OCR check (both page modes) and the string search
+        // thread the same review term, and the dedup is by text.
+        let layer2 = LayerResult(
+            name: "OCR Check", symbolName: "shield",
+            status: .attention("Text matching your redactions is still readable on page 2 — read by OCR outside every redacted region"),
+            shortDescription: "", detailDescription: "",
+            pageReferences: [1], durationSeconds: 0, reviewTermTexts: ["Delia"], layer: .ocrCheck)
         let layer3 = LayerResult(
             name: "Binary String Search", symbolName: "shield",
             status: .attention("Text matching your redactions is still readable on 1 page: 2 (1 instance)"),
             shortDescription: "", detailDescription: "",
             pageReferences: [1], durationSeconds: 0, reviewTermTexts: ["Delia"])
         let report = VerificationReport(
-            layers: [layer3, layer], overallStatus: .attention("x"), durationSeconds: 0)
+            layers: [layer2, layer3, layer], overallStatus: .attention("x"), durationSeconds: 0)
         #expect(VerificationResultsView.mastheadSubtitle(report: report) == "Unredacted text remains: 'Delia'")
+        #expect(VerificationResultsView.reviewTermTexts(report: report) == ["Delia"])
+        #expect(VerificationResultsView.detailsSummaryText(for: report) == "0 of 3 checks passed · 3 need review")
+        // The OCR check's attention row reuses the same sentence — no copy
+        // fork for a third layer.
+        #expect(LayerResultRow.rowSubtitleText(layer: layer2)
+                == LayerResultRow.reviewRowText(termTexts: ["Delia"], pages: [1]))
     }
 }
