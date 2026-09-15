@@ -470,12 +470,14 @@ struct VerificationEngineTests {
         }
     }
 
-    @Test("Layer 5 expected-keys-only INFO copy unchanged")
+    @Test("Layer 5 expected-keys-only INFO copy unchanged when the producer carries the fixed value")
     func expectedKeysOnlyInfoCopyUnchanged() async throws {
         // Producer/CreationDate/ModDate ARE auto-injected — the pure-INFO
-        // path keeps the auto-injected wording.
+        // path keeps the auto-injected wording once the producer literal
+        // reads back as the writer's fixed value.
         let (doc, url) = try TestFixtures.writeTempPDF(
-            TestFixtures.withMetadataRaw(infoDictBody: "/Producer (SyntheticWriter)"),
+            TestFixtures.withMetadataRaw(
+                infoDictBody: "/Producer (\(PDFStreamReconstructor.fixedProducerValue))"),
             prefix: "producer_info_")
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -491,6 +493,102 @@ struct VerificationEngineTests {
         if case .info(let msg) = result.status {
             #expect(msg == "Auto-injected metadata present: /Producer",
                     "Pure-INFO copy keeps auto-injected wording; got \(msg)")
+        }
+    }
+
+    @Test("Layer 5 WARNs when the producer field was not rewritten to the fixed value")
+    func producerNotRewrittenWarns() async throws {
+        // A producer literal that still carries a writer's own string means
+        // the post-write rewrite did not happen (it leaves the file untouched
+        // on any anomaly and only logs). Layer 5 reports that instead of
+        // filing the key under auto-injected metadata.
+        let (doc, url) = try TestFixtures.writeTempPDF(
+            TestFixtures.withMetadataRaw(infoDictBody: "/Producer (SyntheticWriter)"),
+            prefix: "producer_not_rewritten_")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let engine = VerificationEngine()
+        let result = await engine.runLayer(
+            4, outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: 1, regions: [:], sensitiveTerms: [],
+            pipelineMode: .secureRasterization,
+            filterDigests: [], perPageModes: [.secureRasterization]
+        )
+        #expect(result.status.isWarn,
+                "A producer value other than the fixed one must WARN; got \(result.status)")
+        if case .warn(let msg) = result.status {
+            #expect(msg == "Producer field was not rewritten to the fixed value",
+                    "Attestation WARN copy; got \(msg)")
+        }
+    }
+
+    @Test("Layer 5 producer WARN never echoes the producer value")
+    func producerWarnNeverEchoesValue() async throws {
+        let writerString = "SyntheticWriter 99.9 (Build ZZ999) PDFContext"
+        let (doc, url) = try TestFixtures.writeTempPDF(
+            TestFixtures.withMetadataRaw(infoDictBody: "/Producer (\(writerString))"),
+            prefix: "producer_no_echo_")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let engine = VerificationEngine()
+        let result = await engine.runLayer(
+            4, outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: 1, regions: [:], sensitiveTerms: [],
+            pipelineMode: .secureRasterization,
+            filterDigests: [], perPageModes: [.secureRasterization]
+        )
+        #expect(result.status.isWarn, "got \(result.status)")
+        if case .warn(let msg) = result.status {
+            for fragment in ["SyntheticWriter", "99.9", "ZZ999", "PDFContext"] {
+                #expect(!msg.contains(fragment),
+                        "the WARN must not carry the producer value; got \(msg)")
+            }
+        }
+        #expect(result.detailDescription.contains("SyntheticWriter") == false)
+    }
+
+    @Test("Layer 5 tolerates trailing spaces inside the producer literal")
+    func producerTrailingSpacesTolerated() async throws {
+        // The rewrite pads after the closing paren, so a real export decodes
+        // to the bare fixed value; padding inside the literal is still the
+        // fixed value and stays INFO.
+        let (doc, url) = try TestFixtures.writeTempPDF(
+            TestFixtures.withMetadataRaw(
+                infoDictBody: "/Producer (\(PDFStreamReconstructor.fixedProducerValue)    )"),
+            prefix: "producer_padded_")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let engine = VerificationEngine()
+        let result = await engine.runLayer(
+            4, outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: 1, regions: [:], sensitiveTerms: [],
+            pipelineMode: .secureRasterization,
+            filterDigests: [], perPageModes: [.secureRasterization]
+        )
+        #expect(result.status.isInfo,
+                "Trailing spaces inside the literal must not WARN; got \(result.status)")
+    }
+
+    @Test("Layer 5 attests the fixed producer on real reconstructed output")
+    func producerAttestedOnReconstructedOutput() async throws {
+        // The reconstructor's finalize step rewrites the writer's producer
+        // literal in place; the metadata check reads it back as the fixed
+        // value and reports the three auto-injected keys as INFO, not WARN.
+        let (doc, url) = try await makeCleanPDF()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let engine = VerificationEngine()
+        let result = await engine.runLayer(
+            4, outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: 1, regions: [:], sensitiveTerms: [],
+            pipelineMode: .secureRasterization,
+            filterDigests: [], perPageModes: [.secureRasterization]
+        )
+        #expect(result.status.isInfo,
+                "Real output must attest the fixed producer as INFO; got \(result.status)")
+        if case .info(let msg) = result.status {
+            #expect(msg == "Auto-injected metadata present: /Producer, /CreationDate, /ModDate",
+                    "INFO composition unchanged for the fixed-value case; got \(msg)")
         }
     }
 
