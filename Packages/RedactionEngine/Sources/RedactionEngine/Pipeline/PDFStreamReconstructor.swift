@@ -78,7 +78,8 @@ public actor PDFStreamReconstructor {
     /// Empty auxiliary dictionary omits /Author, /Title, /Subject,
     /// /Keywords, /Creator. /Producer, /CreationDate, /ModDate are
     /// auto-injected by CGPDFContext; `finalize()` then rewrites the
-    /// producer value to `fixedProducerValue`.
+    /// producer value to `fixedProducerValue` and both dates to
+    /// `fixedDateValue`.
     public func begin(firstPageSize: CGSize) throws {
         guard !finalized else {
             throw PipelineError.redactionError(.reconstructionFailed)
@@ -208,14 +209,17 @@ public actor PDFStreamReconstructor {
         context = nil
 
         // The system writer auto-injects a `/Producer` literal naming
-        // the OS version and build that wrote the file. CGPDFContext exposes
-        // no producer key in its auxiliary dictionary, so the value is
-        // rewritten here, after the context closes: a byte-length-preserving
-        // in-place patch that replaces the string's contents with a fixed
-        // value (the freed bytes become whitespace between dictionary
-        // entries), so every xref offset stays valid. Any anomaly leaves the
-        // file untouched — the export never fails on this step.
-        Self.overwriteProducerLiteral(at: tempURL)
+        // the OS version and build that wrote the file, and `/CreationDate`
+        // and `/ModDate` literals carrying the moment it was written.
+        // CGPDFContext exposes none of these keys in its auxiliary
+        // dictionary, so the values are rewritten here, after the context
+        // closes: byte-length-preserving in-place patches that replace each
+        // string's contents with a fixed value (the producer's freed bytes
+        // become whitespace between dictionary entries; each date is
+        // overwritten at its exact length), so every xref offset stays
+        // valid. Any anomaly leaves that literal untouched — the export
+        // never fails on this step.
+        Self.overwriteInfoLiterals(at: tempURL)
 
         // Apply `.complete` file protection to the finalized temp
         // file. PipelineCoordinator.downgradeTempProtectionOnSessionClose()
@@ -228,30 +232,58 @@ public actor PDFStreamReconstructor {
         try? TempFileHardening.applyProtection(tempURL, level: .complete)
     }
 
-    // MARK: - Producer rewrite
+    // MARK: - Info literal rewrite
 
     /// The fixed `/Producer` value written into finalized files. A constant —
     /// identical across devices, OS versions, and app versions — so the field
     /// carries no information about the producing system.
     static let fixedProducerValue = "Resecta"
 
-    private static let producerLogger = Logger(
+    /// The fixed `/CreationDate` and `/ModDate` value written into finalized
+    /// files. The system writer stamps both with the export moment spelled
+    /// `D:YYYYMMDDHHmmSSZ00'00'` (23 bytes); this constant has the same
+    /// length, so the rewrite is a straight overwrite and the fields carry
+    /// no information about when the file was written.
+    static let fixedDateValue = "D:20000101000000Z00'00'"
+
+    /// One `/Info` literal the finalize step rewrites: the key as the writer
+    /// spells it, the fixed replacement, and whether a longer existing value
+    /// is absorbed by space padding after the closing paren (the producer,
+    /// whose length varies by OS build) or must match the replacement's
+    /// length exactly (the dates).
+    private struct InfoLiteralRewrite {
+        let key: String
+        let replacement: String
+        let padsToLength: Bool
+        var marker: Data { Data("/\(key) (".utf8) }
+    }
+
+    private static let infoLiteralRewrites: [InfoLiteralRewrite] = [
+        InfoLiteralRewrite(key: "Producer", replacement: fixedProducerValue, padsToLength: true),
+        InfoLiteralRewrite(key: "CreationDate", replacement: fixedDateValue, padsToLength: false),
+        InfoLiteralRewrite(key: "ModDate", replacement: fixedDateValue, padsToLength: false),
+    ]
+
+    private static let infoRewriteLogger = Logger(
         subsystem: "app.resecta.engine", category: "pdf-reconstructor")
 
-    /// Replace the contents of the single `/Producer (…)` literal near the end
-    /// of the finished file with `fixedProducerValue`, preserving the total
-    /// byte length: the replacement writes `value + ")"` and pads the
-    /// remainder with spaces *after* the closing paren, inside the `/Info`
-    /// dictionary, where whitespace between entries is insignificant. The file
-    /// is patched in place through a `FileHandle` — nothing else moves, so
-    /// every xref offset stays valid and image streams are never re-encoded.
+    /// Replace the contents of the single `/Producer (…)`, `/CreationDate (…)`
+    /// and `/ModDate (…)` literals near the end of the finished file with the
+    /// fixed values, preserving the total byte length. The producer
+    /// replacement writes `value + ")"` and pads the remainder with spaces
+    /// *after* the closing paren, inside the `/Info` dictionary, where
+    /// whitespace between entries is insignificant; each date is overwritten
+    /// at its exact length. The file is patched in place through a
+    /// `FileHandle` — nothing else moves, so every xref offset stays valid
+    /// and image streams are never re-encoded. Running the rewrite again on
+    /// its own output changes nothing.
     ///
-    /// Guards (each leaves the file untouched and never fails the export):
-    /// no marker in the tail window, more than one marker, an unterminated
-    /// literal, or an existing value shorter than the fixed one.
-    static func overwriteProducerLiteral(at url: URL) {
-        let marker = Data("/Producer (".utf8)
-        let replacement = Data(fixedProducerValue.utf8)
+    /// Guards (each leaves that one literal untouched, the other literals
+    /// are still processed, and the export never fails): no marker in the
+    /// tail window, more than one marker, an unterminated literal, an
+    /// existing producer value shorter than the fixed one, or a date value
+    /// whose length differs from the fixed one's.
+    static func overwriteInfoLiterals(at url: URL) {
         do {
             let handle = try FileHandle(forUpdating: url)
             defer { try? handle.close() }
@@ -261,7 +293,7 @@ public actor PDFStreamReconstructor {
             // between it and the xref — measured 12.6 KB from EOF on the
             // macOS tooling destination, 4.3 KB on iOS. 256 KB covers both
             // layouts with wide margin while keeping page image streams out
-            // of the search space.
+            // of the search space. One read serves all three literals.
             let fileSize = try handle.seekToEnd()
             let windowLength = min(fileSize, 262_144)
             let windowStart = fileSize - windowLength
@@ -269,61 +301,88 @@ public actor PDFStreamReconstructor {
             guard let window = try handle.read(upToCount: Int(windowLength)),
                   !window.isEmpty else { return }
 
-            guard let markerRange = window.range(of: marker) else {
-                producerLogger.info("producer literal not present in tail; file left unchanged")
-                return
+            for rewrite in infoLiteralRewrites {
+                guard let patch = rewriteBytes(for: rewrite, in: window) else { continue }
+                try handle.seek(toOffset: windowStart + UInt64(patch.offset))
+                try handle.write(contentsOf: patch.bytes)
             }
-            guard window.range(of: marker, in: markerRange.upperBound..<window.endIndex) == nil else {
-                producerLogger.warning("multiple producer literals in tail; file left unchanged")
-                return
-            }
-
-            // Escape-aware scan for the literal's closing paren: a backslash
-            // escapes the next byte, and unescaped balanced paren pairs are
-            // legal inside a PDF literal string.
-            var index = markerRange.upperBound
-            var depth = 1
-            var closeIndex: Data.Index?
-            while index < window.endIndex {
-                let byte = window[index]
-                if byte == 0x5C {  // backslash
-                    index = window.index(index, offsetBy: 2, limitedBy: window.endIndex)
-                        ?? window.endIndex
-                    continue
-                }
-                if byte == 0x28 { depth += 1 }  // "("
-                if byte == 0x29 {               // ")"
-                    depth -= 1
-                    if depth == 0 { closeIndex = index; break }
-                }
-                index = window.index(after: index)
-            }
-            guard let close = closeIndex else {
-                producerLogger.warning("unterminated producer literal in tail; file left unchanged")
-                return
-            }
-
-            let valueLength = window.distance(from: markerRange.upperBound, to: close)
-            guard valueLength >= replacement.count else {
-                producerLogger.warning("producer literal shorter than the fixed value; file left unchanged")
-                return
-            }
-
-            // value bytes + ")" + space padding == the replaced range exactly.
-            var patch = replacement
-            patch.append(0x29)  // ")"
-            patch.append(Data(repeating: 0x20, count: valueLength - replacement.count))
-
-            let valueStartOffset = windowStart
-                + UInt64(window.distance(from: window.startIndex, to: markerRange.upperBound))
-            try handle.seek(toOffset: valueStartOffset)
-            try handle.write(contentsOf: patch)
-        } catch {
+        } catch { // LegalPhrases:safe (Swift keyword)
             // Mechanism-only logging; the export proceeds with
-            // the writer's own value rather than failing.
-            producerLogger.warning(
-                "producer rewrite skipped (metadata: \(error.localizedDescription, privacy: .public))")
+            // the writer's own values rather than failing.
+            infoRewriteLogger.warning(
+                "info literal rewrite skipped (metadata: \(error.localizedDescription, privacy: .public))")
         }
+    }
+
+    /// Locate `rewrite`'s literal in `window` and build the bytes that replace
+    /// its value-through-paren range, or `nil` (after logging) when a guard
+    /// says to leave it alone. `offset` is relative to the window's start.
+    private static func rewriteBytes(
+        for rewrite: InfoLiteralRewrite, in window: Data
+    ) -> (offset: Int, bytes: Data)? {
+        let marker = rewrite.marker
+        let replacement = Data(rewrite.replacement.utf8)
+        let key = rewrite.key
+
+        guard let markerRange = window.range(of: marker) else {
+            infoRewriteLogger.info(
+                "\(key, privacy: .public) literal not present in tail; left unchanged")
+            return nil
+        }
+        guard window.range(of: marker, in: markerRange.upperBound..<window.endIndex) == nil else {
+            infoRewriteLogger.warning(
+                "multiple \(key, privacy: .public) literals in tail; left unchanged")
+            return nil
+        }
+
+        // Escape-aware scan for the literal's closing paren: a backslash
+        // escapes the next byte, and unescaped balanced paren pairs are
+        // legal inside a PDF literal string.
+        var index = markerRange.upperBound
+        var depth = 1
+        var closeIndex: Data.Index?
+        while index < window.endIndex {
+            let byte = window[index]
+            if byte == 0x5C {  // backslash
+                index = window.index(index, offsetBy: 2, limitedBy: window.endIndex)
+                    ?? window.endIndex
+                continue
+            }
+            if byte == 0x28 { depth += 1 }  // "("
+            if byte == 0x29 {               // ")"
+                depth -= 1
+                if depth == 0 { closeIndex = index; break }
+            }
+            index = window.index(after: index)
+        }
+        guard let close = closeIndex else {
+            infoRewriteLogger.warning(
+                "unterminated \(key, privacy: .public) literal in tail; left unchanged")
+            return nil
+        }
+
+        let valueLength = window.distance(from: markerRange.upperBound, to: close)
+        if rewrite.padsToLength {
+            guard valueLength >= replacement.count else {
+                infoRewriteLogger.warning(
+                    "\(key, privacy: .public) literal shorter than the fixed value; left unchanged")
+                return nil
+            }
+        } else {
+            guard valueLength == replacement.count else {
+                infoRewriteLogger.warning(
+                    "\(key, privacy: .public) literal length unexpected; left unchanged")
+                return nil
+            }
+        }
+
+        // value bytes + ")" + space padding == the replaced range exactly
+        // (the padding is empty for an exact-length date).
+        var bytes = replacement
+        bytes.append(0x29)  // ")"
+        bytes.append(Data(repeating: 0x20, count: valueLength - replacement.count))
+        let offset = window.distance(from: window.startIndex, to: markerRange.upperBound)
+        return (offset, bytes)
     }
 
     // MARK: - JPEG Encoding

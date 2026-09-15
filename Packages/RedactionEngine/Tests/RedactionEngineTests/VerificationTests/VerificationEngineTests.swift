@@ -517,7 +517,7 @@ struct VerificationEngineTests {
         #expect(result.status.isWarn,
                 "A producer value other than the fixed one must WARN; got \(result.status)")
         if case .warn(let msg) = result.status {
-            #expect(msg == "Producer field was not rewritten to the fixed value",
+            #expect(msg == "Producer or timestamp fields were not rewritten to the fixed values",
                     "Attestation WARN copy; got \(msg)")
         }
     }
@@ -569,11 +569,12 @@ struct VerificationEngineTests {
                 "Trailing spaces inside the literal must not WARN; got \(result.status)")
     }
 
-    @Test("Layer 5 attests the fixed producer on real reconstructed output")
+    @Test("Layer 5 attests the fixed producer and dates on real reconstructed output")
     func producerAttestedOnReconstructedOutput() async throws {
         // The reconstructor's finalize step rewrites the writer's producer
-        // literal in place; the metadata check reads it back as the fixed
-        // value and reports the three auto-injected keys as INFO, not WARN.
+        // literal and both date literals in place; the metadata check reads
+        // all three back as the fixed values and reports the three
+        // auto-injected keys as INFO, not WARN.
         let (doc, url) = try await makeCleanPDF()
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -589,6 +590,96 @@ struct VerificationEngineTests {
         if case .info(let msg) = result.status {
             #expect(msg == "Auto-injected metadata present: /Producer, /CreationDate, /ModDate",
                     "INFO composition unchanged for the fixed-value case; got \(msg)")
+        }
+    }
+
+    @Test("Layer 5 WARNs when a timestamp field was not rewritten to the fixed value")
+    func timestampNotRewrittenWarns() async throws {
+        // A date literal still carrying the writer's export moment means the
+        // post-write rewrite left it untouched (an unexpected length, or a
+        // future writer change). Either date alone is enough to WARN; the
+        // producer beside it carries the fixed value.
+        let fixedProducer = PDFStreamReconstructor.fixedProducerValue
+        let fixedDate = PDFStreamReconstructor.fixedDateValue
+        let liveDate = "D:20260906212041Z00'00'"
+        let bodies = [
+            "/Producer (\(fixedProducer)) /CreationDate (\(liveDate)) /ModDate (\(fixedDate))",
+            "/Producer (\(fixedProducer)) /CreationDate (\(fixedDate)) /ModDate (\(liveDate))",
+        ]
+        for body in bodies {
+            let (doc, url) = try TestFixtures.writeTempPDF(
+                TestFixtures.withMetadataRaw(infoDictBody: body),
+                prefix: "timestamp_not_rewritten_")
+            defer { try? FileManager.default.removeItem(at: url) }
+
+            let engine = VerificationEngine()
+            let result = await engine.runLayer(
+                4, outputDocument: SendablePDFDocument(doc),
+                sourcePageCount: 1, regions: [:], sensitiveTerms: [],
+                pipelineMode: .secureRasterization,
+                filterDigests: [], perPageModes: [.secureRasterization]
+            )
+            #expect(result.status.isWarn,
+                    "A date other than the fixed one must WARN; got \(result.status)")
+            if case .warn(let msg) = result.status {
+                #expect(msg == "Producer or timestamp fields were not rewritten to the fixed values",
+                        "Attestation WARN copy; got \(msg)")
+            }
+        }
+    }
+
+    @Test("Layer 5 timestamp WARN never echoes the date value")
+    func timestampWarnNeverEchoesValue() async throws {
+        let liveDate = "D:20260906212041Z00'00'"
+        let (doc, url) = try TestFixtures.writeTempPDF(
+            TestFixtures.withMetadataRaw(
+                infoDictBody: "/Producer (\(PDFStreamReconstructor.fixedProducerValue)) "
+                    + "/CreationDate (\(liveDate)) /ModDate (\(liveDate))"),
+            prefix: "timestamp_no_echo_")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let engine = VerificationEngine()
+        let result = await engine.runLayer(
+            4, outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: 1, regions: [:], sensitiveTerms: [],
+            pipelineMode: .secureRasterization,
+            filterDigests: [], perPageModes: [.secureRasterization]
+        )
+        #expect(result.status.isWarn, "got \(result.status)")
+        if case .warn(let msg) = result.status {
+            for fragment in ["2026", "0906", "212041", "D:"] {
+                #expect(!msg.contains(fragment),
+                        "the WARN must not carry the date; got \(msg)")
+            }
+        }
+        #expect(result.detailDescription.contains("212041") == false)
+    }
+
+    @Test("Layer 5 reports all three fixed writer fields as INFO, byte-exact")
+    func fixedWriterFieldsInfoByteExact() async throws {
+        // Fixture spelled as the writer's rewritten output: the fixed producer
+        // and both dates at the fixed value. The three keys ride in the INFO
+        // composition in the check's own order; nothing WARNs.
+        let fixedProducer = PDFStreamReconstructor.fixedProducerValue
+        let fixedDate = PDFStreamReconstructor.fixedDateValue
+        let (doc, url) = try TestFixtures.writeTempPDF(
+            TestFixtures.withMetadataRaw(
+                infoDictBody: "/CreationDate (\(fixedDate)) /Producer (\(fixedProducer)) /ModDate (\(fixedDate))"),
+            prefix: "fixed_fields_info_")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let engine = VerificationEngine()
+        let result = await engine.runLayer(
+            4, outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: 1, regions: [:], sensitiveTerms: [],
+            pipelineMode: .secureRasterization,
+            filterDigests: [], perPageModes: [.secureRasterization]
+        )
+        #expect(result.status.isInfo,
+                "All three fixed values must stay INFO; got \(result.status)")
+        if case .info(let msg) = result.status {
+            #expect(msg == "Auto-injected metadata present: /Producer, /CreationDate, /ModDate",
+                    "INFO composition for the fixed-value case; got \(msg)")
         }
     }
 
