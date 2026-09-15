@@ -252,8 +252,8 @@ struct PolygonFillVerifyTests {
 
     // MARK: - Degenerate polygon early-exit
 
-    @Test("Degenerate collinear polygon verifies as a pass via the interior-pixel early-exit")
-    func testDegenerateCollinearPolygonVerifyPasses() throws {
+    @Test("Degenerate collinear polygon reports a failed fill: no interior pixel was painted")
+    func testDegenerateCollinearPolygonVerifyFails() throws {
         let size = 200
         let ctx = try Self.makeContext(size)
 
@@ -261,7 +261,9 @@ struct PolygonFillVerifyTests {
         // non-degenerate (width and height > 0), so buildPolygonMask returns a
         // mask, but the even-odd fill marks no interior pixels — a zero-area
         // polygon. verifyPolygonFill takes the no-interior-pixels early-exit and
-        // reports a pass: nothing was filled, so there is nothing to verify.
+        // reports a FAILED fill: nothing was painted for the region, so the
+        // region was not redacted. (Before this pin the early-exit reported a
+        // pass with no pixel compared.)
         let pixelVerts = [
             CGPoint(x: 40, y: 40),
             CGPoint(x: 100, y: 100),
@@ -285,8 +287,8 @@ struct PolygonFillVerifyTests {
             pixelVertices: pixelVerts,
             expectedColor: FillColor.black.expectedPixel
         )
-        #expect(passes,
-                "degenerate (no-interior) polygon takes the early-exit pass")
+        #expect(!passes,
+                "a polygon that covers no pixel is a failed fill")
     }
 
     // MARK: - Unit-square clipping

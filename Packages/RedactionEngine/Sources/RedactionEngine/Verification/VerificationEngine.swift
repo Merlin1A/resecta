@@ -2415,6 +2415,37 @@ public struct VerificationEngine: Sendable {
         return (data, cgDoc)
     }
 
+    // MARK: - Per-page mode coverage (Layers 6–9)
+
+    /// The 0-based pages `perPageModes` does not describe — every index at
+    /// or beyond `perPageModes.count` — or nil when the array covers the
+    /// whole document. The Searchable-layer dispatchers (Layers 6–9) pick
+    /// their pages through `perPageModes[i]`, so a short array silently
+    /// leaves the tail of the document out of the check; each dispatcher
+    /// reports that tail as a WARN on its otherwise-PASS exit instead of
+    /// passing pages it never looked at. FAIL, `.skipped` and the layer's
+    /// own WARNs keep precedence. The coordinator always supplies one mode
+    /// per page, so on the product's own paths this returns nil.
+    private func perPageModeCoverageGap(
+        perPageModes: [PipelineMode], pageCount: Int
+    ) -> [Int]? {
+        guard perPageModes.count < pageCount else { return nil }
+        return Array(perPageModes.count..<pageCount)
+    }
+
+    /// WARN copy for a per-page mode coverage gap — the mechanism only.
+    private func perPageModeCoverageWarn(
+        uncovered: [Int], pageCount: Int
+    ) -> VerificationStatus {
+        let covered = pageCount - uncovered.count
+        let unchecked = uncovered.count == 1
+            ? "1 page was" : "\(uncovered.count) pages were"
+        return .warn(
+            "Per-page mode data covered \(covered) of \(pageCount) "
+            + "\(pageCount == 1 ? "page" : "pages") — \(unchecked) not checked"
+        )
+    }
+
     // MARK: - Layer 6: Spatial Verification
 
     /// Dispatch spatial verification across all Searchable Redaction pages.
@@ -2523,6 +2554,14 @@ public struct VerificationEngine: Sendable {
         if !unreadablePages.isEmpty {
             return (unreadablePagesWarn(unreadablePages), unreadablePages)
         }
+        // Pages beyond `perPageModes` were never selected above — report
+        // them rather than pass them (see perPageModeCoverageGap).
+        if let uncovered = perPageModeCoverageGap(
+            perPageModes: perPageModes, pageCount: doc.pageCount
+        ) {
+            return (perPageModeCoverageWarn(
+                uncovered: uncovered, pageCount: doc.pageCount), uncovered)
+        }
         return (.pass, nil)
     }
 
@@ -2573,14 +2612,23 @@ public struct VerificationEngine: Sendable {
         // Eligible-but-unchecked → honest .skipped (the verify-only
         // resume path rebuilds all-nil digests). Partial coverage → .warn
         // (defensive; unreachable today since digests are all-present or
-        // all-nil). eligible == 0 stays .pass — skipped by design (every page
-        // is per-page Secure Rasterization); promoting it would WARN-flag
-        // valid docs (the false-positive trap one layer up).
+        // all-nil). eligible == 0 stays .pass when `perPageModes` covers the
+        // document — skipped by design (every page is per-page Secure
+        // Rasterization); promoting it would WARN-flag valid docs (the
+        // false-positive trap one layer up). Pages beyond `perPageModes`
+        // never counted as eligible, so they are reported last, on the
+        // otherwise-PASS exit (see perPageModeCoverageGap).
         if eligible > 0 && checked == 0 {
             return (.skipped, nil)
         }
         if checked < eligible {
             return (.warn("Cross-checked \(checked) of \(eligible) \(eligible == 1 ? "page" : "pages") — remaining pages lacked rasterization data"), nil)
+        }
+        if let uncovered = perPageModeCoverageGap(
+            perPageModes: perPageModes, pageCount: doc.pageCount
+        ) {
+            return (perPageModeCoverageWarn(
+                uncovered: uncovered, pageCount: doc.pageCount), uncovered)
         }
         return (.pass, nil)
     }
@@ -2624,6 +2672,14 @@ public struct VerificationEngine: Sendable {
         }
         if !unreadablePages.isEmpty {
             return (unreadablePagesWarn(unreadablePages), unreadablePages)
+        }
+        // Pages beyond `perPageModes` were never selected above — report
+        // them rather than pass them (see perPageModeCoverageGap).
+        if let uncovered = perPageModeCoverageGap(
+            perPageModes: perPageModes, pageCount: doc.pageCount
+        ) {
+            return (perPageModeCoverageWarn(
+                uncovered: uncovered, pageCount: doc.pageCount), uncovered)
         }
         return (.pass, nil)
     }
@@ -2683,12 +2739,19 @@ public struct VerificationEngine: Sendable {
             return (.fail(msg), failingPages)
         }
         // Eligible-but-unchecked → .skipped; partial → .warn;
-        // eligible == 0 stays .pass (skipped by design). See Layer 7.
+        // eligible == 0 stays .pass (skipped by design); pages beyond
+        // `perPageModes` are reported last. See Layer 7.
         if eligible > 0 && checked == 0 {
             return (.skipped, nil)
         }
         if checked < eligible {
             return (.warn("Cross-checked \(checked) of \(eligible) \(eligible == 1 ? "page" : "pages") — remaining pages lacked rasterization data"), nil)
+        }
+        if let uncovered = perPageModeCoverageGap(
+            perPageModes: perPageModes, pageCount: doc.pageCount
+        ) {
+            return (perPageModeCoverageWarn(
+                uncovered: uncovered, pageCount: doc.pageCount), uncovered)
         }
         return (.pass, nil)
     }

@@ -367,6 +367,29 @@ struct PolygonDrawingTests {
                 "commit zeros the observer count")
     }
 
+    @Test("commitInProgressPolygon with sub-floor bounds adds no region and discards the polygon")
+    func testCommitInProgressPolygonSubFloorBoundsIsRejected() {
+        let h = makePolygonHarness()
+        // Three vertices inside a 6×6-pt box: past the 3-vertex floor and
+        // the 2-pt dedup tolerance, but below the 10-pt minimum region
+        // size on both axes (no zoom override ⇒ the floor is 10 overlay
+        // points). The commit path rejects the polygon with the rectangle
+        // path's haptic; the button path then clears the in-progress
+        // vertices.
+        let pts = [
+            CGPoint(x: 50, y: 50),
+            CGPoint(x: 56, y: 50),
+            CGPoint(x: 53, y: 56),
+        ]
+        for p in pts { tap(h.overlay, at: p) }
+        #expect(h.state.inProgressPolygonVertexCount == 3)
+        h.overlay.commitInProgressPolygon()
+        #expect(h.coordinator.addedRegions.isEmpty,
+                "a polygon below the minimum region size must not produce a region")
+        #expect(h.state.inProgressPolygonVertexCount == 0,
+                "the rejected polygon is discarded")
+    }
+
     @Test("discardInProgressPolygon clears vertices and zeros observer count")
     func testDiscardInProgressPolygonClearsState() {
         let h = makePolygonHarness()

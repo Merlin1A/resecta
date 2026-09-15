@@ -15,6 +15,7 @@ The entries below follow the Keep-a-Changelog index format.
 ### Changed
 
 - Verification: the OCR check now reports a redacted term that is still readable outside every redacted region as Attention Needed on both output modes, naming the text on the results screen; on rasterized pages it was an informational note.
+- Verification: the text-layer checks report pages without per-page mode data as not checked instead of passing them; a polygon that covers no pixel is reported as a failed fill; the polygon and freeform tools apply the rectangle tool's 10-point minimum size.
 - Documentation: shorter code of conduct; README/CONTRIBUTING/SECURITY trimmed and corrected.
 - Documentation: the README links the App Store listing and resecta.app.
 
