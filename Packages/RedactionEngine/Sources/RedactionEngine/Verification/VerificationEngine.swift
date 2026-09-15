@@ -2380,6 +2380,26 @@ public struct VerificationEngine: Sendable {
             return .fail("Non-standard /Info key(s): \(nonStandardKeys.joined(separator: ", "))")
         }
 
+        // Producer attestation. The writer rewrites the auto-injected
+        // /Producer literal to `PDFStreamReconstructor.fixedProducerValue`
+        // after the context closes; that rewrite leaves the file untouched
+        // on any anomaly and only logs. Read the value back here so a
+        // silent no-op (or a future writer change) is reported instead of
+        // passing as auto-injected metadata. The rewrite pads with spaces
+        // after the closing paren, so the decoded literal is the bare fixed
+        // value; trailing spaces inside the literal are tolerated. A value
+        // that does not decode counts as not rewritten. An absent /Producer
+        // stays on the paths below. Never echo the value in the message.
+        var producerRef: CGPDFStringRef?
+        if CGPDFDictionaryGetString(infoDict, "Producer", &producerRef),
+           let producerRef {
+            var producerValue = (CGPDFStringCopyTextString(producerRef) as String?) ?? ""
+            while producerValue.hasSuffix(" ") { producerValue.removeLast() }
+            if producerValue != PDFStreamReconstructor.fixedProducerValue {
+                return .warn("Producer field was not rewritten to the fixed value")
+            }
+        }
+
         // XMP metadata — scanned above the /Info guard; fold the
         // result into the warnings here for the /Info-present message path.
         if hasXMP {
