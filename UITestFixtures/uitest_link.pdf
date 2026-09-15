@@ -1,0 +1,53 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R /Annots [6 0 R] >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 246 >>
+stream
+BT
+/F1 14 Tf
+72 720 Td
+(Link fixture page 1) Tj
+ET
+BT
+/F1 9 Tf
+72 700 Td
+(Synthetic UI-test fixture: one link annotation covers the outlined band.) Tj
+ET
+0.5 w
+122.4 316.8 367.2 158.4 re S
+BT
+/F1 10 Tf
+134.4 451.2 Td
+(Link annotation band) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Annot /Subtype /Link /Rect [122.4 316.8 489.6 475.2] /Border [0 0 0] /A << /S /URI /URI (http://link.invalid/probe) >> >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000263 00000 n 
+0000000333 00000 n 
+0000000629 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+776
+%%EOF

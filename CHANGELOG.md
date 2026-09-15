@@ -22,6 +22,10 @@ The entries below follow the Keep-a-Changelog index format.
 - Documentation: shorter code of conduct; README/CONTRIBUTING/SECURITY trimmed and corrected.
 - Documentation: the README links the App Store listing and resecta.app.
 
+### Security
+
+- Links inside an imported document are not followed when tapped in the editor, and data detectors are turned off for the document the editor shows.
+
 ## [1.1.0] — 2026-08-28
 
 ### Added

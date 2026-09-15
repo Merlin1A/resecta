@@ -109,6 +109,23 @@ struct ResectaApp: App {
         "multiTerm": .multiTerm,
         "piiScan": .piiScan,
     ]
+
+    /// Launch arguments that swap the `--loadTestDocument` fixture for a
+    /// different bundled synthetic (UITestFixtures/, Debug only). The
+    /// first matching argument wins; none present = the single-page
+    /// `test_sample`. Fixture names are the bundle resource names.
+    static let fixtureArgMap: [String: String] = [
+        // 23-page workpaper: paginated editor + page strip.
+        "--multipageDoc": "uitest_multipage",
+        // One page carrying a link annotation over its central band
+        // (Scripts/generate_uitest_link.py): the editor's link policy.
+        "--linkDoc": "uitest_link",
+    ]
+
+    /// The `--loadTestDocument` fixture name for a launch-argument list.
+    static func testDocumentName(for arguments: [String]) -> String {
+        arguments.lazy.compactMap { fixtureArgMap[$0] }.first ?? "test_sample"
+    }
     #endif
 
     var body: some Scene {
@@ -151,9 +168,11 @@ struct ResectaApp: App {
                                     // real paginated document behind the sheet
                                     // (the editor's page-strip layout, which
                                     // the Dismiss toast's synchronous graph
-                                    // flush re-resolves, differs by page count).
-                                    let sampleName = launchArguments.contains("--multipageDoc")
-                                        ? "uitest_multipage" : "test_sample"
+                                    // flush re-resolves, differs by page count);
+                                    // `--linkDoc` loads the one-page link
+                                    // fixture. See `fixtureArgMap`.
+                                    let sampleName = Self.testDocumentName(
+                                        for: launchArguments)
                                     await ImportService.loadSampleDocument(
                                         named: sampleName,
                                         documentState: ws.documentState,
