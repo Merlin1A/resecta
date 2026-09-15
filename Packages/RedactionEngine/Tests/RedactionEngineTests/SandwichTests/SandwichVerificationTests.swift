@@ -53,6 +53,38 @@ struct SandwichVerificationTests {
                 "Spatial verification should FAIL when text overlaps redaction region")
     }
 
+    @Test("Zero-bounds non-whitespace units WARN instead of being skipped")
+    func spatialVerificationZeroBoundsUnitsWarn() async throws {
+        // Two drawn glyphs under a zero text matrix: extracted, but PDFKit
+        // reports empty selection bounds for both. Before this check they
+        // were dropped from the walk and the page passed; now they are
+        // counted and the page WARNs.
+        let data = TestFixtures.zeroBoundsGlyphPDF(text: "AB")
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+        #expect(page.numberOfCharacters == 2, "fixture: got \(page.numberOfCharacters)")
+        let first = try #require(page.selection(for: NSRange(location: 0, length: 1)))
+        let bounds = first.bounds(for: page)
+        #expect(bounds.width <= 0 || bounds.height <= 0,
+                "fixture must read back an empty selection bounds; got \(bounds)")
+
+        let result = try await verifier.verifySpatialExclusion(
+            outputPage: page, regionShapes: [], pageIndex: 0)
+        #expect(result.isWarn, "unmeasured units must WARN, not pass; got \(result)")
+        if case .warn(let msg) = result {
+            #expect(msg == "2 characters on page 1 had no measurable position and were not position-checked",
+                    "got: \(msg)")
+        }
+
+        // The copy seam pluralises by count and prints the 1-based page.
+        if case .warn(let msg) = SandwichVerification.zeroBoundsWarning(count: 1, pageIndex: 1) {
+            #expect(msg == "1 character on page 2 had no measurable position and was not position-checked",
+                    "got: \(msg)")
+        } else {
+            Issue.record("zeroBoundsWarning must return .warn")
+        }
+    }
+
     @Test("Spatial verification passes for empty text layer")
     func spatialVerificationEmptyTextLayer() async throws {
         let data = TestFixtures.imageOnlyPDF()

@@ -297,6 +297,27 @@ enum TestFixtures {
         }
     }
 
+    /// One-page raw PDF whose text object is drawn under a zero text
+    /// matrix (`0 0 0 0 x y Tm`): the glyphs are extracted (they are in
+    /// the content stream and `page.string` carries them) but PDFKit reports
+    /// an EMPTY selection bounds for every one — a drawn, non-whitespace
+    /// unit with no measurable position. A `0 Tz` horizontal scaling gives
+    /// the same zero-width read-back. Neither shape is produced by the
+    /// reconstructor; the fixture stands for a tampered or foreign output.
+    static func zeroBoundsGlyphPDF(text: String = "AB") -> Data {
+        let stream = "BT /F1 12 Tf 0 0 0 0 100 700 Tm (\(text)) Tj ET"
+        return buildRawPDF(objects: [
+            PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            PDFObject(id: 3, content: """
+                << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] \
+                /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+                """),
+            PDFObject(id: 4, content: "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"),
+            PDFObject(id: 5, content: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
+        ], rootId: 1)
+    }
+
     /// PDF with text positioned for boundary testing — characters at exact
     /// redaction boundaries test the 2-point safety margin.
     /// Uses Courier for predictable per-character widths.

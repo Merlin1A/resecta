@@ -163,6 +163,10 @@ public struct SandwichVerification: Sendable {
     /// (a coalesced bridge-space box can span a whole gutter and graze a
     /// region the drawn ink never touches), Layers 6 and 9's domains already
     /// exclude whitespace, and an invisible space carries no content.
+    /// A NON-whitespace unit whose read-back selection has empty bounds has
+    /// no measurable position: it is counted and, when the page would
+    /// otherwise PASS, reported as a WARN (`zeroBoundsWarning`) rather than
+    /// dropped — the check cannot say where that character sits.
     /// Line bands derive from the same `yBands` sweep the Layer 6 lattice
     /// uses, over the core boxes. For a shape whose
     /// `bounds == expandedBounds` (the legacy construction) the two tiers
@@ -191,6 +195,10 @@ public struct SandwichVerification: Sendable {
         // cancel→surrender budget; bitmask check is amortized constant time.
         var bandCounter = 0
         var utf16Offset = 0
+        // Non-whitespace units whose read-back selection has no measurable
+        // bounds. They cannot be position-checked; counted here and reported
+        // as a WARN on the otherwise-PASS exit instead of being dropped.
+        var zeroBoundsUnits = 0
         // Non-whitespace units for the exclusion pass, in string order (the
         // band gate needs the whole page's Y structure before any verdict,
         // so collection precedes checking; failure order stays first-offset).
@@ -210,6 +218,9 @@ public struct SandwichVerification: Sendable {
             }
             let bounds = sel.bounds(for: outputPage)
             guard bounds.width > 0, bounds.height > 0 else {
+                if !FilterResult.isLineageWhitespace(nsText.substring(with: composedRange)) {
+                    zeroBoundsUnits += 1
+                }
                 utf16Offset += max(composedRange.length, 1)
                 continue
             }
@@ -442,7 +453,20 @@ public struct SandwichVerification: Sendable {
         if let firstGrazeMessage {
             return .warn(firstGrazeMessage)
         }
+        if zeroBoundsUnits > 0 {
+            return Self.zeroBoundsWarning(count: zeroBoundsUnits, pageIndex: pageIndex)
+        }
         return .pass
+    }
+
+    /// WARN copy for non-whitespace read-back units whose selection bounds
+    /// were empty: they had no measurable position and were not
+    /// position-checked. Mechanism only; `pageIndex` is 0-based.
+    static func zeroBoundsWarning(count: Int, pageIndex: Int) -> VerificationStatus {
+        .warn(
+            "\(count) character\(count == 1 ? "" : "s") on page \(pageIndex + 1) "
+            + "had no measurable position and \(count == 1 ? "was" : "were") not position-checked"
+        )
     }
 
     /// Even-odd point-in-polygon test (ray cast), matching the even-odd
