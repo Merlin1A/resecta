@@ -18,6 +18,7 @@ The entries below follow the Keep-a-Changelog index format.
 - Verification: the text-layer checks report pages without per-page mode data as not checked instead of passing them; a polygon that covers no pixel is reported as a failed fill; the polygon and freeform tools apply the rectangle tool's 10-point minimum size.
 - Verification: a page written as image-only that still carries a text layer now fails the spatial check instead of being skipped; characters whose position could not be measured are reported as not checked; the text-extraction check reads each page's own output mode.
 - Verification: the metadata check confirms the producer field carries the fixed value and warns when it does not.
+- Export: the creation and modification timestamps the system PDF writer adds are rewritten to a fixed value, like the producer tag; the metadata check confirms all three.
 - Documentation: shorter code of conduct; README/CONTRIBUTING/SECURITY trimmed and corrected.
 - Documentation: the README links the App Store listing and resecta.app.
 

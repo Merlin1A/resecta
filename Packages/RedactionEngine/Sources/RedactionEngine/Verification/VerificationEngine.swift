@@ -2380,23 +2380,31 @@ public struct VerificationEngine: Sendable {
             return .fail("Non-standard /Info key(s): \(nonStandardKeys.joined(separator: ", "))")
         }
 
-        // Producer attestation. The writer rewrites the auto-injected
+        // Writer-field attestation. The writer rewrites the auto-injected
         // /Producer literal to `PDFStreamReconstructor.fixedProducerValue`
-        // after the context closes; that rewrite leaves the file untouched
-        // on any anomaly and only logs. Read the value back here so a
-        // silent no-op (or a future writer change) is reported instead of
-        // passing as auto-injected metadata. The rewrite pads with spaces
+        // and the /CreationDate and /ModDate literals to
+        // `PDFStreamReconstructor.fixedDateValue` after the context closes;
+        // that rewrite leaves a literal untouched on any anomaly and only
+        // logs. Read the three values back here so a silent no-op (or a
+        // future writer change) is reported instead of passing as
+        // auto-injected metadata. The producer rewrite pads with spaces
         // after the closing paren, so the decoded literal is the bare fixed
-        // value; trailing spaces inside the literal are tolerated. A value
-        // that does not decode counts as not rewritten. An absent /Producer
-        // stays on the paths below. Never echo the value in the message.
-        var producerRef: CGPDFStringRef?
-        if CGPDFDictionaryGetString(infoDict, "Producer", &producerRef),
-           let producerRef {
-            var producerValue = (CGPDFStringCopyTextString(producerRef) as String?) ?? ""
-            while producerValue.hasSuffix(" ") { producerValue.removeLast() }
-            if producerValue != PDFStreamReconstructor.fixedProducerValue {
-                return .warn("Producer field was not rewritten to the fixed value")
+        // value; trailing spaces inside a literal are tolerated. A value
+        // that does not decode counts as not rewritten. An absent key stays
+        // on the paths below. One message covers all three fields; never
+        // echo a value in it.
+        let fixedWriterFields = [
+            ("Producer", PDFStreamReconstructor.fixedProducerValue),
+            ("CreationDate", PDFStreamReconstructor.fixedDateValue),
+            ("ModDate", PDFStreamReconstructor.fixedDateValue),
+        ]
+        for (key, fixedValue) in fixedWriterFields {
+            var ref: CGPDFStringRef?
+            guard CGPDFDictionaryGetString(infoDict, key, &ref), let ref else { continue }
+            var value = (CGPDFStringCopyTextString(ref) as String?) ?? ""
+            while value.hasSuffix(" ") { value.removeLast() }
+            if value != fixedValue {
+                return .warn("Producer or timestamp fields were not rewritten to the fixed values")
             }
         }
 

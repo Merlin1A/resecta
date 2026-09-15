@@ -95,14 +95,15 @@ struct ReconstructionTests {
         #expect(!pdfString.contains("/Keywords"))
         // /Creator may or may not appear (Apple behavior)
 
-        // /Producer is auto-injected by CGPDFContext, then rewritten to the
-        // fixed value by finalize() — pinned by the tests below.
+        // /Producer, /CreationDate and /ModDate are auto-injected by
+        // CGPDFContext, then rewritten to the fixed values by finalize() —
+        // pinned by the tests below.
     }
 
-    // MARK: - Producer rewrite
+    // MARK: - Info literal rewrite
 
-    @Test("Finalized output carries the fixed /Producer value and the expected /Info keys")
-    func outputProducerCarriesFixedValue() async throws {
+    @Test("Finalized output carries the fixed /Producer and date values and the expected /Info keys")
+    func outputCarriesFixedInfoValues() async throws {
         let tempURL = makeTempURL()
         defer { try? FileManager.default.removeItem(at: tempURL) }
 
@@ -114,7 +115,7 @@ struct ReconstructionTests {
         try await recon.appendPage(PageOutput(image: image, size: size, textLayerEntries: nil))
         await recon.finalize()
 
-        // The document must stay fully parseable after the in-place patch —
+        // The document must stay fully parseable after the in-place patches —
         // CGPDFDocument resolves pages through the xref table, so a moved
         // offset would surface here.
         let data = try Data(contentsOf: tempURL)
@@ -125,61 +126,109 @@ struct ReconstructionTests {
                 "PDFKit must also open the patched file")
 
         let info = try #require(doc.info)
-        for key in ["Producer", "CreationDate", "ModDate"] {
-            var str: CGPDFStringRef?
-            #expect(CGPDFDictionaryGetString(info, key, &str),
+        let fixedValues = [
+            ("Producer", PDFStreamReconstructor.fixedProducerValue),
+            ("CreationDate", PDFStreamReconstructor.fixedDateValue),
+            ("ModDate", PDFStreamReconstructor.fixedDateValue),
+        ]
+        for (key, fixedValue) in fixedValues {
+            var ref: CGPDFStringRef?
+            #expect(CGPDFDictionaryGetString(info, key, &ref),
                     "/\(key) must be present in /Info")
+            let str = try #require(ref)
+            let value = try #require(CGPDFStringCopyTextString(str)) as String
+            #expect(value == fixedValue,
+                    "/\(key) must be the fixed value, not the writer's own string")
         }
-        var producerRef: CGPDFStringRef?
-        #expect(CGPDFDictionaryGetString(info, "Producer", &producerRef))
-        let ref = try #require(producerRef)
-        let producer = try #require(CGPDFStringCopyTextString(ref)) as String
-        #expect(producer == PDFStreamReconstructor.fixedProducerValue,
-                "producer must be the fixed value, not the writer's own string")
     }
 
-    @Test("Producer rewrite preserves total byte length and every surrounding byte")
-    func producerRewritePreservesByteLayout() throws {
-        // Synthetic tail with an escaped-paren value — the scan must find the
-        // literal's real closing paren, and the patch must change ONLY the
-        // value-through-paren range, leaving the file size and every byte
-        // outside that range identical (xref offsets depend on it).
-        let originalValue = "iOS Version 99.9 \\(Build XX999\\) Quartz PDFContext"
-        let before = "HEADER…binary…\n1 0 obj\n<< /Producer (\(originalValue)) /CreationDate (D:20260101000000Z00'00') >>\nendobj\nstartxref\n123\n%%EOF\n"
-        let url = makeTempURL(prefix: "producer_patch_")
+    @Test("Info rewrite preserves total byte length and every surrounding byte")
+    func infoRewritePreservesByteLayout() throws {
+        // Synthetic tail in the writer's layout: an escaped-paren producer
+        // value plus both date literals at the writer's 23-byte length. The
+        // scan must locate each literal's real closing paren, and the patches
+        // must change ONLY the three value-through-paren ranges, leaving the
+        // file size and every byte outside them identical (xref offsets
+        // depend on it).
+        let originalProducer = "iOS Version 99.9 \\(Build XX999\\) Quartz PDFContext"
+        let originalDate = "D:20260906212041Z00'00'"
+        #expect(originalDate.utf8.count == PDFStreamReconstructor.fixedDateValue.utf8.count,
+                "the fixture date must be spelled at the writer's length")
+        let before = "HEADER…binary…\n9 0 obj\n<< /CreationDate (\(originalDate)) /Producer (\(originalProducer)) \n/ModDate (\(originalDate)) >>\nendobj\nstartxref\n123\n%%EOF\n"
+        let url = makeTempURL(prefix: "info_patch_")
         defer { try? FileManager.default.removeItem(at: url) }
         try Data(before.utf8).write(to: url)
 
-        PDFStreamReconstructor.overwriteProducerLiteral(at: url)
+        PDFStreamReconstructor.overwriteInfoLiterals(at: url)
 
         let after = try Data(contentsOf: url)
         #expect(after.count == before.utf8.count, "total byte length must be preserved")
-        let fixed = PDFStreamReconstructor.fixedProducerValue
-        let padding = String(repeating: " ", count: originalValue.utf8.count - fixed.utf8.count)
-        let expected = before.replacingOccurrences(
-            of: "(\(originalValue))",
-            with: "(\(fixed))\(padding)")
+        let fixedProducer = PDFStreamReconstructor.fixedProducerValue
+        let padding = String(repeating: " ", count: originalProducer.utf8.count - fixedProducer.utf8.count)
+        let expected = before
+            .replacingOccurrences(of: "(\(originalProducer))", with: "(\(fixedProducer))\(padding)")
+            .replacingOccurrences(of: "(\(originalDate))", with: "(\(PDFStreamReconstructor.fixedDateValue))")
         #expect(after == Data(expected.utf8),
-                "value replaced, closing paren moved in, remainder space-padded inside the dictionary")
+                "producer replaced with its paren moved in and the remainder space-padded; both dates overwritten at their exact length; nothing else moved")
     }
 
-    @Test("Producer rewrite guards: absent pattern and too-short value leave the file untouched")
-    func producerRewriteGuardsLeaveFileUntouched() throws {
+    @Test("Info rewrite guards: absent pattern, too-short producer, and an unexpected date length leave that literal untouched")
+    func infoRewriteGuardsLeaveLiteralUntouched() throws {
         // No marker anywhere.
         let noMarker = "no info dictionary here at all\nstartxref\n0\n%%EOF\n"
-        let noMarkerURL = makeTempURL(prefix: "producer_guard_absent_")
+        let noMarkerURL = makeTempURL(prefix: "info_guard_absent_")
         defer { try? FileManager.default.removeItem(at: noMarkerURL) }
         try Data(noMarker.utf8).write(to: noMarkerURL)
-        PDFStreamReconstructor.overwriteProducerLiteral(at: noMarkerURL)
+        PDFStreamReconstructor.overwriteInfoLiterals(at: noMarkerURL)
         #expect(try Data(contentsOf: noMarkerURL) == Data(noMarker.utf8))
 
-        // Marker present but the existing value is shorter than the fixed one.
+        // Marker present but the existing producer value is shorter than the fixed one.
         let short = "<< /Producer (abc) >>\nstartxref\n0\n%%EOF\n"
-        let shortURL = makeTempURL(prefix: "producer_guard_short_")
+        let shortURL = makeTempURL(prefix: "info_guard_short_")
         defer { try? FileManager.default.removeItem(at: shortURL) }
         try Data(short.utf8).write(to: shortURL)
-        PDFStreamReconstructor.overwriteProducerLiteral(at: shortURL)
+        PDFStreamReconstructor.overwriteInfoLiterals(at: shortURL)
         #expect(try Data(contentsOf: shortURL) == Data(short.utf8))
+
+        // A date literal of unexpected length is left alone while the
+        // producer beside it is still rewritten, and so is a date spelled at
+        // the writer's length.
+        let oddDate = "D:20260906212041Z"  // 17 bytes, not the writer's 23
+        let goodDate = "D:20260906212041Z00'00'"
+        let mixed = "<< /CreationDate (\(oddDate)) /Producer (SyntheticWriter) /ModDate (\(goodDate)) >>\nstartxref\n0\n%%EOF\n"
+        let mixedURL = makeTempURL(prefix: "info_guard_date_length_")
+        defer { try? FileManager.default.removeItem(at: mixedURL) }
+        try Data(mixed.utf8).write(to: mixedURL)
+        PDFStreamReconstructor.overwriteInfoLiterals(at: mixedURL)
+        let fixedProducer = PDFStreamReconstructor.fixedProducerValue
+        let padding = String(repeating: " ", count: "SyntheticWriter".utf8.count - fixedProducer.utf8.count)
+        let expected = mixed
+            .replacingOccurrences(of: "(SyntheticWriter)", with: "(\(fixedProducer))\(padding)")
+            .replacingOccurrences(of: "(\(goodDate))", with: "(\(PDFStreamReconstructor.fixedDateValue))")
+        #expect(try Data(contentsOf: mixedURL) == Data(expected.utf8),
+                "the odd-length date stays as written; the producer and the well-formed date are rewritten")
+    }
+
+    @Test("Info rewrite is idempotent on real output")
+    func infoRewriteIdempotent() async throws {
+        // finalize() runs the rewrite once; a second pass over the finished
+        // file must meet the fixed values already in place and change no
+        // byte, and the document must still open.
+        let tempURL = makeTempURL()
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let image = try makeTestImage(width: 120, height: 160)
+        let recon = PDFStreamReconstructor(tempURL: tempURL)
+        let size = CGSize(width: 120, height: 160)
+        try await recon.begin(firstPageSize: size)
+        try await recon.appendPage(PageOutput(image: image, size: size, textLayerEntries: nil))
+        await recon.finalize()
+
+        let once = try Data(contentsOf: tempURL)
+        PDFStreamReconstructor.overwriteInfoLiterals(at: tempURL)
+        let twice = try Data(contentsOf: tempURL)
+        #expect(twice == once, "a second pass over already-rewritten output must change nothing")
+        #expect(PDFDocument(url: tempURL)?.pageCount == 1)
     }
 
     // MARK: - Atomic Write
