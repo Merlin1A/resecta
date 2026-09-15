@@ -14,6 +14,7 @@ The entries below follow the Keep-a-Changelog index format.
 
 ### Changed
 
+- Verification: the OCR check now reports a redacted term that is still readable outside every redacted region as Attention Needed on both output modes, naming the text on the results screen; on rasterized pages it was an informational note.
 - Documentation: shorter code of conduct; README/CONTRIBUTING/SECURITY trimmed and corrected.
 - Documentation: the README links the App Store listing and resecta.app.
 

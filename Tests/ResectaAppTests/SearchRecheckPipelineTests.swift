@@ -234,14 +234,24 @@ struct SearchRecheckPipelineTests {
 
         // Layer 3 (Binary String Search) reads the same leftover from the
         // sensitive-term set — the accepted two-decoder cross-check — and
-        // the masthead still names the text ONCE (deduped across layers).
+        // Layer 2 (OCR Check) reads it off the rendered page outside every
+        // region; the masthead still names the text ONCE (deduped across
+        // layers) and the details line counts every attention row.
         let layer3 = try #require(report.layers.first { $0.layer == .binaryStringSearch })
         #expect(layer3.status.isAttention, "Layer 3 flags the same leftover")
+        let layer2 = try #require(report.layers.first { $0.layer == .ocrCheck })
+        #expect(layer2.status.isAttention, "Layer 2 flags the same leftover outside every region; got \(layer2.status)")
+        #expect(layer2.reviewTermTexts == [Self.term])
+        #expect(layer2.pageReferences == [1])
+        let attentionLayers = report.layers.filter { $0.status.isAttention }.compactMap(\.layer)
+        #expect(attentionLayers == [.ocrCheck, .binaryStringSearch, .operatorReExtraction, .searchRecheck],
+                "got \(attentionLayers)")
         #expect(report.overallStatus.isAttention)
         #expect(VerificationResultsView.reviewTermTexts(report: report) == [Self.term])
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
                 == "Unredacted text remains: '\(Self.term)'")
-        #expect(VerificationResultsView.detailsSummaryText(for: report).contains("need review"))
+        #expect(VerificationResultsView.detailsSummaryText(for: report).contains("4 need review"),
+                "got \(VerificationResultsView.detailsSummaryText(for: report))")
     }
 
     // MARK: - INFO

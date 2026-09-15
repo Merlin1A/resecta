@@ -179,8 +179,9 @@ public struct VerificationEngine: Sendable {
 
         var status: VerificationStatus
         var layerPageReferences: [Int]? = nil
-        // Display-only term texts behind an `.attention` result (Layers 3 and
-        // 10) — threaded into LayerResult.reviewTermTexts; nil elsewhere.
+        // Display-only term texts behind an `.attention` result (Layers 2, 3
+        // and 10, and the Search Re-check) — threaded into
+        // LayerResult.reviewTermTexts; nil elsewhere.
         var layerReviewTerms: [String]? = nil
         // A layer that supplies its own PASS/ATTENTION/WARN copy (the
         // Search Re-check; the Layer-7 promotion below is the precedent).
@@ -206,12 +207,15 @@ public struct VerificationEngine: Sendable {
                 // discipline as the byte layers (String-space mirror in
                 // `containsTerm`), so a boundary-required name term cannot
                 // substring-match inside an unrelated word read off a raster.
-                let (s1, pages1) = try await runLayer2OCR(
+                // The third element carries the display-only term texts
+                // behind an `.attention` verdict (Layer 3's shape).
+                let (s1, pages1, terms1) = try await runLayer2OCR(
                     doc, pipelineMode: pipelineMode,
                     regions: regions, sensitiveTerms: sensitiveTerms,
                     perPageModes: perPageModes)
                 status = s1
                 layerPageReferences = pages1
+                layerReviewTerms = terms1
             case .binaryStringSearch:
                 let (s2, pages2, terms2) = try runLayer3BinarySearch(doc, sensitiveTerms: sensitiveTerms)
                 status = s2
@@ -547,20 +551,22 @@ public struct VerificationEngine: Sendable {
     /// `sensitiveTermInRegion > textInRegion > fillArtifactInRegion >
     /// sensitiveTermOutsideRegions > textOutsideRegionsOnly > none`; the
     /// cross-page layer fold (`foldLayer2PageOutcomes`) then places the
-    /// warnable out-of-region arms ahead of the fill-artifact note — see the
-    /// priority-fold comment there.
+    /// attention and warnable out-of-region arms ahead of the fill-artifact
+    /// note — see the priority-fold comment there.
     /// `fillArtifactInRegion` (Part A) is an in-region OCR hit proven to be a
     /// Vision hallucination off the SOLID fill — it DEMOTES the would-be
     /// FAIL/WARN to an informational note, and never silences a hit: it
     /// outranks `textOutsideRegionsOnly` in both orders, so a page carrying it
-    /// can never fold to a clean PASS. `sensitiveTermOutsideRegions` marks a page where a sensitive term
-    /// is readable OUTSIDE every region. `pageBucket(for:effectiveMode:)`
-    /// folds it to the generic outside-regions bucket on BOTH page modes
-    /// (out-of-region content is the page's
-    /// own un-redacted text — an occurrence the user left unredacted or
-    /// detection missed — so the raster arm reads informational; Searchable
-    /// pages' text layer is owned by Layers 3/10 either way). The distinct
-    /// finding is kept so the classifier-level signal stays unit-pinned.
+    /// can never fold to a clean PASS. `sensitiveTermOutsideRegions` marks a
+    /// page where a sensitive term — the matched text of a region the user
+    /// applied — is readable OUTSIDE every region: the redaction itself is
+    /// intact, but an un-redacted occurrence of the term survives.
+    /// `pageBucket(for:effectiveMode:)` maps it to its own bucket on BOTH
+    /// page modes and the fold reports ATTENTION with the matched term texts
+    /// (`outsideRegionTermTexts`) threaded to the results row — the tier
+    /// Layer 3 and the Search Re-check give the same condition; the user's
+    /// remedy is a text search. `textOutsideRegionsOnly` is the page's own
+    /// un-redacted content and stays informational.
     enum PageOCRFinding: Sendable, Equatable {
         case sensitiveTermInRegion
         case textInRegion
@@ -637,25 +643,10 @@ public struct VerificationEngine: Sendable {
             var hitHasOutOfRegionBox = false
 
             for (index, box) in boxes.enumerated() {
-                // Require MEANINGFUL containment, not
-                // an any-overlap edge touch. A still-visible word whose box clips a
-                // mid-line region's edge by a sliver is not in-region; a box that is
-                // substantially inside (a paint miss) still is. One word box over the
-                // bar pulls the hit in. See `inRegionCoverageThreshold`.
-                let inRegion = pageRegions.contains { region in
-                    guard coverageFraction(of: box, inside: region.normalizedRect)
-                            >= inRegionCoverageThreshold else { return false }
-                    // A polygon region's `normalizedRect` is only its
-                    // bounding box — text the user deliberately preserved
-                    // inside bbox-minus-polygon (an L-shape's notch) is NOT
-                    // redacted content. Require the box to also intersect the
-                    // polygon itself (same normalized space; shared geometry
-                    // with the character filter and Layer 6). Rect-only
-                    // regions (`vertices == nil` or < 3) take the unchanged
-                    // rect-coverage path above.
-                    guard let vertices = region.vertices, vertices.count >= 3 else { return true }
-                    return rectIntersectsPolygon(box, vertices: vertices)
-                }
+                // One word box over the bar pulls the hit in — the shared
+                // predicate (`boxLiesInRegion`) requires MEANINGFUL
+                // containment plus the polygon test.
+                let inRegion = boxLiesInRegion(box, of: pageRegions)
                 if inRegion {
                     // Part A: distinguish a fill artifact (Vision read a token off
                     // the SOLID bar — full-RGB fill-consistent on its in-region portion) from
@@ -682,9 +673,10 @@ public struct VerificationEngine: Sendable {
             // A hit with readable strokes outside every region whose text matches
             // a sensitive term (same confidence gate and term filter as the
             // in-region FAIL above): the term the user redacted is still readable
-            // somewhere on the page. Signal only — `pageBucket(for:effectiveMode:)`
-            // folds it to the generic outside bucket on both page modes
-            // (see the `PageOCRFinding` cases above).
+            // somewhere on the page. `pageBucket(for:effectiveMode:)` maps the
+            // signal to its own bucket on both page modes and the fold reports
+            // ATTENTION; `outsideRegionTermTexts` re-walks the same geometry for
+            // the term texts the results row names.
             if hitHasOutOfRegionBox,
                hit.confidence >= sensitiveTermFailConfidenceThreshold,
                let text = hit.text,
@@ -714,6 +706,57 @@ public struct VerificationEngine: Sendable {
         if sawSensitiveTermOutsideRegions { return .sensitiveTermOutsideRegions }
         if sawTextOutsideRegions { return .textOutsideRegionsOnly }
         return .none
+    }
+
+    /// The one in-region predicate for a Layer-2 OCR box: MEANINGFUL
+    /// containment — at least `inRegionCoverageThreshold` of the box's own
+    /// area inside a region's `normalizedRect` — never an any-overlap edge
+    /// touch. A still-visible word whose box clips a mid-line region's edge
+    /// by a sliver is not in-region; a box substantially inside (a paint
+    /// miss) still is. A polygon region's `normalizedRect` is only its
+    /// bounding box — text the user deliberately preserved inside
+    /// bbox-minus-polygon (an L-shape's notch) is NOT redacted content — so
+    /// the box must also intersect the polygon itself (same normalized
+    /// space; shared geometry with the character filter and Layer 6).
+    /// Rect-only regions (`vertices == nil` or < 3) take the rect-coverage
+    /// path alone. Shared by `classifyPageOCR` and `outsideRegionTermTexts`
+    /// so the verdict and the term texts read the SAME geometry.
+    static func boxLiesInRegion(_ box: CGRect, of pageRegions: [RedactionRegion]) -> Bool {
+        pageRegions.contains { region in
+            guard coverageFraction(of: box, inside: region.normalizedRect)
+                    >= inRegionCoverageThreshold else { return false }
+            guard let vertices = region.vertices, vertices.count >= 3 else { return true }
+            return rectIntersectsPolygon(box, vertices: vertices)
+        }
+    }
+
+    /// Display-only companion to `classifyPageOCR` for a page it classified
+    /// `.sensitiveTermOutsideRegions`: the `SensitiveTerm.text` values
+    /// contained by a hit with readable strokes outside every region, under
+    /// the SAME per-box geometry (`boxLiesInRegion`), confidence gate and
+    /// term filter the classifier applied. Insertion-ordered by first
+    /// match, deduplicated; empty when nothing matches. Never feeds a
+    /// verdict — the fold threads it to `LayerResult.reviewTermTexts` so
+    /// the results row can name the text (the status message itself stays
+    /// content-free).
+    static func outsideRegionTermTexts(
+        hits: [OCRHit],
+        pageRegions: [RedactionRegion],
+        sensitiveTerms: [SensitiveTerm]
+    ) -> [String] {
+        let validTerms = sensitiveTerms.filter { AhoCorasick.isSearchableTerm($0.text) }
+        var seen = Set<String>()
+        var texts: [String] = []
+        for hit in hits {
+            guard hit.confidence >= sensitiveTermFailConfidenceThreshold,
+                  let text = hit.text else { continue }
+            let boxes = inRegionCandidateBoxes(of: hit)
+            guard boxes.contains(where: { !boxLiesInRegion($0, of: pageRegions) }) else { continue }
+            for term in validTerms where containsTerm(text, term) && seen.insert(term.text).inserted {
+                texts.append(term.text)
+            }
+        }
+        return texts
     }
 
     /// Case-insensitive term containment pinned to en_US_POSIX, over both
@@ -1160,6 +1203,10 @@ public struct VerificationEngine: Sendable {
         // secure-raster list and keeps the Searchable list on the existing WARN.
         case textInRegionSecureRaster
         case textInRegionSearchable
+        // A sensitive term readable OUTSIDE every region (the classifier's
+        // `.sensitiveTermOutsideRegions`) on either page mode: the fold
+        // reports ATTENTION with the term texts — see `foldLayer2PageOutcomes`.
+        case sensitiveTermOutsideRegions
         case fillArtifactInRegion
         case textOutsideRegionsOnly
         case unmappable
@@ -1170,6 +1217,19 @@ public struct VerificationEngine: Sendable {
     /// One page's folded Layer-2 outcome. A named tuple type so the task group's
     /// `of:` argument and the accumulator stay unambiguous.
     typealias PageOutcome = (page: Int, bucket: PageOCRBucket)
+
+    /// One page's Layer-2 result as it leaves the OCR task group: the folded
+    /// outcome plus, for a `.sensitiveTermOutsideRegions` page, the matched
+    /// term texts the results row names (empty for every other bucket).
+    struct PageOCRResult: Sendable {
+        let outcome: PageOutcome
+        let reviewTermTexts: [String]
+
+        init(_ page: Int, _ bucket: PageOCRBucket, reviewTermTexts: [String] = []) {
+            self.outcome = (page, bucket)
+            self.reviewTermTexts = reviewTermTexts
+        }
+    }
 
     /// One page's already-downsampled OCR inputs, captured by value
     /// so the bounded task group OCRs pages concurrently without sharing the
@@ -1285,15 +1345,15 @@ public struct VerificationEngine: Sendable {
             // textInRegion WARN path above.
             return .fillArtifactInRegion
         case .sensitiveTermOutsideRegions:
-            // A term readable outside every region is the
-            // page's own un-redacted content — an occurrence the user left
-            // unredacted or detection missed — and the output is exactly as
-            // redacted. Both page modes fold it to the generic outside
-            // bucket, whose secure-raster arm reads informational ("expected
-            // for this mode").
-            // In-region survivors still FAIL above; Searchable pages' text
-            // layer is owned by Layers 3/10 either way.
-            return .textOutsideRegionsOnly
+            // A term the user redacted is still readable outside every
+            // region — the redaction itself is intact, but an un-redacted
+            // occurrence survives (one the user did not select or detection
+            // missed). Its own bucket on BOTH page modes: the fold reports
+            // ATTENTION with the term texts, the tier Layer 3 and the Search
+            // Re-check give the same condition (a rasterized page has no
+            // text layer for them to read, so Layer 2 is the only layer that
+            // can see it there). In-region survivors still FAIL above.
+            return .sensitiveTermOutsideRegions
         case .textOutsideRegionsOnly:
             return .textOutsideRegionsOnly
         case .none:
@@ -1310,7 +1370,7 @@ public struct VerificationEngine: Sendable {
     private static func classifyPageImages(
         _ work: PageOCRWork,
         sensitiveTerms: [SensitiveTerm]
-    ) async throws -> PageOutcome {
+    ) async throws -> PageOCRResult {
         // Run OCR on EVERY image with the FROZEN verificationLayer2 preset
         // (.fast, no language correction) at the moderate confidence threshold
         // — 0.50 reduces bitmap-artifact noise while detecting
@@ -1322,7 +1382,7 @@ public struct VerificationEngine: Sendable {
         for pageImage in work.images {
             try Task.checkCancellation()
             guard let imageHits = await Self.layer2OCRHits(in: pageImage) else {
-                return (work.page, .unchecked)
+                return PageOCRResult(work.page, .unchecked)
             }
             hits.append(contentsOf: imageHits)
         }
@@ -1335,34 +1395,46 @@ public struct VerificationEngine: Sendable {
             let enriched = work.images.first.map {
                 Self.enrichWithFillSamples(hits, image: $0, regions: work.pageRegions)
             } ?? hits
-            let finding = Self.classifyPageOCR(
+            let classification = Self.classifyPageOCR(
                 hits: enriched, pageRegions: work.pageRegions, sensitiveTerms: sensitiveTerms)
-            return (work.page, Self.pageBucket(for: finding, effectiveMode: work.effectiveMode))
+            // Only a term-outside page carries term texts, read from the
+            // SAME hits, regions and terms the classifier saw, so the names
+            // the results row shows are exactly the matches behind the
+            // verdict.
+            let reviewTermTexts = classification == .sensitiveTermOutsideRegions
+                ? Self.outsideRegionTermTexts(
+                    hits: enriched, pageRegions: work.pageRegions, sensitiveTerms: sensitiveTerms)
+                : []
+            return PageOCRResult(
+                work.page, Self.pageBucket(for: classification, effectiveMode: work.effectiveMode),
+                reviewTermTexts: reviewTermTexts)
         } else if !work.pageRegions.isEmpty,
                   hits.contains(where: { !($0.text ?? "").isEmpty }) {
             // Unmappable coordinates with a redaction region present: text might
             // sit inside a region but cannot be confirmed. Conservative WARN
             // (C-B contract: never identity-map unmappable observations).
-            return (work.page, .unmappable)
+            return PageOCRResult(work.page, .unmappable)
         } else if work.effectiveMode == .searchableRedaction,
                   hits.contains(where: { !($0.text ?? "").isEmpty }) {
             // No regions to violate — selectable text on a Searchable page is
             // expected; keep the INFO continuity.
-            return (work.page, .textOutsideRegionsOnly)
+            return PageOCRResult(work.page, .textOutsideRegionsOnly)
         }
-        return (work.page, .clean)
+        return PageOCRResult(work.page, .clean)
     }
 
-    /// Returns (status, affectedPages): the winning fold bucket's page list,
-    /// 0-based for the UI's tappable page chips (the message text keeps its
-    /// 1-based numbering). A clean PASS carries nil.
+    /// Returns (status, affectedPages, reviewTermTexts): the winning fold
+    /// bucket's page list, 0-based for the UI's tappable page chips (the
+    /// message text keeps its 1-based numbering), and the display-only term
+    /// texts behind an `.attention` verdict (nil for every other status —
+    /// Layer 3's shape). A clean PASS carries nil for both.
     private func runLayer2OCR(
         _ doc: PDFDocument,
         pipelineMode: PipelineMode,
         regions: [Int: [RedactionRegion]],
         sensitiveTerms: [SensitiveTerm],
         perPageModes: [PipelineMode]
-    ) async throws -> (VerificationStatus, [Int]?) {
+    ) async throws -> (VerificationStatus, [Int]?, [String]?) {
         // Entry-level cooperative cancellation, plus a
         // per-page check inside the OCR loop. A 50-page OCR pass that does
         // not check until layer return would exceed the 50 ms p95
@@ -1389,6 +1461,9 @@ public struct VerificationEngine: Sendable {
         let pageCount = doc.pageCount
         var pageOutcomes: [PageOutcome] = []
         pageOutcomes.reserveCapacity(pageCount)
+        // Term texts behind each `.sensitiveTermOutsideRegions` page, keyed
+        // by 1-based page; read only by the fold's ATTENTION arm.
+        var reviewTermsByPage: [Int: [String]] = [:]
 
         var pageIndex = 0
         while pageIndex < pageCount {
@@ -1484,7 +1559,7 @@ public struct VerificationEngine: Sendable {
             // Phase 2 — bounded-concurrent OCR + classify (width ≤ ocrParallelism).
             if !chunkWork.isEmpty {
                 let chunkResults = try await withThrowingTaskGroup(
-                    of: PageOutcome.self
+                    of: PageOCRResult.self
                 ) { group in
                     for work in chunkWork {
                         group.addTask {
@@ -1497,11 +1572,16 @@ public struct VerificationEngine: Sendable {
                                 sensitiveTerms: sensitiveTerms)
                         }
                     }
-                    var acc: [PageOutcome] = []
-                    for try await outcome in group { acc.append(outcome) }
+                    var acc: [PageOCRResult] = []
+                    for try await result in group { acc.append(result) }
                     return acc
                 }
-                pageOutcomes.append(contentsOf: chunkResults)
+                for result in chunkResults {
+                    pageOutcomes.append(result.outcome)
+                    if !result.reviewTermTexts.isEmpty {
+                        reviewTermsByPage[result.outcome.page] = result.reviewTermTexts
+                    }
+                }
             }
 
             pageIndex = chunkEnd
@@ -1510,18 +1590,23 @@ public struct VerificationEngine: Sendable {
         return Self.foldLayer2PageOutcomes(
             pageOutcomes,
             pipelineMode: pipelineMode,
-            documentHasRegions: documentHasRegions)
+            documentHasRegions: documentHasRegions,
+            reviewTermsByPage: reviewTermsByPage)
     }
 
     /// Cross-page fold: collapses the per-page Layer-2 buckets into the layer's
-    /// single (status, pageReferences) verdict. `static` and OCR-free so arm
-    /// precedence has a direct unit test (`Layer2FoldOrderTests`);
-    /// `runLayer2OCR` feeds it the real buckets.
+    /// single (status, pageReferences, reviewTermTexts) verdict. `static` and
+    /// OCR-free so arm precedence has a direct unit test
+    /// (`Layer2FoldOrderTests`); `runLayer2OCR` feeds it the real buckets.
+    /// `reviewTermsByPage` (1-based) carries the term texts behind each
+    /// `.sensitiveTermOutsideRegions` page and is read only by the ATTENTION
+    /// arm; every other arm returns nil for the third element.
     static func foldLayer2PageOutcomes(
         _ pageOutcomes: [PageOutcome],
         pipelineMode: PipelineMode,
-        documentHasRegions: Bool
-    ) -> (VerificationStatus, [Int]?) {
+        documentHasRegions: Bool,
+        reviewTermsByPage: [Int: [String]] = [:]
+    ) -> (VerificationStatus, [Int]?, [String]?) {
         // Fold the per-page buckets into the per-bucket page lists, SORTED
         // ascending so the message text is byte-identical regardless of OCR
         // completion order (the sequential loop appended in page order; the
@@ -1535,6 +1620,7 @@ public struct VerificationEngine: Sendable {
         let pagesWithSensitiveTermInRegion = pages(in: .sensitiveTermInRegion)
         let pagesWithTextInRegionSecureRaster = pages(in: .textInRegionSecureRaster)
         let pagesWithTextInRegionSearchable = pages(in: .textInRegionSearchable)
+        let pagesWithSensitiveTermOutsideRegions = pages(in: .sensitiveTermOutsideRegions)
         let pagesWithFillArtifactInRegion = pages(in: .fillArtifactInRegion)
         let pagesWithTextOutsideRegionsOnly = pages(in: .textOutsideRegionsOnly)
         let pagesWithUnmappableImages = pages(in: .unmappable)
@@ -1542,25 +1628,27 @@ public struct VerificationEngine: Sendable {
 
         // Page numbers only, never document content, in any message.
         // Priority fold: FAIL (term in region) > FAIL/WARN (text in region, by
-        // the page's own mode) > WARN (unmappable) > INFO (Part A fill artifact
-        // in region) > INFO (text only outside regions) > unchecked WARN >
-        // PASS. The layer reports its single most specific outcome, with the
-        // warnable unmappable arm ahead of the proven-artifact note — on a
-        // multi-signal document a page in a warnable bucket sets the masthead,
-        // not the note. Within the note tier the order stays specificity
-        // (fill artifact > generic outside text); the unchecked arm keeps its
-        // long-standing position below the expected-state notes. The dedicated
-        // sensitive-term-outside WARN arm is de-escalated into the outside-text
-        // informational (`pageBucket(for:effectiveMode:)`
-        // folds that finding generic); the classifier-level signal remains in
-        // `PageOCRFinding`.
+        // the page's own mode) > ATTENTION (a redacted term readable outside
+        // every region) > WARN (unmappable) > INFO (Part A fill artifact in
+        // region) > INFO (text only outside regions) > unchecked WARN > PASS.
+        // The layer reports its single most specific outcome. ATTENTION sits
+        // above the WARN tier because the report aggregate ranks attention
+        // above warn (`aggregateStatus`): a document carrying both a
+        // term-outside page and an unmappable page reports the attention,
+        // exactly as a FAIL page masks every lower arm. The warnable
+        // unmappable arm stays ahead of the proven-artifact note — on a
+        // multi-signal document a page in a warnable bucket sets the
+        // masthead, not the note. Within the note tier the order stays
+        // specificity (fill artifact > generic outside text); the unchecked
+        // arm keeps its long-standing position below the expected-state
+        // notes.
         if !pagesWithSensitiveTermInRegion.isEmpty {
             let list = pagesWithSensitiveTermInRegion.map(String.init).joined(separator: ", ")
             // An OCR hit inside a redacted region means readable text inside the
             // black box — a leak in EITHER mode. Region scoping already
             // excludes Searchable Redaction's expected surviving text.
             return (.fail("Sensitive text detected within a redacted region on \(pagePhrase(pagesWithSensitiveTermInRegion, list: list))"),
-                    pagesWithSensitiveTermInRegion.map { $0 - 1 })
+                    pagesWithSensitiveTermInRegion.map { $0 - 1 }, nil)
         }
         // On a rasterized page the region is a destroyed-pixel box that
         // holds NO readable text by construction, so ANY in-region OCR hit is a
@@ -1573,12 +1661,34 @@ public struct VerificationEngine: Sendable {
         if !pagesWithTextInRegionSecureRaster.isEmpty {
             let list = pagesWithTextInRegionSecureRaster.map(String.init).joined(separator: ", ")
             return (.fail("Readable text detected within a redacted region on \(pagePhrase(pagesWithTextInRegionSecureRaster, list: list))"),
-                    pagesWithTextInRegionSecureRaster.map { $0 - 1 })
+                    pagesWithTextInRegionSecureRaster.map { $0 - 1 }, nil)
         }
         if !pagesWithTextInRegionSearchable.isEmpty {
             let list = pagesWithTextInRegionSearchable.map(String.init).joined(separator: ", ")
             return (.warn("OCR detected text within a redacted region on \(pagePhrase(pagesWithTextInRegionSearchable, list: list))"),
-                    pagesWithTextInRegionSearchable.map { $0 - 1 })
+                    pagesWithTextInRegionSearchable.map { $0 - 1 }, nil)
+        }
+        // A term the user redacted is still readable outside every region —
+        // read by OCR off the rendered page, so it is reported on BOTH page
+        // modes (on a rasterized page Layer 2 is the only layer that can see
+        // it; on a Searchable page Layers 3/10 read the same text and the
+        // results masthead names each text once). The message is
+        // mechanism-only and content-free; the term texts ride the third
+        // element for the results row, in page order, deduplicated across
+        // pages. The remedy is the user's — a text search — so the tier is
+        // attention, never a FAIL: the redacted output itself is intact.
+        if !pagesWithSensitiveTermOutsideRegions.isEmpty {
+            let list = pagesWithSensitiveTermOutsideRegions.map(String.init).joined(separator: ", ")
+            var seen = Set<String>()
+            var reviewTerms: [String] = []
+            for page in pagesWithSensitiveTermOutsideRegions {
+                for text in reviewTermsByPage[page] ?? [] where seen.insert(text).inserted {
+                    reviewTerms.append(text)
+                }
+            }
+            return (.attention("Text matching your redactions is still readable on \(pagePhrase(pagesWithSensitiveTermOutsideRegions, list: list)) — read by OCR outside every redacted region"),
+                    pagesWithSensitiveTermOutsideRegions.map { $0 - 1 },
+                    reviewTerms.isEmpty ? nil : reviewTerms)
         }
         // Unmappable-coordinate pages (multi-image or padded thumbnail)
         // that carry OCR text near a region — surfaced as a WARN because the
@@ -1586,7 +1696,7 @@ public struct VerificationEngine: Sendable {
         if !pagesWithUnmappableImages.isEmpty {
             let list = pagesWithUnmappableImages.map(String.init).joined(separator: ", ")
             return (.warn("OCR coordinates could not be mapped to page space on \(pagePhrase(pagesWithUnmappableImages, list: list)) — text could not be confirmed inside or outside a redacted region"),
-                    pagesWithUnmappableImages.map { $0 - 1 })
+                    pagesWithUnmappableImages.map { $0 - 1 }, nil)
         }
         if !pagesWithFillArtifactInRegion.isEmpty {
             let list = pagesWithFillArtifactInRegion.map(String.init).joined(separator: ", ")
@@ -1601,7 +1711,7 @@ public struct VerificationEngine: Sendable {
             // — on a multi-signal document the warning sets the layer status —
             // and above the generic outside-text note (note-tier specificity).
             return (.info("OCR detected likely fill artifacts within a redacted region on \(pagePhrase(pagesWithFillArtifactInRegion, list: list)) — no readable text recovered"),
-                    pagesWithFillArtifactInRegion.map { $0 - 1 })
+                    pagesWithFillArtifactInRegion.map { $0 - 1 }, nil)
         }
         if !pagesWithTextOutsideRegionsOnly.isEmpty {
             let list = pagesWithTextOutsideRegionsOnly.map(String.init).joined(separator: ", ")
@@ -1609,7 +1719,7 @@ public struct VerificationEngine: Sendable {
             case .searchableRedaction:
                 // Selectable/raster text outside regions is expected on a Searchable page.
                 return (.info("OCR detected text on \(pagePhrase(pagesWithTextOutsideRegionsOnly, list: list)) — expected for Searchable Redaction mode."),
-                        pagesWithTextOutsideRegionsOnly.map { $0 - 1 })
+                        pagesWithTextOutsideRegionsOnly.map { $0 - 1 }, nil)
             case .secureRasterization:
                 // Out-of-region OCR text on a Secure-Rasterized page is expected
                 // output — nearly every real document keeps readable non-redacted
@@ -1619,23 +1729,23 @@ public struct VerificationEngine: Sendable {
                 // The displaced-fill leak this WARN was originally aimed at is
                 // carried by the in-region arms above (a displaced fill leaves
                 // the region's own text readable in-region → FAIL); a redacted
-                // term surviving out-of-region folds here as
-                // expected-under-this-mode content.
+                // term surviving out-of-region is the ATTENTION arm above.
+                // This note covers the page's own un-redacted content only.
                 // Expected-under-this-mode observations are informational;
                 // every could-not-verify condition keeps its warning tier.
                 // Pages with NO regions have nothing to violate → the raster's
                 // own content → PASS.
                 if documentHasRegions {
                     return (.info("Unredacted page content remains readable on \(pagePhrase(pagesWithTextOutsideRegionsOnly, list: list)) — expected for this mode."),
-                            pagesWithTextOutsideRegionsOnly.map { $0 - 1 })
+                            pagesWithTextOutsideRegionsOnly.map { $0 - 1 }, nil)
                 }
             }
         }
         if !uncheckedPages.isEmpty {
             return (.warn("OCR could not be run on \(pageCountPhrase(uncheckedPages.count))"),
-                    uncheckedPages.map { $0 - 1 })
+                    uncheckedPages.map { $0 - 1 }, nil)
         }
-        return (.pass, nil)
+        return (.pass, nil, nil)
     }
 
     /// Extract ALL embedded JPEG/JPEG2000 images from a PDF page's XObject
