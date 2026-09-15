@@ -703,6 +703,72 @@ struct VerificationEngineTests {
                 "Layer 7 with zero eligible pages stays .pass (skipped by design)")
     }
 
+    // MARK: - Layers 6–9: Per-Page Mode Coverage
+    //
+    // The four Searchable-layer dispatchers select their pages through
+    // `perPageModes[i]`. An array shorter than the document used to drop
+    // its tail from the check and land on `.pass` having compared nothing
+    // there. They now report the uncovered pages as a WARN on the
+    // otherwise-PASS exit, with the uncovered pages as page references.
+    // The coordinator always supplies one mode per page, so these pins
+    // exercise a defensive arm for callers that do not.
+    //
+    // Layers 7 and 9 keep their `.skipped` precedence: a covered
+    // Searchable page with a nil digest is eligible-but-unchecked and
+    // reports `.skipped` before the coverage arm is reached, so their pins
+    // cover the one page with per-page Secure Rasterization (zero eligible
+    // pages — the exit that used to stay `.pass`). Layers 6 and 8 check
+    // the covered blank page and reach the coverage arm on its PASS exit.
+
+    @Test("Layer 6 WARNs when perPageModes is shorter than the document")
+    func layer6ShortPerPageModesWarns() async throws {
+        try await expectCoverageWarn(
+            layerIndex: 5, label: "Layer 6", coveredMode: .searchableRedaction)
+    }
+
+    @Test("Layer 7 WARNs when perPageModes is shorter than the document")
+    func layer7ShortPerPageModesWarns() async throws {
+        try await expectCoverageWarn(
+            layerIndex: 6, label: "Layer 7", coveredMode: .secureRasterization)
+    }
+
+    @Test("Layer 8 WARNs when perPageModes is shorter than the document")
+    func layer8ShortPerPageModesWarns() async throws {
+        try await expectCoverageWarn(
+            layerIndex: 7, label: "Layer 8", coveredMode: .searchableRedaction)
+    }
+
+    @Test("Layer 9 WARNs when perPageModes is shorter than the document")
+    func layer9ShortPerPageModesWarns() async throws {
+        try await expectCoverageWarn(
+            layerIndex: 8, label: "Layer 9", coveredMode: .secureRasterization)
+    }
+
+    /// Two-page blank document, a one-entry `perPageModes` (page 0 covered
+    /// with `coveredMode`, page 1 beyond the array), all-nil digests:
+    /// the layer must WARN with "not checked" and reference page 1.
+    private func expectCoverageWarn(
+        layerIndex: Int, label: String, coveredMode: PipelineMode
+    ) async throws {
+        let (doc, url) = try makeBlankPDF(pageCount: 2)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let engine = VerificationEngine()
+        let result = await engine.runLayer(
+            layerIndex, outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: 2, regions: [:], sensitiveTerms: [],
+            pipelineMode: .searchableRedaction,
+            filterDigests: [nil, nil],
+            perPageModes: [coveredMode]
+        )
+        #expect(result.status.isWarn, "\(label): got \(result.status)")
+        if case .warn(let msg) = result.status {
+            #expect(msg.contains("not checked"), "\(label): got: \(msg)")
+        }
+        #expect(result.pageReferences == [1],
+                "\(label): got \(String(describing: result.pageReferences))")
+    }
+
     // MARK: - Layer 1 / Layer 2 Silent-Bypass Hardening
 
     @Test("Layer 1 warns when documentURL is nil (AcroForm cannot be checked)")

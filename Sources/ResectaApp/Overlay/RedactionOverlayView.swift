@@ -687,25 +687,25 @@ class RedactionOverlayView: UIView {
     /// Builds normalized vertices and the corresponding bounding rect,
     /// then routes through the existing `addRegion(_:page:undoManager:)`
     /// path so undo / observer wiring is uniform with the rectangle path.
+    ///
+    /// Minimum size: the vertex set's bounding box, measured in overlay
+    /// points before normalization, must reach `minimumRegionSize` on both
+    /// axes — the same floor the rectangle tool's resize path applies,
+    /// scaled by `fingerScale` so it is a screen-point tolerance. A
+    /// thinner polygon is rejected with the rectangle path's haptic and
+    /// nothing is committed; every caller discards the in-progress
+    /// geometry afterwards. The freeform tool commits through this same
+    /// path, so the floor covers it too.
     private func commitPolygonRegion(vertices: [CGPoint]) {
         guard vertices.count >= 3 else { return }
-        let normalizedVerts = vertices.map(overlayPointToNormalized)
-        // Bounding box of the vertex set.
-        var minX = CGFloat.greatestFiniteMagnitude
-        var minY = CGFloat.greatestFiniteMagnitude
-        var maxX = -CGFloat.greatestFiniteMagnitude
-        var maxY = -CGFloat.greatestFiniteMagnitude
-        for v in normalizedVerts {
-            if v.x < minX { minX = v.x }
-            if v.x > maxX { maxX = v.x }
-            if v.y < minY { minY = v.y }
-            if v.y > maxY { maxY = v.y }
+        let overlayBounds = Self.boundingBox(of: vertices)
+        let sizeFloor = Self.minimumRegionSize * fingerScale
+        if overlayBounds.width < sizeFloor || overlayBounds.height < sizeFloor {
+            rejectionFeedback.impactOccurred(intensity: 0.3)
+            return
         }
-        let bounds = CGRect(
-            x: minX, y: minY,
-            width: max(0, maxX - minX),
-            height: max(0, maxY - minY)
-        )
+        let normalizedVerts = vertices.map(overlayPointToNormalized)
+        let bounds = Self.boundingBox(of: normalizedVerts)
         let region = RedactionRegion(
             id: UUID(),
             normalizedRect: bounds,
@@ -714,6 +714,28 @@ class RedactionOverlayView: UIView {
         )
         coordinator?.addRegion(region, page: pageIndex, undoManager: window?.undoManager)
         UIAccessibility.post(notification: .announcement, argument: "Polygon region added")
+    }
+
+    /// Axis-aligned bounding box of a point set (zero-size when the set is
+    /// empty). Used for the polygon commit's size floor in overlay points
+    /// and for the committed region's normalized rect.
+    private static func boundingBox(of points: [CGPoint]) -> CGRect {
+        var minX = CGFloat.greatestFiniteMagnitude
+        var minY = CGFloat.greatestFiniteMagnitude
+        var maxX = -CGFloat.greatestFiniteMagnitude
+        var maxY = -CGFloat.greatestFiniteMagnitude
+        for v in points {
+            if v.x < minX { minX = v.x }
+            if v.x > maxX { maxX = v.x }
+            if v.y < minY { minY = v.y }
+            if v.y > maxY { maxY = v.y }
+        }
+        guard !points.isEmpty else { return .zero }
+        return CGRect(
+            x: minX, y: minY,
+            width: max(0, maxX - minX),
+            height: max(0, maxY - minY)
+        )
     }
 
     /// Convert a single point in overlay-space to normalized PDF

@@ -595,10 +595,12 @@ public func verifyPolygonFill(
     ) else { return false }
 
     // The mask has no interior pixels (degenerate polygon, e.g. collinear
-    // vertices). Treat as a pass — there is nothing to verify and the fill
-    // would have been a no-op on the bitmap. Any-bit-set early-exit,
-    // not a full-mask popcount.
-    if !mask.hasInteriorPixels { return true }
+    // vertices). Nothing was painted for this region, so the fill did not
+    // happen: report a failed fill rather than a pass that compared no
+    // pixel. The overlay's minimum-size floor keeps such polygons from
+    // being committed in the first place. Any-bit-set early-exit, not a
+    // full-mask popcount.
+    if !mask.hasInteriorPixels { return false }
 
     // Build a 4-byte expected pixel pattern in BGRA layout. Used per-span
     // via memcmp against contiguous mask runs.
