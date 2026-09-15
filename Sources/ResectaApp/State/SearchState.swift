@@ -30,10 +30,19 @@ final class SearchState: Identifiable {
     /// off behind this flag.
     /// All machinery (MatchAuditExporter, MatchExportService, coverage-report
     /// computation) stays compiled and unit-tested; restore = flip to `true`
-    /// + update the pin test. These surfaces are revisited for 1.1. Mirrors
-    /// `CustomTermsView.templatePickerEnabled`.
+    /// + update the pin test, or in DEBUG launch with `--enableAuditSurfaces`
+    /// (one arg shared with `searchDiagnosticSurfacesEnabled` — the
+    /// measurement harness's walkthrough evidence hook; compiled out of
+    /// Release, proven by `Scripts/release-flag-check.sh`). These surfaces
+    /// are revisited for 1.1. Mirrors `CustomTermsView.templatePickerEnabled`.
     // nonisolated: Sendable constant read from nonisolated test contexts.
-    nonisolated static let searchAuditSurfacesEnabled = false
+    nonisolated static let searchAuditSurfacesEnabled: Bool = {
+        #if DEBUG
+        CommandLine.arguments.contains("--enableAuditSurfaces")
+        #else
+        false
+        #endif
+    }()
 
     /// V1.0 ships without the doctype diagnostic surfaces; the
     /// doctype banner and the footer Document-profile disclosure (two
@@ -41,10 +50,18 @@ final class SearchState: Identifiable {
     /// flag.
     /// All machinery (doctype classifier, `lastDoctypeExplanation`,
     /// `WU07Strings`, `DoctypeBannerTests`) stays compiled and
-    /// unit-tested; restore = flip to `true` + update the pin test.
+    /// unit-tested; restore = flip to `true` + update the pin test, or in
+    /// DEBUG launch with `--enableAuditSurfaces` (one arg shared with
+    /// `searchAuditSurfacesEnabled` above — see its note).
     /// These surfaces are revisited for 1.1.
     // nonisolated: Sendable constant read from nonisolated test contexts.
-    nonisolated static let searchDiagnosticSurfacesEnabled = false
+    nonisolated static let searchDiagnosticSurfacesEnabled: Bool = {
+        #if DEBUG
+        CommandLine.arguments.contains("--enableAuditSurfaces")
+        #else
+        false
+        #endif
+    }()
 
     /// V1.0 ships without the Scan category-chips strip (per-run
     /// detector narrowing over `enabledPIICategories`, its in-row ↻,

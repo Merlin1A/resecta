@@ -312,6 +312,12 @@ struct SearchStateTests {
         // An accidental flip re-exposes all three surfaces — this pin makes
         // that a loud CI red. Restoring these surfaces means flipping the
         // flag and updating this test.
+        // The flag is now the DEBUG launch-arg shape
+        // (`--enableAuditSurfaces`); the xctest runner never carries the
+        // arg, so this pin still asserts `false`. The Release side is
+        // proven at the binary level by `Scripts/release-flag-check.sh`;
+        // the arg-on mounting is covered by
+        // `AuditSurfacesDebugLaunchArgUITests`.
         #expect(SearchState.searchAuditSurfacesEnabled == false)
     }
 
@@ -323,6 +329,9 @@ struct SearchStateTests {
         // are behind this flag. An accidental flip re-exposes both mounts —
         // this pin makes that a loud CI red. Restoring these surfaces means
         // flipping the flag and updating this test.
+        // Same DEBUG launch-arg shape as the audit flag above (one shared
+        // `--enableAuditSurfaces` arg) — the runner carries no arg, so
+        // `false` still holds here.
         #expect(SearchState.searchDiagnosticSurfacesEnabled == false)
     }
 

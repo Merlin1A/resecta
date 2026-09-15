@@ -1,0 +1,827 @@
+[
+  {
+    "id": "packet",
+    "path": "packet.pdf",
+    "sha256": "362375692b8cff378d66c43fcf46f00ba09e1ea982602fcc5c8b70e96f54339a",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K0",
+    "features": [
+      "F0"
+    ],
+    "gt": "packet-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "text",
+      "ocr"
+    ],
+    "source": "bundled",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.build_packet",
+      "seed": null,
+      "variant": null
+    }
+  },
+  {
+    "id": "sample-bank-statement",
+    "path": "sample-bank-statement.pdf",
+    "sha256": "992ca0543eb1a2eaab8d8dba0a4ad4b8339cf95b804a0347ab1b0987ce18fa20",
+    "pages": 3,
+    "class": "C1",
+    "capture": "K0",
+    "features": [
+      "F0"
+    ],
+    "gt": null,
+    "gt_kind": null,
+    "leg_applicability": [
+      "text",
+      "ocr"
+    ],
+    "source": "bundled",
+    "provenance": {
+      "generator": "resecta-sample-doc generate_statement.py",
+      "seed": null,
+      "variant": null
+    }
+  },
+  {
+    "id": "g8-corpus",
+    "path": "corpus/g8_corpus.json",
+    "sha256": "0e25f49115a91d8364f0317b7be6fdb518271ff247a20c8e71ff8e35b6ec3741",
+    "pages": null,
+    "class": null,
+    "capture": null,
+    "features": [],
+    "gt": "corpus/g8_corpus.json",
+    "gt_kind": "span",
+    "leg_applicability": [
+      "text"
+    ],
+    "source": "bundled",
+    "provenance": {
+      "generator": "resecta-datapipeline build g8-corpus",
+      "seed": 20260416,
+      "variant": null,
+      "note": "installed via make install-assets; span ground truth inline"
+    }
+  },
+  {
+    "id": "packet-rotate-trigger",
+    "path": "packet-rotate-trigger.pdf",
+    "sha256": "452798bb06e20c5c1b34172c496b92f504cce302a9df20f023dcf168f5deb9a6",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K0",
+    "features": [
+      "F1"
+    ],
+    "gt": "variants/packet-rotate-trigger-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "text",
+      "ocr"
+    ],
+    "source": "bundled",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants rotate_trigger",
+      "seed": null,
+      "variant": "rotate-90"
+    }
+  },
+  {
+    "id": "perf-filler-120pp",
+    "path": "variants/perf-filler-120pp.pdf",
+    "sha256": "327680624ad73feed3e1ac8d93e721d9ef544322651f19de77e12bdeba7e3e28",
+    "pages": 120,
+    "class": "C1",
+    "capture": "K0",
+    "features": [
+      "F6"
+    ],
+    "gt": null,
+    "gt_kind": null,
+    "leg_applicability": [
+      "text"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants perf_filler",
+      "seed": null,
+      "variant": "filler-120pp"
+    }
+  },
+  {
+    "id": "packet-scan-sim-150dpi",
+    "path": "packet-scan-sim-150dpi.pdf",
+    "sha256": "9af85bcef11b7e0cc14db1b43040f0cc121482598a8f5174296775268bf51874",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-scan-sim-150dpi-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "bundled",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants scan_sim",
+      "seed": null,
+      "variant": "scan-sim-150",
+      "gt_sha256": "28b159c6dd8ba59ca433ceb576155958adcf2aa5dcea4f018ed6db964c45e21c"
+    }
+  },
+  {
+    "id": "packet-degrade-skew",
+    "path": "variants/packet-degrade-skew.pdf",
+    "sha256": "a1f3585f37e36c9804441a3d0b5d29cbfdbf0d83ca3cdf2d435753e59acc2aa2",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-degrade-skew-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-skew",
+      "gt_sha256": "490fc0ce5513428871797dc904d8d50aa1a4a595e739f99f9b1fe4aca7e9857f",
+      "note": "150 DPI raster rotated 1.5deg; GT boxes = axis-aligned hull (approximate)"
+    }
+  },
+  {
+    "id": "packet-degrade-blur",
+    "path": "variants/packet-degrade-blur.pdf",
+    "sha256": "4344c62d43e922c0aea5346e6d0e3111844ab0da11df6877bd9fcdd4f6005cbc",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-degrade-blur-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-blur",
+      "gt_sha256": "57524cbd6442b02aa95094b8eec30dec035c408ab0812a3ae2c3bf375e13f13a",
+      "note": "150 DPI raster softened by 50% down/up resample; GT geometry inherited"
+    }
+  },
+  {
+    "id": "packet-degrade-lowdpi",
+    "path": "variants/packet-degrade-lowdpi.pdf",
+    "sha256": "3ff37cb24996363059b5fe86c5a14af62b2bc64bf3ba2a2d17ddce0908fbfc52",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-degrade-lowdpi-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-lowdpi",
+      "gt_sha256": "cb6faedab8f59d3feac67382e2c968426c95af2fd878fc6929131b2f142921d1",
+      "note": "re-rasterized at 100 DPI; GT geometry inherited"
+    }
+  },
+  {
+    "id": "capture-masters-2026-08",
+    "path": "capture-masters-2026-08.pdf",
+    "sha256": "96de0cb8c2cc00cf90e9a3a2969b1b3adc20e71501fd0fab101fa1e05b73a1b3",
+    "pages": 16,
+    "class": null,
+    "capture": "K0",
+    "features": [
+      "F0"
+    ],
+    "gt": "capture-masters-2026-08-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "text",
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.build_capture",
+      "seed": null,
+      "variant": "capture-masters-2026-08",
+      "gt_sha256": "bb4a49bb89da927207ac16d3401a13377e44a6ec274a812106c8493f1ed70be3",
+      "marks_sha256": "915d1c3ceef1f6fc5c570cbbb26a3f6f52aa97c79c656a6f4ccbfdb9ead7c2ea",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      },
+      "note": "born-digital K0 arm of the capture family (31- SSC.1); class null = one document spans C1..C4, per-page classes in page_classes; marker sidecar is a SIBLING file (PB-86 DOCS_ROOT-direct), not a manifest row"
+    }
+  },
+  {
+    "id": "capture-2026-08-29-scan150",
+    "path": "variants/capture/2026-08-29/scan150.pdf",
+    "sha256": "09b680d25df00748e44aee5adb0f499499cd65f52c8f18d0e13f6d1c5ef96f0b",
+    "pages": 16,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture/2026-08-29/scan150-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc tools/register_capture.py",
+      "seed": null,
+      "variant": "scan150",
+      "capture_leg": "scan150",
+      "condition": null,
+      "capture_stamp": "2026-08-29",
+      "synthetic": false,
+      "gt_sha256": "aaab2b40623615bb1bf2fbdf829fb6b25acc5bb68aab574bdccb622092b50d45",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      },
+      "master_pages": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "homography_error_px": [
+        0.3352,
+        0.2504,
+        0.3384,
+        0.3263,
+        0.3452,
+        0.2523,
+        0.3473,
+        0.399,
+        0.2745,
+        0.3198,
+        0.3182,
+        0.3345,
+        0.3354,
+        0.283,
+        0.3644,
+        0.3812
+      ],
+      "homography_error_max_px": [
+        0.6234,
+        0.4225,
+        0.6159,
+        0.621,
+        0.5775,
+        0.4353,
+        0.629,
+        0.5725,
+        0.4413,
+        0.5552,
+        0.6456,
+        0.7387,
+        0.5362,
+        0.4419,
+        0.5796,
+        0.6965
+      ],
+      "dpi_effective": [
+        150.07,
+        150.07,
+        150.06,
+        150.08,
+        150.12,
+        150.1,
+        150.08,
+        150.09,
+        150.12,
+        150.1,
+        150.12,
+        150.12,
+        150.1,
+        150.12,
+        150.13,
+        150.11
+      ],
+      "registration_run": "evidence/8bbf5c8c/capture/20260829-0955-register",
+      "note": "class is null because one document spans C1..C4 (per-page classes in page_classes; the L-19 null precedent); polygons ride beside bbox in the sidecar"
+    }
+  },
+  {
+    "id": "capture-2026-08-29-scan300",
+    "path": "variants/capture/2026-08-29/scan300.pdf",
+    "sha256": "818d28463c0b8de89243515daebc0253808f21e81d15f3079c0779a339e33bda",
+    "pages": 16,
+    "class": null,
+    "capture": "K2",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture/2026-08-29/scan300-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc tools/register_capture.py",
+      "seed": null,
+      "variant": "scan300",
+      "capture_leg": "scan300",
+      "condition": null,
+      "capture_stamp": "2026-08-29",
+      "synthetic": false,
+      "gt_sha256": "17bec1bb38d466fa7a5d1d1e149e0c4a0c7bd95b3bfa08b81dc5aee284fa3689",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      },
+      "master_pages": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "homography_error_px": [
+        0.6011,
+        0.7355,
+        0.6541,
+        0.6242,
+        0.6528,
+        0.6055,
+        0.6161,
+        0.6163,
+        0.6544,
+        0.6561,
+        0.6292,
+        0.7434,
+        0.6344,
+        0.5906,
+        0.7406,
+        0.8432
+      ],
+      "homography_error_max_px": [
+        1.0449,
+        1.67,
+        1.1298,
+        1.4204,
+        0.9562,
+        0.8887,
+        0.9738,
+        0.9639,
+        0.9893,
+        0.9383,
+        1.0759,
+        1.4474,
+        1.0489,
+        0.8091,
+        1.1577,
+        1.8712
+      ],
+      "dpi_effective": [
+        300.15,
+        300.14,
+        300.13,
+        300.16,
+        300.25,
+        300.21,
+        300.16,
+        300.19,
+        300.25,
+        300.19,
+        300.23,
+        300.24,
+        300.22,
+        300.25,
+        300.27,
+        300.24
+      ],
+      "registration_run": "evidence/8bbf5c8c/capture/20260829-0955-register",
+      "note": "class is null because one document spans C1..C4 (per-page classes in page_classes; the L-19 null precedent); polygons ride beside bbox in the sidecar"
+    }
+  },
+  {
+    "id": "capture-2026-08-29-rotated-rot90",
+    "path": "variants/capture/2026-08-29/rotated-rot90.pdf",
+    "sha256": "3f1f0eb551ff0ee6df2215bdecb8935b677307de45edb5b1ad308205f1e72b05",
+    "pages": 2,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F1"
+    ],
+    "gt": "variants/capture/2026-08-29/rotated-rot90-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc tools/register_capture.py",
+      "seed": null,
+      "variant": "rotated-rot90",
+      "capture_leg": "rotated",
+      "condition": "rot90",
+      "capture_stamp": "2026-08-29",
+      "synthetic": false,
+      "gt_sha256": "07446f242d1a8609293b5b70dc9e8eed4e6ffba8a15cbf2acb380ab9db8e69c5",
+      "page_classes": {
+        "0": "C1",
+        "1": "C3"
+      },
+      "master_pages": [
+        1,
+        9
+      ],
+      "homography_error_px": [
+        0.2504,
+        0.3179
+      ],
+      "homography_error_max_px": [
+        0.4224,
+        0.5537
+      ],
+      "dpi_effective": [
+        150.07,
+        150.1
+      ],
+      "registration_run": "evidence/8bbf5c8c/capture/20260829-0955-register",
+      "note": "class is null because one document spans C1..C4 (per-page classes in page_classes; the L-19 null precedent); polygons ride beside bbox in the sidecar"
+    }
+  },
+  {
+    "id": "capture-2026-08-29-rotated-rot180",
+    "path": "variants/capture/2026-08-29/rotated-rot180.pdf",
+    "sha256": "68117b15548303e6d2b119323ef7a65e45769a1fd6a34aad1d789a374ee46792",
+    "pages": 2,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F1"
+    ],
+    "gt": "variants/capture/2026-08-29/rotated-rot180-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc tools/register_capture.py",
+      "seed": null,
+      "variant": "rotated-rot180",
+      "capture_leg": "rotated",
+      "condition": "rot180",
+      "capture_stamp": "2026-08-29",
+      "synthetic": false,
+      "gt_sha256": "57f9ef7c644cf3b2d36294dbd27e757904734da2e3d2ef97b525e2d887e2c278",
+      "page_classes": {
+        "0": "C1",
+        "1": "C3"
+      },
+      "master_pages": [
+        1,
+        9
+      ],
+      "homography_error_px": [
+        0.2406,
+        0.2683
+      ],
+      "homography_error_max_px": [
+        0.433,
+        0.4448
+      ],
+      "dpi_effective": [
+        150.06,
+        150.09
+      ],
+      "registration_run": "evidence/8bbf5c8c/capture/20260829-0955-register",
+      "note": "class is null because one document spans C1..C4 (per-page classes in page_classes; the L-19 null precedent); polygons ride beside bbox in the sidecar"
+    }
+  },
+  {
+    "id": "capture-synthetic-synth150",
+    "path": "variants/capture/synthetic/synth150.pdf",
+    "sha256": "20a102a0ecb4413a8d127aae1102cd146076e53f03bfe5a1f2189217bbbaa966",
+    "pages": 16,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture/synthetic/synth150-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc tools/register_capture.py",
+      "seed": null,
+      "variant": "synth150",
+      "capture_leg": "synth150",
+      "condition": null,
+      "capture_stamp": "synthetic",
+      "synthetic": true,
+      "gt_sha256": "82b23277c4054e4d46dd364f596a5ef23fd16b015c87d02dc367b52fcfb0c003",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      },
+      "master_pages": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "homography_error_px": [
+        0.5363,
+        0.5362,
+        0.5363,
+        0.5363,
+        0.5364,
+        0.5363,
+        0.5363,
+        0.5363,
+        0.5363,
+        0.5363,
+        0.5363,
+        0.5363,
+        0.5363,
+        0.5363,
+        0.5361,
+        0.5361
+      ],
+      "homography_error_max_px": [
+        0.5616,
+        0.5594,
+        0.5616,
+        0.5616,
+        0.5616,
+        0.5616,
+        0.5616,
+        0.5616,
+        0.5616,
+        0.5616,
+        0.5616,
+        0.5616,
+        0.5616,
+        0.5616,
+        0.5616,
+        0.5616
+      ],
+      "dpi_effective": [
+        150.05,
+        150.05,
+        150.05,
+        150.05,
+        150.05,
+        150.05,
+        150.05,
+        150.05,
+        150.05,
+        150.05,
+        150.05,
+        150.05,
+        150.05,
+        150.05,
+        150.05,
+        150.05
+      ],
+      "registration_run": "evidence/8bbf5c8c/capture/20260825-2000-register-synthetic",
+      "note": "class is null because one document spans C1..C4 (per-page classes in page_classes; the L-19 null precedent); polygons ride beside bbox in the sidecar"
+    }
+  },
+  {
+    "id": "capture-synthetic-synth300",
+    "path": "variants/capture/synthetic/synth300.pdf",
+    "sha256": "d6c386c5ca8b81f29a7f28ca683b0b65f896b37eb8a7620b43415ecf8c328e34",
+    "pages": 16,
+    "class": null,
+    "capture": "K2",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture/synthetic/synth300-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc tools/register_capture.py",
+      "seed": null,
+      "variant": "synth300",
+      "capture_leg": "synth300",
+      "condition": null,
+      "capture_stamp": "synthetic",
+      "synthetic": true,
+      "gt_sha256": "09a1619850f38986320dbbd41731869ce09a5d8c16c34610123e28bade97ff0d",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      },
+      "master_pages": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "homography_error_px": [
+        0.0957,
+        0.2947,
+        0.0957,
+        0.0957,
+        0.0957,
+        0.0957,
+        0.0957,
+        0.0957,
+        0.0957,
+        0.0957,
+        0.0957,
+        0.0957,
+        0.0957,
+        0.0957,
+        0.0957,
+        0.0957
+      ],
+      "homography_error_max_px": [
+        0.1291,
+        0.9831,
+        0.1291,
+        0.1291,
+        0.1291,
+        0.1291,
+        0.1291,
+        0.1291,
+        0.1291,
+        0.1291,
+        0.1291,
+        0.1291,
+        0.1291,
+        0.1291,
+        0.1291,
+        0.1291
+      ],
+      "dpi_effective": [
+        300.05,
+        300.04,
+        300.05,
+        300.05,
+        300.05,
+        300.05,
+        300.05,
+        300.05,
+        300.05,
+        300.05,
+        300.05,
+        300.05,
+        300.05,
+        300.05,
+        300.05,
+        300.05
+      ],
+      "registration_run": "evidence/8bbf5c8c/capture/20260825-2000-register-synthetic",
+      "note": "class is null because one document spans C1..C4 (per-page classes in page_classes; the L-19 null precedent); polygons ride beside bbox in the sidecar"
+    }
+  }
+]

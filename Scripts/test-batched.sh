@@ -114,8 +114,15 @@ if [ "$(printf '%.0f' "$LOAD1")" -gt "$LOAD_WARN" ]; then
     echo "  Perf-budget suites are report-only, but batch wall time will inflate. Proceeding." >&2
 fi
 
-# Resolve an available iPhone 17 simulator (name may drift across runtimes;
+# Resolve the destination simulator. TEST_BATCHED_SIM_UDID pins an explicit
+# device (the 1.2 measurement lane runs on its own harness sim, whose name is
+# not an "iPhone 17" match, and the store-media sims must never be selected —
+# or erased by the wedge recovery below). Unset, the historical resolution
+# applies: an available iPhone 17 simulator (name may drift across runtimes;
 # prefer a booted device, then exact name on the newest runtime, then prefix).
+if [ -n "${TEST_BATCHED_SIM_UDID:-}" ]; then
+    SIM_LINE="$TEST_BATCHED_SIM_UDID|pinned via TEST_BATCHED_SIM_UDID"
+else
 SIM_LINE="$(xcrun simctl list devices available -j | python3 -c '
 import json, re, sys
 data = json.load(sys.stdin)
@@ -136,6 +143,7 @@ if best is None:
     sys.exit(3)
 print(best[1] + "|" + best[2] + " (" + best[3].rsplit(".", 1)[-1] + ")")
 ')" || { echo "PRE-FLIGHT: no available iPhone 17 simulator" >&2; exit 1; }
+fi
 SIM_UDID="${SIM_LINE%%|*}"
 echo "simulator: ${SIM_LINE#*|} [$SIM_UDID]"
 DEST="id=$SIM_UDID"

@@ -331,4 +331,231 @@ struct G8SearchParityHarnessTests {
         #expect(!afterCells.isEmpty, "no AFTER cells emitted")
         #expect(sortedDocs.count == 1100, "G8 doc_count expected 1100; got \(sortedDocs.count)")
     }
+
+    // MARK: - H1.1 — the Site-B G8 baseline trio (1.2 measurement program)
+    //
+    // D12-24: Site B (Search-and-Redact) IS the product's detection surface, so
+    // the 1.2 baseline measures the PRODUCT semantics end to end:
+    //   - detection is doctype-blind (`detect(in:)`, doctype nil — the search
+    //     path carries no classifier output), unlike the Site-A emitter's
+    //     `detect(in:doctype:)`;
+    //   - the five scored families surface through the PRODUCTION composition
+    //     (`DocumentSearcher.composedSurvivors` via the observation-only
+    //     `_testComposeSiteB` seam: installed calibrated scorer, empty priors,
+    //     `.generic` doctype features, posterior floor);
+    //   - every other family surfaces through the raw W4 gate
+    //     (`applyingCountingDrops(thresholdVector:)`), exactly as
+    //     `performSearch(.piiScan)` recombines them.
+    //
+    // Output: the SAME trio schema as `G8BaselineHarnessTests.emitBaseline`
+    // (cells / raw_scores / fire_features) with `site: "siteB"`, at
+    // `<base>_siteb_cells.json` / `_siteb_raw_scores.json` /
+    // `_siteb_fire_features.json`. The detector-direct emitter keeps writing
+    // its trio with `site: "detector"`; dp `eval-baseline` scores both, and
+    // the per-category difference is the M12-02 "site gap".
+    //
+    // Semantics notes, pinned so the numbers are interpretable:
+    //   - `raw` in raw_scores/fire rows stays the detector's PRE-composition
+    //     confidence (the same signal the Site-A emitter records); for scored
+    //     families the SURFACING decision is on the composed posterior, so
+    //     `surfaced` here cannot be re-derived from `raw` vs any cutoff.
+    //   - fire-row `features` are computed at `.generic` (the doctype-blind
+    //     search path), not at the corpus doctype.
+    //   - docs are filtered by the same `gateDoctypeClass` guard as the Site-A
+    //     emitter, so both trios cover the identical document set and the
+    //     site gap is a like-for-like join.
+
+    @Test("H1.1 — emit Site-B G8 baseline trio (product semantics)")
+    func emitSiteBBaseline() async throws {
+        guard let corpus = try G8BaselineHarnessTests.loadBaselineCorpus() else {
+            print("[H1.1 siteB baseline] g8_corpus.json not bundled; emit skipped " +
+                  "until `make install-assets` runs.")
+            return
+        }
+        guard let vector = Self.balancedVector() else {
+            print("[H1.1 siteB baseline] balanced preset vector unavailable; skipped.")
+            return
+        }
+
+        let detector = PIIDetector()
+        let sortedDocs = corpus.documents.sorted { $0.id < $1.id }
+        let installed = ContextScorerWeights.loadFromEngineBundle()
+
+        var cells: [String: Cell] = [:]
+        var rawRows: [G8BaselineHarnessTests.RawScoreRow] = []
+        var fireRows: [G8BaselineHarnessTests.FireFeatureRow] = []
+
+        for doc in sortedDocs {
+            // Same doc filter as the Site-A emitter (identical coverage).
+            guard gateDoctypeClass(doc.doctype) != nil else { continue }
+            let bucket = doc.demographic_bucket
+
+            // PRODUCT detection: doctype-blind.
+            let matches = await detector.detect(in: doc.text)
+
+            var positiveGTByKind: [RedactionRegion.PIIKind: [NSRange]] = [:]
+            var decoyGTByKind:    [RedactionRegion.PIIKind: [NSRange]] = [:]
+            var allGTByKind:      [RedactionRegion.PIIKind: [NSRange]] = [:]
+            // Every GT span with its packet tier (additive per-tier counters,
+            // 1.2 P1.10 — same bridge as the detector-site emitter).
+            var tierGTByKind:     [RedactionRegion.PIIKind: [(NSRange, String)]] = [:]
+            for span in doc.pii_spans {
+                guard let kind = G8BaselineHarnessTests.baselineMapCategory(span.category) else { continue }
+                let r = NSRange(location: span.start, length: span.end - span.start)
+                allGTByKind[kind, default: []].append(r)
+                tierGTByKind[kind, default: []].append((r, span.bridgedTier))
+                if span.expected_outcome == "suppress" {
+                    decoyGTByKind[kind, default: []].append(r)
+                } else {
+                    positiveGTByKind[kind, default: []].append(r)
+                }
+            }
+
+            // PRODUCT surfacing: scored families through the composed gate,
+            // the rest through the raw W4 gate.
+            let (scoredAll, rest) = matches.partitionedByScoredFamily()
+            let scoredSurvivors = DocumentSearcher._testComposeSiteB(
+                scoredAll, pageText: doc.text, thresholdVector: vector, scorer: installed
+            )
+            let survivors = rest.applyingCountingDrops(thresholdVector: vector).survivors + scoredSurvivors
+
+            // Identity of a match for survived-set membership (fire rows).
+            func matchKey(_ m: PIIDetector.PIIMatch) -> String {
+                "\(m.kind)|\(m.range.location)|\(m.range.length)|\(m.confidence)"
+            }
+            let scoredSurvivorKeys = Set(scoredSurvivors.map(matchKey))
+
+            // Raw scores + fire rows over EVERY detected match (pre-gate).
+            for match in matches {
+                guard let catKey = G8BaselineHarnessTests.cellCategoryKey(for: match.kind) else { continue }
+                let gtClass: String
+                let decoys = decoyGTByKind[match.kind] ?? []
+                let positives = positiveGTByKind[match.kind] ?? []
+                if decoys.contains(where: { G8BaselineHarnessTests.rangesOverlap(match.range, $0) }) {
+                    gtClass = "suppress"
+                } else if positives.contains(where: { G8BaselineHarnessTests.rangesOverlap(match.range, $0) }) {
+                    gtClass = "positive"
+                } else {
+                    gtClass = "none"
+                }
+                rawRows.append(G8BaselineHarnessTests.RawScoreRow(
+                    category: catKey,
+                    doctype: doc.doctype,
+                    bucket: bucket,
+                    raw: match.confidence,
+                    gt_class: gtClass
+                ))
+
+                if let family = PIICategory(piiKind: match.kind)
+                    .flatMap({ PresetThresholdVector.wireName(for: $0) }),
+                    ContextFeatureContract.scoredFamilies.contains(family) {
+                    let feats = contextFeatures(
+                        match: match,
+                        effectiveDoctype: .generic,
+                        pageText: doc.text
+                    )
+                    fireRows.append(G8BaselineHarnessTests.FireFeatureRow(
+                        family: family,
+                        cell_category_key: catKey,
+                        doctype: doc.doctype,
+                        bucket: bucket,
+                        start: match.range.location,
+                        end: match.range.location + match.range.length,
+                        raw: match.confidence,
+                        gt_class: gtClass,
+                        surfaced: scoredSurvivorKeys.contains(matchKey(match)),
+                        features: feats
+                    ))
+                }
+            }
+
+            // Cells over the Site-B survivor set.
+            var surfacedByKind: [RedactionRegion.PIIKind: [(NSRange, Bool)]] = [:]
+            for m in survivors {
+                surfacedByKind[m.kind, default: []].append((m.range, isNegativeContextSuppressed(m)))
+            }
+
+            var kinds = Set(allGTByKind.keys)
+            kinds.formUnion(surfacedByKind.keys)
+            for kind in kinds {
+                guard let catKey = G8BaselineHarnessTests.cellCategoryKey(for: kind) else { continue }
+                let cellKey = "\(catKey)_\(doc.doctype)_\(bucket)"
+                var cell = cells[cellKey] ?? Cell()
+
+                let positives = positiveGTByKind[kind] ?? []
+                let decoys    = decoyGTByKind[kind] ?? []
+                let allGT     = allGTByKind[kind] ?? []
+                let surfaced  = surfacedByKind[kind] ?? []
+
+                for gt in positives {
+                    let covered = surfaced.contains { G8BaselineHarnessTests.rangesOverlap($0.0, gt) }
+                    if covered { cell.true_positives += 1 } else { cell.false_negatives += 1 }
+                }
+                cell.adversarial_suppress_total += decoys.count
+                for decoy in decoys {
+                    let fired = surfaced.contains { G8BaselineHarnessTests.rangesOverlap($0.0, decoy) }
+                    if fired { cell.adversarial_suppress_fired += 1 }
+                }
+                for (det, suppressed) in surfaced {
+                    let overlapsAnyGT = allGT.contains { G8BaselineHarnessTests.rangesOverlap(det, $0) }
+                    if !overlapsAnyGT { cell.false_positives += 1 }
+                    if suppressed { cell.suppressed_by_negative_context += 1 }
+                }
+                // Per-tier counters (additive), same overlap rule.
+                for (gt, tier) in tierGTByKind[kind] ?? [] {
+                    let hit = surfaced.contains { G8BaselineHarnessTests.rangesOverlap($0.0, gt) }
+                    cell.tally(tier: tier, hit: hit)
+                }
+                cells[cellKey] = cell
+            }
+        }
+
+        // Balanced cutoff map (raw_scores header) — same construction as the
+        // Site-A emitter; informational at Site B (see semantics notes above).
+        var cutoffMap: [String: Double] = [:]
+        for kind in G8BaselineHarnessTests.allCorpusKinds {
+            guard let catKey = G8BaselineHarnessTests.cellCategoryKey(for: kind) else { continue }
+            if let c = balancedCutoff(for: kind) { cutoffMap[catKey] = c }
+        }
+
+        let base = G8BaselineHarnessTests.baselineOutBase()
+
+        let cellsReport = G8BaselineHarnessTests.BaselineCellsReport(
+            schema_version: 1,
+            generated_by: "G8SearchParityHarness.emitSiteBBaseline",
+            g8_corpus_seed: corpus.seed,
+            cutoff_preset: "balanced",
+            site: "siteB",
+            doc_count: sortedDocs.count,
+            cells: cells
+        )
+        try G8BaselineHarnessTests.writeJSON(cellsReport, to: "\(base)_siteb_cells.json")
+
+        let rawReport = G8BaselineHarnessTests.RawScoresReport(
+            schema_version: 1,
+            site: "siteB",
+            balanced_cutoffs: cutoffMap,
+            absorbing_state_floor: DetectionOrchestrator.absorbingStateFloor,
+            rows: rawRows
+        )
+        try G8BaselineHarnessTests.writeJSON(rawReport, to: "\(base)_siteb_raw_scores.json")
+
+        let fireReport = G8BaselineHarnessTests.FireFeaturesReport(
+            schema_version: 1,
+            generated_by: "G8SearchParityHarness.emitSiteBBaseline",
+            site: "siteB",
+            feature_order: ContextFeatureContract.featureOrder,
+            fires: fireRows
+        )
+        try G8BaselineHarnessTests.writeJSON(fireReport, to: "\(base)_siteb_fire_features.json")
+
+        print("[H1.1 siteB baseline] cells → \(base)_siteb_cells.json (\(cells.count) cells)")
+        print("[H1.1 siteB baseline] raw_scores → \(base)_siteb_raw_scores.json (\(rawRows.count) rows)")
+        print("[H1.1 siteB baseline] fire_features → \(base)_siteb_fire_features.json (\(fireRows.count) fires)")
+
+        // Emitter sanity only (standing emitter, not a quality gate).
+        #expect(!cells.isEmpty, "no Site-B cells emitted — corpus loaded but produced nothing")
+        #expect(sortedDocs.count == 1100,
+                "G8 doc_count expected 1100; got \(sortedDocs.count)")
+    }
 }

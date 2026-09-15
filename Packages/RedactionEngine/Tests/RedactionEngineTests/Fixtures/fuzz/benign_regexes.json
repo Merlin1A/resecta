@@ -1,0 +1,590 @@
+{
+ "generated_by": "resecta 1.2 P1.5 \u2014 T3.2 hand-authored benign corpus",
+ "license_note": "own-authored realistic user patterns; no scraped corpora (DR-3/DR-4 licensing canon). Borderline rows are realistic shapes expected to sit on the conservative-precheck boundary; they count toward the benign-rejection rate and are additionally sliced separately.",
+ "patterns": [
+  {
+   "id": "ssn_00",
+   "pattern": "\\d{3}-\\d{2}-\\d{4}",
+   "pattern_class": "ssn"
+  },
+  {
+   "id": "ssn_01",
+   "pattern": "\\b\\d{3}-\\d{2}-\\d{4}\\b",
+   "pattern_class": "ssn"
+  },
+  {
+   "id": "ssn_02",
+   "pattern": "\\d{3}[- ]?\\d{2}[- ]?\\d{4}",
+   "pattern_class": "ssn"
+  },
+  {
+   "id": "ssn_03",
+   "pattern": "\\d{3}\\s?-\\s?\\d{2}\\s?-\\s?\\d{4}",
+   "pattern_class": "ssn"
+  },
+  {
+   "id": "ssn_04",
+   "pattern": "[0-8]\\d{2}-\\d{2}-\\d{4}",
+   "pattern_class": "ssn"
+  },
+  {
+   "id": "ssn_05",
+   "pattern": "SSN:?\\s*\\d{3}-\\d{2}-\\d{4}",
+   "pattern_class": "ssn"
+  },
+  {
+   "id": "ssn_06",
+   "notes": "unquantified alternation group",
+   "pattern": "(SSN|Social Security)[:# ]*\\d{3}-\\d{2}-\\d{4}",
+   "pattern_class": "ssn"
+  },
+  {
+   "id": "ssn_07",
+   "pattern": "\\d{9}",
+   "pattern_class": "ssn"
+  },
+  {
+   "id": "ssn_08",
+   "notes": "top-level alternation, unquantified",
+   "pattern": "\\d{3}-\\d{2}-\\d{4}|\\d{9}",
+   "pattern_class": "ssn"
+  },
+  {
+   "id": "ssn_09",
+   "notes": "negative lookahead prefix",
+   "pattern": "(?!000)\\d{3}-\\d{2}-\\d{4}",
+   "pattern_class": "ssn"
+  },
+  {
+   "id": "ssn_10",
+   "notes": "masked render",
+   "pattern": "XXX-XX-\\d{4}",
+   "pattern_class": "ssn"
+  },
+  {
+   "id": "itin_00",
+   "pattern": "9\\d{2}-[78]\\d-\\d{4}",
+   "pattern_class": "itin"
+  },
+  {
+   "id": "ein_00",
+   "pattern": "\\d{2}-\\d{7}",
+   "pattern_class": "ein"
+  },
+  {
+   "id": "ein_01",
+   "pattern": "EIN:?\\s*\\d{2}-\\d{7}",
+   "pattern_class": "ein"
+  },
+  {
+   "id": "phone_00",
+   "pattern": "\\(\\d{3}\\) \\d{3}-\\d{4}",
+   "pattern_class": "phone"
+  },
+  {
+   "id": "phone_01",
+   "pattern": "\\d{3}-\\d{3}-\\d{4}",
+   "pattern_class": "phone"
+  },
+  {
+   "id": "phone_02",
+   "pattern": "\\d{3}[.-]\\d{3}[.-]\\d{4}",
+   "pattern_class": "phone"
+  },
+  {
+   "id": "phone_03",
+   "notes": "classic optional-riddled user phone pattern",
+   "pattern": "\\+?1?[ .-]?\\(?\\d{3}\\)?[ .-]?\\d{3}[ .-]?\\d{4}",
+   "pattern_class": "phone"
+  },
+  {
+   "id": "phone_04",
+   "pattern": "\\b\\d{10}\\b",
+   "pattern_class": "phone"
+  },
+  {
+   "id": "phone_05",
+   "notes": "optional country-code group (bounded ? quantifier)",
+   "pattern": "(\\+1[ -]?)?\\(?\\d{3}\\)?[ -]?\\d{3}[ -]?\\d{4}",
+   "pattern_class": "phone"
+  },
+  {
+   "id": "phone_06",
+   "pattern": "1-800-\\d{3}-\\d{4}",
+   "pattern_class": "phone"
+  },
+  {
+   "id": "phone_07",
+   "pattern": "(?i)(phone|tel|fax)[:. ]*\\(?\\d{3}\\)?[ .-]\\d{3}[ .-]\\d{4}",
+   "pattern_class": "phone"
+  },
+  {
+   "id": "phone_08",
+   "pattern": "\\d{3}\\.\\d{3}\\.\\d{4}",
+   "pattern_class": "phone"
+  },
+  {
+   "id": "phone_09",
+   "pattern": "\\(\\d{3}\\)\\s*\\d{3}[- ]\\d{4}",
+   "pattern_class": "phone"
+  },
+  {
+   "id": "phone_10",
+   "pattern": "\\+1 \\d{3}-\\d{3}-\\d{4}",
+   "pattern_class": "phone"
+  },
+  {
+   "id": "date_00",
+   "pattern": "\\d{2}/\\d{2}/\\d{4}",
+   "pattern_class": "date"
+  },
+  {
+   "id": "date_01",
+   "pattern": "\\d{1,2}/\\d{1,2}/\\d{2,4}",
+   "pattern_class": "date"
+  },
+  {
+   "id": "date_02",
+   "pattern": "\\d{4}-\\d{2}-\\d{2}",
+   "pattern_class": "date"
+  },
+  {
+   "id": "date_03",
+   "notes": "strict mm/dd/yyyy with unquantified alternation groups",
+   "pattern": "(0[1-9]|1[0-2])/(0[1-9]|[12]\\d|3[01])/(19|20)\\d{2}",
+   "pattern_class": "date"
+  },
+  {
+   "id": "date_04",
+   "pattern": "(?i)DOB:?\\s*\\d{2}/\\d{2}/\\d{4}",
+   "pattern_class": "date"
+  },
+  {
+   "id": "date_05",
+   "notes": "month-name alternation, unquantified",
+   "pattern": "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \\d{1,2}, \\d{4}",
+   "pattern_class": "date"
+  },
+  {
+   "id": "date_06",
+   "pattern": "\\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \\d{4}",
+   "pattern_class": "date"
+  },
+  {
+   "id": "date_07",
+   "pattern": "\\b\\d{2}/\\d{2}/\\d{2}\\b",
+   "pattern_class": "date"
+  },
+  {
+   "id": "date_08",
+   "notes": "bounded gap {0,3}",
+   "pattern": "Date of Birth.{0,3}\\d{2}/\\d{2}/\\d{4}",
+   "pattern_class": "date"
+  },
+  {
+   "id": "date_09",
+   "pattern": "\\d{2}-\\d{2}-\\d{4}",
+   "pattern_class": "date"
+  },
+  {
+   "id": "acct_00",
+   "pattern": "\\b\\d{8,17}\\b",
+   "pattern_class": "account"
+  },
+  {
+   "id": "acct_01",
+   "notes": "optional label group + unbounded digit token",
+   "pattern": "(?i)account\\s*(#|no\\.?|number)?:?\\s*\\d+",
+   "pattern_class": "account"
+  },
+  {
+   "id": "acct_02",
+   "pattern": "\\d{4}[- ]\\d{4}[- ]\\d{4}[- ]\\d{4}",
+   "pattern_class": "account"
+  },
+  {
+   "id": "acct_03",
+   "notes": "visa shape",
+   "pattern": "4\\d{15}",
+   "pattern_class": "account"
+  },
+  {
+   "id": "acct_04",
+   "notes": "mastercard shape",
+   "pattern": "5[1-5]\\d{14}",
+   "pattern_class": "account"
+  },
+  {
+   "id": "acct_05",
+   "notes": "amex shape",
+   "pattern": "3[47]\\d{13}",
+   "pattern_class": "account"
+  },
+  {
+   "id": "acct_06",
+   "notes": "masked card tail",
+   "pattern": "\\*{4}[- ]?\\d{4}",
+   "pattern_class": "account"
+  },
+  {
+   "id": "acct_07",
+   "notes": "routing number",
+   "pattern": "\\b[0-9]{9}\\b",
+   "pattern_class": "account"
+  },
+  {
+   "id": "acct_08",
+   "pattern": "ABA:?\\s*\\d{9}",
+   "pattern_class": "account"
+  },
+  {
+   "id": "acct_09",
+   "notes": "IBAN-like",
+   "pattern": "[A-Z]{2}\\d{2}[A-Z0-9]{11,30}",
+   "pattern_class": "account"
+  },
+  {
+   "id": "acct_10",
+   "pattern": "(?i)routing (number|no\\.?):?\\s*\\d{9}",
+   "pattern_class": "account"
+  },
+  {
+   "id": "acct_11",
+   "notes": "masked account render",
+   "pattern": "X{4,12}\\d{4}",
+   "pattern_class": "account"
+  },
+  {
+   "id": "email_00",
+   "notes": "the canonical user email pattern (char-class + runs, no nesting)",
+   "pattern": "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
+   "pattern_class": "email"
+  },
+  {
+   "id": "email_01",
+   "pattern": "\\S+@\\S+\\.\\S+",
+   "pattern_class": "email"
+  },
+  {
+   "id": "email_02",
+   "pattern": "[\\w.-]+@example\\.(com|net|org)",
+   "pattern_class": "email"
+  },
+  {
+   "id": "email_03",
+   "pattern": "(?i)[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,63}",
+   "pattern_class": "email"
+  },
+  {
+   "id": "email_04",
+   "pattern": "\\b[\\w.%-]+@[\\w.-]+\\.[A-Za-z]{2,4}\\b",
+   "pattern_class": "email"
+  },
+  {
+   "id": "email_05",
+   "pattern": "(?i)e-?mail:?\\s*\\S+@\\S+",
+   "pattern_class": "email"
+  },
+  {
+   "id": "url_00",
+   "notes": "optional path group",
+   "pattern": "https?://[\\w.-]+(/\\S*)?",
+   "pattern_class": "url"
+  },
+  {
+   "id": "ip_00",
+   "pattern": "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}",
+   "pattern_class": "url"
+  },
+  {
+   "id": "name_00",
+   "notes": "surname list, unquantified",
+   "pattern": "\\b(Hartwell|Delgado)\\b",
+   "pattern_class": "name"
+  },
+  {
+   "id": "name_01",
+   "pattern": "(Mr|Mrs|Ms|Dr)\\.? [A-Z][a-z]+",
+   "pattern_class": "name"
+  },
+  {
+   "id": "name_02",
+   "notes": "first-MI-last",
+   "pattern": "[A-Z][a-z]+ [A-Z]\\. [A-Z][a-z]+",
+   "pattern_class": "name"
+  },
+  {
+   "id": "name_03",
+   "notes": "single .* gap",
+   "pattern": "\\bDelia\\b.*\\bHartwell\\b",
+   "pattern_class": "name"
+  },
+  {
+   "id": "name_04",
+   "pattern": "(?i)\\bconfidential\\b",
+   "pattern_class": "word"
+  },
+  {
+   "id": "name_05",
+   "notes": "all-caps name pair",
+   "pattern": "[A-Z]{2,} [A-Z]{2,}",
+   "pattern_class": "name"
+  },
+  {
+   "id": "name_06",
+   "notes": "last, first",
+   "pattern": "\\b[A-Z][a-z]+, [A-Z][a-z]+\\b",
+   "pattern_class": "name"
+  },
+  {
+   "id": "name_07",
+   "pattern": "(?i)signature of (borrower|applicant|employee)",
+   "pattern_class": "word"
+  },
+  {
+   "id": "name_08",
+   "notes": "optional-MI group",
+   "pattern": "\\bJohn (Q\\. )?Public\\b",
+   "pattern_class": "name"
+  },
+  {
+   "id": "name_09",
+   "pattern": "witness(es)?",
+   "pattern_class": "word"
+  },
+  {
+   "id": "word_00",
+   "notes": "escaped brackets",
+   "pattern": "\\[REDACTED\\]",
+   "pattern_class": "word"
+  },
+  {
+   "id": "word_01",
+   "pattern": "(?i)privileged (and|&) confidential",
+   "pattern_class": "word"
+  },
+  {
+   "id": "addr_00",
+   "notes": "street-suffix alternation, unquantified",
+   "pattern": "\\d+ [A-Z][a-z]+ (Street|St|Avenue|Ave|Road|Rd|Place|Pl|Drive|Dr)\\.?",
+   "pattern_class": "address"
+  },
+  {
+   "id": "addr_01",
+   "pattern": "P\\.?O\\.? Box \\d+",
+   "pattern_class": "address"
+  },
+  {
+   "id": "addr_02",
+   "notes": "zip+4 optional group",
+   "pattern": "\\b\\d{5}(-\\d{4})?\\b",
+   "pattern_class": "address"
+  },
+  {
+   "id": "addr_03",
+   "notes": "state + zip",
+   "pattern": "[A-Z]{2} \\d{5}",
+   "pattern_class": "address"
+  },
+  {
+   "id": "addr_04",
+   "pattern": "(?i)(suite|apt|unit) ?#? ?\\d+",
+   "pattern_class": "address"
+  },
+  {
+   "id": "addr_05",
+   "pattern": "\\bBoise, ID 837\\d{2}\\b",
+   "pattern_class": "address"
+  },
+  {
+   "id": "addr_06",
+   "pattern": "\\d{1,5} [A-Z][a-z]+ [A-Z][a-z]+",
+   "pattern_class": "address"
+  },
+  {
+   "id": "id_00",
+   "pattern": "(?i)MRN:?\\s*[A-Z0-9-]{6,12}",
+   "pattern_class": "medical"
+  },
+  {
+   "id": "id_01",
+   "notes": "NPI shape",
+   "pattern": "\\b\\d{10}\\b",
+   "pattern_class": "medical"
+  },
+  {
+   "id": "id_02",
+   "notes": "DEA shape",
+   "pattern": "[A-Z]{2}\\d{7}",
+   "pattern_class": "medical"
+  },
+  {
+   "id": "id_03",
+   "notes": "drivers-license shape",
+   "pattern": "[A-Z]\\d{7,12}",
+   "pattern_class": "id"
+  },
+  {
+   "id": "id_04",
+   "notes": "passport shape",
+   "pattern": "\\b[A-Z]\\d{8}\\b",
+   "pattern_class": "id"
+  },
+  {
+   "id": "id_05",
+   "notes": "VIN charset",
+   "pattern": "[A-HJ-NPR-Z0-9]{17}",
+   "pattern_class": "vehicle"
+  },
+  {
+   "id": "id_06",
+   "notes": "plate shape",
+   "pattern": "\\d[A-Z]{3}\\d{3}",
+   "pattern_class": "vehicle"
+  },
+  {
+   "id": "id_07",
+   "notes": "case number",
+   "pattern": "\\d{2}-[A-Z]{2}-\\d{4,6}",
+   "pattern_class": "legal"
+  },
+  {
+   "id": "id_08",
+   "notes": "Bates number",
+   "pattern": "[A-Z]{2,4}-\\d{7}",
+   "pattern_class": "legal"
+  },
+  {
+   "id": "id_09",
+   "pattern": "(?i)case (no\\.?|number):?\\s*[\\w-]+",
+   "pattern_class": "legal"
+  },
+  {
+   "id": "id_10",
+   "notes": "MBI-like",
+   "pattern": "\\d[A-Z]\\d{2}-[A-Z]\\d{2}-[A-Z]{2}\\d{2}",
+   "pattern_class": "medical"
+  },
+  {
+   "id": "id_11",
+   "pattern": "(?i)policy (no\\.?|number):?\\s*[A-Z0-9-]{5,15}",
+   "pattern_class": "id"
+  },
+  {
+   "id": "id_12",
+   "pattern": "(?i)claim ?#?:? ?[A-Z0-9-]{5,15}",
+   "pattern_class": "id"
+  },
+  {
+   "id": "id_13",
+   "pattern": "(?i)employee id:?\\s*\\d{3,8}",
+   "pattern_class": "id"
+  },
+  {
+   "id": "money_00",
+   "notes": "char-class run + optional cents",
+   "pattern": "\\$[\\d,]+(\\.\\d{2})?",
+   "pattern_class": "money"
+  },
+  {
+   "id": "money_01",
+   "notes": "grouped thousands: bounded-inner group under * (the shape users copy)",
+   "pattern": "\\$\\d{1,3}(,\\d{3})*(\\.\\d{2})?",
+   "pattern_class": "money"
+  },
+  {
+   "id": "money_02",
+   "pattern": "(?i)total:?\\s+\\$?\\d[\\d,.]*",
+   "pattern_class": "money"
+  },
+  {
+   "id": "money_03",
+   "pattern": "\\b\\d+\\.\\d{2}\\b",
+   "pattern_class": "money"
+  },
+  {
+   "id": "money_04",
+   "pattern": "USD ?\\d+(\\.\\d{2})?",
+   "pattern_class": "money"
+  },
+  {
+   "id": "struct_00",
+   "pattern": "^Name:.*$",
+   "pattern_class": "structural"
+  },
+  {
+   "id": "struct_01",
+   "pattern": "(?m)^Signature:.*$",
+   "pattern_class": "structural"
+  },
+  {
+   "id": "struct_02",
+   "pattern": "^\\s*SSN",
+   "pattern_class": "structural"
+  },
+  {
+   "id": "struct_03",
+   "pattern": "^Page \\d+ of \\d+$",
+   "pattern_class": "structural"
+  },
+  {
+   "id": "struct_04",
+   "pattern": "\\bForm 10\\d{2}\\b",
+   "pattern_class": "structural"
+  },
+  {
+   "id": "struct_05",
+   "pattern": "(?i)^(re|subject):.*",
+   "pattern_class": "structural"
+  },
+  {
+   "id": "struct_06",
+   "notes": "dotted section numbers",
+   "pattern": "Section \\d+(\\.\\d+)*",
+   "pattern_class": "structural"
+  },
+  {
+   "borderline": true,
+   "id": "border_00",
+   "notes": "multi-word proper name \u2014 group with inner space under +",
+   "pattern": "([A-Z][a-z]+ )+[A-Z][a-z]+",
+   "pattern_class": "name"
+  },
+  {
+   "borderline": true,
+   "id": "border_01",
+   "notes": "digit runs \u2014 nested unbounded quantifiers",
+   "pattern": "(\\d+\\s*)+",
+   "pattern_class": "account"
+  },
+  {
+   "borderline": true,
+   "id": "border_02",
+   "notes": "dotted-name chain (hostnames, section ids)",
+   "pattern": "(\\w+\\.)+\\w+",
+   "pattern_class": "url"
+  },
+  {
+   "borderline": true,
+   "id": "border_03",
+   "notes": "comma-grouped amount \u2014 bounded inner {1,3} under +",
+   "pattern": "(\\d{1,3},)+\\d{3}",
+   "pattern_class": "money"
+  },
+  {
+   "borderline": true,
+   "id": "border_04",
+   "notes": "quantified title alternation (unusual but written)",
+   "pattern": "(Mr\\.|Mrs\\.|Ms\\.|Dr\\.)+",
+   "pattern_class": "name"
+  },
+  {
+   "borderline": true,
+   "id": "border_05",
+   "notes": "separator-grouped phone \u2014 bounded inner under +",
+   "pattern": "(\\d{3}[-. ])+\\d{4}",
+   "pattern_class": "phone"
+  }
+ ],
+ "version": 1
+}
