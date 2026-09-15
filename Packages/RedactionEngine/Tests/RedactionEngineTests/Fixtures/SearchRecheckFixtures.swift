@@ -2,7 +2,9 @@ import Foundation
 import PDFKit
 import CoreGraphics
 import CoreText
+#if canImport(UIKit)
 import UIKit
+#endif
 @testable import RedactionEngine
 
 // Fixtures and runners shared by the Search Re-check suites
