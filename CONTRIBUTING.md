@@ -72,17 +72,26 @@ Resecta does not use a Contributor License Agreement (CLA); DCO is the contribut
 
 ## Audit checklist
 
-The audit checklist has two halves: mechanical checks the local pre-commit hook runs automatically, and manual checks that sessions self-verify before each commit. The local pre-commit hook is the developer gate; the pull-request gate on GitHub Actions (`.github/workflows/ci.yml`) re-runs the same mechanical checks over the lines a pull request adds (`Scripts/audit-lint.sh --range base..HEAD`), alongside the claims lint, the app and test-bundle builds and the shipped-asset hash fence, and must be green before a merge to `main`. Everything else is session discipline plus the local test runs in the "Tests" section below.
+The audit checklist has two halves: mechanical checks the local pre-commit hook runs automatically, and manual checks that sessions self-verify before each commit. The local pre-commit hook is the developer gate; the pull-request gate on GitHub Actions (`.github/workflows/ci.yml`) re-runs the same mechanical checks over the lines a pull request adds (`Scripts/audit-lint.sh --range base..HEAD`), alongside the claims lint, the documented-counts check (`Scripts/doc-metrics.sh --check`), the app and test-bundle builds and the shipped-asset hash fence, and must be green before a merge to `main`. Everything else is session discipline plus the local test runs in the "Tests" section below.
 
 ### Mechanical checks (hook-enforced, local)
 
 The hook (`Scripts/audit-lint.sh`) runs on every commit and blocks the commit on:
 
 - **M-1.** Forbidden-token matches in staged `.swift`, `.xcstrings`, or `.md` diff lines. The regex pattern lives in `Scripts/audit-lint.sh`; the rules are summarized in the "Mechanism-description language" section below.
-- **M-3.** Banned networking symbols in `Sources/` or `Packages/`. Override with `Networking:exempt SafariView` on the same line for SafariView-adjacent helpers.
+- **M-3.** Banned networking symbols in `Sources/` or `Packages/` (added lines only; pre-existing lines are not re-scanned). Override with `Networking:exempt SafariView` on the same line for SafariView-adjacent helpers.
 - **M-4.** `@AppStorage` declarations inside `@Observable` class bodies.
 - **M-5.** Banned APIs (`PKCanvasView`, `PDFPage.draw`).
 - **M-6.** LOC ceilings: 1500 on `Sources/ResectaApp/Views/SearchAndRedactSheet.swift`; 700 on any newly-added Swift file.
+
+### Script-local checks (hook-enforced)
+
+`Scripts/audit-lint.sh` also carries four checks of its own, numbered `AL-*` so they do not collide with the `M-*` list on this page; a hook message naming one of these refers to the script, not to this checklist:
+
+- **AL-1.** XcodeGen sync: a staged `project.yml` change needs a regenerated `project.pbxproj` (skipped in range mode, where CI regenerates the project first).
+- **AL-2.** The ResectaApp target's `resources:` block silently enumerates nothing; a new entry there is reported as a warning only (route shipped resources through `sources:`).
+- **AL-3.** Sample-statement dual copy: the app-bundle statement and the engine test fixture stay byte-identical.
+- **AL-4.** Loan-packet dual copy: the app-bundle packet and the engine test fixture stay byte-identical.
 
 ### Manual checks (session discipline)
 
@@ -93,7 +102,7 @@ The hook (`Scripts/audit-lint.sh`) runs on every commit and blocks the commit on
 - **M-11.** Privacy floor: no document-derived data persisted.
 - **M-12.** No new dependencies (even Apple-first-party beyond the current set).
 - **M-13.** No plan-first change without an agreed plan (see "Changes that need an agreed plan" below).
-- Documented counts: `Scripts/doc-metrics.sh --check` passes whenever a change moves the line or test counts that README.md and ENGINEERING.md quote.
+- Documented counts: `Scripts/doc-metrics.sh --check` passes whenever a change moves the line or test counts that README.md and ENGINEERING.md quote (the pull-request gate runs the same check).
 
 ## Mechanism-description language
 

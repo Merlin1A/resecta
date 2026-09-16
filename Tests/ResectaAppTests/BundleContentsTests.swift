@@ -63,7 +63,7 @@ struct BundleContentsTests {
     // SampleStatementSnapshotTests against TestFixtures.sampleStatementSHA256).
     // Cross-bundle byte compare in a single test is not feasible (different
     // bundles), so each side SHA-pins to the SAME shared constant and
-    // Scripts/audit-lint.sh (M-9) cmp's the two repo files at commit time.
+    // Scripts/audit-lint.sh (AL-3) cmp's the two repo files at commit time.
     @Test("SampleDocument.pdf bytes match the frozen statement SHA (dual-copy guard)")
     func sampleDocumentMatchesFrozenSHA() throws {
         let url = try #require(
@@ -90,7 +90,7 @@ struct BundleContentsTests {
     // TestFixtures.loanPacketSHA256). Same rationale as the statement
     // guard: cross-bundle byte compare in one test is not feasible, so each
     // side SHA-pins to the SAME shared constant and Scripts/audit-lint.sh
-    // (M-10) cmp's the two repo files at commit time.
+    // (AL-4) cmp's the two repo files at commit time.
     @Test("packet.pdf ships in the app bundle (second sample)")
     func loanPacketIsBundled() {
         #expect(
@@ -109,7 +109,7 @@ struct BundleContentsTests {
         let hex = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         // MUST equal TestFixtures.loanPacketSHA256 in the RedactionEngine test
         // target (different bundle — cannot be imported here). The commit-time
-        // cmp in Scripts/audit-lint.sh (M-10) is the byte-identity backstop.
+        // cmp in Scripts/audit-lint.sh (AL-4) is the byte-identity backstop.
         #expect(
             hex == "362375692b8cff378d66c43fcf46f00ba09e1ea982602fcc5c8b70e96f54339a",
             "app-bundle packet.pdf SHA drift — no longer matches the committed engine packet fixture"

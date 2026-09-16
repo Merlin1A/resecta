@@ -22,6 +22,7 @@ The entries below follow the Keep-a-Changelog index format.
 - Documentation: shorter code of conduct; README/CONTRIBUTING/SECURITY trimmed and corrected.
 - Documentation: the README links the App Store listing and resecta.app.
 - Temporary files: the orphan sweep also runs when the app returns to the foreground; a region change removes the previous output file at once; closing a session removes any leftover intermediate file.
+- Documentation: storage wording for Custom Terms and saved regexes, the supported-versions table, the outbound-links and export-metadata passages, a rotated-page note, and the audit-lint check ids; the documented-counts check runs in the pull-request gate.
 
 ### Security
 

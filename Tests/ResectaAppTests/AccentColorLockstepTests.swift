@@ -9,7 +9,7 @@ import UIKit
 // ambient .tint — the iOS 26.4 sim runtime does not adopt the colorset as
 // the global tint, so both sources ship). This suite pins the two sources
 // component-equal in BOTH appearances so they cannot drift, and the named
-// lookup doubles as built-app packaging proof for the colorset (M-8 spirit;
+// lookup doubles as built-app packaging proof for the colorset (AL-2 spirit;
 // resolved against the APP bundle via Bundle(for:), same rationale as
 // BundleContentsTests — a Bundle.main pointing at the xctest runner cannot
 // produce a false green).

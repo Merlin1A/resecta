@@ -6,7 +6,8 @@ Resecta is an on-device iOS redaction app. Because redaction is a security-sensi
 
 | Version | Supported |
 | --- | --- |
-| 1.0.x | Yes |
+| Current App Store release | Yes |
+| Earlier releases | Best effort |
 | Pre-release builds | No |
 
 When reproducing a report, please use the synthetic test corpus bundled with the repository (the Hartwell loan-packet and sample bank statement fixtures) rather than real personal documents — reports should never contain real PII.
