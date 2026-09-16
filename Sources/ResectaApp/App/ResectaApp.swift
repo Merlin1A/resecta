@@ -260,7 +260,8 @@ struct ResectaApp: App {
                     cleanOrphanedTempFiles()
                 }
             }
-            // Drive `obscureContent` from scene-phase transitions at
+            // Drive `obscureContent` (and the orphan sweep, below) from
+            // scene-phase transitions at
             // the root so the overlay is in the view hierarchy before the
             // system takes its snapshot. The obscure path is synchronous
             // (`withAnimation(.none)`) — animating it would let
@@ -274,6 +275,17 @@ struct ResectaApp: App {
                     withAnimation(.easeIn(duration: 0.15)) { obscureContent = false }
                 case .none:
                     break
+                }
+                // Re-run the orphaned-temp-file sweep on every return
+                // to the foreground. The launch `.task` above covers a
+                // fresh process; a process that stays resident across many
+                // foreground/background cycles would otherwise never sweep
+                // again. The sweep is idempotent and TTL-bounded, so each
+                // extra run costs one directory listing.
+                if LaunchHygienePolicy.shouldSweepOrphans(on: newPhase) {
+                    Task.detached(priority: .utility) {
+                        cleanOrphanedTempFiles()
+                    }
                 }
             }
             // Apply the user's appearance

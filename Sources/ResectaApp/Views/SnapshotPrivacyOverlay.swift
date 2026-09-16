@@ -72,3 +72,29 @@ enum SnapshotPrivacyPolicy {
         }
     }
 }
+
+// MARK: - Launch-hygiene policy (testable seam)
+
+/// Pure-function decision helper for the orphaned-temp-file sweep's
+/// scene-phase response. `cleanOrphanedTempFiles()` runs once at process
+/// launch; this policy adds the return-to-foreground re-fire so a process
+/// that stays resident across many foreground/background cycles still
+/// reaps stale intermediates. Extracted beside `SnapshotPrivacyPolicy` so
+/// tests can pin the phase mapping without instantiating a SwiftUI scene.
+enum LaunchHygienePolicy {
+    /// Whether the sweep should run for a scene-phase transition.
+    /// `true` only for `.active`: the sweep is idempotent and TTL-bounded,
+    /// so re-running it on every foreground return costs one directory
+    /// listing. `.inactive` and `.background` are the snapshot-privacy
+    /// phases — no filesystem work starts there.
+    static func shouldSweepOrphans(on phase: ScenePhase) -> Bool {
+        switch phase {
+        case .active:
+            return true
+        case .inactive, .background:
+            return false
+        @unknown default:
+            return false
+        }
+    }
+}

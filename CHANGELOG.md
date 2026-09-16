@@ -21,6 +21,7 @@ The entries below follow the Keep-a-Changelog index format.
 - Export: the creation and modification timestamps the system PDF writer adds are rewritten to a fixed value, like the producer tag; the metadata check confirms all three.
 - Documentation: shorter code of conduct; README/CONTRIBUTING/SECURITY trimmed and corrected.
 - Documentation: the README links the App Store listing and resecta.app.
+- Temporary files: the orphan sweep also runs when the app returns to the foreground; a region change removes the previous output file at once; closing a session removes any leftover intermediate file.
 
 ### Security
 

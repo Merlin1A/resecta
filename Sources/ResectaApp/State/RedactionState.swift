@@ -1,5 +1,10 @@
 import Foundation
+import os
 import RedactionEngine
+
+// Log only closed-vocabulary facts as .public (an error domain and code).
+// Never log document content, file paths, or redaction coordinates.
+private let logger = Logger(subsystem: "com.resecta.app", category: "state")
 
 /// Redaction regions and detection results. MainActor by SE-0466 default.
 @Observable
@@ -623,7 +628,8 @@ class RedactionState {
         // call sites continue to express the intent.
     }
 
-    /// Reset all output state. Called on pipeline cancel/fail or new import.
+    /// Reset all output state. Called on pipeline cancel/fail, new import,
+    /// and every region mutation (the output no longer matches the regions).
     ///
     /// Clear `outputURL` first, then attempt `removeItem`
     /// against a local capture. The previous order (`removeItem(at: url)`
@@ -632,15 +638,24 @@ class RedactionState {
     /// nil-out could pick up a URL whose file had already been unlinked.
     /// On removeItem failure (filesystem race, file already purged) we
     /// still nil the URL — the document state is the authority on
-    /// "where the redacted PDF lives," and a register-orphan sweep on
-    /// next launch handles leftover bytes (cleanOrphanedTempFiles).
+    /// "where the redacted PDF lives," and the orphan sweep
+    /// (`cleanOrphanedTempFiles()`, at launch and on each return to the
+    /// foreground) handles leftover bytes.
     func clearOutput() {
         let url = outputURL
         outputURL = nil
         if let url {
-            // Best-effort delete — failure to remove leaves the file
-            // for `cleanOrphanedTempFiles()` to sweep on next launch.
-            try? FileManager.default.removeItem(at: url)
+            // Best-effort delete — a failure leaves the file for
+            // `cleanOrphanedTempFiles()` to sweep (next launch or the next
+            // return to the foreground) and is logged content-free: the
+            // error's domain and code only, never the path.
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch { // LegalPhrases:safe (Swift keyword)
+                let failure = error as NSError
+                logger.error(
+                    "Output unlink failed: \(failure.domain, privacy: .public) \(failure.code, privacy: .public)")
+            }
         }
         clearVerification()
         textExtractionBuffer = nil
@@ -661,7 +676,7 @@ class RedactionState {
         regionPageIndex[region.id] = page
         invalidateRegionCaches()
         regionsModifiedSinceVerification = true
-        outputURL = nil
+        clearOutput()
         let regionID = region.id
         registerUndo(undoManager, "Add Redaction") { target in
             target.removeRegion(regionID, page: page, undoManager: undoManager)
@@ -700,7 +715,7 @@ class RedactionState {
         invalidateRegionCaches()
         let removedMetadata = regionMetadata.removeValue(forKey: id) // Capture metadata
         regionsModifiedSinceVerification = true
-        outputURL = nil
+        clearOutput()
         registerUndo(undoManager, "Delete Redaction") { target in
             target.addRegion(removed, page: page, undoManager: undoManager)
             if let removedMetadata { // Restore metadata on undo
@@ -721,7 +736,7 @@ class RedactionState {
         regions[page] = pageRegions
         invalidateRegionCaches()
         regionsModifiedSinceVerification = true
-        outputURL = nil
+        clearOutput()
         registerUndo(undoManager, "Resize Redaction") { target in
             target.resizeRegion(id, page: page, newRect: oldRect, undoManager: undoManager)
         }
@@ -740,7 +755,7 @@ class RedactionState {
         regions[page] = pageRegions
         invalidateRegionCaches()
         regionsModifiedSinceVerification = true
-        outputURL = nil
+        clearOutput()
         registerUndo(undoManager, "Move Redaction") { target in
             target.moveRegion(id, page: page, newRect: oldRect, undoManager: undoManager)
         }
@@ -759,7 +774,7 @@ class RedactionState {
         regions[page] = pageRegions
         invalidateRegionCaches()
         regionsModifiedSinceVerification = true
-        outputURL = nil
+        clearOutput()
         let snapshot = mutableOldRects
         registerUndo(undoManager, "Move Redactions") { target in
             let restoreMoves = snapshot.map { (id: $0.id, newRect: $0.oldRect) }
@@ -782,7 +797,7 @@ class RedactionState {
         for id in ids { regionPageIndex.removeValue(forKey: id) }
         invalidateRegionCaches()
         regionsModifiedSinceVerification = true
-        outputURL = nil
+        clearOutput()
         selectedRegionIDs.subtract(ids)
         let snapshot = mutableRemoved
         registerUndo(undoManager, "Delete Redactions") { target in
@@ -795,7 +810,7 @@ class RedactionState {
             }
             target.invalidateRegionCaches()
             target.regionsModifiedSinceVerification = true
-            target.outputURL = nil
+            target.clearOutput()
             // Undo re-inserts the deleted regions — bump so the overlay
             // refresh gate observes it (the redo leg recurses into
             // `removeRegions`, which bumps at entry).
@@ -1532,7 +1547,7 @@ class RedactionState {
         appliedMatchAudit.merge(createdAudit) { _, new in new }
         invalidateRegionCaches()
         regionsModifiedSinceVerification = true
-        outputURL = nil
+        clearOutput()
 
         let snapshot = createdRegions
         let metaSnapshot = createdMetadata
@@ -1556,7 +1571,7 @@ class RedactionState {
             }
             target.invalidateRegionCaches()
             target.regionsModifiedSinceVerification = true
-            target.outputURL = nil
+            target.clearOutput()
             // The undo leg is a region mutation like any other: bump
             // `regionVersion` so the overlay refresh gate and the search
             // sheet's applied-marker `.onChange` observe the removal.
@@ -1573,7 +1588,7 @@ class RedactionState {
                 target2.appliedMatchAudit.merge(auditSnapshot) { _, new in new }
                 target2.invalidateRegionCaches()
                 target2.regionsModifiedSinceVerification = true
-                target2.outputURL = nil
+                target2.clearOutput()
                 // Redo re-inserts regions — a region mutation; the bump
                 // keeps the canvas overlays refreshing. The sheet's
                 // applied markers stay cleared (conservative: the

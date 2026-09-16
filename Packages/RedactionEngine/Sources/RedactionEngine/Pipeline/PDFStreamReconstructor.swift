@@ -415,7 +415,9 @@ public actor PDFStreamReconstructor {
 
 // MARK: - Temp File Cleanup
 
-/// Clean orphaned temp files from prior sessions. Called once at app launch.
+/// Clean orphaned temp files from prior sessions. Called at app launch and on
+/// every return to the foreground; idempotent, so repeated calls repeat the
+/// same bounded work.
 /// Crash-loop scenarios can accumulate large temp files before iOS purges them.
 ///
 /// Known temp entry prefixes (keep in sync with producers):
