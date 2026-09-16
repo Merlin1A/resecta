@@ -191,10 +191,11 @@ Overclaiming is a defect class here, tested like any other:
   invariant, not a style choice.
 - `TransparencyClaimsTests` exists because I shipped an overclaim: early docs
   said user-entered Custom Terms don't persist across launches. They do (in
-  `UserDefaults`, documented in `PRIVACY.md` and the README). I corrected the
-  docs, then wrote a guard that reads the docs from the tree and goes red if
-  the false claim ever comes back. That found-it, fixed-it, pinned-it pattern
-  is the project's response to its own mistakes.
+  protected files under Application Support, documented in `PRIVACY.md` and
+  the README). I corrected the docs, then wrote a guard that reads the docs
+  from the tree and goes red if the false claim ever comes back or a doc
+  names the superseded store. That found-it, fixed-it, pinned-it pattern is
+  the project's response to its own mistakes.
 
 ## 6. The no-network claim is checkable in about a minute
 
@@ -208,10 +209,10 @@ grep -rn "URLSession\|NWConnection" Sources/ Packages/RedactionEngine/Sources
 The expected result is a single match — a code comment noting the fact. The
 pre-commit hook rejects `URLSession`, `URLRequest`, `NWConnection`,
 `NWPathMonitor`, and `WKWebView` in any staged source diff, so the property
-holds going forward, not just today. The in-app legal/support links open in
-Safari or Mail, each in its own process — the binary embeds no web engine of
-its own. The privacy manifest ships at `Resources/PrivacyInfo.xcprivacy` with
-an empty collection declaration, matching `PRIVACY.md` ("Data Not
+holds going forward, not just today. The in-app legal/support links open in a
+Safari view or Mail, each in its own process — the binary embeds no web engine
+of its own. The privacy manifest ships at `Resources/PrivacyInfo.xcprivacy`
+with an empty collection declaration, matching `PRIVACY.md` ("Data Not
 Collected"). And the dependency footprint makes the review tractable: the
 app's only dependency is its own engine package — there is no third-party SDK
 to audit.

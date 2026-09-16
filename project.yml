@@ -42,7 +42,7 @@ targets:
       # routing as SampleDocument.pdf. Held
       # byte-identical to the engine fixture
       # (Packages/RedactionEngine/Tests/.../TestResources/packet.pdf) — one SHA,
-      # guarded by BundleContentsTests (app side) + audit-lint.sh M-10 (cmp).
+      # guarded by BundleContentsTests (app side) + audit-lint.sh AL-4 (cmp).
       - path: Resources/packet.pdf
       # Privacy manifest — must ship in the bundle root or every
       # App Store submission trips ITMS-91053. Routed through `sources:`

@@ -1,7 +1,8 @@
 # Pull-request gate. Builds the app and both test bundles, runs the two
-# lints over the lines the change adds, and checks the shipped-asset
-# hashes. About five minutes on a hosted macos-26 runner. The engine host
-# suite (engine-suite.yml) and the simulator suite (sim-suite.yml) run on
+# lints over the lines the change adds, checks the documented counts
+# against the tree, and checks the shipped-asset hashes. About five
+# minutes on a hosted macos-26 runner. The engine host suite
+# (engine-suite.yml) and the simulator suite (sim-suite.yml) run on
 # demand and on release tags, not here.
 name: ci
 
@@ -72,6 +73,12 @@ jobs:
           Scripts/claims-lint.sh
           echo "CLAIMS_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
 
+      - name: Documented counts
+        run: |
+          t0=$SECONDS
+          Scripts/doc-metrics.sh --check
+          echo "DOCMETRICS_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
+
       - name: Audit lint over the change
         env:
           PR_BASE: ${{ github.event.pull_request.base.sha }}
@@ -101,5 +108,6 @@ jobs:
             echo "| xcodebuild build | ${BUILD_SECS:-—} |"
             echo "| xcodebuild build-for-testing | ${BFT_SECS:-—} |"
             echo "| claims-lint | ${CLAIMS_SECS:-—} |"
+            echo "| doc-metrics (check) | ${DOCMETRICS_SECS:-—} |"
             echo "| audit-lint (range) | ${AUDIT_SECS:-—} |"
           } >> "$GITHUB_STEP_SUMMARY"

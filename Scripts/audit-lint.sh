@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # audit-lint.sh — pre-commit gate (mechanical checks M-1..M-6; see
-# CONTRIBUTING "Audit checklist"), plus script-local M-7 (XcodeGen sync),
-# M-8 (resources: no-op warn), and M-9 (sample-statement dual-copy byte
-# identity) — numbering note at the M-7 section below.
+# CONTRIBUTING "Audit checklist"), plus the script-local checks AL-1..AL-4
+# (XcodeGen sync · resources: no-op warn · sample-statement and loan-packet
+# dual-copy byte identity) — numbering note at the AL-1 section below.
 # Symlinked into .git/hooks/pre-commit by install-hooks.sh.
 #
 # Scope: staged Added/Modified files (`git diff --cached --diff-filter=AM`).
@@ -14,7 +14,7 @@
 # Range mode (CI): `--range A..B` (or the env AUDIT_LINT_RANGE=A..B) swaps
 # the staged diff for the commit range A..B — the same rules over the lines
 # the range adds, with the file list, the added-line scan and the new-file
-# list all read from `git diff A..B`. M-7 (pbxproj freshness) is skipped in
+# list all read from `git diff A..B`. AL-1 (pbxproj freshness) is skipped in
 # range mode: the pbxproj is gitignored and CI regenerates it first.
 #
 # Usage: Scripts/audit-lint.sh                 (staged mode; the pre-commit hook)
@@ -58,7 +58,7 @@ diff_added_hunks() { # path
     if [ -n "$RANGE" ]; then git diff -U0 --no-color "$RANGE" -- "$1"
     else git diff --cached -U0 --no-color -- "$1"; fi
 }
-# The pre-change and post-change copies of a file (M-8).
+# The pre-change and post-change copies of a file (AL-2).
 show_before() { # path
     if [ -n "$RANGE" ]; then git show "${RANGE_BASE}:$1" 2>/dev/null
     else git show "HEAD:$1" 2>/dev/null; fi
@@ -199,18 +199,18 @@ for path in ${ADDED[@]+"${ADDED[@]}"}; do
     [ "$loc" -gt "$NEW_CAP" ] && violate "M-6 new-file LOC cap exceeded: $path is $loc LOC (cap $NEW_CAP)"
 done
 
-# ── M-7 XcodeGen sync ──────────────────────────────────
+# ── AL-1 XcodeGen sync ─────────────────────────────────
 # project.pbxproj is GENERATED from project.yml; landing a project.yml
 # change without a regenerate means every local build/test ran against a
-# stale project. Script ids M-7/M-8 below are
-# audit-lint check ids continuing M-1..M-6 above; M-9+ are reserved for
-# the merge-gate cluster. The manual session-discipline checks in
-# CONTRIBUTING "Audit checklist" are a separate pre-existing namespace.
+# stale project. AL-* are this script's own checks; M-* belong to
+# CONTRIBUTING "Audit checklist" (M-1..M-6 are the mechanical rules this
+# script enforces above; its manual session-discipline checks live only
+# on that page and are never referenced here).
 PBXPROJ="ResectaApp.xcodeproj/project.pbxproj"
 for path in "${STAGED[@]}"; do
     [ "$path" = "project.yml" ] || continue
     if [ -n "$RANGE" ]; then
-        echo "M-7 skipped in range mode: the pbxproj is gitignored and regenerated from project.yml before the lint runs"
+        echo "AL-1 skipped in range mode: the pbxproj is gitignored and regenerated from project.yml before the lint runs"
         break
     fi
     if git ls-files --error-unmatch "$PBXPROJ" >/dev/null 2>&1; then
@@ -220,18 +220,18 @@ for path in "${STAGED[@]}"; do
             [ "$staged_path" = "$PBXPROJ" ] && pbx_staged=1
         done
         [ "$pbx_staged" -eq 1 ] \
-            || violate "M-7 project.yml staged but $PBXPROJ not staged — run ./regenerate.sh and stage it"
+            || violate "AL-1 project.yml staged but $PBXPROJ not staged — run ./regenerate.sh and stage it"
     else
         # Gitignored-generated pbxproj (current policy): demand a
         # regenerate after the last project.yml edit. mtime tripwire —
         # xcodegen always writes the pbxproj after reading project.yml.
         if [ ! -f "$PBXPROJ" ] || [ "$PBXPROJ" -ot "project.yml" ]; then
-            violate "M-7 project.yml staged but $PBXPROJ is missing or older than project.yml — run ./regenerate.sh"
+            violate "AL-1 project.yml staged but $PBXPROJ is missing or older than project.yml — run ./regenerate.sh"
         fi
     fi
 done
 
-# ── M-8 app-target resources: block is a silent no-op (warn-only) ──────
+# ── AL-2 app-target resources: block is a silent no-op (warn-only) ─────
 # The ResectaApp target's resources: block
 # silently enumerates nothing; a new `- path:` entry there never reaches
 # the bundle. Route shipped resources through sources: instead (the
@@ -271,11 +271,11 @@ for path in "${STAGED[@]}"; do
     while IFS= read -r entry; do
         [ -n "$entry" ] || continue
         resource_entry_known "$entry" "$head_resources" \
-            || warn "M-8 warning: '$entry' added to the ResectaApp resources: block — that block silently fails to enumerate; route it through sources: (see project.yml comment / BundleContentsTests)"
+            || warn "AL-2 warning: '$entry' added to the ResectaApp resources: block — that block silently fails to enumerate; route it through sources: (see project.yml comment / BundleContentsTests)"
     done <<< "$staged_resources"
 done
 
-# ── M-9 sample-statement dual-copy byte identity ─
+# ── AL-3 sample-statement dual-copy byte identity ─
 # The shipped first-run statement lives in TWO repo locations that must stay
 # byte-identical (three names, ONE SHA): the app-bundle copy and the engine
 # test fixture. The SHA is pinned on both sides (BundleContentsTests app-side,
@@ -290,13 +290,13 @@ for path in "${STAGED[@]}"; do
 done
 if [ "$sample_touched" -eq 1 ]; then
     if [ ! -f "$SAMPLE_APP" ] || [ ! -f "$SAMPLE_ENGINE" ]; then
-        violate "M-9 sample-statement dual-copy: a copy is missing ($SAMPLE_APP / $SAMPLE_ENGINE) — both must exist and match"
+        violate "AL-3 sample-statement dual-copy: a copy is missing ($SAMPLE_APP / $SAMPLE_ENGINE) — both must exist and match"
     elif ! cmp -s "$SAMPLE_APP" "$SAMPLE_ENGINE"; then
-        violate "M-9 sample-statement dual-copy DIFFERS: $SAMPLE_APP vs $SAMPLE_ENGINE — the statement is FROZEN (three names, one SHA); re-sync the copies"
+        violate "AL-3 sample-statement dual-copy DIFFERS: $SAMPLE_APP vs $SAMPLE_ENGINE — the statement is FROZEN (three names, one SHA); re-sync the copies"
     fi
 fi
 
-# ── M-10 loan-packet dual-copy byte identity (sample-packet series) ──────
+# ── AL-4 loan-packet dual-copy byte identity (sample-packet series) ──────
 # The Hartwell loan packet (the SECOND in-app sample) lives in TWO repo
 # locations that must stay byte-identical (one SHA): the app-bundle copy and
 # the engine test fixture. The SHA is pinned on both sides (BundleContentsTests
@@ -311,16 +311,16 @@ for path in "${STAGED[@]}"; do
 done
 if [ "$packet_touched" -eq 1 ]; then
     if [ ! -f "$PACKET_APP" ] || [ ! -f "$PACKET_ENGINE" ]; then
-        violate "M-10 loan-packet dual-copy: a copy is missing ($PACKET_APP / $PACKET_ENGINE) — both must exist and match"
+        violate "AL-4 loan-packet dual-copy: a copy is missing ($PACKET_APP / $PACKET_ENGINE) — both must exist and match"
     elif ! cmp -s "$PACKET_APP" "$PACKET_ENGINE"; then
-        violate "M-10 loan-packet dual-copy DIFFERS: $PACKET_APP vs $PACKET_ENGINE — the packet is byte-deterministic (one SHA); re-sync the copies (the generator is the source of truth)"
+        violate "AL-4 loan-packet dual-copy DIFFERS: $PACKET_APP vs $PACKET_ENGINE — the packet is byte-deterministic (one SHA); re-sync the copies (the generator is the source of truth)"
     fi
 fi
 
 # ── Summary ─────────────────────────────────────────────────────────────
 if [ "$FAIL" -gt 0 ]; then
     printf '\naudit-lint: %d offence(s); commit blocked.\n' "$FAIL" >&2
-    printf 'Reference: CONTRIBUTING.md "Audit checklist" (M-1..M-13)\n' >&2
+    printf 'Reference: CONTRIBUTING.md "Audit checklist" (M-1..M-6 mechanical) and this script'"'"'s AL-1..AL-4\n' >&2
     exit 1
 fi
 exit 0

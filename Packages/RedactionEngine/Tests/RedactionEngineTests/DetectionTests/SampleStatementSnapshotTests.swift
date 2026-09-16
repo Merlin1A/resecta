@@ -41,7 +41,7 @@ struct SampleStatementSnapshotTests {
 
     /// Engine half of the dual-copy identity guard. The app-bundle copy is
     /// pinned by `ResectaAppTests/BundleContentsTests`; the two repo files are
-    /// byte-compared at commit time by `Scripts/audit-lint.sh` (M-9). Three
+    /// byte-compared at commit time by `Scripts/audit-lint.sh` (AL-3). Three
     /// names, one SHA — a silent fixture substitution must be loud.
     @Test("Fixture identity — SHA-256 + page count pin")
     func fixtureIdentity() throws {

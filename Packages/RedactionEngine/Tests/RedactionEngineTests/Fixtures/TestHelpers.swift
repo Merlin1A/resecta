@@ -53,7 +53,7 @@ extension LayerResult {
 /// `SampleDocument.pdf` · engine `sample-bank-statement.pdf` · generator
 /// `sample-bank-statement.pdf`). The dual-copy identity guard spans the engine
 /// test (SHA, below), `ResectaAppTests/BundleContentsTests` (app copy SHA), and
-/// `Scripts/audit-lint.sh` (commit-time `cmp` of the two repo bytes, M-9).
+/// `Scripts/audit-lint.sh` (commit-time `cmp` of the two repo bytes, AL-3).
 ///
 /// Unlike a real-document tax fixture, this statement is FULLY SYNTHETIC with a
 /// public, fixture-disclosed value set, so test
