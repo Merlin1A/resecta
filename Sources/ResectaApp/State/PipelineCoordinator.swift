@@ -2111,7 +2111,8 @@ final class PipelineCoordinator: @unchecked Sendable {
 
     /// Hook invoked when the user closes the active document (the Done
     /// close path in `DocumentEditorView.performDoneCloseSession()`, and
-    /// `FailedStateView`'s Start Over path). Recursively
+    /// `FailedStateView`'s Start Over path). Removes any `recon_*`
+    /// intermediate left in the session directory, then recursively
     /// downgrades every regular file in the current session's temp subtree
     /// (`tempExportDirectory.url`, the `redacted_session_<UUID>/` directory)
     /// to `.completeUntilFirstUserAuthentication` via
@@ -2137,12 +2138,34 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// unlock — `.completeUntilFirstUserAuthentication` is the level that
     /// supports this.
     func downgradeTempProtectionOnSessionClose() {
+        // An intermediate still in the session directory at close was
+        // abandoned by its run (every exit path of `processDocument`
+        // removes its own `recon_*`): unlink it now rather than leave it
+        // for the launch sweep's 1-hour TTL. The session's output stays —
+        // it is the registered `outputURL` until `clearAll()` runs.
+        Self.removeAbandonedIntermediates(in: tempExportDirectory.url)
         // Recurse into the session subtree via the engine helper —
         // best-effort, per-file errors are swallowed inside downgradeTree.
         TempFileHardening.downgradeTree(
             at: tempExportDirectory.url,
             to: .completeUntilFirstUserAuthentication
         )
+    }
+
+    /// Remove every entry directly inside `directory` whose name carries
+    /// the reconstructor's `recon_` intermediate prefix. Best-effort: a
+    /// missing directory or an entry that cannot be removed is left for
+    /// `cleanOrphanedTempFiles()`. Output files (`redacted_*`) and
+    /// everything else are untouched.
+    nonisolated static func removeAbandonedIntermediates(in directory: URL) {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return }
+        for entry in entries where entry.lastPathComponent.hasPrefix("recon_") {
+            try? fm.removeItem(at: entry)
+        }
     }
 
     // MARK: - Sensitive Term Collection

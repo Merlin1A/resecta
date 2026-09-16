@@ -244,6 +244,190 @@ struct RegionManagerTests {
         #expect(state.outputURL == url)
     }
 
+    // MARK: - Region mutations unlink the previous output
+
+    // Every region mutation routes through `clearOutput()`: the previous
+    // output file is unlinked at once (not left for the launch sweep), the
+    // published URL is nil, and the retained run inputs are dropped — the
+    // output they described no longer exists, and the verify-only path
+    // re-derives its inputs when they are nil. The three undo/redo
+    // closures that mutate through `target` / `target2` are pinned by the
+    // two lifecycle tests at the end.
+
+    /// Write a real file, register it as the output, and record run
+    /// inputs, so a mutation has something to unlink and something to drop.
+    private func seedOutput(_ state: RedactionState) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("redacted_\(UUID().uuidString).pdf")
+        try Data("output".utf8).write(to: url)
+        state.outputURL = url
+        state.recordLastRunInputs(
+            perPageModes: [.secureRasterization],
+            perPageFallbackReasons: [nil],
+            sensitiveTerms: [],
+            appliedSearches: [])
+        state.textExtractionBuffer = [:]
+        return url
+    }
+
+    private func expectOutputUnlinked(
+        _ state: RedactionState, _ url: URL, _ leg: String
+    ) {
+        #expect(!FileManager.default.fileExists(atPath: url.path),
+                "\(leg): the previous output file is unlinked at once")
+        #expect(state.outputURL == nil, "\(leg): the published URL is nil")
+        #expect(state.lastRunAppliedSearches == nil,
+                "\(leg): the retained applied searches are dropped")
+        #expect(state.lastRunPerPageModes == nil,
+                "\(leg): the retained per-page modes are dropped")
+        #expect(state.textExtractionBuffer == nil,
+                "\(leg): the extraction buffer is dropped")
+    }
+
+    @Test("addRegion unlinks the previous output file and drops the retained run inputs")
+    func addRegionUnlinksOutput() throws {
+        let state = RedactionState()
+        let url = try seedOutput(state)
+        defer { try? FileManager.default.removeItem(at: url) }
+        state.addRegion(makeRegion(), page: 0, undoManager: nil)
+        expectOutputUnlinked(state, url, "addRegion")
+    }
+
+    @Test("removeRegion unlinks the previous output file and drops the retained run inputs")
+    func removeRegionUnlinksOutput() throws {
+        let state = RedactionState()
+        let region = makeRegion()
+        state.addRegion(region, page: 0, undoManager: nil)
+        let url = try seedOutput(state)
+        defer { try? FileManager.default.removeItem(at: url) }
+        state.removeRegion(region.id, page: 0, undoManager: nil)
+        expectOutputUnlinked(state, url, "removeRegion")
+    }
+
+    @Test("resizeRegion unlinks the previous output file and drops the retained run inputs")
+    func resizeRegionUnlinksOutput() throws {
+        let state = RedactionState()
+        let region = makeRegion()
+        state.addRegion(region, page: 0, undoManager: nil)
+        let url = try seedOutput(state)
+        defer { try? FileManager.default.removeItem(at: url) }
+        state.resizeRegion(
+            region.id, page: 0,
+            newRect: CGRect(x: 0.1, y: 0.2, width: 0.5, height: 0.5),
+            undoManager: nil)
+        expectOutputUnlinked(state, url, "resizeRegion")
+    }
+
+    @Test("moveRegion unlinks the previous output file and drops the retained run inputs")
+    func moveRegionUnlinksOutput() throws {
+        let state = RedactionState()
+        let region = makeRegion()
+        state.addRegion(region, page: 0, undoManager: nil)
+        let url = try seedOutput(state)
+        defer { try? FileManager.default.removeItem(at: url) }
+        state.moveRegion(
+            region.id, page: 0,
+            newRect: CGRect(x: 0.4, y: 0.4, width: 0.3, height: 0.4),
+            undoManager: nil)
+        expectOutputUnlinked(state, url, "moveRegion")
+    }
+
+    @Test("moveRegions unlinks the previous output file and drops the retained run inputs")
+    func moveRegionsUnlinksOutput() throws {
+        let state = RedactionState()
+        let a = makeRegion()
+        let b = makeRegion(rect: CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.1))
+        state.addRegion(a, page: 0, undoManager: nil)
+        state.addRegion(b, page: 0, undoManager: nil)
+        let url = try seedOutput(state)
+        defer { try? FileManager.default.removeItem(at: url) }
+        state.moveRegions(
+            [(id: a.id, newRect: CGRect(x: 0.2, y: 0.2, width: 0.3, height: 0.4)),
+             (id: b.id, newRect: CGRect(x: 0.6, y: 0.6, width: 0.2, height: 0.1))],
+            page: 0, undoManager: nil)
+        expectOutputUnlinked(state, url, "moveRegions")
+    }
+
+    @Test("removeRegions unlinks the previous output file and drops the retained run inputs")
+    func removeRegionsUnlinksOutput() throws {
+        let state = RedactionState()
+        let a = makeRegion()
+        let b = makeRegion(rect: CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.1))
+        state.addRegion(a, page: 0, undoManager: nil)
+        state.addRegion(b, page: 0, undoManager: nil)
+        let url = try seedOutput(state)
+        defer { try? FileManager.default.removeItem(at: url) }
+        state.removeRegions([a.id, b.id], page: 0, undoManager: nil)
+        expectOutputUnlinked(state, url, "removeRegions")
+    }
+
+    @Test("The apply path unlinks the previous output file and drops the retained run inputs")
+    func applyUnlinksOutput() async throws {
+        let state = RedactionState()
+        let url = try seedOutput(state)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let det = DetectionResult(
+            normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
+            kind: .pii(.ssn), confidence: 0.95)
+        await state.applyFindings(.detectionResults([0: [det]]), undoManager: nil)
+        #expect(state.regions[0]?.count == 1)
+        expectOutputUnlinked(state, url, "apply")
+    }
+
+    @Test("removeRegions undo and redo each unlink the output registered since the previous leg")
+    func removeRegionsUndoRedoUnlinkOutput() throws {
+        let state = RedactionState()
+        let undoManager = makeUndoManager()
+        let a = makeRegion()
+        let b = makeRegion(rect: CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.1))
+        state.addRegion(a, page: 0, undoManager: nil)
+        state.addRegion(b, page: 0, undoManager: nil)
+        undoManager.beginUndoGrouping()
+        state.removeRegions([a.id, b.id], page: 0, undoManager: undoManager)
+        undoManager.endUndoGrouping()
+
+        // Undo re-inserts through the closure's `target`.
+        let afterRemove = try seedOutput(state)
+        defer { try? FileManager.default.removeItem(at: afterRemove) }
+        undoManager.undo()
+        #expect(state.regions[0]?.count == 2)
+        expectOutputUnlinked(state, afterRemove, "removeRegions undo")
+
+        // Redo removes again through the nested closure's `target2`.
+        let afterUndo = try seedOutput(state)
+        defer { try? FileManager.default.removeItem(at: afterUndo) }
+        undoManager.redo()
+        #expect(state.regions[0]?.isEmpty != false)
+        expectOutputUnlinked(state, afterUndo, "removeRegions redo")
+    }
+
+    @Test("Apply undo and redo each unlink the output registered since the previous leg")
+    func applyUndoRedoUnlinkOutput() async throws {
+        let state = RedactionState()
+        let undoManager = makeUndoManager()
+        let det = DetectionResult(
+            normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
+            kind: .pii(.ssn), confidence: 0.95)
+        undoManager.beginUndoGrouping()
+        await state.applyFindings(.detectionResults([0: [det]]), undoManager: undoManager)
+        undoManager.endUndoGrouping()
+        #expect(state.regions[0]?.count == 1)
+
+        // Undo removes the created regions through the closure's `target`.
+        let afterApply = try seedOutput(state)
+        defer { try? FileManager.default.removeItem(at: afterApply) }
+        undoManager.undo()
+        #expect(state.regions[0]?.isEmpty != false)
+        expectOutputUnlinked(state, afterApply, "apply undo")
+
+        // Redo re-inserts them through the nested closure's `target2`.
+        let afterUndo = try seedOutput(state)
+        defer { try? FileManager.default.removeItem(at: afterUndo) }
+        undoManager.redo()
+        #expect(state.regions[0]?.count == 1)
+        expectOutputUnlinked(state, afterUndo, "apply redo")
+    }
+
     // MARK: - Clear and Multi-Page
 
     @Test("clearForNewDocument resets all state")
