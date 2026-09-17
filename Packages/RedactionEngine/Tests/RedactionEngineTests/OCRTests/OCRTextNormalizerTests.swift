@@ -138,6 +138,73 @@ struct OCRTextNormalizerTests {
         #expect(normalizer.normalize("1OO-23-4567") == "100-23-4567")
     }
 
+    // MARK: - Digit runs (an all-ambiguous digit group beside a clear digit)
+    //
+    // Vision reads labelled phone, card and date lines correctly, but the
+    // line is letter-majority (its label), so an all-ambiguous group such as
+    // "555" or "1111" used to inherit letter context and be letterized
+    // ("SSS", "IIII") before detection ever saw it. Tokens that carry no
+    // clear letter and are linked through "-" "." "/" "(" ")" or spaces form
+    // a run; a run carrying at least one clear digit is digit context for
+    // every token in it, resolved before the line-level fallback. The inputs
+    // are the sample packet's own fixture values (the 555 convention).
+
+    @Test("Labelled phone lines keep their digit runs intact")
+    func labelledPhoneLinesKeepDigitRuns() {
+        let lines = [
+            "Home Phone: (208) 555-0147",
+            "Cell Phone: 916-555-0182",
+            "Work Phone: 208.555.0119",
+            "Work Phone: +1 208-555-0173",
+            "Customer Service: 1-800-555-0199",
+        ]
+        for line in lines {
+            #expect(normalizer.normalize(line) == line,
+                    "digit run letterized in '\(line)': got '\(normalizer.normalize(line))'")
+        }
+    }
+
+    @Test("Card number run carries digit context across all-ambiguous groups")
+    func cardNumberRunIsTransitive() {
+        // Only "4111" carries a clear digit; the third and fourth "1111"
+        // groups touch no clear-digit token directly. The run carries the
+        // context to every group.
+        let line = "Account Number: 4111 1111 1111 1111"
+        #expect(normalizer.normalize(line) == line)
+    }
+
+    @Test("Date runs keep all-ambiguous day and month groups")
+    func dateRunsKeepDigits() {
+        #expect(normalizer.normalize("(2) Date of Birth: 12/15/2017") == "(2) Date of Birth: 12/15/2017")
+        #expect(normalizer.normalize("Statement Period: 05/01/2026") == "Statement Period: 05/01/2026")
+    }
+
+    @Test("Lone all-ambiguous token on a letter line still inherits letter context")
+    func loneAmbiguousTokenOnLetterLineStillLetterizes() {
+        // Documented boundary of the run rule: "100" is a run of one token
+        // with no clear digit, so it still inherits the line's letter
+        // tendency. Pinned so a later change to this behaviour is measured,
+        // not silent.
+        #expect(normalizer.normalize("Suite 100") == "Suite IOO")
+    }
+
+    @Test("Run boundary: only the run separators link digit groups")
+    func runBoundaryFollowsSeparatorSet() {
+        // A space links "1OO" to the clear-digit group "2026"; a colon
+        // between them ends the run and "1OO" falls back to the letter line.
+        #expect(normalizer.normalize("Invoice 1OO 2026") == "Invoice 100 2026")
+        #expect(normalizer.normalize("Invoice 1OO: 2026") == "Invoice IOO: 2026")
+    }
+
+    @Test("Mixed identifier with clear digits keeps token-level digit context")
+    func mixedIdentifierKeepsTokenLevelDigitContext() {
+        // "7XYZ842": clear digits 7, 4, 2 outnumber clear letters X, Y, so
+        // the token decides for digit context on its own and the ambiguous
+        // Z becomes 2. The run rule never reaches a token with a clear
+        // letter; pinned as the documented non-target.
+        #expect(normalizer.normalize("7XYZ842") == "7XY2842")
+    }
+
     // MARK: - Same-length invariant (leak-class guard)
     //
     // OCRTextNormalizer must be same-length by construction — 1:1 character
@@ -156,6 +223,17 @@ struct OCRTextNormalizerTests {
             "MRN-001O23",
             "JOHNSON",
             "123 O0I1S5 7",
+            "Home Phone: (208) 555-0147",
+            "Cell Phone: 916-555-0182",
+            "Work Phone: 208.555.0119",
+            "Work Phone: +1 208-555-0173",
+            "Customer Service: 1-800-555-0199",
+            "Account Number: 4111 1111 1111 1111",
+            "(2) Date of Birth: 12/15/2017",
+            "Statement Period: 05/01/2026",
+            "Suite 100",
+            "Invoice 1OO 2026",
+            "7XYZ842",
             "",
         ]
         for s in inputs {
