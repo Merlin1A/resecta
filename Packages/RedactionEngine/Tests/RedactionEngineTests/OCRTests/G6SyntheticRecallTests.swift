@@ -99,19 +99,15 @@ struct G6SyntheticRecallTests {
               "normalized=\(normalizedHits) (\(String(format: "%.4f", normalizedRecall))), " +
               "delta=\(normalizedHits - rawHits)")
 
-        // The g8 corpus reached Bundle.module for the first time, un-gating
-        // this suite — measured normalized=357 vs raw=371 on the
-        // noise-injected sample. Pre-existing normalizer gap, not caused by
-        // this change; the OCR program owns the fix and re-baselines this
-        // suite. The withKnownIssue pin keeps the measurement live and
-        // flips red when the normalizer reaches parity; remove the pin
-        // then.
-        withKnownIssue("normalizer recall below raw until the OCR program re-baselines") {
-            #expect(
-                normalizedHits >= rawHits,
-                "Normalizer regressed recall: raw=\(rawHits) normalized=\(normalizedHits)"
-            )
-        }
+        // The digit-run rule in OCRTextNormalizer took the normalizer past
+        // raw recall on this sample (host: raw=477, normalized=494 of 603
+        // spans; before the rule normalized=461, and the guard held a
+        // known-issue pin while the normalizer trailed raw). The pin is
+        // removed as its comment asked; the guard is live.
+        #expect(
+            normalizedHits >= rawHits,
+            "Normalizer regressed recall: raw=\(rawHits) normalized=\(normalizedHits)"
+        )
     }
 
     // MARK: - Helpers
