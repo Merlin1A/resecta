@@ -276,6 +276,178 @@ struct G8BaselineHarnessTests {
         return a.location < bEnd && b.location < aEnd
     }
 
+    // MARK: - Per-span outcome sidecar (one JSONL per site)
+    //
+    // Beside the trio, each emitter writes one JSON-Lines file with ONE row
+    // per ground-truth span of every corpus family plus one row per surfaced
+    // detection that overlaps no ground-truth span of its family. Rows carry
+    // offsets only -- never the span or match text:
+    //
+    //   {doc_id, family, start, end, tier, outcome}
+    //     outcome "tp" / "fn"  a positive span covered / not covered by at
+    //                          least one surfaced detection (the trio's
+    //                          true_positives / false_negatives, span by span);
+    //                          "tp" rows add det_start / det_end -- the hull
+    //                          of EVERY surfaced same-family detection that
+    //                          overlaps the span -- and det_spans, those
+    //                          detections' own [start, end] pairs in start
+    //                          order (the name path emits one detection per
+    //                          token, so a two-token name is usually covered
+    //                          by two detections; the pairs keep that split
+    //                          derivable while the hull keeps the row simple).
+    //     outcome "fp"         tier null: a surfaced detection overlapping no
+    //                          ground truth (start / end are the detection's);
+    //                          tier "must_not": a planted decoy that fired
+    //                          (with the same det fields as a "tp" row).
+    //     outcome "tn"         a planted decoy (tier must_not) that stayed quiet.
+    //
+    // `family` is the corpus category string (the inverse of
+    // baselineMapCategory), so the datapipeline reader joins rows back to the
+    // corpus by (doc_id, start, end) without a second vocabulary. The join is
+    // the SAME binary overlap the counters use; the sidecar preserves what the
+    // tally loops compute and discard. Rows are sorted by (doc_id, family,
+    // start, end, outcome, det_start) with sorted keys per line and LF line
+    // ends -- that ordering is the file's determinism, since it bypasses
+    // writeJSON.
+
+    struct SpanOutcomeRow: Encodable, Sendable {
+        let doc_id: String
+        let family: String
+        let start: Int
+        let end: Int
+        let tier: String?        // nil on detection-only rows -> JSON null
+        let outcome: String      // "tp" | "fn" | "fp" | "tn"
+        let det_start: Int?      // present on covered rows only: the hull
+        let det_end: Int?
+        let det_spans: [[Int]]?  // every overlapping detection's [start, end]
+
+        private enum CodingKeys: String, CodingKey {
+            case doc_id, family, start, end, tier, outcome, det_start, det_end, det_spans
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(doc_id, forKey: .doc_id)
+            try c.encode(family, forKey: .family)
+            try c.encode(start, forKey: .start)
+            try c.encode(end, forKey: .end)
+            try c.encode(tier, forKey: .tier)           // Optional -> explicit null
+            try c.encode(outcome, forKey: .outcome)
+            try c.encodeIfPresent(det_start, forKey: .det_start)
+            try c.encodeIfPresent(det_end, forKey: .det_end)
+            try c.encodeIfPresent(det_spans, forKey: .det_spans)
+        }
+    }
+
+    /// The corpus category string for a kind (inverse of `baselineMapCategory`).
+    static func corpusCategory(for kind: RedactionRegion.PIIKind) -> String? {
+        Self.corpusCategoryByKind[kind]
+    }
+
+    private static let corpusCategoryByKind: [RedactionRegion.PIIKind: String] = {
+        let names = [
+            "ssn", "npi", "dea", "dob", "address", "account", "mrn", "name", "phone",
+            "email", "routingNumber", "ein", "itin", "creditCard", "driversLicense",
+            "passport", "licensePlate",
+        ]
+        var map: [RedactionRegion.PIIKind: String] = [:]
+        for name in names {
+            if let kind = baselineMapCategory(name) { map[kind] = name }
+        }
+        return map
+    }()
+
+    /// The sidecar bytes: one sorted-key JSON object per line, rows in
+    /// (doc_id, family, start, end, outcome, det_start) order, LF-terminated.
+    static func spanSidecarData(_ rows: [SpanOutcomeRow]) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let ordered = rows.sorted { a, b in
+            if a.doc_id != b.doc_id { return a.doc_id < b.doc_id }
+            if a.family != b.family { return a.family < b.family }
+            if a.start != b.start { return a.start < b.start }
+            if a.end != b.end { return a.end < b.end }
+            if a.outcome != b.outcome { return a.outcome < b.outcome }
+            return (a.det_start ?? -1) < (b.det_start ?? -1)
+        }
+        var data = Data()
+        for row in ordered {
+            data.append(try encoder.encode(row))
+            data.append(0x0A)
+        }
+        return data
+    }
+
+    static func writeSpanSidecar(_ rows: [SpanOutcomeRow], to path: String) throws {
+        let url = URL(fileURLWithPath: path)
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try spanSidecarData(rows).write(to: url, options: .atomic)
+    }
+
+    /// Fold one kind's ground truth and surfaced detections into sidecar rows
+    /// (the same overlap predicate the cell counters apply).
+    static func appendSpanRows(
+        into rows: inout [SpanOutcomeRow],
+        docID: String,
+        family: String,
+        groundTruth: [(NSRange, String, Bool)],   // (range, tier, isDecoy)
+        surfaced: [(NSRange, Bool)],
+        allGT: [NSRange]
+    ) {
+        for (gt, tier, isDecoy) in groundTruth {
+            // Every surfaced detection overlapping this span (the counters
+            // ask only whether there is at least one), in start order.
+            let hits = surfaced
+                .map { $0.0 }
+                .filter { rangesOverlap($0, gt) }
+                .sorted { ($0.location, $0.length) < ($1.location, $1.length) }
+            let covered = !hits.isEmpty
+            let outcome: String
+            if isDecoy { outcome = covered ? "fp" : "tn" }
+            else       { outcome = covered ? "tp" : "fn" }
+            rows.append(SpanOutcomeRow(
+                doc_id: docID, family: family,
+                start: gt.location, end: gt.location + gt.length,
+                tier: tier, outcome: outcome,
+                det_start: hits.map(\.location).min(),
+                det_end: hits.map { $0.location + $0.length }.max(),
+                det_spans: covered ? hits.map { [$0.location, $0.location + $0.length] } : nil
+            ))
+        }
+        for (det, _) in surfaced where !allGT.contains(where: { rangesOverlap(det, $0) }) {
+            rows.append(SpanOutcomeRow(
+                doc_id: docID, family: family,
+                start: det.location, end: det.location + det.length,
+                tier: nil, outcome: "fp", det_start: nil, det_end: nil, det_spans: nil
+            ))
+        }
+    }
+
+    @Test("Span sidecar line format is sorted, keyed and null-explicit")
+    func spanSidecarLineFormat() throws {
+        let rows = [
+            SpanOutcomeRow(doc_id: "b", family: "name", start: 8, end: 16, tier: "should",
+                           outcome: "fn", det_start: nil, det_end: nil, det_spans: nil),
+            SpanOutcomeRow(doc_id: "a", family: "phone", start: 30, end: 41, tier: nil,
+                           outcome: "fp", det_start: nil, det_end: nil, det_spans: nil),
+            SpanOutcomeRow(doc_id: "a", family: "name", start: 10, end: 24, tier: "must",
+                           outcome: "tp", det_start: 10, det_end: 24,
+                           det_spans: [[10, 15], [16, 24]]),
+        ]
+        let text = String(decoding: try Self.spanSidecarData(rows), as: UTF8.self)
+        #expect(text == """
+            {"det_end":24,"det_spans":[[10,15],[16,24]],"det_start":10,"doc_id":"a","end":24,"family":"name","outcome":"tp","start":10,"tier":"must"}
+            {"doc_id":"a","end":41,"family":"phone","outcome":"fp","start":30,"tier":null}
+            {"doc_id":"b","end":16,"family":"name","outcome":"fn","start":8,"tier":"should"}
+
+            """)
+        #expect(Self.corpusCategory(for: .medicalRecord) == "mrn")
+        #expect(Self.corpusCategory(for: .dateOfBirth) == "dob")
+    }
+
     // MARK: - The emit
 
     @Test("Emit G8 baseline cells + raw scores")
@@ -294,6 +466,8 @@ struct G8BaselineHarnessTests {
         var rawRows: [RawScoreRow] = []
         // File 5: per-fire rows for the five scored families only.
         var fireRows: [FireFeatureRow] = []
+        // Per-span outcome sidecar rows (offsets only; every family).
+        var spanRows: [SpanOutcomeRow] = []
 
         for doc in sortedDocs {
             guard let doctype = gateDoctypeClass(doc.doctype) else { continue }
@@ -311,11 +485,16 @@ struct G8BaselineHarnessTests {
             // Every GT span of a kind with its packet tier (the additive
             // per-tier counters, 1.2 P1.10).
             var tierGTByKind:     [RedactionRegion.PIIKind: [(NSRange, String)]] = [:]
+            // Every GT span with its tier and its positive/decoy split, for
+            // the per-span sidecar (same split the counters use).
+            var spanGTByKind:     [RedactionRegion.PIIKind: [(NSRange, String, Bool)]] = [:]
             for span in doc.pii_spans {
                 guard let kind = Self.baselineMapCategory(span.category) else { continue }
                 let r = NSRange(location: span.start, length: span.end - span.start)
                 allGTByKind[kind, default: []].append(r)
                 tierGTByKind[kind, default: []].append((r, span.bridgedTier))
+                spanGTByKind[kind, default: []].append(
+                    (r, span.bridgedTier, span.expected_outcome == "suppress"))
                 if span.expected_outcome == "suppress" {
                     decoyGTByKind[kind, default: []].append(r)
                 } else {
@@ -434,6 +613,16 @@ struct G8BaselineHarnessTests {
                     cell.tally(tier: tier, hit: hit)
                 }
 
+                // Per-span outcome sidecar: the verdicts the loops above fold
+                // into counters, preserved span by span (offsets only).
+                if let family = Self.corpusCategory(for: kind) {
+                    Self.appendSpanRows(
+                        into: &spanRows, docID: doc.id, family: family,
+                        groundTruth: spanGTByKind[kind] ?? [],
+                        surfaced: surfaced, allGT: allGT
+                    )
+                }
+
                 cells[cellKey] = cell
             }
         }
@@ -480,13 +669,38 @@ struct G8BaselineHarnessTests {
         )
         try Self.writeJSON(fireReport, to: "\(base)_fire_features.json")
 
+        // Per-span outcome sidecar (one JSONL per site; additive, offsets only).
+        try Self.writeSpanSidecar(spanRows, to: "\(base)_detector_spans.jsonl")
+
         print("[detection-baseline] cells → \(base)_cells.json (\(cells.count) cells)")
         print("[detection-baseline] raw_scores → \(base)_raw_scores.json (\(rawRows.count) rows)")
         print("[detection-baseline] fire_features → \(base)_fire_features.json (\(fireRows.count) fires)")
+        print("[detection-baseline] spans → \(base)_detector_spans.jsonl (\(spanRows.count) rows)")
 
         // Emitter sanity only (this is NOT a pass/fail quality gate).
         #expect(!cells.isEmpty, "no cells emitted — corpus loaded but produced nothing")
         #expect(sortedDocs.count == 1100,
                 "G8 doc_count expected 1100; got \(sortedDocs.count)")
+        // Emitter sanity only: the sidecar carries one row per corpus span the
+        // tally saw (tp + fn + must_not) and one per generic false positive.
+        let corpusSpans = sortedDocs
+            .filter { gateDoctypeClass($0.doctype) != nil }
+            .reduce(0) { $0 + $1.pii_spans.filter { Self.baselineMapCategory($0.category) != nil }.count }
+        let groundTruthRows = spanRows.filter { $0.tier != nil }.count
+        let cellGroundTruth = cells.values.reduce(0) {
+            $0 + $1.true_positives + $1.false_negatives + $1.tier_must_not_total
+        }
+        #expect(groundTruthRows == corpusSpans,
+                "sidecar ground-truth rows \(groundTruthRows) != corpus spans \(corpusSpans)")
+        #expect(groundTruthRows == cellGroundTruth,
+                "sidecar ground-truth rows \(groundTruthRows) != cells tp+fn+must_not \(cellGroundTruth)")
+        #expect(spanRows.filter { $0.tier == nil }.count
+                == cells.values.reduce(0) { $0 + $1.false_positives },
+                "sidecar detection-only rows != cells false_positives")
+        let nameSpans = sortedDocs
+            .filter { gateDoctypeClass($0.doctype) != nil }
+            .reduce(0) { $0 + $1.pii_spans.filter { $0.category == "name" }.count }
+        #expect(spanRows.filter { $0.family == "name" && $0.tier != nil }.count == nameSpans,
+                "every name ground-truth span must have a sidecar row")
     }
 }

@@ -34,6 +34,15 @@ import CryptoKit
 // gate, no engine-behavior assertions beyond fixture identity and text-leg
 // determinism. MATCHED-TEXT LOGGING (D31): all fixtures are synthetic with a
 // public values manifest — matched text is emitted.
+//
+// OCR LINE DUMP: every run that took a page through Vision also writes
+// `<out>/<doc_id>/ocr-lines-run-<n>.json` — the raw recognized lines and the
+// product-normalized form of each, per page, read back from the searcher's
+// own OCR cache after the run (the `_testOCRCachedLines` seam the search
+// ground-truth runner already uses; same file shape). Nothing in the search
+// path changes: the dump is the text the OCR leg matched against, so a
+// missed value can be attributed downstream to the recognizer or to the
+// normalizer without a second OCR pass.
 
 @Suite("H1.2 Site-B document harness (standing emitter)", .serialized)
 struct DocumentHarnessTests {
@@ -166,6 +175,56 @@ struct DocumentHarnessTests {
         try data.write(to: url, options: .atomic)
     }
 
+    // MARK: - OCR line dump (raw + normalized Vision lines per OCR'd page)
+
+    struct OCRLineOut: Encodable {
+        let text: String
+        let normalized: String
+        let rect: [Double]
+        let confidence: Double
+    }
+    struct OCRPageOut: Encodable {
+        let page: Int
+        let lines: [OCRLineOut]
+    }
+    struct OCRLinesOut: Encodable {
+        let schema_version: Int
+        let doc_id: String
+        let run_index: Int
+        let pages: [OCRPageOut]
+    }
+
+    /// Write the searcher's cached Vision lines for every page the run OCR'd.
+    /// Returns false (and writes nothing) when the run took no page through
+    /// OCR -- a pure text-leg run has no line dump.
+    @discardableResult
+    static func dumpOCRLines(
+        searcher: DocumentSearcher, docID: String, runIndex: Int, out: String
+    ) async throws -> Bool {
+        let pageIndices = await searcher._testOCRCacheKeys.sorted()
+        guard !pageIndices.isEmpty else { return false }
+        let normalizer = OCRTextNormalizer()
+        var pages: [OCRPageOut] = []
+        for pageIndex in pageIndices {
+            guard let lines = await searcher._testOCRCachedLines(forPageIndex: pageIndex)
+            else { continue }
+            pages.append(OCRPageOut(
+                page: pageIndex,
+                lines: lines.map { line in
+                    OCRLineOut(
+                        text: line.text,
+                        normalized: normalizer.normalize(line.text),
+                        rect: [r6(line.normalizedRect.origin.x), r6(line.normalizedRect.origin.y),
+                               r6(line.normalizedRect.width), r6(line.normalizedRect.height)],
+                        confidence: r6(Double(line.confidence)))
+                }))
+        }
+        try writeJSON(
+            OCRLinesOut(schema_version: 1, doc_id: docID, run_index: runIndex, pages: pages),
+            to: "\(out)/\(docID)/ocr-lines-run-\(runIndex).json")
+        return true
+    }
+
     // MARK: - Per-run sinks
 
     final class Tally: @unchecked Sendable {
@@ -189,7 +248,7 @@ struct DocumentHarnessTests {
     static func naturalRun(
         data: Data, status: [Int: TextLayerStatus],
         balanced: PresetThresholdVector?
-    ) async throws -> (hits: [SearchResult], tally: Tally, seconds: Double) {
+    ) async throws -> (hits: [SearchResult], tally: Tally, seconds: Double, searcher: DocumentSearcher) {
         let doc = try #require(PDFDocument(data: data))
         let searcher = DocumentSearcher()
         let tally = Tally()
@@ -210,7 +269,7 @@ struct DocumentHarnessTests {
         let elapsed = clock.now - start
         let seconds = Double(elapsed.components.seconds)
             + Double(elapsed.components.attoseconds) / 1e18
-        return (hits, tally, seconds)
+        return (hits, tally, seconds, searcher)
     }
 
     /// One forced-OCR run: every page through the private product OCR body
@@ -218,7 +277,7 @@ struct DocumentHarnessTests {
     /// OCR cache never collapses repeats into one Vision pass).
     static func forcedOCRRun(
         data: Data, balanced: PresetThresholdVector?
-    ) async throws -> (hits: [SearchResult], tally: Tally, seconds: Double) {
+    ) async throws -> (hits: [SearchResult], tally: Tally, seconds: Double, searcher: DocumentSearcher) {
         let doc = try #require(PDFDocument(data: data))
         let searcher = DocumentSearcher()
         let tally = Tally()
@@ -237,7 +296,7 @@ struct DocumentHarnessTests {
         let elapsed = clock.now - start
         let seconds = Double(elapsed.components.seconds)
             + Double(elapsed.components.attoseconds) / 1e18
-        return (hits, tally, seconds)
+        return (hits, tally, seconds, searcher)
     }
 
     /// Warm the Vision inference context before the measurement loop (the
@@ -325,7 +384,7 @@ struct DocumentHarnessTests {
 
             var naturalHitData: [Data] = []
             for run in 1...naturalRuns {
-                let (hits, tally, seconds) = try await Self.naturalRun(
+                let (hits, tally, seconds, searcher) = try await Self.naturalRun(
                     data: data, status: status, balanced: balanced)
                 let report = RunReport(
                     schema_version: 1,
@@ -350,6 +409,10 @@ struct DocumentHarnessTests {
                         overlap_suppressed: tally.overlap,
                         below_threshold_dropped: tally.belowThreshold))
                 try Self.writeJSON(report, to: "\(out)/\(row.id)/natural-run-\(run).json")
+                // The OCR leg's line dump (pages the run took through Vision;
+                // none on a pure text-leg run).
+                try await Self.dumpOCRLines(
+                    searcher: searcher, docID: row.id, runIndex: run, out: out)
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.sortedKeys]
                 naturalHitData.append(try encoder.encode(hits.map(Self.hitRow)))
@@ -361,7 +424,7 @@ struct DocumentHarnessTests {
 
             if allRich {
                 for run in 1...3 {
-                    let (hits, tally, seconds) = try await Self.forcedOCRRun(
+                    let (hits, tally, seconds, searcher) = try await Self.forcedOCRRun(
                         data: data, balanced: balanced)
                     let report = RunReport(
                         schema_version: 1,
@@ -386,6 +449,8 @@ struct DocumentHarnessTests {
                             overlap_suppressed: [:],
                             below_threshold_dropped: 0))
                     try Self.writeJSON(report, to: "\(out)/\(row.id)/ocr-forced-run-\(run).json")
+                    try await Self.dumpOCRLines(
+                        searcher: searcher, docID: row.id, runIndex: run, out: out)
                 }
             }
             docsRun.append(row.id)
