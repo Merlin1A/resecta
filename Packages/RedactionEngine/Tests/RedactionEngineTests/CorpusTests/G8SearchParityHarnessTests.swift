@@ -384,6 +384,8 @@ struct G8SearchParityHarnessTests {
         var cells: [String: Cell] = [:]
         var rawRows: [G8BaselineHarnessTests.RawScoreRow] = []
         var fireRows: [G8BaselineHarnessTests.FireFeatureRow] = []
+        // Per-span outcome sidecar rows (offsets only; every family).
+        var spanRows: [G8BaselineHarnessTests.SpanOutcomeRow] = []
 
         for doc in sortedDocs {
             // Same doc filter as the Site-A emitter (identical coverage).
@@ -399,11 +401,16 @@ struct G8SearchParityHarnessTests {
             // Every GT span with its packet tier (additive per-tier counters,
             // 1.2 P1.10 — same bridge as the detector-site emitter).
             var tierGTByKind:     [RedactionRegion.PIIKind: [(NSRange, String)]] = [:]
+            // Every GT span with its tier and its positive/decoy split, for
+            // the per-span sidecar (same split the counters use).
+            var spanGTByKind:     [RedactionRegion.PIIKind: [(NSRange, String, Bool)]] = [:]
             for span in doc.pii_spans {
                 guard let kind = G8BaselineHarnessTests.baselineMapCategory(span.category) else { continue }
                 let r = NSRange(location: span.start, length: span.end - span.start)
                 allGTByKind[kind, default: []].append(r)
                 tierGTByKind[kind, default: []].append((r, span.bridgedTier))
+                spanGTByKind[kind, default: []].append(
+                    (r, span.bridgedTier, span.expected_outcome == "suppress"))
                 if span.expected_outcome == "suppress" {
                     decoyGTByKind[kind, default: []].append(r)
                 } else {
@@ -506,6 +513,15 @@ struct G8SearchParityHarnessTests {
                     let hit = surfaced.contains { G8BaselineHarnessTests.rangesOverlap($0.0, gt) }
                     cell.tally(tier: tier, hit: hit)
                 }
+                // Per-span outcome sidecar: the verdicts the loops above fold
+                // into counters, preserved span by span (offsets only).
+                if let family = G8BaselineHarnessTests.corpusCategory(for: kind) {
+                    G8BaselineHarnessTests.appendSpanRows(
+                        into: &spanRows, docID: doc.id, family: family,
+                        groundTruth: spanGTByKind[kind] ?? [],
+                        surfaced: surfaced, allGT: allGT
+                    )
+                }
                 cells[cellKey] = cell
             }
         }
@@ -549,13 +565,40 @@ struct G8SearchParityHarnessTests {
         )
         try G8BaselineHarnessTests.writeJSON(fireReport, to: "\(base)_siteb_fire_features.json")
 
+        // Per-span outcome sidecar (one JSONL per site; additive, offsets only).
+        try G8BaselineHarnessTests.writeSpanSidecar(spanRows, to: "\(base)_siteb_spans.jsonl")
+
         print("[H1.1 siteB baseline] cells → \(base)_siteb_cells.json (\(cells.count) cells)")
         print("[H1.1 siteB baseline] raw_scores → \(base)_siteb_raw_scores.json (\(rawRows.count) rows)")
         print("[H1.1 siteB baseline] fire_features → \(base)_siteb_fire_features.json (\(fireRows.count) fires)")
+        print("[H1.1 siteB baseline] spans → \(base)_siteb_spans.jsonl (\(spanRows.count) rows)")
 
         // Emitter sanity only (standing emitter, not a quality gate).
         #expect(!cells.isEmpty, "no Site-B cells emitted — corpus loaded but produced nothing")
         #expect(sortedDocs.count == 1100,
                 "G8 doc_count expected 1100; got \(sortedDocs.count)")
+        // Emitter sanity only: one sidecar row per corpus span the tally saw
+        // (tp + fn + must_not) and one per generic false positive.
+        let corpusSpans = sortedDocs
+            .filter { gateDoctypeClass($0.doctype) != nil }
+            .reduce(0) {
+                $0 + $1.pii_spans.filter { G8BaselineHarnessTests.baselineMapCategory($0.category) != nil }.count
+            }
+        let groundTruthRows = spanRows.filter { $0.tier != nil }.count
+        let cellGroundTruth = cells.values.reduce(0) {
+            $0 + $1.true_positives + $1.false_negatives + $1.tier_must_not_total
+        }
+        #expect(groundTruthRows == corpusSpans,
+                "sidecar ground-truth rows \(groundTruthRows) != corpus spans \(corpusSpans)")
+        #expect(groundTruthRows == cellGroundTruth,
+                "sidecar ground-truth rows \(groundTruthRows) != cells tp+fn+must_not \(cellGroundTruth)")
+        #expect(spanRows.filter { $0.tier == nil }.count
+                == cells.values.reduce(0) { $0 + $1.false_positives },
+                "sidecar detection-only rows != cells false_positives")
+        let nameSpans = sortedDocs
+            .filter { gateDoctypeClass($0.doctype) != nil }
+            .reduce(0) { $0 + $1.pii_spans.filter { $0.category == "name" }.count }
+        #expect(spanRows.filter { $0.family == "name" && $0.tier != nil }.count == nameSpans,
+                "every name ground-truth span must have a sidecar row")
     }
 }
