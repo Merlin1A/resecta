@@ -514,6 +514,20 @@ struct SearchRecheckQueryLineDisplayTests {
             queryLines: queryLines)
     }
 
+    @Test("queryLineText says a refused query was not re-checked instead of printing 0 remain")
+    func queryLineTextUncheckedQuery() {
+        let refused = SearchRecheckQueryLine(
+            label: "\u{201C}(a+)+b\u{201D}", foundCount: 1, foundHitCap: false,
+            appliedCount: 1, remainingCount: 0, route: .mixed(textPages: 0, ocrPages: 0),
+            unchecked: true)
+        #expect(LayerResultRow.queryLineText(refused)
+                == "\u{201C}(a+)+b\u{201D} · found 1 · applied 1 · not re-checked (pattern not accepted)")
+        let checked = SearchRecheckQueryLine(
+            label: "\u{201C}Delia\u{201D}", foundCount: 2, foundHitCap: false,
+            appliedCount: 2, remainingCount: 0, route: .textLayer)
+        #expect(LayerResultRow.queryLineText(checked) == "\u{201C}Delia\u{201D} · found 2 · applied 2 · 0 remain")
+    }
+
     @Test("queryLineTexts composes label · found · applied · remain, the badges, the cap, and per-term sub-lines")
     func queryLineComposition() {
         let plain = SearchRecheckQueryLine(

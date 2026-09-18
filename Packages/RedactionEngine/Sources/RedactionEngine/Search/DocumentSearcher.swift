@@ -159,6 +159,10 @@ public actor DocumentSearcher {
     // (`previewRegex`) and the full-scan path (`searchRegex`). The app
     // layer accumulates page indices to render the regex-timeout banner.
     private var regexTimeoutSink: (@Sendable (Int) -> Void)?
+    /// Fired once, with the gate's reason, when a regex search starts on a
+    /// pattern the safety gate refuses; the stream then finishes empty.
+    /// Without it an empty stream reads as "0 results" to every consumer.
+    private var regexRejectionSink: (@Sendable (String) -> Void)?
 
     // Optional sink for per-page oversized-OCR-skip reporting.
     // Fires once per page whose 300-DPI render exceeds the OCR pixel caps
@@ -526,6 +530,16 @@ public actor DocumentSearcher {
         self.regexTimeoutSink = sink
     }
 
+    /// Install a regex-rejection sink. Pass nil to disable reporting.
+    /// Fires once per `search` on a `.regex` mode whose pattern the safety
+    /// gate refuses — with the typed reason's copy, or the engine's compile
+    /// error text — before the stream finishes empty. Mirrors the timeout
+    /// sink's contract; the live preview carries the same reason in its
+    /// result instead.
+    public func setRegexRejectionSink(_ sink: (@Sendable (String) -> Void)?) {
+        self.regexRejectionSink = sink
+    }
+
     /// Install a per-page oversized-OCR-skip sink. Pass nil to
     /// disable reporting. Fires once per OCR attempt on a page whose
     /// render exceeds the OCR pixel caps, in all three OCR entry paths
@@ -674,11 +688,17 @@ public actor DocumentSearcher {
             )
 
         case .regex(let pattern, let options):
-            guard let regex = Self.validateRegexPattern(pattern) else {
+            let regex: NSRegularExpression
+            do {
+                regex = try Self.validateRegexPatternWithError(pattern)
+            } catch { // LegalPhrases:safe (Swift keyword)
+                // The reason rides the result so the caller need not
+                // re-validate to learn why the count is empty.
                 return SearchPreviewResult(
                     scope: scope,
                     totalCount: 0, saturated: false, regexInvalid: true,
-                    currentPageMatches: []
+                    currentPageMatches: [],
+                    regexRejection: error.localizedDescription
                 )
             }
             let sink = await currentRegexTimeoutSink()
@@ -1134,7 +1154,14 @@ public actor DocumentSearcher {
         progress: @Sendable (Int, Int) -> Void,
         continuation: AsyncStream<SearchResult>.Continuation
     ) async {
-        guard let regex = Self.validateRegexPattern(pattern) else {
+        let regex: NSRegularExpression
+        do {
+            regex = try Self.validateRegexPatternWithError(pattern)
+        } catch { // LegalPhrases:safe (Swift keyword)
+            // The gate refused the pattern: say so once, then finish empty.
+            // A silent empty stream reads as "0 results" to every consumer,
+            // the verification re-check included.
+            regexRejectionSink?(error.localizedDescription)
             continuation.finish()
             return
         }

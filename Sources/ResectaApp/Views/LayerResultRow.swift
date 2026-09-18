@@ -189,7 +189,13 @@ struct LayerResultRow: View {
     /// repeated here — the layer's detail sentence carries it once.
     static func queryLineText(_ line: SearchRecheckQueryLine) -> String {
         let found = line.foundHitCap ? "1,000+" : String(line.foundCount)
-        var text = "\(line.label) · found \(found) · applied \(line.appliedCount) · \(line.remainingCount) remain"
+        // A query the search engine refused to re-run (the regex safety
+        // gate) has no remaining count: the line says so instead of
+        // printing "0 remain", which would read as a clear.
+        let remaining = line.unchecked
+            ? "not re-checked (pattern not accepted)"
+            : "\(line.remainingCount) remain"
+        var text = "\(line.label) · found \(found) · applied \(line.appliedCount) · \(remaining)"
         for badge in line.optionBadges {
             text += " · \(badge)"
         }

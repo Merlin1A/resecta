@@ -309,3 +309,73 @@ struct RegexGateBoundedQuantifierTests {
         #expect(DocumentSearcher.validateRegexPattern("(a{0,20}){0,20}") != nil)
     }
 }
+
+// MARK: - The rejection reason reaches every caller
+
+/// A refused pattern used to leave two silent traces: `previewMatches`
+/// answered `regexInvalid` with no reason, and `searchRegex` finished its
+/// stream empty — indistinguishable from a document with no match, which
+/// is what the verification re-check then reported. The preview now carries
+/// the reason in its result and the search fires a sink with it once before
+/// finishing.
+@Suite("Regex rejection reason", .tags(.search))
+struct RegexRejectionReasonTests {
+
+    private func singlePage() -> PDFDocument? {
+        PDFDocument(data: TestFixtures.textLayerPDF(text: "alpha beta gamma"))
+    }
+
+    @Test("previewMatches returns the gate's reason beside regexInvalid")
+    func previewCarriesTheReason() async {
+        let searcher = DocumentSearcher()
+        let result = await searcher.previewMatches(
+            mode: .regex("(a+)+b", options: SearchOptions()),
+            scope: .wholeDocument, currentPageIndex: 0, totalPageCount: 1,
+            pageTextProvider: { _ in "alpha beta gamma" })
+        #expect(result.regexInvalid)
+        #expect(result.totalCount == 0)
+        #expect(result.regexRejection == "Pattern may cause performance issues and has not been accepted.")
+        let ok = await searcher.previewMatches(
+            mode: .regex("alpha", options: SearchOptions()),
+            scope: .wholeDocument, currentPageIndex: 0, totalPageCount: 1,
+            pageTextProvider: { _ in "alpha beta gamma" })
+        #expect(!ok.regexInvalid)
+        #expect(ok.regexRejection == nil)
+        #expect(ok.totalCount == 1)
+    }
+
+    @Test("searchRegex fires the rejection sink once with the reason and finishes the stream empty")
+    func searchFiresTheSinkOnce() async throws {
+        guard let doc = singlePage() else {
+            Issue.record("PDFDocument creation failed"); return
+        }
+        let searcher = DocumentSearcher()
+        let reasons = ReasonCollector()
+        await searcher.setRegexRejectionSink({ reason in
+            Task { await reasons.append(reason) }
+        })
+        let stream = searcher.search(
+            SendablePDFDocument(doc), mode: .regex("(a+)+b", options: SearchOptions()), progress: { _, _ in })
+        var count = 0
+        for await _ in stream { count += 1 }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(count == 0)
+        #expect(await reasons.snapshot() == ["Pattern may cause performance issues and has not been accepted."])
+
+        // An accepted pattern never fires it.
+        let accepted = searcher.search(
+            SendablePDFDocument(doc), mode: .regex("alpha", options: SearchOptions()), progress: { _, _ in })
+        var hits = 0
+        for await _ in accepted { hits += 1 }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(hits == 1)
+        #expect(await reasons.snapshot().count == 1)
+        await searcher.setRegexRejectionSink(nil)
+    }
+}
+
+private actor ReasonCollector {
+    private var reasons: [String] = []
+    func append(_ reason: String) { reasons.append(reason) }
+    func snapshot() -> [String] { reasons }
+}

@@ -204,6 +204,24 @@ extension SearchToolbarSection {
         return !error.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// The one action the regex error callout offers: run the same
+    /// query as a plain text search. Title-cased like its sibling
+    /// "Search Anyway" in the short-term warning. Pinned by
+    /// `RegexErrorCalloutTests`.
+    static let regexErrorSearchAsTextLabel: String = "Search as Text"
+
+    /// Switch the sheet to text mode for a text search of the query as
+    /// typed. The transition is flagged programmatic so the hub's
+    /// mode-change handler neither clears nor toasts (the same shape the
+    /// saved-search recall takes); the caller re-triggers the search,
+    /// whose own kickoff clears the result state and the standing error.
+    /// Pure state edit — testable without a SwiftUI host.
+    @MainActor
+    static func switchToTextSearch(_ searchState: SearchState) {
+        searchState.isProgrammaticModeChange = true
+        searchState.searchModeType = .text
+    }
+
     // MARK: - Pure-Function Contract
 
     /// The six Search option chips (via `optionChip`),

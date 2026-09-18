@@ -54,3 +54,30 @@ struct RegexErrorCalloutTests {
         ) == true)
     }
 }
+
+// MARK: - The "Search as Text" action
+
+@Suite("Regex error callout — search as text", .tags(.search))
+@MainActor
+struct RegexErrorCalloutSearchAsTextTests {
+
+    @Test("The action reads like its sibling control: title-cased, one verb phrase")
+    func actionLabel() {
+        #expect(SearchToolbarSection.regexErrorSearchAsTextLabel == "Search as Text")
+    }
+
+    @Test("Switching to a text search keeps the query, flags the transition programmatic, and changes only the mode")
+    func switchToTextSearchKeepsQuery() {
+        let state = SearchState()
+        state.searchModeType = .regex
+        state.queryText = "4111(\\s?\\d{4}){3}"
+        state.regexError = "Pattern contains nested quantifiers and has not been accepted."
+        SearchToolbarSection.switchToTextSearch(state)
+        #expect(state.searchModeType == .text)
+        #expect(state.queryText == "4111(\\s?\\d{4}){3}")
+        #expect(state.isProgrammaticModeChange == true)
+        // The standing error is the trigger's to clear at its kickoff
+        // (`clearResults()`), not the switch's.
+        #expect(state.regexError != nil)
+    }
+}

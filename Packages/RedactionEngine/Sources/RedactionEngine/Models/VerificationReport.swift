@@ -208,6 +208,10 @@ public struct SearchRecheckQueryLine: Sendable, Equatable {
     /// "case-sensitive" / "whole word", in that order, when set.
     public let optionBadges: [String]
     public let perTerm: [PerTerm]?
+    /// The search engine refused to re-run this query (the regex safety
+    /// gate), so `remainingCount` is not a measurement; the display says
+    /// so instead of printing a count.
+    public let unchecked: Bool
 
     public init(
         label: String,
@@ -217,7 +221,8 @@ public struct SearchRecheckQueryLine: Sendable, Equatable {
         remainingCount: Int,
         route: Route,
         optionBadges: [String] = [],
-        perTerm: [PerTerm]? = nil
+        perTerm: [PerTerm]? = nil,
+        unchecked: Bool = false
     ) {
         self.label = label
         self.foundCount = foundCount
@@ -227,5 +232,6 @@ public struct SearchRecheckQueryLine: Sendable, Equatable {
         self.route = route
         self.optionBadges = optionBadges
         self.perTerm = perTerm
+        self.unchecked = unchecked
     }
 }

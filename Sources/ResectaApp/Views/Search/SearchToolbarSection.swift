@@ -354,11 +354,23 @@ struct SearchToolbarSection: View {
                 .font(.caption)
                 .foregroundStyle(ResectaTokens.SemanticColor.failText)
                 .lineLimit(1)
+            // The one affordance beside the reason: the same query as
+            // a plain text search. Same control shape and in-flight gate
+            // as "Search Anyway" in the short-term warning below.
+            Button(Self.regexErrorSearchAsTextLabel) {
+                Self.switchToTextSearch(searchState)
+                onTriggerSearch()
+            }
+            .controlSize(.small)
+            .disabled(searchState.isSearching)
             Spacer()
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .frame(minHeight: Self.regexErrorCalloutMinHeight, alignment: .leading)
         .opacity(visible ? 1 : 0)
+        // The faded container keeps its layout slot; its action must
+        // not stay tappable while it is invisible.
+        .allowsHitTesting(visible)
         // The callout surfaces the engine's
         // verbatim NSError text, which can echo fragments of the
         // submitted pattern — and the pattern may itself be PII.
