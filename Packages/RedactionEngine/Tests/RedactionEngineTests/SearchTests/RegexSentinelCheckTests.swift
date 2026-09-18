@@ -61,17 +61,31 @@ struct RegexSentinelCheckTests {
 
     @Test("Nested-quantifier pattern throws nestedQuantifiers with mechanism copy")
     func nestedQuantifierThrowsTypedError() {
-        // `(a{2,3})+b` reaches the nested-quantifier gate: the BOUNDED
-        // inner quantifier is invisible to RegexSafetyPrecheck (which
-        // only flags unbounded inner/outer shapes), so the precheck
-        // passes and the quantifier scan fires. `(a+)+b` would trip
-        // the precheck FIRST and surface the likelyPathological copy.
+        // `(a{2,63})+b` reaches the nested-quantifier gate: the inner
+        // `{2,63}` is bounded in form — invisible to RegexSafetyPrecheck,
+        // which only flags `*`/`+`/`{n,}` inner shapes — but its upper
+        // bound exceeds the ceiling that keeps a bounded quantifier
+        // bounded, so the precheck passes and the quantifier scan fires.
+        // `(a+)+b` would trip the precheck FIRST and surface the
+        // likelyPathological copy; `(a{2,3})+b` is accepted outright.
         do {
-            _ = try DocumentSearcher.validateRegexPatternWithError(#"(a{2,3})+b"#)
+            _ = try DocumentSearcher.validateRegexPatternWithError(#"(a{2,63})+b"#)
             Issue.record("nested-quantifier pattern was accepted")
         } catch { // LegalPhrases:safe (Swift keyword)
             #expect(error.localizedDescription
                     == "Pattern contains nested quantifiers and has not been accepted.")
+        }
+        #expect(DocumentSearcher.validateRegexPattern(#"(a{2,3})+b"#) != nil)
+    }
+
+    @Test("Bounded-chain pattern throws nestedBoundProduct with mechanism copy")
+    func nestedBoundProductThrowsTypedError() {
+        do {
+            _ = try DocumentSearcher.validateRegexPatternWithError(#"(a{0,40}){0,40}"#)
+            Issue.record("bounded-chain pattern was accepted")
+        } catch { // LegalPhrases:safe (Swift keyword)
+            #expect(error.localizedDescription
+                    == "Pattern repeats a repeated group more than \(DocumentSearcher.nestedBoundProductCap) times in total and has not been accepted.")
         }
     }
 
@@ -98,7 +112,8 @@ struct RegexSentinelCheckTests {
         let probes = [
             String(repeating: "S3CRET-", count: 30),   // patternTooLong
             #"(S3CRET|S3CRETS3CRET)*b"#,               // likelyPathological
-            #"(S3CRET{2,3})+b"#,                       // nestedQuantifiers
+            #"(S3CRET{2,63})+b"#,                      // nestedQuantifiers
+            #"(S3CRET{0,40}){0,40}"#,                  // nestedBoundProduct
         ]
         for probe in probes {
             do {
