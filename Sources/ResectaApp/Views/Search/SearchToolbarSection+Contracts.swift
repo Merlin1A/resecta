@@ -186,10 +186,12 @@ extension SearchToolbarSection {
     /// Minimum vertical extent the regex
     /// error callout reserves while in regex mode so the toolbar
     /// height does NOT reflow when `searchState.regexError` flips
-    /// between nil and a string. Picked to seat one line of `.caption`
-    /// + the leading icon comfortably without crowding the chip row
-    /// above. Pinned by `RegexErrorCalloutTests.calloutReservesFixedHeight`.
-    static let regexErrorCalloutMinHeight: CGFloat = 24
+    /// between nil and a string. Seats two lines of `.caption` + the
+    /// leading icon: the reason shares its row with the "Search as
+    /// Text" action, so the longest gate copy wraps rather than
+    /// truncating, and the floor covers both lines. Pinned by
+    /// `RegexErrorCalloutTests.calloutReservesFixedHeight`.
+    static let regexErrorCalloutMinHeight: CGFloat = 40
 
     /// Visibility predicate for the regex error callout
     /// contents. Returns true when the engine has a non-empty error

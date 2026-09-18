@@ -345,25 +345,35 @@ struct SearchToolbarSection: View {
     private var regexErrorCallout: some View {
         let error = searchState.regexError
         let visible = Self.regexErrorCalloutShouldShow(error: error)
-        return HStack(spacing: 4) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.red)
-            // Small error TEXT routes through the measured
-            // text tier; the glyph above stays on the system-color tier.
-            Text(error ?? "")
-                .font(.caption)
-                .foregroundStyle(ResectaTokens.SemanticColor.failText)
-                .lineLimit(1)
+        return HStack(alignment: .top, spacing: 4) {
+            HStack(alignment: .top, spacing: 4) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                // Small error TEXT routes through the measured
+                // text tier; the glyph above stays on the system-color tier.
+                // Two lines so the reason is never cut short by the action
+                // beside it; the floor below reserves both.
+                Text(error ?? "")
+                    .font(.caption)
+                    .foregroundStyle(ResectaTokens.SemanticColor.failText)
+                    .lineLimit(2)
+                    .layoutPriority(1)
+            }
+            .accessibilityHidden(!visible)
+            .accessibilityLabel(visible ? "Regex error: \(error ?? "")" : "")
             // The one affordance beside the reason: the same query as
             // a plain text search. Same control shape and in-flight gate
-            // as "Search Anyway" in the short-term warning below.
+            // as "Search Anyway" in the short-term warning below; kept
+            // outside the labelled pair so it keeps its own label.
             Button(Self.regexErrorSearchAsTextLabel) {
                 Self.switchToTextSearch(searchState)
                 onTriggerSearch()
             }
+            .font(.caption)
             .controlSize(.small)
             .disabled(searchState.isSearching)
-            Spacer()
+            .accessibilityHidden(!visible)
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .frame(minHeight: Self.regexErrorCalloutMinHeight, alignment: .leading)
@@ -375,8 +385,6 @@ struct SearchToolbarSection: View {
         // verbatim NSError text, which can echo fragments of the
         // submitted pattern — and the pattern may itself be PII.
         .privacySensitive()
-        .accessibilityHidden(!visible)
-        .accessibilityLabel(visible ? "Regex error: \(error ?? "")" : "")
         .animation(
             ResectaTokens.Anim.resolved(ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion),
             value: visible

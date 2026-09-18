@@ -21,10 +21,12 @@ struct RegexErrorCalloutTests {
 
     @Test("Callout reserves a fixed minimum height so toolbar doesn't reflow")
     func calloutReservesFixedHeight() {
-        // The 24pt floor seats one `.caption` line + the leading
-        // icon comfortably; pin the literal so a future tweak surfaces
-        // as a deliberate test rename rather than silent layout drift.
-        #expect(SearchToolbarSection.regexErrorCalloutMinHeight == 24)
+        // The 40pt floor seats two `.caption` lines + the leading
+        // icon (the reason shares its row with the "Search as Text"
+        // action and wraps rather than truncating); pin the literal so
+        // a future tweak surfaces as a deliberate test rename rather
+        // than silent layout drift.
+        #expect(SearchToolbarSection.regexErrorCalloutMinHeight == 40)
     }
 
     @Test("Visibility predicate matches the engine's nil/non-nil state")
