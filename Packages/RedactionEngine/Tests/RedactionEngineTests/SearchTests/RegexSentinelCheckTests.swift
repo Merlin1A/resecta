@@ -64,7 +64,7 @@ struct RegexSentinelCheckTests {
         // `(a{2,3})+b` reaches the nested-quantifier gate: the BOUNDED
         // inner quantifier is invisible to RegexSafetyPrecheck (which
         // only flags unbounded inner/outer shapes), so the precheck
-        // passes and `hasNestedQuantifiers` fires. `(a+)+b` would trip
+        // passes and the quantifier scan fires. `(a+)+b` would trip
         // the precheck FIRST and surface the likelyPathological copy.
         do {
             _ = try DocumentSearcher.validateRegexPatternWithError(#"(a{2,3})+b"#)

@@ -90,7 +90,7 @@ struct ReDoSFuzzTests {
     func validateRejectsNestedQuantifiers() {
         // `validateRegexPattern` now delegates to
         // `RegexSafetyPrecheck.isLikelyPathological` in addition to the
-        // original `hasNestedQuantifiers` heuristic. The combined check
+        // original nested-quantifier heuristic. The combined check
         // covers both (group-with-quantifier)quantifier shapes and
         // unbounded group-quantifiers over alternation
         // (e.g. `(a|ab)*b`). Backreference traps and patterns whose

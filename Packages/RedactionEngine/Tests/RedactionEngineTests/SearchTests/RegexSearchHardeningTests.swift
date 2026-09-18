@@ -3,7 +3,7 @@ import PDFKit
 @testable import RedactionEngine
 
 // `validateRegexPattern` rejects catastrophic shapes that
-// compile cleanly under the legacy `hasNestedQuantifiers` heuristic, plus
+// compile cleanly under the earlier nested-quantifier heuristic, plus
 // a cancellation-propagation check that exercises the `.reportProgress`
 // path through the full-scan branch.
 
@@ -243,4 +243,65 @@ private actor TimeoutCollector {
     private var pages: [Int] = []
     func append(_ page: Int) { pages.append(page) }
     func snapshot() -> [Int] { pages }
+}
+
+// MARK: - Bounded quantifiers are not nesting (the [R13] A.3 rule set)
+
+/// Patterns whose only "nesting" is a group closed by a BOUNDED quantifier
+/// (`?`, `{n}`, `{n,m}`) or a bounded quantifier inside a group closed by an
+/// unbounded one — the shapes users write for optional suffixes, grouped
+/// thousands, separator-grouped digits. Each is a realistic user pattern
+/// from the engine's own benign corpus; every one compiles and runs in
+/// linear time on ICU. The legacy heuristic counted `?` and `{n}` as
+/// nesting and rejected them all.
+private let boundedQuantifierPatterns: [(id: String, pattern: String)] = [
+    ("phone_05", #"(\+1[ -]?)?\(?\d{3}\)?[ -]?\d{3}[ -]?\d{4}"#),
+    ("acct_01", #"(?i)account\s*(#|no\.?|number)?:?\s*\d+"#),
+    ("url_00", #"https?://[\w.-]+(/\S*)?"#),
+    ("addr_02", #"\b\d{5}(-\d{4})?\b"#),
+    ("money_00", #"\$[\d,]+(\.\d{2})?"#),
+    ("money_01", #"\$\d{1,3}(,\d{3})*(\.\d{2})?"#),
+    ("money_04", #"USD ?\d+(\.\d{2})?"#),
+    ("border_03", #"(\d{1,3},)+\d{3}"#),
+    ("border_05", #"(\d{3}[-. ])+\d{4}"#),
+    ("card_grouped", #"4111(\s?\d{4}){3}"#)
+]
+
+/// Shapes that stay rejected: an unbounded quantifier over a group that
+/// itself contains an unbounded quantifier, an overlapping alternation
+/// under `*`, and a bounded chain whose product of maxima is unbounded in
+/// practice.
+private let stillRejectedPatterns: [(id: String, pattern: String)] = [
+    ("nested_plus", "(a+)+b"),
+    ("nested_star_any", "(.*)+"),
+    ("nested_open_brace", "(a{2,})*"),
+    ("overlapping_alternation", "(a|aa)*b"),
+    ("digit_runs", #"(\d+\s*)+"#)
+]
+
+@Suite("Regex gate — bounded quantifiers", .tags(.search))
+struct RegexGateBoundedQuantifierTests {
+
+    @Test("A group closed by a bounded quantifier is accepted", arguments: boundedQuantifierPatterns)
+    func boundedGroupAccepted(_ row: (id: String, pattern: String)) {
+        #expect(DocumentSearcher.validateRegexPattern(row.pattern) != nil,
+                "\(row.id) was rejected: \(row.pattern)")
+    }
+
+    @Test("An unbounded quantifier over an unbounded group stays rejected", arguments: stillRejectedPatterns)
+    func nestedUnboundedRejected(_ row: (id: String, pattern: String)) {
+        #expect(DocumentSearcher.validateRegexPattern(row.pattern) == nil,
+                "\(row.id) was accepted: \(row.pattern)")
+    }
+
+    @Test("A bounded chain whose product of maxima exceeds the cap is rejected")
+    func nestedBoundProductRejected() {
+        // `{0,1000}` stacked on `{0,1000}`: every quantifier is bounded in
+        // form, but the repetition count the engine may explore is their
+        // product — a counting blow-up no single bound reveals.
+        #expect(DocumentSearcher.validateRegexPattern("a{0,1000}{0,1000}") == nil)
+        #expect(DocumentSearcher.validateRegexPattern("(a{0,40}){0,40}") == nil)
+        // The same shapes under the cap are accepted.
+        #expect(DocumentSearcher.validateRegexPattern("(a{0,20}){0,20}") != nil)
+    }
 }

@@ -100,7 +100,7 @@ struct LivePreviewTests {
     func invalidRegex() async {
         let doc = twoPageFixture()
         let searcher = DocumentSearcher()
-        // Nested quantifiers — caught by hasNestedQuantifiers heuristic.
+        // Nested quantifiers — refused by the quantifier scan.
         let mode = SearchMode.regex("(a+)+b", options: SearchOptions())
 
         let result = await searcher.previewMatches(
