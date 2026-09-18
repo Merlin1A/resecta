@@ -134,14 +134,30 @@ struct G8CorpusIngestionTests {
                 "corpus categories \(seenCategories.sorted()) != the 17-category set")
     }
 
-    // MARK: - Loader
+    // 1.2 C12-95: the test-target override the G8 emitters honour (a generator
+    // PROFILE the datapipeline built, read from build/ and never installed)
+    // must load the very bytes the invoking target announced. Gated on the
+    // override: without it this test has nothing to check and passes quietly.
+    @Test("Corpus path override loads the announced file (gated on the override)")
+    func overrideLoadsAnnouncedFile() throws {
+        guard let (url, overridden) = G8BaselineHarnessTests.baselineCorpusURL(),
+              overridden else {
+            return
+        }
+        let data = try Data(contentsOf: url)
+        G8BaselineHarnessTests.expectAnnouncedCorpusSHA(data)
+        let corpus = try JSONDecoder().decode(G8Corpus.self, from: data)
+        // A profile is the same 1,100 documents (same seed, same counts) with
+        // its name slots re-rendered and/or furniture planted.
+        #expect(corpus.seed == 20260416)
+        #expect(corpus.documents.count == 1100)
+    }
+
+    // MARK: - Loader (the bundled fixture, or the RESECTA_G8_CORPUS_PATH
+    // override the emitters honour — resolved by the one shared function)
 
     private func loadCorpus() throws -> G8Corpus? {
-        guard let url = Bundle.module.url(
-            forResource: "g8_corpus",
-            withExtension: "json",
-            subdirectory: "corpus"
-        ) else {
+        guard let (url, _) = G8BaselineHarnessTests.baselineCorpusURL() else {
             return nil
         }
         let data = try Data(contentsOf: url)
