@@ -1581,6 +1581,9 @@ public struct PIIDetector: Sendable {
             if tag == .personalName {
                 let name = String(text[range])
                 guard name.count >= 2 else { return true }
+                // A whole-candidate stop token (`nameStopTokens`) is never a
+                // name by itself, whatever the tagger says of it.
+                guard !Self.nameStopTokens.contains(name) else { return true }
                 // `range` indexes `text` (the `on:` string),
                 // but the redaction box must index `original`. Anchor at THIS
                 // tag's own offset: a from-zero `range(of:)` search resolves
@@ -1665,6 +1668,22 @@ public struct PIIDetector: Sendable {
         return results
     }
 
+    // MARK: - Name Stop Tokens
+
+    /// Tokens the name path never surfaces as a name candidate on their own.
+    /// Exact, case-sensitive, whole-candidate equality — nothing looser: a
+    /// name that follows a role noun still surfaces (the prefix pass exists
+    /// for that), the bare role noun never does. The five are court and
+    /// licence furniture the tagger reads as given names when they open a
+    /// sentence or a label ("Plaintiff is a corporation, Business
+    /// Registration # …", "Reg # …", the "PP" / "Lic" / "DL" document labels).
+    /// They are ONE measured unit: added together and measured together on
+    /// the synthetic corpus, where they remove label-token false positives
+    /// and change no true positive. Any addition is its own measured change,
+    /// never a quiet edit here. Checked before the gazetteer query on both
+    /// tagger passes and on the prefix pass's assembled name.
+    static let nameStopTokens: Set<String> = ["Plaintiff", "Reg", "PP", "Lic", "DL"]
+
     // MARK: - Legal Prefix Heuristics
 
     private static let legalPrefixes = [
@@ -1707,8 +1726,10 @@ public struct PIIDetector: Sendable {
                     guard let first = word.first else { return false }
                     return first.isUppercase
                 })
-                if !nameWords.isEmpty {
-                    let name = nameWords.joined(separator: " ")
+                let name = nameWords.joined(separator: " ")
+                // An empty assembly or a stop token standing alone after the
+                // prefix is not a name; the scan moves on to the next prefix hit.
+                if !nameWords.isEmpty, !Self.nameStopTokens.contains(name) {
                     // `afterText` was trimmed of leading punctuation/
                     // whitespace, but `afterPrefix` still points at the first
                     // trimmed char, so the name range was left-shifted by the
