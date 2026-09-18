@@ -171,4 +171,51 @@ struct SearchMultiTermConjunctionTests {
         #expect(Set(andResults.map(\.pageIndex)) == Set(orResults.map(\.pageIndex)),
                 "Single-term AND and OR modes must return results from the same pages")
     }
+
+    // MARK: - Empty entries in the term list
+
+    /// Runs a multi-term search over the three-page fixture and returns
+    /// one `page:matchedText:term` line per yielded result, in order.
+    private func multiTermHits(_ terms: [String], conjunction: Bool) async -> [String] {
+        guard let doc = PDFDocument(data: threePageTermsPDF()) else {
+            Issue.record("Failed to create PDFDocument")
+            return ["fixture-unavailable"]
+        }
+        let searcher = DocumentSearcher()
+        let options = SearchOptions(multiTermConjunction: conjunction)
+        let stream = searcher.search(
+            SendablePDFDocument(doc),
+            mode: .multiTerm(terms, options: options),
+            progress: { _, _ in }
+        )
+        var hits: [String] = []
+        for await result in stream {
+            hits.append("\(result.pageIndex):\(result.matchedText):\(result.term)")
+        }
+        return hits
+    }
+
+    @Test("An empty entry in the term list changes nothing in AND mode")
+    func andModeIgnoresEmptyEntry() async {
+        let without = await multiTermHits(["routing"], conjunction: true)
+        let withEmpty = await multiTermHits(["routing", ""], conjunction: true)
+        #expect(!without.isEmpty, "the single term reaches every page of the fixture")
+        #expect(withEmpty == without, "an empty entry must not turn the conjunction empty")
+    }
+
+    @Test("An empty entry in the term list changes nothing in OR mode")
+    func orModeIgnoresEmptyEntry() async {
+        let without = await multiTermHits(["routing"], conjunction: false)
+        let withEmpty = await multiTermHits(["routing", ""], conjunction: false)
+        #expect(!without.isEmpty)
+        #expect(withEmpty == without)
+    }
+
+    @Test("A term list of only empty and whitespace entries yields nothing in either mode")
+    func blankEntriesOnlyYieldNothing() async {
+        let orHits = await multiTermHits(["", " "], conjunction: false)
+        let andHits = await multiTermHits(["", " "], conjunction: true)
+        #expect(orHits.isEmpty, "a lone space is not a query; got \(orHits.count) OR hits")
+        #expect(andHits.isEmpty, "got \(andHits.count) AND hits")
+    }
 }

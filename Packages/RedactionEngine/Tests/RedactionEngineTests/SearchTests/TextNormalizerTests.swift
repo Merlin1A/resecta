@@ -108,12 +108,26 @@ struct TextNormalizerTests {
 
     @Test("Every smart-punctuation map entry folds and preserves length")
     func smartPunctuationFullMap() {
-        let input = "\u{201C}\u{201D}\u{2018}\u{2019}\u{2013}\u{2014}\u{2012}\u{2011}\u{00AD}"
+        let input = "\u{201C}\u{201D}\u{2018}\u{2019}\u{2013}\u{2014}\u{2012}\u{2011}\u{2010}\u{00AD}"
         let folded = TextNormalizer.normalizeSmartPunctuation(input)
-        #expect(folded == "\"\"''-----")
+        #expect(folded == "\"\"''------")
         #expect(folded.count == input.count, "1:1 map must preserve Character count")
         #expect(folded.utf16.count == input.utf16.count,
                 "1:1 map must preserve UTF-16 length for NSRange validity")
+    }
+
+    @Test("HYPHEN U+2010 folds to '-', so the NFKC image of a non-breaking hyphen folds too")
+    func hyphenFoldsAfterNFKC() {
+        let hyphen = "123\u{2010}45\u{2010}6789"
+        #expect(TextNormalizer.normalizeSmartPunctuation(hyphen) == "123-45-6789")
+        #expect(TextNormalizer.normalizeSmartPunctuation(hyphen).count == hyphen.count)
+        // NFKC maps U+2011 NON-BREAKING HYPHEN to U+2010. A query on the
+        // Unicode path therefore reaches the fold as U+2010, which the map
+        // has to carry for the two paths to agree.
+        let nonBreaking = "123\u{2011}45\u{2011}6789"
+        let afterNFKC = TextNormalizer.normalize(nonBreaking)
+        #expect(afterNFKC == hyphen, "NFKC maps U+2011 to U+2010")
+        #expect(TextNormalizer.normalizeSmartPunctuation(afterNFKC) == "123-45-6789")
     }
 
     // MARK: - Separator Strip + Offset Map

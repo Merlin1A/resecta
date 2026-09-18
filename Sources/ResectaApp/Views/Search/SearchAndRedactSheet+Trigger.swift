@@ -73,6 +73,11 @@ extension SearchAndRedactSheet {
             // results land, surfacing the Coverage Report diff line.
             searchState.captureFingerprintsBeforeScan()
             searchState.clearResults()
+            // The token this run's results and progress hops carry: a
+            // cancelled predecessor still draining its stream is told
+            // apart by it and dropped, so its late batch can never land
+            // in this run's list.
+            let run = searchState.beginRun()
 
             // Pre-validate regex before starting search.
             // Surface the rejection reason —
@@ -331,6 +336,9 @@ extension SearchAndRedactSheet {
                     mode: mode,
                     progress: { current, total in
                         Task { @MainActor in
+                            // A superseded run's page hops must not move
+                            // this run's counters.
+                            guard searchState.runToken == run else { return }
                             searchState.currentSearchPage = current
                             searchState.totalPages = total
                             // VoiceOver progress announcement (every 10 pages)
@@ -346,7 +354,7 @@ extension SearchAndRedactSheet {
 
                 for await result in stream {
                     if Task.isCancelled { break }
-                    searchState.appendResult(result)
+                    searchState.appendResult(result, run: run)
                 }
 
                 // Skip the cleanup tail when cancelled — a successor task

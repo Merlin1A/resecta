@@ -384,6 +384,64 @@ struct SearchStateTriggerSingleFlightTests {
         #expect(state.hasCompletedRunSinceClear == false)
         #expect(state.scanStartFailed == false)
     }
+
+    // MARK: - Run token
+
+    /// A result stamped with the run it claims to come from, so a stale
+    /// row can be told apart from a current one in the published list.
+    private func makeResult(run: String) -> SearchResult {
+        SearchResult(
+            pageIndex: 0,
+            normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.04),
+            matchedText: run,
+            contextSnippet: "…\(run)…",
+            source: .textLayer,
+            term: run,
+            isSelected: false
+        )
+    }
+
+    @Test("A superseded run's late appends never land in the next run's list")
+    func staleRunAppendsAreDropped() {
+        let state = SearchState()
+        let runA = state.beginRun()
+        for _ in 0..<3 { state.appendResult(makeResult(run: "a"), run: runA) }
+        state.clearResults()
+        let runB = state.beginRun()
+        #expect(runB != runA)
+        for _ in 0..<2 { state.appendResult(makeResult(run: "b"), run: runB) }
+        // The cancelled run's stream still draining after the clear.
+        for _ in 0..<2 { state.appendResult(makeResult(run: "a"), run: runA) }
+        let versionBefore = state.resultVersion
+        state.flushPendingResults()
+        #expect(state.results.count == 2)
+        #expect(state.results.allSatisfy { $0.term == "b" }, "no row of the superseded run survives")
+        #expect(state.resultVersion == versionBefore + 1, "one version bump per flush")
+        state.flushPendingResults()
+        #expect(state.resultVersion == versionBefore + 1, "an empty flush bumps nothing")
+    }
+
+    @Test("Every result of the current run is kept across the batch boundary")
+    func currentRunResultsAreNeverDropped() {
+        let state = SearchState()
+        state.clearResults()
+        let run = state.beginRun()
+        for _ in 0..<60 { state.appendResult(makeResult(run: "current"), run: run) }
+        // 50 flushed at the batch size; the remaining 10 wait for the timer.
+        #expect(state.results.count == 50)
+        state.flushPendingResults()
+        #expect(state.results.count == 60)
+        #expect(state.results.allSatisfy { $0.term == "current" })
+    }
+
+    @Test("An append that names no run belongs to the current one")
+    func untaggedAppendIsCurrent() {
+        let state = SearchState()
+        _ = state.beginRun()
+        state.appendResult(makeResult(run: "seed"))
+        state.flushPendingResults()
+        #expect(state.results.count == 1)
+    }
 }
 
 extension Tag {

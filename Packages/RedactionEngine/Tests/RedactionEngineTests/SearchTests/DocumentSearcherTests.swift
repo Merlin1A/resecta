@@ -774,6 +774,64 @@ struct DocumentSearcherTests {
         #expect(pixelH <= 10_000, "Letter page height at 300 DPI should be under cap")
     }
 
+    // MARK: - Result stream delivery
+
+    /// A searcher whose OCR cache holds one image-only page of `lineCount`
+    /// lines, each carrying exactly one digit run, so a `\d+` regex over
+    /// the OCR route yields one result per line — a page that bursts well
+    /// past a hundred matches from a single yield loop.
+    private func digitRunSearcher(lineCount: Int) async -> DocumentSearcher {
+        let searcher = DocumentSearcher()
+        let step = 1.0 / Double(lineCount + 1)
+        let lines = (0..<lineCount).map { i in
+            OCREngine.TextLine(
+                text: "Item \(String(format: "%04d", i)) posted",
+                normalizedRect: CGRect(x: 0.1, y: step * Double(i + 1), width: 0.6, height: step * 0.8),
+                confidence: 0.9
+            )
+        }
+        await searcher._testSeedOCRLines(lines, forPageIndex: 0)
+        return searcher
+    }
+
+    /// Runs `\d+` over the seeded page and counts what the stream delivers,
+    /// pausing `consumerDelay` after every element.
+    private func deliveredDigitRuns(lineCount: Int, consumerDelay: Duration?) async -> Int {
+        guard let doc = PDFDocument(data: TestFixtures.imageOnlyPDF()) else {
+            Issue.record("Failed to create PDFDocument")
+            return -1
+        }
+        let searcher = await digitRunSearcher(lineCount: lineCount)
+        let stream = searcher.search(
+            SendablePDFDocument(doc),
+            mode: .regex("\\d+", options: SearchOptions(includeOCR: true)),
+            progress: { _, _ in }
+        )
+        var delivered = 0
+        for await _ in stream {
+            delivered += 1
+            if let consumerDelay {
+                try? await Task.sleep(for: consumerDelay)
+            }
+        }
+        return delivered
+    }
+
+    @Test("A consumer slower than the producer still receives every hit of a page that bursts past a hundred matches")
+    func slowConsumerReceivesEveryBurstHit() async {
+        // The producer yields the whole page in one pass, long before a
+        // consumer that pauses per element has drained more than a few;
+        // a buffer bounded below the burst would have to discard here.
+        let delivered = await deliveredDigitRuns(lineCount: 300, consumerDelay: .milliseconds(10))
+        #expect(delivered == 300, "a lagging consumer must receive every hit; got \(delivered)")
+    }
+
+    @Test("A consumer that keeps up receives every hit of the same page (control)")
+    func fastConsumerReceivesEveryBurstHit() async {
+        let delivered = await deliveredDigitRuns(lineCount: 300, consumerDelay: nil)
+        #expect(delivered == 300, "the control consumer must receive every hit; got \(delivered)")
+    }
+
     // MARK: - belowThresholdSink
 
     /// Thread-safe accumulator for the `@Sendable` below-threshold sink. The sink

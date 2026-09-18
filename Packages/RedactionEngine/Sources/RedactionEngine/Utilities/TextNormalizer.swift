@@ -58,6 +58,7 @@ public struct TextNormalizer: Sendable {
         "\u{2013}": "-",   // EN DASH
         "\u{2014}": "-",   // EM DASH
         "\u{2012}": "-",   // FIGURE DASH
+        "\u{2010}": "-",   // HYPHEN (also NFKC's image of U+2011)
         "\u{2011}": "-",   // NON-BREAKING HYPHEN
         "\u{00AD}": "-",   // SOFT HYPHEN
     ]
