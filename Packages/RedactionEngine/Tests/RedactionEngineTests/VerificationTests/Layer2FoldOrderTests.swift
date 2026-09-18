@@ -23,11 +23,11 @@ struct Layer2FoldOrderTests {
         mode: PipelineMode = .searchableRedaction,
         hasRegions: Bool = true,
         terms: [Int: [String]] = [:]
-    ) -> (status: VerificationStatus, pages: [Int]?, terms: [String]?) {
+    ) -> (status: VerificationStatus, pages: [Int]?, terms: [String]?, couldNotVerify: Bool) {
         let result = VerificationEngine.foldLayer2PageOutcomes(
             outcomes, pipelineMode: mode, documentHasRegions: hasRegions,
             reviewTermsByPage: terms)
-        return (result.0, result.1, result.2)
+        return (result.0, result.1, result.2, result.3)
     }
 
     private func message(_ status: VerificationStatus) -> String {
@@ -84,6 +84,7 @@ struct Layer2FoldOrderTests {
         #expect(!message(r.status).contains("CONFIDENTIAL"), "the message never echoes a term")
         #expect(r.pages == [3])
         #expect(r.terms == ["CONFIDENTIAL"])
+        #expect(!r.couldNotVerify, "a leak result never carries the could-not-verify flag")
 
         // The warnable out-of-region arm returns ahead of the fill-artifact
         // note: a multi-signal document folds to the warning.
@@ -91,6 +92,7 @@ struct Layer2FoldOrderTests {
         r = fold(outcomes, terms: terms)
         #expect(r.status.isWarn, "unmappable WARN returns ahead of the fill note — got \(r.status)")
         #expect(message(r.status).contains("could not be mapped to page space"))
+        #expect(r.couldNotVerify, "unmappable coordinates: the check did not fully run")
         #expect(r.pages == [4])
         #expect(r.terms == nil)
 
@@ -112,6 +114,7 @@ struct Layer2FoldOrderTests {
         r = fold(outcomes, terms: terms)
         #expect(r.status.isWarn, "unchecked pages WARN once no note arm fires — got \(r.status)")
         #expect(message(r.status).contains("OCR could not be run"))
+        #expect(r.couldNotVerify, "unchecked pages: the check did not fully run")
         #expect(r.pages == [7])
 
         outcomes.removeAll { $0.bucket == .unchecked }

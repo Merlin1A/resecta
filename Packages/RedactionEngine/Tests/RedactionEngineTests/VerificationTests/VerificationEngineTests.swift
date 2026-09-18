@@ -1743,6 +1743,7 @@ struct VerificationEngineTests {
         if case .warn(let msg) = result.status {
             #expect(msg.contains("OCR could not be run on 1 page"),
                     "errored page folds to the unchecked arm; got \(msg)")
+            #expect(result.couldNotVerify, "OCR could not be run: the check did not fully run")
         }
     }
 
@@ -2022,6 +2023,7 @@ struct VerificationEngineTests {
                 "an unopenable page was never OCR-checked → unchecked WARN; got \(result.status)")
         if case .warn(let msg) = result.status {
             #expect(msg.contains("OCR could not be run"), "got: \(msg)")
+            #expect(result.couldNotVerify, "OCR could not be run: the check did not fully run")
         }
         #expect(result.pageReferences == [1],
                 "got \(String(describing: result.pageReferences))")
@@ -2148,6 +2150,7 @@ struct VerificationEngineTests {
         #expect(result.status.isWarn, "got \(result.status)")
         if case .warn(let msg) = result.status {
             #expect(msg.contains("OCR could not be run"), "got: \(msg)")
+            #expect(result.couldNotVerify, "OCR could not be run: the check did not fully run")
         }
         #expect(result.pageReferences == [0],
                 "got \(String(describing: result.pageReferences))")

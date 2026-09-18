@@ -236,6 +236,29 @@ struct SearchRecheckTests {
                 : [request: .init(remaining: remaining, hitCap: hitCap, perTerm: [:])])
     }
 
+    @Test("An unchecked page's WARN carries couldNotVerify through runLayer; a clean re-run and INFO do not")
+    func uncheckedWarnCarriesCouldNotVerify() async throws {
+        // 300-DPI render of a 40×40-inch page exceeds the searcher's OCR
+        // pixel cap → the layer's unchecked-pages WARN.
+        let size = CGSize(width: 40 * 72, height: 40 * 72)
+        let img = try TestFixtures.renderedTextImage("CONFIDENTIAL", width: 1600, height: 1600, fontSize: 160)
+        let (doc, url) = try await TestFixtures.imagePagesPDF([img], size: size, prefix: "recheck_cnv_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let unchecked = await TestFixtures.recheck(
+            SendablePDFDocument(doc), requests: [TestFixtures.textRequest("CONFIDENTIAL")],
+            mode: .secureRasterization)
+        #expect(unchecked.status == .warn(""), "got \(unchecked.status)")
+        #expect(unchecked.couldNotVerify, "the unchecked-pages WARN says the re-check did not fully run")
+
+        let clean = try output(["nothing here"])
+        let pass = await TestFixtures.recheck(clean, requests: [TestFixtures.textRequest("Delia")])
+        #expect(pass.status == .pass)
+        #expect(!pass.couldNotVerify)
+        let info = await TestFixtures.recheck(clean, requests: [])
+        #expect(info.status == .info(""))
+        #expect(!info.couldNotVerify)
+    }
+
     @Test("fold: OCR unavailable → WARN 'OCR did not run', never PASS")
     func foldOCRUnavailable() {
         let requests = [TestFixtures.textRequest("Delia")]

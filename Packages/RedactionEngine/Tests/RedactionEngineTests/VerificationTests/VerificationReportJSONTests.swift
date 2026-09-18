@@ -64,6 +64,7 @@ struct VerificationReportJSONTests {
           "duration_s" : 0.875,
           "layers" : [
             {
+              "could_not_verify" : false,
               "detail" : "No sensitive text found in the text layer.",
               "duration_s" : 0.25,
               "index" : 0,
@@ -75,6 +76,7 @@ struct VerificationReportJSONTests {
               "symbol" : "doc.text.magnifyingglass"
             },
             {
+              "could_not_verify" : false,
               "detail" : "An applied term remains readable outside every redacted region.",
               "duration_s" : 0.5,
               "index" : 1,
@@ -94,6 +96,7 @@ struct VerificationReportJSONTests {
               "symbol" : "exclamationmark.magnifyingglass"
             },
             {
+              "could_not_verify" : false,
               "detail" : "Residual sensitive text detected in the output.",
               "duration_s" : 0.125,
               "index" : 2,

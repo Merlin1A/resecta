@@ -137,13 +137,23 @@ public struct LayerResult: Sendable {
     /// exists solely for in-app display composition and is never logged or
     /// persisted. Nil for every other layer.
     public let queryLines: [SearchRecheckQueryLine]?
+    /// True when the layer's WARN says the check did not fully run — pages
+    /// it could not read or open, OCR it could not run or map, terms it
+    /// could not search, positions it could not measure, per-page data it
+    /// lacked. Never true for a check that ran and reported what it saw (a
+    /// positional graze, a count excess, a structural or metadata note, an
+    /// attestation mismatch) and
+    /// never true on a non-WARN status. Set by the engine at the site that
+    /// composes the WARN, so consumers key on it instead of the message.
+    public let couldNotVerify: Bool
 
     public init(name: String, symbolName: String, status: VerificationStatus,
                 shortDescription: String, detailDescription: String,
                 pageReferences: [Int]?, durationSeconds: Double,
                 reviewTermTexts: [String]? = nil,
                 layer: VerificationLayer? = nil,
-                queryLines: [SearchRecheckQueryLine]? = nil) {
+                queryLines: [SearchRecheckQueryLine]? = nil,
+                couldNotVerify: Bool = false) {
         self.name = name
         self.symbolName = symbolName
         self.status = status
@@ -154,6 +164,7 @@ public struct LayerResult: Sendable {
         self.reviewTermTexts = reviewTermTexts
         self.layer = layer
         self.queryLines = queryLines
+        self.couldNotVerify = couldNotVerify
     }
 }
 

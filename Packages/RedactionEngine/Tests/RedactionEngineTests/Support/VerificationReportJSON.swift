@@ -13,7 +13,11 @@ import Foundation
 // Wire format (schema_version 1):
 //   {schema_version, overall:{case, message?}, duration_s,
 //    layers:[{index, name, symbol, status:{case, message?}, short, detail,
-//             pages:[Int]?, duration_s, review_terms:[String]?}],
+//             pages:[Int]?, duration_s, review_terms:[String]?,
+//             could_not_verify:Bool}],
+//   `could_not_verify` (2026-09-17) mirrors `LayerResult.couldNotVerify`:
+//   additive — every earlier evidence file reads as `false`, so
+//   schema_version stays 1.
 //    per_page_modes:["secureRasterization"|"searchableRedaction"],
 //    per_page_fallback_reasons:[String?],   // FallbackReason case names
 //    skip_reason:"autoVerifyOff"|"cancelled"|"error",
@@ -64,6 +68,7 @@ private struct LayerJSON: Encodable {
     let pages: [Int]?
     let duration_s: Double
     let review_terms: [String]?
+    let could_not_verify: Bool
 
     init(_ layer: LayerResult, index: Int) {
         self.index = index
@@ -75,6 +80,7 @@ private struct LayerJSON: Encodable {
         self.pages = layer.pageReferences
         self.duration_s = layer.durationSeconds
         self.review_terms = layer.reviewTermTexts
+        self.could_not_verify = layer.couldNotVerify
     }
 }
 

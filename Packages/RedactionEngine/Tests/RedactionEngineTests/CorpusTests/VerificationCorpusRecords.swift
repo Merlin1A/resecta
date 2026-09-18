@@ -88,6 +88,8 @@ extension VerificationCorpusRunnerTests {
     }
 
     /// Duration-free identity tuple for the cross-sweep determinism check.
+    /// Eight elements: name · status case · message · short · detail ·
+    /// pages · review terms · the could-not-verify flag.
     static func layerIdentity(_ layer: LayerResult) -> String {
         let statusCase: String
         let message: String
@@ -101,8 +103,9 @@ extension VerificationCorpusRunnerTests {
         }
         let pages = layer.pageReferences.map { $0.map(String.init).joined(separator: ",") } ?? "-"
         let terms = layer.reviewTermTexts?.joined(separator: "|") ?? "-"
+        let flag = layer.couldNotVerify ? "could_not_verify" : "-"
         return [layer.name, statusCase, message, layer.shortDescription,
-                layer.detailDescription, pages, terms].joined(separator: "\u{1F}")
+                layer.detailDescription, pages, terms, flag].joined(separator: "\u{1F}")
     }
 
     static func statusCaseName(_ status: VerificationStatus) -> String {
