@@ -26,7 +26,7 @@ struct CouldNotVerifyFlagTests {
 
     /// A document whose second page cannot be opened (`page(at: 1)` is nil)
     /// while `pageCount` still reports it — the per-page loops' unreadable arm.
-    private final class UnopenableSecondPageDocument: PDFDocument, @unchecked Sendable {
+    private final class UnopenableSecondPageDocument: PDFDocument {
         override func page(at index: Int) -> PDFPage? {
             index == 1 ? nil : super.page(at: index)
         }
