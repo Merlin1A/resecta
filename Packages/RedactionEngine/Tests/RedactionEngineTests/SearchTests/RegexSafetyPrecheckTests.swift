@@ -36,7 +36,10 @@ struct RegexSafetyPrecheckTests {
 
     @Test("Group followed by `{n,}` open upper bound flagged")
     func groupFollowedByOpenBraceFlagged() {
-        #expect(RegexSafetyPrecheck.isLikelyPathological("(a|b){2,}"))
+        // `(a|ab)`: "a" is a prefix of "ab", so the repeated choice is
+        // ambiguous. (`(a|b){2,}` — two distinct single letters — repeats
+        // deterministically and is accepted; see the alternation suite.)
+        #expect(RegexSafetyPrecheck.isLikelyPathological("(a|ab){2,}"))
     }
 
     @Test("Simple nested star `(a*)*` flagged")
@@ -144,5 +147,37 @@ struct RegexSafetyPrecheckSeparatorTests {
     @Test("A quantified separator does not demote: `(\\d+\\.?)+` stays flagged")
     func quantifiedSeparatorStaysFlagged() {
         #expect(RegexSafetyPrecheck.isLikelyPathological(#"(\d+\.?)+"#))
+    }
+}
+
+// MARK: - Prefix-free literal alternation under repetition
+
+/// A repeated alternation of literal strings none of which is a prefix of
+/// another matches at most one alternative at any position: repeating it is
+/// a deterministic walk. Only that exact shape is demoted; an alternative
+/// with a class, quantifier, wildcard, anchor or nested group — or two
+/// alternatives that overlap — keeps the conservative verdict.
+@Suite("Regex Safety Precheck — literal alternation")
+struct RegexSafetyPrecheckAlternationTests {
+
+    @Test(#"Quantified title alternation `(Mr\.|Mrs\.|Ms\.|Dr\.)+` accepted"#)
+    func titleAlternationAccepted() {
+        #expect(!RegexSafetyPrecheck.isLikelyPathological(#"(Mr\.|Mrs\.|Ms\.|Dr\.)+"#))
+        #expect(DocumentSearcher.validateRegexPattern(#"(Mr\.|Mrs\.|Ms\.|Dr\.)+"#) != nil)
+    }
+
+    @Test("Distinct single letters `(a|b){2,}` and `(?:ab|cd)+` accepted")
+    func prefixFreeLiteralsAccepted() {
+        #expect(!RegexSafetyPrecheck.isLikelyPathological("(a|b){2,}"))
+        #expect(!RegexSafetyPrecheck.isLikelyPathological("(?:ab|cd)+"))
+    }
+
+    @Test("A prefix overlap `(a|ab)+b`, a duplicate `(a\\.|a\\.)+` and a class inside `(a|[bc])+` stay flagged")
+    func overlappingOrNonLiteralAlternationStaysFlagged() {
+        #expect(RegexSafetyPrecheck.isLikelyPathological("(a|ab)+b"))
+        #expect(RegexSafetyPrecheck.isLikelyPathological(#"(a\.|a\.)+"#))
+        #expect(RegexSafetyPrecheck.isLikelyPathological("(a|[bc])+"))
+        #expect(RegexSafetyPrecheck.isLikelyPathological("(a|b+)+"))
+        #expect(RegexSafetyPrecheck.isLikelyPathological("(?=a|b)+"))
     }
 }

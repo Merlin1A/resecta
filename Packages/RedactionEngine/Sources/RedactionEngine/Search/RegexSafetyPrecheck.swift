@@ -18,7 +18,9 @@ public enum RegexSafetyPrecheck {
     /// Returns true if the pattern contains a group followed by an unbounded
     /// quantifier (`*`, `+`, `{n,}`) and that group either contains another
     /// unbounded quantifier (nested case) or a top-level alternation `|`
-    /// (overlapping-alternation proxy).
+    /// (overlapping-alternation proxy) — unless that alternation is a
+    /// prefix-free set of literal strings, which repeats deterministically
+    /// (`isPrefixFreeLiteralAlternation`).
     ///
     /// The nested case defers to `RegexQuantifierScan`'s reading of the
     /// same shape, which ignores an inner run that a literal character
@@ -41,6 +43,8 @@ public enum RegexSafetyPrecheck {
         struct GroupState {
             var hasInnerQuantifier = false
             var hasAlternation = false
+            /// Index of the opening `(`; -1 for the pseudo top-level group.
+            var start = -1
         }
         // Index 0 is the pseudo top-level group; real nested groups push above.
         var stack: [GroupState] = [GroupState()]
@@ -60,7 +64,7 @@ public enum RegexSafetyPrecheck {
 
             switch chars[i] {
             case "(":
-                stack.append(GroupState())
+                stack.append(GroupState(start: i))
 
             case ")":
                 // Defensive: a malformed pattern with unbalanced parens is
@@ -81,7 +85,8 @@ public enum RegexSafetyPrecheck {
                 } else {
                     unbounded = false
                 }
-                if unbounded, closed.hasAlternation {
+                if unbounded, closed.hasAlternation,
+                   !isPrefixFreeLiteralAlternation(chars, from: closed.start, to: i) {
                     return true
                 }
                 if unbounded, closed.hasInnerQuantifier, nestedUnboundedStands() {
@@ -108,6 +113,57 @@ public enum RegexSafetyPrecheck {
     }
 
     // MARK: - Helpers
+
+    /// True when the group `chars[from...to]` (its parentheses included) is
+    /// a plain or non-capturing group whose body is an alternation of pure
+    /// literal strings — escapes allowed, no classes, quantifiers, anchors,
+    /// wildcards or nested groups — that are pairwise distinct and
+    /// prefix-free. At any input position at most one such alternative can
+    /// match, so repeating the group is a deterministic, linear walk:
+    /// `(Mr\.|Mrs\.|Ms\.|Dr\.)+` qualifies; `(a|ab)+b`, `(a|aa)*b` and
+    /// `(a\.|a\.)+` (a duplicate) do not.
+    private static func isPrefixFreeLiteralAlternation(
+        _ chars: [Character], from: Int, to: Int
+    ) -> Bool {
+        guard from >= 0, to > from + 1 else { return false }
+        var i = from + 1
+        if i < to, chars[i] == "?" {
+            // Only the non-capturing form; lookarounds and atomic groups
+            // stay on the conservative side.
+            guard i + 1 < to, chars[i + 1] == ":" else { return false }
+            i += 2
+        }
+        var alternatives: [[Character]] = [[]]
+        while i < to {
+            let c = chars[i]
+            switch c {
+            case "\\":
+                guard i + 1 < to else { return false }
+                let e = chars[i + 1]
+                // Only escaped punctuation is a literal; `\d`, `\w`, `\b`,
+                // `\1`, `\p{…}` and the control escapes are not.
+                if e.isLetter || e.isNumber { return false }
+                alternatives[alternatives.count - 1].append(e)
+                i += 2
+            case "|":
+                alternatives.append([])
+                i += 1
+            case "(", ")", "[", "]", "*", "+", "?", "{", "}", ".", "^", "$":
+                return false
+            default:
+                alternatives[alternatives.count - 1].append(c)
+                i += 1
+            }
+        }
+        guard alternatives.count >= 2, alternatives.allSatisfy({ !$0.isEmpty }) else { return false }
+        for a in alternatives.indices {
+            for b in alternatives.indices where a != b {
+                let x = alternatives[a], y = alternatives[b]
+                if x.count <= y.count, Array(y.prefix(x.count)) == x { return false }
+            }
+        }
+        return true
+    }
 
     private static func skipCharClass(_ chars: [Character], from: Int) -> Int {
         var i = from + 1

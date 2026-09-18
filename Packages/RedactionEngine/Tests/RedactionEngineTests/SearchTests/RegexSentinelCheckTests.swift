@@ -112,7 +112,7 @@ struct RegexSentinelCheckTests {
         let probes = [
             String(repeating: "S3CRET-", count: 30),   // patternTooLong
             #"(S3CRET|S3CRETS3CRET)*b"#,               // likelyPathological
-            #"(S3CRET{2,63})+b"#,                      // nestedQuantifiers
+            #"(S3CRET\w{2,63})+b"#,                    // nestedQuantifiers
             #"(S3CRET{0,40}){0,40}"#,                  // nestedBoundProduct
         ]
         for probe in probes {

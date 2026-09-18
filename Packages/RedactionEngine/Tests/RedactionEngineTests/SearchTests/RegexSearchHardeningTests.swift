@@ -37,9 +37,13 @@ struct RegexSearchHardeningTests {
         #expect(DocumentSearcher.validateRegexPattern("(a+|b+)+") == nil)
     }
 
-    @Test("validateRegexPattern rejects `(a|b){2,}` (group with unbounded open brace)")
+    @Test("validateRegexPattern rejects `(a|ab){2,}` (overlapping alternation under an open brace)")
     func rejectsOpenBraceOverAlternation() {
-        #expect(DocumentSearcher.validateRegexPattern("(a|b){2,}") == nil)
+        // `(a|b){2,}` — two distinct single letters — repeats
+        // deterministically and is accepted since the precheck's
+        // literal-alternation demotion.
+        #expect(DocumentSearcher.validateRegexPattern("(a|ab){2,}") == nil)
+        #expect(DocumentSearcher.validateRegexPattern("(a|b){2,}") != nil)
     }
 
     // MARK: - Validation still accepts safe shapes
