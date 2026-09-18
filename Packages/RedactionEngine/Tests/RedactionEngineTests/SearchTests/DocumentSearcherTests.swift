@@ -779,13 +779,16 @@ struct DocumentSearcherTests {
     /// A searcher whose OCR cache holds one image-only page of `lineCount`
     /// lines, each carrying exactly one digit run, so a `\d+` regex over
     /// the OCR route yields one result per line — a page that bursts well
-    /// past a hundred matches from a single yield loop.
+    /// past a hundred matches from a single yield loop. Every number
+    /// starts with a clear digit so the OCR normalizer keeps it digit
+    /// context on the letter-majority line (a run of 0/1/5/8 alone would
+    /// be read as letters and yield nothing).
     private func digitRunSearcher(lineCount: Int) async -> DocumentSearcher {
         let searcher = DocumentSearcher()
         let step = 1.0 / Double(lineCount + 1)
         let lines = (0..<lineCount).map { i in
             OCREngine.TextLine(
-                text: "Item \(String(format: "%04d", i)) posted",
+                text: "Item \(2000 + i) posted",
                 normalizedRect: CGRect(x: 0.1, y: step * Double(i + 1), width: 0.6, height: step * 0.8),
                 confidence: 0.9
             )
