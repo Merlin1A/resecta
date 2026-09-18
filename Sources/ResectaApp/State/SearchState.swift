@@ -976,14 +976,32 @@ final class SearchState: Identifiable {
 
     // MARK: - Result Batching (P2)
 
-    /// Pending results buffered before flush.
-    private var pendingResults: [SearchResult] = []
+    /// Pending results buffered before flush, each tagged with the run
+    /// it was appended under so a flush moves only the current run's.
+    private var pendingResults: [(run: Int, result: SearchResult)] = []
     /// Flush timer task.
     private var flushTask: Task<Void, Never>?
     /// Batch size threshold before immediate flush.
     private static let batchFlushSize = 50
     /// Time interval between automatic flushes.
     private static let flushInterval: Duration = .milliseconds(100)
+
+    // MARK: - Run token
+
+    /// Names the run whose results the sheet is collecting. Minted by
+    /// `beginRun()` and bumped by every result clear, so a result from a
+    /// superseded run — a stream still draining after the sheet cancelled
+    /// it and started the next — is told apart from the current run's
+    /// and dropped instead of appended. The current run's results are
+    /// never dropped by it.
+    private(set) var runToken: Int = 0
+
+    /// Starts a run: mints and returns the token the run's consumer
+    /// passes to `appendResult(_:run:)`. Called after `clearResults()`.
+    func beginRun() -> Int {
+        runToken += 1
+        return runToken
+    }
 
     // MARK: - Result Navigation
 
@@ -1177,6 +1195,7 @@ final class SearchState: Identifiable {
         regexError = nil
         flushTask?.cancel()
         flushTask = nil
+        runToken += 1
         pendingResults.removeAll()
         results = []
         appliedResultIDs.removeAll()
@@ -1374,7 +1393,12 @@ final class SearchState: Identifiable {
     /// Buffer a result from the search stream. Flushed in batches
     /// to avoid per-result @Observable change notifications (P2).
     /// Stops accepting at engine cap and cancels the search (P3).
-    func appendResult(_ result: SearchResult) {
+    /// `run` names the run the result belongs to (the token
+    /// `beginRun()` handed its consumer); a result from a superseded
+    /// run is dropped before anything below sees it. A caller that
+    /// holds no token — a direct seed — appends to the current run.
+    func appendResult(_ result: SearchResult, run: Int? = nil) {
+        if let run, run != runToken { return }
         if results.count + pendingResults.count >= DocumentSearcher.maxResults {
             resultsAtCap = true
             // Snapshot how many pages the cancelled scan will
@@ -1397,7 +1421,7 @@ final class SearchState: Identifiable {
             // be silently swiped away unreviewed.
             hasUnreviewedPreselection = true
         }
-        pendingResults.append(stored)
+        pendingResults.append((run: runToken, result: stored))
         if pendingResults.count >= Self.batchFlushSize {
             flushPendingResults()
         } else if flushTask == nil {
@@ -1409,13 +1433,17 @@ final class SearchState: Identifiable {
         }
     }
 
-    /// Flush buffered results into the published array. Single version bump.
+    /// Flush buffered results into the published array. Single version
+    /// bump. Only the current run's entries move; anything buffered
+    /// under an earlier token is discarded with the flush.
     func flushPendingResults() {
         flushTask?.cancel()
         flushTask = nil
         guard !pendingResults.isEmpty else { return }
-        results.append(contentsOf: pendingResults)
+        let current = pendingResults.filter { $0.run == runToken }.map(\.result)
         pendingResults.removeAll()
+        guard !current.isEmpty else { return }
+        results.append(contentsOf: current)
         resultVersion += 1
     }
 
@@ -1432,6 +1460,7 @@ final class SearchState: Identifiable {
     private func clearResultState() {
         flushTask?.cancel()
         flushTask = nil
+        runToken += 1
         pendingResults.removeAll()
         results = []
         appliedResultIDs.removeAll()

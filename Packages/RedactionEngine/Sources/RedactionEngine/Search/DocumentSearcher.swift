@@ -568,6 +568,11 @@ public actor DocumentSearcher {
 
     /// Search the document, yielding results progressively.
     ///
+    /// Delivery is complete: the stream buffers without bound, so a page
+    /// that bursts more matches than a lagging consumer has drained loses
+    /// nothing. The bound on results in flight is `maxResults`, enforced
+    /// at every yield site.
+    ///
     /// - Parameters:
     ///   - document: The PDF to search (SendablePDFDocument wrapper).
     ///   - mode: Text, regex, or multi-term search.
@@ -580,7 +585,7 @@ public actor DocumentSearcher {
     ) -> AsyncStream<SearchResult> {
         let (stream, continuation) = AsyncStream.makeStream(
             of: SearchResult.self,
-            bufferingPolicy: .bufferingNewest(100)
+            bufferingPolicy: .unbounded
         )
 
         let searcher = self
@@ -1301,6 +1306,20 @@ public actor DocumentSearcher {
         progress: @Sendable (Int, Int) -> Void,
         continuation: AsyncStream<SearchResult>.Continuation
     ) async {
+        // Empty and whitespace-only entries carry no query: drop them
+        // before either arm reads the list. Left in, the AND arm demanded
+        // a term no page could carry and its result set was always empty;
+        // the OR arm ran a lone space as a live query. The live preview
+        // already filters the same way, so the full search now agrees
+        // with it. An all-blank list finishes at once.
+        let terms = terms.filter {
+            !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        guard !terms.isEmpty else {
+            continuation.finish()
+            return
+        }
+
         // AND mode requires accumulate-then-filter-then-stream.
         // OR mode (default) streams results directly as before (zero behavior change).
         if options.multiTermConjunction {
