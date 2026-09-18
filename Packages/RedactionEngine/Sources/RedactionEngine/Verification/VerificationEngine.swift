@@ -188,6 +188,11 @@ public struct VerificationEngine: Sendable {
         var copyOverride: SearchRecheck.Copy? = nil
         // Display-only per-query lines (Search Re-check only).
         var layerQueryLines: [SearchRecheckQueryLine]? = nil
+        // The layer's own classification of a WARN that says the check did
+        // not fully run (see `LayerResult.couldNotVerify`); each dispatcher
+        // returns it beside its status, `false` for every WARN that reports
+        // what a check saw.
+        var couldNotVerify = false
 
         // Each layer method calls
         // `try Task.checkCancellation()` on entry (and within long inner
@@ -199,10 +204,11 @@ public struct VerificationEngine: Sendable {
         do { // LegalPhrases:safe (Swift keyword usage below)
             switch layer {
             case .textExtraction:
-                let (s0, pages0) = try runLayer1TextExtraction(
+                let (s0, pages0, cnv0) = try runLayer1TextExtraction(
                     doc, pipelineMode: pipelineMode, perPageModes: perPageModes)
                 status = s0
                 layerPageReferences = pages0
+                couldNotVerify = cnv0
             case .ocrCheck:
                 // Layer 2's OCR gate applies the same per-term boundary
                 // discipline as the byte layers (String-space mirror in
@@ -210,49 +216,58 @@ public struct VerificationEngine: Sendable {
                 // substring-match inside an unrelated word read off a raster.
                 // The third element carries the display-only term texts
                 // behind an `.attention` verdict (Layer 3's shape).
-                let (s1, pages1, terms1) = try await runLayer2OCR(
+                let (s1, pages1, terms1, cnv1) = try await runLayer2OCR(
                     doc, pipelineMode: pipelineMode,
                     regions: regions, sensitiveTerms: sensitiveTerms,
                     perPageModes: perPageModes)
                 status = s1
                 layerPageReferences = pages1
                 layerReviewTerms = terms1
+                couldNotVerify = cnv1
             case .binaryStringSearch:
-                let (s2, pages2, terms2) = try runLayer3BinarySearch(doc, sensitiveTerms: sensitiveTerms)
+                let (s2, pages2, terms2, cnv2) = try runLayer3BinarySearch(doc, sensitiveTerms: sensitiveTerms)
                 status = s2
                 layerPageReferences = pages2
                 layerReviewTerms = terms2
+                couldNotVerify = cnv2
             case .structureCheck:
-                let (s, pages) = try runLayer4Structural(doc)
+                let (s, pages, cnv3) = try runLayer4Structural(doc)
                 status = s
                 layerPageReferences = pages
+                couldNotVerify = cnv3
             case .metadataCheck:
-                status = try runLayer5Metadata(doc)
+                let (s4, cnv4) = try runLayer5Metadata(doc)
+                status = s4
+                couldNotVerify = cnv4
             // Layers 6–10: Sandwich-specific.
             // Only run for Searchable Redaction pages.
             case .spatialVerification:
-                let (s5, pages5) = try await runLayer6SpatialVerification(
+                let (s5, pages5, cnv5) = try await runLayer6SpatialVerification(
                     doc, regions: regions, perPageModes: perPageModes,
                     verifier: sandwichVerifier)
                 status = s5
                 layerPageReferences = pages5
+                couldNotVerify = cnv5
             case .characterCount:
-                let (s6, pages6) = try await runLayer7CharacterCount(
+                let (s6, pages6, cnv6) = try await runLayer7CharacterCount(
                     doc, filterDigests: filterDigests, perPageModes: perPageModes,
                     verifier: sandwichVerifier)
                 status = s6
                 layerPageReferences = pages6
+                couldNotVerify = cnv6
             case .fontVerification:
-                let (s7, pages7) = try await runLayer8FontVerification(
+                let (s7, pages7, cnv7) = try await runLayer8FontVerification(
                     doc, perPageModes: perPageModes, verifier: sandwichVerifier)
                 status = s7
                 layerPageReferences = pages7
+                couldNotVerify = cnv7
             case .characterLineage:
-                let (s8, pages8) = try await runLayer9CharacterLineage(
+                let (s8, pages8, cnv8) = try await runLayer9CharacterLineage(
                     doc, filterDigests: filterDigests, perPageModes: perPageModes,
                     verifier: sandwichVerifier)
                 status = s8
                 layerPageReferences = pages8
+                couldNotVerify = cnv8
             case .operatorReExtraction:
                 // Layer 10 — operator-semantic re-extraction.
                 // Independent of `regions`, `perPageModes`, `filterDigests`, and
@@ -265,6 +280,7 @@ public struct VerificationEngine: Sendable {
                 status = l10.status
                 layerPageReferences = l10.pageReferences
                 layerReviewTerms = l10.reviewTermTexts
+                couldNotVerify = l10.couldNotVerify
             case .searchRecheck:
                 // Search Re-check — re-runs every applied search on the
                 // output through the search engine itself (text layer or the
@@ -280,6 +296,11 @@ public struct VerificationEngine: Sendable {
                 layerReviewTerms = outcome.reviewTermTexts
                 copyOverride = outcome.copyOverride
                 layerQueryLines = outcome.queryLines
+                // The re-check's only WARN family is its unchecked-pages
+                // one (pages it could not open or read, OCR it could not
+                // run, pages over its caps): a WARN here always says the
+                // re-check did not fully run.
+                couldNotVerify = outcome.status.isWarn
             }
         } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
             let duration = CFAbsoluteTimeGetCurrent() - start
@@ -363,7 +384,8 @@ public struct VerificationEngine: Sendable {
             pageReferences: layerPageReferences, durationSeconds: duration,
             reviewTermTexts: layerReviewTerms,
             layer: layer,
-            queryLines: layerQueryLines
+            queryLines: layerQueryLines,
+            couldNotVerify: couldNotVerify
         )
     }
 
@@ -424,7 +446,7 @@ public struct VerificationEngine: Sendable {
         _ doc: PDFDocument,
         pipelineMode: PipelineMode,
         perPageModes: [PipelineMode]
-    ) throws -> (VerificationStatus, [Int]?) {
+    ) throws -> (VerificationStatus, [Int]?, Bool) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         var selectableTextPages: [Int] = []
@@ -462,17 +484,17 @@ public struct VerificationEngine: Sendable {
         if !selectableTextPages.isEmpty {
             let list = selectableTextPages.map { String($0 + 1) }.joined(separator: ", ")
             return (.fail("Selectable text found on \(pagePhrase(selectableTextPages, list: list))"),
-                    selectableTextPages)
+                    selectableTextPages, false)
         }
         if !annotationPages.isEmpty {
             let list = annotationPages.map { String($0 + 1) }.joined(separator: ", ")
             return (.fail("Annotations found on \(pagePhrase(annotationPages, list: list))"),
-                    annotationPages)
+                    annotationPages, false)
         }
 
         // Check document-level structures
         if doc.outlineRoot != nil {
-            return (.fail("Bookmarks found in output"), nil)
+            return (.fail("Bookmarks found in output"), nil, false)
         }
 
         // Check for /AcroForm via CGPDFDocument. A silent no-op on any nil
@@ -481,19 +503,19 @@ public struct VerificationEngine: Sendable {
         guard let url = doc.documentURL,
               let cgDoc = CGPDFDocument(url as CFURL),
               let catalog = cgDoc.catalog else {
-            return (.warn("Could not verify /AcroForm absence"), nil)
+            return (.warn("Could not verify /AcroForm absence"), nil, true)
         }
         var acroForm: CGPDFDictionaryRef?
         if CGPDFDictionaryGetDictionary(catalog, "AcroForm", &acroForm) {
-            return (.fail("Form fields found in output"), nil)
+            return (.fail("Form fields found in output"), nil, false)
         }
 
         // No leak reported, but some pages were never inspected —
         // an honest WARN, not a clean PASS.
         if !unreadablePages.isEmpty {
-            return (unreadablePagesWarn(unreadablePages), unreadablePages)
+            return (unreadablePagesWarn(unreadablePages), unreadablePages, true)
         }
-        return (.pass, nil)
+        return (.pass, nil, false)
     }
 
     // MARK: - Layer 2: OCR on Output
@@ -1442,7 +1464,7 @@ public struct VerificationEngine: Sendable {
         regions: [Int: [RedactionRegion]],
         sensitiveTerms: [SensitiveTerm],
         perPageModes: [PipelineMode]
-    ) async throws -> (VerificationStatus, [Int]?, [String]?) {
+    ) async throws -> (VerificationStatus, [Int]?, [String]?, Bool) {
         // Entry-level cooperative cancellation, plus a
         // per-page check inside the OCR loop. A 50-page OCR pass that does
         // not check until layer return would exceed the 50 ms p95
@@ -1603,7 +1625,10 @@ public struct VerificationEngine: Sendable {
     }
 
     /// Cross-page fold: collapses the per-page Layer-2 buckets into the layer's
-    /// single (status, pageReferences, reviewTermTexts) verdict. `static` and
+    /// single (status, pageReferences, reviewTermTexts, couldNotVerify)
+    /// verdict — the fourth element is true for the two WARN arms that say
+    /// the check did not fully run (unmappable coordinates, unchecked
+    /// pages) and false for every note. `static` and
     /// OCR-free so arm precedence has a direct unit test
     /// (`Layer2FoldOrderTests`); `runLayer2OCR` feeds it the real buckets.
     /// `reviewTermsByPage` (1-based) carries the term texts behind each
@@ -1614,7 +1639,7 @@ public struct VerificationEngine: Sendable {
         pipelineMode: PipelineMode,
         documentHasRegions: Bool,
         reviewTermsByPage: [Int: [String]] = [:]
-    ) -> (VerificationStatus, [Int]?, [String]?) {
+    ) -> (VerificationStatus, [Int]?, [String]?, Bool) {
         // Fold the per-page buckets into the per-bucket page lists, SORTED
         // ascending so the message text is byte-identical regardless of OCR
         // completion order (the sequential loop appended in page order; the
@@ -1656,7 +1681,7 @@ public struct VerificationEngine: Sendable {
             // black box — a leak in EITHER mode. Region scoping already
             // excludes Searchable Redaction's expected surviving text.
             return (.fail("Sensitive text detected within a redacted region on \(pagePhrase(pagesWithSensitiveTermInRegion, list: list))"),
-                    pagesWithSensitiveTermInRegion.map { $0 - 1 }, nil)
+                    pagesWithSensitiveTermInRegion.map { $0 - 1 }, nil, false)
         }
         // On a rasterized page the region is a destroyed-pixel box that
         // holds NO readable text by construction, so ANY in-region OCR hit is a
@@ -1669,12 +1694,12 @@ public struct VerificationEngine: Sendable {
         if !pagesWithTextInRegionSecureRaster.isEmpty {
             let list = pagesWithTextInRegionSecureRaster.map(String.init).joined(separator: ", ")
             return (.fail("Readable text detected within a redacted region on \(pagePhrase(pagesWithTextInRegionSecureRaster, list: list))"),
-                    pagesWithTextInRegionSecureRaster.map { $0 - 1 }, nil)
+                    pagesWithTextInRegionSecureRaster.map { $0 - 1 }, nil, false)
         }
         if !pagesWithTextInRegionSearchable.isEmpty {
             let list = pagesWithTextInRegionSearchable.map(String.init).joined(separator: ", ")
             return (.warn("OCR detected text within a redacted region on \(pagePhrase(pagesWithTextInRegionSearchable, list: list))"),
-                    pagesWithTextInRegionSearchable.map { $0 - 1 }, nil)
+                    pagesWithTextInRegionSearchable.map { $0 - 1 }, nil, false)
         }
         // A term the user redacted is still readable outside every region —
         // read by OCR off the rendered page, so it is reported on BOTH page
@@ -1696,7 +1721,7 @@ public struct VerificationEngine: Sendable {
             }
             return (.attention("Text matching your redactions is still readable on \(pagePhrase(pagesWithSensitiveTermOutsideRegions, list: list)) — read by OCR outside every redacted region"),
                     pagesWithSensitiveTermOutsideRegions.map { $0 - 1 },
-                    reviewTerms.isEmpty ? nil : reviewTerms)
+                    reviewTerms.isEmpty ? nil : reviewTerms, false)
         }
         // Unmappable-coordinate pages (multi-image or padded thumbnail)
         // that carry OCR text near a region — surfaced as a WARN because the
@@ -1704,7 +1729,7 @@ public struct VerificationEngine: Sendable {
         if !pagesWithUnmappableImages.isEmpty {
             let list = pagesWithUnmappableImages.map(String.init).joined(separator: ", ")
             return (.warn("OCR coordinates could not be mapped to page space on \(pagePhrase(pagesWithUnmappableImages, list: list)) — text could not be confirmed inside or outside a redacted region"),
-                    pagesWithUnmappableImages.map { $0 - 1 }, nil)
+                    pagesWithUnmappableImages.map { $0 - 1 }, nil, true)
         }
         if !pagesWithFillArtifactInRegion.isEmpty {
             let list = pagesWithFillArtifactInRegion.map(String.init).joined(separator: ", ")
@@ -1719,7 +1744,7 @@ public struct VerificationEngine: Sendable {
             // — on a multi-signal document the warning sets the layer status —
             // and above the generic outside-text note (note-tier specificity).
             return (.info("OCR detected likely fill artifacts within a redacted region on \(pagePhrase(pagesWithFillArtifactInRegion, list: list)) — no readable text recovered"),
-                    pagesWithFillArtifactInRegion.map { $0 - 1 }, nil)
+                    pagesWithFillArtifactInRegion.map { $0 - 1 }, nil, false)
         }
         if !pagesWithTextOutsideRegionsOnly.isEmpty {
             let list = pagesWithTextOutsideRegionsOnly.map(String.init).joined(separator: ", ")
@@ -1727,7 +1752,7 @@ public struct VerificationEngine: Sendable {
             case .searchableRedaction:
                 // Selectable/raster text outside regions is expected on a Searchable page.
                 return (.info("OCR detected text on \(pagePhrase(pagesWithTextOutsideRegionsOnly, list: list)) — expected for Searchable Redaction mode."),
-                        pagesWithTextOutsideRegionsOnly.map { $0 - 1 }, nil)
+                        pagesWithTextOutsideRegionsOnly.map { $0 - 1 }, nil, false)
             case .secureRasterization:
                 // Out-of-region OCR text on a Secure-Rasterized page is expected
                 // output — nearly every real document keeps readable non-redacted
@@ -1745,15 +1770,15 @@ public struct VerificationEngine: Sendable {
                 // own content → PASS.
                 if documentHasRegions {
                     return (.info("Unredacted page content remains readable on \(pagePhrase(pagesWithTextOutsideRegionsOnly, list: list)) — expected for this mode."),
-                            pagesWithTextOutsideRegionsOnly.map { $0 - 1 }, nil)
+                            pagesWithTextOutsideRegionsOnly.map { $0 - 1 }, nil, false)
                 }
             }
         }
         if !uncheckedPages.isEmpty {
             return (.warn("OCR could not be run on \(pageCountPhrase(uncheckedPages.count))"),
-                    uncheckedPages.map { $0 - 1 }, nil)
+                    uncheckedPages.map { $0 - 1 }, nil, true)
         }
-        return (.pass, nil, nil)
+        return (.pass, nil, nil, false)
     }
 
     /// Extract ALL embedded JPEG/JPEG2000 images from a PDF page's XObject
@@ -1916,7 +1941,7 @@ public struct VerificationEngine: Sendable {
     /// texts behind an `.attention` verdict (nil for every other status).
     private func runLayer3BinarySearch(
         _ doc: PDFDocument, sensitiveTerms: [SensitiveTerm]
-    ) throws -> (VerificationStatus, [Int]?, [String]?) {
+    ) throws -> (VerificationStatus, [Int]?, [String]?, Bool) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         // No terms provided — expected for manual-only redaction.
@@ -1925,14 +1950,14 @@ public struct VerificationEngine: Sendable {
         // notes group without bumping the masthead (Layer-7 boundary-count
         // precedent).
         guard !sensitiveTerms.isEmpty else {
-            return (.info("No sensitive terms were provided — string search did not run."), nil, nil)
+            return (.info("No sensitive terms were provided — string search did not run."), nil, nil, false)
         }
         // Filter terms too short to search (shared
         // `AhoCorasick.isSearchableTerm`): ≥3 scalars (supports 3-letter PII
         // abbreviations like SSN, DOB, PHI) or a 2-character CJK name.
         let validTerms = sensitiveTerms.filter { AhoCorasick.isSearchableTerm($0.text) }
         guard !validTerms.isEmpty else {
-            return (.warn("All sensitive terms shorter than 3 characters"), nil, nil)
+            return (.warn("All sensitive terms shorter than 3 characters"), nil, nil, true)
         }
         // Surfaced on the otherwise-clean path below so a partial drop is
         // never silent (the all-short WARN above covers the total drop).
@@ -1946,13 +1971,13 @@ public struct VerificationEngine: Sendable {
         // verification call; caching needs an actor/class wrapper for ~25 ms
         // saved once per export — low benefit, no security relevance.
         let termAutomaton = SensitiveTermAutomaton(validTerms: validTerms)
-        guard termAutomaton.hasPatterns else { return (.pass, nil, nil) }
+        guard termAutomaton.hasPatterns else { return (.pass, nil, nil, false) }
         let automaton = termAutomaton.automaton
 
         // If the automaton degraded due to pattern size limits,
         // report the limitation rather than silently passing.
         if automaton.isDegraded {
-            return (.warn("Sensitive term search exceeded size limit — results may be incomplete"), nil, nil)
+            return (.warn("Sensitive term search exceeded size limit — results may be incomplete"), nil, nil, true)
         }
 
         // Get raw PDF bytes.
@@ -1960,7 +1985,7 @@ public struct VerificationEngine: Sendable {
         // `Data(contentsOf:options:.mappedIfSafe)`; loadPDFData uses the
         // default-options overload, which is `.mappedIfSafe`.
         guard let (data, cgDoc) = loadPDFData(doc) else {
-            return (.warn("Could not read output PDF for binary search"), nil, nil)
+            return (.warn("Could not read output PDF for binary search"), nil, nil, true)
         }
 
         // First WARN encountered, returned only if no FAIL is found below: a
@@ -2079,10 +2104,10 @@ public struct VerificationEngine: Sendable {
             let message = [structuralFailMessage, decodedResidualMessage]
                 .compactMap { $0 }
                 .joined(separator: "; ")
-            return (.fail(message), decodedHitPages.isEmpty ? nil : decodedHitPages, nil)
+            return (.fail(message), decodedHitPages.isEmpty ? nil : decodedHitPages, nil, false)
         }
         if let decodedResidualMessage {
-            return (.attention(decodedResidualMessage), decodedHitPages, decodedTermTexts)
+            return (.attention(decodedResidualMessage), decodedHitPages, decodedTermTexts, false)
         }
 
         // EXIF scan ("scan JPEG APP1/EXIF markers", WARN-only):
@@ -2104,13 +2129,13 @@ public struct VerificationEngine: Sendable {
             }
         }
 
-        if let warn = deferredWarn { return (.warn(warn.message), warn.pages, nil) }
+        if let warn = deferredWarn { return (.warn(warn.message), warn.pages, nil, false) }
         if droppedTermCount > 0 {
             // Partial-coverage honesty: some (not all) terms were too short
             // to search. Informational — the searched terms were clean.
-            return (.info(shortTermTail(droppedTermCount)), nil, nil)
+            return (.info(shortTermTail(droppedTermCount)), nil, nil, false)
         }
-        return (.pass, nil, nil)
+        return (.pass, nil, nil, false)
     }
 
     /// Byte ranges of PDF stream data (between `stream` and `endstream` markers).
@@ -2200,12 +2225,12 @@ public struct VerificationEngine: Sendable {
 
     /// Returns (status, affectedPages) where affectedPages is non-nil
     /// only for per-page /AA findings (enables tappable page chips in UI).
-    private func runLayer4Structural(_ doc: PDFDocument) throws -> (VerificationStatus, [Int]?) {
+    private func runLayer4Structural(_ doc: PDFDocument) throws -> (VerificationStatus, [Int]?, Bool) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         guard let (pdfData, cgDoc) = loadPDFData(doc),
               let catalog = cgDoc.catalog else {
-            return (.warn("Could not inspect document structure"), nil)
+            return (.warn("Could not inspect document structure"), nil, true)
         }
 
         // FAIL-triggering keys
@@ -2219,7 +2244,7 @@ public struct VerificationEngine: Sendable {
         for key in failKeys {
             var obj: CGPDFObjectRef?
             if CGPDFDictionaryGetObject(catalog, key, &obj) {
-                return (.fail("\(key) found in document catalog"), nil)
+                return (.fail("\(key) found in document catalog"), nil, false)
             }
         }
 
@@ -2234,7 +2259,7 @@ public struct VerificationEngine: Sendable {
             for key in ["EmbeddedFiles", "JavaScript"] {
                 var subtree: CGPDFDictionaryRef?
                 if CGPDFDictionaryGetDictionary(namesDict, key, &subtree) {
-                    return (.fail("\(key) found under /Names in document catalog"), nil)
+                    return (.fail("\(key) found under /Names in document catalog"), nil, false)
                 }
             }
         }
@@ -2253,7 +2278,7 @@ public struct VerificationEngine: Sendable {
             }
         }
         if !aaPages.isEmpty {
-            return (.fail("Per-page /AA (automatic action) found on \(pageCountPhrase(aaPages.count))"), aaPages)
+            return (.fail("Per-page /AA (automatic action) found on \(pageCountPhrase(aaPages.count))"), aaPages, false)
         }
 
         // WARN-triggering keys
@@ -2280,22 +2305,22 @@ public struct VerificationEngine: Sendable {
             // Incremental updates can append original content
             // after redaction. Resecta's reconstructor writes a single clean
             // PDF stream — multiple markers indicate tampering or corruption.
-            return (.fail("Multiple %%EOF markers (\(eofCount)) — incremental update may contain original content"), nil)
+            return (.fail("Multiple %%EOF markers (\(eofCount)) — incremental update may contain original content"), nil, false)
         }
 
         if !warnings.isEmpty {
-            return (.warn("Structural findings: \(warnings.joined(separator: ", "))"), nil)
+            return (.warn("Structural findings: \(warnings.joined(separator: ", "))"), nil, false)  // LegalPhrases:safe (the shipped message; a list of structural notes)
         }
-        return (.pass, nil)
+        return (.pass, nil, false)
     }
 
     // MARK: - Layer 5: Metadata Verification
 
-    private func runLayer5Metadata(_ doc: PDFDocument) throws -> VerificationStatus {
+    private func runLayer5Metadata(_ doc: PDFDocument) throws -> (VerificationStatus, Bool) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         guard let (pdfData, cgDoc) = loadPDFData(doc) else {
-            return .warn("Could not inspect metadata")
+            return (.warn("Could not inspect metadata"), true)
         }
 
         // Scan for XMP metadata BEFORE the /Info guard. XMP lives in
@@ -2310,9 +2335,9 @@ public struct VerificationEngine: Sendable {
         // Check /Info dictionary. When absent, the XMP scan above is still
         // authoritative — surface it rather than passing blind.
         guard let infoDict = cgDoc.info else {
-            return hasXMP
+            return (hasXMP
                 ? .warn("Auto-injected metadata present: XMP metadata")
-                : .pass
+                : .pass, false)
         }
 
         // Standard metadata keys to check. FAIL on key presence regardless of
@@ -2330,7 +2355,7 @@ public struct VerificationEngine: Sendable {
         for key in sensitiveKeys {
             var obj: CGPDFObjectRef?
             if CGPDFDictionaryGetObject(infoDict, key, &obj) {
-                return .fail("Metadata key /\(key) present")
+                return (.fail("Metadata key /\(key) present"), false)
             }
         }
 
@@ -2377,7 +2402,7 @@ public struct VerificationEngine: Sendable {
         }, nil)
         if !nonStandardKeys.isEmpty {
             // Do not include key values — just names
-            return .fail("Non-standard /Info key(s): \(nonStandardKeys.joined(separator: ", "))")
+            return (.fail("Non-standard /Info key(s): \(nonStandardKeys.joined(separator: ", "))"), false)
         }
 
         // Writer-field attestation. The writer rewrites the auto-injected
@@ -2404,7 +2429,7 @@ public struct VerificationEngine: Sendable {
             var value = (CGPDFStringCopyTextString(ref) as String?) ?? ""
             while value.hasSuffix(" ") { value.removeLast() }
             if value != fixedValue {
-                return .warn("Producer or timestamp fields were not rewritten to the fixed values")
+                return (.warn("Producer or timestamp fields were not rewritten to the fixed values"), false)
             }
         }
 
@@ -2423,12 +2448,12 @@ public struct VerificationEngine: Sendable {
             // XMP is the sole entry.
             let onlyXMP = warnings.allSatisfy { $0 == "XMP metadata" }
             let prefix = onlyXMP ? "Auto-injected metadata present" : "Metadata present"
-            return .warn("\(prefix): \(warnings.joined(separator: ", "))")
+            return (.warn("\(prefix): \(warnings.joined(separator: ", "))"), false)
         }
         if !infoFindings.isEmpty {
-            return .info("Auto-injected metadata present: \(infoFindings.joined(separator: ", "))")
+            return (.info("Auto-injected metadata present: \(infoFindings.joined(separator: ", "))"), false)
         }
-        return .pass
+        return (.pass, false)
     }
 
     // MARK: - PDF Data Loading Helper
@@ -2500,7 +2525,7 @@ public struct VerificationEngine: Sendable {
         regions: [Int: [RedactionRegion]],
         perPageModes: [PipelineMode],
         verifier: SandwichVerification
-    ) async throws -> (VerificationStatus, [Int]?) {
+    ) async throws -> (VerificationStatus, [Int]?, Bool) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         var failingPages: [Int] = []
@@ -2515,6 +2540,10 @@ public struct VerificationEngine: Sendable {
         // order.
         var exclusionWarnPages: [Int] = []
         var firstExclusionWarnMessage: String?
+        // The classification of that first WARN: true when the verifier
+        // could not place characters (the unmeasured-position note), false
+        // for a positional edge graze.
+        var firstExclusionCouldNotVerify = false
         // Eligible pages PDFKit cannot open surface as a WARN when the
         // layer would otherwise PASS — see runLayer1TextExtraction.
         var unreadablePages: [Int] = []
@@ -2586,17 +2615,20 @@ public struct VerificationEngine: Sendable {
                     )
                 }
 
-            let result = try await verifier.verifySpatialExclusion(
+            let outcome = try await verifier.spatialExclusionOutcome(
                 outputPage: page,
                 regionShapes: regionShapes,
                 pageIndex: i
             )
-            if case .fail(let msg) = result {
+            if case .fail(let msg) = outcome.status {
                 failingPages.append(i)
                 if firstFailMessage == nil { firstFailMessage = msg }
-            } else if case .warn(let msg) = result {
+            } else if case .warn(let msg) = outcome.status {
                 exclusionWarnPages.append(i)
-                if firstExclusionWarnMessage == nil { firstExclusionWarnMessage = msg }
+                if firstExclusionWarnMessage == nil {
+                    firstExclusionWarnMessage = msg
+                    firstExclusionCouldNotVerify = outcome.couldNotVerify
+                }
             }
         }
         // A text layer on a page written as image-only outranks every other
@@ -2604,19 +2636,19 @@ public struct VerificationEngine: Sendable {
         if !secureDeclaredTextPages.isEmpty {
             let list = secureDeclaredTextPages.map { String($0 + 1) }.joined(separator: ", ")
             return (.fail("A page written as image-only still carries a text layer on \(pagePhrase(secureDeclaredTextPages, list: list))"),
-                    secureDeclaredTextPages)
+                    secureDeclaredTextPages, false)
         }
         if let msg = firstFailMessage {
-            return (.fail(msg), failingPages)
+            return (.fail(msg), failingPages, false)
         }
         // The exclusion pass's WARN outranks the unreadable-page WARN
         // (mirror of FAIL's masking above; the combined case is rare and the
         // exclusion message is the more actionable of the two).
         if let msg = firstExclusionWarnMessage {
-            return (.warn(msg), exclusionWarnPages)
+            return (.warn(msg), exclusionWarnPages, firstExclusionCouldNotVerify)
         }
         if !unreadablePages.isEmpty {
-            return (unreadablePagesWarn(unreadablePages), unreadablePages)
+            return (unreadablePagesWarn(unreadablePages), unreadablePages, true)
         }
         // Pages beyond `perPageModes` were never selected above — report
         // them rather than pass them (see perPageModeCoverageGap).
@@ -2624,9 +2656,9 @@ public struct VerificationEngine: Sendable {
             perPageModes: perPageModes, pageCount: doc.pageCount
         ) {
             return (perPageModeCoverageWarn(
-                uncovered: uncovered, pageCount: doc.pageCount), uncovered)
+                uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
         }
-        return (.pass, nil)
+        return (.pass, nil, false)
     }
 
     // MARK: - Layer 7: Character Count Cross-Check
@@ -2638,7 +2670,7 @@ public struct VerificationEngine: Sendable {
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode],
         verifier: SandwichVerification
-    ) async throws -> (VerificationStatus, [Int]?) {
+    ) async throws -> (VerificationStatus, [Int]?, Bool) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         var failingPages: [Int] = []
@@ -2671,7 +2703,7 @@ public struct VerificationEngine: Sendable {
             }
         }
         if let msg = firstFailMessage {
-            return (.fail(msg), failingPages)
+            return (.fail(msg), failingPages, false)
         }
         // Eligible-but-unchecked → honest .skipped (the verify-only
         // resume path rebuilds all-nil digests). Partial coverage → .warn
@@ -2683,18 +2715,18 @@ public struct VerificationEngine: Sendable {
         // never counted as eligible, so they are reported last, on the
         // otherwise-PASS exit (see perPageModeCoverageGap).
         if eligible > 0 && checked == 0 {
-            return (.skipped, nil)
+            return (.skipped, nil, false)
         }
         if checked < eligible {
-            return (.warn("Cross-checked \(checked) of \(eligible) \(eligible == 1 ? "page" : "pages") — remaining pages lacked rasterization data"), nil)
+            return (.warn("Cross-checked \(checked) of \(eligible) \(eligible == 1 ? "page" : "pages") — remaining pages lacked rasterization data"), nil, true)
         }
         if let uncovered = perPageModeCoverageGap(
             perPageModes: perPageModes, pageCount: doc.pageCount
         ) {
             return (perPageModeCoverageWarn(
-                uncovered: uncovered, pageCount: doc.pageCount), uncovered)
+                uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
         }
-        return (.pass, nil)
+        return (.pass, nil, false)
     }
 
     // MARK: - Layer 8: Font Verification
@@ -2705,7 +2737,7 @@ public struct VerificationEngine: Sendable {
         _ doc: PDFDocument,
         perPageModes: [PipelineMode],
         verifier: SandwichVerification
-    ) async throws -> (VerificationStatus, [Int]?) {
+    ) async throws -> (VerificationStatus, [Int]?, Bool) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         var failingPages: [Int] = []
@@ -2732,10 +2764,10 @@ public struct VerificationEngine: Sendable {
             }
         }
         if let msg = firstFailMessage {
-            return (.fail(msg), failingPages)
+            return (.fail(msg), failingPages, false)
         }
         if !unreadablePages.isEmpty {
-            return (unreadablePagesWarn(unreadablePages), unreadablePages)
+            return (unreadablePagesWarn(unreadablePages), unreadablePages, true)
         }
         // Pages beyond `perPageModes` were never selected above — report
         // them rather than pass them (see perPageModeCoverageGap).
@@ -2743,9 +2775,9 @@ public struct VerificationEngine: Sendable {
             perPageModes: perPageModes, pageCount: doc.pageCount
         ) {
             return (perPageModeCoverageWarn(
-                uncovered: uncovered, pageCount: doc.pageCount), uncovered)
+                uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
         }
-        return (.pass, nil)
+        return (.pass, nil, false)
     }
 
     // MARK: - Layer 9: Character Lineage
@@ -2764,7 +2796,7 @@ public struct VerificationEngine: Sendable {
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode],
         verifier: SandwichVerification
-    ) async throws -> (VerificationStatus, [Int]?) {
+    ) async throws -> (VerificationStatus, [Int]?, Bool) {
         // Entry-level cooperative cancellation +
         // a per-page check, matching every other layer dispatcher; the
         // composed-character walk inside the verifier carries the banded
@@ -2800,24 +2832,24 @@ public struct VerificationEngine: Sendable {
             }
         }
         if let msg = firstFailMessage {
-            return (.fail(msg), failingPages)
+            return (.fail(msg), failingPages, false)
         }
         // Eligible-but-unchecked → .skipped; partial → .warn;
         // eligible == 0 stays .pass (skipped by design); pages beyond
         // `perPageModes` are reported last. See Layer 7.
         if eligible > 0 && checked == 0 {
-            return (.skipped, nil)
+            return (.skipped, nil, false)
         }
         if checked < eligible {
-            return (.warn("Cross-checked \(checked) of \(eligible) \(eligible == 1 ? "page" : "pages") — remaining pages lacked rasterization data"), nil)
+            return (.warn("Cross-checked \(checked) of \(eligible) \(eligible == 1 ? "page" : "pages") — remaining pages lacked rasterization data"), nil, true)
         }
         if let uncovered = perPageModeCoverageGap(
             perPageModes: perPageModes, pageCount: doc.pageCount
         ) {
             return (perPageModeCoverageWarn(
-                uncovered: uncovered, pageCount: doc.pageCount), uncovered)
+                uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
         }
-        return (.pass, nil)
+        return (.pass, nil, false)
     }
 }
 

@@ -176,9 +176,24 @@ public struct SandwichVerification: Sendable {
         regionShapes: [RegionShape],
         pageIndex: Int = 0
     ) async throws -> VerificationStatus {
+        try await spatialExclusionOutcome(
+            outputPage: outputPage, regionShapes: regionShapes, pageIndex: pageIndex
+        ).status
+    }
+
+    /// The exclusion check with its could-not-verify classification: the
+    /// unmeasured-position WARN (`zeroBoundsWarning`) says the check did not
+    /// fully run, the edge-graze WARN is a positional note. The Layer-6
+    /// dispatcher reads the pair; `verifySpatialExclusion` is the status
+    /// alone.
+    func spatialExclusionOutcome(
+        outputPage: PDFPage,
+        regionShapes: [RegionShape],
+        pageIndex: Int = 0
+    ) async throws -> (status: VerificationStatus, couldNotVerify: Bool) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
-        guard let pageText = outputPage.string else { return .pass }
+        guard let pageText = outputPage.string else { return (.pass, false) }
         let nsText = pageText as NSString
         let count = outputPage.numberOfCharacters
         // Count-only guard. `!regionShapes.isEmpty` was dropped so the
@@ -188,7 +203,7 @@ public struct SandwichVerification: Sendable {
         // no-op on [] shapes, and the lattice gap-skip skips no pairs (strictly
         // more pairs validated). The nil-`string` guard above still covers a
         // page with no text layer.
-        guard count > 0 else { return .pass }
+        guard count > 0 else { return (.pass, false) }
 
         // 256-iteration band counter in the per-character
         // walk. A 10k-character page would otherwise exceed the 50 ms p95
@@ -343,9 +358,9 @@ public struct SandwichVerification: Sendable {
                             centerInRegion = shape.bounds.contains(center)
                         }
                         if centerInRegion {
-                            return .fail(
+                            return (.fail(
                                 "A character overlaps a redacted area on page \(pageIndex + 1) (position \(unit.utf16Offset))"
-                            )
+                            ), false)
                         }
                         if firstGrazeMessage == nil {
                             firstGrazeMessage =
@@ -419,9 +434,9 @@ public struct SandwichVerification: Sendable {
                        Self.isWriterQuantizedPitch(curr.pointSize) {
                         continue
                     }
-                    return .fail(
+                    return (.fail(
                         "Non-uniform glyph advance on page \(pageIndex + 1) at offset \(curr.utf16Offset)"
-                    )
+                    ), false)
                 }
                 let delta = curr.bounds.minX - prev.bounds.minX
                 guard delta > 0 else { continue }
@@ -444,19 +459,22 @@ public struct SandwichVerification: Sendable {
                     pointSize: prev.pointSize) ?? cell
                 let j = max(0, ((delta - natural) / cell).rounded())
                 if abs(delta - (natural + j * cell)) > tolerance {
-                    return .fail(
+                    return (.fail(
                         "Non-uniform glyph advance on page \(pageIndex + 1) at offset \(curr.utf16Offset)"
-                    )
+                    ), false)
                 }
             }
         }
         if let firstGrazeMessage {
-            return .warn(firstGrazeMessage)
+            // A positional note: the character's content is outside the
+            // region; the check ran.
+            return (.warn(firstGrazeMessage), false)
         }
         if zeroBoundsUnits > 0 {
-            return Self.zeroBoundsWarning(count: zeroBoundsUnits, pageIndex: pageIndex)
+            // Characters the check could not place — it did not fully run.
+            return (Self.zeroBoundsWarning(count: zeroBoundsUnits, pageIndex: pageIndex), true)
         }
-        return .pass
+        return (.pass, false)
     }
 
     /// WARN copy for non-whitespace read-back units whose selection bounds
@@ -844,21 +862,24 @@ public struct SandwichVerification: Sendable {
     /// `pageRef` (non-Sendable); the verification runner calls this layer
     /// on a single executor at a time. Hand-off across the @concurrent
     /// dispatch boundary uses the existing `SendablePDFDocument` wrapper.
-    /// Returns (status, pageReferences, reviewTermTexts). `pageReferences`
-    /// carries the 0-based page behind an `.attention` verdict for the UI's
-    /// tappable page chips; `reviewTermTexts` carries the display-only term
-    /// texts behind that verdict (the status message itself stays
-    /// content-free). Both nil for every other status.
+    /// Returns (status, pageReferences, reviewTermTexts, couldNotVerify).
+    /// `pageReferences` carries the 0-based page behind an `.attention`
+    /// verdict for the UI's tappable page chips; `reviewTermTexts` carries
+    /// the display-only term texts behind that verdict (the status message
+    /// itself stays content-free). Both nil for every other status.
+    /// `couldNotVerify` is true for the WARNs that say the scan did not
+    /// fully run (terms it could not search, pages it could not traverse).
     public func verifyTextOperatorSemantics(
         outputDocument: SendablePDFDocument,
         sensitiveTerms: [SensitiveTerm]
-    ) async -> (status: VerificationStatus, pageReferences: [Int]?, reviewTermTexts: [String]?) {
+    ) async -> (status: VerificationStatus, pageReferences: [Int]?, reviewTermTexts: [String]?,
+                couldNotVerify: Bool) {
         // No terms provided — expected for manual-only redaction.
         // INFO, not PASS — the operator-semantic search did not run, and
         // "No issues found" would overstate what this layer observed
         // (mirrors Layer 3's guard).
         guard !sensitiveTerms.isEmpty else {
-            return (.info("No sensitive terms were provided — string search did not run."), nil, nil)
+            return (.info("No sensitive terms were provided — string search did not run."), nil, nil, false)
         }
         // Filter terms too short to search (matches Layer 3, shared
         // `AhoCorasick.isSearchableTerm`): ≥3 scalars (supports 3-letter PII
@@ -867,7 +888,7 @@ public struct SandwichVerification: Sendable {
         // while Layer 3 WARNed — align on Layer 3's tier and copy.
         let validTerms = sensitiveTerms.filter { AhoCorasick.isSearchableTerm($0.text) }
         guard !validTerms.isEmpty else {
-            return (.warn("All sensitive terms shorter than 3 characters"), nil, nil)
+            return (.warn("All sensitive terms shorter than 3 characters"), nil, nil, true)
         }
         // Surfaced on the otherwise-clean path below (mirrors Layer 3).
         let droppedTermCount = sensitiveTerms.count - validTerms.count
@@ -875,11 +896,11 @@ public struct SandwichVerification: Sendable {
         // Boundary-required terms drop matches embedded in an
         // alphanumeric run; plain terms keep substring semantics.
         let termAutomaton = SensitiveTermAutomaton(validTerms: validTerms)
-        guard termAutomaton.hasPatterns else { return (.pass, nil, nil) }
+        guard termAutomaton.hasPatterns else { return (.pass, nil, nil, false) }
         if termAutomaton.isDegraded {
             return (.warn(
                 "Operator-semantic term search exceeded size limit — results may be incomplete"
-            ), nil, nil)
+            ), nil, nil, true)
         }
 
         let doc = outputDocument.document
@@ -888,7 +909,7 @@ public struct SandwichVerification: Sendable {
                   let pageRef = page.pageRef else {
                 return (.warn(
                     "Operator scanner unavailable for page \(pageIdx + 1)"
-                ), nil, nil)
+                ), nil, nil, true)
             }
 
             // Accumulate per-page semantic text bytes. The C callbacks below
@@ -955,7 +976,7 @@ public struct SandwichVerification: Sendable {
             if !scanned {
                 return (.warn(
                     "Operator scanner could not traverse page \(pageIdx + 1)"
-                ), nil, nil)
+                ), nil, nil, true)
             }
 
             // The status message reports page index + match count
@@ -974,13 +995,13 @@ public struct SandwichVerification: Sendable {
                 return (.attention(
                     "Text matching your redactions is readable in page \(pageIdx + 1) content "
                     + "(\(count) instance\(count == 1 ? "" : "s"))"
-                ), [pageIdx], termAutomaton.matchedTermTexts(matches))
+                ), [pageIdx], termAutomaton.matchedTermTexts(matches), false)
             }
         }
         if droppedTermCount > 0 {
-            return (.info(shortTermTail(droppedTermCount)), nil, nil)
+            return (.info(shortTermTail(droppedTermCount)), nil, nil, false)
         }
-        return (.pass, nil, nil)
+        return (.pass, nil, nil, false)
     }
 }
 
