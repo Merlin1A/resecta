@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "packet": "hartwell-loan-packet",
   "generator": "resecta-sample-doc/packet",
   "page_count": 12,
@@ -69,6 +69,9 @@
         "ocr"
       ],
       "label_context": "Name (First, Middle, Last, Suffix):",
+      "context_class": "none",
+      "caption_clearance_pt": 3.49,
+      "caption_text": "Section 1a. Personal Information",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -88,7 +91,7 @@
       "overlaps": [],
       "justification": "middle initial breaks the NLTagger span -> tracked recall miss.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_09",
@@ -108,6 +111,9 @@
         "ocr"
       ],
       "label_context": "Social Security Number:",
+      "context_class": "none",
+      "caption_clearance_pt": 4.35,
+      "caption_text": "Name (First, Middle, Last, Suffix):",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -127,7 +133,7 @@
       "overlaps": [],
       "justification": "area 502 (001-899, !=666), group 19, serial 7438; valid -> 0.95 with label.",
       "source_range": "synthetic + manifest (no provable never-issued SSN space post-2011)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_04",
@@ -147,6 +153,9 @@
         "ocr"
       ],
       "label_context": "Date of Birth (mm/dd/yyyy):",
+      "context_class": "none",
+      "caption_clearance_pt": 19.35,
+      "caption_text": "Name (First, Middle, Last, Suffix):",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -166,7 +175,7 @@
       "overlaps": [],
       "justification": "numeric, label-anchored. Text-leg miss (numeric DOB on .financial not detected; OCR leg mislabels as phone) -> should_fire.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_10",
@@ -186,6 +195,9 @@
         "ocr"
       ],
       "label_context": "Home Phone:",
+      "context_class": "none",
+      "caption_clearance_pt": 4.99,
+      "caption_text": "Contact Information",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -205,7 +217,7 @@
       "overlaps": [],
       "justification": "NANPA 555-0147; phone kw within +-80 -> 0.80 >= 0.70.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_11",
@@ -225,6 +237,9 @@
         "ocr"
       ],
       "label_context": "Cell Phone:",
+      "context_class": "none",
+      "caption_clearance_pt": 4.35,
+      "caption_text": "Home Phone:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -244,7 +259,7 @@
       "overlaps": [],
       "justification": "format-zoo (CA 916 area, kept post-relocation); 555-0182 -> 0.80.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_12",
@@ -264,6 +279,9 @@
         "ocr"
       ],
       "label_context": "Work Phone:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -283,7 +301,7 @@
       "overlaps": [],
       "justification": "format-zoo (dotted); 555-0119 -> 0.80.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_13",
@@ -303,6 +321,9 @@
         "ocr"
       ],
       "label_context": "Email:",
+      "context_class": "none",
+      "caption_clearance_pt": 4.35,
+      "caption_text": "Work Phone:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -322,7 +343,7 @@
       "overlaps": [],
       "justification": "RFC-2606 -> 0.90 >= 0.83.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_06",
@@ -342,6 +363,9 @@
         "ocr"
       ],
       "label_context": "Current Address:",
+      "context_class": "none",
+      "caption_clearance_pt": 1.35,
+      "caption_text": "Current Address:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -370,7 +394,7 @@
       "overlaps": [],
       "justification": "shared residence; 2 spans (street; city/ST/ZIP); 0.70.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_06b",
@@ -390,6 +414,9 @@
         "ocr"
       ],
       "label_context": "Former Address:",
+      "context_class": "none",
+      "caption_clearance_pt": 1.35,
+      "caption_text": "Former Address:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -418,7 +445,7 @@
       "overlaps": [],
       "justification": "CA-DL/ID-residence reconciliation; 2 spans.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_07",
@@ -438,6 +465,9 @@
         "ocr"
       ],
       "label_context": "Mailing Address (if different):",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -457,7 +487,7 @@
       "overlaps": [],
       "justification": "P.O. Box arm.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_08",
@@ -477,6 +507,9 @@
         "ocr"
       ],
       "label_context": "Employer Address:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.11,
+      "caption_text": "Tannersworth Freight Systems, Inc.",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -496,7 +529,7 @@
       "overlaps": [],
       "justification": "employer (Tannersworth) address.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_02",
@@ -516,6 +549,9 @@
         "ocr"
       ],
       "label_context": "Borrower (printed):",
+      "context_class": "none",
+      "caption_clearance_pt": 7.63,
+      "caption_text": "Uniform Residential Loan Application -- continued",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -535,7 +571,7 @@
       "overlaps": [],
       "justification": "clean two-token Title-Case -> NLTagger 0.70 >= 0.60.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_15",
@@ -555,6 +591,9 @@
         "ocr"
       ],
       "label_context": "Account #",
+      "context_class": "none",
+      "caption_clearance_pt": 3.49,
+      "caption_text": "Section 2a. Assets -- Bank and Retirement Accounts",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -574,7 +613,7 @@
       "overlaps": [],
       "justification": "12-digit (dodges 10-digit phone, < 13-digit cc); acct kw +-5, away from phone +-80 / routing +-8. 0.75.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_16",
@@ -594,6 +633,9 @@
         "ocr"
       ],
       "label_context": "Acct No.",
+      "context_class": "none",
+      "caption_clearance_pt": 3.35,
+      "caption_text": "Account #",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -613,7 +655,7 @@
       "overlaps": [],
       "justification": "12-digit 401k; 0.75.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_17",
@@ -633,6 +675,9 @@
         "ocr"
       ],
       "label_context": "A/C",
+      "context_class": "none",
+      "caption_clearance_pt": 3.35,
+      "caption_text": "Acct No.",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -652,7 +697,7 @@
       "overlaps": [],
       "justification": "12-digit; A/C label clears account AND suppresses the phone competitor. 0.75.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_18",
@@ -672,6 +717,9 @@
         "ocr"
       ],
       "label_context": "Account #",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": true,
@@ -691,7 +739,7 @@
       "overlaps": [],
       "justification": "masked X breaks \\d{6,15} -> invisible. last-4 3265 = STMT primary checking tie.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_19",
@@ -711,6 +759,9 @@
         "ocr"
       ],
       "label_context": "Account Number:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.79,
+      "caption_text": "Enter each revolving tradeline with the full account identifier shown on the most recent paper statement; mask only where the issuer masks.",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -730,7 +781,7 @@
       "overlaps": [],
       "justification": "Visa test PAN, Luhn+IIN+16d -> 0.95; spaced 4-groups deny account/phone capture.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_20",
@@ -750,6 +801,9 @@
         "ocr"
       ],
       "label_context": "Account Number:",
+      "context_class": "none",
+      "caption_clearance_pt": 16.79,
+      "caption_text": "Enter each revolving tradeline with the full account identifier shown on the most recent paper statement; mask only where the issuer masks.",
       "render": {
         "all_caps": false,
         "masked": true,
@@ -769,7 +823,7 @@
       "overlaps": [],
       "justification": "< 13 digits -> below CC shape; masked watch.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_21",
@@ -789,6 +843,9 @@
         "ocr"
       ],
       "label_context": "Account Number:",
+      "context_class": "none",
+      "caption_clearance_pt": 29.79,
+      "caption_text": "Enter each revolving tradeline with the full account identifier shown on the most recent paper statement; mask only where the issuer masks.",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -808,7 +865,7 @@
       "overlaps": [],
       "justification": "Luhn FAILS -> CC rejects.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-CC-1",
@@ -828,6 +885,9 @@
         "ocr"
       ],
       "label_context": "Account Number:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -847,7 +907,7 @@
       "overlaps": [],
       "justification": "16-digit, Luhn-PASS but lead 9 -> no IIN family -> CC rejects.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-CC-2",
@@ -867,6 +927,9 @@
         "ocr"
       ],
       "label_context": "Account Number:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -886,7 +949,7 @@
       "overlaps": [],
       "justification": "12 digits (3x4) < 13 -> below CC shape; spaced -> account regex sees <6-digit groups.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_23",
@@ -906,6 +969,9 @@
         "ocr"
       ],
       "label_context": "Account / Tradeline -- SSN:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": true,
@@ -925,7 +991,7 @@
       "overlaps": [],
       "justification": "Masked X breaks \\d runs -> tracked recall miss. Delia's masked SSN.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_24",
@@ -945,6 +1011,9 @@
         "ocr"
       ],
       "label_context": "Collateral Vehicle Plate No:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.35,
+      "caption_text": "Account / Tradeline -- SSN:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -964,7 +1033,7 @@
       "overlaps": [],
       "justification": "N-LP-3: plate-labeled + vehicle context BUT on a .financial page -> runsLicensePlate=false -> MNF.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_05",
@@ -984,6 +1053,9 @@
         "ocr"
       ],
       "label_context": "Born",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1003,7 +1075,7 @@
       "overlaps": [],
       "justification": "TEXTUAL date surface (month-name alternation accepted) -> 0.85. Same DOB as occ_04.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_03",
@@ -1023,6 +1095,9 @@
         "ocr"
       ],
       "label_context": "Loan Originator Name:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.49,
+      "caption_text": "Section 9. Loan Originator Information",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1042,7 +1117,7 @@
       "overlaps": [],
       "justification": "clean two-token; lender employee. Text-leg miss (NLTagger did not tag this name in context) -> should_fire.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_14",
@@ -1062,6 +1137,9 @@
         "ocr"
       ],
       "label_context": "Email:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.11,
+      "caption_text": "204878",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1081,7 +1159,7 @@
       "overlaps": [],
       "justification": "RFC-2606 (Sec 9 originator).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_25",
@@ -1101,6 +1179,9 @@
         "ocr"
       ],
       "label_context": "Loan File / Case No.:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1120,7 +1201,7 @@
       "overlaps": [],
       "justification": "N-PHONE-1: negative-context 'case no' + NO positive phone kw within +-80 -> dropped.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlab_22",
@@ -1140,6 +1221,9 @@
         "ocr"
       ],
       "label_context": "Date:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1159,7 +1243,7 @@
       "overlaps": [],
       "justification": "bare application sign date -> suppressed (financial label-anchored-only gate).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlaa_01",
@@ -1179,6 +1263,9 @@
         "ocr"
       ],
       "label_context": "Name (First / Middle / Last / Suffix):",
+      "context_class": "none",
+      "caption_clearance_pt": 3.49,
+      "caption_text": "Section 1a. Personal Information",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1198,7 +1285,7 @@
       "overlaps": [],
       "justification": "clean two-token Title-Case (deliberately distinct surface from the ALL-CAPS SF variant).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlaa_03",
@@ -1218,6 +1305,9 @@
         "ocr"
       ],
       "label_context": "Social Security Number (or Individual Taxpayer Identification Number) (ITIN):",
+      "context_class": "none",
+      "caption_clearance_pt": 0.87,
+      "caption_text": "Social Security Number (or Individual Taxpayer Identification Number) (ITIN):",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1237,7 +1327,7 @@
       "overlaps": [],
       "justification": "area 970 (9NN), group 85 in {70-88}; ITIN label -> 0.85. area 9NN -> SSN rejects.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlaa_04",
@@ -1257,6 +1347,9 @@
         "ocr"
       ],
       "label_context": "Date of Birth (mm/dd/yyyy):",
+      "context_class": "none",
+      "caption_clearance_pt": 17.35,
+      "caption_text": "Social Security Number (or Individual Taxpayer Identification Number) (ITIN):",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1276,7 +1369,7 @@
       "overlaps": [],
       "justification": "label-anchored. Text-leg miss (numeric DOB on .financial; OCR leg mislabels as phone) -> should_fire.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-ITIN-3",
@@ -1296,6 +1389,9 @@
         "ocr"
       ],
       "label_context": "SSN / ITIN:",
+      "context_class": "none",
+      "caption_clearance_pt": 4.35,
+      "caption_text": "Date of Birth (mm/dd/yyyy):",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1315,7 +1411,7 @@
       "overlaps": [],
       "justification": "inconsistent separator (dash then space) -> ITIN backref \\1 fails -> no match.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlaa_07",
@@ -1335,6 +1431,9 @@
         "ocr"
       ],
       "label_context": "Work Phone:",
+      "context_class": "none",
+      "caption_clearance_pt": 19.35,
+      "caption_text": "Date of Birth (mm/dd/yyyy):",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1354,7 +1453,7 @@
       "overlaps": [],
       "justification": "format-zoo (+1); 555-0173 -> 0.80.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlaa_08",
@@ -1374,6 +1473,9 @@
         "ocr"
       ],
       "label_context": "Email:",
+      "context_class": "none",
+      "caption_clearance_pt": 4.35,
+      "caption_text": "Work Phone:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1393,7 +1495,7 @@
       "overlaps": [],
       "justification": "RFC-2606.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlaa_05",
@@ -1413,6 +1515,9 @@
         "ocr"
       ],
       "label_context": "Current Address:",
+      "context_class": "none",
+      "caption_clearance_pt": 1.35,
+      "caption_text": "Current Address:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1441,7 +1546,7 @@
       "overlaps": [],
       "justification": "shared residence (married); 2 spans.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlaa_06",
@@ -1461,6 +1566,9 @@
         "ocr"
       ],
       "label_context": "Mailing Address (if different):",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1480,7 +1588,7 @@
       "overlaps": [],
       "justification": "P.O. Box arm (co-applicant mailing).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlaa_11",
@@ -1500,6 +1608,9 @@
         "ocr"
       ],
       "label_context": "Start Date (mm/dd/yyyy):",
+      "context_class": "none",
+      "caption_clearance_pt": 3.11,
+      "caption_text": "Tannersworth Freight Systems, Inc.",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1519,7 +1630,7 @@
       "overlaps": [],
       "justification": "bare employment date -> suppressed (financial).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlaa_09",
@@ -1539,6 +1650,9 @@
         "ocr"
       ],
       "label_context": "Acct #:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.49,
+      "caption_text": "Section 2a. Assets -- Bank and Retirement Accounts",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1558,7 +1672,7 @@
       "overlaps": [],
       "justification": "12-digit savings; away from phone; 0.75.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlaa_10",
@@ -1578,6 +1692,9 @@
         "ocr"
       ],
       "label_context": "Account Number:",
+      "context_class": "none",
+      "caption_clearance_pt": 5.79,
+      "caption_text": "List each retirement account separately. Enter the institution and the account identifier exactly as shown on the most recent paper notice.",
       "render": {
         "all_caps": false,
         "masked": true,
@@ -1597,7 +1714,7 @@
       "overlaps": [],
       "justification": "masked -> invisible.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlaa_02",
@@ -1617,6 +1734,9 @@
         "ocr"
       ],
       "label_context": "Printed Name:",
+      "context_class": "none",
+      "caption_clearance_pt": 7.79,
+      "caption_text": "Additional Borrower acknowledges that the information may be verified with the parties named in this application and consents to that verification.",
       "render": {
         "all_caps": true,
         "masked": false,
@@ -1636,7 +1756,7 @@
       "overlaps": [],
       "justification": "ALL-CAPS -> NLTagger miss -> should_fire.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_urlaa_12",
@@ -1656,6 +1776,9 @@
         "ocr"
       ],
       "label_context": "Date:",
+      "context_class": "none",
+      "caption_clearance_pt": 27.79,
+      "caption_text": "Additional Borrower acknowledges that the information may be verified with the parties named in this application and consents to that verification.",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1675,7 +1798,7 @@
       "overlaps": [],
       "justification": "bare signature date -> suppressed.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_15",
@@ -1695,6 +1818,9 @@
         "ocr"
       ],
       "label_context": "For the calendar year:",
+      "context_class": "none",
+      "caption_clearance_pt": 12.23,
+      "caption_text": "Original-layout specimen for software testing. Not an IRS form.",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1714,7 +1840,7 @@
       "overlaps": [],
       "justification": "bare tax-year span -> suppressed.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_02",
@@ -1734,6 +1860,9 @@
         "ocr"
       ],
       "label_context": "Taxpayer name:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.01,
+      "caption_text": "Filing Information",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1753,7 +1882,7 @@
       "overlaps": [],
       "justification": "clean two-token (MI dropped).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_01",
@@ -1773,6 +1902,9 @@
         "ocr"
       ],
       "label_context": "Your Social Security Number (SSN):",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1792,7 +1924,7 @@
       "overlaps": [],
       "justification": "Delia's SSN.",
       "source_range": "synthetic + manifest",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_04",
@@ -1812,6 +1944,9 @@
         "ocr"
       ],
       "label_context": "Spouse's name:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1831,7 +1966,7 @@
       "overlaps": [],
       "justification": "clean two-token (= occ_urlaa_01 person).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_05",
@@ -1851,6 +1986,9 @@
         "ocr"
       ],
       "label_context": "Spouse's Individual Taxpayer Identification Number (ITIN):",
+      "context_class": "none",
+      "caption_clearance_pt": 0.87,
+      "caption_text": "Spouse's Individual Taxpayer Identification Number (ITIN):",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1870,7 +2008,7 @@
       "overlaps": [],
       "justification": "Mateo's ITIN (= occ_urlaa_03). area 9NN -> SSN rejects.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_03",
@@ -1890,6 +2028,9 @@
         "ocr"
       ],
       "label_context": "Home address, City, State, ZIP:",
+      "context_class": "none",
+      "caption_clearance_pt": 1.35,
+      "caption_text": "Home address, City, State, ZIP:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1918,7 +2059,7 @@
       "overlaps": [],
       "justification": "2 spans.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_06",
@@ -1938,6 +2079,9 @@
         "ocr"
       ],
       "label_context": "(1) Name:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.49,
+      "caption_text": "Dependents",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1957,7 +2101,7 @@
       "overlaps": [],
       "justification": "clean two-token (dependent).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_07",
@@ -1977,6 +2121,9 @@
         "ocr"
       ],
       "label_context": "(1) SSN:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -1996,7 +2143,7 @@
       "overlaps": [],
       "justification": "Lena's SSN (area 521, valid).",
       "source_range": "synthetic + manifest",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_08",
@@ -2016,6 +2163,9 @@
         "ocr"
       ],
       "label_context": "(1) Date of Birth:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2035,7 +2185,7 @@
       "overlaps": [],
       "justification": "Lena, label-anchored -> 0.85.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_09",
@@ -2055,6 +2205,9 @@
         "ocr"
       ],
       "label_context": "(2) Name:",
+      "context_class": "none",
+      "caption_clearance_pt": 19.49,
+      "caption_text": "Dependents",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2074,7 +2227,7 @@
       "overlaps": [],
       "justification": "clean two-token (dependent).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_10",
@@ -2094,6 +2247,9 @@
         "ocr"
       ],
       "label_context": "(2) SSN:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2113,7 +2269,7 @@
       "overlaps": [],
       "justification": "Theo's SSN (area 438, valid).",
       "source_range": "synthetic + manifest",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_11",
@@ -2133,6 +2289,9 @@
         "ocr"
       ],
       "label_context": "(2) Date of Birth:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2152,7 +2311,7 @@
       "overlaps": [],
       "justification": "Theo, label-anchored.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_12",
@@ -2172,6 +2331,9 @@
         "ocr"
       ],
       "label_context": "Employer Identification Number (EIN):",
+      "context_class": "none",
+      "caption_clearance_pt": 2.63,
+      "caption_text": "Tannersworth Freight Systems, Inc.",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2191,7 +2353,7 @@
       "overlaps": [],
       "justification": "prefix 36 (valid) + EIN label -> 0.85. Tannersworth's EIN.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-ITIN-1",
@@ -2211,6 +2373,9 @@
         "ocr"
       ],
       "label_context": "Spouse ITIN instruction:",
+      "context_class": "none",
+      "caption_clearance_pt": 7.35,
+      "caption_text": "Employer Identification Number (EIN):",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2230,7 +2395,7 @@
       "overlaps": [],
       "justification": "group 12 not in {50-65,70-88,90-92,94-99} -> ITIN rejects; area 9NN -> SSN rejects.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_13",
@@ -2250,6 +2415,9 @@
         "ocr"
       ],
       "label_context": "Your social security number:",
+      "context_class": "none",
+      "caption_clearance_pt": 7.63,
+      "caption_text": "U.S. Individual Income Tax Return (specimen) -- continued",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2269,7 +2437,7 @@
       "overlaps": [],
       "justification": "SAME value as occ_01 (genre-honest page-2 repeat). Each repeated box counts as its own occurrence -> distinct box.",
       "source_range": "synthetic + manifest",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_14",
@@ -2289,6 +2457,9 @@
         "ocr"
       ],
       "label_context": "for example, 987-65-4320.",
+      "context_class": "none",
+      "caption_clearance_pt": 0.75,
+      "caption_text": "Sample only -- do not enter. A sample value follows",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2308,7 +2479,7 @@
       "overlaps": [],
       "justification": "area 987 >= 900 -> SSN rejects. NO substring 'tin'/ITIN keyword within +-8 tokens.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-ITIN-2",
@@ -2328,6 +2499,9 @@
         "ocr"
       ],
       "label_context": "Taxpayer reference / control no.:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2347,7 +2521,7 @@
       "overlaps": [],
       "justification": "valid ITIN shape, no nearby itin kw. Fires as itin (structural match clears 0.65 without context) -> watch; engine-improvement: require itin context.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-SSN-2",
@@ -2367,6 +2541,9 @@
         "ocr"
       ],
       "label_context": "SSN instruction footnote:",
+      "context_class": "none",
+      "caption_clearance_pt": 9.35,
+      "caption_text": "Taxpayer reference / control no.:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2386,7 +2563,7 @@
       "overlaps": [],
       "justification": "area 900 >= 900 -> SSN rejects; group 12 out of ITIN range -> ITIN rejects.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_16",
@@ -2406,6 +2583,9 @@
         "ocr"
       ],
       "label_context": "Sign here -- Date:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2425,7 +2605,7 @@
       "overlaps": [],
       "justification": "bare signature date -> suppressed.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_t1040_17",
@@ -2445,6 +2625,9 @@
         "ocr"
       ],
       "label_context": "Spouse signature -- Date:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2464,7 +2647,7 @@
       "overlaps": [],
       "justification": "bare signature date -> suppressed.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_ach_01",
@@ -2484,6 +2667,9 @@
         "ocr"
       ],
       "label_context": "Routing Number / ABA #:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.11,
+      "caption_text": "Sablebrook Bank",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2503,7 +2689,7 @@
       "overlaps": [],
       "justification": "prefix 21 valid, mod-10 (sum 70) valid, group-00 SSN-invalid; routing kw +-8 -> 0.88.",
       "source_range": "synthetic + manifest (FedACH pre-screen clean)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_ach_02",
@@ -2523,6 +2709,9 @@
         "ocr"
       ],
       "label_context": "Origin ABA:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.35,
+      "caption_text": "Routing Number / ABA #:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2542,7 +2731,7 @@
       "overlaps": [],
       "justification": "shares value w/ occ_01 (same bank RTN twice).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_ach_04",
@@ -2562,6 +2751,9 @@
         "ocr"
       ],
       "label_context": "Intermediary Wire Routing:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2581,7 +2773,7 @@
       "overlaps": [],
       "justification": "prefix 61 valid but mod-10 FAILS (sum 53) -> routing rejects on checksum.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-RTN-1",
@@ -2601,6 +2793,9 @@
         "ocr"
       ],
       "label_context": "2nd Intermediary / Returns Wire Routing:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2620,7 +2815,7 @@
       "overlaps": [],
       "justification": "prefix 90 outside ABA set -> routing rejects; area 901 >= 900 -> SSN rejects.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_ach_05",
@@ -2640,6 +2835,9 @@
         "ocr"
       ],
       "label_context": "Account Type Checking -- Acct No.:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2659,7 +2857,7 @@
       "overlaps": [],
       "justification": "Delia checking (= occ_06, occ_urlab_15); 12-digit; away from routing kw; 0.75.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_ach_06",
@@ -2679,6 +2877,9 @@
         "ocr"
       ],
       "label_context": "Crediting Account Type -- Receiving Acct No.:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2698,7 +2899,7 @@
       "overlaps": [],
       "justification": "shares value w/ occ_05.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_ach_07",
@@ -2718,6 +2919,9 @@
         "ocr"
       ],
       "label_context": "Account Holder Name:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.49,
+      "caption_text": "Receiving Entry Detail",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2737,7 +2941,7 @@
       "overlaps": [],
       "justification": "clean two-token.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_ach_08",
@@ -2757,6 +2961,9 @@
         "ocr"
       ],
       "label_context": "INDN:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.35,
+      "caption_text": "Account Holder Name:",
       "render": {
         "all_caps": true,
         "masked": false,
@@ -2776,7 +2983,7 @@
       "overlaps": [],
       "justification": "INDN prefix corrupts NLTagger context -> miss.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_ach_09",
@@ -2796,6 +3003,9 @@
         "ocr"
       ],
       "label_context": "INDN:",
+      "context_class": "none",
+      "caption_clearance_pt": 16.35,
+      "caption_text": "Account Holder Name:",
       "render": {
         "all_caps": true,
         "masked": false,
@@ -2815,7 +3025,7 @@
       "overlaps": [],
       "justification": "as occ_08 (offset).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_ach_11",
@@ -2835,6 +3045,9 @@
         "ocr"
       ],
       "label_context": "CO ID:",
+      "context_class": "none",
+      "caption_clearance_pt": 2.23,
+      "caption_text": "DES: PAYROLL",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2854,7 +3067,7 @@
       "overlaps": [],
       "justification": "'1'+9-digit EIN; 10 contiguous -> einPatternNoSep needs exactly 9 -> no EIN. Keep >+-80 chars from any phone kw.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_ach_13",
@@ -2874,6 +3087,9 @@
         "ocr"
       ],
       "label_context": "Account Holder Mailing Address:",
+      "context_class": "none",
+      "caption_clearance_pt": 1.35,
+      "caption_text": "Account Holder Mailing Address:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2902,7 +3118,7 @@
       "overlaps": [],
       "justification": "2 spans.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_ach_03",
@@ -2922,6 +3138,9 @@
         "ocr"
       ],
       "label_context": "Form Control No.:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2941,7 +3160,7 @@
       "overlaps": [],
       "justification": "valid RTN, NO routing kw within +-8 -> stays 0.50 < 0.60 -> watch.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-INV-1",
@@ -2961,6 +3180,9 @@
         "ocr"
       ],
       "label_context": "Reference No.:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -2980,7 +3202,7 @@
       "overlaps": [],
       "justification": "area 000 -> SSN rejects; prefix 00 -> routing rejects; no acct kw; 9 digits -> no phone/cc.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-RTN-2",
@@ -3000,6 +3222,9 @@
         "ocr"
       ],
       "label_context": "Trace:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.35,
+      "caption_text": "Form Control No.:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3019,7 +3244,7 @@
       "overlaps": [],
       "justification": "15 digits -> routing len!=9; starts 21 -> no cc IIN; Trace: no acct kw; no bounded 9-run -> no SSN.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_ach_10",
@@ -3039,6 +3264,9 @@
         "ocr"
       ],
       "label_context": "Printed Name:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": true,
         "masked": false,
@@ -3058,7 +3286,7 @@
       "overlaps": [],
       "justification": "anchor present but ALL-CAPS -> undecided -> watch.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_ach_12",
@@ -3078,6 +3306,9 @@
         "ocr"
       ],
       "label_context": "Date:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3097,7 +3328,7 @@
       "overlaps": [],
       "justification": "bare authorization date -> suppressed.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-ACCT-1",
@@ -3117,6 +3348,9 @@
         "ocr"
       ],
       "label_context": "Account Number:",
+      "context_class": "none",
+      "caption_clearance_pt": 27.35,
+      "caption_text": "Printed Name:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3136,7 +3370,7 @@
       "overlaps": [],
       "justification": "REC: 10-digit NANP shape + phone kw within +-80 -> phone 0.80 wins overlap over account 0.75 -> MNF-as-account. = STMT account tie.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_w2_07",
@@ -3156,6 +3390,9 @@
         "ocr"
       ],
       "label_context": "For Tax Year:",
+      "context_class": "none",
+      "caption_clearance_pt": 12.23,
+      "caption_text": "Original-layout specimen for software testing. Not an IRS form.",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3175,7 +3412,7 @@
       "overlaps": [],
       "justification": "bare tax-year date -> suppressed.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_w2_01",
@@ -3195,6 +3432,9 @@
         "ocr"
       ],
       "label_context": "a Employee's social security number",
+      "context_class": "none",
+      "caption_clearance_pt": 1.74,
+      "caption_text": "a Employee's social security number",
       "render": {
         "all_caps": false,
         "masked": true,
@@ -3214,7 +3454,7 @@
       "overlaps": [],
       "justification": "masked X breaks \\d runs -> tracked recall miss. Delia (last-4 7438).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_w2_02",
@@ -3234,6 +3474,9 @@
         "ocr"
       ],
       "label_context": "b Employer identification number (EIN)",
+      "context_class": "none",
+      "caption_clearance_pt": 1.74,
+      "caption_text": "b Employer identification number (EIN)",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3253,7 +3496,7 @@
       "overlaps": [],
       "justification": "valid prefix 36 + EIN label -> 0.85. Tannersworth (= occ_t1040_12).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_w2_04",
@@ -3273,6 +3516,9 @@
         "ocr"
       ],
       "label_context": "c Employer's name, address, and ZIP code",
+      "context_class": "none",
+      "caption_clearance_pt": 1.11,
+      "caption_text": "Tannersworth Freight Systems, Inc.",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3292,7 +3538,7 @@
       "overlaps": [],
       "justification": "employer address (single-line value); org-name line rides as a sibling.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_w2_03",
@@ -3312,6 +3558,9 @@
         "ocr"
       ],
       "label_context": "e Employee's first name and initial / Last name",
+      "context_class": "none",
+      "caption_clearance_pt": -6.77,
+      "caption_text": "e Employee's first name and initial / Last name",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3331,7 +3580,7 @@
       "overlaps": [],
       "justification": "initial/Suff sub-cells blank -> clean two-token.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_w2_05",
@@ -3351,6 +3600,9 @@
         "ocr"
       ],
       "label_context": "f Employee's address and ZIP code",
+      "context_class": "none",
+      "caption_clearance_pt": -6.29,
+      "caption_text": "f Employee's address and ZIP code",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3379,7 +3631,7 @@
       "overlaps": [],
       "justification": "2 spans.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-EIN-1",
@@ -3399,6 +3651,9 @@
         "ocr"
       ],
       "label_context": "15 Employer's state ID no.:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3418,7 +3673,7 @@
       "overlaps": [],
       "justification": "NON-EIN shape -> no EIN candidate even though bare 'employer' substring is adjacent.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-SSN-1",
@@ -3438,6 +3693,9 @@
         "ocr"
       ],
       "label_context": "Notice to Employee (Box a example):",
+      "context_class": "none",
+      "caption_clearance_pt": 12.99,
+      "caption_text": "This specimen reproduces the box layout of a wage statement so software can be checked against the same field grammar a real statement uses. Every value",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3457,7 +3715,7 @@
       "overlaps": [],
       "justification": "Woolworth/wallet SSN -> SSNStructuralValidator Rule 6 hard reject -> MNF.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_w2_06",
@@ -3477,6 +3735,9 @@
         "ocr"
       ],
       "label_context": "for example, 07-3300449.",
+      "context_class": "none",
+      "caption_clearance_pt": 26.99,
+      "caption_text": "This specimen reproduces the box layout of a wage statement so software can be checked against the same field grammar a real statement uses. Every value",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3496,7 +3757,7 @@
       "overlaps": [],
       "justification": "prefix 07 in invalid set -> EIN rejected pre-scoring. Keep >+-6 tokens from the real Box-b label.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_govid_01",
@@ -3516,6 +3777,9 @@
         "ocr"
       ],
       "label_context": "Full Legal Name:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.49,
+      "caption_text": "Primary Applicant Identity",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3535,7 +3799,7 @@
       "overlaps": [],
       "justification": "clean two-token. Text-leg miss on the GOV-ID layout (adjacent-token context breaks the NLTagger span) -> should_fire.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_govid_03",
@@ -3555,6 +3819,9 @@
         "ocr"
       ],
       "label_context": "Date of Birth:",
+      "context_class": "none",
+      "caption_clearance_pt": 4.35,
+      "caption_text": "Full Legal Name:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3574,7 +3841,7 @@
       "overlaps": [],
       "justification": "Delia, label-anchored.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_govid_05",
@@ -3594,6 +3861,9 @@
         "ocr"
       ],
       "label_context": "Current Residential Address:",
+      "context_class": "none",
+      "caption_clearance_pt": 1.35,
+      "caption_text": "Current Residential Address:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3622,7 +3892,7 @@
       "overlaps": [],
       "justification": "2 spans.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_govid_06",
@@ -3642,6 +3912,9 @@
         "ocr"
       ],
       "label_context": "Driver's License:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.49,
+      "caption_text": "Driver's License (Primary Photo ID)",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3661,7 +3934,7 @@
       "overlaps": [],
       "justification": "matches CA ^[A-Z][0-9]{7}$ -> 0.80 >= 0.72. Delia.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_govid_07",
@@ -3681,6 +3954,9 @@
         "ocr"
       ],
       "label_context": "Primary ID verified -- Driver's License:",
+      "context_class": "none",
+      "caption_clearance_pt": 18.49,
+      "caption_text": "Driver's License (Primary Photo ID)",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3700,7 +3976,7 @@
       "overlaps": [],
       "justification": "same value re-recorded (KYC).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_govid_11",
@@ -3720,6 +3996,9 @@
         "ocr"
       ],
       "label_context": "License Expires:",
+      "context_class": "none",
+      "caption_clearance_pt": 4.35,
+      "caption_text": "Primary ID verified -- Driver's License:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3739,7 +4018,7 @@
       "overlaps": [],
       "justification": "bare date. GOV-ID classifies non-financial (foia) -> the full DOB path fires on bare dates -> watch (this negative is only valid on a .financial page).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_govid_08",
@@ -3759,6 +4038,9 @@
         "ocr"
       ],
       "label_context": "Secondary ID -- Driver's License:",
+      "context_class": "none",
+      "caption_clearance_pt": 19.35,
+      "caption_text": "Primary ID verified -- Driver's License:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3778,7 +4060,7 @@
       "overlaps": [],
       "justification": "1L+14D (15 chars) > every dl_patterns row -> gazetteer suppresses.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_govid_02",
@@ -3798,6 +4080,9 @@
         "ocr"
       ],
       "label_context": "Name (as shown on passport):",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": true,
         "masked": false,
@@ -3817,7 +4102,7 @@
       "overlaps": [],
       "justification": "ALL-CAPS -> miss.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_govid_04",
@@ -3837,6 +4122,9 @@
         "ocr"
       ],
       "label_context": "Date of Birth:",
+      "context_class": "none",
+      "caption_clearance_pt": 4.35,
+      "caption_text": "Name (as shown on passport):",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3856,7 +4144,7 @@
       "overlaps": [],
       "justification": "Mateo, label-anchored.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_govid_09",
@@ -3876,6 +4164,9 @@
         "ocr"
       ],
       "label_context": "Passport No:",
+      "context_class": "none",
+      "caption_clearance_pt": 19.35,
+      "caption_text": "Name (as shown on passport):",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3895,7 +4186,7 @@
       "overlaps": [],
       "justification": "matches MX ^[A-Z][0-9]{8}$ -> 0.80 >= 0.72. Mateo (foreign issuer).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_govid_12",
@@ -3915,6 +4206,9 @@
         "ocr"
       ],
       "label_context": "Passport Date of Issue:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3934,7 +4228,7 @@
       "overlaps": [],
       "justification": "bare date. GOV-ID classifies non-financial (foia) -> the full DOB path fires on bare dates -> watch (this negative is only valid on a .financial page).",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_govid_10",
@@ -3954,6 +4248,9 @@
         "ocr"
       ],
       "label_context": "Prior Passport No:",
+      "context_class": "none",
+      "caption_clearance_pt": 4.35,
+      "caption_text": "Passport Date of Issue:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -3973,7 +4270,7 @@
       "overlaps": [],
       "justification": "1L+6D (7 chars) matches no issuer row (all 8-9) -> suppressed.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-PP-1",
@@ -3993,6 +4290,9 @@
         "ocr"
       ],
       "label_context": "Legacy / Prior Passport No:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4012,7 +4312,7 @@
       "overlaps": [],
       "justification": "pure 9-digit -> passport capture needs a leading letter -> unreachable; area 000 -> SSN rejects.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "N-PP-2",
@@ -4032,6 +4332,9 @@
         "ocr"
       ],
       "label_context": "Transcription-error Passport No:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4051,7 +4354,7 @@
       "overlaps": [],
       "justification": "1L+9D (10 chars) -> matches no 9-char issuer row; 9-digit run has group 00 -> SSN rejects.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_veh_01",
@@ -4071,6 +4374,9 @@
         "ocr"
       ],
       "label_context": "Plate No:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.63,
+      "caption_text": "Vehicle Make: utility wagon",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4090,7 +4396,7 @@
       "overlaps": [],
       "justification": "CA-style 1+3+3 plate; vehicle-context boost -> 0.88; FIRES because page is .generic.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_veh_02",
@@ -4110,6 +4416,9 @@
         "ocr"
       ],
       "label_context": "Registered Owner:",
+      "context_class": "none",
+      "caption_clearance_pt": 3.63,
+      "caption_text": "Model Year: 2019",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4129,7 +4438,7 @@
       "overlaps": [],
       "justification": "clean two-token Title-Case -> 0.70; name not doctype-gated -> fires on .generic.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_veh_03",
@@ -4149,6 +4458,9 @@
         "ocr"
       ],
       "label_context": "Owner Address:",
+      "context_class": "none",
+      "caption_clearance_pt": 0.87,
+      "caption_text": "Owner Address:",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4177,7 +4489,7 @@
       "overlaps": [],
       "justification": "shared residence; 2 spans; 0.70.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_veh_04",
@@ -4197,6 +4509,9 @@
         "ocr"
       ],
       "label_context": "VIN:",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4216,7 +4531,7 @@
       "overlaps": [],
       "justification": "licensePlate regex requires a PLATE label -> 17-char VIN behind VIN: never matches -> MNF.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "occ_veh_05",
@@ -4236,6 +4551,9 @@
         "ocr"
       ],
       "label_context": "Tag No:",
+      "context_class": "none",
+      "caption_clearance_pt": 2.75,
+      "caption_text": "Surrendered Tag Inventory (enclosed attachment)",
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4255,7 +4573,7 @@
       "overlaps": [],
       "justification": "Fires as licensePlate -- 'Tag No' is a plate-label synonym; watch tier: must-fire versus engine-suppress is undecided.",
       "source_range": "",
-      "schema_version": 1
+      "schema_version": 2
     }
   ],
   "carried_stmt": [
@@ -4272,6 +4590,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4283,7 +4604,7 @@
       "measured_pending": true,
       "justification": "conf 0.90 (= occ_urlab_13 value -- consistent).",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_mf_addr",
@@ -4298,6 +4619,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4309,7 +4633,7 @@
       "measured_pending": true,
       "justification": "assembled address spans.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_mf_phone",
@@ -4323,6 +4647,9 @@
         "text"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4334,7 +4661,7 @@
       "measured_pending": true,
       "justification": "Reg E, context-boosted 0.80.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_mf_name",
@@ -4348,6 +4675,9 @@
         "text"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4359,7 +4689,7 @@
       "measured_pending": true,
       "justification": "only NLTagger-tagged Hartwell form.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_mf_acctphone",
@@ -4374,6 +4704,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4385,7 +4718,7 @@
       "measured_pending": true,
       "justification": "NANP shape wins overlap vs account 0.75 (Probe B). last-4 3265 = occ_urlab_18 tie.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_mnf_ocrconcat_1",
@@ -4399,6 +4732,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4410,7 +4746,7 @@
       "measured_pending": true,
       "justification": "OCR-concatenated date -> false account.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_mnf_ocrconcat_2",
@@ -4424,6 +4760,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4435,7 +4774,7 @@
       "measured_pending": true,
       "justification": "OCR-concatenated date -> false account.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_mnf_ocrconcat_3",
@@ -4449,6 +4788,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4460,7 +4802,7 @@
       "measured_pending": true,
       "justification": "OCR-concatenated date -> false account.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_mnf_acctasacct",
@@ -4475,6 +4817,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4486,7 +4831,7 @@
       "measured_pending": true,
       "justification": "detected 0.75 then overlap-suppressed to phone (aspirational should-fire-as-account).",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_mnf_nameprec",
@@ -4501,6 +4846,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4512,7 +4860,7 @@
       "measured_pending": true,
       "justification": "NLTagger mis-tag, bloom-confirmed -> precision hazard.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_mnf_coid",
@@ -4527,6 +4875,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4538,7 +4889,7 @@
       "measured_pending": true,
       "justification": "near ID:, no acct kw; sub-threshold phone 0.60 < 0.70.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_mnf_dob",
@@ -4553,6 +4904,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4564,7 +4918,7 @@
       "measured_pending": true,
       "justification": "label-anchored-only gate holds (bare dates suppressed).",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_mnf_trap_addr",
@@ -4579,6 +4933,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4590,7 +4947,7 @@
       "measured_pending": true,
       "justification": "state-abbrev trap held silent (address aspect).",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_mnf_trap_dl",
@@ -4605,6 +4962,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4616,7 +4976,7 @@
       "measured_pending": true,
       "justification": "state-abbrev trap held silent (DL aspect).",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_sf_indn",
@@ -4631,6 +4991,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4642,7 +5005,7 @@
       "measured_pending": true,
       "justification": "NLTagger-limited miss (ALL-CAPS + INDN prefix).",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_sf_mi",
@@ -4657,6 +5020,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4668,7 +5034,7 @@
       "measured_pending": true,
       "justification": "middle-initial span break.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_sf_firstinit",
@@ -4683,6 +5049,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4694,7 +5063,7 @@
       "measured_pending": true,
       "justification": "first+initial NLTagger-limited.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_watch_acct",
@@ -4709,6 +5078,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": true,
@@ -4720,7 +5092,7 @@
       "measured_pending": true,
       "justification": "masked -> invisible.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_watch_phone",
@@ -4735,6 +5107,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4746,7 +5121,7 @@
       "measured_pending": true,
       "justification": "sub-threshold on page 0.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "id": "stmt_watch_coid",
@@ -4761,6 +5136,9 @@
         "ocr"
       ],
       "label_context": "",
+      "context_class": "none",
+      "caption_clearance_pt": null,
+      "caption_text": null,
       "render": {
         "all_caps": false,
         "masked": false,
@@ -4772,7 +5150,7 @@
       "measured_pending": true,
       "justification": "sub-threshold CO-ID class.",
       "source_range": "frozen statement; geometry not resolved (measured_pending)",
-      "schema_version": 1
+      "schema_version": 2
     }
   ]
 }

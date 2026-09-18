@@ -131,7 +131,7 @@
       "generator": "resecta-sample-doc packet.variants scan_sim",
       "seed": null,
       "variant": "scan-sim-150",
-      "gt_sha256": "28b159c6dd8ba59ca433ceb576155958adcf2aa5dcea4f018ed6db964c45e21c"
+      "gt_sha256": "9a34d6472dc97d1dfb0ffe165bf62bfd9565258ca68de9408bd1b4a814fdae3c"
     }
   },
   {
@@ -154,8 +154,10 @@
       "generator": "resecta-sample-doc packet.variants degrade_ladder",
       "seed": null,
       "variant": "degrade-skew",
-      "gt_sha256": "490fc0ce5513428871797dc904d8d50aa1a4a595e739f99f9b1fe4aca7e9857f",
-      "note": "150 DPI raster rotated 1.5deg; GT boxes = axis-aligned hull (approximate)"
+      "source_document": "packet",
+      "gt_sha256": "5533544b9c941097095337a2c214786b9a308d8d785b9833828d209ee0a6aa95",
+      "gt_geometry": "polygon = the box rotated 1.5deg about the page center; bbox = its axis-aligned hull",
+      "note": "150 DPI raster rotated 1.5deg CCW about the page center."
     }
   },
   {
@@ -178,8 +180,10 @@
       "generator": "resecta-sample-doc packet.variants degrade_ladder",
       "seed": null,
       "variant": "degrade-blur",
-      "gt_sha256": "57524cbd6442b02aa95094b8eec30dec035c408ab0812a3ae2c3bf375e13f13a",
-      "note": "150 DPI raster softened by 50% down/up resample; GT geometry inherited"
+      "source_document": "packet",
+      "gt_sha256": "cae413cb60f1d01dfa46ac31b14b63084dba0431adf94718874f479a65bec9a9",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "150 DPI raster softened by a 50% down/up resample."
     }
   },
   {
@@ -202,8 +206,192 @@
       "generator": "resecta-sample-doc packet.variants degrade_ladder",
       "seed": null,
       "variant": "degrade-lowdpi",
-      "gt_sha256": "cb6faedab8f59d3feac67382e2c968426c95af2fd878fc6929131b2f142921d1",
-      "note": "re-rasterized at 100 DPI; GT geometry inherited"
+      "source_document": "packet",
+      "gt_sha256": "4d6374b3e8ba21e47e9ad9cd9a8a4de3f48ee3e72cc30d86eb00d38406224122",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "Source re-rasterized at 100 DPI."
+    }
+  },
+  {
+    "id": "packet-degrade-lowdpi75",
+    "path": "variants/packet-degrade-lowdpi75.pdf",
+    "sha256": "ac02ac6cfc9eecdcbb2867d763449615b570ea9034092a84a902aa16cf369d0d",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-degrade-lowdpi75-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-lowdpi75",
+      "source_document": "packet",
+      "gt_sha256": "b529647285acf8955624062f7ef51c6be4ea87fd9d8208fb83950c631a0ee444",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "Source re-rasterized at 75 DPI."
+    }
+  },
+  {
+    "id": "packet-degrade-jpeg85",
+    "path": "variants/packet-degrade-jpeg85.pdf",
+    "sha256": "43f241731d308bb1b03496346b68de55da2b0feef034e8fcf52898a5be23357a",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-degrade-jpeg85-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-jpeg85",
+      "source_document": "packet",
+      "gt_sha256": "eacd855178be69bd0dfef8f6a008fb1d7dd8627e2d801daef748e3645f2a7d90",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "150 DPI raster JPEG-encoded at quality 85 and decoded (scanner-software class)."
+    }
+  },
+  {
+    "id": "packet-degrade-jpeg70",
+    "path": "variants/packet-degrade-jpeg70.pdf",
+    "sha256": "0f9342b34f5fd2f4a5fac3bc6cbb6730776737ac6c5f139edf5d2b9f6daff67e",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-degrade-jpeg70-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-jpeg70",
+      "source_document": "packet",
+      "gt_sha256": "11133cb6d09a17cbb9a349a79efc164f2924ca0369e7ef16eeb6d423b3caee18",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "150 DPI raster JPEG-encoded at quality 70 and decoded (phone-camera floor)."
+    }
+  },
+  {
+    "id": "packet-degrade-noise",
+    "path": "variants/packet-degrade-noise.pdf",
+    "sha256": "a9b595198b80ba9116f25aa6faa3b99ae8505132e170a761d4dd29a8e233257b",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-degrade-noise-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": 103479186426135,
+      "variant": "degrade-noise",
+      "source_document": "packet",
+      "gt_sha256": "c393cfe509e8bca129fdcfb111fb696436ec2ef0d46d90117246396b125a030e",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "150 DPI raster + seeded additive Gaussian noise (sigma 12/255) + 0.5% salt-and-pepper (SplitMix64 stream; integer arithmetic only)."
+    }
+  },
+  {
+    "id": "packet-degrade-bleed",
+    "path": "variants/packet-degrade-bleed.pdf",
+    "sha256": "e29a46592a3817643700484085a2bbb2f9cf55aa243200aefa596456783836b5",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-degrade-bleed-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-bleed",
+      "source_document": "packet",
+      "gt_sha256": "d0967683c6491662212dace9cf1d7b10b342fb30d7a2874fc5981c0cb2f47bb5",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "150 DPI raster with the duplex verso (page i^1) mirrored and shown through at 18% of its ink, then contrast compressed to [40, 225]."
+    }
+  },
+  {
+    "id": "packet-degrade-fax98",
+    "path": "variants/packet-degrade-fax98.pdf",
+    "sha256": "acd5faf5da0b1535591e41af996667c1f18a32a61f95ad9fc971751c9df478b1",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-degrade-fax98-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-fax98",
+      "source_document": "packet",
+      "gt_sha256": "14bc27311c8e1afb7e68fba01af9601dd908a4d38a8a980ab8e57ad8b9724d17",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "Source rendered at 204x98 DPI (CCITT standard), thresholded at 50% to 1-bit content, stretched back to the page."
+    }
+  },
+  {
+    "id": "packet-degrade-fax196",
+    "path": "variants/packet-degrade-fax196.pdf",
+    "sha256": "a8469d2834f641edf2e96ceb5a220d6d902faec457edd9a801bdd4bc266cc8f5",
+    "pages": 12,
+    "class": "C1",
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/packet-degrade-fax196-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-fax196",
+      "source_document": "packet",
+      "gt_sha256": "bff3e870383b45bcab3cbf094f204f53fdac84a528972882fc24b0d13f05d620",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "Source rendered at 204x196 DPI (CCITT fine), thresholded at 50% to 1-bit content, stretched back to the page."
     }
   },
   {
@@ -227,7 +415,7 @@
       "generator": "resecta-sample-doc packet.build_capture",
       "seed": null,
       "variant": "capture-masters-2026-08",
-      "gt_sha256": "bb4a49bb89da927207ac16d3401a13377e44a6ec274a812106c8493f1ed70be3",
+      "gt_sha256": "12a6a87efa54a2f32a7015451c21dbd519461959e2b585f3c9c2c0ca4840ddbb",
       "marks_sha256": "915d1c3ceef1f6fc5c570cbbb26a3f6f52aa97c79c656a6f4ccbfdb9ead7c2ea",
       "page_classes": {
         "0": "C1",
@@ -822,6 +1010,489 @@
       ],
       "registration_run": "evidence/8bbf5c8c/capture/20260825-2000-register-synthetic",
       "note": "class is null because one document spans C1..C4 (per-page classes in page_classes; the L-19 null precedent); polygons ride beside bbox in the sidecar"
+    }
+  },
+  {
+    "id": "capture-masters-2026-08-scan-sim-150dpi",
+    "path": "variants/capture-masters-2026-08-scan-sim-150dpi.pdf",
+    "sha256": "f80bdbb0a98fcf29722d37f39b1df4d94dfafaa5802c7b6995dc028bd0b5665b",
+    "pages": 16,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture-masters-2026-08-scan-sim-150dpi-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants scan_sim",
+      "seed": null,
+      "variant": "scan-sim-150",
+      "source_document": "capture-masters-2026-08",
+      "gt_sha256": "1733b56200b101fc747b5ad764aef8ac359bb8d2b2edfd32ce76390034f05341",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      },
+      "note": "the capture ladder's own 150 DPI base (PyMuPDF), image-only"
+    }
+  },
+  {
+    "id": "capture-masters-2026-08-degrade-skew",
+    "path": "variants/capture-masters-2026-08-degrade-skew.pdf",
+    "sha256": "77deafd38258ab4aafa358a3eef2307a9a6a41da3121f05fa748483bcb1e12d9",
+    "pages": 16,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture-masters-2026-08-degrade-skew-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-skew",
+      "source_document": "capture-masters-2026-08",
+      "gt_sha256": "fc7411cec3884bc131133a44348db2400a6a578063213ca2c166b36d469f5280",
+      "gt_geometry": "polygon = the box rotated 1.5deg about the page center; bbox = its axis-aligned hull",
+      "note": "150 DPI raster rotated 1.5deg CCW about the page center.",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      }
+    }
+  },
+  {
+    "id": "capture-masters-2026-08-degrade-blur",
+    "path": "variants/capture-masters-2026-08-degrade-blur.pdf",
+    "sha256": "7b4de559e31ddd8badf780477449753c28b744d122fb76e26bc8b02437c6e866",
+    "pages": 16,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture-masters-2026-08-degrade-blur-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-blur",
+      "source_document": "capture-masters-2026-08",
+      "gt_sha256": "8e0a4fcd74feda593ede1252c7b55cf193def04fae87ed96507ae802fb433088",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "150 DPI raster softened by a 50% down/up resample.",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      }
+    }
+  },
+  {
+    "id": "capture-masters-2026-08-degrade-lowdpi",
+    "path": "variants/capture-masters-2026-08-degrade-lowdpi.pdf",
+    "sha256": "9360283f05308ca84b7e95354594dd0671b519a928ba3d25ef3aa77be61444ef",
+    "pages": 16,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture-masters-2026-08-degrade-lowdpi-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-lowdpi",
+      "source_document": "capture-masters-2026-08",
+      "gt_sha256": "b8e8db1c17f8ac2e2a76f12729cf5ffc983482e4bdea03daf1268e978722136b",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "Source re-rasterized at 100 DPI.",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      }
+    }
+  },
+  {
+    "id": "capture-masters-2026-08-degrade-lowdpi75",
+    "path": "variants/capture-masters-2026-08-degrade-lowdpi75.pdf",
+    "sha256": "d16bc212d45efce2d0519391393964671fa72adf3847124ec688c04a48ef18aa",
+    "pages": 16,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture-masters-2026-08-degrade-lowdpi75-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-lowdpi75",
+      "source_document": "capture-masters-2026-08",
+      "gt_sha256": "d9035d62dbd1218e6aba20285027d206cb22af6a2ebe684d19476b927c40d20f",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "Source re-rasterized at 75 DPI.",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      }
+    }
+  },
+  {
+    "id": "capture-masters-2026-08-degrade-jpeg85",
+    "path": "variants/capture-masters-2026-08-degrade-jpeg85.pdf",
+    "sha256": "d94e869f157ea7ecfad030a6d912d8c6472387af71d860ca86034a557737a75f",
+    "pages": 16,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture-masters-2026-08-degrade-jpeg85-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-jpeg85",
+      "source_document": "capture-masters-2026-08",
+      "gt_sha256": "ef390b6880335d9bc171d1b173606aa42f7292036a651482c290d7aaffc11bd2",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "150 DPI raster JPEG-encoded at quality 85 and decoded (scanner-software class).",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      }
+    }
+  },
+  {
+    "id": "capture-masters-2026-08-degrade-jpeg70",
+    "path": "variants/capture-masters-2026-08-degrade-jpeg70.pdf",
+    "sha256": "44ec4d13f8b1997d130a9029f9108f2cb65eb6ac86b7d2cc0b70bd708198e17e",
+    "pages": 16,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture-masters-2026-08-degrade-jpeg70-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-jpeg70",
+      "source_document": "capture-masters-2026-08",
+      "gt_sha256": "826695c5708cf1e5277248c950aee1475f077dc8e187ed32b9a7067de13f6c6e",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "150 DPI raster JPEG-encoded at quality 70 and decoded (phone-camera floor).",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      }
+    }
+  },
+  {
+    "id": "capture-masters-2026-08-degrade-noise",
+    "path": "variants/capture-masters-2026-08-degrade-noise.pdf",
+    "sha256": "809b9af1fd5bde9bb897bd0016df96649a91f0116003492c2cd4ab16c0d77fc4",
+    "pages": 16,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture-masters-2026-08-degrade-noise-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": 103479186426135,
+      "variant": "degrade-noise",
+      "source_document": "capture-masters-2026-08",
+      "gt_sha256": "bfbfd5566fbd43aa91b8af0b111ba8f1ba20e0120b6b2d1e44022c0f81aabf05",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "150 DPI raster + seeded additive Gaussian noise (sigma 12/255) + 0.5% salt-and-pepper (SplitMix64 stream; integer arithmetic only).",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      }
+    }
+  },
+  {
+    "id": "capture-masters-2026-08-degrade-bleed",
+    "path": "variants/capture-masters-2026-08-degrade-bleed.pdf",
+    "sha256": "55003aeec78111d74a1ceda92a887e60a341aab1541285a7016434cf510300f9",
+    "pages": 16,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture-masters-2026-08-degrade-bleed-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-bleed",
+      "source_document": "capture-masters-2026-08",
+      "gt_sha256": "2f6da2479d1c056dae35248c4a811ff8f255bf0e69bca1fd1b67bce84db711cb",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "150 DPI raster with the duplex verso (page i^1) mirrored and shown through at 18% of its ink, then contrast compressed to [40, 225].",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      }
+    }
+  },
+  {
+    "id": "capture-masters-2026-08-degrade-fax98",
+    "path": "variants/capture-masters-2026-08-degrade-fax98.pdf",
+    "sha256": "29af3cea12e53084c93dd2b1f018d6845ad42316a102e4cb67e0545ad74bd257",
+    "pages": 16,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture-masters-2026-08-degrade-fax98-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-fax98",
+      "source_document": "capture-masters-2026-08",
+      "gt_sha256": "ff7ea60094e281c7fa6b8c493b313882def432877cd4f84a9e66646047833554",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "Source rendered at 204x98 DPI (CCITT standard), thresholded at 50% to 1-bit content, stretched back to the page.",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      }
+    }
+  },
+  {
+    "id": "capture-masters-2026-08-degrade-fax196",
+    "path": "variants/capture-masters-2026-08-degrade-fax196.pdf",
+    "sha256": "c589e75b5d83dbad81d13f4dc6f0ea1e8397b386ea56204980496e504907a3d4",
+    "pages": 16,
+    "class": null,
+    "capture": "K1",
+    "features": [
+      "F0"
+    ],
+    "gt": "variants/capture-masters-2026-08-degrade-fax196-ground-truth.json",
+    "gt_kind": "bbox",
+    "leg_applicability": [
+      "ocr"
+    ],
+    "source": "external",
+    "provenance": {
+      "generator": "resecta-sample-doc packet.variants degrade_ladder",
+      "seed": null,
+      "variant": "degrade-fax196",
+      "source_document": "capture-masters-2026-08",
+      "gt_sha256": "47fefb4e4e0b4c3c20ba8faea46d65d10ce622c4dabf8ed93dc313033f2b417a",
+      "gt_geometry": "inherited (unchanged); polygon = the box's own corners",
+      "note": "Source rendered at 204x196 DPI (CCITT fine), thresholded at 50% to 1-bit content, stretched back to the page.",
+      "page_classes": {
+        "0": "C1",
+        "1": "C1",
+        "2": "C1",
+        "3": "C1",
+        "4": "C2",
+        "5": "C2",
+        "6": "C2",
+        "7": "C2",
+        "8": "C3",
+        "9": "C3",
+        "10": "C3",
+        "11": "C3",
+        "12": "C4",
+        "13": "C4",
+        "14": "C4",
+        "15": "C4"
+      }
     }
   }
 ]
