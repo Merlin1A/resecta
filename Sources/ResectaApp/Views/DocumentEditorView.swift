@@ -1744,28 +1744,32 @@ struct DocumentEditorView: View {
         report.overallStatus.isSkipped && !acknowledged
     }
 
-    /// Incomplete-WARN share-risk confirm predicate. A WARN
-    /// report whose aggregate carries zero real WARN layers but at least one
-    /// SKIPPED layer is the digest-less verify-only degrade
-    /// (`VerificationResultsView.mastheadSubtitle`'s "Completed with N of M
-    /// checks skipped — results may be incomplete." branch) — the narrow
-    /// condition is deliberately identical to that branch's own gate, so the
-    /// confirm sheet can reuse its exact sentence with no new string. A WARN
-    /// that mixes real WARN layers with skipped ones does NOT take this
-    /// confirm (`warnCount == 0` fails) — that combination has no approved
-    /// copy and stays confirm-free, same as any other routine WARN. `report`
-    /// alone can't carry the acknowledgement (`VerificationReport` lives in
-    /// the fenced Packages/RedactionEngine), so unlike its two siblings
-    /// this predicate takes `acknowledged` as an explicit parameter, sourced
-    /// at the call site from `DocumentState.incompleteWarnShareAcknowledged`.
-    /// Pure + `static` for the same testability reason as the two siblings.
+    /// Incomplete-WARN share-risk confirm predicate. Two WARN shapes take
+    /// this confirm, both meaning a check did not run in full on the output:
+    /// the digest-less verify-only degrade — zero real WARN layers but at
+    /// least one SKIPPED layer, deliberately the exact gate of
+    /// `VerificationResultsView.mastheadSubtitle`'s "Completed with N of M
+    /// checks skipped — results may be incomplete." branch — and a WARN
+    /// whose layers include a could-not-verify WARN
+    /// (`CouldNotVerifyWarn.matches`). Either way the confirm sheet reuses
+    /// the masthead's own sentence — no new string — and for the second
+    /// shape lists the reporting checks under the existing list header. A
+    /// WARN made only of routine notes (a structural or metadata note, a
+    /// positional graze, an attestation mismatch) stays confirm-free.
+    /// `report` alone can't carry the acknowledgement (`VerificationReport`
+    /// lives in the fenced Packages/RedactionEngine), so unlike its two
+    /// siblings this predicate takes `acknowledged` as an explicit
+    /// parameter, sourced at the call site from
+    /// `DocumentState.incompleteWarnShareAcknowledged`. Pure + `static` for
+    /// the same testability reason as the two siblings.
     static func shareNeedsIncompleteWarnConfirm(
         report: VerificationReport, acknowledged: Bool
     ) -> Bool {
-        guard report.overallStatus.isWarn else { return false }
+        guard report.overallStatus.isWarn, !acknowledged else { return false }
         let warnCount = report.layers.filter(\.status.isWarn).count
         let skippedCount = report.layers.filter(\.status.isSkipped).count
-        return warnCount == 0 && skippedCount > 0 && !acknowledged
+        if warnCount == 0 && skippedCount > 0 { return true }
+        return report.layers.contains(where: CouldNotVerifyWarn.matches)
     }
 
     private func canExport(report: VerificationReport) -> Bool {
@@ -1805,8 +1809,9 @@ struct DocumentEditorView: View {
     /// re-scoping a second one is out of the sprint's timeline.
     static let shareRiskConfirmTitle = "Share with reported issues?"
 
-    /// List header shown above the at-risk item list — the FAIL/ATTENTION
-    /// confirm family only.
+    /// List header shown above the item list — the FAIL/ATTENTION confirm
+    /// family, and the incomplete-WARN family when could-not-verify layers
+    /// report (`couldNotVerifyItemLines`).
     static let shareRiskConfirmListHeader = "The verification check reported:"
 
     /// At-risk item lines for the FAIL/ATTENTION confirm family: every
@@ -1819,6 +1824,18 @@ struct DocumentEditorView: View {
     static func atRiskItemLines(report: VerificationReport) -> [String] {
         report.layers
             .filter { $0.status.isFail || $0.status.isAttention }
+            .map(\.shortDescription)
+    }
+
+    /// Item lines for the incomplete-WARN confirm family: every
+    /// could-not-verify WARN layer's `shortDescription`
+    /// (`CouldNotVerifyWarn.matches`), content-free by the same construction
+    /// as `atRiskItemLines`. Empty for the all-skipped degrade, whose
+    /// masthead sentence already names the skips. Static so the derivation
+    /// is unit-testable without a SwiftUI host.
+    static func couldNotVerifyItemLines(report: VerificationReport) -> [String] {
+        report.layers
+            .filter(CouldNotVerifyWarn.matches)
             .map(\.shortDescription)
     }
 
@@ -1906,9 +1923,10 @@ struct DocumentEditorView: View {
             shareRiskConfirmKind = .skipped(report)
             return
         }
-        // Incomplete-WARN confirm — a WARN whose
-        // digest-dependent layers were skipped, not yet acknowledged.
-        // Mutually exclusive with both branches above by overallStatus.
+        // Incomplete-WARN confirm — a WARN whose digest-dependent layers
+        // were skipped, or whose layers include a could-not-verify WARN,
+        // not yet acknowledged. Mutually exclusive with both branches above
+        // by overallStatus.
         if Self.shareNeedsIncompleteWarnConfirm(
             report: report,
             acknowledged: documentState.incompleteWarnShareAcknowledged
@@ -2688,7 +2706,8 @@ enum ShareRiskConfirmKind: Identifiable {
     case failOrAttention(VerificationReport)
     /// Verification never ran (any `SkipReason`).
     case skipped(VerificationReport)
-    /// WARN whose digest-dependent layers were skipped.
+    /// WARN whose digest-dependent layers were skipped, or whose layers
+    /// include a could-not-verify WARN (`CouldNotVerifyWarn`).
     case incompleteWarn(VerificationReport)
 
     var id: String {
@@ -2716,6 +2735,23 @@ enum ShareRiskConfirmKind: Identifiable {
         case .failOrAttention: "shareAnywayConfirm"
         case .skipped: "shareSkippedConfirm"
         case .incompleteWarn: "shareIncompleteWarnConfirm"
+        }
+    }
+
+    /// The lines the confirm sheet lists under
+    /// `DocumentEditorView.shareRiskConfirmListHeader`: the at-risk layers
+    /// for FAIL/ATTENTION, the could-not-verify layers for incomplete-WARN,
+    /// none for SKIPPED (its fact line stands alone). A pure derivation from
+    /// the captured report so the sheet's composition is unit-testable
+    /// without a SwiftUI host.
+    var itemLines: [String] {
+        switch self {
+        case .failOrAttention(let report):
+            DocumentEditorView.atRiskItemLines(report: report)
+        case .incompleteWarn(let report):
+            DocumentEditorView.couldNotVerifyItemLines(report: report)
+        case .skipped:
+            []
         }
     }
 }
@@ -2772,10 +2808,23 @@ struct ShareRiskConfirmSheet: View {
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
-    private var atRiskItems: [String] {
-        switch kind {
-        case .failOrAttention(let report): DocumentEditorView.atRiskItemLines(report: report)
-        case .skipped, .incompleteWarn: []
+    private var atRiskItems: [String] { kind.itemLines }
+
+    /// The list header + one `Label` line per item — the FAIL/ATTENTION
+    /// arm's list, shared with the incomplete-WARN arm when could-not-verify
+    /// layers report.
+    @ViewBuilder
+    private var itemList: some View {
+        Text(DocumentEditorView.shareRiskConfirmListHeader)
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(.secondary)
+        ForEach(Array(atRiskItems.enumerated()), id: \.offset) { _, line in
+            Label {
+                Text(line).font(.subheadline)
+            } icon: {
+                Image(systemName: "exclamationmark.circle")
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -2793,28 +2842,23 @@ struct ShareRiskConfirmSheet: View {
                 VStack(alignment: .leading, spacing: ResectaTokens.Spacing.sm) {
                     switch kind {
                     case .failOrAttention:
-                        Text(DocumentEditorView.shareRiskConfirmListHeader)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary)
-                        ForEach(Array(atRiskItems.enumerated()), id: \.offset) { _, line in
-                            Label {
-                                Text(line).font(.subheadline)
-                            } icon: {
-                                Image(systemName: "exclamationmark.circle")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                        itemList
                     case .skipped:
                         Text(DocumentEditorView.shareRiskConfirmSkipFactLine)
                             .font(.subheadline)
                     case .incompleteWarn(let report):
-                        // Reuse the masthead's own skip-induced-WARN
-                        // sentence verbatim — no new string. The helper is
-                        // optional only for PASS (title-only
-                        // masthead); a WARN report always carries a line.
+                        // Reuse the masthead's own WARN sentence verbatim —
+                        // no new string. The helper is optional only for
+                        // PASS (title-only masthead); a WARN report always
+                        // carries a line. When could-not-verify layers
+                        // report, the checks are listed beneath it in the
+                        // FAIL/ATTENTION arm's own list shape.
                         if let line = VerificationResultsView.mastheadSubtitle(report: report) {
                             Text(line)
                                 .font(.subheadline)
+                        }
+                        if !atRiskItems.isEmpty {
+                            itemList
                         }
                     }
 
