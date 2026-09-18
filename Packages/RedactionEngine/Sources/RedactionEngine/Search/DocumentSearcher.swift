@@ -1103,12 +1103,14 @@ public actor DocumentSearcher {
         }
 
         // Nested quantifier rejection — the structural heuristic for
-        // catastrophic backtracking, bounded-quantifier aware.
+        // catastrophic backtracking, bounded-quantifier aware; an inner
+        // unbounded run that a literal inside its group delimits is not
+        // nesting (the sentinel probe's polynomial class, not this one's).
         if let violation = RegexQuantifierScan.violation(
             in: pattern,
             boundedCeiling: boundedQuantifierCeiling,
             productCap: nestedBoundProductCap,
-            literalSeparatorDemotion: false
+            literalSeparatorDemotion: true
         ) {
             switch violation {
             case .nestedUnbounded:

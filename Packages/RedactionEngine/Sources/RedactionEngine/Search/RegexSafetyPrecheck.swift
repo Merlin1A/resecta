@@ -19,8 +19,24 @@ public enum RegexSafetyPrecheck {
     /// quantifier (`*`, `+`, `{n,}`) and that group either contains another
     /// unbounded quantifier (nested case) or a top-level alternation `|`
     /// (overlapping-alternation proxy).
+    ///
+    /// The nested case defers to `RegexQuantifierScan`'s reading of the
+    /// same shape, which ignores an inner run that a literal character
+    /// inside the group delimits (`(\.\d+)*`, `([a-z]+ )+`): with the
+    /// iteration boundary fixed by the literal the shape is at worst
+    /// polynomial — the runtime sentinel's class, not this precheck's.
     public static func isLikelyPathological(_ pattern: String) -> Bool {
         let chars = Array(pattern)
+        var nestedUnboundedCache: Bool? = nil
+        func nestedUnboundedStands() -> Bool {
+            if let cached = nestedUnboundedCache { return cached }
+            let value = RegexQuantifierScan.hasNestedUnbounded(
+                pattern,
+                boundedCeiling: DocumentSearcher.boundedQuantifierCeiling,
+                literalSeparatorDemotion: true)
+            nestedUnboundedCache = value
+            return value
+        }
 
         struct GroupState {
             var hasInnerQuantifier = false
@@ -65,7 +81,10 @@ public enum RegexSafetyPrecheck {
                 } else {
                     unbounded = false
                 }
-                if unbounded, closed.hasInnerQuantifier || closed.hasAlternation {
+                if unbounded, closed.hasAlternation {
+                    return true
+                }
+                if unbounded, closed.hasInnerQuantifier, nestedUnboundedStands() {
                     return true
                 }
 

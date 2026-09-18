@@ -101,3 +101,48 @@ struct RegexSafetyPrecheckTests {
         #expect(!RegexSafetyPrecheck.isLikelyPathological(""))
     }
 }
+
+// MARK: - Literal separators demote the nested-unbounded shape
+
+/// A group repeated without bound whose inner unbounded run is delimited
+/// INSIDE the group by a literal character the run cannot match —
+/// `\.` beside `\d+`, a space after `[a-z]+`, `\.` after `\w+` — cannot
+/// re-split the input between iterations: the literal fixes every
+/// iteration boundary. That is the polynomial class the 200 ms sentinel
+/// probe backstops, not the exponential nested-quantifier class this
+/// precheck exists for. The demotion never touches the alternation rule.
+@Suite("Regex Safety Precheck — literal separators")
+struct RegexSafetyPrecheckSeparatorTests {
+
+    @Test(#"Dotted section numbers `Section \d+(\.\d+)*` accepted"#)
+    func dottedSectionNumbersAccepted() {
+        #expect(!RegexSafetyPrecheck.isLikelyPathological(#"Section \d+(\.\d+)*"#))
+    }
+
+    @Test("Space-separated capitalised words `([A-Z][a-z]+ )+[A-Z][a-z]+` accepted")
+    func spaceSeparatedWordsAccepted() {
+        #expect(!RegexSafetyPrecheck.isLikelyPathological("([A-Z][a-z]+ )+[A-Z][a-z]+"))
+    }
+
+    @Test(#"Dotted name chain `(\w+\.)+\w+` accepted"#)
+    func dottedNameChainAccepted() {
+        #expect(!RegexSafetyPrecheck.isLikelyPathological(#"(\w+\.)+\w+"#))
+    }
+
+    @Test(#"Digit runs with optional whitespace `(\d+\s*)+` stay flagged (no literal delimits the run)"#)
+    func digitRunsStayFlagged() {
+        #expect(RegexSafetyPrecheck.isLikelyPathological(#"(\d+\s*)+"#))
+    }
+
+    @Test("A separator the run CAN match does not demote: `(\\w+_)+` stays flagged")
+    func matchableSeparatorStaysFlagged() {
+        // `_` is a word character, so `\w+` can absorb the separator and
+        // the iteration boundary is ambiguous again.
+        #expect(RegexSafetyPrecheck.isLikelyPathological(#"(\w+_)+"#))
+    }
+
+    @Test("A quantified separator does not demote: `(\\d+\\.?)+` stays flagged")
+    func quantifiedSeparatorStaysFlagged() {
+        #expect(RegexSafetyPrecheck.isLikelyPathological(#"(\d+\.?)+"#))
+    }
+}
