@@ -29,13 +29,16 @@ public struct AhoCorasick: Sendable {
     public let isDegraded: Bool
 
     /// Maximum total pattern bytes before the automaton degrades to a no-op.
-    /// Deliberately kept at 1 MB after the UTF-32 additions: an ASCII term now
-    /// emits ~13n bytes per case variant (was ~5n), so the bound supports
-    /// roughly 77K characters of raw term content — still orders of magnitude
-    /// beyond any realistic term set, while capping automaton construction
-    /// memory against pathological input. The degrade is surfaced by both
-    /// consuming layers.
-    private static let maxTotalPatternBytes = 1_000_000
+    /// 2 MB: the largest realistic term set — 250 distinct 40-character
+    /// terms, each carrying a compatibility character and a ligature site
+    /// so `encodeForSearch` emits its widest variant set — encodes to about
+    /// 1.42 MB, which crossed the earlier 1 MB bound (the guard test in the
+    /// automaton suite pins the set and its headroom). An ASCII term emits
+    /// ~13n bytes per case variant, so the bound supports roughly 154K
+    /// characters of raw term content while still capping automaton
+    /// construction memory against pathological input. The degrade is
+    /// surfaced by both consuming layers.
+    static let maxTotalPatternBytes = 2_000_000
 
     /// Build the automaton from a set of byte patterns.
     /// Construction is O(sum of pattern lengths).

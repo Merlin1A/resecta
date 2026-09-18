@@ -2798,8 +2798,10 @@ public actor DocumentSearcher {
     /// starts or ends inside a word — except that the trim never moves
     /// into the match itself: when the partial word adjoins the match,
     /// that side keeps the raw cut. `…` is prepended/appended only on a
-    /// side where text was cut. Newlines flatten to spaces LAST, one
-    /// Character each, so the returned offsets stay valid.
+    /// side where text was cut. Newlines outside the match flatten to
+    /// spaces LAST, one Character each, so the returned offsets stay
+    /// valid; the match span itself is copied verbatim so the window
+    /// always contains `matchedText`.
     func contextSnippet(text: String, matchStart: Int, matchLength: Int) -> ContextWindow {
         let textCount = text.count
         let clampedStart = min(max(0, matchStart), textCount)
@@ -2830,13 +2832,20 @@ public actor DocumentSearcher {
         let leading = leftCut ? "…" : ""
         let trailing = rightCut ? "…" : ""
         let matchOffset = leading.count + text.distance(from: startIdx, to: matchStartIdx)
-        // Flatten LAST, Character for Character (a "\r\n" grapheme is one
-        // Character before and after), so `matchOffset` stays valid.
-        let flattened = String((leading + text[startIdx..<endIdx] + trailing).map { ch -> Character in
-            ch.isNewline ? " " : ch
-        })
+        // Flatten LAST and only OUTSIDE the match, Character for Character
+        // (a "\r\n" grapheme is one Character before and after), so
+        // `matchOffset` stays valid and the window contains the match
+        // verbatim — a match that spans a line break keeps its break.
+        func flattened(_ part: Substring) -> String {
+            String(part.map { ch -> Character in ch.isNewline ? " " : ch })
+        }
+        let snippet = leading
+            + flattened(text[startIdx..<matchStartIdx])
+            + String(text[matchStartIdx..<matchEndIdx])
+            + flattened(text[matchEndIdx..<endIdx])
+            + trailing
         return ContextWindow(
-            snippet: flattened,
+            snippet: snippet,
             matchRange: matchOffset ..< matchOffset + clampedLength
         )
     }

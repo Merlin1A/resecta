@@ -1345,11 +1345,8 @@ struct SearchAndRedactSheet: View {
 
     private func presentReverseRationale(for result: SearchResult) {
         let doctype = searchState.lastDoctypeExplanation?.primary
-        let context: String = {
-            let snippet = result.contextSnippet
-            if snippet.contains(result.matchedText) { return snippet }
-            return "\(snippet) \(result.matchedText)"
-        }()
+        let context = ReverseRationaleContext.make(
+            snippet: result.contextSnippet, matchedText: result.matchedText)
         activeModal = .rationale(ReverseRationaleRequest(
             snippet: result.matchedText,
             fullContext: context,

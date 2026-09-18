@@ -150,10 +150,14 @@ public struct UserTermMatcher: Sendable {
     /// steps with `NSString.range(of:options:range:)` so it's bounded by
     /// page length.
     ///
-    /// Literal patterns are case-insensitively matched via `.caseInsensitive`
-    /// NSString options — we operate on the raw `pageText` (not normalized)
-    /// so the returned NSRange maps cleanly back to PDFKit selection bounds
-    /// via `DocumentSearcher.boundingRect(for:page:)`.
+    /// Literal patterns match on the search-normalized text (ligature
+    /// expansion + NFKC + case fold — the form `shouldSuppress` compares),
+    /// and every hit range is mapped back to the raw `pageText` through a
+    /// per-character map so the returned NSRange resolves PDFKit selection
+    /// bounds on the page's own characters via
+    /// `DocumentSearcher.boundingRect(for:page:)`. An all-ASCII page takes
+    /// the plain case-insensitive search (the two are equivalent there),
+    /// as does a page whose per-character normalization cannot be mapped.
     ///
     /// Returns `AlwaysFlagPageResult.timedOutPatterns` populated with the
     /// user-authored patterns whose `enumerateMatches` bailed on the per-
@@ -183,6 +187,8 @@ public struct UserTermMatcher: Sendable {
         let fullRange = NSRange(location: 0, length: ns.length)
         let startTime = ContinuousClock.now
         let timeout = timeoutOverride ?? DocumentSearcher.perPageRegexTimeout
+        // Built once per page, on the first literal term that needs it.
+        var normalizedPage: NormalizedSearchText? = nil
 
         for term in alwaysFlag {
             if ContinuousClock.now - startTime > timeout { break }
@@ -210,6 +216,10 @@ public struct UserTermMatcher: Sendable {
                 if thisTermTimedOut {
                     timedOutPatterns.append(term.pattern)
                 }
+            } else if let literal = term.normalizedLiteral,
+                      let mapped = normalizedPage ?? Self.normalizedSearchText(pageText) {
+                normalizedPage = mapped
+                hits.append(contentsOf: Self.literalHits(literal, in: mapped, pattern: term.pattern))
             } else {
                 var searchRange = fullRange
                 while searchRange.length > 0 {
@@ -230,5 +240,67 @@ public struct UserTermMatcher: Sendable {
             }
         }
         return AlwaysFlagPageResult(hits: hits, timedOutPatterns: timedOutPatterns)
+    }
+
+    // MARK: - Literal matching on the search-normalized text
+
+    /// The search-normalized form of a page with, per normalized Character,
+    /// the UTF-16 span of the raw Character it came from.
+    struct NormalizedSearchText {
+        let text: String
+        /// Raw UTF-16 offset where the source Character starts.
+        let rawStart: [Int]
+        /// Raw UTF-16 offset after the source Character.
+        let rawEnd: [Int]
+    }
+
+    /// nil for an all-ASCII page (the plain case-insensitive search is
+    /// exactly equivalent there) and when the per-character pass disagrees
+    /// with the whole-string form — a script that re-clusters across
+    /// characters — so the map would not describe the searched text.
+    static func normalizedSearchText(_ raw: String) -> NormalizedSearchText? {
+        guard raw.utf8.count != raw.unicodeScalars.count else { return nil }
+        var text = ""
+        var starts: [Int] = []
+        var ends: [Int] = []
+        var offset = 0
+        for character in raw {
+            let unit = String(character)
+            let length = unit.utf16.count
+            for normalized in TextNormalizer.normalizeForSearch(unit, caseSensitive: false) {
+                text.append(normalized)
+                starts.append(offset)
+                ends.append(offset + length)
+            }
+            offset += length
+        }
+        guard text.count == starts.count,
+              text == TextNormalizer.normalizeForSearch(raw, caseSensitive: false) else {
+            return nil
+        }
+        return NormalizedSearchText(text: text, rawStart: starts, rawEnd: ends)
+    }
+
+    /// Every occurrence of `literal` (already search-normalized) in the
+    /// mapped text, as raw UTF-16 ranges, in document order.
+    static func literalHits(
+        _ literal: String, in mapped: NormalizedSearchText, pattern: String
+    ) -> [(range: NSRange, pattern: String)] {
+        var hits: [(range: NSRange, pattern: String)] = []
+        let text = mapped.text
+        var searchStart = text.startIndex
+        var searchOffset = 0
+        while searchStart < text.endIndex,
+              let found = text.range(of: literal, range: searchStart..<text.endIndex) {
+            let start = searchOffset + text.distance(from: searchStart, to: found.lowerBound)
+            let length = text.distance(from: found.lowerBound, to: found.upperBound)
+            guard length > 0, start + length - 1 < mapped.rawStart.count else { break }
+            let rawStart = mapped.rawStart[start]
+            let rawEnd = mapped.rawEnd[start + length - 1]
+            hits.append((range: NSRange(location: rawStart, length: rawEnd - rawStart), pattern: pattern))
+            searchOffset = start + length
+            searchStart = found.upperBound
+        }
+        return hits
     }
 }

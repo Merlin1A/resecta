@@ -163,7 +163,7 @@ struct AhoCorasickTests {
     @Test("Degradation bound stays byte-based over the expanded variant set")
     func degradedBoundIsByteBased() {
         // Case variants roughly triple the pattern bytes for a cased ASCII
-        // term; the 1 MB bound must count the actual emitted bytes. One
+        // term; the 2 MB bound must count the actual emitted bytes. One
         // 100_000-character term → 3 variants × (100k UTF-8 + 200k UTF-16BE
         // + 200k UTF-16LE + 400k UTF-32BE + 400k UTF-32LE) = 3.9 MB > bound
         // → degraded no-op automaton. No ligature site, so the composed
@@ -256,13 +256,80 @@ struct AhoCorasickTests {
 
     @Test("isDegraded is true when pattern bytes exceed limit")
     func degradedOnOversize() {
-        // Create patterns totaling > 1MB
-        let bigPattern = Array(repeating: UInt8(0x41), count: 500_001)
+        // Create patterns totaling > 2 MB (one byte over the bound)
+        let bigPattern = Array(repeating: UInt8(0x41), count: 1_000_001)
         let ac = AhoCorasick(patterns: [bigPattern, bigPattern])
         #expect(ac.isDegraded)
         // Search should return no matches (degraded = empty automaton)
         let input = Array("test".utf8)
         let matches = input.withUnsafeBufferPointer { ac.search($0) }
         #expect(matches.isEmpty)
+    }
+}
+
+// MARK: - The byte-budget guard over the largest realistic term set
+
+/// `SensitiveTermAutomaton` degrades to a NO-OP (zero matches, `isDegraded`)
+/// once the encoded pattern bytes cross the budget, so Layers 3 and 10
+/// would report no sensitive term on the output. The guard builds the
+/// largest term set the product is expected to carry — 250 distinct
+/// 40-character terms, each with a compatibility character and a lowercase
+/// ligature site so `encodeForSearch` emits its widest variant set — and
+/// pins that the automaton is NOT degraded, printing the headroom; the twin
+/// at twice the set pins that the cliff is real. The set encodes to about
+/// 1.42 MB, which crossed the earlier 1 MB bound; the bound is 2 MB.
+@Suite("Sensitive-term automaton budget guard")
+struct SensitiveTermAutomatonBudgetTests {
+
+    /// The budget `AhoCorasick.init(patterns:)` degrades past.
+    static let budgetBytes = AhoCorasick.maxTotalPatternBytes
+
+    /// `count` distinct terms of exactly 40 Characters: a fullwidth letter
+    /// (NFKC-compatibility form differs), the lowercase "fi" site inside
+    /// "confidential" (the ligature-composed form differs), a unique index,
+    /// padding without further ligature sites.
+    static func realisticTermSet(count: Int) -> [SensitiveTerm] {
+        (0..<count).map { i in
+            var text = "\u{FF31}uarterly confidential record \(String(format: "%04d", i))"
+            while text.count < 40 { text += "n" }
+            return SensitiveTerm(text: String(text.prefix(40)))
+        }
+    }
+
+    static func encodedBytes(_ terms: [SensitiveTerm]) -> (patterns: Int, bytes: Int) {
+        var patterns = 0
+        var bytes = 0
+        for term in terms {
+            let encoded = AhoCorasick.encodeForSearch(term.text)
+            patterns += encoded.count
+            bytes += encoded.reduce(0) { $0 + $1.count }
+        }
+        return (patterns, bytes)
+    }
+
+    @Test("The largest realistic term set builds a live automaton under the byte budget")
+    func realisticTermSetIsNotDegraded() {
+        let terms = Self.realisticTermSet(count: 250)
+        #expect(Set(terms.map(\.text)).count == 250)
+        #expect(terms.allSatisfy { $0.text.count == 40 })
+        let size = Self.encodedBytes(terms)
+        let automaton = SensitiveTermAutomaton(validTerms: terms)
+        let headroom = Double(Self.budgetBytes) / Double(max(size.bytes, 1))
+        print("[C12-137] realistic set: 250 terms × 40 chars → \(size.patterns) patterns, "
+              + "\(size.bytes) bytes; budget \(Self.budgetBytes); headroom ratio "
+              + String(format: "%.3f", headroom))
+        #expect(!automaton.isDegraded,
+                "the realistic set crossed the budget: \(size.bytes) > \(Self.budgetBytes)")
+        #expect(automaton.hasPatterns)
+    }
+
+    @Test("Twice the realistic set crosses the budget and degrades — the cliff is real")
+    func doubledTermSetIsDegraded() {
+        let terms = Self.realisticTermSet(count: 500)
+        let size = Self.encodedBytes(terms)
+        let automaton = SensitiveTermAutomaton(validTerms: terms)
+        print("[C12-137] doubled set: 500 terms → \(size.patterns) patterns, \(size.bytes) bytes")
+        #expect(size.bytes > Self.budgetBytes)
+        #expect(automaton.isDegraded)
     }
 }

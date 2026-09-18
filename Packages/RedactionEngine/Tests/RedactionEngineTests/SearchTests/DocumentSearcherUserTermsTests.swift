@@ -107,6 +107,54 @@ struct DocumentSearcherUserTermsTests {
         #expect(proj?.term == "Custom")
     }
 
+    @Test("Always-flag literal matches a compatibility spelling on the search-normalized text")
+    func alwaysFlagLiteralMatchesCompatibilitySpelling() {
+        // `shouldSuppress` compares the search-normalized forms (ligature
+        // expansion + NFKC + case fold); the always-flag literal search
+        // must read the same form, or a term typed as "financial" never
+        // sees a page's fullwidth "Ｆinancial" (Foundation's own
+        // non-literal search folds Latin ligatures but not the NFKC
+        // compatibility forms). The hit range is expressed on the raw text
+        // so PDFKit selection bounds resolve on the page's own characters.
+        let matcher = UserTermMatcher.compile(
+            alwaysFlag: [UserTerm(pattern: "financial", isRegex: false)],
+            neverFlag: []
+        )
+        let fullwidth = matcher.alwaysFlagHits(in: "Quarterly \u{FF26}inancial report")
+        #expect(fullwidth.hits.count == 1, "expected one hit on the fullwidth spelling; got \(fullwidth.hits.count)")
+        #expect(fullwidth.hits.first?.range == NSRange(location: 10, length: 9),
+                "hit range must cover the raw run; got \(String(describing: fullwidth.hits.first?.range))")
+        // The ligature spelling (one UTF-16 unit for the two letters) maps
+        // back to its raw one-unit range.
+        let ligature = matcher.alwaysFlagHits(in: "Quarterly \u{FB01}nancial report")
+        #expect(ligature.hits.count == 1)
+        #expect(ligature.hits.first?.range == NSRange(location: 10, length: 8))
+        // Symmetry with the never-flag comparison on the same input.
+        let suppressor = UserTermMatcher.compile(
+            alwaysFlag: [], neverFlag: [UserTerm(pattern: "financial", isRegex: false)])
+        #expect(suppressor.shouldSuppress("\u{FF26}inancial") != nil)
+        #expect(fullwidth.timedOutPatterns.isEmpty)
+    }
+
+    @Test("Always-flag literal on a compatibility-spelled page emits a synthetic hit with a resolved rect")
+    func alwaysFlagLiteralCompatibilityPageEmits() async {
+        let matcher = UserTermMatcher.compile(
+            alwaysFlag: [UserTerm(pattern: "financial", isRegex: false)],
+            neverFlag: []
+        )
+        let results = await runPIIScan(
+            text: "Quarterly \u{FF26}inancial report",
+            categories: [.ssn],
+            userTerms: matcher
+        )
+        let custom = results.filter { $0.term == "Custom" }
+        #expect(custom.count == 1, "expected one synthetic hit; got \(custom.count)")
+        let rect = custom.first?.normalizedRect ?? .zero
+        #expect(rect.width > 0 && rect.height > 0, "the hit must carry a resolved rect")
+        #expect(TextNormalizer.normalizeForSearch(custom.first?.matchedText ?? "", caseSensitive: false)
+                == "financial")
+    }
+
     // MARK: - Never-flag suppression
 
     @Test("Never-flag literal drops a detector match with equal text")
