@@ -274,6 +274,19 @@ extension SearchAndRedactSheet {
                         searchState?.recordRegexTimeout(page: page)
                     }
                 })
+                // Install the regex-rejection sink beside the timeout
+                // sink. `DocumentSearcher` fires it once when the safety
+                // gate refuses the pattern at search start (the stream then
+                // finishes empty); the same hint + engine copy the
+                // pre-validation composes reaches the callout, so a
+                // rejected pattern never reads as "0 results".
+                await searcher.setRegexRejectionSink({ [weak searchState] reason in
+                    Task { @MainActor in
+                        guard let searchState else { return }
+                        searchState.recordRegexRejection(Self.regexErrorDisplayMessage(
+                            pattern: searchState.queryText, engineDescription: reason))
+                    }
+                })
                 // Install the oversized-OCR-skip sink mirroring
                 // the regex-timeout sink. `DocumentSearcher` calls this
                 // once per OCR attempt on a page whose render exceeds the
@@ -405,6 +418,7 @@ extension SearchAndRedactSheet {
                     await searcher.setOverlapSink(nil)
                     await searcher.setBelowThresholdSink(nil)
                     await searcher.setRegexTimeoutSink(nil)
+                    await searcher.setRegexRejectionSink(nil)
                     await searcher.setUserTermsTimeoutSink(nil)
                     await searcher.setScannedRegionNotAnalyzedSink(nil)
 

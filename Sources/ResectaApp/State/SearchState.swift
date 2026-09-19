@@ -423,6 +423,17 @@ final class SearchState: Identifiable {
         regexTimeoutPages = []
     }
 
+    /// Route the engine's regex-rejection sink into the callout. The
+    /// searcher fires it once, with the gate's reason, when a regex search
+    /// starts on a pattern the safety gate refuses — the stream then
+    /// finishes empty instead of silently reading as "0 results". The
+    /// trigger pre-validates and normally sets `regexError` first; a
+    /// message already standing wins, so the sink never overwrites it.
+    func recordRegexRejection(_ reason: String) {
+        guard regexError == nil else { return }
+        regexError = reason
+    }
+
     /// Page indices whose raster exceeded the OCR pixel caps, so
     /// OCR never ran on them during this scan. Populated by
     /// `DocumentSearcher`'s OCR-skip sink via

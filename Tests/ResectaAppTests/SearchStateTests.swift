@@ -26,6 +26,23 @@ struct SearchStateTests {
         #expect(state.totalPages == 0)
     }
 
+    @Test("recordRegexRejection routes the engine's rejection reason into regexError once; a standing message wins")
+    func regexRejectionSinkRoutesToRegexError() {
+        let state = SearchState()
+        state.results = [makeResult(term: "stale")]
+        state.recordRegexRejection("Pattern contains nested quantifiers and has not been accepted.")
+        #expect(state.regexError == "Pattern contains nested quantifiers and has not been accepted.")
+        // The arriving error clears the stale list (the observer's rule).
+        #expect(state.results.isEmpty)
+        // The pre-validation's hinted copy, when it stands first, is kept.
+        state.recordRegexRejection("A second reason")
+        #expect(state.regexError == "Pattern contains nested quantifiers and has not been accepted.")
+        state.clearResults()
+        #expect(state.regexError == nil)
+        state.recordRegexRejection("A second reason")
+        #expect(state.regexError == "A second reason")
+    }
+
     @Test("appliedSearchRecord() derives the query buildSearchMode() runs, for the three typed modes; nil for scan and empty")
     func appliedSearchRecordAgreesWithBuildSearchMode() {
         let search = SearchState()

@@ -14,8 +14,8 @@ import PDFKit
 // message — page lists are sorted before the fold.
 //
 // Honesty: a page the searcher could not read (OCR did not run, oversize,
-// unopenable, regex timeout, the per-page result cap) is listed, never
-// counted as clear. Query texts ride only the display-only fields
+// unopenable, regex timeout, the per-page result cap, a pattern the regex
+// safety gate refused) is listed, never counted as clear. Query texts ride only the display-only fields
 // (`reviewTermTexts`, `queryLines`); every status message is content-free.
 // Nothing in this file logs.
 
@@ -56,6 +56,9 @@ struct SearchRecheck: Sendable {
             var remaining: Int
             var hitCap: Bool
             var perTerm: [String: Int]
+            /// The searcher refused the request's pattern before reading the
+            /// page; `remaining` is not a measurement.
+            var rejected: Bool = false
         }
         let pageIndex: Int
         /// The worst route the searcher reported for the page; nil when no
@@ -174,6 +177,14 @@ struct SearchRecheck: Sendable {
         }
     }
 
+    /// Set once by the searcher's rejection sink for one request.
+    private final class RejectionFlag: @unchecked Sendable {
+        private let lock = NSLock()
+        private var fired = false
+        func set() { lock.lock(); fired = true; lock.unlock() }
+        var value: Bool { lock.lock(); defer { lock.unlock() }; return fired }
+    }
+
     /// Run every applicable request on one page through its own searcher.
     private static func observePage(
         _ work: PageWork, requests: [SearchRecheckRequest]
@@ -205,6 +216,10 @@ struct SearchRecheck: Sendable {
 
             var remaining = 0
             var perTerm: [String: Int] = [:]
+            // A pattern the safety gate refuses finishes the stream empty;
+            // the sink is what tells that apart from a page with no match.
+            let rejection = RejectionFlag()
+            await searcher.setRegexRejectionSink { _ in rejection.set() }
             let stream = searcher.search(wrapped, mode: mode, progress: { _, _ in })
             for await result in stream {
                 if Task.isCancelled { break }
@@ -214,7 +229,8 @@ struct SearchRecheck: Sendable {
             observation.counts[requestIndex] = PageObservation.Count(
                 remaining: remaining,
                 hitCap: remaining >= DocumentSearcher.maxResults,
-                perTerm: perTerm)
+                perTerm: perTerm,
+                rejected: rejection.value)
         }
 
         let coverage = box.snapshot
@@ -242,6 +258,8 @@ struct SearchRecheck: Sendable {
         var ocrPages = 0
         // Unchecked pages → reason clauses (§5.2), in page order.
         var uncheckedClauses: [Int: [String]] = [:]
+        // Requests the searcher refused to re-run on at least one page.
+        var uncheckedByRequest = [Bool](repeating: false, count: requestCount)
 
         for observation in observations {
             let page = observation.pageIndex
@@ -264,7 +282,15 @@ struct SearchRecheck: Sendable {
                 uncheckedClauses[page, default: []].append("the pattern took too long")
             }
             var pageHitCap = false
+            var pageRefused = false
             for (requestIndex, count) in observation.counts {
+                if count.rejected {
+                    // No count for this request on this page: the page is
+                    // unchecked for it, never clear.
+                    uncheckedByRequest[requestIndex] = true
+                    pageRefused = true
+                    continue
+                }
                 remainingByRequest[requestIndex] += count.remaining
                 if count.remaining > 0 {
                     remainingPagesByRequest[requestIndex].append(page)
@@ -284,6 +310,9 @@ struct SearchRecheck: Sendable {
             if pageHitCap {
                 uncheckedClauses[page, default: []]
                     .append("the re-check stopped at 1,000 matches on the page")
+            }
+            if pageRefused {
+                uncheckedClauses[page, default: []].append("the pattern was not accepted")
             }
         }
 
@@ -329,7 +358,8 @@ struct SearchRecheck: Sendable {
                 route: Self.route(textPages: textPagesByRequest[index],
                                   ocrPages: ocrPagesByRequest[index]),
                 optionBadges: query.optionBadges,
-                perTerm: perTerm)
+                perTerm: perTerm,
+                unchecked: uncheckedByRequest[index])
         }
 
         if totalRemaining > 0 {

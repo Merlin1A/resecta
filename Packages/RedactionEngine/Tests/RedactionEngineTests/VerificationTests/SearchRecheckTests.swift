@@ -135,6 +135,19 @@ struct SearchRecheckTests {
         #expect(clean.queryLines?.first?.remainingCount == 0)
     }
 
+    @Test("regex: a pattern the safety gate rejects lists the page as unchecked, never as 0 remaining")
+    func rejectedPatternIsUnchecked() async throws {
+        // The searcher refuses the pattern before reading a page; the layer
+        // must say the page could not be checked rather than report a clear.
+        let result = await TestFixtures.recheck(
+            try output(["Delia R. Hartwell"]), requests: [TestFixtures.regexRequest("(a+)+b")])
+        #expect(result.status == .warn(""), "a rejected pattern must not PASS; got \(result.status)")
+        #expect(TestFixtures.message(of: result.status)
+                == "Re-ran 1 search; 1 page could not be checked: 1 (the pattern was not accepted)")
+        #expect(result.pageReferences == [0])
+        #expect(result.reviewTermTexts == nil)
+    }
+
     @Test("multiTerm OR counts both terms; AND counts only pages carrying every term")
     func multiTermConjunction() async throws {
         let out = try output(["Delia and Hartwell together", "Delia alone"])

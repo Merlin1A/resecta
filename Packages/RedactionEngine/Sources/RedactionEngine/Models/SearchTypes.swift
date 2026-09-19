@@ -131,19 +131,25 @@ public struct SearchPreviewResult: Sendable, Equatable {
     public let saturated: Bool
     public let regexInvalid: Bool
     public let currentPageMatches: [NSRange]
+    /// Why a `.regex` preview is empty when `regexInvalid` is set: the
+    /// safety gate's typed reason or the engine's compile error text.
+    /// nil for every other result.
+    public let regexRejection: String?
 
     public init(
         scope: SearchPreviewScope,
         totalCount: Int,
         saturated: Bool,
         regexInvalid: Bool,
-        currentPageMatches: [NSRange]
+        currentPageMatches: [NSRange],
+        regexRejection: String? = nil
     ) {
         self.scope = scope
         self.totalCount = totalCount
         self.saturated = saturated
         self.regexInvalid = regexInvalid
         self.currentPageMatches = currentPageMatches
+        self.regexRejection = regexRejection
     }
 
     public static func == (lhs: SearchPreviewResult, rhs: SearchPreviewResult) -> Bool {
@@ -152,6 +158,7 @@ public struct SearchPreviewResult: Sendable, Equatable {
             && lhs.saturated == rhs.saturated
             && lhs.regexInvalid == rhs.regexInvalid
             && lhs.currentPageMatches == rhs.currentPageMatches
+            && lhs.regexRejection == rhs.regexRejection
     }
 }
 
@@ -262,7 +269,8 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
     /// Surrounding text for context display: the engine's centered
     /// window (`DocumentSearcher.contextRadius` characters each side of
     /// the match, trimmed back to word boundaries on a truncated side,
-    /// `…` only where text was cut, newlines flattened). Every builder
+    /// `…` only where text was cut, newlines outside the match flattened,
+    /// the match itself verbatim). Every builder
     /// path — text layer, regex, PII scan, and both OCR legs — yields
     /// this one shape; `matchRangeInSnippet` locates the match inside it.
     public let contextSnippet: String

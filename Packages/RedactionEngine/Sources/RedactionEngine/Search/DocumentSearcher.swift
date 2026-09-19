@@ -32,6 +32,17 @@ public actor DocumentSearcher {
     /// Maximum regex pattern length (ReDoS prevention).
     static let maxRegexPatternLength = 200
 
+    /// The largest `{n,m}` upper bound that still counts as BOUNDED for
+    /// the nested-quantifier rule: `(a{2,25})+` is a bounded group under
+    /// a repetition, `(a{2,63})+` is treated like `(a+)+`. The safe-regex
+    /// precedent's ceiling.
+    static let boundedQuantifierCeiling = 25
+
+    /// The cap on the product of bounded maxima along a nesting chain —
+    /// `(a{0,40}){0,40}` may explore 1,600 repetitions although every
+    /// bound is small; the counted-loop precedent's cap.
+    static let nestedBoundProductCap = 1000
+
     /// Per-page regex timeout.
     static let perPageRegexTimeout: Duration = .seconds(5)
 
@@ -148,6 +159,10 @@ public actor DocumentSearcher {
     // (`previewRegex`) and the full-scan path (`searchRegex`). The app
     // layer accumulates page indices to render the regex-timeout banner.
     private var regexTimeoutSink: (@Sendable (Int) -> Void)?
+    /// Fired once, with the gate's reason, when a regex search starts on a
+    /// pattern the safety gate refuses; the stream then finishes empty.
+    /// Without it an empty stream reads as "0 results" to every consumer.
+    private var regexRejectionSink: (@Sendable (String) -> Void)?
 
     // Optional sink for per-page oversized-OCR-skip reporting.
     // Fires once per page whose 300-DPI render exceeds the OCR pixel caps
@@ -515,6 +530,16 @@ public actor DocumentSearcher {
         self.regexTimeoutSink = sink
     }
 
+    /// Install a regex-rejection sink. Pass nil to disable reporting.
+    /// Fires once per `search` on a `.regex` mode whose pattern the safety
+    /// gate refuses — with the typed reason's copy, or the engine's compile
+    /// error text — before the stream finishes empty. Mirrors the timeout
+    /// sink's contract; the live preview carries the same reason in its
+    /// result instead.
+    public func setRegexRejectionSink(_ sink: (@Sendable (String) -> Void)?) {
+        self.regexRejectionSink = sink
+    }
+
     /// Install a per-page oversized-OCR-skip sink. Pass nil to
     /// disable reporting. Fires once per OCR attempt on a page whose
     /// render exceeds the OCR pixel caps, in all three OCR entry paths
@@ -663,11 +688,17 @@ public actor DocumentSearcher {
             )
 
         case .regex(let pattern, let options):
-            guard let regex = Self.validateRegexPattern(pattern) else {
+            let regex: NSRegularExpression
+            do {
+                regex = try Self.validateRegexPatternWithError(pattern)
+            } catch { // LegalPhrases:safe (Swift keyword)
+                // The reason rides the result so the caller need not
+                // re-validate to learn why the count is empty.
                 return SearchPreviewResult(
                     scope: scope,
                     totalCount: 0, saturated: false, regexInvalid: true,
-                    currentPageMatches: []
+                    currentPageMatches: [],
+                    regexRejection: error.localizedDescription
                 )
             }
             let sink = await currentRegexTimeoutSink()
@@ -1070,11 +1101,15 @@ public actor DocumentSearcher {
     ///
     /// Sync entry point gates ad-hoc trigger, compose
     /// sub-mode, custom-terms editor, and saved-regex compile via a
-    /// single check. `hasNestedQuantifiers` only spots `(x+)+` shape;
-    /// `RegexSafetyPrecheck` additionally rejects unbounded
-    /// group-quantifiers over alternation (e.g. `(a|aa)*b`,
-    /// `(ab|abc)*xyz`) that compile cleanly but backtrack
-    /// catastrophically. The async `RegexSentinelCheck.validate`
+    /// single check. `RegexQuantifierScan` refuses the nested-quantifier
+    /// shapes — an unbounded quantifier over a group that itself carries
+    /// one (`(x+)+`, `(.*)*`, `(a{2,})*`), and bounded chains whose
+    /// product of maxima exceeds `nestedBoundProductCap` — while a group
+    /// closed by a bounded quantifier (`(-\d{4})?`, `(,\d{3})*`,
+    /// `4111(\s?\d{4}){3}`) is never nesting. `RegexSafetyPrecheck`
+    /// additionally rejects unbounded group-quantifiers over alternation
+    /// (e.g. `(a|aa)*b`, `(ab|abc)*xyz`) that compile cleanly but
+    /// backtrack catastrophically. The async `RegexSentinelCheck.validate`
     /// adds a sentinel-string runtime probe at compose-execution
     /// and profile-import time on top of this.
     public static func validateRegexPatternWithError(_ pattern: String) throws -> NSRegularExpression {
@@ -1087,63 +1122,28 @@ public actor DocumentSearcher {
             throw RegexValidationError.likelyPathological
         }
 
-        // Nested quantifier rejection — heuristic for catastrophic backtracking.
-        // Reject patterns like (a+)+, (.*)+, (a{2,})*
-        if hasNestedQuantifiers(pattern) {
-            throw RegexValidationError.nestedQuantifiers
+        // Nested quantifier rejection — the structural heuristic for
+        // catastrophic backtracking, bounded-quantifier aware; an inner
+        // unbounded run that a literal inside its group delimits is not
+        // nesting (the sentinel probe's polynomial class, not this one's).
+        if let violation = RegexQuantifierScan.violation(
+            in: pattern,
+            boundedCeiling: boundedQuantifierCeiling,
+            productCap: nestedBoundProductCap,
+            literalSeparatorDemotion: true
+        ) {
+            switch violation {
+            case .nestedUnbounded:
+                throw RegexValidationError.nestedQuantifiers
+            case .nestedBoundProduct:
+                throw RegexValidationError.nestedBoundProduct(cap: nestedBoundProductCap)
+            }
         }
 
         // Attempt compilation; an engine rejection propagates as the
         // system NSError whose localizedDescription the sheet surfaces.
         // Note: case sensitivity handled via text normalization, not regex flags
         return try NSRegularExpression(pattern: pattern)
-    }
-
-    /// Detect nested quantifiers that risk catastrophic backtracking.
-    /// Matches patterns like (group-with-quantifier)quantifier.
-    private static func hasNestedQuantifiers(_ pattern: String) -> Bool {
-        // Find groups containing quantifiers, followed by quantifiers
-        var depth = 0
-        var groupHasQuantifier = [false]
-        let chars = Array(pattern)
-
-        for i in 0..<chars.count {
-            switch chars[i] {
-            case "(":
-                // Skip escaped literal parens — not capture groups
-                if i > 0 && chars[i - 1] == "\\" { continue }
-                depth += 1
-                groupHasQuantifier.append(false)
-            case ")":
-                if i > 0 && chars[i - 1] == "\\" { continue }
-                let groupHadQuantifier = groupHasQuantifier.last ?? false
-                if depth > 0 {
-                    groupHasQuantifier.removeLast()
-                    depth -= 1
-                }
-                // Check if the closing paren is followed by a quantifier
-                if groupHadQuantifier {
-                    let next = i + 1 < chars.count ? chars[i + 1] : Character(" ")
-                    if next == "*" || next == "+" || next == "{" || next == "?" {
-                        return true
-                    }
-                }
-            case "*", "+", "?":
-                // Skip if escaped
-                if i > 0 && chars[i - 1] == "\\" { continue }
-                if depth > 0 {
-                    groupHasQuantifier[groupHasQuantifier.count - 1] = true
-                }
-            case "{":
-                if i > 0 && chars[i - 1] == "\\" { continue }
-                if depth > 0 {
-                    groupHasQuantifier[groupHasQuantifier.count - 1] = true
-                }
-            default:
-                break
-            }
-        }
-        return false
     }
 
     private func searchRegex(
@@ -1154,7 +1154,14 @@ public actor DocumentSearcher {
         progress: @Sendable (Int, Int) -> Void,
         continuation: AsyncStream<SearchResult>.Continuation
     ) async {
-        guard let regex = Self.validateRegexPattern(pattern) else {
+        let regex: NSRegularExpression
+        do {
+            regex = try Self.validateRegexPatternWithError(pattern)
+        } catch { // LegalPhrases:safe (Swift keyword)
+            // The gate refused the pattern: say so once, then finish empty.
+            // A silent empty stream reads as "0 results" to every consumer,
+            // the verification re-check included.
+            regexRejectionSink?(error.localizedDescription)
             continuation.finish()
             return
         }
@@ -2791,8 +2798,10 @@ public actor DocumentSearcher {
     /// starts or ends inside a word — except that the trim never moves
     /// into the match itself: when the partial word adjoins the match,
     /// that side keeps the raw cut. `…` is prepended/appended only on a
-    /// side where text was cut. Newlines flatten to spaces LAST, one
-    /// Character each, so the returned offsets stay valid.
+    /// side where text was cut. Newlines outside the match flatten to
+    /// spaces LAST, one Character each, so the returned offsets stay
+    /// valid; the match span itself is copied verbatim so the window
+    /// always contains `matchedText`.
     func contextSnippet(text: String, matchStart: Int, matchLength: Int) -> ContextWindow {
         let textCount = text.count
         let clampedStart = min(max(0, matchStart), textCount)
@@ -2823,13 +2832,20 @@ public actor DocumentSearcher {
         let leading = leftCut ? "…" : ""
         let trailing = rightCut ? "…" : ""
         let matchOffset = leading.count + text.distance(from: startIdx, to: matchStartIdx)
-        // Flatten LAST, Character for Character (a "\r\n" grapheme is one
-        // Character before and after), so `matchOffset` stays valid.
-        let flattened = String((leading + text[startIdx..<endIdx] + trailing).map { ch -> Character in
-            ch.isNewline ? " " : ch
-        })
+        // Flatten LAST and only OUTSIDE the match, Character for Character
+        // (a "\r\n" grapheme is one Character before and after), so
+        // `matchOffset` stays valid and the window contains the match
+        // verbatim — a match that spans a line break keeps its break.
+        func flattened(_ part: Substring) -> String {
+            String(part.map { ch -> Character in ch.isNewline ? " " : ch })
+        }
+        let snippet = leading
+            + flattened(text[startIdx..<matchStartIdx])
+            + String(text[matchStartIdx..<matchEndIdx])
+            + flattened(text[matchEndIdx..<endIdx])
+            + trailing
         return ContextWindow(
-            snippet: flattened,
+            snippet: snippet,
             matchRange: matchOffset ..< matchOffset + clampedLength
         )
     }
@@ -2903,7 +2919,7 @@ public actor DocumentSearcher {
 /// they propagate as the system `NSError` so its `localizedDescription`
 /// reaches the regex error callout verbatim.
 ///
-/// Copy constraint: these three strings are app-owned user-facing copy and
+/// Copy constraint: these strings are app-owned user-facing copy and
 /// use mechanism-description language ("has not been
 /// accepted" — names the response, promises no outcome). The strings never
 /// echo the submitted pattern text.
@@ -2911,6 +2927,8 @@ public enum RegexValidationError: Error, LocalizedError {
     case patternTooLong(maxLength: Int)
     case likelyPathological
     case nestedQuantifiers
+    /// A chain of bounded repetitions whose combined count exceeds `cap`.
+    case nestedBoundProduct(cap: Int)
 
     public var errorDescription: String? {
         switch self {
@@ -2920,6 +2938,8 @@ public enum RegexValidationError: Error, LocalizedError {
             return "Pattern may cause performance issues and has not been accepted."
         case .nestedQuantifiers:
             return "Pattern contains nested quantifiers and has not been accepted."
+        case .nestedBoundProduct(let cap):
+            return "Pattern repeats a repeated group more than \(cap) times in total and has not been accepted."
         }
     }
 }

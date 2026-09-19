@@ -45,6 +45,17 @@ struct RegexSafetyRunnerTests {
         return nil
     }
 
+    /// Optional second benign yardstick: a JSON file in the benign corpus
+    /// shape (`patterns: [{id, pattern, pattern_class}]`) drawn OUTSIDE the
+    /// repository — a dev-time sample of a third-party regex corpus that is
+    /// never a fixture. Absent → the addendum is skipped, never red.
+    static func regexSample() -> String? {
+        let e = ProcessInfo.processInfo.environment
+        if let p = e["RESECTA_REGEX_SAMPLE"], !p.isEmpty { return p }
+        if let p = e["TEST_RUNNER_RESECTA_REGEX_SAMPLE"], !p.isEmpty { return p }
+        return nil
+    }
+
     // MARK: - Corpora
 
     struct AdversarialRow: Decodable {
@@ -115,6 +126,23 @@ struct RegexSafetyRunnerTests {
         let benign_sha256: String
         let rows: [RowOut]
         let summary: SummaryOut
+    }
+
+    struct SampleSummaryOut: Encodable {
+        let total: Int
+        let rejected: Int
+        let reject_rate: Double
+        let rejected_ids: [String]
+        let exec_timed_out_ids: [String]
+        let rejection_by_stage: [String: Int]
+    }
+    struct SampleFileOut: Encodable {
+        let schema_version: Int
+        let generated_by: String
+        let sample_sha256: String
+        let sample_file: String
+        let rows: [RowOut]
+        let summary: SampleSummaryOut
     }
 
     static func sha(_ data: Data) -> String {
@@ -207,6 +235,7 @@ struct RegexSafetyRunnerTests {
             case .patternTooLong: validateError = "patternTooLong"
             case .likelyPathological: validateError = "likelyPathological"
             case .nestedQuantifiers: validateError = "nestedQuantifiers"
+            case .nestedBoundProduct: validateError = "nestedBoundProduct"
             }
         } catch {  // LegalPhrases:safe (Swift keyword)
             validateError = "compile: \((error as NSError).localizedDescription)"
@@ -325,5 +354,49 @@ struct RegexSafetyRunnerTests {
               + "(borderline \(benRejected.filter(\.borderline).count)); "
               + "adversarial \(advRejected.count) rejected / \(advBounded.count) bounded "
               + "/ \(advUnbounded.count) UNBOUNDED")
+
+        try await Self.emitSample(out: out, execText: packetText)
+    }
+
+    /// The optional second yardstick (see `regexSample`): every row graded
+    /// through the same pipeline against the same execution text, reported
+    /// beside — never merged into — the corpus numbers. No hard assertion:
+    /// the sample is a statistic, not a contract.
+    static func emitSample(out: String, execText: String) async throws {
+        guard let samplePath = Self.regexSample() else {
+            print("[H3.4] RESECTA_REGEX_SAMPLE not set; the sample addendum skipped.")
+            return
+        }
+        let sampleData = try Data(contentsOf: URL(fileURLWithPath: samplePath))
+        let sample = try JSONDecoder().decode(BenignFile.self, from: sampleData).patterns
+        var rows: [RowOut] = []
+        for row in sample {
+            rows.append(await Self.gradePattern(
+                id: row.id, corpus: "sample", cls: row.pattern_class,
+                pattern: row.pattern, borderline: false, execText: execText))
+        }
+        let rejected = rows.filter { !$0.accepted }
+        var byStage: [String: Int] = [:]
+        for row in rejected {
+            let stage = row.validate_error.map { $0.hasPrefix("compile") ? "compile" : $0 } ?? "sentinel"
+            byStage[stage, default: 0] += 1
+        }
+        let summary = SampleSummaryOut(
+            total: rows.count,
+            rejected: rejected.count,
+            reject_rate: rows.isEmpty ? 0
+                : (Double(rejected.count) / Double(rows.count) * 1e6).rounded() / 1e6,
+            rejected_ids: rejected.map(\.id).sorted(),
+            exec_timed_out_ids: rows.filter(\.exec_timed_out).map(\.id).sorted(),
+            rejection_by_stage: byStage)
+        try Self.writeJSON(SampleFileOut(
+            schema_version: 1,
+            generated_by: "RegexSafetyRunnerTests (H3.4 sample addendum)",
+            sample_sha256: Self.sha(sampleData),
+            sample_file: URL(fileURLWithPath: samplePath).lastPathComponent,
+            rows: rows,
+            summary: summary), to: "\(out)/regex-safety-sample.json")
+        print("[H3.4] sample \(rejected.count)/\(rows.count) rejected; "
+              + "stages \(byStage); exec timed out \(summary.exec_timed_out_ids.count)")
     }
 }

@@ -186,10 +186,12 @@ extension SearchToolbarSection {
     /// Minimum vertical extent the regex
     /// error callout reserves while in regex mode so the toolbar
     /// height does NOT reflow when `searchState.regexError` flips
-    /// between nil and a string. Picked to seat one line of `.caption`
-    /// + the leading icon comfortably without crowding the chip row
-    /// above. Pinned by `RegexErrorCalloutTests.calloutReservesFixedHeight`.
-    static let regexErrorCalloutMinHeight: CGFloat = 24
+    /// between nil and a string. Seats two lines of `.caption` + the
+    /// leading icon: the reason shares its row with the "Search as
+    /// Text" action, so the longest gate copy wraps rather than
+    /// truncating, and the floor covers both lines. Pinned by
+    /// `RegexErrorCalloutTests.calloutReservesFixedHeight`.
+    static let regexErrorCalloutMinHeight: CGFloat = 40
 
     /// Visibility predicate for the regex error callout
     /// contents. Returns true when the engine has a non-empty error
@@ -202,6 +204,24 @@ extension SearchToolbarSection {
     static func regexErrorCalloutShouldShow(error: String?) -> Bool {
         guard let error else { return false }
         return !error.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// The one action the regex error callout offers: run the same
+    /// query as a plain text search. Title-cased like its sibling
+    /// "Search Anyway" in the short-term warning. Pinned by
+    /// `RegexErrorCalloutTests`.
+    static let regexErrorSearchAsTextLabel: String = "Search as Text"
+
+    /// Switch the sheet to text mode for a text search of the query as
+    /// typed. The transition is flagged programmatic so the hub's
+    /// mode-change handler neither clears nor toasts (the same shape the
+    /// saved-search recall takes); the caller re-triggers the search,
+    /// whose own kickoff clears the result state and the standing error.
+    /// Pure state edit — testable without a SwiftUI host.
+    @MainActor
+    static func switchToTextSearch(_ searchState: SearchState) {
+        searchState.isProgrammaticModeChange = true
+        searchState.searchModeType = .text
     }
 
     // MARK: - Pure-Function Contract

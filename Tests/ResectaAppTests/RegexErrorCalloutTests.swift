@@ -21,10 +21,12 @@ struct RegexErrorCalloutTests {
 
     @Test("Callout reserves a fixed minimum height so toolbar doesn't reflow")
     func calloutReservesFixedHeight() {
-        // The 24pt floor seats one `.caption` line + the leading
-        // icon comfortably; pin the literal so a future tweak surfaces
-        // as a deliberate test rename rather than silent layout drift.
-        #expect(SearchToolbarSection.regexErrorCalloutMinHeight == 24)
+        // The 40pt floor seats two `.caption` lines + the leading
+        // icon (the reason shares its row with the "Search as Text"
+        // action and wraps rather than truncating); pin the literal so
+        // a future tweak surfaces as a deliberate test rename rather
+        // than silent layout drift.
+        #expect(SearchToolbarSection.regexErrorCalloutMinHeight == 40)
     }
 
     @Test("Visibility predicate matches the engine's nil/non-nil state")
@@ -52,5 +54,32 @@ struct RegexErrorCalloutTests {
         #expect(SearchToolbarSection.regexErrorCalloutShouldShow(
             error: "Invalid regular expression"
         ) == true)
+    }
+}
+
+// MARK: - The "Search as Text" action
+
+@Suite("Regex error callout — search as text", .tags(.search))
+@MainActor
+struct RegexErrorCalloutSearchAsTextTests {
+
+    @Test("The action reads like its sibling control: title-cased, one verb phrase")
+    func actionLabel() {
+        #expect(SearchToolbarSection.regexErrorSearchAsTextLabel == "Search as Text")
+    }
+
+    @Test("Switching to a text search keeps the query, flags the transition programmatic, and changes only the mode")
+    func switchToTextSearchKeepsQuery() {
+        let state = SearchState()
+        state.searchModeType = .regex
+        state.queryText = "4111(\\s?\\d{4}){3}"
+        state.regexError = "Pattern contains nested quantifiers and has not been accepted."
+        SearchToolbarSection.switchToTextSearch(state)
+        #expect(state.searchModeType == .text)
+        #expect(state.queryText == "4111(\\s?\\d{4}){3}")
+        #expect(state.isProgrammaticModeChange == true)
+        // The standing error is the trigger's to clear at its kickoff
+        // (`clearResults()`), not the switch's.
+        #expect(state.regexError != nil)
     }
 }
