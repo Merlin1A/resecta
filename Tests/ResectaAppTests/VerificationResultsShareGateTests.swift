@@ -577,6 +577,39 @@ struct ShareRiskConfirmSheetTests {
         #expect(!joined.contains("never surfaced"))
     }
 
+    @Test("Sheet item lines per family: FAIL/ATTENTION lists the at-risk layers, incomplete-WARN the could-not-verify layers, SKIPPED nothing")
+    func itemLinesPerFamily() {
+        let failReport = VerificationReport(
+            layers: [layer(.fail("x"), shortDescription: "Output has 2 pages; source has 3.")],
+            overallStatus: .fail("x"), durationSeconds: 0)
+        #expect(ShareRiskConfirmKind.failOrAttention(failReport).itemLines
+            == DocumentEditorView.atRiskItemLines(report: failReport))
+        #expect(ShareRiskConfirmKind.failOrAttention(failReport).itemLines
+            == ["Output has 2 pages; source has 3."])
+
+        let couldNotVerify = LayerResult(
+            name: "Layer", symbolName: "checkmark", status: .warn("w"),
+            shortDescription: "OCR could not be run on 2 pages", detailDescription: "detail — never surfaced",
+            pageReferences: nil, durationSeconds: 0, couldNotVerify: true)
+        let warnReport = VerificationReport(
+            layers: [layer(.warn("w"), shortDescription: "Metadata present: Trapped"), couldNotVerify],
+            overallStatus: .warn("w"), durationSeconds: 0)
+        #expect(ShareRiskConfirmKind.incompleteWarn(warnReport).itemLines
+            == DocumentEditorView.couldNotVerifyItemLines(report: warnReport))
+        #expect(ShareRiskConfirmKind.incompleteWarn(warnReport).itemLines
+            == ["OCR could not be run on 2 pages"])
+        // The masthead sentence the arm keeps above the list is the WARN
+        // count line, never the skip sentence, when real WARN layers exist.
+        #expect(VerificationResultsView.mastheadSubtitle(report: warnReport)
+            == "Verification completed with 2 notes. Review below before sharing.")
+
+        let allSkipped = VerificationReport(
+            layers: [layer(.skipped, shortDescription: "s"), layer(.skipped, shortDescription: "s")],
+            overallStatus: .warn("w"), durationSeconds: 0)
+        #expect(ShareRiskConfirmKind.incompleteWarn(allSkipped).itemLines.isEmpty)
+        #expect(ShareRiskConfirmKind.skipped(VerificationReport.skipped(reason: .cancelled)).itemLines.isEmpty)
+    }
+
     // MARK: - Deselected-items line — singular/plural
 
     @Test("Singular")
@@ -744,11 +777,15 @@ struct ShareRiskConfirmSheetTests {
 }
 
 // Incomplete-WARN share confirm gate. Tests target the
-// pure static predicate shareNeedsIncompleteWarnConfirm(report:acknowledged:):
-// a WARN report whose aggregate carries zero real WARN layers but ≥1 skipped
-// layer — the exact condition VerificationResultsView.mastheadSubtitle's
-// skip-induced-WARN branch renders on — routes the Share tap through the
-// same confirm sheet as FAIL/ATTENTION/SKIPPED. Unlike its two siblings the
+// pure static predicate shareNeedsIncompleteWarnConfirm(report:acknowledged:).
+// Two WARN shapes route the Share tap through the same confirm sheet as
+// FAIL/ATTENTION/SKIPPED: a WARN whose aggregate carries zero real WARN
+// layers but ≥1 skipped layer — the exact condition
+// VerificationResultsView.mastheadSubtitle's skip-induced-WARN branch renders
+// on — and a WARN whose layers include a could-not-verify WARN
+// (`CouldNotVerifyWarn.matches`: a check that did not fully run on the
+// output, classified by the engine's `LayerResult.couldNotVerify`). A WARN
+// made only of routine notes stays confirm-free. Unlike its two siblings the
 // acknowledgement flag is NOT on VerificationReport (Packages/RedactionEngine
 // is a separate package) — it lives on DocumentState instead
 // (`incompleteWarnShareAcknowledged` / `acknowledgeIncompleteWarnShare()`),
@@ -757,10 +794,22 @@ struct ShareRiskConfirmSheetTests {
 @MainActor
 struct IncompleteWarnShareGateTests {
 
-    private func layer(_ status: VerificationStatus) -> LayerResult {
+    private func layer(_ status: VerificationStatus, shortDescription: String = "",
+                       couldNotVerify: Bool = false) -> LayerResult {
         LayerResult(name: "Layer", symbolName: "checkmark", status: status,
-                   shortDescription: "", detailDescription: "",
-                   pageReferences: nil, durationSeconds: 0)
+                   shortDescription: shortDescription, detailDescription: "",
+                   pageReferences: nil, durationSeconds: 0,
+                   couldNotVerify: couldNotVerify)
+    }
+
+    /// A could-not-verify WARN layer, as the engine composes one.
+    private func couldNotVerifyLayer(_ message: String = "OCR could not be run on 2 pages") -> LayerResult {
+        layer(.warn(message), shortDescription: message, couldNotVerify: true)
+    }
+
+    /// A routine WARN note — the check ran and reported what it saw.
+    private func routineWarnLayer(_ message: String = "Structural findings: URI") -> LayerResult {  // LegalPhrases:safe (the engine message)
+        layer(.warn(message), shortDescription: message)
     }
 
     private func incompleteWarnReport() -> VerificationReport {
@@ -783,25 +832,96 @@ struct IncompleteWarnShareGateTests {
             report: incompleteWarnReport(), acknowledged: true) == false)
     }
 
-    @Test("A WARN mixing a real WARN layer with a skipped layer does NOT need this confirm")
-    func mixedWarnAndSkipDoesNotConfirm() {
-        // No approved copy exists for this mixed shape (the masthead's own
-        // skip-sentence branch requires warnCount == 0); it stays
-        // confirm-free like any other routine WARN.
+    @Test("A WARN mixing a routine WARN note with a skipped layer does NOT need this confirm")
+    func mixedRoutineWarnAndSkipDoesNotConfirm() {
+        // The masthead's skip-sentence branch requires warnCount == 0 and
+        // the routine note is not a could-not-verify condition; the shape
+        // stays confirm-free like any other routine WARN.
         let mixed = VerificationReport(
-            layers: [layer(.warn("w")), layer(.skipped)],
+            layers: [routineWarnLayer(), layer(.skipped)],
             overallStatus: .warn("w"), durationSeconds: 0
         )
         #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
             report: mixed, acknowledged: false) == false)
     }
 
-    @Test("A WARN with no skipped layers does not need this confirm")
-    func plainWarnDoesNotConfirm() {
+    @Test("A routine WARN note with no skipped layers does not need this confirm")
+    func plainRoutineWarnDoesNotConfirm() {
         let plain = VerificationReport(
-            layers: [layer(.warn("w"))], overallStatus: .warn("w"), durationSeconds: 0)
+            layers: [routineWarnLayer()], overallStatus: .warn("w"), durationSeconds: 0)
         #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
             report: plain, acknowledged: false) == false)
+    }
+
+    // MARK: - Could-not-verify WARN layers
+
+    @Test("A could-not-verify WARN layer needs the confirm even though the report carries a real note count")
+    func couldNotVerifyWarnNeedsConfirm() {
+        let report = VerificationReport(
+            layers: [layer(.pass), couldNotVerifyLayer()],
+            overallStatus: .warn("Verification produced warnings"), durationSeconds: 0)
+        #expect(report.layers.filter(\.status.isWarn).count == 1)
+        #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
+            report: report, acknowledged: false) == true)
+    }
+
+    @Test("A could-not-verify WARN layer beside a skipped layer needs the confirm")
+    func couldNotVerifyWarnWithSkipNeedsConfirm() {
+        let report = VerificationReport(
+            layers: [couldNotVerifyLayer(), layer(.skipped)],
+            overallStatus: .warn("Verification produced warnings"), durationSeconds: 0)
+        #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
+            report: report, acknowledged: false) == true)
+    }
+
+    @Test("A could-not-verify WARN beside routine notes still needs the confirm")
+    func couldNotVerifyWarnAmongRoutineNotesNeedsConfirm() {
+        let report = VerificationReport(
+            layers: [routineWarnLayer(), layer(.info("i")), couldNotVerifyLayer("Could not inspect metadata")],
+            overallStatus: .warn("Verification produced warnings"), durationSeconds: 0)
+        #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
+            report: report, acknowledged: false) == true)
+    }
+
+    @Test("An acknowledged could-not-verify WARN shares without re-confirm (confirm once)")
+    func acknowledgedCouldNotVerifySharesFreely() {
+        let report = VerificationReport(
+            layers: [couldNotVerifyLayer()],
+            overallStatus: .warn("Verification produced warnings"), durationSeconds: 0)
+        #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
+            report: report, acknowledged: true) == false)
+    }
+
+    @Test("The flag is read on WARN layers only: a flagged non-WARN layer does not route the confirm")
+    func flaggedNonWarnLayerIgnored() {
+        let report = VerificationReport(
+            layers: [layer(.info("i"), shortDescription: "note", couldNotVerify: true), routineWarnLayer()],
+            overallStatus: .warn("Verification produced warnings"), durationSeconds: 0)
+        #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
+            report: report, acknowledged: false) == false)
+    }
+
+    @Test("couldNotVerifyItemLines lists exactly the could-not-verify WARN layers, in layer order, shortDescription only")
+    func couldNotVerifyItemLinesDerivation() {
+        let report = VerificationReport(
+            layers: [
+                routineWarnLayer("Metadata present: Trapped"),
+                couldNotVerifyLayer("OCR could not be run on 2 pages"),
+                layer(.pass, shortDescription: "passed — must not appear"),
+                layer(.skipped, shortDescription: "skipped — must not appear"),
+                layer(.fail("x"), shortDescription: "failed — must not appear", couldNotVerify: true),
+                couldNotVerifyLayer("Cross-checked 1 of 2 pages — remaining pages lacked rasterization data"),
+            ],
+            overallStatus: .warn("Verification produced warnings"), durationSeconds: 0)
+        #expect(DocumentEditorView.couldNotVerifyItemLines(report: report) == [
+            "OCR could not be run on 2 pages",
+            "Cross-checked 1 of 2 pages — remaining pages lacked rasterization data",
+        ])
+    }
+
+    @Test("couldNotVerifyItemLines is empty for the all-skipped degrade — the masthead sentence names the skips")
+    func couldNotVerifyItemLinesEmptyForAllSkipped() {
+        #expect(DocumentEditorView.couldNotVerifyItemLines(report: incompleteWarnReport()).isEmpty)
     }
 
     @Test("Non-WARN verdicts never need this confirm (PASS / INFO / ATTENTION / FAIL / SKIPPED)")
