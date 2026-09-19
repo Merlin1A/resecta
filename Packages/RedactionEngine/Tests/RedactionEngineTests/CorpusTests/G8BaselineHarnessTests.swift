@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import CryptoKit
 @testable import RedactionEngine
 
 // Detection-quality baseline — standing emitter (NOT a pass/fail gate).
@@ -231,15 +232,56 @@ struct G8BaselineHarnessTests {
         return cat.rawValue.lowercased().replacingOccurrences(of: " ", with: "")
     }
 
-    // MARK: - Loader (own; Bundle.module corpus/g8_corpus.json)
+    // MARK: - Loader (own; Bundle.module corpus/g8_corpus.json, or the
+    // RESECTA_G8_CORPUS_PATH override)
+    //
+    // The override is TEST-TARGET ONLY: the datapipeline's `make eval
+    // EVAL_CORPUS_PROFILE=<p>` points it at a generator profile it built
+    // (build/corpus/g8_corpus_<p>.json — the same 1,100 documents with their
+    // name slots re-rendered and/or furniture planted) so a profile can be
+    // measured against the bundled corpus WITHOUT installing it. Both G8
+    // emitters (this suite and the Site-B twin) load through this one
+    // function, so an override reaches both or neither. The engine has no
+    // such switch. Default (no override) = the bundled fixture, unchanged.
 
-    static func loadBaselineCorpus() throws -> BaselineG8Corpus? {
+    /// The corpus file the harnesses read and whether an override chose it.
+    /// `RESECTA_G8_CORPUS_PATH`, else its `TEST_RUNNER_`-prefixed twin (the
+    /// form xcodebuild forwards to the runner), else the bundled fixture;
+    /// `nil` when neither an override nor the fixture exists.
+    static func baselineCorpusURL() -> (url: URL, overridden: Bool)? {
+        let env = ProcessInfo.processInfo.environment
+        for key in ["RESECTA_G8_CORPUS_PATH", "TEST_RUNNER_RESECTA_G8_CORPUS_PATH"] {
+            if let path = env[key], !path.isEmpty {
+                return (URL(fileURLWithPath: path), true)
+            }
+        }
         guard let url = Bundle.module.url(
             forResource: "g8_corpus",
             withExtension: "json",
             subdirectory: "corpus"
         ) else { return nil }
+        return (url, false)
+    }
+
+    /// With an override in force, the invoking make target announces the
+    /// file's SHA-256 in `RESECTA_G8_CORPUS_SHA256` (or the `TEST_RUNNER_`
+    /// twin); the bytes actually loaded must match it, so a run of record can
+    /// never silently read a stale or wrong profile file. No announcement =
+    /// no check (the override alone is enough for an ad-hoc run).
+    static func expectAnnouncedCorpusSHA(_ data: Data) {
+        let env = ProcessInfo.processInfo.environment
+        let announced = env["RESECTA_G8_CORPUS_SHA256"]
+            ?? env["TEST_RUNNER_RESECTA_G8_CORPUS_SHA256"]
+        guard let announced, !announced.isEmpty else { return }
+        let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        #expect(actual == announced.lowercased(),
+                "override corpus sha \(actual) != announced \(announced)")
+    }
+
+    static func loadBaselineCorpus() throws -> BaselineG8Corpus? {
+        guard let (url, overridden) = Self.baselineCorpusURL() else { return nil }
         let data = try Data(contentsOf: url)
+        if overridden { Self.expectAnnouncedCorpusSHA(data) }
         return try JSONDecoder().decode(BaselineG8Corpus.self, from: data)
     }
 
