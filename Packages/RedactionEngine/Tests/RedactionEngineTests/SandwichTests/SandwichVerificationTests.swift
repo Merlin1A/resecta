@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 import PDFKit
 import CoreGraphics
 @testable import RedactionEngine
@@ -375,5 +376,127 @@ struct SandwichVerificationTests {
         #expect(digest.excludedCount == filterResult.excludedCount)
         #expect(digest.survivingCount == filterResult.surviving.count)
         #expect(digest.extractedCount == digest.excludedCount + digest.survivingCount)
+    }
+
+    // MARK: - Layer 6: unmeasured units (the R111-04 residue, S4-V2)
+
+    /// A page whose units have NO read-back selection at all — the class
+    /// `selection(for:)` returns nil for. The exclusion walk reads only
+    /// `string`, `numberOfCharacters` and `selection(for:)` before its
+    /// exclusion pass, so this double is sufficient.
+    private final class NilSelectionPage: PDFPage {
+        let text: String
+        init(text: String) {
+            self.text = text
+            super.init()
+        }
+        override var string: String? { text }
+        override var numberOfCharacters: Int { (text as NSString).length }
+        override func selection(for range: NSRange) -> PDFSelection? { nil }
+    }
+
+    @Test("A nil-selection non-whitespace unit is counted as unmeasured (WARN, could-not-verify)")
+    func nilSelectionUnitCountedAsUnmeasured() async throws {
+        let page = NilSelectionPage(text: "A")
+        let region = RegionShape(
+            expandedBounds: CGRect(x: 100, y: 100, width: 50, height: 20),
+            polygonVertices: nil)
+        let outcome = try await verifier.spatialExclusionOutcome(
+            outputPage: page, regionShapes: [region], pageIndex: 3)
+        #expect(outcome.status.isWarn,
+                "a character the check could not place must be reported, not silently skipped; got \(outcome.status)")
+        #expect(outcome.couldNotVerify,
+                "the unmeasured-position note is the could-not-verify class")
+        if case .warn(let msg) = outcome.status {
+            #expect(msg == "1 character on page 4 had no measurable position and was not position-checked",
+                    "got: \(msg)")
+        }
+    }
+
+    @Test("A nil-selection whitespace unit is not counted (whitespace is outside the position domain)")
+    func nilSelectionWhitespaceNotCounted() async throws {
+        let page = NilSelectionPage(text: " ")
+        let region = RegionShape(
+            expandedBounds: CGRect(x: 100, y: 100, width: 50, height: 20),
+            polygonVertices: nil)
+        let outcome = try await verifier.spatialExclusionOutcome(
+            outputPage: page, regionShapes: [region])
+        #expect(outcome.status == .pass, "got \(outcome.status)")
+        #expect(!outcome.couldNotVerify)
+    }
+
+    // MARK: - Layer 9: empty-lineage symmetry (C12-79 / F12-05, S4-V2)
+
+    @Test("The output walk of a textless page hashes like the filter's empty survivor set")
+    func emptyOutputWalkHashesLikeEmptySurvivorSet() async throws {
+        let doc = try #require(PDFDocument(data: TestFixtures.blankPage()))
+        let page = try #require(doc.page(at: 0))
+        let outputHash = try SandwichVerification.computeOutputLineageHash(page)
+        let filterHash = FilterResult.computeLineageHash(over: [])
+        #expect(!filterHash.isEmpty,
+                "the filter's empty-set digest is the SHA-256 of zero updates, never Data()")
+        #expect(outputHash == filterHash,
+                "a page with no text layer must hash as zero survivors recorded, not as 'no lineage recorded'")
+    }
+
+    @Test("A fully-redacted searchable page verifies: Layer 9 PASS and Layer 7 PASS",
+          .timeLimit(.minutes(1)))
+    func fullyRedactedSearchablePageVerifies() async throws {
+        let fixture = TestFixtures.fakeRedaction()
+        let fullPage = RedactionRegion(
+            id: UUID(), normalizedRect: CGRect(x: 0, y: 0, width: 1, height: 1),
+            source: .manual)
+        let url = try await TestPipeline.processAndExport(
+            fixture, mode: .searchableRedaction, regions: [0: [fullPage]])
+        defer { try? FileManager.default.removeItem(at: url) }
+        let digests = try await TestPipeline.searchableDigests(fixture, regions: [0: [fullPage]])
+        let digest = try #require(digests[0])
+        #expect(digest.survivingCount == 0, "the full-page region empties the survivor set")
+        let outDoc = try #require(PDFDocument(url: url))
+        let outPage = try #require(outDoc.page(at: 0))
+
+        let lineage = try await verifier.verifyCharacterLineage(outputPage: outPage, digest: digest)
+        #expect(lineage == .pass,
+                "zero survivors recorded and zero output characters must agree; got \(lineage)")
+        let count = try await verifier.verifyCharacterCount(outputPage: outPage, digest: digest)
+        #expect(count == .pass, "got \(count)")
+    }
+
+    @Test("The empty-set digest against an output page carrying a glyph FAILs (an injection)")
+    func emptySetDigestAgainstDrawnGlyphFails() async throws {
+        let digest = PageFilterDigest(
+            pageIndex: 0, extractedCount: 1, excludedCount: 1, survivingCount: 0,
+            boundaryCharacters: [], lineageHash: FilterResult.computeLineageHash(over: []))
+        let (doc, url) = try TestFixtures.writeTempPDF(
+            TestFixtures.courierTextLayerPDF(text: "A"), prefix: "s4v2_empty_vs_glyph_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let page = try #require(doc.page(at: 0))
+        let result = try await verifier.verifyCharacterLineage(outputPage: page, digest: digest)
+        #expect(result == .fail(""),
+                "0 survivors recorded with a measurable output unit must FAIL; got \(result)")
+    }
+
+    @Test("A Data() lineage digest means 'not recorded' and passes (the legacy guard holds)")
+    func emptyDataDigestMeansNotRecorded() async throws {
+        let digest = PageFilterDigest(
+            pageIndex: 0, extractedCount: 1, excludedCount: 0, survivingCount: 1,
+            boundaryCharacters: [])
+        #expect(digest.lineageHash.isEmpty)
+        let (doc, url) = try TestFixtures.writeTempPDF(
+            TestFixtures.courierTextLayerPDF(text: "A"), prefix: "s4v2_data_guard_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let page = try #require(doc.page(at: 0))
+        let result = try await verifier.verifyCharacterLineage(outputPage: page, digest: digest)
+        #expect(result == .pass, "got \(result)")
+    }
+
+    @Test("emptyLineageDigest is the filter's empty-set digest and the textless output walk's value")
+    func emptyLineageDigestIsShared() async throws {
+        #expect(SandwichVerification.emptyLineageDigest == FilterResult.computeLineageHash(over: []))
+        #expect(SandwichVerification.emptyLineageDigest.count == 32)
+        let doc = try #require(PDFDocument(data: TestFixtures.blankPage()))
+        let page = try #require(doc.page(at: 0))
+        #expect(try SandwichVerification.computeOutputLineageHash(page)
+                == SandwichVerification.emptyLineageDigest)
     }
 }
