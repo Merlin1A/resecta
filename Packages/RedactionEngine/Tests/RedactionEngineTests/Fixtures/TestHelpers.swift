@@ -326,7 +326,12 @@ enum TestPipeline {
                         characters: characters,
                         redactionRects: redactionRectsInPoints
                     )
-                    textLayerEntries = filterResult.surviving
+                    // The writer-side drawn-cell rule, as production runs it
+                    // before the digest is taken.
+                    textLayerEntries = TextLayerReconstructor.validateSurvivors(
+                        filterResult, pageWidth: regionBasis.width,
+                        regionShapes: TestPipeline.rectShapes(redactionRectsInPoints)
+                    ).result.surviving
                 }
             }
 
@@ -403,12 +408,28 @@ enum TestPipeline {
                 characters: characters,
                 redactionRects: redactionRectsInPoints
             )
-            digests[pageIndex] = filterResult.toDigest(
+            // The writer-side drawn-cell rule, as production runs it.
+            let validated = TextLayerReconstructor.validateSurvivors(
+                filterResult, pageWidth: regionBasis.width,
+                regionShapes: TestPipeline.rectShapes(redactionRectsInPoints)
+            )
+            digests[pageIndex] = validated.result.toDigest(
                 pageIndex: pageIndex,
                 redactionRects: redactionRectsInPoints,
-                safetyMargin: safetyMarginPoints
+                safetyMargin: safetyMarginPoints,
+                drawnCellRuleExcludedCount: validated.dropped
             )
         }
         return digests
+    }
+
+    /// Rect regions as the engine's `RegionShape` (un-expanded `bounds`, the
+    /// safety-margin halo in `expandedBounds`), mirroring `PageRasterizer`.
+    static func rectShapes(_ rects: [CGRect]) -> [RegionShape] {
+        rects.map {
+            RegionShape(
+                expandedBounds: $0.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
+                polygonVertices: nil, bounds: $0)
+        }
     }
 }

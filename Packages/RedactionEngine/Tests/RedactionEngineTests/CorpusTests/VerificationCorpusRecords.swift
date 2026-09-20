@@ -60,6 +60,12 @@ extension VerificationCorpusRunnerTests {
         let overall_per_sweep: [String]
         let layer_status_per_sweep: [[String]]
         let non_ocr_layers_identical: Bool
+        /// Per page (nil for a Secure page): extracted · excluded · surviving ·
+        /// surviving_non_ws from the redaction's filter digest.
+        let filter_digest_counts: [[Int]?]
+        /// Per page (nil for a Secure page): survivors the writer-side
+        /// drawn-cell rule dropped after the filter.
+        let drawn_cell_rule_drops: [Int?]
     }
 
     struct RunnerSummary: Encodable {
