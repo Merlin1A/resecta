@@ -112,7 +112,7 @@ struct SettingsViewResetConfirmationTests {
         // SettingsView. Pin the copy so it can't silently drift into
         // outcome-promise language.
         let title = "Reset all settings?"
-        let message = "All settings return to their default values. Custom Terms and Saved Regexes are not affected."
+        let message = "All settings return to their default values. Custom Terms, Saved Regexes, and saved searches are not affected."
 
         let banned = ["guaranteed", "ensures", "impossible", "securely"] // LegalPhrases:safe (test banlist)
         for word in banned {
@@ -125,6 +125,8 @@ struct SettingsViewResetConfirmationTests {
         // affected. The shape of the copy carries the mechanism.
         #expect(message.contains("Custom Terms"))
         #expect(message.contains("Saved Regexes"))
+        #expect(message.contains("saved searches"),
+                "the reset dialog names every user store it leaves alone — the saved-search library included")
         #expect(message.contains("not affected"))
     }
 }

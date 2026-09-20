@@ -131,6 +131,53 @@ nonisolated final class SavedSearchCollisionUITests: XCTestCase {
         deleteRows(named: ["Text: Sample", "Control OK"])
     }
 
+    /// Delete All path: with at least one row saved, the list's
+    /// destructive "Delete All Saved Searches" row is present; its
+    /// confirm dialog carries the pinned title and the "Delete All"
+    /// role; committing clears the Search-side list to its empty state
+    /// and the row hides itself (it is shown only while rows exist).
+    func testDeleteAll_clearsListToEmptyState() {
+        launchSearchSheetWithResults(query: "Sample")
+        openSavedList()
+
+        saveCurrentSearch(expectingPrefill: "Text: Sample")
+        XCTAssertTrue(
+            app.staticTexts["Text: Sample"].waitForExistence(timeout: 10),
+            "Save did not create the row — success control failed."
+        )
+
+        let clearAllRow = app.buttons["savedSearchClearAllButton"]
+        XCTAssertTrue(
+            clearAllRow.waitForExistence(timeout: 5),
+            "Delete All row absent while the list has rows."
+        )
+        clearAllRow.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Delete all saved searches?"].waitForExistence(timeout: 5),
+            "Delete All confirm dialog never presented."
+        )
+        // The dialog's destructive action resolves to more than one
+        // matching element in the accessibility tree (the action sheet
+        // mirrors it), so take the first by identifier.
+        let confirm = app.buttons["savedSearchClearAllConfirm"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Delete All confirm button not found.")
+        confirm.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["No Saved Searches"].waitForExistence(timeout: 10),
+            "Empty state never appeared after Delete All."
+        )
+        XCTAssertFalse(
+            app.staticTexts["Text: Sample"].exists,
+            "The saved row survived Delete All."
+        )
+        XCTAssertTrue(
+            waitForAbsence(of: clearAllRow, timeout: 5),
+            "Delete All row still present on the empty list."
+        )
+    }
+
     // MARK: - Launch + navigation helpers
 
     /// Launch straight into the search sheet over the bundled single-page
