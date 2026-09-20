@@ -142,14 +142,19 @@ struct BloomFilterFPRTests {
 
     // This report-only decorator runs the test against the curated installed
     // surname asset via Bundle.module. The membership probe of an English
-    // non-name word list against a multilingual name corpus does not reach
-    // the 0.0015 design target — the curated bar is ~0.184 (a
-    // shard-streamed/observed estimate, not artifact-re-derivable). The
-    // 0.0015 over-gate factor is the live 240× (the prior decorator text
-    // quoted a stale 84×). This probe is therefore REPORTED, not
-    // hard-asserted at 0.0015; only a well-formedness sanity check is
-    // asserted. The 0.0015 design-target gate remains tracked separately
-    // (see measureNameBloomMembershipFPR below).
+    // non-name word list against a multilingual name corpus reads ~0.184
+    // (101 of the 549 words are genuine inventory rows — "the", "no",
+    // "table" are surnames somewhere). That is MEMBERSHIP, a different
+    // quantity from the filter's structural false-positive rate, which sits
+    // at the 0.0015 design target (about 0.1 % measured). The two must not be
+    // divided into a factor: earlier revisions of this comment quoted "~240×"
+    // and "84×"; 0.184 / 0.0015 = 122.7 and describes nothing. The curation
+    // the engine applies to these members is the common-word sidecar
+    // (`NameCommonWords`, built from this very list — see
+    // NameCommonWordsTests for the drift pin). This probe is therefore
+    // REPORTED, not hard-asserted at 0.0015; only a well-formedness sanity
+    // check is asserted. The 0.0015 design-target gate remains tracked
+    // separately (see measureNameBloomMembershipFPR below).
     @Test(
         "Surname Bloom membership FPR — report-only (curated asset, own bar)"
     )
@@ -181,9 +186,9 @@ struct BloomFilterFPRTests {
 
         let observedFPR = Double(membershipHits) / Double(samples.count)
         // Report-only: emit the observed membership rate (counts + rate only,
-        // no words). The curated bar (~0.184, a shard-streamed estimate) is
-        // over the 0.0015 design target by the live 240× factor; this probe
-        // does not hard-assert that target.
+        // no words). The membership rate (~0.184) and the 0.0015 structural
+        // design target are different quantities; this probe does not
+        // hard-assert the target.
         print("[FPR gate] surname membership FPR (report-only): " +
               "\(membershipHits)/\(samples.count)=\(observedFPR) " +
               "rowCount=\(filter.rowCount)")
