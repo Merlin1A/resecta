@@ -420,11 +420,21 @@ public enum TextLayerReconstructor {
     /// test pipeline mirrors it. Over-redaction is safe, under-redaction is a
     /// breach: a dropped glyph is one the searchable layer would otherwise
     /// have placed inside a redaction.
+    ///
+    /// Not applied on a page stored with a rotation (`pageRotation % 360 !=
+    /// 0`): there today's band layout is not geometrically faithful — the
+    /// source lines run vertically in output space and the horizontal
+    /// assembler pools glyphs of many source lines into one band — so the
+    /// rule would drop displaced glyphs by the hundreds without making the
+    /// page verify. The gate lifts when the layout is assembled in the
+    /// source frame.
     static func validateSurvivors(
         _ result: FilterResult,
         pageWidth: CGFloat,
-        regionShapes: [RegionShape]
+        regionShapes: [RegionShape],
+        pageRotation: Int
     ) -> (result: FilterResult, dropped: Int) {
+        guard pageRotation % 360 == 0 else { return (result, 0) }
         var surviving = result.surviving
         var dropped = 0
         var passes = 0

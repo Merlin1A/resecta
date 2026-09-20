@@ -479,7 +479,7 @@ struct TextLayerReconstructorTests {
             expandedBounds: region.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
             polygonVertices: nil, bounds: region)]
         let validated = TextLayerReconstructor.validateSurvivors(
-            filtered, pageWidth: 612, regionShapes: shapes)
+            filtered, pageWidth: 612, regionShapes: shapes, pageRotation: 0)
         #expect(validated.dropped == 1)
         #expect(validated.result.surviving.count == 8)
         #expect(validated.result.excludedCount == 12)
@@ -493,6 +493,26 @@ struct TextLayerReconstructorTests {
         #expect(digest.drawnCellRuleExcludedCount == 1)
         #expect(digest.excludedCount == 12)
         #expect(digest.survivingNonWhitespaceCount == 8)
+    }
+
+    @Test("drawn-cell rule: not applied on a page stored with a rotation (the layout is not faithful there yet)")
+    func drawnCellRuleGatedOnRotatedPages() {
+        let (entries, region) = Self.narrowLabelBand()
+        let filtered = FilterResult(surviving: entries, totalCharacters: 20, excludedCount: 11)
+        let shapes = [RegionShape(
+            expandedBounds: region.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
+            polygonVertices: nil, bounds: region)]
+        for rotation in [90, 180, 270, 450] {
+            let v = TextLayerReconstructor.validateSurvivors(
+                filtered, pageWidth: 612, regionShapes: shapes, pageRotation: rotation)
+            #expect(v.dropped == 0 && v.result.surviving.count == 9,
+                    "rotation \(rotation): the rule must leave the filter result unchanged")
+        }
+        for rotation in [0, 360, -360] {
+            #expect(TextLayerReconstructor.validateSurvivors(
+                filtered, pageWidth: 612, regionShapes: shapes, pageRotation: rotation).dropped == 1,
+                    "rotation \(rotation) is unrotated: the rule applies")
+        }
     }
 
     @Test("drawn-cell rule: a polygon region is tested as the polygon, not its bounding box")

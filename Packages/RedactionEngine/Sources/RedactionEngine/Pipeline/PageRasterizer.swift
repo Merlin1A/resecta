@@ -281,7 +281,8 @@ public final class PageRasterizer: @unchecked Sendable {
                     // digest, the drawn layer and Layer 6 agree by
                     // construction.
                     let validated = TextLayerReconstructor.validateSurvivors(
-                        filterResult, pageWidth: pageBounds.width, regionShapes: shapes
+                        filterResult, pageWidth: pageBounds.width, regionShapes: shapes,
+                        pageRotation: page.rotation
                     )
                     if validated.dropped > 0 {
                         pageRasterizerLogger.log(

@@ -330,7 +330,8 @@ enum TestPipeline {
                     // before the digest is taken.
                     textLayerEntries = TextLayerReconstructor.validateSurvivors(
                         filterResult, pageWidth: regionBasis.width,
-                        regionShapes: TestPipeline.rectShapes(redactionRectsInPoints)
+                        regionShapes: TestPipeline.rectShapes(redactionRectsInPoints),
+                        pageRotation: page.rotation
                     ).result.surviving
                 }
             }
@@ -411,7 +412,8 @@ enum TestPipeline {
             // The writer-side drawn-cell rule, as production runs it.
             let validated = TextLayerReconstructor.validateSurvivors(
                 filterResult, pageWidth: regionBasis.width,
-                regionShapes: TestPipeline.rectShapes(redactionRectsInPoints)
+                regionShapes: TestPipeline.rectShapes(redactionRectsInPoints),
+                pageRotation: page.rotation
             )
             digests[pageIndex] = validated.result.toDigest(
                 pageIndex: pageIndex,
