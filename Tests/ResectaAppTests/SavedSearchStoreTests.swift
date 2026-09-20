@@ -502,6 +502,108 @@ struct SavedSearchStoreTests {
         #expect(rehydrated.savedSearches.count == 1)
     }
 
+    // MARK: - Delete All (per interface)
+
+    @Test("clearAll(interface:) removes only that interface's entries and round-trips through the storage file")
+    func clearAllRemovesOnlyThatInterface() {
+        let fileURL = Self.makeScratchFileURL()
+        let (defaults, suiteName) = Self.makeScratchDefaults()
+        defer {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
+        store.add(SavedSearch(name: "Text A", mode: .text, queryText: "alpha"))
+        store.add(SavedSearch(name: "Regex B", mode: .regex, queryText: "\\d+"))
+        store.add(SavedSearch(name: "Terms C", mode: .multiTerm, searchTerms: ["x", "y"]))
+        store.add(SavedSearch(name: "Scan D", mode: .piiScan, enabledPIICategories: [.ssn]))
+        #expect(store.savedSearches.count == 4)
+
+        // The Search side's Delete All: text / regex / multi-term go,
+        // the saved scan stays — it is listed on the Scan side, which
+        // this control never names.
+        store.clearAll(interface: .search)
+        #expect(store.savedSearches.map(\.name) == ["Scan D"])
+
+        let rehydrated = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
+        #expect(rehydrated.savedSearches.map(\.name) == ["Scan D"],
+                "the cleared state must be the persisted state")
+
+        // The Scan side's Delete All empties the rest.
+        rehydrated.clearAll(interface: .scan)
+        #expect(rehydrated.savedSearches.isEmpty)
+        let again = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
+        #expect(again.savedSearches.isEmpty)
+    }
+
+    @Test("clearAll(interface:) that empties the store drops the parked undecodable rows too")
+    func clearAllLastEntriesDropsParkedRows() throws {
+        let fileURL = Self.makeScratchFileURL()
+        let (defaults, suiteName) = Self.makeScratchDefaults()
+        defer {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        // One decodable Search-side row plus a future-version row the
+        // fail-closed row decoder parks (unknown key).
+        let good = Self.validRowJSON(id: "00000000-0000-0000-0000-000000000021", name: "good row")
+        let future = #"{"id": "00000000-0000-0000-0000-000000000022", "name": "future", "mode": "text", "queryText": "q", "caseSensitive": false, "wholeWord": false, "sourceFilter": "All", "minimumOCRConfidence": 0.0, "minimumPIIConfidence": 0.5, "futureKey": true}"#
+        let fileJSON = #"{"schemaVersion": 2, "payload": {"schemaVersion": 2, "savedSearches": [\#(good), \#(future)]}}"#
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fileJSON.data(using: .utf8)!.write(to: fileURL)
+
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
+        #expect(store.savedSearches.map(\.name) == ["good row"])
+
+        // Delete All on the Search side leaves nothing on either side, so
+        // the parked row goes with it: an explicit delete-everything must
+        // not re-emit a row the user cannot see on the next save.
+        store.clearAll(interface: .search)
+        #expect(store.savedSearches.isEmpty)
+
+        let raw = try String(contentsOf: fileURL, encoding: .utf8)
+        #expect(!raw.contains("futureKey"),
+                "the parked row must not survive a delete-everything on disk")
+        let reloaded = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
+        #expect(reloaded.savedSearches.isEmpty)
+        reloaded.add(SavedSearch(name: "after", mode: .text, queryText: "z"))
+        let rawAfter = try String(contentsOf: fileURL, encoding: .utf8)
+        #expect(!rawAfter.contains("futureKey"),
+                "a later save must not resurrect the dropped row")
+    }
+
+    @Test("clearAll(interface:) keeps the parked rows while the other interface still has entries")
+    func clearAllKeepsParkedRowsWhileOtherInterfaceRemains() throws {
+        let fileURL = Self.makeScratchFileURL()
+        let (defaults, suiteName) = Self.makeScratchDefaults()
+        defer {
+            try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let good = Self.validRowJSON(id: "00000000-0000-0000-0000-000000000023", name: "good row")
+        let future = #"{"id": "00000000-0000-0000-0000-000000000024", "name": "future", "mode": "text", "queryText": "q", "caseSensitive": false, "wholeWord": false, "sourceFilter": "All", "minimumOCRConfidence": 0.0, "minimumPIIConfidence": 0.5, "futureKey": true}"#
+        let fileJSON = #"{"schemaVersion": 2, "payload": {"schemaVersion": 2, "savedSearches": [\#(good), \#(future)]}}"#
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fileJSON.data(using: .utf8)!.write(to: fileURL)
+
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: defaults)
+        store.add(SavedSearch(name: "Scan D", mode: .piiScan, enabledPIICategories: [.ssn]))
+
+        // A one-sided Delete All is not a delete-everything: the parked
+        // row keeps parking (the lenient-decode rule) until the store is
+        // empty on both sides.
+        store.clearAll(interface: .search)
+        #expect(store.savedSearches.map(\.name) == ["Scan D"])
+        let raw = try String(contentsOf: fileURL, encoding: .utf8)
+        #expect(raw.contains("futureKey"),
+                "a one-sided clear must not drop rows that belong to neither side")
+    }
+
     @Test("Empty store hydrates as empty list, not crash")
     func emptyStoreHydrate() {
         let fileURL = Self.makeScratchFileURL()

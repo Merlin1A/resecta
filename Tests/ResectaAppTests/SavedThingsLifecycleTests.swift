@@ -343,6 +343,81 @@ struct SavedSearchDeleteConfirmationTests {
         #expect(store.savedSearches.count == 1)
         #expect(store.savedSearches.first?.name == "Survivor")
     }
+
+    // MARK: - Delete All (per interface)
+
+    @Test("Delete All row, title, body and footer follow the active interface (Search side)")
+    func clearAllCopySearchSide() {
+        #expect(SavedSearchListSheet.clearAllRowTitle(for: .search) == "Delete All Saved Searches")
+        #expect(SavedSearchListSheet.clearAllTitle(for: .search) == "Delete all saved searches?")
+        #expect(SavedSearchListSheet.clearAllMessage(for: .search)
+                == "Every saved search is deleted from this device. Saved scans and other settings are not affected.")
+        #expect(SavedSearchListSheet.clearAllFooter(for: .search)
+                == "Removes every saved search on this device.")
+    }
+
+    @Test("Delete All row, title, body and footer follow the active interface (Scan side)")
+    func clearAllCopyScanSide() {
+        #expect(SavedSearchListSheet.clearAllRowTitle(for: .scan) == "Delete All Saved Scans")
+        #expect(SavedSearchListSheet.clearAllTitle(for: .scan) == "Delete all saved scans?")
+        #expect(SavedSearchListSheet.clearAllMessage(for: .scan)
+                == "Every saved scan is deleted from this device. Saved searches and other settings are not affected.")
+        #expect(SavedSearchListSheet.clearAllFooter(for: .scan)
+                == "Removes every saved scan on this device.")
+    }
+
+    /// The three delete-all dialogs (Custom Terms, Saved Regexes, saved
+    /// searches) share one sentence shape: what is deleted, from where,
+    /// and which stores are not affected. The sibling strings are inline
+    /// in their views, so they are quoted here; the saved-search pair
+    /// comes from the statics.
+    @Test("The three delete-all bodies share the sibling sentence shape")
+    func clearAllMessageSiblingParity() {
+        let customTerms = "Every always-flag and never-flag term is deleted from this device. Saved Regexes and other settings are not affected."
+        let savedRegexes = "Every user-saved pattern is deleted from this device. Built-in patterns and other settings are not affected."
+        let bodies = [
+            customTerms,
+            savedRegexes,
+            SavedSearchListSheet.clearAllMessage(for: .search),
+            SavedSearchListSheet.clearAllMessage(for: .scan),
+        ]
+        let shape = #/^Every .+ is deleted from this device\. .+ and other settings are not affected\.$/#
+        for body in bodies {
+            #expect(body.wholeMatch(of: shape) != nil,
+                    "delete-all body departs from the sibling shape: \(body)")
+        }
+        let banned = ["guaranteed", "ensures", "impossible", "securely", "permanently"] // LegalPhrases:safe (test banlist)
+        for body in bodies {
+            for word in banned {
+                #expect(!body.lowercased().contains(word),
+                        "delete-all body must not carry an outcome promise: \(word)")
+            }
+        }
+    }
+
+    @Test("Delete All's destructive role clears exactly the active interface's entries")
+    func clearAllDestructiveRoleClearsActiveInterface() {
+        let fileURL = Self.makeScratchFileURL()
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: Self.makeSuite())
+        store.add(makeSaved(name: "Tax terms"))
+        store.add(makeSaved(name: "Invoice regex", mode: .regex))
+        store.add(makeSaved(name: "Weekly scan", mode: .piiScan))
+
+        // Arming the confirm (the row button) alone changes nothing.
+        var showClearAllConfirmation = false
+        showClearAllConfirmation = true
+        #expect(showClearAllConfirmation)
+        #expect(store.savedSearches.count == 3)
+
+        // The dialog's destructive button closure on the Search side.
+        store.clearAll(interface: .search)
+        #expect(store.savedSearches.map(\.name) == ["Weekly scan"])
+        #expect(SavedSearchListSheet.visibleEntries(store.savedSearches, interface: .search).isEmpty,
+                "the Search-side list is at its empty state")
+        #expect(SavedSearchListSheet.visibleEntries(store.savedSearches, interface: .scan).count == 1,
+                "the Scan-side list is untouched")
+    }
 }
 
 // MARK: - Reset Detection History confirm

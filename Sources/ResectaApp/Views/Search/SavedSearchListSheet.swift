@@ -47,6 +47,10 @@ struct SavedSearchListSheet: View {
     /// store removal (app-standard destructive-confirm idiom — same
     /// shape as Settings' Reset dialogs).
     @State private var deleteTarget: SavedSearch?
+    /// Destructive-action confirmation symmetry (mirrors the Saved
+    /// Regexes and Custom Terms delete-all rows): the delete-all row
+    /// confirms before dropping the active interface's list.
+    @State private var showClearAllConfirmation = false
 
     /// The interface whose entries this list shows — the active one.
     /// Stable for the sheet's lifetime (no user path changes the
@@ -79,6 +83,8 @@ struct SavedSearchListSheet: View {
                         }
                     }
                 }
+
+                clearAllSection
 
                 // Save entry point — always visible while the sheet is open,
                 // pre-filled with a generated name. Saves
@@ -183,6 +189,24 @@ struct SavedSearchListSheet: View {
             } message: { search in
                 Text(Self.deleteConfirmMessage(for: search))
             }
+            // Destructive confirm for the delete-all row. Copy names
+            // exactly what is cleared: the active interface's entries —
+            // the other interface's list and the other stores are
+            // unaffected. Strings come from the `clearAll*(for:)` statics
+            // so the copy is pinned by test.
+            .confirmationDialog(
+                Self.clearAllTitle(for: activeInterface),
+                isPresented: $showClearAllConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete All", role: .destructive) {
+                    savedSearchStore.clearAll(interface: activeInterface)
+                }
+                .accessibilityIdentifier("savedSearchClearAllConfirm")
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text(Self.clearAllMessage(for: activeInterface))
+            }
             // Collision re-present, decoupled from
             // the alert button actions — a same-transaction re-arm inside an
             // action is swallowed by the tap's own dismissal (both collision
@@ -208,6 +232,26 @@ struct SavedSearchListSheet: View {
         // presents modally above the search sheet's shield swap, so it
         // carries its own screen-capture shield for the same reason.
         .shieldedSheetContent(monitor: captureMonitor)
+    }
+
+    // MARK: - Delete All
+
+    /// Destructive bulk clear for the active interface's list.
+    /// Swipe-to-delete covers single rows; this row removes every entry
+    /// on this side at once. Hidden while the list is empty — there is
+    /// nothing to delete and the row would read as broken.
+    @ViewBuilder
+    private var clearAllSection: some View {
+        if !visibleSearches.isEmpty {
+            Section {
+                Button(Self.clearAllRowTitle(for: activeInterface), role: .destructive) {
+                    showClearAllConfirmation = true
+                }
+                .accessibilityIdentifier("savedSearchClearAllButton")
+            } footer: {
+                Text(Self.clearAllFooter(for: activeInterface))
+            }
+        }
     }
 
     // MARK: - Row
@@ -412,6 +456,32 @@ struct SavedSearchListSheet: View {
         search.mode.interface == .scan
             ? "The saved scan is removed from this device."
             : "The saved search is removed from this device."
+    }
+
+    /// Delete-all row, dialog title, dialog body and section footer —
+    /// keyed by the active interface like the per-row confirm (a saved
+    /// SCAN is not a "saved search"). The sentences follow the Saved
+    /// Regexes and Custom Terms delete-all copy word for word except
+    /// the nouns: mechanism description, the out-of-scope stores named,
+    /// no outcome promise.
+    static func clearAllRowTitle(for interface: SearchInterface) -> String {
+        interface == .scan ? "Delete All Saved Scans" : "Delete All Saved Searches"
+    }
+
+    static func clearAllTitle(for interface: SearchInterface) -> String {
+        interface == .scan ? "Delete all saved scans?" : "Delete all saved searches?"
+    }
+
+    static func clearAllMessage(for interface: SearchInterface) -> String {
+        interface == .scan
+            ? "Every saved scan is deleted from this device. Saved searches and other settings are not affected."
+            : "Every saved search is deleted from this device. Saved scans and other settings are not affected."
+    }
+
+    static func clearAllFooter(for interface: SearchInterface) -> String {
+        interface == .scan
+            ? "Removes every saved scan on this device."
+            : "Removes every saved search on this device."
     }
 
     /// Pre-filled save-prompt name.
