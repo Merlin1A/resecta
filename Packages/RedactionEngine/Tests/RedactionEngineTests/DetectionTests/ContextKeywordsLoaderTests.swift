@@ -16,16 +16,17 @@ struct ContextKeywordsLoaderTests {
 
     // MARK: - Smoke / loader contract
 
-    @Test("Loader exposes 192 entries across 9 categories (A21 row count)")
+    @Test("Loader exposes 196 entries across 9 categories (A21 row count)")
     func smokeFullEntries() throws {
-        // Doctype-scoped additions: +5 ssn, +5 name, +6 ein.
-        // The bundled file carries 213 rows; the 21 bates rows are
+        // Doctype-scoped additions: +5 ssn, +5 name, +6 ein, then the four
+        // court role nouns re-landed as court-scoped name positives (+4 name).
+        // The bundled file carries 217 rows; the 21 bates rows are
         // engine-invisible (mapCategory has no bates case), so the loader
-        // exposes 192.
+        // exposes 196.
         let loader = try ContextKeywordsLoader()
         let perCategory: [(PIICategory, Int)] = [
             (.ssn, 15), (.medicalRecord, 13), (.licensePlate, 15),
-            (.dea, 29), (.dateOfBirth, 26), (.itin, 28), (.name, 31), (.npi, 29),
+            (.dea, 29), (.dateOfBirth, 26), (.itin, 28), (.name, 35), (.npi, 29),
             (.ein, 6),
         ]
         var total = 0
@@ -35,7 +36,21 @@ struct ContextKeywordsLoaderTests {
                     "category \(cat) entry count: expected \(expected), got \(count)")
             total += count
         }
-        #expect(total == 192, "A21 total entry count regressed (expected 192)")
+        #expect(total == 196, "A21 total entry count regressed (expected 196)")
+    }
+
+    @Test("The four court role nouns ship as court-scoped name positives")
+    func courtRoleNounsAreCourtScopedNamePositives() throws {
+        let loader = try ContextKeywordsLoader()
+        let court = try #require(loader.positiveKeywords(for: .name, doctype: .court))
+        for term in ["plaintiff", "defendant", "petitioner", "respondent"] {
+            #expect(court.contains(term), "\(term) must be a court-scoped name positive")
+        }
+        // Court-scoped only: the global set (doctype nil) never carries them.
+        let global = loader.positiveKeywords(for: .name, doctype: nil) ?? []
+        for term in ["plaintiff", "defendant", "petitioner", "respondent"] {
+            #expect(!global.contains(term), "\(term) must not be a global name positive")
+        }
     }
 
     @Test("Empty bundle throws resourceMissing")
