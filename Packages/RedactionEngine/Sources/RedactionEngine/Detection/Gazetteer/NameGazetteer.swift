@@ -36,6 +36,11 @@ public struct NameGazetteer: Sendable {
     /// via nickname→canonical resolution.
     private let nicknameGazetteer: NicknameGazetteer?
 
+    /// Optional common-word curation sidecar — nil when the file is not
+    /// bundled (no demotion). When non-nil, `queryBoosted` withholds the
+    /// surname credit for a candidate whose surname token is an exact member.
+    private let commonWords: NameCommonWords?
+
     // MARK: - Init
 
     /// Load gazetteer from bundled resources.
@@ -66,6 +71,8 @@ public struct NameGazetteer: Sendable {
                 GazetteerManifest.self, from: manifestData)
             // Nickname sidecar is optional: its absence does not fail the init.
             self.nicknameGazetteer = try? NicknameGazetteer(bundle: Bundle.module)
+            // The common-word curation sidecar is optional too: absent → no demotion.
+            self.commonWords = try? NameCommonWords(bundle: Bundle.module)
         } catch {
             return nil
         }
@@ -128,14 +135,18 @@ public struct NameGazetteer: Sendable {
         self.givenNameFilter = givenFilter
         // Nickname sidecar is optional: its absence does not fail the init.
         self.nicknameGazetteer = try? NicknameGazetteer(bundle: bundle)
+        // The common-word curation sidecar is optional too: absent → no demotion.
+        self.commonWords = try? NameCommonWords(bundle: bundle)
     }
 
     /// Init from explicit filter data (for testing with golden files).
     public init(surnameFilter: BloomFilter, givenNameFilter: BloomFilter,
-                nicknameGazetteer: NicknameGazetteer? = nil) {
+                nicknameGazetteer: NicknameGazetteer? = nil,
+                commonWords: NameCommonWords? = nil) {
         self.surnameFilter = surnameFilter
         self.givenNameFilter = givenNameFilter
         self.nicknameGazetteer = nicknameGazetteer
+        self.commonWords = commonWords
     }
 
     // MARK: - Queries
@@ -167,8 +178,32 @@ public struct NameGazetteer: Sendable {
         public let fuzzyScore: Double?
         /// 0.00, 0.05, 0.10, or 0.15 — see the boost table below.
         public let boost: Double
+        /// The surname token is an exact member of the common-word curation
+        /// list (`NameCommonWords`). Its Bloom membership is still reported in
+        /// `surnameHit` (an inventory fact the strict pass keeps reading), but
+        /// it earned no credit: `boost` is 0 and `hadSupport` is false unless
+        /// another signal supports the candidate.
+        public let commonWordSurname: Bool
 
+        /// Any filter hit at all — the strict (ALL-CAPS) pass's gate.
         public var hadAnyHit: Bool { surnameHit || givenHit || fuzzySurnameHit }
+
+        /// Inventory SUPPORT for the first pass's gate: an exact surname hit
+        /// that is not a common word, or a fuzzy surname hit (never offered to
+        /// a common word). Given-name membership alone is not support here —
+        /// the caller's lone-token given-name fallback covers that case, as it
+        /// does on the strict pass.
+        public var hadSupport: Bool { (surnameHit && !commonWordSurname) || fuzzySurnameHit }
+
+        public init(surnameHit: Bool, givenHit: Bool, fuzzySurnameHit: Bool,
+                    fuzzyScore: Double?, boost: Double, commonWordSurname: Bool = false) {
+            self.surnameHit = surnameHit
+            self.givenHit = givenHit
+            self.fuzzySurnameHit = fuzzySurnameHit
+            self.fuzzyScore = fuzzyScore
+            self.boost = boost
+            self.commonWordSurname = commonWordSurname
+        }
 
         public static let none = NameGazetteerVerdict(
             surnameHit: false, givenHit: false, fuzzySurnameHit: false,
@@ -219,6 +254,9 @@ public struct NameGazetteer: Sendable {
     /// - partial hyphen component hit → +0.05
     /// - fuzzy surname only    → +0.05 (only when `fuzzy == true`)
     /// - otherwise             →  0.00
+    /// - surname token ∈ the common-word list → 0.00 on every path (the
+    ///   exact credit and the fuzzy fallback are both withheld; the verdict
+    ///   still reports the Bloom membership, flagged `commonWordSurname`)
     ///
     /// `fuzzy: false` disables the Levenshtein-1 fallback — the ALL-CAPS
     /// strict pass passes `false` so suppress-on-miss behavior is consistent
@@ -242,6 +280,20 @@ public struct NameGazetteer: Sendable {
 
         guard let surname = tokens.last else { return .none }
         let given = tokens.dropLast().joined(separator: " ")
+
+        // Common-word curation: an ordinary English word that happens to be a
+        // surname somewhere earns no surname credit — not the exact credit,
+        // not the Levenshtein-1 fallback (which would re-support "the" through
+        // a one-edit neighbour). Membership is still reported so the strict
+        // pass's hit set is unchanged; only the score and the first pass's
+        // support reading move. The list is a sidecar; no Bloom row is touched.
+        if let commonWords, commonWords.contains(surname) {
+            return NameGazetteerVerdict(
+                surnameHit: contains(surname: surname), givenHit: false,
+                fuzzySurnameHit: false, fuzzyScore: nil, boost: 0.0,
+                commonWordSurname: true
+            )
+        }
 
         let surnameHit = contains(surname: surname)
         let givenHit = !given.isEmpty && contains(givenName: given)

@@ -1495,6 +1495,16 @@
       "category": "name",
       "confidence": "high",
       "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "defendant"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
         "financial",
         "medical"
       ],
@@ -1722,6 +1732,26 @@
       "category": "name",
       "confidence": "high",
       "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "petitioner"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "plaintiff"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
         "court",
         "financial",
         "generic",
@@ -1741,6 +1771,16 @@
       "locale": "en",
       "polarity": "positive",
       "term": "recipient's name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "respondent"
     },
     {
       "category": "name",

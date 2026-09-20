@@ -1628,17 +1628,26 @@ public struct PIIDetector: Sendable {
                     verdict = .none
                 }
 
-                // Strict pass suppresses candidates the gazetteer didn't
-                // recognize. nil-gazetteer → fall through so stripped-bundle
-                // environments keep the same behavior.
+                // Inventory gate on BOTH tagger passes. The strict (ALL-CAPS
+                // shadow) pass suppresses candidates the gazetteer didn't
+                // recognize at all (`hadAnyHit`); the first pass suppresses
+                // candidates the inventory does not SUPPORT (`hadSupport`:
+                // an exact surname hit that is not a curated common word, or
+                // a fuzzy hit) — the mirror of the strict gate, so a
+                // Title-case pair the inventory has never seen no longer
+                // surfaces at 0.70 on the tagger's word alone. The prefix
+                // pass is untouched. nil-gazetteer → fall through so
+                // stripped-bundle environments keep the same behavior.
                 // `unit: .word` delivers one-word candidates
                 // and `queryBoosted` treats a lone token as a surname query,
                 // so a given-name word ("Delia") tagged on a transaction line
                 // would be suppressed even once the tagger sees it. Accept a
-                // single-token candidate present in the given-name bloom; the
-                // The boost table is unchanged (given-only carries no boost).
+                // single-token candidate present in the given-name bloom on
+                // either pass; the boost table is unchanged (given-only
+                // carries no boost).
                 var givenNameOnlyHit = false
-                if strict, let gazetteer = nameGazetteer, !verdict.hadAnyHit {
+                if let gazetteer = nameGazetteer,
+                   strict ? !verdict.hadAnyHit : !verdict.hadSupport {
                     givenNameOnlyHit = !name.contains(" ")
                         && gazetteer.contains(givenName: name)
                     if !givenNameOnlyHit {
