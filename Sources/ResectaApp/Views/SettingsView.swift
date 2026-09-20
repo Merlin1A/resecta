@@ -134,7 +134,7 @@ struct SettingsView: View {
                 .accessibilityIdentifier("settingsResetConfirm")
                 Button("Cancel", role: .cancel) { }
             } message: {
-                Text("All settings return to their default values. Custom Terms and Saved Regexes are not affected.")
+                Text("All settings return to their default values. Custom Terms, Saved Regexes, and saved searches are not affected.")
             }
         }
     }

@@ -360,6 +360,23 @@ final class SavedSearchStore {
         persist()
     }
 
+    /// Delete-everything for one interface's list — the bulk control the
+    /// list sheet offers beside swipe-Delete, one per interface like the
+    /// list itself. Removes every entry whose persisted mode belongs to
+    /// `interface`; the other interface's entries stay (they are listed
+    /// on their own side and this control never names them). When
+    /// nothing is left at all, the parked undecodable rows go too: they
+    /// belong to neither interface, and an explicit delete-everything
+    /// must not re-emit them on the next save — the same rule as
+    /// `SavedRegexStore.clearAllUserSaved()`.
+    func clearAll(interface: SearchInterface) {
+        savedSearches.removeAll(where: { $0.mode.interface == interface })
+        if savedSearches.isEmpty {
+            unrecognizedRows = []
+        }
+        persist()
+    }
+
     /// Rename only — other fields are immutable in V1.x.
     /// Renaming onto ANOTHER entry's name would
     /// recreate the indistinguishable-rows state the add guard closes;

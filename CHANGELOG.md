@@ -10,6 +10,7 @@ The entries below follow the Keep-a-Changelog index format.
 
 ### Added
 
+- Saved searches: a Delete All control in the saved-search list, one per interface, matching the Custom Terms and Saved Regexes controls; the Settings reset dialog names all three stores.
 - **Search re-check.** Verification ends with a new check that re-runs each search you applied — the same text, pattern, or term list with the same options — on the redacted output through the search engine, and reports per search how many matches it found, how many you applied, and how many remain in the text the app can read. In Secure Rasterization the output has no text layer, so the check reads the rendered pages with OCR and says so. Pages the check could not read are listed rather than counted as clear. Secure Rasterization output now runs a 6-layer check and Searchable Redaction an 11-layer check.
 
 ### Changed
