@@ -205,7 +205,7 @@ struct NameGazetteerTests {
             Issue.record("Expected LoaderError.unsupportedManifestVersion but no error was thrown")
         } catch NameGazetteer.LoaderError.unsupportedManifestVersion(let actual, let supported) {
             #expect(actual == "99.0.0")
-            #expect(supported == ["1.0.0"])
+            #expect(supported == GazetteerManifest.supportedVersions)
         } catch {
             Issue.record("Expected LoaderError.unsupportedManifestVersion but got \(error)")
         }

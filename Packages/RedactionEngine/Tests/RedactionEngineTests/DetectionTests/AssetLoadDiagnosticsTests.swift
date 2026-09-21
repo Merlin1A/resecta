@@ -54,8 +54,9 @@ struct AssetLoadDiagnosticsTests {
     }
 
     /// A scratch copy of the full engine resource layout (Gazetteers +
-    /// Classifier) so `PIIDetector.loadWithDiagnostics(bundle:)` runs its
-    /// valid-signature path against it. Each call uses a fresh directory —
+    /// Classifier + Audit — the whole tree the signed manifest lists) so
+    /// `PIIDetector.loadWithDiagnostics(bundle:)` runs its trusted path
+    /// against it. Each call uses a fresh directory —
     /// `Bundle` caches by path, so altered fixtures always get their own
     /// bundle instance.
     private static func makeScratchEngineBundle() throws -> (bundle: Bundle, root: URL) {
@@ -66,7 +67,7 @@ struct AssetLoadDiagnosticsTests {
                 directoryHint: .isDirectory
             )
         try FileManager.default.createDirectory(at: tempBase, withIntermediateDirectories: true)
-        for subdir in ["Gazetteers", "Classifier"] {
+        for subdir in ["Gazetteers", "Classifier", "Audit"] {
             try FileManager.default.copyItem(
                 at: resourceRoot.appending(path: subdir, directoryHint: .isDirectory),
                 to: tempBase.appending(path: subdir, directoryHint: .isDirectory)

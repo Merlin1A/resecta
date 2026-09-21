@@ -97,21 +97,22 @@ public struct PIIDetector: Sendable {
     // is live in the struct but not called here.
     private let negativeContextGazetteer: NegativeContextGazetteer?
 
-    // The default arguments consult the same memoized signature verdict the
-    // diagnostics loader uses, so `PIIDetector()` cannot load a corpus the
-    // manifest-signature check would have withheld. With the shipped valid
-    // signature every default evaluates exactly as before.
+    // The default arguments consult the same memoized corpus verdict the
+    // diagnostics loader uses (the manifest signature plus the signed digests
+    // of the files these five read), so `PIIDetector()` cannot load a corpus
+    // the check would have withheld. With the shipped bundle intact every
+    // default evaluates exactly as before.
     public init(
         nameGazetteer: NameGazetteer? =
-            GazetteerTrust.isShippedManifestSignatureValid() ? NameGazetteer() : nil,
+            GazetteerTrust.isShippedCorpusTrusted() ? NameGazetteer() : nil,
         dlPatternGazetteer: DLPatternGazetteer? =
-            GazetteerTrust.isShippedManifestSignatureValid() ? (try? DLPatternGazetteer()) : nil,
+            GazetteerTrust.isShippedCorpusTrusted() ? (try? DLPatternGazetteer()) : nil,
         passportPatternGazetteer: PassportPatternGazetteer? =
-            GazetteerTrust.isShippedManifestSignatureValid() ? (try? PassportPatternGazetteer()) : nil,
+            GazetteerTrust.isShippedCorpusTrusted() ? (try? PassportPatternGazetteer()) : nil,
         contextLoader: ContextKeywordsLoader? =
-            GazetteerTrust.isShippedManifestSignatureValid() ? (try? ContextKeywordsLoader()) : nil,
+            GazetteerTrust.isShippedCorpusTrusted() ? (try? ContextKeywordsLoader()) : nil,
         negativeContextGazetteer: NegativeContextGazetteer? =
-            GazetteerTrust.isShippedManifestSignatureValid() ? (try? NegativeContextGazetteer()) : nil
+            GazetteerTrust.isShippedCorpusTrusted() ? (try? NegativeContextGazetteer()) : nil
     ) {
         self.nameGazetteer = nameGazetteer
         self.dlPatternGazetteer = dlPatternGazetteer
@@ -152,36 +153,35 @@ public struct PIIDetector: Sendable {
     {
         var diagnostics = GazetteerLoadDiagnostics()
 
-        // Verify the gazetteer manifest's Ed25519 signature before
-        // trusting any bundled corpus. The verdict comes from the shared
-        // memoized chokepoint (`GazetteerTrust`), the same one the public
-        // `PIIDetector.init` default arguments consult. Failure short-
-        // circuits the five signature-gated loaders below: each reports as
-        // failed (with the signature-verification reason in
-        // `failureReasons`) so the existing auto-detect-degraded banner / toast surface
-        // fires unchanged. The detector is constructed with nil gazetteers —
+        // Verify the corpus before trusting any bundled asset: the manifest's
+        // Ed25519 signature, then the signed SHA-256 of every file the five
+        // gated loaders read (`AssetIntegrity`). The verdict comes from the
+        // shared memoized chokepoint (`GazetteerTrust`), the same one the
+        // public `PIIDetector.init` default arguments consult. A false verdict
+        // short-circuits the five gated loaders below: each reports as failed
+        // (with the signature or digest reason in `failureReasons`) so the
+        // existing auto-detect-degraded banner / toast surface fires
+        // unchanged. The detector is constructed with nil gazetteers —
         // non-gazetteer detectors (SSN state machine, regex-based DEA /
         // email / phone) keep running so manual redaction users retain
         // partial auto-detection (degrade-with-banner).
-        if !GazetteerTrust.isManifestSignatureValid(bundle: bundle) {
-            let reason = "gazetteer-manifest signature verification failed (PipelineError.detectionError(.detectionCorpusInvalid))"
-            // Loaders NOT covered by the gazetteer-manifest signature must not
-            // be auto-attributed here (their load status is folded in on the
-            // valid-signature path below): the doctype classifier's
-            // doctype-keywords.json, the OS-provisioned NER MobileAsset,
-            // the three Classifier/ quality assets (context-scorer /
-            // doctype-temperature / preset-thresholds), and the three JSON
-            // reference tables (institution / address-components / ZIP-state)
-            // whose ungated static loads a signature failure never reaches.
-            // Membership lives on the enum so the loop and the valid-path
-            // probes cannot drift apart.
+        let verdict = GazetteerTrust.corpusVerdict(bundle: bundle)
+        if let reason = verdict.failureReason {
+            // Trackers a false corpus verdict does not withhold must not be
+            // auto-attributed here (their load status and their own digest
+            // failures are folded in on the trusted path below): the doctype
+            // classifier, the OS-provisioned NER MobileAsset, the three
+            // Classifier/ quality assets, the audit rule catalog's integrity
+            // tracker, and the three JSON reference tables whose ungated
+            // static loads a false verdict never reaches. Membership lives on
+            // the enum so the loop and the trusted-path probes cannot drift.
             for gazetteer in GazetteerLoadDiagnostics.Gazetteer.allCases
             where !GazetteerLoadDiagnostics.outsideManifestSignature.contains(gazetteer) {
                 diagnostics = diagnostics.appending(gazetteer, reason: reason)
             }
-            // Signature-fail path: the five signature-gated loaders are nil;
-            // the institution, address-components and ZIP-state reference
-            // tables load outside the signature and stay live (see
+            // False-verdict path: the five gated loaders are nil; the
+            // institution, address-components and ZIP-state reference
+            // tables load outside the verdict and stay live (see
             // ENGINEERING.md §8). negativeContextGazetteer: nil is the
             // correct degrade behavior (no suppression).
             let detector = PIIDetector(
@@ -192,6 +192,19 @@ public struct PIIDetector: Sendable {
                 negativeContextGazetteer: nil
             )
             return (detector, diagnostics)
+        }
+
+        // 0. Signed-digest failures on UNGATED assets (the reference tables,
+        //    the Classifier files, the audit rule catalog): the asset's own
+        //    tracker reports the digest mismatch first, so the banner names
+        //    the root cause; the loader's own decode failure, if any, is
+        //    folded into the same entry below. The loaders keep their
+        //    fail-open fallbacks — reporting only.
+        if let report = verdict.report {
+            for failure in report.ungated {
+                let tracker = AssetIntegrity.diagnosticsCase(forPath: failure.path ?? "")
+                diagnostics = diagnostics.appending(tracker, reason: failure.description)
+            }
         }
 
         // 1. NameGazetteer — paired throwing variant exists alongside init?();

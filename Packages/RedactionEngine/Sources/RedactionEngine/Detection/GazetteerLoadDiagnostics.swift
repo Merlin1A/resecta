@@ -56,22 +56,27 @@ public struct GazetteerLoadDiagnostics: Sendable, Equatable {
         case contextScorerWeights = "ContextScorerWeights"
         case doctypeTemperature = "DoctypeTemperature"
         case presetThresholds = "PresetThresholds"
+        // A signed-manifest digest failure on an UNGATED asset that has no
+        // detection loader of its own (today: the audit rule catalog).
+        // Ungated assets with a loader report under that loader's case.
+        case assetIntegrity = "AssetIntegrity"
     }
 
-    /// Loaders NOT covered by the gazetteer-manifest signature. A manifest-
-    /// signature failure must not auto-attribute these; their load status is
-    /// folded in on the valid-signature path of
-    /// `PIIDetector.loadWithDiagnostics(bundle:)`.
+    /// Trackers a failed CORPUS verdict (a bad manifest signature, or a
+    /// trust-gated asset failing its signed digest) must not auto-attribute:
+    /// nothing withholds them on that path, so naming them would overstate the
+    /// degradation. Their own load status — and, since the manifest lists
+    /// every installed asset, their own digest failures — are folded in on the
+    /// trusted path of `PIIDetector.loadWithDiagnostics(bundle:)`.
     static let outsideManifestSignature: Set<Gazetteer> = [
         .documentTypeClassifier, .nerNameModel,
         .contextScorerWeights, .doctypeTemperature, .presetThresholds,
+        .assetIntegrity,
         // The three JSON reference tables load through ungated process-
         // lifetime `static let`s (AddressSpatialAssembler.sharedAddressComponents,
-        // ZIPStateTable.loader, OCRCustomWordsBuilder.financialCustomWords) and
-        // `gazetteer-manifest.json` enumerates only the two Bloom filters
-        // (`GazetteerManifest.filters`) — a signature failure never withholds
-        // them, so attributing them to one would overstate the degradation.
-        // Their own load failures report on the valid-signature path probes.
+        // ZIPStateTable.loader, OCRCustomWordsBuilder.financialCustomWords);
+        // a false corpus verdict never withholds them. Their digests are
+        // verified with everyone else's and report on the trusted path.
         .institutionGazetteer, .addressComponentsGazetteer, .zipStateTableLoader,
     ]
 
@@ -100,6 +105,10 @@ public struct GazetteerLoadDiagnostics: Sendable, Equatable {
     /// Append a single failure. Used by `PIIDetector.loadWithDiagnostics(bundle:)`
     /// as it walks the four loaders. Returns a new value (struct semantics).
     public func appending(_ gazetteer: Gazetteer, reason: String) -> GazetteerLoadDiagnostics {
+        // One entry per loader: the first attribution wins (the integrity pass
+        // reports a digest failure before the loader reports the decode
+        // failure it causes), so the banner names each loader once.
+        guard !failedGazetteers.contains(gazetteer.rawValue) else { return self }
         var failures = failedGazetteers
         failures.append(gazetteer.rawValue)
         var reasons = failureReasons
