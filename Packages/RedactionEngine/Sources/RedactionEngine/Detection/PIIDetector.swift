@@ -1989,6 +1989,8 @@ public struct PIIDetector: Sendable {
             Self.scanLabelColon(in: ns, line: line, labels: orderedLabels, into: &results)
             Self.scanCaption(in: ns, line: line, into: &results)
             Self.scanClosingLine(in: ns, lines: lines, at: index, into: &results)
+            Self.scanSalutation(in: ns, line: line, into: &results)
+            Self.scanSubjectLine(in: ns, line: line, into: &results)
         }
         return results
     }
@@ -2094,6 +2096,80 @@ public struct PIIDetector: Sendable {
             results.append(anchorMatch(candidate, route: "closing-line"))
             return
         }
+    }
+
+    /// Generic addressees a salutation names instead of a person; a
+    /// candidate equal to one of them (case-folded) is not read.
+    private static let genericAddressees: Set<String> = [
+        "sir", "madam", "sir or madam", "sirs", "customer", "valued customer",
+        "member", "colleague", "colleagues", "team", "all", "friend", "friends",
+        "parent", "parents", "guardian", "patient", "resident", "homeowner",
+        "applicant", "candidate", "hiring manager", "committee", "editor",
+        "doctor", "counsel", "client", "employee", "staff", "student",
+        "occupant", "taxpayer",
+    ]
+
+    /// The subject-line labels, case-folded; the colon follows.
+    private static let subjectLabels = ["re", "subject", "regarding"]
+
+    /// Route 4a — the salutation: `Dear` at the line's start, then the
+    /// candidate, closed by a comma, a colon or the line's end. A generic
+    /// addressee (`Dear Sir or Madam,`) is not a name.
+    private static func scanSalutation(in ns: NSString, line: NSRange, into results: inout [PIIMatch]) {
+        let lineEnd = NSMaxRange(line)
+        var i = line.location
+        while i < lineEnd, isHorizontalSpace(ns.character(at: i)) { i += 1 }
+        let dear = ns.range(of: "dear", options: [.caseInsensitive, .anchored], range: NSRange(location: i, length: lineEnd - i))
+        guard dear.location != NSNotFound else { return }
+        let after = NSMaxRange(dear)
+        guard after < lineEnd, isHorizontalSpace(ns.character(at: after)) else { return }
+        guard let candidate = readCandidate(forwardFrom: after, lineEnd: lineEnd, in: ns, minTokens: 1) else { return }
+        var j = NSMaxRange(candidate.range)
+        while j < lineEnd, isHorizontalSpace(ns.character(at: j)) { j += 1 }
+        if j < lineEnd {
+            let u = ns.character(at: j)
+            guard u == 0x2C || u == 0x3A else { return }   // ',' or ':'
+        }
+        guard !genericAddressees.contains(candidate.text.lowercased()), admits(candidate) else { return }
+        results.append(anchorMatch(candidate, route: "salutation"))
+    }
+
+    /// Route 4b — the subject line: `Re:` / `Subject:` / `Regarding:` at
+    /// the line's start, and the candidate that CLOSES the line when a
+    /// lower-case token stands right before it (`Re: Records pertaining to
+    /// Jane Q. Public`); a subject in title case throughout is a title, not
+    /// a name, and yields nothing.
+    private static func scanSubjectLine(in ns: NSString, line: NSRange, into results: inout [PIIMatch]) {
+        let lineEnd = NSMaxRange(line)
+        var i = line.location
+        while i < lineEnd, isHorizontalSpace(ns.character(at: i)) { i += 1 }
+        var labelled = false
+        for label in subjectLabels {
+            let hit = ns.range(of: label, options: [.caseInsensitive, .anchored], range: NSRange(location: i, length: lineEnd - i))
+            guard hit.location != NSNotFound else { continue }
+            var k = NSMaxRange(hit)
+            while k < lineEnd, isHorizontalSpace(ns.character(at: k)) { k += 1 }
+            if k < lineEnd, ns.character(at: k) == 0x3A { labelled = true; i = k + 1; break }
+        }
+        guard labelled else { return }
+        // The line's tail: drop trailing whitespace and one closing period.
+        var end = lineEnd
+        while end > i, isHorizontalSpace(ns.character(at: end - 1)) { end -= 1 }
+        if end > i, ns.character(at: end - 1) == 0x2E {
+            // A period that closes an initial or a suffix stays; a sentence's is dropped.
+            var t = end - 1
+            while t > i, isAnchorLetter(ns.character(at: t - 1)) { t -= 1 }
+            if end - 1 - t >= 3 { end -= 1 }
+        }
+        guard let candidate = readCandidate(backwardFrom: end, lineStart: i, in: ns, minTokens: 2), admits(candidate) else { return }
+        // The token before the candidate must be a lower-case word.
+        var p = candidate.range.location
+        while p > i, isHorizontalSpace(ns.character(at: p - 1)) { p -= 1 }
+        guard p > i, p < candidate.range.location, isAnchorLetter(ns.character(at: p - 1)) else { return }
+        var q = p
+        while q > i, isAnchorTokenChar(ns.character(at: q - 1)) { q -= 1 }
+        guard !isAnchorUppercase(ns.character(at: q)) else { return }
+        results.append(anchorMatch(candidate, route: "subject-line"))
     }
 
     // MARK: - ALL-CAPS Title-Casing
