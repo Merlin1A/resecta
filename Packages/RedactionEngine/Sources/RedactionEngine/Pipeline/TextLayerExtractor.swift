@@ -210,6 +210,50 @@ public struct TextLayerExtractor: Sendable {
         }
     }
 
+    /// The inverse of `rotateRectIntoOutputSpace`: a DISPLAYED (output-page)
+    /// rect back in cropBox-LOCAL source space. `size` is again the SOURCE
+    /// crop size, pre-swap. Each case solves the forward case for
+    /// `(x, y, wr, hr)`; the four-rotation round-trip is pinned by
+    /// `TextLayerExtractorTests`. With displayed rect `(X, Y, W, H)`:
+    ///   • r = 90:  origin (w − Y − H, X), size (H, W).
+    ///   • r = 180: origin (w − X − W, h − Y − H), size (W, H) — self-inverse.
+    ///   • r = 270: origin (Y, h − X − W), size (H, W).
+    static func unrotateRectIntoSourceSpace(
+        _ rect: CGRect, sourceCropSize size: CGSize, rotation: Int
+    ) -> CGRect {
+        let x = rect.minX, y = rect.minY, wr = rect.width, hr = rect.height
+        let w = size.width, h = size.height
+        switch rotation {
+        case 90:
+            return CGRect(x: w - y - hr, y: x, width: hr, height: wr)
+        case 180:
+            return CGRect(x: w - x - wr, y: h - y - hr, width: wr, height: hr)
+        case 270:
+            return CGRect(x: y, y: h - x - wr, width: hr, height: wr)
+        default:
+            return rect
+        }
+    }
+
+    /// `rotateRectIntoOutputSpace` on a point (a zero-size rect: every
+    /// corner is the point, so the rect map is the point map).
+    static func rotatePointIntoOutputSpace(
+        _ point: CGPoint, sourceCropSize size: CGSize, rotation: Int
+    ) -> CGPoint {
+        rotateRectIntoOutputSpace(
+            CGRect(origin: point, size: .zero), sourceCropSize: size, rotation: rotation
+        ).origin
+    }
+
+    /// `unrotateRectIntoSourceSpace` on a point.
+    static func unrotatePointIntoSourceSpace(
+        _ point: CGPoint, sourceCropSize size: CGSize, rotation: Int
+    ) -> CGPoint {
+        unrotateRectIntoSourceSpace(
+            CGRect(origin: point, size: .zero), sourceCropSize: size, rotation: rotation
+        ).origin
+    }
+
     // MARK: - OCG Hidden Layer Defense
 
     /// Check if a page references Optional Content Groups with hidden layers.
