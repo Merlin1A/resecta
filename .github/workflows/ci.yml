@@ -3,9 +3,10 @@
 # against the tree, and checks the shipped-asset hashes. The four scripts
 # run from the base branch's copies, so a change cannot edit the lint it
 # is gated by; the change's own copies run once more, report-only. About
-# five minutes on a hosted macos-26 runner. The engine host suite
-# (engine-suite.yml) and the simulator suite (sim-suite.yml) run on
-# demand and on release tags, not here.
+# five minutes on a hosted macos-26 runner. The batched simulator suites
+# (sim-suite.yml) run weekly, on demand and on release tags, and the
+# engine host suite (engine-suite.yml) on demand and on release tags,
+# not here.
 name: ci
 
 on:

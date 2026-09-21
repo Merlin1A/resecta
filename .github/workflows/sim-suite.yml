@@ -1,11 +1,11 @@
-# The batched simulator suite (Scripts/test-batched.sh <scheme>) on a
+# The batched simulator suites (Scripts/test-batched.sh <scheme>) on a
 # hosted macos-26 runner: build once, then serial suite-level batches on
 # an iPhone 17 simulator under a watchdog, perf suites alone and
-# report-only. The scheme is a dispatch input: ResectaApp (the default,
-# and what a release tag runs) or RedactionEngine, which runs the engine
-# package's suites on the simulator instead of the macOS host. About
-# thirty minutes. Runs on demand and on release tags; it is not part of
-# the pull-request gate.
+# report-only. Both schemes run every Monday and on release tags, one job
+# each; a dispatch runs the scheme it names. RedactionEngine here runs the
+# engine package's suites on the simulator instead of the macOS host,
+# where the whole-package run stalls (engine-suite.yml). Twenty to forty
+# minutes per scheme. Not part of the pull-request gate.
 name: sim-suite
 
 on:
@@ -16,6 +16,10 @@ on:
         type: choice
         options: [ResectaApp, RedactionEngine]
         default: ResectaApp
+  # KEEP-ALIVE: GitHub disables a scheduled workflow after sixty days
+  # without a commit to the repository; any commit re-enables it.
+  schedule:
+    - cron: '0 9 * * 1' # Monday 09:00 UTC
   push:
     tags: ['v*']
 
@@ -23,7 +27,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sim-suite-${{ github.ref }}-${{ inputs.scheme || 'ResectaApp' }}
+  group: sim-suite-${{ github.ref }}-${{ inputs.scheme || 'both' }}
   cancel-in-progress: true
 
 defaults:
@@ -33,13 +37,18 @@ defaults:
 env:
   XCODEGEN_VERSION: 2.45.3
   XCODEGEN_SHA256: 0c90f4d28ca57335f9fa78cf5bf6dabfe20a232036dabe36de2eef79cb7c0878
-  SCHEME: ${{ inputs.scheme || 'ResectaApp' }}
 
 jobs:
   sim-suite:
-    name: sim-suite (${{ inputs.scheme || 'ResectaApp' }})
+    name: sim-suite (${{ matrix.scheme }})
     runs-on: macos-26
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        scheme: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.scheme || 'ResectaApp')) || fromJSON('["ResectaApp", "RedactionEngine"]') }}
+    env:
+      SCHEME: ${{ matrix.scheme }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -137,7 +146,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: sim-suite-logs-${{ env.SCHEME }}
+          name: sim-suite-logs-${{ matrix.scheme }}
           path: upload
           retention-days: 14
           if-no-files-found: warn
