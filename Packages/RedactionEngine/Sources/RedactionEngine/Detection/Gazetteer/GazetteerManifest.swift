@@ -10,6 +10,12 @@ import Foundation
 /// Built by `Scripts/gazetteer/build_bloom.py` at dev time.
 public struct GazetteerManifest: Codable, Sendable, Equatable {
 
+    /// The manifest `version` values this engine accepts — the single source
+    /// of truth for every loader that fences the manifest (`NameGazetteer`'s
+    /// two initializers read it here). The field is a semver String, so the
+    /// Int-range `LoaderVersionFence` does not apply; membership is the check.
+    public static let supportedVersions: Set<String> = ["1.0.0"]
+
     /// Semantic version of the gazetteer asset bundle (e.g. "1.0.0").
     public let version: String
 

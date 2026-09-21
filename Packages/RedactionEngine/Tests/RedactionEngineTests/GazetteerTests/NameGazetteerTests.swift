@@ -162,6 +162,20 @@ struct NameGazetteerTests {
 
     // MARK: - Version fence
 
+    @Test("Both initializers fence the manifest against one accepted set and agree on the shipped bundle")
+    func bothInitializersShareTheManifestFence() throws {
+        // The failable initializer is the production path (PIIDetector.init's
+        // default argument); it delegates to the throwing one, so the version
+        // fence below is the fence it runs. The accepted set is the manifest
+        // type's, and the shipped manifest is a member of it.
+        let manifestURL = try #require(Bundle.module.url(
+            forResource: "gazetteer-manifest", withExtension: "json", subdirectory: "Gazetteers"))
+        let shipped = try JSONDecoder().decode(GazetteerManifest.self, from: Data(contentsOf: manifestURL))
+        #expect(GazetteerManifest.supportedVersions.contains(shipped.version))
+        #expect(NameGazetteer() != nil, "the failable init must load the shipped bundle")
+        #expect(throws: Never.self) { _ = try NameGazetteer(throwingFromBundle: .module) }
+    }
+
     @Test("Version-fence rejects out-of-range manifest version")
     func versionFenceRejectsOutOfRange() throws {
         let tempBase = FileManager.default.temporaryDirectory
