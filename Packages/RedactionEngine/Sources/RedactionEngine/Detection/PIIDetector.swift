@@ -1682,16 +1682,24 @@ public struct PIIDetector: Sendable {
     /// Tokens the name path never surfaces as a name candidate on their own.
     /// Exact, case-sensitive, whole-candidate equality — nothing looser: a
     /// name that follows a role noun still surfaces (the prefix pass exists
-    /// for that), the bare role noun never does. The five are court and
-    /// licence furniture the tagger reads as given names when they open a
-    /// sentence or a label ("Plaintiff is a corporation, Business
-    /// Registration # …", "Reg # …", the "PP" / "Lic" / "DL" document labels).
-    /// They are ONE measured unit: added together and measured together on
-    /// the synthetic corpus, where they remove label-token false positives
-    /// and change no true positive. Any addition is its own measured change,
-    /// never a quiet edit here. Checked before the gazetteer query on both
-    /// tagger passes and on the prefix pass's assembled name.
-    static let nameStopTokens: Set<String> = ["Plaintiff", "Reg", "PP", "Lic", "DL"]
+    /// for that), the bare role noun never does. Two measured units: the five
+    /// court and licence label tokens the tagger reads as given names when
+    /// they open a sentence or a label ("Plaintiff is a corporation, Business
+    /// Registration # …", "Reg # …", the "PP" / "Lic" / "DL" document labels),
+    /// then the five furniture tokens — the honorific with and without its
+    /// period, two role nouns and the legal opener — that the tagger and the
+    /// prefix pass surface alone on furniture-dense pages ("Dr." before a
+    /// line break, "Patient reports …", "Pursuant to …", "Counsel for …").
+    /// Each unit was added together and measured together on the synthetic
+    /// corpus and its furniture profiles, where it removes label and
+    /// furniture false positives and changes no true positive. Any addition
+    /// is its own measured change, never a quiet edit here. Checked before
+    /// the gazetteer query on both tagger passes and on the prefix pass's
+    /// assembled name.
+    static let nameStopTokens: Set<String> = [
+        "Plaintiff", "Reg", "PP", "Lic", "DL",
+        "Dr.", "Dr", "Patient", "Pursuant", "Counsel",
+    ]
 
     // MARK: - Legal Prefix Heuristics
 
