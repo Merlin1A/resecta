@@ -21,9 +21,9 @@ public struct NameGazetteer: Sendable {
 
     // The manifest's `version` field is a semver String
     // (`"1.0.0"`, not an Int), so the standard `LoaderVersionFence.assert(...)`
-    // helper (Int / ClosedRange<Int>) doesn't apply. This uses Set<String>
-    // and inlines the membership check.
-    private static let supportedManifestVersions: Set<String> = ["1.0.0"]
+    // helper (Int / ClosedRange<Int>) doesn't apply. The accepted set lives on
+    // `GazetteerManifest` so both initializers here fence against one value.
+    private static var supportedManifestVersions: Set<String> { GazetteerManifest.supportedVersions }
 
     /// Surname Bloom filter (Census + Spanish + ParaNames + PopNames).
     public let surnameFilter: BloomFilter
@@ -43,37 +43,16 @@ public struct NameGazetteer: Sendable {
 
     // MARK: - Init
 
-    /// Load gazetteer from bundled resources.
-    /// Returns `nil` if any resource file is missing (safe for test contexts
-    /// where Bundle.module resources may not be available).
+    /// Load gazetteer from the shipped bundle.
+    /// Returns `nil` on any failure the throwing initializer reports —
+    /// missing resources, a decode failure, or a manifest version outside
+    /// `GazetteerManifest.supportedVersions`. This is the production path
+    /// (`PIIDetector.init`'s default argument), so it runs the same version
+    /// fence as `init(throwingFromBundle:)` by delegating to it.
     public init?() {
-        guard let surnameURL = Bundle.module.url(
-                  forResource: "surnames", withExtension: "bloom",
-                  subdirectory: "Gazetteers"),
-              let givenURL = Bundle.module.url(
-                  forResource: "given-names", withExtension: "bloom",
-                  subdirectory: "Gazetteers"),
-              let manifestURL = Bundle.module.url(
-                  forResource: "gazetteer-manifest", withExtension: "json",
-                  subdirectory: "Gazetteers")
-        else { return nil }
-
         do {
-            let surnameData = try Data(contentsOf: surnameURL)
-            let givenData = try Data(contentsOf: givenURL)
-            let manifestData = try Data(contentsOf: manifestURL)
-
-            self.surnameFilter = try BloomFilter(data: surnameData)
-            self.givenNameFilter = try BloomFilter(data: givenData)
-            // Manifest is decoded (not stored) so a malformed manifest file
-            // still fails this initializer, matching prior behavior.
-            _ = try JSONDecoder().decode(
-                GazetteerManifest.self, from: manifestData)
-            // Nickname sidecar is optional: its absence does not fail the init.
-            self.nicknameGazetteer = try? NicknameGazetteer(bundle: Bundle.module)
-            // The common-word curation sidecar is optional too: absent → no demotion.
-            self.commonWords = try? NameCommonWords(bundle: Bundle.module)
-        } catch {
+            try self.init(throwingFromBundle: .module)
+        } catch { // LegalPhrases:safe — Swift catch clause, not English
             return nil
         }
     }

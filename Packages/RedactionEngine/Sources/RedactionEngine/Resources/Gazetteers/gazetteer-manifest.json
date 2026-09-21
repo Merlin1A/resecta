@@ -1,4 +1,81 @@
 {
+  "assets": [
+    {
+      "bytes": 4240,
+      "path": "Audit/rule-catalog.json",
+      "sha256": "1168dfe6b4a9687f2905579c7adb958b3fb46b47aa09443e4b3fa0a5f4e2da8d"
+    },
+    {
+      "bytes": 5490,
+      "path": "Classifier/context-scorer.json",
+      "sha256": "fecd89b6a790d9895e7081e99b448d9245096aa435e2389252f7c5f5eab2acb8"
+    },
+    {
+      "bytes": 9416,
+      "path": "Classifier/doctype-keywords.json",
+      "sha256": "53d5f472fc77fe47e574f402c260f3dd63d5cdc499453f8fd719a9e095759181"
+    },
+    {
+      "bytes": 826,
+      "path": "Classifier/doctype-temperature.json",
+      "sha256": "329783c394e4bda5881c44ea2562640ba66ea793cf2a5b7702413a4c1ed06be2"
+    },
+    {
+      "bytes": 3234,
+      "path": "Classifier/preset-thresholds.json",
+      "sha256": "cdbd1e406e76442c299eeea84403d3e9dc722290cb1d85f8488374f3a43b6895"
+    },
+    {
+      "bytes": 2339203,
+      "path": "Gazetteers/address_components.json",
+      "sha256": "d47ac703558c9fc2d9bfd79c6aea67e220381d4ec9fb1442a642227a645e669d"
+    },
+    {
+      "bytes": 48340,
+      "path": "Gazetteers/context-keywords.json",
+      "sha256": "99723049ba4b4121b54c597cbcfbb661e4d81a7a13cbea5268d4ed96b1c5159f"
+    },
+    {
+      "bytes": 46895,
+      "path": "Gazetteers/dl_patterns.json",
+      "sha256": "1ceec69e3bc7f5d523f05c17318a584b640c1285daef8535f66c7f29c3a4647b"
+    },
+    {
+      "bytes": 20971488,
+      "path": "Gazetteers/given-names.bloom",
+      "sha256": "6d855ed20cbe4665cdf3bcd95defe87cd22723e8f9b32959d59ef7ebda87dfa8"
+    },
+    {
+      "bytes": 307724,
+      "path": "Gazetteers/institutions.json",
+      "sha256": "eef8a3661ca52829e0b5a28c3c479b114cb1e781b638086de8a24053cf0bd487"
+    },
+    {
+      "bytes": 9165,
+      "path": "Gazetteers/name-common-words.json",
+      "sha256": "a3c2ba8d135a7bbeecd85a986bc3aad48a44a7c7c1ee190c5136c8cc1050ffc2"
+    },
+    {
+      "bytes": 51425,
+      "path": "Gazetteers/negative-context.json",
+      "sha256": "dadedcab7de6b101f4275b4a1bdb7d2f17fbd275ba869ea565947405a4d6cc83"
+    },
+    {
+      "bytes": 23039,
+      "path": "Gazetteers/passport_patterns.json",
+      "sha256": "6e2367fb6a3be3e958d21f28d7194406ff2e5ad9937f8eb9e49433cadf94ea52"
+    },
+    {
+      "bytes": 21211748,
+      "path": "Gazetteers/surnames.bloom",
+      "sha256": "6dbe8170b007cfc4b8e7ce71d32cf6e1c850a8fcac8c8fc399c9e0c2a09c2dcc"
+    },
+    {
+      "bytes": 15883,
+      "path": "Gazetteers/zip_scf_states.json",
+      "sha256": "2345e52f2c28fdfb47215db6b361f70821af897ba9347e4337b656a832330fcb"
+    }
+  ],
   "filters": [
     {
       "builtAt": "2026-04-16T00:00:00Z",
@@ -37,5 +114,5 @@
   ],
   "hashAlgorithm": "MurmurHash3_x64_128",
   "seed": 20260416,
-  "version": "1.0.0"
+  "version": "1.1.0"
 }

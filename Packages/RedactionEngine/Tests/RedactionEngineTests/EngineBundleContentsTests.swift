@@ -37,6 +37,40 @@ struct EngineBundleContentsTests {
         #expect(name <= 0.90)
     }
 
+    @Test("The shipped manifest lists every bundled asset, each digest and size match, and the corpus is trusted")
+    func shippedManifestListsEveryAssetAndVerifies() throws {
+        // The shipped bundle's own verdict (memoized in the engine module).
+        let verdict = GazetteerTrust.shippedCorpusVerdict()
+        #expect(verdict.isTrusted, "\(verdict)")
+        let report = try #require(verdict.report)
+        #expect(report.ungated.isEmpty, "\(report.ungated)")
+        // Fifteen installed assets: the two Bloom filters and eight JSON tables
+        // under Gazetteers/, the four Classifier/ files, the Audit/ catalog —
+        // everything except the manifest, its signature and the public key.
+        #expect(report.verifiedCount == 15)
+
+        // The same tree as the test target carries it: every entry's file
+        // present with the recorded size; the trust-gated set fully listed.
+        let manifestURL = try #require(Bundle.module.url(
+            forResource: "gazetteer-manifest", withExtension: "json", subdirectory: "Gazetteers"))
+        let manifest = try JSONDecoder().decode(GazetteerManifest.self, from: Data(contentsOf: manifestURL))
+        let entries = try #require(manifest.assets)
+        #expect(GazetteerManifest.supportedVersions.contains(manifest.version))
+        #expect(entries.count == 15)
+        #expect(entries.map(\.path) == entries.map(\.path).sorted(), "entries are sorted by path")
+        let listed = Set(entries.map(\.path))
+        let gatedShipped = AssetIntegrity.trustGatedPaths.subtracting(["Gazetteers/nicknames.json"])
+        #expect(gatedShipped.isSubset(of: listed), "\(gatedShipped.subtracting(listed))")
+        #expect(!listed.contains("Gazetteers/gazetteer-manifest.json"))
+        #expect(!listed.contains("Gazetteers/gazetteer_manifest.sig"))
+        #expect(!listed.contains("Gazetteers/manifest_public_key.pem"))
+        let root = try #require(Bundle.module.resourceURL)
+        for entry in entries {
+            let size = try FileManager.default.attributesOfItem(atPath: root.appending(path: entry.path).path())[.size] as? Int
+            #expect(size == entry.bytes, "\(entry.path)")
+        }
+    }
+
     @Test("context-scorer.json loads as the calibrated (non-identity) scorer")
     func contextScorerLoadsAsCalibratedNonIdentity() throws {
         // loadFromEngineBundle() falls open to .identity on any missing-resource /

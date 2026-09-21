@@ -267,26 +267,32 @@ assets. The contract between the two repos is enforced, not eyeballed:
   SHA-256 against a checked-in manifest, build targets make no network calls,
   and a PII-pattern guard is wired into the repo's verify script so cleanup
   rules are enforced by tooling rather than by memory.
-- At load, the app verifies an Ed25519 signature over the gazetteer manifest
-  (`Detection/GazetteerLoader.swift`): detached signature, bundled public
-  key, both produced by the pipeline's signing step. Stated plainly: **the
-  signature covers the manifest file itself** — it proves the manifest is the
-  one the pipeline signed, and it does not hash every asset's bytes at load.
-  Extending the manifest to carry per-asset content hashes is on the deferred
-  list. On any verification failure, detection degrades with a visible banner
-  — never silently.
-- What that verdict governs, precisely: the manifest enumerates the two Bloom
-  filters, and one memoized verdict (`Detection/Gazetteer/GazetteerTrust.swift`,
-  computed once per process) is consulted by both loading paths — the
-  diagnostics loader and the public detector initializer's defaults. On a
-  failed verification, five loaders are withheld and reported by name: the
-  name Bloom filters, the driver's-license and passport pattern gazetteers,
-  the context-keywords loader, and the negative-context gazetteer. Three
-  reference tables load outside the signature by design and stay live —
-  the institution gazetteer, the address-components gazetteer, and the
-  ZIP-to-state table; their own load failures still report through the
-  valid-path diagnostics. The degraded-detection banner names exactly the
-  withheld set.
+- At first load, the app verifies an Ed25519 signature over the gazetteer
+  manifest (`Detection/GazetteerLoader.swift`): detached signature, bundled
+  public key, both produced by the pipeline's signing step. The signed
+  manifest lists every other bundled detection asset with its SHA-256 and
+  size, and each file is checked against its entry once per process
+  (`Detection/Gazetteer/AssetIntegrity.swift`). Stated plainly: **runtime
+  tamper detection of the installed app is the app-bundle code signature,
+  which seals these same files; the manifest's per-asset digests are
+  pipeline-to-bundle provenance**, verified at first load, so the bytes the
+  detector reads are the bytes the pipeline shipped. On any verification
+  failure, detection degrades with a visible banner — never silently.
+- What that verdict governs, precisely: one memoized verdict
+  (`Detection/Gazetteer/GazetteerTrust.swift`, computed once per process) is
+  consulted by both loading paths — the diagnostics loader and the public
+  detector initializer's defaults. On a failed signature, or a digest failure
+  on any file the gated loaders read, five loaders are withheld and reported
+  by name: the name Bloom filters (with their sidecars), the driver's-license
+  and passport pattern gazetteers, the context-keywords loader, and the
+  negative-context gazetteer. Three reference tables load outside that
+  verdict by design and stay live — the institution gazetteer, the
+  address-components gazetteer, and the ZIP-to-state table; a digest failure
+  on one of them, or on a Classifier or Audit asset, reports under that
+  asset's own diagnostic and raises the banner while the asset's fail-open
+  fallback stands. Every loader that decodes a versioned table fences its wire
+  version, so a table from a future or stale schema is refused by name rather
+  than read. The degraded-detection banner names exactly the withheld set.
 - One asset additionally carries a load-time content check: the context-scorer
   weights file is SHA-256-hashed at load against a compiled-in constant, with
   an identity-scorer fallback on mismatch. That fallback — and the equivalent

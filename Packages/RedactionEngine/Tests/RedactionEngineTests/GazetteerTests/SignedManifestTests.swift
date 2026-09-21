@@ -72,13 +72,58 @@ struct SignedManifestTests {
     /// the production manifest produced by the bloom builder.
     static let sampleManifestBytes: Data = Data("""
         {
+          "assets": [],
           "filters": [],
           "hashAlgorithm": "MurmurHash3_x64_128",
           "seed": 20260416,
-          "version": "1.0.0"
+          "version": "1.1.0"
         }
 
         """.utf8)
+
+    /// A signed fixture whose manifest lists `listed` under `assets[]` and
+    /// whose tree holds `files` (bundle-relative path → bytes). Entries are
+    /// computed from `files` unless overridden in `listed`, so a test states
+    /// only the discrepancy it is about.
+    static func makeSignedAssetFixture(
+        files: [String: Data],
+        listed: [String: (sha256: String, bytes: Int)]? = nil,
+        version: String = "1.1.0",
+        includeAssetsSection: Bool = true
+    ) throws -> (bundle: Bundle, root: URL) {
+        let root = Self.sandboxRoot
+            .appending(path: "assets-fixture-\(UUID().uuidString)", directoryHint: .isDirectory)
+        for (path, bytes) in files {
+            let url = root.appending(path: path)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try bytes.write(to: url)
+        }
+        var entries: [[String: Any]] = []
+        let table = listed ?? files.mapValues { bytes in
+            (sha256: SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined(), bytes: bytes.count)
+        }
+        for path in table.keys.sorted() {
+            let entry = table[path]!
+            entries.append(["path": path, "sha256": entry.sha256, "bytes": entry.bytes])
+        }
+        var manifest: [String: Any] = [
+            "filters": [], "hashAlgorithm": "MurmurHash3_x64_128", "seed": 20260416, "version": version,
+        ]
+        if includeAssetsSection { manifest["assets"] = entries }
+        let manifestBytes = try JSONSerialization.data(
+            withJSONObject: manifest, options: [.sortedKeys, .prettyPrinted])
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let signature = try privateKey.signature(for: manifestBytes)
+        let gazetteers = root.appending(path: "Gazetteers", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: gazetteers, withIntermediateDirectories: true)
+        try manifestBytes.write(to: gazetteers.appending(path: "gazetteer-manifest.json"))
+        try Self.encodeSignaturePEM(signature).write(to: gazetteers.appending(path: "gazetteer_manifest.sig"))
+        try Self.encodePublicKeyPEM(privateKey.publicKey)
+            .write(to: gazetteers.appending(path: "manifest_public_key.pem"))
+        guard let bundle = Bundle(path: root.path()) else { throw FixtureError.bundleConstructionFailed }
+        return (bundle, root)
+    }
 
     /// Encode an Ed25519 public key in the same SubjectPublicKeyInfo PEM
     /// envelope that the Python `cryptography` library produces. The DER
@@ -232,6 +277,116 @@ struct SignedManifestTests {
         } catch { // LegalPhrases:safe — Swift catch clause, not English
             Issue.record("expected PipelineError, got \(type(of: error)): \(error)")
         }
+    }
+
+    // MARK: - The assets[] section (per-asset digests behind the signature)
+
+    @Test("Listed assets that match: the corpus is trusted and the report counts them")
+    func matchingAssetsAreTrusted() throws {
+        let (bundle, root) = try Self.makeSignedAssetFixture(files: [
+            "Gazetteers/dl_patterns.json": Data("gated".utf8),
+            "Classifier/preset-thresholds.json": Data("ungated".utf8),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let verdict = GazetteerTrust.corpusVerdict(bundle: bundle)
+        #expect(verdict.isTrusted)
+        #expect(verdict.report == AssetIntegrity.Report(gated: [], ungated: [], verifiedCount: 2))
+    }
+
+    @Test("A trust-gated asset whose bytes differ from its signed digest withholds the corpus")
+    func gatedDigestMismatchWithholds() throws {
+        let (bundle, root) = try Self.makeSignedAssetFixture(
+            files: ["Gazetteers/dl_patterns.json": Data("shipped".utf8)],
+            listed: ["Gazetteers/dl_patterns.json": (sha256: String(repeating: "0", count: 64), bytes: 7)])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let verdict = GazetteerTrust.corpusVerdict(bundle: bundle)
+        #expect(!verdict.isTrusted)
+        #expect(verdict.report?.gated == [.digestMismatch(path: "Gazetteers/dl_patterns.json")])
+        #expect(verdict.failureReason?.contains("SHA-256 differs") == true)
+    }
+
+    @Test("A trust-gated asset whose size differs is refused before it is hashed")
+    func gatedSizeMismatchWithholds() throws {
+        let (bundle, root) = try Self.makeSignedAssetFixture(
+            files: ["Gazetteers/surnames.bloom": Data("bloom".utf8)],
+            listed: ["Gazetteers/surnames.bloom": (sha256: String(repeating: "0", count: 64), bytes: 99)])
+        defer { try? FileManager.default.removeItem(at: root) }
+        #expect(GazetteerTrust.corpusVerdict(bundle: bundle).report?.gated
+                == [.sizeMismatch(path: "Gazetteers/surnames.bloom", expected: 99, actual: 5)])
+    }
+
+    @Test("A listed trust-gated asset that is not bundled withholds the corpus")
+    func gatedMissingWithholds() throws {
+        let (bundle, root) = try Self.makeSignedAssetFixture(
+            files: [:],
+            listed: ["Gazetteers/context-keywords.json": (sha256: String(repeating: "a", count: 64), bytes: 1)])
+        defer { try? FileManager.default.removeItem(at: root) }
+        #expect(GazetteerTrust.corpusVerdict(bundle: bundle).report?.gated
+                == [.missing(path: "Gazetteers/context-keywords.json")])
+    }
+
+    @Test("A trust-gated file present in the bundle but absent from assets[] withholds the corpus")
+    func gatedUnlistedWithholds() throws {
+        let (bundle, root) = try Self.makeSignedAssetFixture(
+            files: ["Gazetteers/negative-context.json": Data("swapped in".utf8)], listed: [:])
+        defer { try? FileManager.default.removeItem(at: root) }
+        #expect(GazetteerTrust.corpusVerdict(bundle: bundle).report?.gated
+                == [.unlisted(path: "Gazetteers/negative-context.json")])
+    }
+
+    @Test("An ungated asset whose bytes differ is reported, not withheld")
+    func ungatedDigestMismatchIsReportedOnly() throws {
+        let (bundle, root) = try Self.makeSignedAssetFixture(
+            files: [
+                "Gazetteers/dl_patterns.json": Data("gated".utf8),
+                "Audit/rule-catalog.json": Data("catalog".utf8),
+            ],
+            listed: [
+                "Gazetteers/dl_patterns.json": (
+                    sha256: SHA256.hash(data: Data("gated".utf8)).map { String(format: "%02x", $0) }.joined(),
+                    bytes: 5),
+                "Audit/rule-catalog.json": (sha256: String(repeating: "f", count: 64), bytes: 7),
+            ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let verdict = GazetteerTrust.corpusVerdict(bundle: bundle)
+        #expect(verdict.isTrusted)
+        #expect(verdict.report?.ungated == [.digestMismatch(path: "Audit/rule-catalog.json")])
+        #expect(AssetIntegrity.diagnosticsCase(forPath: "Audit/rule-catalog.json") == .assetIntegrity)
+        #expect(AssetIntegrity.diagnosticsCase(forPath: "Classifier/preset-thresholds.json") == .presetThresholds)
+    }
+
+    @Test("A signed manifest at the previous version is refused by the fence, not decoded around")
+    func previousVersionIsRefused() throws {
+        let (bundle, root) = try Self.makeSignedAssetFixture(
+            files: [:], version: "1.0.0", includeAssetsSection: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let verdict = GazetteerTrust.corpusVerdict(bundle: bundle)
+        #expect(!verdict.isTrusted)
+        #expect(verdict.report?.gated
+                == [.unsupportedManifestVersion(actual: "1.0.0", supported: GazetteerManifest.supportedVersions)])
+    }
+
+    @Test("A signed manifest at the current version without assets[] is refused")
+    func missingAssetSectionIsRefused() throws {
+        let (bundle, root) = try Self.makeSignedAssetFixture(files: [:], includeAssetsSection: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        #expect(GazetteerTrust.corpusVerdict(bundle: bundle).report?.gated
+                == [.noAssetSection(version: "1.1.0")])
+    }
+
+    @Test("An invalid signature stops before the digests are read")
+    func invalidSignatureSkipsDigests() throws {
+        let (bundle, root) = try Self.makeSignedAssetFixture(
+            files: ["Gazetteers/dl_patterns.json": Data("gated".utf8)])
+        defer { try? FileManager.default.removeItem(at: root) }
+        // Re-sign nothing: append a byte to the manifest so the signature fails.
+        let manifestURL = root.appending(path: "Gazetteers/gazetteer-manifest.json")
+        var bytes = try Data(contentsOf: manifestURL)
+        bytes.append(Data(" ".utf8))
+        try bytes.write(to: manifestURL)
+        let verdict = GazetteerTrust.corpusVerdict(bundle: bundle)
+        #expect(verdict == .signatureInvalid)
+        #expect(verdict.report == nil)
     }
 
     @Test("Degrade banner surfaces on failure: loadWithDiagnostics flags all gazetteers + sets didDegrade")

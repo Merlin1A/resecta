@@ -338,12 +338,33 @@ public struct DocumentTypeClassifier: Sendable {
         do {
             let bytes = try Foundation.Data(contentsOf: url)
             let wire = try JSONDecoder().decode(WireFormat.self, from: bytes)
+            // Wire-version fence (the same shape every sibling loader runs):
+            // a future or stale table is refused by name here rather than
+            // decoded into an empty classifier by accident.
+            try LoaderVersionFence.assert(
+                actual: wire.version,
+                supported: supportedWireVersions,
+                assetName: "doctype-keywords",
+                logger: logger,
+                throwing: { LoaderError.unsupportedVersion(actual: $0, supported: $1) }
+            )
             return (try wire.toData(), nil)
+        } catch let error as LoaderError { // LegalPhrases:safe — Swift catch clause, not English
+            return (Data(termCapPerDoc: 1, perClass: [:], isEmpty: true),
+                    "doctype-keywords.json rejected: \(String(describing: error))")
         } catch {
             logger.warning("doctype-keywords.json decode failed; classifier returns .generic: \(String(describing: error), privacy: .public)")
             return (Data(termCapPerDoc: 1, perClass: [:], isEmpty: true),
                     "doctype-keywords.json decode failed: \(String(describing: error))")
         }
+    }
+
+    /// `WireFormat.version` values this decoder understands
+    /// (`DataPipeline/schemas/doctype_keywords.schema.json`).
+    static let supportedWireVersions: ClosedRange<Int> = 1...1
+
+    enum LoaderError: Error {
+        case unsupportedVersion(actual: Int, supported: ClosedRange<Int>)
     }
 }
 

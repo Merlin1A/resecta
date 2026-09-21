@@ -61,15 +61,32 @@ public struct CalibratedScorer: Sendable {
         do {
             let data = try Data(contentsOf: url)
             let decoded = try JSONDecoder().decode(TemperaturePayload.self, from: data)
+            // Wire-version fence: a payload from a future or stale schema
+            // falls back to the identity temperature by name.
+            try LoaderVersionFence.assert(
+                actual: decoded.version,
+                supported: supportedWireVersions,
+                assetName: "doctype-temperature",
+                logger: Self.logger,
+                throwing: { LoaderError.unsupportedVersion(actual: $0, supported: $1) }
+            )
             guard decoded.temperature.isFinite, decoded.temperature > 0 else {
                 Self.logger.warning("doctype-temperature.json has non-positive/NaN T; using identity")
                 return (1.0, "doctype-temperature.json has non-positive/NaN T")
             }
             return (decoded.temperature, nil)
         } catch {
-            Self.logger.warning("doctype-temperature.json unreadable; using identity (metadata: \(error.localizedDescription, privacy: .public))")
-            return (1.0, "doctype-temperature.json unreadable: \(error.localizedDescription)")
+            Self.logger.warning("doctype-temperature.json unreadable; using identity (metadata: \(String(describing: error), privacy: .public))")
+            return (1.0, "doctype-temperature.json unreadable: \(String(describing: error))")
         }
+    }
+
+    /// `TemperaturePayload.version` values this decoder understands
+    /// (`DataPipeline/schemas/doctype_temperature.schema.json`).
+    static let supportedWireVersions: ClosedRange<Int> = 1...1
+
+    enum LoaderError: Error {
+        case unsupportedVersion(actual: Int, supported: ClosedRange<Int>)
     }
 
     private struct TemperaturePayload: Decodable {

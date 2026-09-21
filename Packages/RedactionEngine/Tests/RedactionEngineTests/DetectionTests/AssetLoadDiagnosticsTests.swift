@@ -54,8 +54,9 @@ struct AssetLoadDiagnosticsTests {
     }
 
     /// A scratch copy of the full engine resource layout (Gazetteers +
-    /// Classifier) so `PIIDetector.loadWithDiagnostics(bundle:)` runs its
-    /// valid-signature path against it. Each call uses a fresh directory —
+    /// Classifier + Audit — the whole tree the signed manifest lists) so
+    /// `PIIDetector.loadWithDiagnostics(bundle:)` runs its trusted path
+    /// against it. Each call uses a fresh directory —
     /// `Bundle` caches by path, so altered fixtures always get their own
     /// bundle instance.
     private static func makeScratchEngineBundle() throws -> (bundle: Bundle, root: URL) {
@@ -66,7 +67,7 @@ struct AssetLoadDiagnosticsTests {
                 directoryHint: .isDirectory
             )
         try FileManager.default.createDirectory(at: tempBase, withIntermediateDirectories: true)
-        for subdir in ["Gazetteers", "Classifier"] {
+        for subdir in ["Gazetteers", "Classifier", "Audit"] {
             try FileManager.default.copyItem(
                 at: resourceRoot.appending(path: subdir, directoryHint: .isDirectory),
                 to: tempBase.appending(path: subdir, directoryHint: .isDirectory)
@@ -142,6 +143,56 @@ struct AssetLoadDiagnosticsTests {
     }
 
     // MARK: - Detector integration (the degraded-detection banner path)
+
+    // MARK: - Wire-version fences (a table from a future or stale schema is refused by name)
+
+    @Test("Doctype temperature: an out-of-range wire version reports and falls back to T=1.0")
+    func doctypeTemperatureVersionFence() throws {
+        for version in [0, 99] {
+            let payload = Data(#"{"version": \#(version), "temperature": 1.23}"#.utf8)
+            let bundle = try Self.makeClassifierBundle(files: ["doctype-temperature": payload])
+            let result = CalibratedScorer.loadTemperatureWithDiagnostics(from: bundle)
+            #expect(result.temperature == 1.0, "version \(version) must fall back to identity")
+            #expect(result.failureReason?.contains("unsupportedVersion") == true,
+                    "version \(version) must be refused by the fence, not decoded")
+        }
+    }
+
+    @Test("Preset thresholds: an out-of-range wire version reports and falls back to built-in defaults")
+    func presetThresholdsVersionFence() throws {
+        let canonical = try Self.canonicalAssetData("preset-thresholds")
+        for version in [0, 99] {
+            let object = try JSONSerialization.jsonObject(with: canonical)
+            var dict = try #require(object as? [String: Any])
+            dict["version"] = version
+            let rewritten = try JSONSerialization.data(withJSONObject: dict, options: [.sortedKeys])
+            let bundle = try Self.makeClassifierBundle(files: ["preset-thresholds": rewritten])
+            let result = PresetThresholdBundle.loadWithDiagnostics(from: bundle)
+            #expect(result.bundle == .builtInDefaults, "version \(version) must fall back to the defaults")
+            #expect(result.failureReason?.contains("unsupportedVersion") == true,
+                    "version \(version) must be refused by the fence, not decoded")
+        }
+    }
+
+    @Test("Doctype keywords: an out-of-range wire version reports and the classifier returns .generic")
+    func doctypeKeywordsVersionFence() throws {
+        let canonical = try Self.canonicalAssetData("doctype-keywords")
+        for version in [0, 99] {
+            let object = try JSONSerialization.jsonObject(with: canonical)
+            var dict = try #require(object as? [String: Any])
+            dict["version"] = version
+            let rewritten = try JSONSerialization.data(withJSONObject: dict, options: [.sortedKeys])
+            let bundle = try Self.makeClassifierBundle(files: ["doctype-keywords": rewritten])
+            let (_, diagnostic) = DocumentTypeClassifier.loadWithDiagnostics(bundle: bundle)
+            let reason = diagnostic?.failureReasons[
+                GazetteerLoadDiagnostics.Gazetteer.documentTypeClassifier.rawValue]
+            #expect(reason?.contains("unsupportedVersion") == true,
+                    "version \(version) must be refused by the fence, not decoded silently")
+        }
+        // The shipped table still decodes clean.
+        let healthy = try Self.makeClassifierBundle(files: ["doctype-keywords": canonical])
+        #expect(DocumentTypeClassifier.loadWithDiagnostics(bundle: healthy).diagnostic == nil)
+    }
 
     @Test("Altered quality assets surface through detector diagnostics; healthy bundle stays silent")
     func alteredAssetsSurfaceThroughDetectorDiagnostics() throws {
