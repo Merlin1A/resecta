@@ -1710,6 +1710,24 @@ public struct PIIDetector: Sendable {
         "Senator", "Rep.", "Honorable", "Reverend", "Rev."
     ]
 
+    /// True when the text right after a prefix hit opens with a sentence
+    /// boundary: optional horizontal whitespace, one of `.` `;` `:`, optional
+    /// horizontal whitespace, then a line break. Anything else — a name, a
+    /// bare line break, a comma, a dash — is not a boundary.
+    private static func sentenceBoundaryOpens(_ window: String) -> Bool {
+        var sawTerminator = false
+        for ch in window {
+            if ch == " " || ch == "\t" { continue }
+            if ch.isNewline { return sawTerminator }
+            if !sawTerminator, ch == "." || ch == ";" || ch == ":" {
+                sawTerminator = true
+                continue
+            }
+            return false
+        }
+        return false
+    }
+
     private func scanLegalPrefixes(in text: String) -> [PIIMatch] {
         var results: [PIIMatch] = []
         let nsText = text as NSString
@@ -1734,8 +1752,15 @@ public struct PIIDetector: Sendable {
                 let afterRange = NSRange(location: afterPrefix, length: min(50, remaining))
                 let trimSet = CharacterSet.whitespacesAndNewlines
                     .union(CharacterSet(charactersIn: ":,;.-—–"))
-                let afterText = nsText.substring(with: afterRange)
-                    .trimmingCharacters(in: trimSet)
+                let window = nsText.substring(with: afterRange)
+                // A sentence boundary right after the prefix — `.` / `;` / `:`
+                // and then a line break — ends the reading before the trim:
+                // the next line's first capitalised word opens a new sentence
+                // and is not the name after the prefix. A bare line break or
+                // same-line punctuation still reaches the trim below.
+                let afterText = Self.sentenceBoundaryOpens(window)
+                    ? ""
+                    : window.trimmingCharacters(in: trimSet)
 
                 // Extract first 1-3 capitalized words
                 let words = afterText.split(separator: " ", maxSplits: 3)
