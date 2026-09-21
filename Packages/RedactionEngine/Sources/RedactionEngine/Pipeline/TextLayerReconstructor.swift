@@ -78,30 +78,43 @@ public enum TextLayerReconstructor {
     ///
     /// - Parameters:
     ///   - context: The CGPDFContext for the current page (between beginPDFPage/endPDFPage).
-    ///   - entries: Surviving characters from the character filter.
-    ///   - pageWidth: Width of the output page in points — bounds the
-    ///     assembled-line fit clamp.
-    ///   - redactionRects: Redaction rectangles in PDF-point-space; a
-    ///     bridge never crosses one (Layer 6 would rightly flag a
-    ///     drawn space inside a region).
+    ///   - entries: Surviving characters from the character filter, in
+    ///     OUTPUT-page (displayed) coordinates.
+    ///   - pageSize: The displayed output page size in points. On an
+    ///     unrotated page only the width is read (it bounds the
+    ///     assembled-line fit clamp); on a rotated page both sides carry the
+    ///     entries into the source frame.
+    ///   - redactionRects: Redaction rectangles in PDF-point-space (the
+    ///     displayed frame); a bridge never crosses one (Layer 6 would
+    ///     rightly flag a drawn space inside a region).
+    ///   - rotation: The source page's `/Rotate`. On a page stored with a
+    ///     rotation the lines are assembled in the SOURCE frame
+    ///     (`sourceFrameLines`) and each is drawn under a rotation of the
+    ///     graphics state about its displayed origin, so every drawn line
+    ///     runs along its source line on the rotated raster and the layer
+    ///     reads back in the source's order. Rotation 0 is the unchanged
+    ///     path: no transform is emitted.
     ///
-    /// The dead `pageHeight` parameter is removed — Y stays
-    /// source-aligned (per-line origins) and nothing in this method consumed
-    /// page height. Output pages are zero-origin (the canonical coordinate
-    /// contract), so the layout works purely in output-page space.
+    /// Output pages are zero-origin (the canonical coordinate contract), so
+    /// the layout works purely in page space: Y stays source-aligned
+    /// (per-line origins) and nothing here consumes the page height on an
+    /// unrotated page.
     public static func drawInvisibleTextLayer(
         context: CGContext,
         entries: [CharacterInfo],
-        pageWidth: CGFloat,
-        redactionRects: [CGRect] = []
+        pageSize: CGSize,
+        redactionRects: [CGRect] = [],
+        rotation: Int = 0
     ) {
         guard !entries.isEmpty else { return }
 
         // PDF Tr mode 3 — text is invisible but selectable
         context.setTextDrawingMode(.invisible)
 
-        let lines = layoutLines(
-            entries, pageWidth: pageWidth, redactionRects: redactionRects)
+        let frame = PageFrame(rotation: rotation, displayedSize: pageSize)
+        let lines = sourceFrameLines(
+            entries, redactionRects: redactionRects, frame: frame
+        ).map(\.line)
         for line in lines {
             context.saveGState()
             context.textMatrix = .identity
@@ -116,10 +129,24 @@ public enum TextLayerReconstructor {
                 string: line.text, attributes: attrs)
             let ctLine = CTLineCreateWithAttributedString(attrString)
 
-            // Y stays source-aligned so the invisible layer
-            // overlays the rasterized image (visible-region search still
-            // resolves per-character).
-            context.textPosition = line.origin
+            if frame.isUnrotated {
+                // Y stays source-aligned so the invisible layer
+                // overlays the rasterized image (visible-region search still
+                // resolves per-character).
+                context.textPosition = line.origin
+            } else {
+                // The line's origin is a SOURCE-frame point. Rotate the
+                // graphics state about its displayed position and draw at
+                // zero with an identity text matrix: the glyphs advance
+                // along the rotated axis with one per-glyph box each, in
+                // draw order, on every rotation. (A rotated TEXT matrix
+                // instead reads back paired two-glyph boxes at 90°/270° and
+                // loses glyphs at 180° — measured on this platform.)
+                let origin = frame.displayedPoint(line.origin)
+                context.translateBy(x: origin.x, y: origin.y)
+                context.rotate(by: frame.displayedAngle)
+                context.textPosition = .zero
+            }
             CTLineDraw(ctLine, context)
 
             context.restoreGState()
@@ -328,6 +355,33 @@ public enum TextLayerReconstructor {
         return result
     }
 
+    /// The line assembly in the page's SOURCE frame. On an unrotated page
+    /// this is `layoutLinesWithSources` as is. On a page stored with a
+    /// rotation the entries' bounds and the redaction rects are carried into
+    /// the source frame first — every source line is horizontal there, so
+    /// the assembler's contract holds (one band per source line, one pitch
+    /// per band, bridges along the line, the fit clamp against the SOURCE
+    /// page width) — and the lines come back with SOURCE-frame origins for
+    /// the caller to rotate. The horizontal assembler run on the displayed
+    /// frame of a 90°/270° page saw every source line as a vertical run,
+    /// pooled glyphs of many source lines into each band and ran the
+    /// assembled line off the page.
+    static func sourceFrameLines(
+        _ entries: [CharacterInfo],
+        redactionRects: [CGRect],
+        frame: PageFrame
+    ) -> [SourcedTextLayerLine] {
+        guard !frame.isUnrotated else {
+            return layoutLinesWithSources(
+                entries, pageWidth: frame.displayedSize.width,
+                redactionRects: redactionRects)
+        }
+        return layoutLinesWithSources(
+            entries.map(frame.sourceEntry),
+            pageWidth: frame.sourceSize.width,
+            redactionRects: redactionRects.map(frame.sourceRect))
+    }
+
     // MARK: - The drawn-cell rule
 
     /// Upper bound on re-flow passes of `validateSurvivors`. A pass that
@@ -355,6 +409,10 @@ public enum TextLayerReconstructor {
     /// A cell that only crosses a region edge is NOT returned: that is
     /// Layer 6's graze note, a positional observation about content that
     /// stays outside.
+    ///
+    /// The rule reads the frame the entries are given in — the displayed
+    /// frame of an unrotated page, or the source frame a rotated page's
+    /// entries are carried into by `inRegionDrawnGlyphIndices(entries:regionShapes:frame:)`.
     static func inRegionDrawnGlyphIndices(
         entries: [CharacterInfo],
         pageWidth: CGFloat,
@@ -396,6 +454,26 @@ public enum TextLayerReconstructor {
         return hits
     }
 
+    /// The drawn-cell rule in the page's SOURCE frame: on a page stored
+    /// with a rotation the entries and the shapes are carried there first
+    /// (a rigid map — the drawn cell, its core and the centre test read the
+    /// same in either frame), so the rule sees the layout the writer draws.
+    static func inRegionDrawnGlyphIndices(
+        entries: [CharacterInfo],
+        regionShapes: [RegionShape],
+        frame: PageFrame
+    ) -> IndexSet {
+        guard !frame.isUnrotated else {
+            return inRegionDrawnGlyphIndices(
+                entries: entries, pageWidth: frame.displayedSize.width,
+                regionShapes: regionShapes)
+        }
+        return inRegionDrawnGlyphIndices(
+            entries: entries.map(frame.sourceEntry),
+            pageWidth: frame.sourceSize.width,
+            regionShapes: regionShapes.map(frame.sourceShape))
+    }
+
     /// Rect-only form of `inRegionDrawnGlyphIndices(entries:pageWidth:regionShapes:)`.
     static func inRegionDrawnGlyphIndices(
         entries: [CharacterInfo],
@@ -421,26 +499,23 @@ public enum TextLayerReconstructor {
     /// breach: a dropped glyph is one the searchable layer would otherwise
     /// have placed inside a redaction.
     ///
-    /// Not applied on a page stored with a rotation (`pageRotation % 360 !=
-    /// 0`): there today's band layout is not geometrically faithful — the
-    /// source lines run vertically in output space and the horizontal
-    /// assembler pools glyphs of many source lines into one band — so the
-    /// rule would drop displaced glyphs by the hundreds without making the
-    /// page verify. The gate lifts when the layout is assembled in the
-    /// source frame.
+    /// Runs in the page's SOURCE frame (`frame`): on a page stored with a
+    /// rotation the layout the writer draws is the source-frame assembly,
+    /// so the rule reads that assembly and drops what it would draw inside
+    /// a region there — nothing more. (The former displayed-frame assembly
+    /// of such a page displaced glyphs by the hundreds; the rule was gated
+    /// off it until the layout was faithful.)
     static func validateSurvivors(
         _ result: FilterResult,
-        pageWidth: CGFloat,
         regionShapes: [RegionShape],
-        pageRotation: Int
+        frame: PageFrame
     ) -> (result: FilterResult, dropped: Int) {
-        guard pageRotation % 360 == 0 else { return (result, 0) }
         var surviving = result.surviving
         var dropped = 0
         var passes = 0
         while passes < drawnCellRulePassLimit {
             let hits = inRegionDrawnGlyphIndices(
-                entries: surviving, pageWidth: pageWidth, regionShapes: regionShapes)
+                entries: surviving, regionShapes: regionShapes, frame: frame)
             if hits.isEmpty { break }
             surviving = surviving.enumerated()
                 .filter { !hits.contains($0.offset) }

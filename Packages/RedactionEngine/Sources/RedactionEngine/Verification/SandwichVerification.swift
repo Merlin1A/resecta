@@ -782,7 +782,8 @@ public struct SandwichVerification: Sendable {
         // injection).
         guard !digest.lineageHash.isEmpty else { return .pass }
 
-        let outputHash = try Self.computeOutputLineageHash(outputPage)
+        let outputHash = try Self.computeOutputLineageHash(
+            outputPage, pageRotation: digest.pageRotation)
         if outputHash != digest.lineageHash {
             return .fail(
                 "Character lineage mismatch on page \(digest.pageIndex + 1)"
@@ -834,11 +835,23 @@ public struct SandwichVerification: Sendable {
     /// skips below are the same predicate Layer 7's `countComposedCharacters`
     /// applies — the two layers walk one domain on both sides of their
     /// comparisons by design; Layer 6 counts and reports the units they skip.
-    static func computeOutputLineageHash(_ outputPage: PDFPage) throws -> Data {
+    ///
+    /// `pageRotation` is the source page's `/Rotate` as the digest records
+    /// it: on a page written from a rotated source each read-back box is
+    /// carried into the SOURCE frame (the output page is zero-origin and
+    /// unrotated; its crop size is the displayed size) before the sort, so
+    /// the canonical order is read along the source lines — as
+    /// `FilterResult.computeLineageHash(over:frame:)` reads it on the
+    /// filter side. At 0 the walk is unchanged.
+    static func computeOutputLineageHash(
+        _ outputPage: PDFPage, pageRotation: Int = 0
+    ) throws -> Data {
         guard let pageText = outputPage.string else { return Self.emptyLineageDigest }
         let nsText = pageText as NSString
         let totalCodeUnits = outputPage.numberOfCharacters
         guard totalCodeUnits > 0 else { return Self.emptyLineageDigest }
+        let pageBox = outputPage.bounds(for: .cropBox)
+        let frame = PageFrame(rotation: pageRotation, displayedSize: pageBox.size)
 
         var units: [(string: String, minY: CGFloat, minX: CGFloat)] = []
         var utf16Offset = 0
@@ -860,7 +873,10 @@ public struct SandwichVerification: Sendable {
             guard bounds.width > 0 && bounds.height > 0 else { continue }
             let charString = nsText.substring(with: composedRange)
             guard !FilterResult.isLineageWhitespace(charString) else { continue }
-            units.append((charString, bounds.minY, bounds.minX))
+            let placed = frame.isUnrotated
+                ? bounds
+                : frame.sourceRect(bounds.offsetBy(dx: -pageBox.minX, dy: -pageBox.minY))
+            units.append((charString, placed.minY, placed.minX))
         }
 
         let bands = Self.yBands(units.map(\.minY))

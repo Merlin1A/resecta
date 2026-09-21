@@ -556,11 +556,16 @@ extension FilterResult {
     ///     writer-side drawn-cell rule dropped after the filter
     ///     (`TextLayerReconstructor.validateSurvivors`); 0 when the rule
     ///     has not run on this result.
+    ///   - frame: The page's frame. On a page stored with a rotation the
+    ///     lineage hash is taken in the SOURCE frame and the digest records
+    ///     the rotation for Layer 9; nil or an unrotated frame is the
+    ///     unchanged digest.
     public func toDigest(
         pageIndex: Int,
         redactionRects: [CGRect],
         safetyMargin: CGFloat,
-        drawnCellRuleExcludedCount: Int = 0
+        drawnCellRuleExcludedCount: Int = 0,
+        frame: PageFrame? = nil
     ) -> PageFilterDigest {
         // Identify boundary characters: surviving characters within safetyMargin * 2
         // of any redaction edge (the "near miss" zone).
@@ -577,12 +582,32 @@ extension FilterResult {
             excludedCount: excludedCount,
             survivingCount: surviving.count,
             boundaryCharacters: boundaryChars,
-            lineageHash: Self.computeLineageHash(over: surviving),
+            lineageHash: Self.computeLineageHash(over: surviving, frame: frame),
             survivingNonWhitespaceCount: surviving.count(where: {
                 !Self.isLineageWhitespace($0.character)
             }),
-            drawnCellRuleExcludedCount: drawnCellRuleExcludedCount
+            drawnCellRuleExcludedCount: drawnCellRuleExcludedCount,
+            pageRotation: frame?.rotation ?? 0
         )
+    }
+
+    /// `computeLineageHash(over:)` in the page's SOURCE frame: on a page
+    /// stored with a rotation the survivors' bounds are carried back through
+    /// the inverse of the rotation transform first, so the canonical order
+    /// (Y bands, X ascending) is read along the source lines — the frame the
+    /// writer assembles in, and the frame Layer 9 carries its read-back
+    /// boxes into (`SandwichVerification.computeOutputLineageHash`). In the
+    /// displayed frame of a 90°/270° page every source line is a vertical
+    /// run and the glyphs' Y values form one near-continuum across lines,
+    /// so the two sides' single-linkage bands would not agree there. On an
+    /// unrotated page (or with no frame) the hash is unchanged.
+    static func computeLineageHash(
+        over characters: [CharacterInfo], frame: PageFrame?
+    ) -> Data {
+        guard let frame, !frame.isUnrotated else {
+            return computeLineageHash(over: characters)
+        }
+        return computeLineageHash(over: characters.map(frame.sourceEntry))
     }
 
     /// SHA-256 over `(character, globalPos)` for each non-whitespace

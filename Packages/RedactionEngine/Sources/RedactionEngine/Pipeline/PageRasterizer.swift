@@ -279,10 +279,13 @@ public final class PageRasterizer: @unchecked Sendable {
                     // source font is narrower than the band pitch). The
                     // layout is validated BEFORE the digest is taken, so the
                     // digest, the drawn layer and Layer 6 agree by
-                    // construction.
+                    // construction. The frame carries the page's rotation:
+                    // the rule, the writer and the lineage digest all work
+                    // in the SOURCE frame of a rotated page.
+                    let frame = PageFrame(
+                        rotation: page.rotation, displayedSize: effectiveSize)
                     let validated = TextLayerReconstructor.validateSurvivors(
-                        filterResult, pageWidth: pageBounds.width, regionShapes: shapes,
-                        pageRotation: page.rotation
+                        filterResult, regionShapes: shapes, frame: frame
                     )
                     if validated.dropped > 0 {
                         pageRasterizerLogger.log(
@@ -296,7 +299,8 @@ public final class PageRasterizer: @unchecked Sendable {
                         pageIndex: page.pageIndex,
                         redactionRects: redactionRectsInPoints,
                         safetyMargin: safetyMarginPoints,
-                        drawnCellRuleExcludedCount: validated.dropped
+                        drawnCellRuleExcludedCount: validated.dropped,
+                        frame: frame
                     )
                 } else {
                     // shouldFallback or empty: textLayerEntries remains nil,
@@ -418,7 +422,8 @@ public final class PageRasterizer: @unchecked Sendable {
                 image: redactedImage,
                 size: effectiveSize,
                 textLayerEntries: textLayerEntries,
-                redactionRectsInPoints: redactionRectsForTextLayer
+                redactionRectsInPoints: redactionRectsForTextLayer,
+                rotation: page.rotation
             )
             return RasterizeResult(pageOutput: output, filterDigest: pageDigest,
                                    fallbackReason: fallbackReason)
