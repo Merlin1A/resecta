@@ -1682,16 +1682,24 @@ public struct PIIDetector: Sendable {
     /// Tokens the name path never surfaces as a name candidate on their own.
     /// Exact, case-sensitive, whole-candidate equality — nothing looser: a
     /// name that follows a role noun still surfaces (the prefix pass exists
-    /// for that), the bare role noun never does. The five are court and
-    /// licence furniture the tagger reads as given names when they open a
-    /// sentence or a label ("Plaintiff is a corporation, Business
-    /// Registration # …", "Reg # …", the "PP" / "Lic" / "DL" document labels).
-    /// They are ONE measured unit: added together and measured together on
-    /// the synthetic corpus, where they remove label-token false positives
-    /// and change no true positive. Any addition is its own measured change,
-    /// never a quiet edit here. Checked before the gazetteer query on both
-    /// tagger passes and on the prefix pass's assembled name.
-    static let nameStopTokens: Set<String> = ["Plaintiff", "Reg", "PP", "Lic", "DL"]
+    /// for that), the bare role noun never does. Two measured units: the five
+    /// court and licence label tokens the tagger reads as given names when
+    /// they open a sentence or a label ("Plaintiff is a corporation, Business
+    /// Registration # …", "Reg # …", the "PP" / "Lic" / "DL" document labels),
+    /// then the five furniture tokens — the honorific with and without its
+    /// period, two role nouns and the legal opener — that the tagger and the
+    /// prefix pass surface alone on furniture-dense pages ("Dr." before a
+    /// line break, "Patient reports …", "Pursuant to …", "Counsel for …").
+    /// Each unit was added together and measured together on the synthetic
+    /// corpus and its furniture profiles, where it removes label and
+    /// furniture false positives and changes no true positive. Any addition
+    /// is its own measured change, never a quiet edit here. Checked before
+    /// the gazetteer query on both tagger passes and on the prefix pass's
+    /// assembled name.
+    static let nameStopTokens: Set<String> = [
+        "Plaintiff", "Reg", "PP", "Lic", "DL",
+        "Dr.", "Dr", "Patient", "Pursuant", "Counsel",
+    ]
 
     // MARK: - Legal Prefix Heuristics
 
@@ -1701,6 +1709,24 @@ public struct PIIDetector: Sendable {
         "Attorney", "Counsel", "Prof.", "Professor", "Officer", "Agent",
         "Senator", "Rep.", "Honorable", "Reverend", "Rev."
     ]
+
+    /// True when the text right after a prefix hit opens with a sentence
+    /// boundary: optional horizontal whitespace, one of `.` `;` `:`, optional
+    /// horizontal whitespace, then a line break. Anything else — a name, a
+    /// bare line break, a comma, a dash — is not a boundary.
+    private static func sentenceBoundaryOpens(_ window: String) -> Bool {
+        var sawTerminator = false
+        for ch in window {
+            if ch == " " || ch == "\t" { continue }
+            if ch.isNewline { return sawTerminator }
+            if !sawTerminator, ch == "." || ch == ";" || ch == ":" {
+                sawTerminator = true
+                continue
+            }
+            return false
+        }
+        return false
+    }
 
     private func scanLegalPrefixes(in text: String) -> [PIIMatch] {
         var results: [PIIMatch] = []
@@ -1726,8 +1752,15 @@ public struct PIIDetector: Sendable {
                 let afterRange = NSRange(location: afterPrefix, length: min(50, remaining))
                 let trimSet = CharacterSet.whitespacesAndNewlines
                     .union(CharacterSet(charactersIn: ":,;.-—–"))
-                let afterText = nsText.substring(with: afterRange)
-                    .trimmingCharacters(in: trimSet)
+                let window = nsText.substring(with: afterRange)
+                // A sentence boundary right after the prefix — `.` / `;` / `:`
+                // and then a line break — ends the reading before the trim:
+                // the next line's first capitalised word opens a new sentence
+                // and is not the name after the prefix. A bare line break or
+                // same-line punctuation still reaches the trim below.
+                let afterText = Self.sentenceBoundaryOpens(window)
+                    ? ""
+                    : window.trimmingCharacters(in: trimSet)
 
                 // Extract first 1-3 capitalized words
                 let words = afterText.split(separator: " ", maxSplits: 3)
