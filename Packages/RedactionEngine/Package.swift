@@ -61,6 +61,10 @@ let package = Package(
                 // altered copies — same wiring rationale as the Gazetteers
                 // entry above.
                 .copy("../../Sources/RedactionEngine/Resources/Classifier"),
+                // The asset tamper matrix (`AssetTamperMatrixTests`) rebuilds the
+                // whole shipped resource tree per cell, so the Audit/ rule catalog
+                // must be reachable the same way.
+                .copy("../../Sources/RedactionEngine/Resources/Audit"),
             ],
             swiftSettings: [
                 .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
