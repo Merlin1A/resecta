@@ -20,7 +20,7 @@ struct ContextKeywordsLoaderTests {
     func smokeFullEntries() throws {
         // Doctype-scoped additions: +5 ssn, +5 name, +6 ein, then the four
         // court role nouns re-landed as court-scoped name positives (+4 name),
-        // then the six title labels the label-anchor route reads (+6 name:
+        // then the six title labels the label-anchor route reads (+6 name, global:
         // counsel of record, bill to, ap contact, employee's name, from, to).
         // The bundled file carries 223 rows; the 21 bates rows are
         // engine-invisible (mapCategory has no bates case), so the loader
@@ -55,24 +55,23 @@ struct ContextKeywordsLoaderTests {
         }
     }
 
-    @Test("The six title labels ship as doctype-scoped name positives")
-    func titleLabelsAreDoctypeScopedNamePositives() throws {
+    @Test("The six title labels ship as global name positives, read with and without a doctype")
+    func titleLabelsAreGlobalNamePositives() throws {
         let loader = try ContextKeywordsLoader()
-        let court = try #require(loader.positiveKeywords(for: .name, doctype: .court))
-        let financial = try #require(loader.positiveKeywords(for: .name, doctype: .financial))
-        let generic = try #require(loader.positiveKeywords(for: .name, doctype: .generic))
-        #expect(court.contains("counsel of record"))
-        #expect(!financial.contains("counsel of record"))
-        for term in ["bill to", "ap contact", "employee's name"] {
-            #expect(financial.contains(term), "\(term) must be a financial name positive")
+        let labels = ["counsel of record", "bill to", "ap contact", "employee's name", "from", "to"]
+        let global = try #require(loader.positiveKeywords(for: .name, doctype: nil))
+        for term in labels {
+            #expect(global.contains(term), "\(term) must be a global name positive")
         }
-        #expect(generic.contains("employee's name"))
-        #expect(!generic.contains("bill to"))
-        // The memo headers read on every doctype.
+        // A doctype-scoped query is a superset of the global set.
         for doctype in [DoctypeClass.court, .medical, .financial, .foia, .generic] {
             let set = try #require(loader.positiveKeywords(for: .name, doctype: doctype))
-            #expect(set.contains("from") && set.contains("to"), "from/to must read on \(doctype)")
+            for term in labels {
+                #expect(set.contains(term), "\(term) must read on \(doctype)")
+            }
         }
+        // The court role nouns stay court-scoped (C12-91's design).
+        #expect(!global.contains("petitioner"))
     }
 
     @Test("Empty bundle throws resourceMissing")

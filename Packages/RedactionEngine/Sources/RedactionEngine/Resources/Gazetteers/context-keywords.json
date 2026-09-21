@@ -1447,9 +1447,7 @@
     {
       "category": "name",
       "confidence": "high",
-      "doctypes": [
-        "financial"
-      ],
+      "doctypes": [],
       "locale": "en",
       "polarity": "positive",
       "term": "ap contact"
@@ -1482,9 +1480,7 @@
     {
       "category": "name",
       "confidence": "high",
-      "doctypes": [
-        "financial"
-      ],
+      "doctypes": [],
       "locale": "en",
       "polarity": "positive",
       "term": "bill to"
@@ -1503,9 +1499,7 @@
     {
       "category": "name",
       "confidence": "high",
-      "doctypes": [
-        "court"
-      ],
+      "doctypes": [],
       "locale": "en",
       "polarity": "positive",
       "term": "counsel of record"
@@ -1556,10 +1550,7 @@
     {
       "category": "name",
       "confidence": "high",
-      "doctypes": [
-        "financial",
-        "generic"
-      ],
+      "doctypes": [],
       "locale": "en",
       "polarity": "positive",
       "term": "employee's name"
@@ -1591,13 +1582,7 @@
     {
       "category": "name",
       "confidence": "high",
-      "doctypes": [
-        "court",
-        "financial",
-        "foia",
-        "generic",
-        "medical"
-      ],
+      "doctypes": [],
       "locale": "en",
       "polarity": "positive",
       "term": "from"
@@ -1884,13 +1869,7 @@
     {
       "category": "name",
       "confidence": "high",
-      "doctypes": [
-        "court",
-        "financial",
-        "foia",
-        "generic",
-        "medical"
-      ],
+      "doctypes": [],
       "locale": "en",
       "polarity": "positive",
       "term": "to"
