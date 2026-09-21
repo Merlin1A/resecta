@@ -1844,7 +1844,8 @@ public struct PIIDetector: Sendable {
         "district", "bureau", "office", "services", "systems", "solutions",
         "technologies", "insurance", "foundation", "institute", "center",
         "fund", "union", "council", "court", "estate", "united", "national",
-        "federal", "government",
+        "federal", "government", "unit", "division", "section", "branch",
+        "team", "desk", "program",
     ]
 
     /// The caption connector between two parties, read case-folded and
@@ -1937,9 +1938,25 @@ public struct PIIDetector: Sendable {
         return AnchorCandidate(text: ns.substring(with: range), range: range, tokens: tokens)
     }
 
+    /// Words that name a role, an honorific or a generic addressee rather
+    /// than a person (case-folded, period-stripped): the legal prefixes, the
+    /// stop tokens and the generic addressees, read on EVERY token of a
+    /// candidate — `Records Officer` and `Hiring Committee` are titles, not
+    /// names, whichever token carries the role word.
+    private static let nonPersonTokens: Set<String> = {
+        var set = Set<String>()
+        for word in legalPrefixes + Array(nameStopTokens) + genericAddressees.flatMap({ $0.split(separator: " ").map(String.init) }) {
+            var folded = word.lowercased()
+            while folded.hasSuffix(".") { folded.removeLast() }
+            if !folded.isEmpty { set.insert(folded) }
+        }
+        return set
+    }()
+
     /// The candidate is a person's name only if it is not a stop token, does
     /// not open with a legal prefix or a stop token (the prefix pass's
-    /// shape), holds no organisation marker, and carries at least one token
+    /// shape), holds no organisation marker and no role, honorific or
+    /// generic-addressee word on any token, and carries at least one token
     /// of two or more letters.
     private static func admits(_ candidate: AnchorCandidate) -> Bool {
         guard !nameStopTokens.contains(candidate.text), let first = candidate.tokens.first else { return false }
@@ -1947,7 +1964,7 @@ public struct PIIDetector: Sendable {
         for token in candidate.tokens {
             var folded = token.lowercased()
             while folded.hasSuffix(".") { folded.removeLast() }
-            if organizationMarkers.contains(folded) { return false }
+            if organizationMarkers.contains(folded) || nonPersonTokens.contains(folded) { return false }
         }
         return candidate.tokens.contains { $0.filter(\.isLetter).count >= 2 }
     }
