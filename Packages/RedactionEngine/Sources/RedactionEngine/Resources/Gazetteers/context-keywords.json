@@ -1448,6 +1448,16 @@
       "category": "name",
       "confidence": "high",
       "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "ap contact"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
         "court",
         "financial",
         "foia",
@@ -1471,6 +1481,16 @@
     },
     {
       "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "financial"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "bill to"
+    },
+    {
+      "category": "name",
       "confidence": "medium",
       "detector_note": "Credit-card statement label",
       "doctypes": [
@@ -1479,6 +1499,16 @@
       "locale": "en",
       "polarity": "positive",
       "term": "cardholder name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "counsel of record"
     },
     {
       "category": "name",
@@ -1526,6 +1556,17 @@
     {
       "category": "name",
       "confidence": "high",
+      "doctypes": [
+        "financial",
+        "generic"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "employee's name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
       "detector_note": "W-2 box c label (exact IRS language)",
       "doctypes": [
         "financial"
@@ -1546,6 +1587,20 @@
       "locale": "en",
       "polarity": "positive",
       "term": "first name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "from"
     },
     {
       "category": "name",
@@ -1825,6 +1880,20 @@
       "locale": "en",
       "polarity": "positive",
       "term": "taxpayer name"
+    },
+    {
+      "category": "name",
+      "confidence": "high",
+      "doctypes": [
+        "court",
+        "financial",
+        "foia",
+        "generic",
+        "medical"
+      ],
+      "locale": "en",
+      "polarity": "positive",
+      "term": "to"
     },
     {
       "category": "npi",
