@@ -12,7 +12,7 @@ On-device iOS 26 PDF and image redaction. Free, open-source, zero data collectio
 
 **Latest release:** 1.1.0 — `main` may be ahead of it: the 6-layer and 11-layer verification counts below describe the next release (1.2.0), not the 1.1.0 build. See the [CHANGELOG](./CHANGELOG.md).
 
-Every pull request builds the app and both test bundles, runs the audit and claims lints on the diff, checks the documented counts against the tree, and checks the shipped-asset hashes; the full engine suite and the simulator suite run on demand and on release tags.
+Every pull request builds the app and both test bundles, runs the audit and claims lints on the diff (from the base branch's copies of the scripts), checks the documented counts against the tree, and checks the shipped-asset hashes; the batched engine and app suites run on a hosted simulator every Monday, on demand and on release tags (GitHub pauses a scheduled workflow after sixty days without a commit; any commit resumes it), and the engine host suite on demand and on release tags.
 
 ---
 
