@@ -98,6 +98,14 @@ public struct PresetThresholdBundle: Sendable, Equatable {
         loadWithDiagnostics(from: bundle).bundle
     }
 
+    /// `WireFormat.version` values this decoder understands
+    /// (`DataPipeline/schemas/preset_thresholds.schema.json`).
+    static let supportedWireVersions: ClosedRange<Int> = 1...1
+
+    enum LoaderError: Error {
+        case unsupportedVersion(actual: Int, supported: ClosedRange<Int>)
+    }
+
     /// Diagnostics variant: the bundle plus, on any fallback to
     /// `.builtInDefaults`, a mechanism-only reason string.
     /// `PIIDetector.loadWithDiagnostics(bundle:)` folds the reason into
@@ -118,6 +126,15 @@ public struct PresetThresholdBundle: Sendable, Equatable {
         do {
             let data = try Data(contentsOf: url)
             let decoded = try JSONDecoder().decode(WireFormat.self, from: data)
+            // Wire-version fence: a table from a future or stale schema falls
+            // back to the built-in defaults by name instead of being read.
+            try LoaderVersionFence.assert(
+                actual: decoded.version,
+                supported: supportedWireVersions,
+                assetName: "preset-thresholds",
+                logger: logger,
+                throwing: { LoaderError.unsupportedVersion(actual: $0, supported: $1) }
+            )
             return (try decoded.toBundle(), nil)
         } catch {
             logger.warning("preset-thresholds.json load failed; using defaults: \(String(describing: error), privacy: .public)")
