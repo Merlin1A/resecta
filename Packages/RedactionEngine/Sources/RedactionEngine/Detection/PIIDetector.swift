@@ -542,7 +542,7 @@ public struct PIIDetector: Sendable {
         }
 
         // Pass 2: NLTagger
-        results.append(contentsOf: withPerPageTimeout("name") { detectNames(in: text) })
+        results.append(contentsOf: withPerPageTimeout("name") { detectNames(in: text, doctype: currentDoctype) })
 
         return Self.ensureRationales(results, doctype: doctype)
     }
@@ -630,7 +630,7 @@ public struct PIIDetector: Sendable {
         }
 
         // Pass 2: NLTagger (names) — only if requested
-        if categories.contains(.name) { results.append(contentsOf: withPerPageTimeout("name") { detectNames(in: text) }) }
+        if categories.contains(.name) { results.append(contentsOf: withPerPageTimeout("name") { detectNames(in: text, doctype: currentDoctype) }) }
 
         return Self.ensureRationales(results, doctype: doctype)
     }
@@ -1470,7 +1470,7 @@ public struct PIIDetector: Sendable {
     /// segmentation) runs strict — a candidate absent from both the surname
     /// and given-name blooms is suppressed, which is how we keep ALL-CAPS
     /// recall without letting the looser tokenizer flood the triage list.
-    func detectNames(in text: String) -> [PIIMatch] {
+    func detectNames(in text: String, doctype: DoctypeClass? = nil) -> [PIIMatch] {
         var results: [PIIMatch] = []
         // Per-page cache of gazetteer verdicts keyed on lowercased candidate
         // text. Bounds the Levenshtein-1 enumeration cost across both passes.
@@ -1493,7 +1493,13 @@ public struct PIIDetector: Sendable {
         // Pass 3: Legal prefix heuristics
         results.append(contentsOf: scanLegalPrefixes(in: text))
 
-        // Deduplicate overlapping name matches across the three passes.
+        // Pass 4: Label anchors — the deterministic readings of the label
+        // slots (a role or field label with its colon, the caption
+        // connector). Same confidence as the prefix pass; a tagger row on
+        // the same text wins the overlap below.
+        results.append(contentsOf: scanLabelAnchors(in: text, doctype: doctype))
+
+        // Deduplicate overlapping name matches across the passes.
         // When multiple passes detect the same text region, keep the match
         // with the higher confidence to avoid duplicate triage entries.
         return Self.deduplicateByRange(results)
@@ -1810,6 +1816,228 @@ public struct PIIDetector: Sendable {
             }
         }
         return results
+    }
+
+    // MARK: - Label Anchor Routes
+
+    /// Confidence of every label-anchor match: the prefix pass's number. The
+    /// conservative preset's cutoff drops them by design. The routes sit
+    /// outside the inventory gate, as the prefix pass does, and say so
+    /// through their own rule id and route signal.
+    static let labelAnchorConfidence = 0.65
+
+    /// Rule id every label-anchor match carries; the rationale's pattern
+    /// signal names the route (`name.label-anchor.<route>`).
+    static let labelAnchorRuleID = "name.label-anchor"
+
+    /// Tokens that mark a capitalised run as an organisation rather than a
+    /// person (case-folded, trailing period stripped). A candidate holding
+    /// any of them is not read: in `Marcus Bellamy v. Sablebrook Holdings
+    /// Inc.` only the left party is a name.
+    static let organizationMarkers: Set<String> = [
+        "inc", "incorporated", "corp", "corporation", "co", "company",
+        "llc", "llp", "lp", "ltd", "limited", "plc", "pllc", "group",
+        "holdings", "bank", "trust", "association", "partners",
+        "partnership", "industries", "enterprises", "hospital", "clinic",
+        "university", "college", "school", "county", "city", "state",
+        "department", "board", "commission", "agency", "authority",
+        "district", "bureau", "office", "services", "systems", "solutions",
+        "technologies", "insurance", "foundation", "institute", "center",
+        "fund", "union", "council", "court", "estate", "united", "national",
+        "federal", "government",
+    ]
+
+    /// The caption connector between two parties, read case-folded and
+    /// bounded by horizontal whitespace on both sides.
+    private static let captionConnectors = ["v.", "vs."]
+
+    /// A candidate a route read: one to three capitalised tokens on one line.
+    private struct AnchorCandidate {
+        let text: String
+        let range: NSRange
+        let tokens: [String]
+    }
+
+    private static let anchorTokenJoiners = CharacterSet(charactersIn: "'\u{2019}-.")
+
+    private static func scalar(_ u: unichar) -> UnicodeScalar? { UnicodeScalar(u) }
+    private static func isAnchorLetter(_ u: unichar) -> Bool {
+        scalar(u).map { CharacterSet.letters.contains($0) } ?? false
+    }
+    private static func isAnchorUppercase(_ u: unichar) -> Bool {
+        scalar(u).map { CharacterSet.uppercaseLetters.contains($0) } ?? false
+    }
+    private static func isAnchorAlphanumeric(_ u: unichar) -> Bool {
+        scalar(u).map { CharacterSet.alphanumerics.contains($0) } ?? false
+    }
+    private static func isAnchorTokenChar(_ u: unichar) -> Bool {
+        scalar(u).map { CharacterSet.letters.contains($0) || anchorTokenJoiners.contains($0) } ?? false
+    }
+    private static func isHorizontalSpace(_ u: unichar) -> Bool { u == 0x20 || u == 0x09 }
+
+    /// Read forwards from `start`: skip horizontal whitespace, then take up
+    /// to three tokens, each a maximal run of letters, apostrophes, hyphens
+    /// and periods that opens with an uppercase letter, separated by
+    /// horizontal whitespace only. A comma, a colon, a digit, a lowercase
+    /// token or the line's end closes the reading.
+    private static func readCandidate(
+        forwardFrom start: Int, lineEnd: Int, in ns: NSString, minTokens: Int
+    ) -> AnchorCandidate? {
+        var i = start
+        while i < lineEnd, isHorizontalSpace(ns.character(at: i)) { i += 1 }
+        var ranges: [NSRange] = []
+        while ranges.count < 3 {
+            guard i < lineEnd, isAnchorUppercase(ns.character(at: i)) else { break }
+            var j = i
+            while j < lineEnd, isAnchorTokenChar(ns.character(at: j)) { j += 1 }
+            ranges.append(NSRange(location: i, length: j - i))
+            var k = j
+            while k < lineEnd, isHorizontalSpace(ns.character(at: k)) { k += 1 }
+            guard k > j else { break }
+            i = k
+        }
+        return assemble(ranges, in: ns, minTokens: minTokens)
+    }
+
+    /// Read backwards from `end` (exclusive): the mirror of the forward
+    /// reading, so the tokens closest to the anchor are taken first.
+    private static func readCandidate(
+        backwardFrom end: Int, lineStart: Int, in ns: NSString, minTokens: Int
+    ) -> AnchorCandidate? {
+        var i = end
+        while i > lineStart, isHorizontalSpace(ns.character(at: i - 1)) { i -= 1 }
+        var ranges: [NSRange] = []
+        while ranges.count < 3 {
+            guard i > lineStart, isAnchorTokenChar(ns.character(at: i - 1)) else { break }
+            var j = i
+            while j > lineStart, isAnchorTokenChar(ns.character(at: j - 1)) { j -= 1 }
+            guard isAnchorUppercase(ns.character(at: j)) else { break }
+            ranges.insert(NSRange(location: j, length: i - j), at: 0)
+            var k = j
+            while k > lineStart, isHorizontalSpace(ns.character(at: k - 1)) { k -= 1 }
+            guard k < j else { break }
+            i = k
+        }
+        return assemble(ranges, in: ns, minTokens: minTokens)
+    }
+
+    /// Join the token ranges into one candidate. A trailing period on a
+    /// token of three or more letters is a sentence's, not the name's, and
+    /// is left outside the box; an initial (`J.`) or a short suffix (`Jr.`)
+    /// keeps its period.
+    private static func assemble(_ ranges: [NSRange], in ns: NSString, minTokens: Int) -> AnchorCandidate? {
+        guard ranges.count >= minTokens, let first = ranges.first, var last = ranges.last else { return nil }
+        let lastText = ns.substring(with: last)
+        if lastText.hasSuffix("."), lastText.filter(\.isLetter).count >= 3 {
+            last = NSRange(location: last.location, length: last.length - 1)
+        }
+        let range = NSRange(location: first.location, length: NSMaxRange(last) - first.location)
+        var tokens = ranges.map { ns.substring(with: $0) }
+        tokens[tokens.count - 1] = ns.substring(with: last)
+        return AnchorCandidate(text: ns.substring(with: range), range: range, tokens: tokens)
+    }
+
+    /// The candidate is a person's name only if it is not a stop token, does
+    /// not open with a legal prefix or a stop token (the prefix pass's
+    /// shape), holds no organisation marker, and carries at least one token
+    /// of two or more letters.
+    private static func admits(_ candidate: AnchorCandidate) -> Bool {
+        guard !nameStopTokens.contains(candidate.text), let first = candidate.tokens.first else { return false }
+        guard !legalPrefixes.contains(first), !nameStopTokens.contains(first) else { return false }
+        for token in candidate.tokens {
+            var folded = token.lowercased()
+            while folded.hasSuffix(".") { folded.removeLast() }
+            if organizationMarkers.contains(folded) { return false }
+        }
+        return candidate.tokens.contains { $0.filter(\.isLetter).count >= 2 }
+    }
+
+    private static func anchorMatch(_ candidate: AnchorCandidate, route: String) -> PIIMatch {
+        PIIMatch(
+            text: candidate.text, range: candidate.range, kind: .name,
+            confidence: labelAnchorConfidence,
+            rationale: MatchRationale(
+                ruleID: labelAnchorRuleID,
+                signals: [.regexPattern(name: "\(labelAnchorRuleID).\(route)")],
+                preThresholdScore: labelAnchorConfidence,
+                finalScore: labelAnchorConfidence
+            )
+        )
+    }
+
+    /// Pass 4 of `detectNames`: the label-anchor routes, one line at a time.
+    /// The vocabulary of the label route is the legal prefixes plus the
+    /// shipped name positives in scope for `doctype` (the court role words
+    /// are court-scoped; with no doctype only the global rows read).
+    /// Internal so the routes can be exercised on their own, apart from the
+    /// tagger rows that win the overlap in `detectNames`.
+    func scanLabelAnchors(in text: String, doctype: DoctypeClass? = nil) -> [PIIMatch] {
+        let ns = text as NSString
+        guard ns.length > 0 else { return [] }
+        var labels = Set(Self.legalPrefixes.map { $0.lowercased() })
+        if let positives = contextLoader?.positiveKeywords(for: .name, doctype: doctype) {
+            labels.formUnion(positives)
+        }
+        let orderedLabels = labels.sorted()
+        var results: [PIIMatch] = []
+        ns.enumerateSubstrings(in: NSRange(location: 0, length: ns.length),
+                               options: [.byLines, .substringNotRequired]) { _, line, _, _ in
+            guard line.length > 0 else { return }
+            Self.scanLabelColon(in: ns, line: line, labels: orderedLabels, into: &results)
+            Self.scanCaption(in: ns, line: line, into: &results)
+        }
+        return results
+    }
+
+    /// Route 1a — a label from the vocabulary, matched case-folded and
+    /// token-bounded (no letter or digit touches it on either side),
+    /// optional horizontal whitespace, a colon, then the candidate.
+    private static func scanLabelColon(
+        in ns: NSString, line: NSRange, labels: [String], into results: inout [PIIMatch]
+    ) {
+        let lineEnd = NSMaxRange(line)
+        for label in labels {
+            var search = line
+            while search.length > 0 {
+                let hit = ns.range(of: label, options: [.caseInsensitive], range: search)
+                guard hit.location != NSNotFound else { break }
+                let after = NSMaxRange(hit)
+                search = NSRange(location: after, length: lineEnd - after)
+                if hit.location > line.location, isAnchorAlphanumeric(ns.character(at: hit.location - 1)) { continue }
+                if after < lineEnd, isAnchorAlphanumeric(ns.character(at: after)) { continue }
+                var i = after
+                while i < lineEnd, isHorizontalSpace(ns.character(at: i)) { i += 1 }
+                guard i < lineEnd, ns.character(at: i) == 0x3A else { continue }
+                guard let candidate = readCandidate(forwardFrom: i + 1, lineEnd: lineEnd, in: ns, minTokens: 2),
+                      admits(candidate) else { continue }
+                results.append(anchorMatch(candidate, route: "label-colon"))
+            }
+        }
+    }
+
+    /// Route 1b — the caption connector with a candidate read backwards on
+    /// its left and forwards on its right; each side is kept on its own.
+    private static func scanCaption(in ns: NSString, line: NSRange, into results: inout [PIIMatch]) {
+        let lineEnd = NSMaxRange(line)
+        for connector in captionConnectors {
+            var search = line
+            while search.length > 0 {
+                let hit = ns.range(of: connector, options: [.caseInsensitive], range: search)
+                guard hit.location != NSNotFound else { break }
+                let after = NSMaxRange(hit)
+                search = NSRange(location: after, length: lineEnd - after)
+                guard hit.location > line.location, isHorizontalSpace(ns.character(at: hit.location - 1)),
+                      after < lineEnd, isHorizontalSpace(ns.character(at: after)) else { continue }
+                if let left = readCandidate(backwardFrom: hit.location, lineStart: line.location, in: ns, minTokens: 2),
+                   admits(left) {
+                    results.append(anchorMatch(left, route: "caption"))
+                }
+                if let right = readCandidate(forwardFrom: after, lineEnd: lineEnd, in: ns, minTokens: 2),
+                   admits(right) {
+                    results.append(anchorMatch(right, route: "caption"))
+                }
+            }
+        }
     }
 
     // MARK: - ALL-CAPS Title-Casing

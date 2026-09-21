@@ -59,6 +59,10 @@ public struct RuleCatalog: Sendable {
         "npi.80840":            "pii.npi.luhn.v1",
         // Name (NLTagger).
         "name.nltagger":        "pii.name.nltagger.v1",
+        // Name (label anchors) — the deterministic label and caption
+        // readings collapse onto the name family's catalog entry, as the two
+        // SSN emissions do.
+        "name.label-anchor":    "pii.name.nltagger.v1",
         // License plate.
         "licensePlate.labeled": "pii.lp.v1",
         // MRN — three sub-rules + regex fallback path.
