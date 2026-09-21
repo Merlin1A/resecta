@@ -97,6 +97,79 @@ public struct SandwichVerification: Sendable {
         return advances.reduce(0) { $0 + $1.width }
     }
 
+    /// Which page axis a text layer's lines run along, read from the
+    /// geometry of the page's own read-back.
+    ///
+    /// The reconstructor draws a page written from a rotated source along
+    /// its source lines, so on a `/Rotate 90`/`270` page every drawn line is
+    /// a vertical run in the output and consecutive glyphs advance in Y;
+    /// on an unrotated or `/Rotate 180` page they advance in X. The
+    /// spatial check bands and walks along this axis: banding a vertical
+    /// run on Y put every glyph in a band of its own and the origin-delta
+    /// lattice adjudicated no pair of it.
+    enum TextAxis: Equatable {
+        /// Lines run along X — an unrotated page, or one stored with
+        /// `/Rotate 180` (mirrored, still horizontal).
+        case horizontal
+        /// Lines run along Y — a page stored with `/Rotate 90` or `270`.
+        /// `downward` says the reading order descends the page (90) rather
+        /// than ascends it (270).
+        case vertical(downward: Bool)
+
+        var isVertical: Bool {
+            if case .vertical = self { return true }
+            return false
+        }
+    }
+
+    /// The axis of a page's text layer from its non-whitespace read-back
+    /// boxes in read-back (string) order: vertical when more than half of
+    /// the consecutive pairs move further in Y than in X. Within a
+    /// horizontal line consecutive glyphs share a baseline (|Δy| ≈ 0), and
+    /// a line break moves a whole line width back in X, so an unrotated
+    /// page reads horizontal by a wide margin; within a vertical run the
+    /// glyphs share an X column and advance in Y by the cell. Fewer than
+    /// two boxes read horizontal (nothing to adjudicate either way).
+    static func readBackAxis(_ boundsInReadBackOrder: [CGRect]) -> TextAxis {
+        let n = boundsInReadBackOrder.count
+        guard n >= 2 else { return .horizontal }
+        var vertical = 0
+        var downward = 0
+        for k in 1..<n {
+            let prev = boundsInReadBackOrder[k - 1], curr = boundsInReadBackOrder[k]
+            let dx = curr.minX - prev.minX, dy = curr.minY - prev.minY
+            if abs(dy) > abs(dx) {
+                vertical += 1
+                if dy < 0 { downward += 1 }
+            }
+        }
+        guard vertical * 2 > n - 1 else { return .horizontal }
+        return .vertical(downward: downward * 2 >= vertical)
+    }
+
+    /// `readBackAxis` over an output page's non-whitespace units with
+    /// measurable bounds, in string order; nil when the page has no text
+    /// layer or fewer than two such units. The corpus runner records it per
+    /// page beside the verdict.
+    static func readBackAxis(outputPage: PDFPage) -> TextAxis? {
+        guard let pageText = outputPage.string else { return nil }
+        let nsText = pageText as NSString
+        let count = outputPage.numberOfCharacters
+        var boxes: [CGRect] = []
+        var offset = 0
+        while offset < count {
+            let range = nsText.rangeOfComposedCharacterSequence(at: offset)
+            offset += max(range.length, 1)
+            guard !FilterResult.isLineageWhitespace(nsText.substring(with: range)),
+                  let sel = outputPage.selection(for: range) else { continue }
+            let bounds = sel.bounds(for: outputPage)
+            guard bounds.width > 0, bounds.height > 0 else { continue }
+            boxes.append(bounds)
+        }
+        guard boxes.count >= 2 else { return nil }
+        return readBackAxis(boxes)
+    }
+
     /// True when a read-back point size is one the reconstructor's
     /// pitch derivation can emit: a whole multiple of
     /// `pitchQuantizationStep` at or above `minimumFontSize`. The
@@ -295,6 +368,15 @@ public struct SandwichVerification: Sendable {
             utf16Offset += composedRange.length
         }
 
+        // The axis the text layer's lines run along (a page written from
+        // a `/Rotate 90`/`270` source is drawn along its source lines, so
+        // its lines are vertical runs here). The line bands of both passes
+        // below and the lattice's advance direction follow it; on a
+        // horizontal page every step is the unchanged walk.
+        let axis = Self.readBackAxis(exclusionUnits.map(\.bounds))
+        // The band coordinate: a line's position ACROSS the reading axis.
+        func across(_ b: CGRect) -> CGFloat { axis.isVertical ? b.minX : b.minY }
+
         // Exclusion pass: two tiers over the non-whitespace
         // units' glyph-core boxes. An edge graze (core box crossing a region
         // edge with its center outside) is held as a positional note and
@@ -312,10 +394,14 @@ public struct SandwichVerification: Sendable {
                     fractionCache[key] = f
                     return f
                 }()
-                return unit.bounds.insetBy(
-                    dx: 0, dy: fraction * unit.bounds.height)
+                // The core shrinks the box along the FONT's vertical axis —
+                // the page's X on a vertical run. Symmetric, so the centre
+                // the FAIL test reads is the same in either frame.
+                return axis.isVertical
+                    ? unit.bounds.insetBy(dx: fraction * unit.bounds.width, dy: 0)
+                    : unit.bounds.insetBy(dx: 0, dy: fraction * unit.bounds.height)
             }
-            let unitBands = Self.yBands(coreBoxes.map(\.minY))
+            let unitBands = Self.yBands(coreBoxes.map(across))
             // Union rect per read-back band — the line-band the halo tier
             // gates on (mirror of the filter's per-lineIndex bands).
             var bandRects: [Int: CGRect] = [:]
@@ -415,11 +501,23 @@ public struct SandwichVerification: Sendable {
         // own geometry, already visible in the raster.
         try Task.checkCancellation()
         if !latticeUnits.isEmpty {
-            let bands = Self.yBands(latticeUnits.map(\.bounds.minY))
+            let bands = Self.yBands(latticeUnits.map { across($0.bounds) })
+            // The origin's coordinate ALONG the reading axis, signed so
+            // reading order ascends: X on a horizontal line; on a vertical
+            // run −Y when the run reads down the page, +Y when up. The
+            // consecutive delta along it is the glyph advance the lattice
+            // adjudicates, and `prev` is the earlier glyph in reading order
+            // whose natural advance the delta is measured against.
+            func along(_ b: CGRect) -> CGFloat {
+                switch axis {
+                case .horizontal: return b.minX
+                case .vertical(let downward): return downward ? -b.minY : b.minY
+                }
+            }
             let order = latticeUnits.indices.sorted {
                 bands[$0] != bands[$1]
                     ? bands[$0] < bands[$1]
-                    : latticeUnits[$0].bounds.minX < latticeUnits[$1].bounds.minX
+                    : along(latticeUnits[$0].bounds) < along(latticeUnits[$1].bounds)
             }
             for k in 1..<order.count {
                 let prev = latticeUnits[order[k - 1]]
@@ -455,14 +553,23 @@ public struct SandwichVerification: Sendable {
                         "Non-uniform glyph advance on page \(pageIndex + 1) at offset \(curr.utf16Offset)"
                     ), false)
                 }
-                let delta = curr.bounds.minX - prev.bounds.minX
+                let delta = along(curr.bounds) - along(prev.bounds)
                 guard delta > 0 else { continue }
-                let gapRect = CGRect(
-                    x: prev.bounds.minX,
-                    y: min(prev.bounds.minY, curr.bounds.minY),
-                    width: delta,
-                    height: max(prev.bounds.maxY, curr.bounds.maxY)
-                        - min(prev.bounds.minY, curr.bounds.minY))
+                // The interval between the two origins along the axis,
+                // spanning the boxes' union across it.
+                let gapRect = axis.isVertical
+                    ? CGRect(
+                        x: min(prev.bounds.minX, curr.bounds.minX),
+                        y: min(prev.bounds.minY, curr.bounds.minY),
+                        width: max(prev.bounds.maxX, curr.bounds.maxX)
+                            - min(prev.bounds.minX, curr.bounds.minX),
+                        height: delta)
+                    : CGRect(
+                        x: prev.bounds.minX,
+                        y: min(prev.bounds.minY, curr.bounds.minY),
+                        width: delta,
+                        height: max(prev.bounds.maxY, curr.bounds.maxY)
+                            - min(prev.bounds.minY, curr.bounds.minY))
                 // Gap-skip tests the UN-expanded rect: a layout hole at a
                 // region is the region's own geometry; the halo is a filter
                 // buffer, not drawn geometry.

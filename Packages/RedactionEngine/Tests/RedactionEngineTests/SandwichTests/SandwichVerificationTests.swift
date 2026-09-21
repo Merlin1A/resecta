@@ -499,4 +499,146 @@ struct SandwichVerificationTests {
         #expect(try SandwichVerification.computeOutputLineageHash(page)
                 == SandwichVerification.emptyLineageDigest)
     }
+
+    // MARK: - Layer 6 on a vertical text layer (a page stored with /Rotate 90 or 270)
+
+    /// Draw invisible Courier runs writer-style under the CTM rotation the
+    /// reconstructor uses on a rotated page: translate to the line's displayed
+    /// origin, rotate by `angle`, identity text matrix, then each run at its
+    /// offset along the line. `-π/2` runs DOWN the page (`/Rotate 90`), `+π/2`
+    /// runs UP (`/Rotate 270`).
+    private func rotatedRunsPDF(
+        angle: CGFloat, origin: CGPoint, size: CGFloat,
+        runs: [(text: String, along: CGFloat)]
+    ) throws -> Data {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("svt_rot_\(UUID().uuidString).pdf")
+        var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let ctx = try #require(CGContext(url as CFURL, mediaBox: &mediaBox, nil))
+        ctx.beginPDFPage(nil)
+        ctx.setTextDrawingMode(.invisible)
+        let font = CTFontCreateWithName("Courier" as CFString, size, nil)
+        ctx.saveGState()
+        ctx.translateBy(x: origin.x, y: origin.y)
+        ctx.rotate(by: angle)
+        ctx.textMatrix = .identity
+        for run in runs {
+            let attr = NSAttributedString(string: run.text, attributes: [.font: font])
+            ctx.textPosition = CGPoint(x: run.along, y: 0)
+            CTLineDraw(CTLineCreateWithAttributedString(attr), ctx)
+        }
+        ctx.restoreGState()
+        ctx.endPDFPage()
+        ctx.closePDF()
+        defer { try? FileManager.default.removeItem(at: url) }
+        return try Data(contentsOf: url)
+    }
+
+    /// The origin-delta lattice must adjudicate a vertical run along Y: a
+    /// second run set 0.4 of a cell beyond the lattice is a glyph-advance
+    /// tamper on a rotated page exactly as it is on an unrotated one. The
+    /// horizontal walk banded such a run one glyph per band and skipped every
+    /// pair (`delta > 0` on X never held) — the coverage gap the drill named.
+    @Test("Layer 6 lattice on a vertical text layer: an off-lattice advance FAILs, the lattice run passes",
+          arguments: [-CGFloat.pi / 2, CGFloat.pi / 2])
+    func verticalRunLatticeIsLive(angle: CGFloat) async throws {
+        let size: CGFloat = 12
+        let cell = SandwichVerification.courierAdvancePerPoint * size
+        let origin = CGPoint(x: 300, y: 600)
+
+        let tampered = try rotatedRunsPDF(
+            angle: angle, origin: origin, size: size,
+            runs: [("ABCD", 0), ("EFGH", 4 * cell + 0.4 * cell)])
+        let tamperedPage = try #require(PDFDocument(data: tampered)?.page(at: 0))
+        #expect(tamperedPage.string?.filter { !$0.isWhitespace } == "ABCDEFGH",
+                "the rotated runs must read back (got \(tamperedPage.string ?? "nil"))")
+        let bad = try await verifier.verifySpatialExclusion(
+            outputPage: tamperedPage, regionShapes: [])
+        #expect(bad.isFail, "an off-lattice advance along a vertical run must FAIL; got \(bad)")
+
+        let clean = try rotatedRunsPDF(
+            angle: angle, origin: origin, size: size,
+            runs: [("ABCD", 0), ("EFGH", 4 * cell)])
+        let cleanPage = try #require(PDFDocument(data: clean)?.page(at: 0))
+        let ok = try await verifier.verifySpatialExclusion(
+            outputPage: cleanPage, regionShapes: [])
+        #expect(ok == .pass, "a lattice-faithful vertical run must PASS; got \(ok)")
+    }
+
+    /// The axis is read from the page's own geometry: a vertical run reads
+    /// vertical with its direction, a writer-style horizontal page reads
+    /// horizontal, and a page with fewer than two measurable units has no
+    /// axis to read.
+    @Test("The text-layer axis is read from the read-back geometry")
+    func readBackAxisFollowsTheGeometry() async throws {
+        let size: CGFloat = 12
+        let cell = SandwichVerification.courierAdvancePerPoint * size
+        let down = try rotatedRunsPDF(
+            angle: -.pi / 2, origin: CGPoint(x: 300, y: 600), size: size,
+            runs: [("ABCD", 0), ("EFGH", 4 * cell)])
+        let downPage = try #require(PDFDocument(data: down)?.page(at: 0))
+        #expect(SandwichVerification.readBackAxis(outputPage: downPage) == .vertical(downward: true))
+
+        let up = try rotatedRunsPDF(
+            angle: .pi / 2, origin: CGPoint(x: 300, y: 300), size: size,
+            runs: [("ABCD", 0), ("EFGH", 4 * cell)])
+        let upPage = try #require(PDFDocument(data: up)?.page(at: 0))
+        #expect(SandwichVerification.readBackAxis(outputPage: upPage) == .vertical(downward: false))
+
+        let flat = try writerStyleTwoLinePDF(
+            first: ("ABCD EFGH", size, CGPoint(x: 72, y: 700)),
+            second: ("IJKL MNOP", size, CGPoint(x: 72, y: 680)))
+        let flatPage = try #require(PDFDocument(data: flat)?.page(at: 0))
+        #expect(SandwichVerification.readBackAxis(outputPage: flatPage) == .horizontal)
+
+        let one = try writerStyleTwoLinePDF(
+            first: ("A", size, CGPoint(x: 72, y: 700)),
+            second: ("", size, CGPoint(x: 72, y: 680)))
+        let onePage = try #require(PDFDocument(data: one)?.page(at: 0))
+        #expect(SandwichVerification.readBackAxis(outputPage: onePage) == nil)
+
+        // The pure-geometry form: a horizontal walk with line breaks stays
+        // horizontal; a vertical column reads vertical with its direction.
+        let row = (0..<10).map { CGRect(x: 72 + CGFloat($0) * cell, y: 700, width: cell, height: size) }
+        let nextRow = (0..<10).map { CGRect(x: 72 + CGFloat($0) * cell, y: 686, width: cell, height: size) }
+        #expect(SandwichVerification.readBackAxis(row + nextRow) == .horizontal)
+        let column = (0..<10).map { CGRect(x: 300, y: 600 - CGFloat($0) * cell, width: size, height: cell) }
+        #expect(SandwichVerification.readBackAxis(column) == .vertical(downward: true))
+        #expect(SandwichVerification.readBackAxis(column.reversed()) == .vertical(downward: false))
+        #expect(SandwichVerification.readBackAxis([row[0]]) == .horizontal)
+    }
+
+    /// On a vertical run the exclusion tiers read the same FAIL/WARN as on
+    /// a horizontal line: a region over a glyph's core centre FAILs with
+    /// its position; a region that only clips a core edge is a graze WARN.
+    @Test("Layer 6 exclusion on a vertical text layer: centre-inside FAILs, an edge clip is a graze")
+    func verticalRunExclusionClassifies() async throws {
+        let size: CGFloat = 12
+        let cell = SandwichVerification.courierAdvancePerPoint * size
+        let data = try rotatedRunsPDF(
+            angle: -.pi / 2, origin: CGPoint(x: 300, y: 600), size: size,
+            runs: [("ABCDEFGH", 0)])
+        let page = try #require(PDFDocument(data: data)?.page(at: 0))
+        // The third glyph's read-back box.
+        let sel = try #require(page.selection(for: NSRange(location: 2, length: 1)))
+        let box = sel.bounds(for: page)
+        #expect(box.width > 0 && box.height > 0)
+        let over = box.insetBy(dx: -1, dy: -1)
+        let fail = try await verifier.verifySpatialExclusion(
+            outputPage: page,
+            regionShapes: [RegionShape(
+                expandedBounds: over.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
+                polygonVertices: nil, bounds: over)])
+        #expect(fail.isFail, "a region over a vertical run's glyph must FAIL; got \(fail)")
+
+        // A region clipping only the glyph's leading X edge (the font's
+        // descent side on a vertical run): the core centre stays outside.
+        let clip = CGRect(x: box.minX - 20, y: box.minY, width: 20 + 0.5, height: box.height)
+        let graze = try await verifier.verifySpatialExclusion(
+            outputPage: page,
+            regionShapes: [RegionShape(
+                expandedBounds: clip.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
+                polygonVertices: nil, bounds: clip)])
+        #expect(!graze.isFail, "an edge clip on a vertical run is a graze, not an in-region FAIL; got \(graze)")
+    }
 }

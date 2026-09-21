@@ -66,6 +66,11 @@ extension VerificationCorpusRunnerTests {
         /// Per page (nil for a Secure page): survivors the writer-side
         /// drawn-cell rule dropped after the filter.
         let drawn_cell_rule_drops: [Int?]
+        /// Per output page: the axis the spatial check read the text layer
+        /// along — "x", "y-down" (`/Rotate 90`), "y-up" (`/Rotate 270`);
+        /// nil for a page with no text layer or fewer than two measurable
+        /// units. Pins "x on every unrotated page".
+        let spatial_lattice_axes: [String?]
     }
 
     struct RunnerSummary: Encodable {
