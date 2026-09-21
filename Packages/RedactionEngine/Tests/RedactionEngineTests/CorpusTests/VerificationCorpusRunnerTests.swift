@@ -247,7 +247,14 @@ struct VerificationCorpusRunnerTests {
                 },
                 overall_per_sweep: overallPerSweep,
                 layer_status_per_sweep: layerStatusPerSweep,
-                non_ocr_layers_identical: deterministic),
+                non_ocr_layers_identical: deterministic,
+                filter_digest_counts: outcome.filterDigests.map { d in
+                    d.map { [$0.extractedCount, $0.excludedCount,
+                             $0.survivingCount, $0.survivingNonWhitespaceCount] }
+                },
+                drawn_cell_rule_drops: outcome.filterDigests.map {
+                    $0?.drawnCellRuleExcludedCount
+                }),
             to: "\(cellDir)/cell.json")
         return nil
     }

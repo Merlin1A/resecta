@@ -431,4 +431,162 @@ struct TextLayerReconstructorTests {
         #expect(font.pointSize == expectedSize,
                 "Output font size equals the band's derived quantized size")
     }
+
+    // MARK: - The drawn-cell rule
+
+    /// A band with a narrow-font label, a redacted value box right after it,
+    /// and a wide-font group further along the band. The band's sum-matched
+    /// pitch (6.5 pt; cell 3.9 pt) is wider than the label's 2.2-pt glyphs,
+    /// so the label's trailing colon — whose SOURCE box ends 4 pt before the
+    /// box, clear of the filter's 3-pt halo — is DRAWN about 4.7 pt to the
+    /// right, its core centre inside the box.
+    private static func narrowLabelBand() -> (entries: [CharacterInfo], region: CGRect) {
+        var entries: [CharacterInfo] = []
+        for (i, ch) in "Name:".enumerated() {
+            entries.append(CharacterInfo(
+                character: String(ch),
+                bounds: CGRect(x: 100 + Double(i) * 2.2, y: 500, width: 2.2, height: 10),
+                stringIndex: i))
+        }
+        for (i, ch) in "WIDE".enumerated() {
+            entries.append(CharacterInfo(
+                character: String(ch),
+                bounds: CGRect(x: 300 + Double(i) * 6, y: 500, width: 6, height: 10),
+                stringIndex: 10 + i))
+        }
+        // The value box starts 4 pt after the colon's source box ends (111 → 115).
+        let region = CGRect(x: 115, y: 500, width: 45, height: 10)
+        return (entries, region)
+    }
+
+    @Test("drawn-cell rule: a narrow-font label's trailing colon drawn into the value box is returned and dropped")
+    func drawnCellRuleReturnsOvershootingColon() {
+        let (entries, region) = Self.narrowLabelBand()
+        let colon = entries[4]
+        #expect(colon.character == ":")
+        #expect(minEdgeDistance(colon.bounds, to: region) >= safetyMarginPoints + 0.5,
+                "the fixture's colon must clear the filter's halo, else the filter would drop it")
+        let lines = TextLayerReconstructor.layoutLines(entries, pageWidth: 612, redactionRects: [region])
+        #expect(lines.first?.fontSize == 6.5,
+                "band pitch 35 / (9 × 0.6001) = 6.48 → 6.5; got \(lines.first?.fontSize ?? -1)")
+        let hits = TextLayerReconstructor.inRegionDrawnGlyphIndices(
+            entries: entries, pageWidth: 612, redactionRects: [region])
+        #expect(hits == IndexSet(integer: 4), "exactly the colon; got \(Array(hits))")
+
+        // Applied: the colon is dropped and counted; the re-flowed layout is clean.
+        let filtered = FilterResult(surviving: entries, totalCharacters: 20, excludedCount: 11)
+        let shapes = [RegionShape(
+            expandedBounds: region.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
+            polygonVertices: nil, bounds: region)]
+        let validated = TextLayerReconstructor.validateSurvivors(
+            filtered, pageWidth: 612, regionShapes: shapes, pageRotation: 0)
+        #expect(validated.dropped == 1)
+        #expect(validated.result.surviving.count == 8)
+        #expect(validated.result.excludedCount == 12)
+        #expect(validated.result.totalCharacters == 20)
+        #expect(!validated.result.surviving.contains { $0.character == ":" })
+        #expect(TextLayerReconstructor.inRegionDrawnGlyphIndices(
+            entries: validated.result.surviving, pageWidth: 612, regionShapes: shapes).isEmpty)
+        let digest = validated.result.toDigest(
+            pageIndex: 0, redactionRects: [region], safetyMargin: safetyMarginPoints,
+            drawnCellRuleExcludedCount: validated.dropped)
+        #expect(digest.drawnCellRuleExcludedCount == 1)
+        #expect(digest.excludedCount == 12)
+        #expect(digest.survivingNonWhitespaceCount == 8)
+    }
+
+    @Test("drawn-cell rule: not applied on a page stored with a rotation (the layout is not faithful there yet)")
+    func drawnCellRuleGatedOnRotatedPages() {
+        let (entries, region) = Self.narrowLabelBand()
+        let filtered = FilterResult(surviving: entries, totalCharacters: 20, excludedCount: 11)
+        let shapes = [RegionShape(
+            expandedBounds: region.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
+            polygonVertices: nil, bounds: region)]
+        for rotation in [90, 180, 270, 450] {
+            let v = TextLayerReconstructor.validateSurvivors(
+                filtered, pageWidth: 612, regionShapes: shapes, pageRotation: rotation)
+            #expect(v.dropped == 0 && v.result.surviving.count == 9,
+                    "rotation \(rotation): the rule must leave the filter result unchanged")
+        }
+        for rotation in [0, 360, -360] {
+            #expect(TextLayerReconstructor.validateSurvivors(
+                filtered, pageWidth: 612, regionShapes: shapes, pageRotation: rotation).dropped == 1,
+                    "rotation \(rotation) is unrotated: the rule applies")
+        }
+    }
+
+    @Test("drawn-cell rule: a polygon region is tested as the polygon, not its bounding box")
+    func drawnCellRulePolygonUsesThePolygon() {
+        let (entries, region) = Self.narrowLabelBand()
+        // A triangle inside the region's bounding box whose interior lies far
+        // right of the colon's drawn centre (x ≈ 115.05).
+        let farTriangle = [CGPoint(x: 150, y: 500), CGPoint(x: 160, y: 500), CGPoint(x: 160, y: 510)]
+        let triangle = RegionShape(
+            expandedBounds: region.insetBy(dx: -3, dy: -3),
+            polygonVertices: farTriangle, bounds: region)
+        #expect(TextLayerReconstructor.inRegionDrawnGlyphIndices(
+            entries: entries, pageWidth: 612, regionShapes: [triangle]).isEmpty,
+                "a centre inside the bounding box but outside the polygon is outside the region")
+        let rectAsPolygon = [
+            CGPoint(x: region.minX, y: region.minY), CGPoint(x: region.maxX, y: region.minY),
+            CGPoint(x: region.maxX, y: region.maxY), CGPoint(x: region.minX, y: region.maxY)]
+        let rectShape = RegionShape(
+            expandedBounds: region.insetBy(dx: -3, dy: -3),
+            polygonVertices: rectAsPolygon, bounds: region)
+        #expect(TextLayerReconstructor.inRegionDrawnGlyphIndices(
+            entries: entries, pageWidth: 612, regionShapes: [rectShape]) == IndexSet(integer: 4))
+    }
+
+    @Test("drawn-cell rule: identity on the committed packet and a rotated page; provenance covers every entry once",
+          .timeLimit(.minutes(1)))
+    func drawnCellRuleIdentityAndProvenance() async throws {
+        let extractor = TextLayerExtractor()
+        // The committed 12-page packet with the preflight's mid-body band on
+        // every page.
+        let packet = try #require(PDFDocument(data: try TestFixtures.loanPacketPDF()))
+        let bands = PacketSearchableProbeTests.packetRegions(pageCount: packet.pageCount)
+        var totalEntries = 0
+        for pi in 0..<packet.pageCount {
+            let page = try #require(packet.page(at: pi))
+            let chars = try await extractor.extractCharacters(from: page)
+            let basis = CGRect(
+                origin: .zero,
+                size: effectiveBounds(page.bounds(for: .cropBox), rotation: page.rotation).size)
+            let rects = (bands[pi] ?? []).map {
+                normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: basis)
+            }
+            let surviving = try await filterCharacters(characters: chars, redactionRects: rects).surviving
+            let hits = TextLayerReconstructor.inRegionDrawnGlyphIndices(
+                entries: surviving, pageWidth: basis.width, redactionRects: rects)
+            #expect(hits.isEmpty, "page \(pi + 1): \(hits.count) drawn cell(s) inside the band")
+            let sourced = TextLayerReconstructor.layoutLinesWithSources(
+                surviving, pageWidth: basis.width, redactionRects: rects)
+            let plain = TextLayerReconstructor.layoutLines(
+                surviving, pageWidth: basis.width, redactionRects: rects)
+            #expect(sourced.map(\.line.text) == plain.map(\.text))
+            #expect(sourced.map(\.line.origin) == plain.map(\.origin))
+            #expect(sourced.map(\.line.fontSize) == plain.map(\.fontSize))
+            let drawn = sourced.flatMap { $0.sources.map(\.entry) }
+            #expect(drawn.count == surviving.count && Set(drawn).count == surviving.count,
+                    "page \(pi + 1): provenance must cover each entry exactly once")
+            totalEntries += surviving.count
+        }
+        #expect(totalEntries > 20_000)
+
+        // A /Rotate 90 page: no region, and a region far from the text.
+        let rotated = try #require(PDFDocument(data: TestFixtures.rotatedTextPDF()))
+        let rpage = try #require(rotated.page(at: 0))
+        let rchars = try await extractor.extractCharacters(from: rpage)
+        let rbasis = CGRect(
+            origin: .zero,
+            size: effectiveBounds(rpage.bounds(for: .cropBox), rotation: rpage.rotation).size)
+        #expect(!rchars.isEmpty)
+        #expect(TextLayerReconstructor.inRegionDrawnGlyphIndices(
+            entries: rchars, pageWidth: rbasis.width, redactionRects: []).isEmpty)
+        let cornerRect = normalizedToPDFPageCoordinates(
+            CGRect(x: 0, y: 0, width: 0.05, height: 0.05), pageRect: rbasis)
+        let rsurviving = try await filterCharacters(characters: rchars, redactionRects: [cornerRect]).surviving
+        #expect(TextLayerReconstructor.inRegionDrawnGlyphIndices(
+            entries: rsurviving, pageWidth: rbasis.width, redactionRects: [cornerRect]).isEmpty)
+    }
 }

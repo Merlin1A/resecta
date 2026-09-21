@@ -30,6 +30,16 @@ struct TextLayerLine {
     let text: String
 }
 
+/// One drawn line with its provenance: for every surviving entry the line
+/// draws, the UTF-16 offset of that entry's text inside `line.text`. Bridge
+/// spaces have no source entry. The drawn-cell rule
+/// (`inRegionDrawnGlyphIndices`) reads this to place a survivor where the
+/// writer draws it, which is not its source box.
+struct SourcedTextLayerLine {
+    let line: TextLayerLine
+    let sources: [(entry: Int, utf16Offset: Int)]
+}
+
 /// Reconstructs the invisible text layer for Searchable Redaction output.
 /// Must be called AFTER the page image has been drawn into the CGContext.
 public enum TextLayerReconstructor {
@@ -155,11 +165,24 @@ public enum TextLayerReconstructor {
         pageWidth: CGFloat,
         redactionRects: [CGRect]
     ) -> [TextLayerLine] {
+        layoutLinesWithSources(
+            entries, pageWidth: pageWidth, redactionRects: redactionRects
+        ).map(\.line)
+    }
+
+    /// `layoutLines` with provenance: the same assembly, each line carrying
+    /// which entry every drawn composed character came from.
+    static func layoutLinesWithSources(
+        _ entries: [CharacterInfo],
+        pageWidth: CGFloat,
+        redactionRects: [CGRect]
+    ) -> [SourcedTextLayerLine] {
         let groups = runMemberGroups(entries)
         guard !groups.isEmpty else { return [] }
         let perPt = SandwichVerification.courierAdvancePerPoint
 
         struct GroupInfo {
+            let members: [Int]
             let text: String
             let composedLen: Int
             let rawX: CGFloat
@@ -181,6 +204,7 @@ public enum TextLayerReconstructor {
             }
             let first = entries[members[0]].bounds
             return GroupInfo(
+                members: members,
                 text: text,
                 composedLen: max(len, 1),
                 rawX: first.minX,
@@ -196,7 +220,7 @@ public enum TextLayerReconstructor {
         var bandGroups: [[Int]] = Array(repeating: [], count: bandCount)
         for (gi, b) in bands.enumerated() { bandGroups[b].append(gi) }
 
-        var result: [TextLayerLine] = []
+        var result: [SourcedTextLayerLine] = []
         for bi in 0..<bandCount {
             let order = bandGroups[bi].sorted { infos[$0].rawX < infos[$1].rawX }
             guard !order.isEmpty else { continue }
@@ -213,7 +237,8 @@ public enum TextLayerReconstructor {
                 (derived / pitchQuantizationStep).rounded() * pitchQuantizationStep,
                 minimumFontSize)
 
-            func assemble(_ size: CGFloat) -> (lines: [TextLayerLine], maxEndX: CGFloat) {
+            func assemble(_ size: CGFloat)
+                -> (lines: [SourcedTextLayerLine], maxEndX: CGFloat) {
                 let cw = perPt * size
                 let font = CTFontCreateWithName("Courier" as CFString, size, nil)
                 let attrs: [NSAttributedString.Key: Any] = [.font: font]
@@ -223,20 +248,34 @@ public enum TextLayerReconstructor {
                         NSAttributedString(string: s, attributes: attrs))
                     return CGFloat(CTLineGetTypographicBounds(l, nil, nil, nil))
                 }
-                var lines: [TextLayerLine] = []
+                var lines: [SourcedTextLayerLine] = []
                 var maxEndX: CGFloat = 0
                 var text = ""
+                var sources: [(entry: Int, utf16Offset: Int)] = []
                 var originX: CGFloat = 0
                 var lineY: CGFloat = 0
                 var yLo: CGFloat = 0
                 var yHi: CGFloat = 0
+                // Append a group's text to the line under assembly, recording
+                // each member's UTF-16 offset inside the line text.
+                func append(_ g: GroupInfo) {
+                    var offset = (text as NSString).length
+                    for m in g.members {
+                        sources.append((m, offset))
+                        offset += (entries[m].character as NSString).length
+                    }
+                    text += g.text
+                }
                 func close() {
                     guard !text.isEmpty else { return }
                     maxEndX = max(maxEndX, originX + drawnWidth(text))
-                    lines.append(TextLayerLine(
-                        origin: CGPoint(x: originX, y: lineY),
-                        fontSize: size, text: text))
+                    lines.append(SourcedTextLayerLine(
+                        line: TextLayerLine(
+                            origin: CGPoint(x: originX, y: lineY),
+                            fontSize: size, text: text),
+                        sources: sources))
                     text = ""
+                    sources = []
                 }
                 for gi in order {
                     let g = infos[gi]
@@ -246,7 +285,7 @@ public enum TextLayerReconstructor {
                         lineY = g.y
                         yLo = g.yMin
                         yHi = g.yMax
-                        text = g.text
+                        append(g)
                         continue
                     }
                     let cursorEnd = originX + drawnWidth(text)
@@ -264,13 +303,14 @@ public enum TextLayerReconstructor {
                         lineY = g.y
                         yLo = g.yMin
                         yHi = g.yMax
-                        text = g.text
+                        append(g)
                     } else {
                         let gapCells = max(
                             1, Int(((target - cursorEnd) / cw).rounded()))
-                        text += String(repeating: " ", count: gapCells) + g.text
+                        text += String(repeating: " ", count: gapCells)
                         yLo = min(yLo, g.yMin)
                         yHi = max(yHi, g.yMax)
+                        append(g)
                     }
                 }
                 close()
@@ -286,6 +326,134 @@ public enum TextLayerReconstructor {
             result.append(contentsOf: assembled.lines)
         }
         return result
+    }
+
+    // MARK: - The drawn-cell rule
+
+    /// Upper bound on re-flow passes of `validateSurvivors`. A pass that
+    /// continues has dropped at least one entry, so the loop ends on its own;
+    /// the bound only caps a pathological page.
+    static let drawnCellRulePassLimit = 16
+
+    /// Indices of `entries` whose DRAWN glyph cell is centred inside an
+    /// un-expanded redaction region.
+    ///
+    /// The character filter keeps or drops a glyph on its SOURCE box. The
+    /// writer then draws it somewhere else: inside a band every group snaps
+    /// its origin LEFT to the band's Courier grid, but the cursor advances by
+    /// Courier cells at the band's sum-matched pitch, so where the source
+    /// font is narrower than that pitch a group's last glyphs land RIGHT of
+    /// their source positions — a label's trailing colon can be drawn into
+    /// the value box beside it although its source box clears the filter's
+    /// halo, and Layer 6 then (correctly) reports a drawn glyph inside a
+    /// region. This rule places each survivor where the writer will draw it —
+    /// the line's origin plus the CTLine's advance to that glyph at the band
+    /// pitch, vertically the Courier line box shrunk to its glyph core by the
+    /// same descent fraction Layer 6 applies to a read-back box — and returns
+    /// every entry whose core centre lies inside a region (the polygon when
+    /// the shape carries one, else the rect: the centre test Layer 6 runs).
+    /// A cell that only crosses a region edge is NOT returned: that is
+    /// Layer 6's graze note, a positional observation about content that
+    /// stays outside.
+    static func inRegionDrawnGlyphIndices(
+        entries: [CharacterInfo],
+        pageWidth: CGFloat,
+        regionShapes: [RegionShape]
+    ) -> IndexSet {
+        guard !entries.isEmpty, !regionShapes.isEmpty else { return IndexSet() }
+        let rects = regionShapes.map(\.bounds)
+        var hits = IndexSet()
+        for sourced in layoutLinesWithSources(
+            entries, pageWidth: pageWidth, redactionRects: rects
+        ) {
+            let line = sourced.line
+            let font = CTFontCreateWithName("Courier" as CFString, line.fontSize, nil)
+            let ascent = CTFontGetAscent(font)
+            let descent = CTFontGetDescent(font)
+            let fraction = SandwichVerification.descentFraction(
+                family: "Courier", pointSize: line.fontSize)
+            let ctLine = CTLineCreateWithAttributedString(
+                NSAttributedString(string: line.text, attributes: [.font: font]))
+            for (entry, offset) in sourced.sources {
+                let length = (entries[entry].character as NSString).length
+                let x0 = CGFloat(CTLineGetOffsetForStringIndex(ctLine, offset, nil))
+                let x1 = CGFloat(CTLineGetOffsetForStringIndex(ctLine, offset + length, nil))
+                let cell = CGRect(
+                    x: line.origin.x + x0, y: line.origin.y - descent,
+                    width: x1 - x0, height: ascent + descent)
+                let core = cell.insetBy(dx: 0, dy: fraction * cell.height)
+                let centre = CGPoint(x: core.midX, y: core.midY)
+                let inside = regionShapes.contains { shape in
+                    if let vertices = shape.polygonVertices {
+                        return SandwichVerification.polygonContainsPoint(
+                            centre, vertices: vertices)
+                    }
+                    return shape.bounds.contains(centre)
+                }
+                if inside { hits.insert(entry) }
+            }
+        }
+        return hits
+    }
+
+    /// Rect-only form of `inRegionDrawnGlyphIndices(entries:pageWidth:regionShapes:)`.
+    static func inRegionDrawnGlyphIndices(
+        entries: [CharacterInfo],
+        pageWidth: CGFloat,
+        redactionRects: [CGRect]
+    ) -> IndexSet {
+        inRegionDrawnGlyphIndices(
+            entries: entries, pageWidth: pageWidth,
+            regionShapes: redactionRects.map {
+                RegionShape(
+                    expandedBounds: $0.insetBy(
+                        dx: -safetyMarginPoints, dy: -safetyMarginPoints),
+                    polygonVertices: nil, bounds: $0)
+            })
+    }
+
+    /// The drawn-cell rule applied to a filter result: every survivor the rule
+    /// returns is dropped (counted into `excludedCount`) and the layout
+    /// re-flowed, until no drawn cell is centred inside a region — so the
+    /// digest, the drawn layer and Layer 6 agree by construction. Runs on the
+    /// production path (`PageRasterizer`) before the digest is taken; the
+    /// test pipeline mirrors it. Over-redaction is safe, under-redaction is a
+    /// breach: a dropped glyph is one the searchable layer would otherwise
+    /// have placed inside a redaction.
+    ///
+    /// Not applied on a page stored with a rotation (`pageRotation % 360 !=
+    /// 0`): there today's band layout is not geometrically faithful — the
+    /// source lines run vertically in output space and the horizontal
+    /// assembler pools glyphs of many source lines into one band — so the
+    /// rule would drop displaced glyphs by the hundreds without making the
+    /// page verify. The gate lifts when the layout is assembled in the
+    /// source frame.
+    static func validateSurvivors(
+        _ result: FilterResult,
+        pageWidth: CGFloat,
+        regionShapes: [RegionShape],
+        pageRotation: Int
+    ) -> (result: FilterResult, dropped: Int) {
+        guard pageRotation % 360 == 0 else { return (result, 0) }
+        var surviving = result.surviving
+        var dropped = 0
+        var passes = 0
+        while passes < drawnCellRulePassLimit {
+            let hits = inRegionDrawnGlyphIndices(
+                entries: surviving, pageWidth: pageWidth, regionShapes: regionShapes)
+            if hits.isEmpty { break }
+            surviving = surviving.enumerated()
+                .filter { !hits.contains($0.offset) }
+                .map(\.element)
+            dropped += hits.count
+            passes += 1
+        }
+        return (
+            FilterResult(
+                surviving: surviving,
+                totalCharacters: result.totalCharacters,
+                excludedCount: result.excludedCount + dropped),
+            dropped)
     }
 
     // MARK: - Text Run Grouping

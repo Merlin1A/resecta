@@ -46,6 +46,17 @@ public struct SandwichVerification: Sendable {
     /// (RealDocProbeTests, 2026-06-09).
     public static let lineBandTolerance: CGFloat = 1.5
 
+    /// The lineage digest of an EMPTY walk — the SHA-256 of zero updates.
+    /// `FilterResult.computeLineageHash(over: [])` yields exactly this for a
+    /// page whose filter kept no survivor, and `computeOutputLineageHash`
+    /// returns it for an output page with no text layer, no code units, or
+    /// no measurable non-whitespace unit, so a fully-redacted searchable
+    /// page compares equal on both sides. It is NOT `Data()`:
+    /// `verifyCharacterLineage` reads an empty `Data()` as "no lineage
+    /// recorded" (legacy digests, hand-built test digests) and passes
+    /// without comparing.
+    public static let emptyLineageDigest = Data(SHA256().finalize())
+
     /// Single-linkage sweep over Y values: returns each input index's band
     /// ordinal (0 = topmost). Deterministic in the input values only.
     static func yBands(_ ys: [CGFloat]) -> [Int] {
@@ -210,9 +221,10 @@ public struct SandwichVerification: Sendable {
         // cancel→surrender budget; bitmask check is amortized constant time.
         var bandCounter = 0
         var utf16Offset = 0
-        // Non-whitespace units whose read-back selection has no measurable
-        // bounds. They cannot be position-checked; counted here and reported
-        // as a WARN on the otherwise-PASS exit instead of being dropped.
+        // Non-whitespace units whose read-back selection is missing or has
+        // no measurable bounds. They cannot be position-checked; counted here
+        // and reported as a WARN on the otherwise-PASS exit instead of being
+        // dropped.
         var zeroBoundsUnits = 0
         // Non-whitespace units for the exclusion pass, in string order (the
         // band gate needs the whole page's Y structure before any verdict,
@@ -228,6 +240,11 @@ public struct SandwichVerification: Sendable {
             bandCounter += 1
             let composedRange = nsText.rangeOfComposedCharacterSequence(at: utf16Offset)
             guard let sel = outputPage.selection(for: composedRange) else {
+                // No read-back selection at all: as unmeasurable as an empty
+                // bounds box — counted, never silently skipped.
+                if !FilterResult.isLineageWhitespace(nsText.substring(with: composedRange)) {
+                    zeroBoundsUnits += 1
+                }
                 utf16Offset += max(composedRange.length, 1)
                 continue
             }
@@ -562,6 +579,13 @@ public struct SandwichVerification: Sendable {
     /// iteration, matching extractCharacters()'s unit and the
     /// output lineage walk's two skip conditions (zero bounds, lineage
     /// whitespace — see `computeOutputLineageHash`).
+    ///
+    /// The nil-selection and zero-bounds skips here are the SAME predicate
+    /// `computeOutputLineageHash` applies: Layer 7's count and Layer 9's hash
+    /// walk it on both sides of their comparisons, so an unmeasurable unit is
+    /// outside both domains by design (the symmetry is the contract, not a
+    /// gap). Layer 6 is the layer that counts such units and reports them as
+    /// unmeasured (`zeroBoundsWarning`).
     private func countComposedCharacters(_ page: PDFPage) throws -> Int {
         guard let text = page.string else { return 0 }
         let nsText = text as NSString
@@ -749,9 +773,13 @@ public struct SandwichVerification: Sendable {
         // was not honored until the layer completed. The composed-character
         // walk below carries the banded 256-cadence checks (house pattern).
         try Task.checkCancellation()
-        // Pages where the filter recorded no surviving characters have an
-        // empty lineage hash; the corresponding output page is expected to
-        // have no composed characters of its own.
+        // An empty `Data()` means NO lineage recorded (legacy reports,
+        // hand-built test digests): nothing to compare, pass. A page whose
+        // filter kept no survivor is different — it carries the empty-set
+        // digest (`emptyLineageDigest`), which the output walk of a textless
+        // page reproduces: 0 expected and 0 found compare equal; 0 expected
+        // with any measurable output unit compares unequal and FAILs (an
+        // injection).
         guard !digest.lineageHash.isEmpty else { return .pass }
 
         let outputHash = try Self.computeOutputLineageHash(outputPage)
@@ -797,11 +825,20 @@ public struct SandwichVerification: Sendable {
     /// Hash domain: each emitted composed character contributes
     /// `(character.utf8, globalPos)` separated by `0x1F`, where `globalPos`
     /// is a 0-indexed integer counter incremented per emitted character.
+    ///
+    /// An EMPTY walk — no text layer, no code units, or no measurable
+    /// non-whitespace unit — returns `emptyLineageDigest`, the SHA-256 of
+    /// zero updates, which is what the filter records for a page whose
+    /// survivor set is empty; never `Data()`, which `verifyCharacterLineage`
+    /// reads as "no lineage recorded". The nil-selection and zero-bounds
+    /// skips below are the same predicate Layer 7's `countComposedCharacters`
+    /// applies — the two layers walk one domain on both sides of their
+    /// comparisons by design; Layer 6 counts and reports the units they skip.
     static func computeOutputLineageHash(_ outputPage: PDFPage) throws -> Data {
-        guard let pageText = outputPage.string else { return Data() }
+        guard let pageText = outputPage.string else { return Self.emptyLineageDigest }
         let nsText = pageText as NSString
         let totalCodeUnits = outputPage.numberOfCharacters
-        guard totalCodeUnits > 0 else { return Data() }
+        guard totalCodeUnits > 0 else { return Self.emptyLineageDigest }
 
         var units: [(string: String, minY: CGFloat, minX: CGFloat)] = []
         var utf16Offset = 0

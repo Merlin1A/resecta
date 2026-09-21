@@ -57,11 +57,15 @@ public struct PageFilterDigest: Sendable {
     public let excludedCount: Int
     public let survivingCount: Int
     public let boundaryCharacters: [BoundaryCharacterInfo]
-    /// SHA-256 over the surviving character sequence in filter iteration order.
+    /// SHA-256 over the surviving character sequence in canonical order.
     /// Layer 9 (Character Lineage) recomputes the same hash from output PDFKit
-    /// composed-character iteration and reports mismatch. Empty Data() when the
-    /// filter ran on a page with no surviving characters or when the digest was
-    /// constructed by a caller that pre-dates the lineage field.
+    /// composed-character iteration and reports mismatch. Two distinct
+    /// "empty" values: a page whose filter kept NO survivor carries the
+    /// empty-set digest (`SandwichVerification.emptyLineageDigest`, the
+    /// SHA-256 of zero updates), which the output walk of a textless page
+    /// reproduces; an empty `Data()` means the digest was constructed by a
+    /// caller that pre-dates the lineage field ("no lineage recorded" —
+    /// Layer 9 passes without comparing).
     public let lineageHash: Data
     /// Count of surviving characters whose text is NOT lineage-whitespace —
     /// the Layer 7 comparison domain. PDFKit synthesizes inter-run
@@ -71,11 +75,18 @@ public struct PageFilterDigest: Sendable {
     /// `survivingCount` (correct wherever the surviving set carries no
     /// whitespace entries).
     public let survivingNonWhitespaceCount: Int
+    /// Of `excludedCount`, the survivors the writer-side drawn-cell rule
+    /// dropped after the filter (`TextLayerReconstructor.validateSurvivors`):
+    /// glyphs the filter kept on their source box but the band layout would
+    /// have drawn centred inside a redaction region. 0 for a digest taken
+    /// before the rule ran, or by a caller that pre-dates it.
+    public let drawnCellRuleExcludedCount: Int
 
     public init(pageIndex: Int, extractedCount: Int, excludedCount: Int,
                 survivingCount: Int, boundaryCharacters: [BoundaryCharacterInfo],
                 lineageHash: Data = Data(),
-                survivingNonWhitespaceCount: Int? = nil) {
+                survivingNonWhitespaceCount: Int? = nil,
+                drawnCellRuleExcludedCount: Int = 0) {
         self.pageIndex = pageIndex
         self.extractedCount = extractedCount
         self.excludedCount = excludedCount
@@ -83,6 +94,7 @@ public struct PageFilterDigest: Sendable {
         self.boundaryCharacters = boundaryCharacters
         self.lineageHash = lineageHash
         self.survivingNonWhitespaceCount = survivingNonWhitespaceCount ?? survivingCount
+        self.drawnCellRuleExcludedCount = drawnCellRuleExcludedCount
     }
 }
 

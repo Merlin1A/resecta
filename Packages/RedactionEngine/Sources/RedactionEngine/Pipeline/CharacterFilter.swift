@@ -552,10 +552,15 @@ extension FilterResult {
     ///   - redactionRects: Redaction rectangles in PDF-point-space (already converted
     ///     from normalized coordinates via normalizedToPDFPageCoordinates).
     ///   - safetyMargin: The safety margin used during filtering.
+    ///   - drawnCellRuleExcludedCount: How many of `excludedCount` the
+    ///     writer-side drawn-cell rule dropped after the filter
+    ///     (`TextLayerReconstructor.validateSurvivors`); 0 when the rule
+    ///     has not run on this result.
     public func toDigest(
         pageIndex: Int,
         redactionRects: [CGRect],
-        safetyMargin: CGFloat
+        safetyMargin: CGFloat,
+        drawnCellRuleExcludedCount: Int = 0
     ) -> PageFilterDigest {
         // Identify boundary characters: surviving characters within safetyMargin * 2
         // of any redaction edge (the "near miss" zone).
@@ -575,7 +580,8 @@ extension FilterResult {
             lineageHash: Self.computeLineageHash(over: surviving),
             survivingNonWhitespaceCount: surviving.count(where: {
                 !Self.isLineageWhitespace($0.character)
-            })
+            }),
+            drawnCellRuleExcludedCount: drawnCellRuleExcludedCount
         )
     }
 

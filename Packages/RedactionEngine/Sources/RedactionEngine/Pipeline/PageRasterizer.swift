@@ -228,33 +228,38 @@ public final class PageRasterizer: @unchecked Sendable {
                         ($0.vertices?.count ?? 0) >= 3
                     }
 
-                    let filterResult: FilterResult
-                    if hasAnyPolygon {
-                        let shapes: [RegionShape] = zip(page.regions, redactionRectsInPoints)
-                            .map { region, rect in
-                                let expanded = rect.insetBy(
-                                    dx: -safetyMarginPoints, dy: -safetyMarginPoints
-                                )
-                                guard let normalized = region.vertices,
-                                      normalized.count >= 3 else {
-                                    return RegionShape(
-                                        expandedBounds: expanded,
-                                        polygonVertices: nil,
-                                        bounds: rect
-                                    )
-                                }
-                                let inPoints = normalized.map { v in
-                                    normalizedToPDFPageCoordinates(
-                                        CGRect(x: v.x, y: v.y, width: 0, height: 0),
-                                        pageRect: pageBounds
-                                    ).origin
-                                }
+                    // Region shapes in output-page points: the polygon
+                    // path's shapes, or the rects wrapped (un-expanded
+                    // `bounds`; the halo in `expandedBounds`). The filter's
+                    // polygon overload and the drawn-cell rule below read them.
+                    let shapes: [RegionShape] = zip(page.regions, redactionRectsInPoints)
+                        .map { region, rect in
+                            let expanded = rect.insetBy(
+                                dx: -safetyMarginPoints, dy: -safetyMarginPoints
+                            )
+                            guard hasAnyPolygon,
+                                  let normalized = region.vertices,
+                                  normalized.count >= 3 else {
                                 return RegionShape(
                                     expandedBounds: expanded,
-                                    polygonVertices: inPoints,
+                                    polygonVertices: nil,
                                     bounds: rect
                                 )
                             }
+                            let inPoints = normalized.map { v in
+                                normalizedToPDFPageCoordinates(
+                                    CGRect(x: v.x, y: v.y, width: 0, height: 0),
+                                    pageRect: pageBounds
+                                ).origin
+                            }
+                            return RegionShape(
+                                expandedBounds: expanded,
+                                polygonVertices: inPoints,
+                                bounds: rect
+                            )
+                        }
+                    let filterResult: FilterResult
+                    if hasAnyPolygon {
                         filterResult = try await filterCharacters(
                             characters: characters,
                             regionShapes: shapes
@@ -267,12 +272,31 @@ public final class PageRasterizer: @unchecked Sendable {
                         )
                     }
 
-                    textLayerEntries = filterResult.surviving
+                    // The writer-side drawn-cell rule: a survivor the filter
+                    // keeps on its SOURCE box can still be DRAWN inside a
+                    // region (the band's Courier cursor carries a group's
+                    // last glyphs right of their source positions where the
+                    // source font is narrower than the band pitch). The
+                    // layout is validated BEFORE the digest is taken, so the
+                    // digest, the drawn layer and Layer 6 agree by
+                    // construction.
+                    let validated = TextLayerReconstructor.validateSurvivors(
+                        filterResult, pageWidth: pageBounds.width, regionShapes: shapes,
+                        pageRotation: page.rotation
+                    )
+                    if validated.dropped > 0 {
+                        pageRasterizerLogger.log(
+                            "page \(page.pageIndex): \(validated.dropped, privacy: .public) surviving character(s) whose drawn cell lay inside a redaction region were dropped from the text layer"
+                        )
+                    }
+
+                    textLayerEntries = validated.result.surviving
                     redactionRectsForTextLayer = redactionRectsInPoints
-                    pageDigest = filterResult.toDigest(
+                    pageDigest = validated.result.toDigest(
                         pageIndex: page.pageIndex,
                         redactionRects: redactionRectsInPoints,
-                        safetyMargin: safetyMarginPoints
+                        safetyMargin: safetyMarginPoints,
+                        drawnCellRuleExcludedCount: validated.dropped
                     )
                 } else {
                     // shouldFallback or empty: textLayerEntries remains nil,

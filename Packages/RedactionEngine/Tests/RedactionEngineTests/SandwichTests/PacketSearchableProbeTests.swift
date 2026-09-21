@@ -176,6 +176,56 @@ struct PacketSearchableProbeTests {
         }
     }
 
+    // MARK: 3 — page 7 with the ground-truth all-must-fire boxes (S4-V2)
+
+    /// The 13 ground-truth `must_fire` boxes on packet page 7 (the T1040
+    /// page), normalized with a bottom-left origin — the same regions the
+    /// verification corpus runner burns for that page. Geometry only.
+    static let page7GroundTruthBoxes: [CGRect] = [
+        CGRect(x: 0.789733, y: 0.827915, width: 0.110721, height: 0.014513),
+        CGRect(x: 0.175756, y: 0.827915, width: 0.101103, height: 0.014513),
+        CGRect(x: 0.068627, y: 0.739683, width: 0.151662, height: 0.013750),
+        CGRect(x: 0.068627, y: 0.724532, width: 0.112427, height: 0.013749),
+        CGRect(x: 0.215686, y: 0.807713, width: 0.110790, height: 0.014513),
+        CGRect(x: 0.081699, y: 0.774884, width: 0.110722, height: 0.014514),
+        CGRect(x: 0.137466, y: 0.668976, width: 0.095049, height: 0.013750),
+        CGRect(x: 0.454440, y: 0.668976, width: 0.104894, height: 0.013750),
+        CGRect(x: 0.767208, y: 0.668976, width: 0.086885, height: 0.013750),
+        CGRect(x: 0.137466, y: 0.648774, width: 0.096794, height: 0.013750),
+        CGRect(x: 0.454440, y: 0.648774, width: 0.104894, height: 0.013750),
+        CGRect(x: 0.767208, y: 0.648774, width: 0.086885, height: 0.013750),
+        CGRect(x: 0.411765, y: 0.572864, width: 0.100656, height: 0.014514),
+    ]
+
+    /// The writer must never draw a surviving glyph inside a redaction. On
+    /// page 7 the source font is narrower than the band's Courier pitch, so a
+    /// label's trailing colon — kept by the filter on its source box, 4 pt
+    /// clear of the value box beside it — was drawn INTO that box and the
+    /// spatial check reported it. The rule that drops such a glyph before the
+    /// digest is taken keeps the digest, the drawn layer and the check in
+    /// agreement: no layer FAILs here.
+    @Test("Preflight — page 7 with the ground-truth boxes: no sandwich layer FAILs")
+    func page7GroundTruthBoxesVerify() async throws {
+        let fixture = try TestFixtures.loanPacketPDF()
+        let regions = Self.page7GroundTruthBoxes.map {
+            RedactionRegion(id: UUID(), normalizedRect: $0, source: .manual)
+        }
+        let run = try await RealDocProbe.run(fixture, regions: [6: regions])
+        defer { try? FileManager.default.removeItem(at: run.outputURL) }
+        let rt = RealDocProbe.runtimeTag
+        for idx in [5, 6, 8] {
+            if let r = run.layers[idx] {
+                print("PKT-P7 [\(rt)] LAYER \(idx) [\(r.name)] -> \(statusTag(r.status)) | \(r.shortDescription)")
+            }
+        }
+        #expect(run.layers[5]?.status.isFail == false,
+                "Spatial Verification must not FAIL — no drawn glyph may sit inside a region; got \(run.layers[5]?.shortDescription ?? "nil")")
+        #expect(run.layers[6]?.status.isFail == false,
+                "Character Count must agree with the digest; got \(run.layers[6]?.shortDescription ?? "nil")")
+        #expect(run.layers[8]?.status == .pass,
+                "Character Lineage must match; got \(run.layers[8]?.shortDescription ?? "nil")")
+    }
+
     // MARK: helpers
 
     private func statusTag(_ s: VerificationStatus) -> String {
