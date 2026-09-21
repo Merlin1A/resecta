@@ -1979,12 +1979,16 @@ public struct PIIDetector: Sendable {
             labels.formUnion(positives)
         }
         let orderedLabels = labels.sorted()
-        var results: [PIIMatch] = []
+        var lines: [NSRange] = []
         ns.enumerateSubstrings(in: NSRange(location: 0, length: ns.length),
                                options: [.byLines, .substringNotRequired]) { _, line, _, _ in
-            guard line.length > 0 else { return }
+            lines.append(line)
+        }
+        var results: [PIIMatch] = []
+        for (index, line) in lines.enumerated() where line.length > 0 {
             Self.scanLabelColon(in: ns, line: line, labels: orderedLabels, into: &results)
             Self.scanCaption(in: ns, line: line, into: &results)
+            Self.scanClosingLine(in: ns, lines: lines, at: index, into: &results)
         }
         return results
     }
@@ -2037,6 +2041,58 @@ public struct PIIDetector: Sendable {
                     results.append(anchorMatch(right, route: "caption"))
                 }
             }
+        }
+    }
+
+    /// The closing phrases a letter signs off with, case-folded; the line
+    /// that carries one ends with a comma and holds nothing else.
+    private static let closingPhrases: Set<String> = [
+        "sincerely", "regards", "best regards", "kind regards", "warm regards",
+        "respectfully", "respectfully submitted", "yours truly",
+        "very truly yours", "cordially", "best", "thank you", "thanks",
+    ]
+
+    /// How many blank lines may sit between the closing phrase and the
+    /// signature line (room for a handwritten signature).
+    private static let closingLineBlankLimit = 3
+
+    /// True when the line is exactly a closing phrase followed by a comma.
+    private static func isClosingPhraseLine(_ ns: NSString, _ line: NSRange) -> Bool {
+        let text = ns.substring(with: line).trimmingCharacters(in: .whitespaces)
+        guard text.hasSuffix(",") else { return false }
+        return closingPhrases.contains(String(text.dropLast()).trimmingCharacters(in: .whitespaces).lowercased())
+    }
+
+    /// Route 2 — the closing line: the first non-blank line after a
+    /// closing-phrase line (at most `closingLineBlankLimit` blank lines
+    /// skipped) is read when the candidate opens it and nothing but a
+    /// comma-led suffix (`, Esq.`) or a period follows on that line.
+    private static func scanClosingLine(
+        in ns: NSString, lines: [NSRange], at index: Int, into results: inout [PIIMatch]
+    ) {
+        guard isClosingPhraseLine(ns, lines[index]) else { return }
+        var next = index + 1
+        var blanks = 0
+        while next < lines.count, blanks <= closingLineBlankLimit {
+            let line = lines[next]
+            let trimmed = ns.substring(with: line).trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty {
+                blanks += 1
+                next += 1
+                continue
+            }
+            let lineEnd = NSMaxRange(line)
+            guard let candidate = readCandidate(forwardFrom: line.location, lineEnd: lineEnd, in: ns, minTokens: 2),
+                  admits(candidate) else { return }
+            var i = NSMaxRange(candidate.range)
+            while i < lineEnd, isHorizontalSpace(ns.character(at: i)) { i += 1 }
+            if i < lineEnd {
+                let u = ns.character(at: i)
+                guard u == 0x2C || u == 0x2E else { return }   // ',' or '.'
+                if u == 0x2E, i + 1 < lineEnd { return }
+            }
+            results.append(anchorMatch(candidate, route: "closing-line"))
+            return
         }
     }
 
