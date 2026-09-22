@@ -71,6 +71,12 @@ extension VerificationCorpusRunnerTests {
         /// nil for a page with no text layer or fewer than two measurable
         /// units. Pins "x on every unrotated page".
         let spatial_lattice_axes: [String?]
+        /// The output's trailer `/ID` payload (32 lowercase hex characters)
+        /// and whether both halves equal the identifier recomputed from the
+        /// file's bytes (`PDFFileIdentifier`); nil without a pair in the
+        /// writer's shape.
+        let file_id_hex: String?
+        let file_id_matches_digest: Bool?
     }
 
     struct RunnerSummary: Encodable {
@@ -96,6 +102,17 @@ extension VerificationCorpusRunnerTests {
 
     static func sha256Hex(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The output's `/ID` payload and its attestation (see `CellJSON`).
+    static func fileIdentifierReadout(_ data: Data) -> (hex: String?, matches: Bool?) {
+        let tailStart = max(data.startIndex, data.endIndex - PDFFileIdentifier.tailWindowLength)
+        guard let location = PDFFileIdentifier.locate(in: data[tailStart...]) else { return (nil, nil) }
+        let expected = PDFFileIdentifier.hexPayload(
+            for: PDFFileIdentifier.identifier(from: PDFFileIdentifier.digest(of: data, zeroing: location)))
+        let first = Data(String(decoding: data[location.first], as: UTF8.self).lowercased().utf8)
+        let second = Data(String(decoding: data[location.second], as: UTF8.self).lowercased().utf8)
+        return (String(decoding: first, as: UTF8.self), first == expected && second == expected)
     }
 
     /// Duration-free identity tuple for the cross-sweep determinism check.
@@ -244,6 +261,32 @@ extension VerificationCorpusRunnerTests {
                                w: 300.0 / 612, h: 40.0 / 792)],
                   terms: [("CLASSIFIED SECRET", false)],
                   notes: "black square annotation over live text; the real region burn must remove the text the annotation only covered"),
+        ]
+    }
+
+    /// The Layer-10 normalization-parity cell (C12-108; searchable only): the
+    /// term's plain spelling is burned; a compatibility-form spelling (the
+    /// ordinal indicator ª for the `a`, NFKC image `a`) survives outside the
+    /// region into the rebuilt text layer. Layer 3 scans the decoded page
+    /// text in its normalized form as well as as-extracted; Layer 10 must
+    /// read the same residue from the operator text. Terms = the plain
+    /// term; `expectedVisible` = the anchor line.
+    static func compatResidueInputs() -> [CellInput] {
+        let data = TestFixtures.compatFormResiduePDF()
+        let burn = TestFixtures.compatPlantBurnTd
+        return [
+            CellInput(
+                docId: "factory-compat-residue", data: data, docSHA: sha256Hex(data),
+                regionSet: fixedSet("factory", seeds: [
+                    seed("compat-plain-line", page: 0,
+                         x: (burn.x - 6) / 612, y: (burn.y - 10) / 792,
+                         w: 220.0 / 612, h: 40.0 / 792),
+                ]),
+                regionSource: "factory",
+                expectedVisible: ["COMPAT VISIBLE ANCHOR LINE"],
+                notes: "the term's plain spelling is burned; its compatibility-form spelling (ordinal indicator for the a) survives outside the region — Layer 3's normalized scan and Layer 10's operator scan must agree",
+                verifyOnly: false,
+                termsOverride: [SensitiveTerm(text: "plant-engcompat-01", requiresTokenBoundary: false)]),
         ]
     }
 }

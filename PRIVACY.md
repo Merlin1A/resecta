@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Effective date:** 2026-09-15
+**Effective date:** 2026-09-22
 
 Resecta is an on-device document-redaction app for iOS. This Privacy Policy
 describes how Resecta handles information. It is written to satisfy Apple's
@@ -78,9 +78,11 @@ producer tag, creation and modification timestamps, and a file identifier when
 it builds the file. Resecta then replaces the producer tag and both timestamps
 in the finished file with fixed values ("Resecta" and a constant date) that
 identify neither the operating system version, the build, nor the moment the
-file was written; the file identifier is a per-export value the writer assigns.
-The export therefore carries much less metadata than a typical PDF, but it is
-not metadata-free.
+file was written; Resecta rewrites the file identifier to a value derived from
+the file's own contents, so it carries nothing about the device, the build or
+the moment of export, and two exports of identical content carry the same
+identifier. The export therefore carries much less metadata than a typical
+PDF, but it is not metadata-free.
 
 A separate note applies to photos. An image you import can carry its own
 embedded metadata, such as EXIF or GPS location data. Resecta redraws imported

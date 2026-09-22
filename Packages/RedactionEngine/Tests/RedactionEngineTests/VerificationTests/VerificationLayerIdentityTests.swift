@@ -66,18 +66,16 @@ struct VerificationLayerIdentityTests {
         #expect(engine.layerName(at: 5, mode: .secureRasterization) == "Search Re-check")
         #expect(engine.layerName(at: 5, mode: .searchableRedaction) == "Spatial Verification")
         #expect(engine.layerName(at: 10, mode: .searchableRedaction) == "Search Re-check")
-        #expect(engine.layerSymbol(at: 5, mode: .secureRasterization) == "text.page.badge.magnifyingglass")
+        #expect(engine.layers(for: .secureRasterization)[5].symbolName == "text.page.badge.magnifyingglass")
         // Out of range keeps the historical fallbacks.
         #expect(engine.layerName(at: 6, mode: .secureRasterization) == "Unknown Layer")
-        #expect(engine.layerSymbol(at: 11, mode: .searchableRedaction) == "questionmark.circle")
         // The index-only adapters read the Searchable order.
         #expect(engine.layerName(at: 10) == "Search Re-check")
         #expect(engine.layerName(at: 5) == "Spatial Verification")
         #expect(engine.layerName(at: 11) == "Unknown Layer")
-        #expect(engine.layerSymbol(at: 11) == "questionmark.circle")
         for (index, layer) in VerificationLayer.allCases.enumerated() {
             #expect(engine.layerName(at: index) == layer.name)
-            #expect(engine.layerSymbol(at: index) == layer.symbolName)
+            #expect(engine.layers(for: .searchableRedaction)[index].symbolName == layer.symbolName)
         }
     }
 

@@ -223,6 +223,14 @@ public actor PDFStreamReconstructor {
         // never fails on this step.
         Self.overwriteInfoLiterals(at: tempURL)
 
+        // The writer also stamps a random per-export `/ID` pair in the
+        // trailer. Both halves are rewritten, at their exact offsets, to the
+        // identifier derived from the file's own bytes (`PDFFileIdentifier`)
+        // — after the literal rewrite above, so the digest covers the fixed
+        // values. Same contract: length-preserving, any anomaly leaves the
+        // pair untouched and only logs.
+        Self.overwriteFileIdentifier(at: tempURL)
+
         // Apply `.complete` file protection to the finalized temp
         // file. PipelineCoordinator.downgradeTempProtectionOnSessionClose()
         // downgrades the whole session subtree to
@@ -385,6 +393,51 @@ public actor PDFStreamReconstructor {
         bytes.append(Data(repeating: 0x20, count: valueLength - replacement.count))
         let offset = window.distance(from: window.startIndex, to: markerRange.upperBound)
         return (offset, bytes)
+    }
+
+    // MARK: - File identifier rewrite
+
+    /// Replace both payloads of the trailer's `/ID [ <…> <…> ]` pair with
+    /// the 32 hex characters of the identifier derived from the file's
+    /// contents: the first 16 bytes of SHA-256 over the whole file with both
+    /// payloads zeroed (`PDFFileIdentifier`). Each payload is overwritten
+    /// at its exact length through a `FileHandle`, so nothing else moves and
+    /// every xref offset stays valid. Zeroing before hashing makes the
+    /// digest independent of the pair's current value, so running the
+    /// rewrite again on its own output changes nothing, and two exports of
+    /// identical content end with the same pair.
+    ///
+    /// Guards (each leaves the pair untouched and the export never fails):
+    /// no `/ID [` marker in the tail window, more than one, or a pair that
+    /// is not two 32-character hex strings closed by `]`. The file is read
+    /// memory-mapped for the digest and the mapping is released before the
+    /// handle writes.
+    static func overwriteFileIdentifier(at url: URL) {
+        do {
+            let patch: (location: PDFFileIdentifier.Location, payload: Data)? = try {
+                let fileData = try Data(contentsOf: url, options: .alwaysMapped)
+                let tailStart = max(fileData.startIndex,
+                                    fileData.endIndex - PDFFileIdentifier.tailWindowLength)
+                guard let location = PDFFileIdentifier.locate(in: fileData[tailStart...]) else {
+                    return nil
+                }
+                let digest = PDFFileIdentifier.digest(of: fileData, zeroing: location)
+                return (location, PDFFileIdentifier.hexPayload(for: PDFFileIdentifier.identifier(from: digest)))
+            }()
+            guard let patch else {
+                infoRewriteLogger.info("file identifier pair not in the writer's shape; left unchanged")
+                return
+            }
+            let handle = try FileHandle(forUpdating: url)
+            defer { try? handle.close() }
+            for range in [patch.location.first, patch.location.second] {
+                try handle.seek(toOffset: UInt64(range.lowerBound))
+                try handle.write(contentsOf: patch.payload)
+            }
+        } catch { // LegalPhrases:safe (Swift keyword)
+            infoRewriteLogger.warning(
+                "file identifier rewrite skipped (metadata: \(error.localizedDescription, privacy: .public))")
+        }
     }
 
     // MARK: - JPEG Encoding

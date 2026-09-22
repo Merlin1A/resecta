@@ -90,25 +90,15 @@ public struct VerificationEngine: Sendable {
         return ordered.indices.contains(index) ? ordered[index].name : "Unknown Layer"
     }
 
-    /// SF Symbol name for the layer at `index` in `mode`'s order.
-    public func layerSymbol(at index: Int, mode: PipelineMode) -> String {
-        let ordered = layers(for: mode)
-        return ordered.indices.contains(index) ? ordered[index].symbolName : "questionmark.circle"
-    }
-
     /// Index-only adapter over the Searchable order (`VerificationLayer
     /// .allCases`): indices 0–9 are identical in both modes; index 10 is the
     /// Search Re-check. Kept for index-keyed callers; new code reads
-    /// `layerName(at:mode:)` or the layer's own `name`.
+    /// `layerName(at:mode:)` or the layer's own `name`. The symbol lives on
+    /// the layer (`VerificationLayer.symbolName`) and on each result
+    /// (`LayerResult.symbolName`); no index-keyed symbol adapter remains.
     public func layerName(at index: Int) -> String {
         let all = VerificationLayer.allCases
         return all.indices.contains(index) ? all[index].name : "Unknown Layer"
-    }
-
-    /// Index-only adapter, symbol counterpart of `layerName(at:)`.
-    public func layerSymbol(at index: Int) -> String {
-        let all = VerificationLayer.allCases
-        return all.indices.contains(index) ? all[index].symbolName : "questionmark.circle"
     }
 
     /// Run a single verification layer by its index in `pipelineMode`'s
@@ -2433,6 +2423,17 @@ public struct VerificationEngine: Sendable {
             }
         }
 
+        // File-identifier attestation. The writer rewrites both halves of
+        // the trailer's `/ID` pair to the identifier derived from the
+        // file's own bytes (`PDFFileIdentifier`); recompute it here and
+        // report a pair that was not derived that way — after the fixed
+        // fields, ahead of /Trapped and XMP, one message that never carries
+        // a value. An absent pair stays on the paths below.
+        if let idArray = cgDoc.fileIdentifier,
+           !Self.fileIdentifierMatchesContents(idArray, pdfData: pdfData) {
+            return (.warn("File identifier was not derived from the file contents"), false)
+        }
+
         // XMP metadata — scanned above the /Info guard; fold the
         // result into the warnings here for the /Info-present message path.
         if hasXMP {
@@ -2454,6 +2455,24 @@ public struct VerificationEngine: Sendable {
             return (.info("Auto-injected metadata present: \(infoFindings.joined(separator: ", "))"), false)
         }
         return (.pass, false)
+    }
+
+    /// True when the two strings of a trailer `/ID` array both equal the
+    /// identifier recomputed from `pdfData`. An array that is not two
+    /// strings, or a pair the locator cannot read from the file's tail in
+    /// the writer's shape, is by construction not the writer's derived
+    /// value.
+    static func fileIdentifierMatchesContents(_ idArray: CGPDFArrayRef, pdfData: Data) -> Bool {
+        guard CGPDFArrayGetCount(idArray) == 2 else { return false }
+        var halves: [Data] = []
+        for index in 0..<2 {
+            var ref: CGPDFStringRef?
+            guard CGPDFArrayGetString(idArray, index, &ref), let ref,
+                  let bytes = CGPDFStringGetBytePtr(ref) else { return false }
+            halves.append(Data(bytes: bytes, count: CGPDFStringGetLength(ref)))
+        }
+        guard let expected = PDFFileIdentifier.recomputedIdentifier(for: pdfData) else { return false }
+        return halves[0] == expected && halves[1] == expected
     }
 
     // MARK: - PDF Data Loading Helper

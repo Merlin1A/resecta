@@ -125,8 +125,8 @@ struct PacketSearchableProbeTests {
             // logging scope. A width far from the expected Courier advance is
             // the "non-uniform glyph advance" this check trips on.
             if let page0 = run.outputDocument.page(at: 0) {
-                let tol = Double(SandwichVerification.advanceWidthTolerance)
-                let perPt = Double(SandwichVerification.courierAdvancePerPoint)
+                let tol = Double(SandwichMetrics.advanceWidthTolerance)
+                let perPt = Double(SandwichMetrics.courierAdvancePerPoint)
                 var n = 0
                 for u in RealDocProbe.outputUnits(page0)
                 where u.positiveBounds && u.pointSize > 0

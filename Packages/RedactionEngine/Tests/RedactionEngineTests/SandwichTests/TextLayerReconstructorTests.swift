@@ -187,7 +187,7 @@ struct TextLayerReconstructorTests {
 
     @Test("Cell width is 0.60009765625 × baseFontSize")
     func cellWidthConstantMatchesPlan() {
-        let expected = SandwichVerification.courierAdvancePerPoint
+        let expected = SandwichMetrics.courierAdvancePerPoint
             * TextLayerReconstructor.baseFontSize
         #expect(TextLayerReconstructor.cellWidth == expected)
         // Anchor value at 12pt base.
@@ -201,7 +201,7 @@ struct TextLayerReconstructorTests {
         // it anchors the verifier's linear tolerance scaling
         // (`advanceWidthTolerancePerPoint × pointSize` == 0.25 at 12pt).
         #expect(TextLayerReconstructor.baseFontSize == 12.0)
-        #expect(abs(SandwichVerification.advanceWidthTolerancePerPoint
+        #expect(abs(SandwichMetrics.advanceWidthTolerancePerPoint
                     * TextLayerReconstructor.baseFontSize - 0.25) < 1e-9)
     }
 
@@ -234,7 +234,7 @@ struct TextLayerReconstructorTests {
         #expect(lines[0].fontSize == 20.0,
                 "Height cap binds and the size lands on the quantization grid")
         #expect(lines[0].text == "AB")
-        let cw = SandwichVerification.courierAdvancePerPoint * 20.0
+        let cw = SandwichMetrics.courierAdvancePerPoint * 20.0
         #expect(lines[0].origin.x == floor(72 / cw) * cw,
                 "Line origin snaps to the band's OWN grid")
         #expect(lines[0].origin.y == 700)
@@ -281,7 +281,7 @@ struct TextLayerReconstructorTests {
         #expect(split.first?.text == "AB")
         #expect(split.last?.text == "CD")
         if let second = split.last {
-            let cw = SandwichVerification.courierAdvancePerPoint * second.fontSize
+            let cw = SandwichMetrics.courierAdvancePerPoint * second.fontSize
             #expect(second.origin.x == floor(160 / cw) * cw,
                     "The post-region line re-anchors at its own snapped origin")
         }
@@ -304,7 +304,7 @@ struct TextLayerReconstructorTests {
         #expect(lines.count == 1)
         if let line = lines.first {
             #expect(line.fontSize < 12.0, "The fit clamp engaged")
-            let cw = SandwichVerification.courierAdvancePerPoint * line.fontSize
+            let cw = SandwichMetrics.courierAdvancePerPoint * line.fontSize
             let font = CTFontCreateWithName("Courier" as CFString, line.fontSize, nil)
             let ctLine = CTLineCreateWithAttributedString(NSAttributedString(
                 string: line.text,
@@ -673,7 +673,7 @@ struct TextLayerReconstructorTests {
             let r = ns.rangeOfComposedCharacterSequence(at: offset)
             offset += max(r.length, 1)
             let ch = ns.substring(with: r)
-            if FilterResult.isLineageWhitespace(ch) { continue }
+            if SandwichMetrics.isLineageWhitespace(ch) { continue }
             let sel = try #require(page.selection(for: r), "r=\(rotation): no selection for \(ch)")
             let b = sel.bounds(for: page)
             let entry = try #require(entries.first { $0.character == ch }, "r=\(rotation): unexpected glyph \(ch)")

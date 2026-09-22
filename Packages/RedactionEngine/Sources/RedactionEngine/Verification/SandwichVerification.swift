@@ -17,61 +17,6 @@ import AppKit  // macOS tooling destination: NSFont carries the .font attribute
 /// and does not leak redacted content.
 public struct SandwichVerification: Sendable {
 
-    /// Courier monospace advance-per-point constant. CoreText's 16-bit
-    /// fixed-point representation of Adobe Font Metrics' 600-units-per-em
-    /// Courier advance (600/1000 = 0.6). Probed against
-    /// `CTFontGetAdvancesForGlyphs` for sizes {1, 6, 12, 24, 100}pt — the
-    /// advance is exactly `0.60009765625 × fontSize` for every probed size.
-    public static let courierAdvancePerPoint: CGFloat = 0.60009765625
-
-    /// Tolerance for the Layer 6 advance crosscheck at the 12pt REFERENCE
-    /// size (M1 tightening). The reconstructor derives line pitches from
-    /// source metrics, so the operative tolerance scales linearly with the
-    /// glyph's own point size via `advanceWidthTolerancePerPoint`; this
-    /// constant remains the 12pt anchor (and the value probe/test code
-    /// built against the 12pt-era geometry still reads).
-    public static let advanceWidthTolerance: CGFloat = 0.25
-
-    /// Linear scaling of the advance tolerance: `0.25pt at 12pt`, applied
-    /// as `advanceWidthTolerancePerPoint × pointSize`.
-    public static let advanceWidthTolerancePerPoint: CGFloat = 0.25 / 12.0
-
-    /// Vertical sweep tolerance for canonical line banding: walking
-    /// Y values in descending order, a gap greater than this opens a new
-    /// band. Shared by the reconstructor's line pooling, the filter-side
-    /// lineage walk, and the verifier's output walk so all three agree on
-    /// band structure. Source line spacing in real documents is several
-    /// points; sub-baseline offsets (superscripts, ordinals) sit well
-    /// under 1pt — measured on the committed real-document fixture
-    /// (RealDocProbeTests, 2026-06-09).
-    public static let lineBandTolerance: CGFloat = 1.5
-
-    /// The lineage digest of an EMPTY walk — the SHA-256 of zero updates.
-    /// `FilterResult.computeLineageHash(over: [])` yields exactly this for a
-    /// page whose filter kept no survivor, and `computeOutputLineageHash`
-    /// returns it for an output page with no text layer, no code units, or
-    /// no measurable non-whitespace unit, so a fully-redacted searchable
-    /// page compares equal on both sides. It is NOT `Data()`:
-    /// `verifyCharacterLineage` reads an empty `Data()` as "no lineage
-    /// recorded" (legacy digests, hand-built test digests) and passes
-    /// without comparing.
-    public static let emptyLineageDigest = Data(SHA256().finalize())
-
-    /// Single-linkage sweep over Y values: returns each input index's band
-    /// ordinal (0 = topmost). Deterministic in the input values only.
-    static func yBands(_ ys: [CGFloat]) -> [Int] {
-        let order = ys.indices.sorted { ys[$0] > ys[$1] }
-        var band = [Int](repeating: 0, count: ys.count)
-        var current = 0
-        var prevY = CGFloat.nan
-        for idx in order {
-            if !prevY.isNaN, prevY - ys[idx] > lineBandTolerance { current += 1 }
-            band[idx] = current
-            prevY = ys[idx]
-        }
-        return band
-    }
-
     /// Natural CoreText advance of one composed grapheme in the accepted
     /// family's own font at `pointSize`.
     /// A font's natural advance is a writer/font property, not a position
@@ -160,7 +105,7 @@ public struct SandwichVerification: Sendable {
         while offset < count {
             let range = nsText.rangeOfComposedCharacterSequence(at: offset)
             offset += max(range.length, 1)
-            guard !FilterResult.isLineageWhitespace(nsText.substring(with: range)),
+            guard !SandwichMetrics.isLineageWhitespace(nsText.substring(with: range)),
                   let sel = outputPage.selection(for: range) else { continue }
             let bounds = sel.bounds(for: outputPage)
             guard bounds.width > 0, bounds.height > 0 else { continue }
@@ -168,40 +113,6 @@ public struct SandwichVerification: Sendable {
         }
         guard boxes.count >= 2 else { return nil }
         return readBackAxis(boxes)
-    }
-
-    /// True when a read-back point size is one the reconstructor's
-    /// pitch derivation can emit: a whole multiple of
-    /// `pitchQuantizationStep` at or above `minimumFontSize`. The
-    /// Layer 6 pitch-flip acceptance gates on this so a foreign text object
-    /// at an arbitrary size never reads as a writer-band junction.
-    static func isWriterQuantizedPitch(_ size: CGFloat) -> Bool {
-        guard size >= TextLayerReconstructor.minimumFontSize - 0.01 else {
-            return false
-        }
-        let steps = size / TextLayerReconstructor.pitchQuantizationStep
-        return abs(steps - steps.rounded()) * TextLayerReconstructor.pitchQuantizationStep <= 0.01
-    }
-
-    /// Descent fraction of a read-back font's line box —
-    /// `descent / (ascent + descent)` — used to shrink read-back selection
-    /// boxes to their glyph-core row. The name mapping matches
-    /// `naturalFamilyAdvance` (Menlo family → Menlo-Regular, everything
-    /// else → Courier: the layer only carries accepted monospace families,
-    /// Layer 8 reports any other). 0.25 without a resolvable font — at or
-    /// above the accepted families' fractions (Courier 0.2465, Menlo
-    /// 0.2028), so the unknown-font core is never larger than a known one.
-    static func descentFraction(
-        family: String?, pointSize: CGFloat
-    ) -> CGFloat {
-        guard let family, pointSize > 0 else { return 0.25 }
-        let name = family.lowercased().contains("menlo")
-            ? "Menlo-Regular" : "Courier"
-        let font = CTFontCreateWithName(name as CFString, pointSize, nil)
-        let ascent = CTFontGetAscent(font)
-        let descent = CTFontGetDescent(font)
-        guard ascent + descent > 0 else { return 0.25 }
-        return descent / (ascent + descent)
     }
 
     public init() {}
@@ -315,7 +226,7 @@ public struct SandwichVerification: Sendable {
             guard let sel = outputPage.selection(for: composedRange) else {
                 // No read-back selection at all: as unmeasurable as an empty
                 // bounds box — counted, never silently skipped.
-                if !FilterResult.isLineageWhitespace(nsText.substring(with: composedRange)) {
+                if !SandwichMetrics.isLineageWhitespace(nsText.substring(with: composedRange)) {
                     zeroBoundsUnits += 1
                 }
                 utf16Offset += max(composedRange.length, 1)
@@ -323,7 +234,7 @@ public struct SandwichVerification: Sendable {
             }
             let bounds = sel.bounds(for: outputPage)
             guard bounds.width > 0, bounds.height > 0 else {
-                if !FilterResult.isLineageWhitespace(nsText.substring(with: composedRange)) {
+                if !SandwichMetrics.isLineageWhitespace(nsText.substring(with: composedRange)) {
                     zeroBoundsUnits += 1
                 }
                 utf16Offset += max(composedRange.length, 1)
@@ -335,7 +246,7 @@ public struct SandwichVerification: Sendable {
             // character; the exclusion pass below derives its glyph-core
             // boxes from them per unit.
             let charString = nsText.substring(with: composedRange)
-            if !FilterResult.isLineageWhitespace(charString) {
+            if !SandwichMetrics.isLineageWhitespace(charString) {
                 var family: String?
                 var pointSize: CGFloat = 0
                 #if canImport(UIKit)
@@ -389,7 +300,7 @@ public struct SandwichVerification: Sendable {
             let coreBoxes: [CGRect] = exclusionUnits.map { unit in
                 let key = "\(unit.family ?? "-")|\(unit.pointSize)"
                 let fraction = fractionCache[key] ?? {
-                    let f = Self.descentFraction(
+                    let f = SandwichMetrics.descentFraction(
                         family: unit.family, pointSize: unit.pointSize)
                     fractionCache[key] = f
                     return f
@@ -401,7 +312,7 @@ public struct SandwichVerification: Sendable {
                     ? unit.bounds.insetBy(dx: fraction * unit.bounds.width, dy: 0)
                     : unit.bounds.insetBy(dx: 0, dy: fraction * unit.bounds.height)
             }
-            let unitBands = Self.yBands(coreBoxes.map(across))
+            let unitBands = SandwichMetrics.yBands(coreBoxes.map(across))
             // Union rect per read-back band — the line-band the halo tier
             // gates on (mirror of the filter's per-lineIndex bands).
             var bandRects: [Int: CGRect] = [:]
@@ -501,7 +412,7 @@ public struct SandwichVerification: Sendable {
         // own geometry, already visible in the raster.
         try Task.checkCancellation()
         if !latticeUnits.isEmpty {
-            let bands = Self.yBands(latticeUnits.map { across($0.bounds) })
+            let bands = SandwichMetrics.yBands(latticeUnits.map { across($0.bounds) })
             // The origin's coordinate ALONG the reading axis, signed so
             // reading order ascends: X on a horizontal line; on a vertical
             // run −Y when the run reads down the page, +Y when up. The
@@ -545,8 +456,8 @@ public struct SandwichVerification: Sendable {
                     // accepted bounded-bits channel. Any off-lattice size
                     // flip still reports output this writer did not
                     // produce.
-                    if Self.isWriterQuantizedPitch(prev.pointSize),
-                       Self.isWriterQuantizedPitch(curr.pointSize) {
+                    if SandwichMetrics.isWriterQuantizedPitch(prev.pointSize),
+                       SandwichMetrics.isWriterQuantizedPitch(curr.pointSize) {
                         continue
                     }
                     return (.fail(
@@ -576,8 +487,8 @@ public struct SandwichVerification: Sendable {
                 if regionShapes.contains(where: {
                     $0.bounds.intersects(gapRect)
                 }) { continue }
-                let cell = Self.courierAdvancePerPoint * prev.pointSize
-                let tolerance = Self.advanceWidthTolerancePerPoint * prev.pointSize
+                let cell = SandwichMetrics.courierAdvancePerPoint * prev.pointSize
+                let tolerance = SandwichMetrics.advanceWidthTolerancePerPoint * prev.pointSize
                 let natural = Self.naturalFamilyAdvance(
                     prev.string, familyName: prev.family,
                     pointSize: prev.pointSize) ?? cell
@@ -710,7 +621,7 @@ public struct SandwichVerification: Sendable {
             // Only count characters with non-zero bounds (matching
             // extractCharacters behavior) whose text is not lineage
             // whitespace (the shared Layer 7 / Layer 9 count domain).
-            if !FilterResult.isLineageWhitespace(nsText.substring(with: composedRange)),
+            if !SandwichMetrics.isLineageWhitespace(nsText.substring(with: composedRange)),
                let sel = page.selection(for: composedRange) {
                 let bounds = sel.bounds(for: page)
                 if bounds.width > 0 && bounds.height > 0 {
@@ -883,7 +794,7 @@ public struct SandwichVerification: Sendable {
         // An empty `Data()` means NO lineage recorded (legacy reports,
         // hand-built test digests): nothing to compare, pass. A page whose
         // filter kept no survivor is different — it carries the empty-set
-        // digest (`emptyLineageDigest`), which the output walk of a textless
+        // digest (`SandwichMetrics.emptyLineageDigest`), which the output walk of a textless
         // page reproduces: 0 expected and 0 found compare equal; 0 expected
         // with any measurable output unit compares unequal and FAILs (an
         // injection).
@@ -916,7 +827,7 @@ public struct SandwichVerification: Sendable {
     ///      content/ordering signal.
     ///
     /// Canonical order: units sort by Y sweep band (descending; see
-    /// `yBands`/`lineBandTolerance`), then X ascending within a band —
+    /// `yBands`/`SandwichMetrics.lineBandTolerance`), then X ascending within a band —
     /// NOT by PDFKit's string order. PDFKit's composition order on
     /// multi-baseline form rows is a layout heuristic the filter side
     /// cannot reproduce (measured on the committed real-document fixture:
@@ -935,7 +846,7 @@ public struct SandwichVerification: Sendable {
     /// is a 0-indexed integer counter incremented per emitted character.
     ///
     /// An EMPTY walk — no text layer, no code units, or no measurable
-    /// non-whitespace unit — returns `emptyLineageDigest`, the SHA-256 of
+    /// non-whitespace unit — returns `SandwichMetrics.emptyLineageDigest`, the SHA-256 of
     /// zero updates, which is what the filter records for a page whose
     /// survivor set is empty; never `Data()`, which `verifyCharacterLineage`
     /// reads as "no lineage recorded". The nil-selection and zero-bounds
@@ -953,10 +864,10 @@ public struct SandwichVerification: Sendable {
     static func computeOutputLineageHash(
         _ outputPage: PDFPage, pageRotation: Int = 0
     ) throws -> Data {
-        guard let pageText = outputPage.string else { return Self.emptyLineageDigest }
+        guard let pageText = outputPage.string else { return SandwichMetrics.emptyLineageDigest }
         let nsText = pageText as NSString
         let totalCodeUnits = outputPage.numberOfCharacters
-        guard totalCodeUnits > 0 else { return Self.emptyLineageDigest }
+        guard totalCodeUnits > 0 else { return SandwichMetrics.emptyLineageDigest }
         let pageBox = outputPage.bounds(for: .cropBox)
         let frame = PageFrame(rotation: pageRotation, displayedSize: pageBox.size)
 
@@ -979,14 +890,14 @@ public struct SandwichVerification: Sendable {
             let bounds = sel.bounds(for: outputPage)
             guard bounds.width > 0 && bounds.height > 0 else { continue }
             let charString = nsText.substring(with: composedRange)
-            guard !FilterResult.isLineageWhitespace(charString) else { continue }
+            guard !SandwichMetrics.isLineageWhitespace(charString) else { continue }
             let placed = frame.isUnrotated
                 ? bounds
                 : frame.sourceRect(bounds.offsetBy(dx: -pageBox.minX, dy: -pageBox.minY))
             units.append((charString, placed.minY, placed.minX))
         }
 
-        let bands = Self.yBands(units.map(\.minY))
+        let bands = SandwichMetrics.yBands(units.map(\.minY))
         let order = units.indices.sorted {
             bands[$0] != bands[$1]
                 ? bands[$0] < bands[$1]
@@ -1093,7 +1004,14 @@ public struct SandwichVerification: Sendable {
                 // forgiving viewer — is observed alongside well-formed
                 // String operands. CGPDFStringCopyTextString is the
                 // independent decoder vs. PDFKit's `page.string` (Layer 3's
-                // decoder). nil decodes are tolerated — false negatives are
+                // decoder): it reads each operand as PDFDocEncoding (or
+                // UTF-16 behind a byte-order mark) without consulting the
+                // page's font encodings, so a byte above ASCII drawn through
+                // a font whose encoding differs from PDFDocEncoding there
+                // (the writer's Courier subset is MacRoman-encoded) reads
+                // back as PDFDocEncoding's character for that byte. The
+                // corpus cell `factory-compat-residue` measures that gap.
+                // nil decodes are tolerated — false negatives are
                 // acceptable on a defense-in-depth layer; false positives
                 // are not.
                 CGPDFOperatorTableSetCallback(table, "Tj") { scanner, info in
@@ -1147,15 +1065,31 @@ public struct SandwichVerification: Sendable {
             // survives OUTSIDE every region (in-region content is removed
             // from the stream) — residual, user-recoverable via text search
             // → ATTENTION, not FAIL.
+            // The decoded operator text is scanned as decoded and, when the
+            // search path's normalizer changes it (a ligature or another
+            // compatibility form in an operand), in that normalized form as
+            // well — the mirror of Layer 3's decoded pass in
+            // `VerificationEngine.runLayer3BinarySearch`. A page counts once;
+            // its instance count is the larger of the two scans, so one
+            // occurrence never double-counts. The accumulator holds UTF-8
+            // (decoded strings + the 0x1F separator), so the round trip
+            // through String is lossless.
             let matches = termAutomaton.tokenFilteredMatches(in: accumulator)
-            if !matches.isEmpty {
+            let decodedText = String(decoding: accumulator, as: UTF8.self)
+            let normalizedText = TextNormalizer.normalize(decodedText)
+            let normalizedMatches = normalizedText == decodedText
+                ? []
+                : termAutomaton.tokenFilteredMatches(in: Data(normalizedText.utf8))
+            if !matches.isEmpty || !normalizedMatches.isEmpty {
                 // Physical-occurrence count: unique (position, length), so one
                 // occurrence never multi-counts across case/encoding variants.
-                let count = AhoCorasick.uniqueOccurrenceCount(matches)
+                let count = max(
+                    AhoCorasick.uniqueOccurrenceCount(matches),
+                    AhoCorasick.uniqueOccurrenceCount(normalizedMatches))
                 return (.attention(
                     "Text matching your redactions is readable in page \(pageIdx + 1) content "
                     + "(\(count) instance\(count == 1 ? "" : "s"))"
-                ), [pageIdx], termAutomaton.matchedTermTexts(matches), false)
+                ), [pageIdx], termAutomaton.matchedTermTexts(matches + normalizedMatches), false)
             }
         }
         if droppedTermCount > 0 {

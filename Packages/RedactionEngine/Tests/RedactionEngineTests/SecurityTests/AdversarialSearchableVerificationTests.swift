@@ -393,7 +393,7 @@ struct AdversarialSearchableVerificationTests {
         // the known constants line up. If the grid constant or the raster
         // DPI is changed without re-evaluating the residual, the
         // arithmetic below changes and the test fires.
-        let cellWidthPt = SandwichVerification.courierAdvancePerPoint * 12.0
+        let cellWidthPt = SandwichMetrics.courierAdvancePerPoint * 12.0
         #expect(abs(cellWidthPt - 7.20117_1875) < 0.001,
                 "M2 grid cell width must remain 0.60009765625 × 12pt = 7.20…pt")
         let rasterPrecisionAt300DPIPt = 72.0 / 300.0

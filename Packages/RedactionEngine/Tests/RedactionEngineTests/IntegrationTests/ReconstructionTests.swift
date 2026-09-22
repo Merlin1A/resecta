@@ -553,6 +553,68 @@ struct ReconstructionTests {
 
     // MARK: - Helpers
 
+    // MARK: - File identifier (C12-100)
+
+    @Test("Finalized output's /ID pair is derived from the file's contents")
+    func fileIdentifierDerivedFromContents() async throws {
+        // The system writer stamps a random per-export pair; finalize()
+        // rewrites both halves to the digest of the file's own bytes with the
+        // pair zeroed. The oracle reads the pair by its own scan and recomputes
+        // the digest with CryptoKit; the document must still open in both
+        // readers and report the pair through `CGPDFDocument.fileIdentifier`.
+        let tempURL = makeTempURL(prefix: "recon_fileid_")
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+        let image = try makeTestImage(width: 120, height: 160)
+        let recon = PDFStreamReconstructor(tempURL: tempURL)
+        let size = CGSize(width: 120, height: 160)
+        try await recon.begin(firstPageSize: size)
+        try await recon.appendPage(PageOutput(image: image, size: size, textLayerEntries: nil))
+        await recon.finalize()
+
+        let data = try Data(contentsOf: tempURL)
+        let pair = try #require(FileIdentifierOracle.pair(in: data), "the writer's /ID pair must be in the tail")
+        let expected = FileIdentifierOracle.expectedHex(for: data, pair: pair)
+        #expect(FileIdentifierOracle.hex(data, pair.first) == expected, "first half must be the content digest")
+        #expect(FileIdentifierOracle.hex(data, pair.second) == expected, "second half must be the content digest")
+
+        let provider = try #require(CGDataProvider(data: data as CFData))
+        let doc = try #require(CGPDFDocument(provider))
+        #expect(doc.numberOfPages == 1)
+        #expect(PDFDocument(url: tempURL)?.pageCount == 1, "PDFKit must also open the patched file")
+        let idArray = try #require(doc.fileIdentifier, "the pair must be readable through CoreGraphics")
+        #expect(CGPDFArrayGetCount(idArray) == 2)
+        for index in 0..<2 {
+            var ref: CGPDFStringRef?
+            #expect(CGPDFArrayGetString(idArray, index, &ref))
+            let str = try #require(ref)
+            let bytes = Data(bytes: try #require(CGPDFStringGetBytePtr(str)), count: CGPDFStringGetLength(str))
+            #expect(bytes.map { String(format: "%02x", $0) }.joined() == expected)
+        }
+    }
+
+    @Test("Two exports of the same page carry the same /ID and the same bytes")
+    func fileIdentifierIdenticalAcrossExports() async throws {
+        // No random field remains in a Secure output once the pair is
+        // content-derived: two exports of identical content are byte-identical.
+        var outputs: [Data] = []
+        for _ in 0..<2 {
+            let tempURL = makeTempURL(prefix: "recon_fileid_twice_")
+            defer { try? FileManager.default.removeItem(at: tempURL) }
+            let image = try makeTestImage(width: 120, height: 160)
+            let recon = PDFStreamReconstructor(tempURL: tempURL)
+            let size = CGSize(width: 120, height: 160)
+            try await recon.begin(firstPageSize: size)
+            try await recon.appendPage(PageOutput(image: image, size: size, textLayerEntries: nil))
+            await recon.finalize()
+            outputs.append(try Data(contentsOf: tempURL))
+        }
+        let p0 = try #require(FileIdentifierOracle.pair(in: outputs[0]))
+        let p1 = try #require(FileIdentifierOracle.pair(in: outputs[1]))
+        #expect(FileIdentifierOracle.hex(outputs[0], p0.first) == FileIdentifierOracle.hex(outputs[1], p1.first),
+                "the identifier must be a function of the content")
+        #expect(outputs[0] == outputs[1], "two exports of identical content must be byte-identical")
+    }
+
     private func makeTempURL(prefix: String = "recon_test_") -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("\(prefix)\(UUID().uuidString).pdf")

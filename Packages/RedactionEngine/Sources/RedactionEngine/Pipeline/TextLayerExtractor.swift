@@ -130,14 +130,14 @@ public struct TextLayerExtractor: Sendable {
             }
 
             let char = sel.string ?? substring
-            if FilterResult.isLineageWhitespace(substring) {
+            if SandwichMetrics.isLineageWhitespace(substring) {
                 // `page.string` interleaves synthesized separator characters
                 // (inter-run newlines/spaces) that have no glyph of their
                 // own; `selection(for:)` over such an offset clamps to the
                 // preceding glyph and reports that glyph's character with
                 // its full-size, non-zero bounds — the zero-size guard above
                 // does not exclude it. A whitespace-source offset
-                // (`FilterResult.isLineageWhitespace`, the lineage-walk
+                // (`SandwichMetrics.isLineageWhitespace`, the lineage-walk
                 // predicate) whose selection returns a DIFFERENT character
                 // is that clamp case: skip it.
                 if char != substring {

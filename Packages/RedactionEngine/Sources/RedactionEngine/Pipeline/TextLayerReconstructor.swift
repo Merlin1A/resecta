@@ -58,16 +58,7 @@ public enum TextLayerReconstructor {
     /// `courierAdvancePerPoint × bandFontSize`; this constant remains the
     /// 12pt-era reference.
     internal static let cellWidth: CGFloat =
-        SandwichVerification.courierAdvancePerPoint * baseFontSize
-
-    /// Pitch quantization step (J-12): band sizes round to
-    /// the nearest half point. Coarser steps leak fewer content-derived
-    /// bits per band and bound the doc-wide distinct-size set (measured:
-    /// 17 sizes across the 23-page real-document fixture at 0.5pt).
-    internal static let pitchQuantizationStep: CGFloat = 0.5
-
-    /// Lower bound on a derived band size.
-    internal static let minimumFontSize: CGFloat = 1.0
+        SandwichMetrics.courierAdvancePerPoint * baseFontSize
 
     // MARK: - Drawing
 
@@ -161,7 +152,7 @@ public enum TextLayerReconstructor {
     /// fixture, RealDocProbeTests rounds 1–8):
     ///
     ///  1. **Band pooling** — run groups band by the shared Y sweep
-    ///     (`SandwichVerification.yBands`); each band draws at ONE pitch,
+    ///     (`SandwichMetrics.yBands`); each band draws at ONE pitch,
     ///     so no same-band pitch junctions exist for the spatial-tampering
     ///     lattice to adjudicate.
     ///  2. **Sum-matched sizing** — the band's raw size reproduces its
@@ -174,7 +165,7 @@ public enum TextLayerReconstructor {
     ///     em-dashes, leader runs) otherwise blows past the line's
     ///     vertical envelope and the oversized glyphs entangle neighboring
     ///     lines' selections.
-    ///  4. **Quantization** — sizes round to `pitchQuantizationStep`,
+    ///  4. **Quantization** — sizes round to `SandwichMetrics.pitchQuantizationStep`,
     ///     bounding the leakage.
     ///  5. **Bridging** — same-band groups merge X-ascending into one
     ///     line, inter-group gaps filled with whole-cell invisible spaces
@@ -206,7 +197,7 @@ public enum TextLayerReconstructor {
     ) -> [SourcedTextLayerLine] {
         let groups = runMemberGroups(entries)
         guard !groups.isEmpty else { return [] }
-        let perPt = SandwichVerification.courierAdvancePerPoint
+        let perPt = SandwichMetrics.courierAdvancePerPoint
 
         struct GroupInfo {
             let members: [Int]
@@ -242,7 +233,7 @@ public enum TextLayerReconstructor {
                 heights: members.map { entries[$0].bounds.height })
         }
 
-        let bands = SandwichVerification.yBands(infos.map(\.y))
+        let bands = SandwichMetrics.yBands(infos.map(\.y))
         let bandCount = (bands.max() ?? 0) + 1
         var bandGroups: [[Int]] = Array(repeating: [], count: bandCount)
         for (gi, b) in bands.enumerated() { bandGroups[b].append(gi) }
@@ -261,8 +252,8 @@ public enum TextLayerReconstructor {
                 derived = min(derived, allHeights[allHeights.count / 2])
             }
             var size = max(
-                (derived / pitchQuantizationStep).rounded() * pitchQuantizationStep,
-                minimumFontSize)
+                (derived / SandwichMetrics.pitchQuantizationStep).rounded() * SandwichMetrics.pitchQuantizationStep,
+                SandwichMetrics.minimumFontSize)
 
             func assemble(_ size: CGFloat)
                 -> (lines: [SourcedTextLayerLine], maxEndX: CGFloat) {
@@ -345,9 +336,9 @@ public enum TextLayerReconstructor {
             }
 
             var assembled = assemble(size)
-            while size - pitchQuantizationStep >= minimumFontSize,
+            while size - SandwichMetrics.pitchQuantizationStep >= SandwichMetrics.minimumFontSize,
                   assembled.maxEndX + perPt * size > pageWidth {
-                size -= pitchQuantizationStep
+                size -= SandwichMetrics.pitchQuantizationStep
                 assembled = assemble(size)
             }
             result.append(contentsOf: assembled.lines)
@@ -428,7 +419,7 @@ public enum TextLayerReconstructor {
             let font = CTFontCreateWithName("Courier" as CFString, line.fontSize, nil)
             let ascent = CTFontGetAscent(font)
             let descent = CTFontGetDescent(font)
-            let fraction = SandwichVerification.descentFraction(
+            let fraction = SandwichMetrics.descentFraction(
                 family: "Courier", pointSize: line.fontSize)
             let ctLine = CTLineCreateWithAttributedString(
                 NSAttributedString(string: line.text, attributes: [.font: font]))

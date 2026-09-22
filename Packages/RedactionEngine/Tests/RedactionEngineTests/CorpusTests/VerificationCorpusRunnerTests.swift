@@ -208,7 +208,9 @@ struct VerificationCorpusRunnerTests {
         #expect(deterministic,
                 "\(input.docId)/\(mode.rawValue)/\(input.regionSet.name): non-OCR layers must report identically across sweeps")
 
-        let outputSHA = sha256Hex((try? Data(contentsOf: outputURL)) ?? Data())
+        let outputData = (try? Data(contentsOf: outputURL)) ?? Data()
+        let outputSHA = sha256Hex(outputData)
+        let fileID = Self.fileIdentifierReadout(outputData)
         try writeJSON(
             RegionsJSON(
                 schema_version: 1,
@@ -255,7 +257,9 @@ struct VerificationCorpusRunnerTests {
                 drawn_cell_rule_drops: outcome.filterDigests.map {
                     $0?.drawnCellRuleExcludedCount
                 },
-                spatial_lattice_axes: Self.readBackAxes(outputURL)),
+                spatial_lattice_axes: Self.readBackAxes(outputURL),
+                file_id_hex: fileID.hex,
+                file_id_matches_digest: fileID.matches),
             to: "\(cellDir)/cell.json")
         return nil
     }
@@ -446,6 +450,11 @@ struct VerificationCorpusRunnerTests {
         for input in Self.factoryInputs() {
             try await execute(
                 input, modes: [.secureRasterization, .searchableRedaction])
+        }
+
+        // --- D2. The Layer-10 normalization-parity cell (searchable only) ---
+        for input in Self.compatResidueInputs() {
+            try await execute(input, modes: [.searchableRedaction])
         }
 
         // --- E. PB-86 hidden-text probe (searchable path; 1.2 P1.4) ---

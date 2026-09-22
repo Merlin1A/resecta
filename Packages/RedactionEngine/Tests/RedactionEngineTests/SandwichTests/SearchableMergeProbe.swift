@@ -107,8 +107,8 @@ enum ProbeMeasureError: Error { case noOutput }
 enum SearchableMergeProbe {
 
     static let cellWidth = TextLayerReconstructor.cellWidth          // 7.20117…pt
-    static let advanceTol = SandwichVerification.advanceWidthTolerance // 0.25pt
-    static let courierPerPt = SandwichVerification.courierAdvancePerPoint
+    static let advanceTol = SandwichMetrics.advanceWidthTolerance // 0.25pt
+    static let courierPerPt = SandwichMetrics.courierAdvancePerPoint
 
     /// Run verification layers `0..<count` on an output document. Returns the
     /// LayerResult keyed by runtime array index.

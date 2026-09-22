@@ -1,5 +1,6 @@
 import Testing
 import SwiftUI
+import UIKit
 @testable import ResectaApp
 
 // Snapshot-privacy overlay scene-phase policy.
@@ -28,6 +29,15 @@ struct SnapshotOverlayTests {
     func testInactivePhaseSynchronouslyObscures() {
         let action = SnapshotPrivacyPolicy.action(for: .inactive)
         #expect(action == .obscureSynchronously)
+    }
+
+    @Test("The overlay's symbol name resolves to an image on the running OS")
+    func symbolNameResolves() {
+        // The KI-3 guard picks `doc.text.redact` where the OS has it and
+        // `doc.viewfinder` otherwise; either way the name must render.
+        #expect(UIImage(systemName: SnapshotPrivacyOverlay.symbolName) != nil,
+                "the chosen symbol must resolve: \(SnapshotPrivacyOverlay.symbolName)")
+        #expect(["doc.text.redact", "doc.viewfinder"].contains(SnapshotPrivacyOverlay.symbolName))
     }
 
     @Test("`.background` also maps to synchronous obscure")

@@ -172,7 +172,7 @@ struct SandwichVerificationTests {
             guard let sel = page.selection(for: r) else { continue }
             let b = sel.bounds(for: page)
             guard b.width > 0, b.height > 0,
-                  !FilterResult.isLineageWhitespace(text.substring(with: r))
+                  !SandwichMetrics.isLineageWhitespace(text.substring(with: r))
             else { continue }
             var size: CGFloat = 0
             #if canImport(UIKit)
@@ -188,7 +188,7 @@ struct SandwichVerificationTests {
             #endif
             units.append((b.minY, size))
         }
-        let bands = SandwichVerification.yBands(units.map(\.y))
+        let bands = SandwichMetrics.yBands(units.map(\.y))
         var sizesPerBand: [Int: [CGFloat]] = [:]
         for (k, u) in units.enumerated() {
             sizesPerBand[bands[k], default: []].append(u.size)
@@ -241,13 +241,13 @@ struct SandwichVerificationTests {
 
     @Test("isWriterQuantizedPitch matches the writer-emittable set")
     func writerQuantizedPitchPredicate() {
-        #expect(SandwichVerification.isWriterQuantizedPitch(5.0))
-        #expect(SandwichVerification.isWriterQuantizedPitch(5.5))
-        #expect(SandwichVerification.isWriterQuantizedPitch(12.0))
-        #expect(SandwichVerification.isWriterQuantizedPitch(1.0))
-        #expect(!SandwichVerification.isWriterQuantizedPitch(5.3))
-        #expect(!SandwichVerification.isWriterQuantizedPitch(5.26))
-        #expect(!SandwichVerification.isWriterQuantizedPitch(0.5),
+        #expect(SandwichMetrics.isWriterQuantizedPitch(5.0))
+        #expect(SandwichMetrics.isWriterQuantizedPitch(5.5))
+        #expect(SandwichMetrics.isWriterQuantizedPitch(12.0))
+        #expect(SandwichMetrics.isWriterQuantizedPitch(1.0))
+        #expect(!SandwichMetrics.isWriterQuantizedPitch(5.3))
+        #expect(!SandwichMetrics.isWriterQuantizedPitch(5.26))
+        #expect(!SandwichMetrics.isWriterQuantizedPitch(0.5),
                 "below minimumFontSize is not writer-emittable")
     }
 
@@ -492,12 +492,12 @@ struct SandwichVerificationTests {
 
     @Test("emptyLineageDigest is the filter's empty-set digest and the textless output walk's value")
     func emptyLineageDigestIsShared() async throws {
-        #expect(SandwichVerification.emptyLineageDigest == FilterResult.computeLineageHash(over: []))
-        #expect(SandwichVerification.emptyLineageDigest.count == 32)
+        #expect(SandwichMetrics.emptyLineageDigest == FilterResult.computeLineageHash(over: []))
+        #expect(SandwichMetrics.emptyLineageDigest.count == 32)
         let doc = try #require(PDFDocument(data: TestFixtures.blankPage()))
         let page = try #require(doc.page(at: 0))
         #expect(try SandwichVerification.computeOutputLineageHash(page)
-                == SandwichVerification.emptyLineageDigest)
+                == SandwichMetrics.emptyLineageDigest)
     }
 
     // MARK: - Layer 6 on a vertical text layer (a page stored with /Rotate 90 or 270)
@@ -543,7 +543,7 @@ struct SandwichVerificationTests {
           arguments: [-CGFloat.pi / 2, CGFloat.pi / 2])
     func verticalRunLatticeIsLive(angle: CGFloat) async throws {
         let size: CGFloat = 12
-        let cell = SandwichVerification.courierAdvancePerPoint * size
+        let cell = SandwichMetrics.courierAdvancePerPoint * size
         let origin = CGPoint(x: 300, y: 600)
 
         let tampered = try rotatedRunsPDF(
@@ -572,7 +572,7 @@ struct SandwichVerificationTests {
     @Test("The text-layer axis is read from the read-back geometry")
     func readBackAxisFollowsTheGeometry() async throws {
         let size: CGFloat = 12
-        let cell = SandwichVerification.courierAdvancePerPoint * size
+        let cell = SandwichMetrics.courierAdvancePerPoint * size
         let down = try rotatedRunsPDF(
             angle: -.pi / 2, origin: CGPoint(x: 300, y: 600), size: size,
             runs: [("ABCD", 0), ("EFGH", 4 * cell)])
@@ -614,7 +614,7 @@ struct SandwichVerificationTests {
     @Test("Layer 6 exclusion on a vertical text layer: centre-inside FAILs, an edge clip is a graze")
     func verticalRunExclusionClassifies() async throws {
         let size: CGFloat = 12
-        let cell = SandwichVerification.courierAdvancePerPoint * size
+        let cell = SandwichMetrics.courierAdvancePerPoint * size
         let data = try rotatedRunsPDF(
             angle: -.pi / 2, origin: CGPoint(x: 300, y: 600), size: size,
             runs: [("ABCDEFGH", 0)])
