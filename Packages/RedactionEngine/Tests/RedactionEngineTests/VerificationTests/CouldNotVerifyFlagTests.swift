@@ -408,6 +408,7 @@ struct CouldNotVerifyFlagTests {
                 Marker(text: "Structural findings:", family: false, sites: 0, lines: 1),  // LegalPhrases:safe (the engine message)
                 Marker(text: "Auto-injected metadata present: XMP metadata", family: false, sites: 0, lines: 1),
                 Marker(text: "Producer or timestamp fields were not rewritten", family: false, sites: 0, lines: 1),
+                Marker(text: "File identifier was not derived from the file contents", family: false, sites: 0, lines: 1),
                 Marker(text: "\\(prefix): \\(warnings.joined", family: false, sites: 0, lines: 1),
                 Marker(text: "return (.warn(msg), exclusionWarnPages", family: false, sites: 0, lines: 1),
             ],
@@ -427,7 +428,7 @@ struct CouldNotVerifyFlagTests {
             ],
         ]
         // Pinned `.warn(` construction counts (pattern matches excluded).
-        let constructionCounts = ["VerificationEngine.swift": 23, "SandwichVerification.swift": 9, "SearchRecheck.swift": 1]
+        let constructionCounts = ["VerificationEngine.swift": 24, "SandwichVerification.swift": 9, "SearchRecheck.swift": 1]
 
         let sources = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

@@ -208,7 +208,9 @@ struct VerificationCorpusRunnerTests {
         #expect(deterministic,
                 "\(input.docId)/\(mode.rawValue)/\(input.regionSet.name): non-OCR layers must report identically across sweeps")
 
-        let outputSHA = sha256Hex((try? Data(contentsOf: outputURL)) ?? Data())
+        let outputData = (try? Data(contentsOf: outputURL)) ?? Data()
+        let outputSHA = sha256Hex(outputData)
+        let fileID = Self.fileIdentifierReadout(outputData)
         try writeJSON(
             RegionsJSON(
                 schema_version: 1,
@@ -255,7 +257,9 @@ struct VerificationCorpusRunnerTests {
                 drawn_cell_rule_drops: outcome.filterDigests.map {
                     $0?.drawnCellRuleExcludedCount
                 },
-                spatial_lattice_axes: Self.readBackAxes(outputURL)),
+                spatial_lattice_axes: Self.readBackAxes(outputURL),
+                file_id_hex: fileID.hex,
+                file_id_matches_digest: fileID.matches),
             to: "\(cellDir)/cell.json")
         return nil
     }

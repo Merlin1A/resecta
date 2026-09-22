@@ -71,6 +71,12 @@ extension VerificationCorpusRunnerTests {
         /// nil for a page with no text layer or fewer than two measurable
         /// units. Pins "x on every unrotated page".
         let spatial_lattice_axes: [String?]
+        /// The output's trailer `/ID` payload (32 lowercase hex characters)
+        /// and whether both halves equal the identifier recomputed from the
+        /// file's bytes (`PDFFileIdentifier`); nil without a pair in the
+        /// writer's shape.
+        let file_id_hex: String?
+        let file_id_matches_digest: Bool?
     }
 
     struct RunnerSummary: Encodable {
@@ -96,6 +102,17 @@ extension VerificationCorpusRunnerTests {
 
     static func sha256Hex(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The output's `/ID` payload and its attestation (see `CellJSON`).
+    static func fileIdentifierReadout(_ data: Data) -> (hex: String?, matches: Bool?) {
+        let tailStart = max(data.startIndex, data.endIndex - PDFFileIdentifier.tailWindowLength)
+        guard let location = PDFFileIdentifier.locate(in: data[tailStart...]) else { return (nil, nil) }
+        let expected = PDFFileIdentifier.hexPayload(
+            for: PDFFileIdentifier.identifier(from: PDFFileIdentifier.digest(of: data, zeroing: location)))
+        let first = Data(String(decoding: data[location.first], as: UTF8.self).lowercased().utf8)
+        let second = Data(String(decoding: data[location.second], as: UTF8.self).lowercased().utf8)
+        return (String(decoding: first, as: UTF8.self), first == expected && second == expected)
     }
 
     /// Duration-free identity tuple for the cross-sweep determinism check.

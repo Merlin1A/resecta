@@ -2433,6 +2433,17 @@ public struct VerificationEngine: Sendable {
             }
         }
 
+        // File-identifier attestation. The writer rewrites both halves of
+        // the trailer's `/ID` pair to the identifier derived from the
+        // file's own bytes (`PDFFileIdentifier`); recompute it here and
+        // report a pair that was not derived that way — after the fixed
+        // fields, ahead of /Trapped and XMP, one message that never carries
+        // a value. An absent pair stays on the paths below.
+        if let idArray = cgDoc.fileIdentifier,
+           !Self.fileIdentifierMatchesContents(idArray, pdfData: pdfData) {
+            return (.warn("File identifier was not derived from the file contents"), false)
+        }
+
         // XMP metadata — scanned above the /Info guard; fold the
         // result into the warnings here for the /Info-present message path.
         if hasXMP {
@@ -2454,6 +2465,24 @@ public struct VerificationEngine: Sendable {
             return (.info("Auto-injected metadata present: \(infoFindings.joined(separator: ", "))"), false)
         }
         return (.pass, false)
+    }
+
+    /// True when the two strings of a trailer `/ID` array both equal the
+    /// identifier recomputed from `pdfData`. An array that is not two
+    /// strings, or a pair the locator cannot read from the file's tail in
+    /// the writer's shape, is by construction not the writer's derived
+    /// value.
+    static func fileIdentifierMatchesContents(_ idArray: CGPDFArrayRef, pdfData: Data) -> Bool {
+        guard CGPDFArrayGetCount(idArray) == 2 else { return false }
+        var halves: [Data] = []
+        for index in 0..<2 {
+            var ref: CGPDFStringRef?
+            guard CGPDFArrayGetString(idArray, index, &ref), let ref,
+                  let bytes = CGPDFStringGetBytePtr(ref) else { return false }
+            halves.append(Data(bytes: bytes, count: CGPDFStringGetLength(ref)))
+        }
+        guard let expected = PDFFileIdentifier.recomputedIdentifier(for: pdfData) else { return false }
+        return halves[0] == expected && halves[1] == expected
     }
 
     // MARK: - PDF Data Loading Helper

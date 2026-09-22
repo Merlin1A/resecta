@@ -2158,6 +2158,39 @@ struct VerificationEngineTests {
 
     // MARK: - Helpers
 
+    @Test("Layer 5 WARNs when the /ID pair was not derived from the file's contents")
+    func layer5WarnsOnFileIdentifierNotDerived() async throws {
+        // A real output attests (the INFO path stays, pinned by
+        // producerAttestedOnReconstructedOutput). Flip one hex character of
+        // the first payload and the metadata check must report the pair as
+        // not derived — with a constant message that carries no value.
+        let (_, url) = try await makeCleanPDF()
+        defer { try? FileManager.default.removeItem(at: url) }
+        var data = try Data(contentsOf: url)
+        let pair = try #require(FileIdentifierOracle.pair(in: data), "the writer's /ID pair must be in the tail")
+        let index = pair.first.lowerBound
+        data[index] = data[index] == UInt8(ascii: "0") ? UInt8(ascii: "1") : UInt8(ascii: "0")
+        let tamperedURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("verify_fileid_tampered_\(UUID().uuidString).pdf")
+        defer { try? FileManager.default.removeItem(at: tamperedURL) }
+        try data.write(to: tamperedURL)
+        let doc = try #require(PDFDocument(url: tamperedURL))
+
+        let engine = VerificationEngine()
+        let result = await engine.runLayer(
+            4, outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: 1, regions: [:], sensitiveTerms: [],
+            pipelineMode: .secureRasterization,
+            filterDigests: [], perPageModes: [.secureRasterization]
+        )
+        #expect(result.status.isWarn, "a pair that is not the content digest must WARN; got \(result.status)")
+        if case .warn(let msg) = result.status {
+            #expect(msg == "File identifier was not derived from the file contents", "\(msg)")
+            #expect(!msg.contains(FileIdentifierOracle.hex(data, pair.first)))
+        }
+        #expect(result.couldNotVerify == false, "an attestation mismatch is a note, not a could-not-verify")
+    }
+
     private func makeCleanPDF() async throws -> (PDFDocument, URL) {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("verify_test_\(UUID().uuidString).pdf")
