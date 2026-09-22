@@ -10,7 +10,10 @@ import SwiftUI
 //
 // Behavior contract:
 // - Opaque `Color(uiColor: .systemBackground)` fill (no transparency).
-// - Branded placeholder: `doc.text.redact` SF Symbol + "Resecta" label.
+// - Branded placeholder: the `doc.text.redact` SF Symbol + "Resecta" label,
+//   with `doc.viewfinder` as the fallback where the running OS has no such
+//   symbol (the KI-3 guard, as on the home and EULA screens) — the overlay
+//   never renders icon-less.
 // - No taps, no gestures, no interactivity — the overlay must not race with
 //   the system snapshotting path.
 // - Reveal animation lives in the call site (ResectaApp) so this view stays
@@ -18,11 +21,16 @@ import SwiftUI
 //
 // No animation change to the obscure path.
 struct SnapshotPrivacyOverlay: View {
+    /// KI-3: `doc.text.redact` availability is checked on the running OS;
+    /// `doc.viewfinder` stands in where it resolves to nothing.
+    static let symbolName: String =
+        UIImage(systemName: "doc.text.redact") != nil ? "doc.text.redact" : "doc.viewfinder"
+
     var body: some View {
         ZStack {
             Color(uiColor: .systemBackground)
             VStack(spacing: ResectaTokens.Spacing.sm) {
-                Image(systemName: "doc.text.redact")
+                Image(systemName: Self.symbolName)
                     .font(.system(size: 48))
                     .foregroundStyle(.secondary)
                 Text("Resecta")

@@ -28,9 +28,10 @@ struct VerificationEngineTests {
     @Test("Every Searchable-mode layer has a non-empty name and symbol")
     func layerNamesAndSymbols() {
         let engine = VerificationEngine()
+        let layers = engine.layers(for: .searchableRedaction)
         for i in 0..<engine.layerCount(for: .searchableRedaction) {
             #expect(!engine.layerName(at: i).isEmpty)
-            #expect(!engine.layerSymbol(at: i).isEmpty)
+            #expect(!layers[i].symbolName.isEmpty)
         }
     }
 
@@ -815,9 +816,10 @@ struct VerificationEngineTests {
           arguments: [PipelineMode.secureRasterization, PipelineMode.searchableRedaction])
     func allLayerSymbolsNonEmpty(mode: PipelineMode) {
         let engine = VerificationEngine()
-        let count = engine.layerCount(for: mode)
-        for i in 0..<count {
-            #expect(!engine.layerSymbol(at: i).isEmpty,
+        let layers = engine.layers(for: mode)
+        #expect(layers.count == engine.layerCount(for: mode))
+        for (i, layer) in layers.enumerated() {
+            #expect(!layer.symbolName.isEmpty,
                     "Layer \(i) symbol should be non-empty for \(mode)")
         }
     }

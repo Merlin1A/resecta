@@ -90,25 +90,15 @@ public struct VerificationEngine: Sendable {
         return ordered.indices.contains(index) ? ordered[index].name : "Unknown Layer"
     }
 
-    /// SF Symbol name for the layer at `index` in `mode`'s order.
-    public func layerSymbol(at index: Int, mode: PipelineMode) -> String {
-        let ordered = layers(for: mode)
-        return ordered.indices.contains(index) ? ordered[index].symbolName : "questionmark.circle"
-    }
-
     /// Index-only adapter over the Searchable order (`VerificationLayer
     /// .allCases`): indices 0–9 are identical in both modes; index 10 is the
     /// Search Re-check. Kept for index-keyed callers; new code reads
-    /// `layerName(at:mode:)` or the layer's own `name`.
+    /// `layerName(at:mode:)` or the layer's own `name`. The symbol lives on
+    /// the layer (`VerificationLayer.symbolName`) and on each result
+    /// (`LayerResult.symbolName`); no index-keyed symbol adapter remains.
     public func layerName(at index: Int) -> String {
         let all = VerificationLayer.allCases
         return all.indices.contains(index) ? all[index].name : "Unknown Layer"
-    }
-
-    /// Index-only adapter, symbol counterpart of `layerName(at:)`.
-    public func layerSymbol(at index: Int) -> String {
-        let all = VerificationLayer.allCases
-        return all.indices.contains(index) ? all[index].symbolName : "questionmark.circle"
     }
 
     /// Run a single verification layer by its index in `pipelineMode`'s
