@@ -110,7 +110,7 @@ User-facing strings, doc comments, and commit messages describe what the code do
 
 Read this section before adding user-facing strings; the pre-commit hook is the mechanical floor, and a manual review pass is required for borderline cases.
 
-When a legitimate Swift control-flow keyword triggers M-1 (typical case is a `do { try ... }` error-handling block), add `LegalPhrases:safe` as a trailing comment on the same line. The override is rare; if it appears more than a few times in a single change, the language is probably drifting and needs a rewrite.
+In Swift files, M-1 skips a match that is syntax rather than prose: `catch` or `do` at statement position (or a `catch` clause after code on the same line) and a `find(` call pass without a marker. The `LegalPhrases:safe` override is for prose that has to use one of the listed words — a comment, a string, a test name, a document line — and it goes as a trailing comment on the same line (`<!-- LegalPhrases:safe -->` in Markdown). The override is rare; if it appears more than a few times in a single change, the language is probably drifting and needs a rewrite. <!-- LegalPhrases:safe -->
 
 ## Changes that need an agreed plan
 
