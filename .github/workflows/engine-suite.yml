@@ -1,8 +1,11 @@
 # The full engine host suite: `swift test` in Packages/RedactionEngine on a
 # hosted macos-26 runner. Runs on demand and on release tags; it is not part
 # of the pull-request gate (the suite exceeds ninety minutes on a 3-vCPU
-# runner). StressCorpusTests is skipped (the multi-minute stress leg runs
-# alone via `make stress-baseline`). FileProtectionTests is skipped because
+# runner, and every parallel run to date has stalled short of a verdict;
+# the serial input runs the suites one at a time under a one-hour cap to
+# name the suite that stalls). StressCorpusTests is skipped (the
+# multi-minute stress leg runs alone via `make stress-baseline`).
+# FileProtectionTests is skipped because
 # a macOS host filesystem cannot exercise the iOS file-protection classes
 # (four of its five tests fail there with NSCocoaErrorDomain 256); the
 # simulator suite covers them.
@@ -13,6 +16,10 @@ on:
     inputs:
       skip_heavy:
         description: Also skip the heavy suites (stress, perf, probe and corpus legs)
+        type: boolean
+        default: false
+      serial:
+        description: Run the suites one at a time (swift test --no-parallel) under a one-hour cap
         type: boolean
         default: false
   push:
@@ -48,7 +55,7 @@ env:
 jobs:
   engine-host-tests:
     runs-on: macos-26
-    timeout-minutes: 240
+    timeout-minutes: ${{ inputs.serial && 60 || 360 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -70,15 +77,19 @@ jobs:
       - name: Run the suite
         env:
           SKIP_HEAVY: ${{ inputs.skip_heavy }}
+          SERIAL: ${{ inputs.serial }}
         run: |
+          args=(--skip-build)
+          if [ "$SERIAL" = "true" ]; then args+=(--no-parallel); fi
           skips=(--skip StressCorpusTests --skip FileProtectionTests)
           if [ "$SKIP_HEAVY" = "true" ]; then
             for s in $HEAVY_SUITES; do skips+=(--skip "$s"); done
           fi
+          echo "args: ${args[*]}"
           echo "skips: ${skips[*]}"
           t0=$SECONDS
           rc=0
-          swift test --skip-build "${skips[@]}" 2>&1 | tee swift-test.log || rc=$?
+          swift test "${args[@]}" "${skips[@]}" 2>&1 | tee swift-test.log || rc=$?
           echo "TEST_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
           echo "TEST_RC=$rc" >> "$GITHUB_ENV"
           exit "$rc"
@@ -92,6 +103,7 @@ jobs:
             echo "- inventory: ${TEST_COUNT:-—} tests"
             echo "- build: ${BUILD_SECS:-—} s · run: ${TEST_SECS:-—} s · rc: ${TEST_RC:-—}"
             echo "- skipped: StressCorpusTests, FileProtectionTests${{ inputs.skip_heavy == true && ', the heavy suites' || '' }}"
+            echo "- mode: ${{ inputs.serial == true && 'serial (--no-parallel)' || 'parallel' }}"
             echo
             if [ -f swift-test.log ]; then
               echo '```'

@@ -227,7 +227,7 @@ concurrent entry points. The working rules, checkable by grep:
   queue for thumbnail-cache disk writes) and **zero** `.main.async` calls —
   main-thread work is expressed through actor isolation, not queue hops.
 - Isolation opt-outs are rare and deliberate: 26 `nonisolated(unsafe)`
-  declarations across ~61,000 lines of app + engine source, and the working
+  declarations across ~63,000 lines of app + engine source, and the working
   convention is a written rationale at the declaration site saying why the
   access is safe.
 - Long pixel operations (fills, readbacks) run in 256-row bands with a
@@ -314,7 +314,7 @@ If you review one path end-to-end, make it this one:
 `Pipeline/PDFStreamReconstructor.swift` (rebuild) →
 `Verification/VerificationEngine.swift` (the layered pass over the output) →
 `SecurityTests/FakeRedactionTests.swift` (the named attack, pinned). The test
-tree is larger than the source tree — about 61,000 lines of source to about
+tree is larger than the source tree — about 63,000 lines of source to about
 93,000 lines of tests; counts and structure are in the README's Testing
 section — and the suites above are the reason I trust my own output enough to
 ship it.

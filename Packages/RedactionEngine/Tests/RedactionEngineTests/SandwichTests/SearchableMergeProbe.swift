@@ -409,7 +409,7 @@ enum SearchableMergeProbe {
         ctx.beginPDFPage(nil)
         TextLayerReconstructor.drawInvisibleTextLayer(
             context: ctx, entries: chars,
-            pageWidth: pageSize.width
+            pageSize: pageSize
         )
         ctx.endPDFPage()
         ctx.closePDF()

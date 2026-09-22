@@ -254,9 +254,24 @@ struct VerificationCorpusRunnerTests {
                 },
                 drawn_cell_rule_drops: outcome.filterDigests.map {
                     $0?.drawnCellRuleExcludedCount
-                }),
+                },
+                spatial_lattice_axes: Self.readBackAxes(outputURL)),
             to: "\(cellDir)/cell.json")
         return nil
+    }
+
+    /// The text-layer axis the spatial check reads on each output page
+    /// (`SandwichVerification.readBackAxis(outputPage:)`), as a short name.
+    static func readBackAxes(_ outputURL: URL) -> [String?] {
+        guard let doc = PDFDocument(url: outputURL) else { return [] }
+        return (0..<doc.pageCount).map { i in
+            guard let page = doc.page(at: i),
+                  let axis = SandwichVerification.readBackAxis(outputPage: page) else { return nil }
+            switch axis {
+            case .horizontal: return "x"
+            case .vertical(let downward): return downward ? "y-down" : "y-up"
+            }
+        }
     }
 
     // MARK: - Manifest (T1.4)

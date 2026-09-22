@@ -397,6 +397,18 @@ struct RotatedPageCoordinateTests {
                     "\(label): \(engine.layerName(at: idx)) must not FAIL on a correct rotated redaction")
         }
 
+        // (ii-b) READING ORDER — the rebuilt layer reads as the surviving
+        // source text in source order on every rotation (whitespace aside).
+        // The horizontal assembler garbled a 90°/270° page (every source line
+        // is a vertical run in the displayed frame) and reversed each line of
+        // a 180° page; the source-frame assembly draws every line along its
+        // source line, so the read-back order is the source's.
+        let outPage = try #require(outDoc.page(at: 0))
+        let expectedOrder = anchorRef.map(\.character).joined().filter { !$0.isWhitespace }
+        let readBack = (outPage.string ?? "").filter { !$0.isWhitespace }
+        #expect(readBack == expectedOrder,
+                "\(label): the rebuilt layer must read in source order — read back \(readBack), expected \(expectedOrder)")
+
         // (iii) TAMPER — reconstruct WITHOUT excluding MARKER (claimed redacted),
         // then verify against the MARKER region: Layer 6 must locate the
         // surviving MARKER text inside the region and FAIL. This both proves the

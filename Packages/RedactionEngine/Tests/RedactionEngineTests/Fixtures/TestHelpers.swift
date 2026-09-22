@@ -327,11 +327,11 @@ enum TestPipeline {
                         redactionRects: redactionRectsInPoints
                     )
                     // The writer-side drawn-cell rule, as production runs it
-                    // before the digest is taken.
+                    // before the digest is taken — in the page's source frame.
                     textLayerEntries = TextLayerReconstructor.validateSurvivors(
-                        filterResult, pageWidth: regionBasis.width,
+                        filterResult,
                         regionShapes: TestPipeline.rectShapes(redactionRectsInPoints),
-                        pageRotation: page.rotation
+                        frame: PageFrame(rotation: page.rotation, displayedSize: regionBasis.size)
                     ).result.surviving
                 }
             }
@@ -343,7 +343,8 @@ enum TestPipeline {
             let pageOutput = PageOutput(
                 image: redactedImage,
                 size: pointSize,
-                textLayerEntries: textLayerEntries
+                textLayerEntries: textLayerEntries,
+                rotation: page.rotation
             )
 
             if firstPage {
@@ -409,17 +410,20 @@ enum TestPipeline {
                 characters: characters,
                 redactionRects: redactionRectsInPoints
             )
-            // The writer-side drawn-cell rule, as production runs it.
+            // The writer-side drawn-cell rule, as production runs it — in
+            // the page's source frame, which the digest records for Layer 9.
+            let frame = PageFrame(rotation: page.rotation, displayedSize: regionBasis.size)
             let validated = TextLayerReconstructor.validateSurvivors(
-                filterResult, pageWidth: regionBasis.width,
+                filterResult,
                 regionShapes: TestPipeline.rectShapes(redactionRectsInPoints),
-                pageRotation: page.rotation
+                frame: frame
             )
             digests[pageIndex] = validated.result.toDigest(
                 pageIndex: pageIndex,
                 redactionRects: redactionRectsInPoints,
                 safetyMargin: safetyMarginPoints,
-                drawnCellRuleExcludedCount: validated.dropped
+                drawnCellRuleExcludedCount: validated.dropped,
+                frame: frame
             )
         }
         return digests
