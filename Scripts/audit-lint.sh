@@ -19,10 +19,17 @@
 #
 # Usage: Scripts/audit-lint.sh                 (staged mode; the pre-commit hook)
 #        Scripts/audit-lint.sh --range A..B    (range mode; the pull-request gate)
+#        Scripts/audit-lint.sh --self-test     (the M-1 keyword rule against five
+#                                               synthetic lines; exit 1 on drift)
 #
 # Override markers (substring on the same line):
 #   LegalPhrases:safe          → exempts a forbidden-phrase hit (M-1)
 #   Networking:exempt SafariView → exempts a banned-symbol hit (M-3)
+#
+# M-1 in a .swift file skips a match that is Swift syntax rather than prose:
+# `catch` / `do` at statement position (or a `catch` clause after code on the
+# same line) and a `find(` / `finds(` call. Matches inside a `//` comment or
+# anywhere else on the line still need the marker.
 #
 # Exit 0 on clean; exit 1 on any offence (per-line report on stderr).
 
@@ -32,13 +39,15 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
 RANGE="${AUDIT_LINT_RANGE:-}"
+SELF_TEST=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --range)
             [ $# -ge 2 ] || { echo "audit-lint: --range needs A..B" >&2; exit 64; }
             RANGE="$2"; shift 2 ;;
         --range=*) RANGE="${1#--range=}"; shift ;;
-        -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+        --self-test) SELF_TEST=1; shift ;;
+        -h|--help) sed -n '2,34p' "$0"; exit 0 ;;
         *) echo "audit-lint: unknown option: $1" >&2; exit 64 ;;
     esac
 done
@@ -69,45 +78,118 @@ show_after() { # path
 }
 
 STAGED=()
-while IFS= read -r path; do
-    [ -n "$path" ] && STAGED+=("$path")
-done < <(diff_names AM)
-
-[ "${#STAGED[@]}" -eq 0 ] && exit 0
+if [ -z "$SELF_TEST" ]; then
+    while IFS= read -r path; do
+        [ -n "$path" ] && STAGED+=("$path")
+    done < <(diff_names AM)
+    [ "${#STAGED[@]}" -eq 0 ] && exit 0
+fi
 
 FAIL=0
 violate() { printf '%s\n' "$1" >&2; FAIL=$((FAIL + 1)); }
 
-# Walk added (+) lines from $1's staged diff. Match perl regex $2,
-# skip lines containing override marker $3 (empty disables override).
-scan_added() {
-    local path="$1" pattern="$2" override="$3"
-    diff_added_hunks "$path" \
-        | PATTERN="$pattern" OVERRIDE="$override" perl -e '
-        my $line = 0;
-        my $re   = qr/$ENV{PATTERN}/i;
-        my $ovr  = $ENV{OVERRIDE} // "";
-        while (<>) {
-            next if /^\+\+\+/ || /^---/;
-            if (/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/) { $line = $1; next; }
-            if (/^\+(.*)$/) {
-                my $body = $1;
-                if ((!$ovr || index($body, $ovr) < 0) && $body =~ $re) {
-                    print "$line: $body\n";
+# The line scanner (perl; env-configured). Reads a unified diff and walks
+# its added (+) lines, or with PLAIN=1 reads plain lines (the self-test).
+# PATTERN = the case-insensitive regex; OVERRIDE = the same-line marker
+# that exempts a line (empty disables); KEYWORD_EXEMPT=1 = the M-1 Swift
+# rule: a match is skipped when it sits in the code part of the line
+# (before any `//`) and is `catch` / `do` at statement position (only
+# whitespace and an optional `}` before it; `do` also needs `{` or the
+# line end after it), a `catch` clause after code on the same line
+# (`… } catch {`, `… } catch let e as E {`, `… } catch is E {`), or a
+# `find(` / `finds(` call. Every other match on the line still counts, so a
+# `} catch { // ensures …` line is reported for its comment. Prints
+# "<line>: <body>" per offending line.
+SCAN_PERL='
+    my $line  = 0;
+    my $re    = qr/$ENV{PATTERN}/i;
+    my $ovr   = $ENV{OVERRIDE} // "";
+    my $plain = $ENV{PLAIN} // "";
+    my $kw    = $ENV{KEYWORD_EXEMPT} // "";
+    sub offends {
+        my ($body) = @_;
+        return 0 if $ovr && index($body, $ovr) >= 0;
+        return ($body =~ $re) ? 1 : 0 unless $kw;
+        my $code_end = index($body, "//");
+        $code_end = length($body) if $code_end < 0;
+        while ($body =~ /$re/g) {
+            my ($word, $start, $end) = ($&, $-[0], $+[0]);
+            my $exempt = 0;
+            if ($start < $code_end) {
+                my $before = substr($body, 0, $start);
+                my $after  = substr($body, $end);
+                if ($word eq "catch") {
+                    $exempt = 1 if $before =~ /^\s*\}?\s*$/;
+                    $exempt = 1 if $after =~ /^\s+(let|var|is)\b/ || $after =~ /^\s*\{/;
+                } elsif ($word eq "do") {
+                    $exempt = 1 if $before =~ /^\s*\}?\s*$/ && $after =~ /^\s*(\{|$)/;
+                } elsif ($word eq "find" || $word eq "finds") {
+                    $exempt = 1 if $after =~ /^\(/;
                 }
-                $line++;
             }
+            return 1 unless $exempt;
         }
-    '
+        return 0;
+    }
+    while (<>) {
+        chomp;
+        if ($plain) {
+            print "$.: $_\n" if offends($_);
+            next;
+        }
+        next if /^\+\+\+/ || /^---/;
+        if (/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/) { $line = $1; next; }
+        if (/^\+(.*)$/) {
+            print "$line: $1\n" if offends($1);
+            $line++;
+        }
+    }
+'
+
+# Walk added (+) lines from $1's staged diff. Match perl regex $2,
+# skip lines containing override marker $3 (empty disables override);
+# $4 = 1 applies the Swift keyword rule (M-1 on .swift files).
+scan_added() {
+    local path="$1" pattern="$2" override="$3" keyword="${4:-}"
+    diff_added_hunks "$path" \
+        | PATTERN="$pattern" OVERRIDE="$override" KEYWORD_EXEMPT="$keyword" perl -e "$SCAN_PERL"
 }
 
 # ── M-1 forbidden phrases (.swift / .xcstrings / .md) ───────────────────
+# On .swift files the scanner's Swift keyword rule applies (SCAN_PERL
+# above): `} catch {`, `do {` and `.find(` are syntax, not claims, and pass
+# without a marker; the same words in a comment, a string or a doc line
+# are still reported and still take `LegalPhrases:safe`.
 M1_RE='\b(guarantee[ds]?|ensure[ds]?|impossible|find(?:s|ing)?|catch(?:es|ing)?|perfectly|flawlessly)\b|100%'
+
+# --self-test: the keyword rule against five synthetic Swift lines. The
+# two comment lines (3 and 5) must be the only hits; anything else means
+# the rule drifted. Exit 0/1, no git access.
+if [ -n "$SELF_TEST" ]; then
+    expected=$'3\n5'
+    actual=$(printf '%s\n' \
+        '        } catch {' \
+        '        do {' \
+        '        // we catch every error' \
+        '        let x = a.find(1)' \
+        '        /// finds every match' \
+        | PATTERN="$M1_RE" OVERRIDE="LegalPhrases:safe" KEYWORD_EXEMPT=1 PLAIN=1 perl -e "$SCAN_PERL" \
+        | cut -d: -f1)
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: M-1 keyword rule OK (hits on lines 3 and 5 of 5; the two comment lines)"
+        exit 0
+    fi
+    echo "audit-lint --self-test: M-1 keyword rule DRIFTED — expected hits on lines 3 and 5, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+    exit 1
+fi
+
 for path in "${STAGED[@]}"; do
     case "$path" in *.swift|*.xcstrings|*.md) ;; *) continue ;; esac
+    keyword=""
+    case "$path" in *.swift) keyword=1 ;; esac
     while IFS= read -r off; do
         [ -n "$off" ] && violate "M-1 forbidden phrase: $path:$off"
-    done < <(scan_added "$path" "$M1_RE" "LegalPhrases:safe")
+    done < <(scan_added "$path" "$M1_RE" "LegalPhrases:safe" "$keyword")
 done
 
 # ── M-3 banned networking symbols (Sources/ + Packages/RedactionEngine/) ─
