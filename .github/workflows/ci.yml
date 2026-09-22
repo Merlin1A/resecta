@@ -1,9 +1,12 @@
 # Pull-request gate. Builds the app and both test bundles, runs the two
 # lints over the lines the change adds, checks the documented counts
-# against the tree, and checks the shipped-asset hashes. About five
-# minutes on a hosted macos-26 runner. The engine host suite
-# (engine-suite.yml) and the simulator suite (sim-suite.yml) run on
-# demand and on release tags, not here.
+# against the tree, and checks the shipped-asset hashes. The four scripts
+# run from the base branch's copies, so a change cannot edit the lint it
+# is gated by; the change's own copies run once more, report-only. About
+# five minutes on a hosted macos-26 runner. The batched simulator suites
+# (sim-suite.yml) run weekly, on demand and on release tags, and the
+# engine host suite (engine-suite.yml) on demand and on release tags,
+# not here.
 name: ci
 
 on:
@@ -67,16 +70,39 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO -quiet
           echo "BFT_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
 
+      # The copies sit one directory under the checkout because two of the
+      # scripts locate the tree relative to their own path. On a push to
+      # main the base is the parent commit, i.e. the merged tree's scripts.
+      - name: Lint scripts from the base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ -n "$BASE_REF" ]; then
+            git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            base="origin/${BASE_REF}"
+          else
+            base="$(git rev-parse HEAD~1)"
+          fi
+          dir="${GITHUB_WORKSPACE}/.base-scripts"
+          mkdir -p "$dir"
+          for s in claims-lint doc-metrics audit-lint verify-shipped-asset-hashes; do
+            git show "${base}:Scripts/${s}.sh" > "${dir}/${s}.sh"
+            chmod +x "${dir}/${s}.sh"
+          done
+          echo "lint scripts from ${base} = $(git rev-parse "$base")"
+          echo "BASE_SCRIPTS=${dir}" >> "$GITHUB_ENV"
+          echo "LINT_SCRIPTS_FROM=${base} $(git rev-parse --short "$base")" >> "$GITHUB_ENV"
+
       - name: Claims lint
         run: |
           t0=$SECONDS
-          Scripts/claims-lint.sh
+          "${BASE_SCRIPTS}/claims-lint.sh"
           echo "CLAIMS_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
 
       - name: Documented counts
         run: |
           t0=$SECONDS
-          Scripts/doc-metrics.sh --check
+          "${BASE_SCRIPTS}/doc-metrics.sh" --check
           echo "DOCMETRICS_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
 
       - name: Audit lint over the change
@@ -91,11 +117,31 @@ jobs:
             echo "no event base (first push or unknown event); using HEAD~1 = $base"
           fi
           echo "audit-lint range: ${base}..HEAD"
-          Scripts/audit-lint.sh --range "${base}..HEAD"
+          "${BASE_SCRIPTS}/audit-lint.sh" --range "${base}..HEAD"
           echo "AUDIT_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
 
       - name: Shipped-asset hash fence
-        run: Scripts/verify-shipped-asset-hashes.sh
+        run: |
+          "${BASE_SCRIPTS}/verify-shipped-asset-hashes.sh"
+
+      # The change's own copies of the four scripts, so an edit to a lint is
+      # exercised before it merges. Never gates.
+      - name: Lint scripts from this change (report-only)
+        continue-on-error: true
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          base="${PR_BASE:-$PUSH_BEFORE}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="$(git rev-parse HEAD~1)"
+          fi
+          rc=0
+          Scripts/claims-lint.sh || { echo "::warning::this change's claims-lint.sh failed"; rc=1; }
+          Scripts/doc-metrics.sh --check || { echo "::warning::this change's doc-metrics.sh --check failed"; rc=1; }
+          Scripts/audit-lint.sh --range "${base}..HEAD" || { echo "::warning::this change's audit-lint.sh failed"; rc=1; }
+          Scripts/verify-shipped-asset-hashes.sh || { echo "::warning::this change's verify-shipped-asset-hashes.sh failed"; rc=1; }
+          exit "$rc"
 
       - name: Summary
         if: always()
@@ -110,4 +156,6 @@ jobs:
             echo "| claims-lint | ${CLAIMS_SECS:-—} |"
             echo "| doc-metrics (check) | ${DOCMETRICS_SECS:-—} |"
             echo "| audit-lint (range) | ${AUDIT_SECS:-—} |"
+            echo
+            echo "lint scripts from: ${LINT_SCRIPTS_FROM:-—}"
           } >> "$GITHUB_STEP_SUMMARY"
