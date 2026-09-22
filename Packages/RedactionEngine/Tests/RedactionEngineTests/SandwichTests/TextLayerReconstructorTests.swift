@@ -352,7 +352,7 @@ struct TextLayerReconstructorTests {
         TextLayerReconstructor.drawInvisibleTextLayer(
             context: ctx,
             entries: entries,
-            pageWidth: pageSize.width
+            pageSize: pageSize
         )
 
         ctx.endPDFPage()
@@ -401,7 +401,7 @@ struct TextLayerReconstructorTests {
         ctx.fill(box)
         TextLayerReconstructor.drawInvisibleTextLayer(
             context: ctx, entries: entries,
-            pageWidth: pageSize.width
+            pageSize: pageSize
         )
         ctx.endPDFPage()
         ctx.closePDF()
@@ -479,7 +479,7 @@ struct TextLayerReconstructorTests {
             expandedBounds: region.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
             polygonVertices: nil, bounds: region)]
         let validated = TextLayerReconstructor.validateSurvivors(
-            filtered, pageWidth: 612, regionShapes: shapes, pageRotation: 0)
+            filtered, regionShapes: shapes, frame: .unrotated(width: 612))
         #expect(validated.dropped == 1)
         #expect(validated.result.surviving.count == 8)
         #expect(validated.result.excludedCount == 12)
@@ -495,24 +495,34 @@ struct TextLayerReconstructorTests {
         #expect(digest.survivingNonWhitespaceCount == 8)
     }
 
-    @Test("drawn-cell rule: not applied on a page stored with a rotation (the layout is not faithful there yet)")
-    func drawnCellRuleGatedOnRotatedPages() {
+    @Test("drawn-cell rule: applies on a page stored with a rotation — in the source frame, as on the unrotated page",
+          arguments: [90, 180, 270])
+    func drawnCellRuleAppliesOnRotatedPages(rotation: Int) {
+        // The same narrow-label band carried into the DISPLAYED frame of a
+        // page stored with `/Rotate`: the rule un-rotates the entries and the
+        // region into the source frame and drops exactly the colon there.
         let (entries, region) = Self.narrowLabelBand()
-        let filtered = FilterResult(surviving: entries, totalCharacters: 20, excludedCount: 11)
+        let source = CGSize(width: 612, height: 792)
+        let displayed = rotation == 180 ? source : CGSize(width: source.height, height: source.width)
+        func t(_ r: CGRect) -> CGRect {
+            TextLayerExtractor.rotateRectIntoOutputSpace(r, sourceCropSize: source, rotation: rotation)
+        }
+        let rotated = entries.map {
+            CharacterInfo(character: $0.character, bounds: t($0.bounds),
+                          stringIndex: $0.stringIndex, lineIndex: $0.lineIndex)
+        }
+        let rect = t(region)
         let shapes = [RegionShape(
-            expandedBounds: region.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-            polygonVertices: nil, bounds: region)]
-        for rotation in [90, 180, 270, 450] {
-            let v = TextLayerReconstructor.validateSurvivors(
-                filtered, pageWidth: 612, regionShapes: shapes, pageRotation: rotation)
-            #expect(v.dropped == 0 && v.result.surviving.count == 9,
-                    "rotation \(rotation): the rule must leave the filter result unchanged")
-        }
-        for rotation in [0, 360, -360] {
-            #expect(TextLayerReconstructor.validateSurvivors(
-                filtered, pageWidth: 612, regionShapes: shapes, pageRotation: rotation).dropped == 1,
-                    "rotation \(rotation) is unrotated: the rule applies")
-        }
+            expandedBounds: rect.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
+            polygonVertices: nil, bounds: rect)]
+        let filtered = FilterResult(surviving: rotated, totalCharacters: 20, excludedCount: 11)
+        let v = TextLayerReconstructor.validateSurvivors(
+            filtered, regionShapes: shapes,
+            frame: PageFrame(rotation: rotation, displayedSize: displayed))
+        #expect(v.dropped == 1 && v.result.surviving.count == 8
+                && !v.result.surviving.contains { $0.character == ":" },
+                "rotation \(rotation): the rule drops exactly the colon (got \(v.dropped))")
+        #expect(v.result.excludedCount == 12 && v.result.totalCharacters == 20)
     }
 
     @Test("drawn-cell rule: a polygon region is tested as the polygon, not its bounding box")
@@ -588,5 +598,118 @@ struct TextLayerReconstructorTests {
         let rsurviving = try await filterCharacters(characters: rchars, redactionRects: [cornerRect]).surviving
         #expect(TextLayerReconstructor.inRegionDrawnGlyphIndices(
             entries: rsurviving, pageWidth: rbasis.width, redactionRects: [cornerRect]).isEmpty)
+    }
+
+    // MARK: - Rotated pages: the source-frame assembly
+
+    /// Two source lines of Courier-shaped glyphs (7.2 × 12 at 12 pt) in the
+    /// SOURCE frame of a 612 × 792 page; every character is distinct so a
+    /// read-back glyph maps to its entry by character alone.
+    private static func twoSourceLines() -> [CharacterInfo] {
+        var entries: [CharacterInfo] = []
+        var idx = 0
+        for (lineIndex, line) in [("ABCDEFG", 700.0), ("HIJKL", 680.0)].enumerated() {
+            for (i, ch) in line.0.enumerated() {
+                entries.append(CharacterInfo(
+                    character: String(ch),
+                    bounds: CGRect(x: 72 + Double(i) * 7.2, y: line.1, width: 7.2, height: 12),
+                    stringIndex: idx, lineIndex: lineIndex))
+                idx += 1
+            }
+        }
+        return entries
+    }
+
+    /// The displayed frame of a 612 × 792 source page under `rotation`, and
+    /// `twoSourceLines()` carried into it (the frame the extractor produces).
+    private static func rotatedFixture(_ rotation: Int) -> (frame: PageFrame, entries: [CharacterInfo]) {
+        let source = CGSize(width: 612, height: 792)
+        let displayed = rotation == 180 || rotation == 0
+            ? source : CGSize(width: source.height, height: source.width)
+        let frame = PageFrame(rotation: rotation, displayedSize: displayed)
+        let entries = twoSourceLines().map {
+            CharacterInfo(character: $0.character, bounds: frame.displayedRect($0.bounds),
+                          stringIndex: $0.stringIndex, lineIndex: $0.lineIndex)
+        }
+        return (frame, entries)
+    }
+
+    /// Render the invisible layer the way the stream reconstructor does and
+    /// return the page.
+    private static func renderPage(_ entries: [CharacterInfo], frame: PageFrame) throws -> PDFPage {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tlr_rot_\(UUID().uuidString).pdf")
+        var box = CGRect(origin: .zero, size: frame.displayedSize)
+        let ctx = try #require(CGContext(url as CFURL, mediaBox: &box, nil))
+        ctx.beginPDFPage(nil)
+        TextLayerReconstructor.drawInvisibleTextLayer(
+            context: ctx, entries: entries, pageSize: frame.displayedSize,
+            rotation: frame.rotation)
+        ctx.endPDFPage()
+        ctx.closePDF()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let data = try Data(contentsOf: url)
+        return try #require(PDFDocument(data: data)?.page(at: 0))
+    }
+
+    /// Every read-back glyph sits on its displayed source box and every
+    /// source line reads back contiguously in source order — the layer is
+    /// drawn along the source lines on all three rotations. On a 90°/270°
+    /// page the horizontal assembler drew every glyph as its own group into
+    /// cross-line bands; on 180° it reversed each line.
+    @Test("A rotated page's text layer is drawn along its source lines and reads back in source order",
+          arguments: [90, 180, 270])
+    func rotatedTextLayerFollowsSourceLines(rotation: Int) throws {
+        let (frame, entries) = Self.rotatedFixture(rotation)
+        let page = try Self.renderPage(entries, frame: frame)
+        let text = (page.string ?? "").filter { !$0.isWhitespace }
+        #expect(text.contains("ABCDEFG") && text.contains("HIJKL"),
+                "r=\(rotation): each source line must read back contiguously in source order (got \(text))")
+
+        let ns = (page.string ?? "") as NSString
+        var offset = 0
+        var matched = 0
+        while offset < ns.length {
+            let r = ns.rangeOfComposedCharacterSequence(at: offset)
+            offset += max(r.length, 1)
+            let ch = ns.substring(with: r)
+            if FilterResult.isLineageWhitespace(ch) { continue }
+            let sel = try #require(page.selection(for: r), "r=\(rotation): no selection for \(ch)")
+            let b = sel.bounds(for: page)
+            let entry = try #require(entries.first { $0.character == ch }, "r=\(rotation): unexpected glyph \(ch)")
+            let c = CGPoint(x: b.midX, y: b.midY)
+            let e = CGPoint(x: entry.bounds.midX, y: entry.bounds.midY)
+            #expect(abs(c.x - e.x) <= 7.2 && abs(c.y - e.y) <= 7.2,
+                    "r=\(rotation) \(ch): read-back centre \(c) vs displayed source centre \(e)")
+            matched += 1
+        }
+        #expect(matched == entries.count, "r=\(rotation): \(matched) of \(entries.count) glyphs read back")
+    }
+
+    /// Layer 9 in the source frame: the digest's hash (taken over the
+    /// displayed-frame survivors carried back into the source frame) equals
+    /// the output walk's hash (the read-back boxes carried into the same
+    /// frame), and a survivor dropped on either side flips it.
+    @Test("Layer 9 agrees on a rotated page's round trip and flags a dropped glyph",
+          arguments: [90, 180, 270])
+    func lineageRoundTripUnderRotation(rotation: Int) async throws {
+        let (frame, entries) = Self.rotatedFixture(rotation)
+        let page = try Self.renderPage(entries, frame: frame)
+        let filtered = FilterResult(surviving: entries, totalCharacters: entries.count, excludedCount: 0)
+        let digest = filtered.toDigest(
+            pageIndex: 0, redactionRects: [], safetyMargin: safetyMarginPoints, frame: frame)
+        #expect(digest.pageRotation == rotation)
+        #expect(digest.lineageHash == FilterResult.computeLineageHash(over: entries, frame: frame))
+        let outputHash = try SandwichVerification.computeOutputLineageHash(page, pageRotation: rotation)
+        #expect(outputHash == digest.lineageHash, "r=\(rotation): the two source-frame walks must agree")
+        let status = try await SandwichVerification().verifyCharacterLineage(outputPage: page, digest: digest)
+        #expect(status == .pass, "r=\(rotation): Layer 9 must pass the round trip; got \(status)")
+
+        let dropped = FilterResult(
+            surviving: entries.filter { $0.character != "D" },
+            totalCharacters: entries.count, excludedCount: 1
+        ).toDigest(pageIndex: 0, redactionRects: [], safetyMargin: safetyMarginPoints, frame: frame)
+        let tampered = try await SandwichVerification().verifyCharacterLineage(outputPage: page, digest: dropped)
+        #expect(tampered.isFail, "r=\(rotation): a glyph the digest does not carry must FAIL Layer 9")
     }
 }

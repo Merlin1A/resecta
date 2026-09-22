@@ -26,6 +26,10 @@ The entries below follow the Keep-a-Changelog index format.
 - Documentation: storage wording for Custom Terms and saved regexes, the supported-versions table, the outbound-links and export-metadata passages, a rotated-page note, and the audit-lint check ids; the documented-counts check runs in the pull-request gate.
 - Sharing: a verification result in which a check could not run on part of the output routes Share through the same slide-to-confirm as a skipped verification, listing the checks that reported it.
 
+### Fixed
+
+- Searchable Redaction: on pages stored with a rotation, the text layer is rebuilt along the source lines and reads in the source's order; the spatial check reads the layer along the axis its lines run on. The rebuilt layer on such pages was previously assembled across lines and could run off the page.
+
 ### Security
 
 - Links inside an imported document are not followed when tapped in the editor, and data detectors are turned off for the document the editor shows.

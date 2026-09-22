@@ -12,14 +12,21 @@ public struct PageOutput: Sendable {
     /// assembly never bridges a gap across one. Empty for
     /// Secure Rasterization pages and pages without regions.
     public let redactionRectsInPoints: [CGRect]
+    /// The source page's `/Rotate`. The text-layer lines are assembled in
+    /// the source frame and drawn back under this rotation
+    /// (`TextLayerReconstructor.drawInvisibleTextLayer`). 0 for an
+    /// unrotated page; unread for Secure Rasterization pages.
+    public let rotation: Int
 
     public init(image: CGImage, size: CGSize,
                 textLayerEntries: [CharacterInfo]?,
-                redactionRectsInPoints: [CGRect] = []) {
+                redactionRectsInPoints: [CGRect] = [],
+                rotation: Int = 0) {
         self.image = image
         self.size = size
         self.textLayerEntries = textLayerEntries
         self.redactionRectsInPoints = redactionRectsInPoints
+        self.rotation = rotation
     }
 }
 
@@ -81,12 +88,20 @@ public struct PageFilterDigest: Sendable {
     /// have drawn centred inside a redaction region. 0 for a digest taken
     /// before the rule ran, or by a caller that pre-dates it.
     public let drawnCellRuleExcludedCount: Int
+    /// The source page's `/Rotate`. `lineageHash` is taken in the SOURCE
+    /// frame — the survivors' bounds carried back through the inverse of
+    /// the rotation transform — and Layer 9 carries the output page's
+    /// read-back boxes into the same frame before its walk, so both sides
+    /// read the canonical order along the source lines. 0 for an unrotated
+    /// page and for a digest built by a caller that pre-dates the field.
+    public let pageRotation: Int
 
     public init(pageIndex: Int, extractedCount: Int, excludedCount: Int,
                 survivingCount: Int, boundaryCharacters: [BoundaryCharacterInfo],
                 lineageHash: Data = Data(),
                 survivingNonWhitespaceCount: Int? = nil,
-                drawnCellRuleExcludedCount: Int = 0) {
+                drawnCellRuleExcludedCount: Int = 0,
+                pageRotation: Int = 0) {
         self.pageIndex = pageIndex
         self.extractedCount = extractedCount
         self.excludedCount = excludedCount
@@ -95,6 +110,7 @@ public struct PageFilterDigest: Sendable {
         self.lineageHash = lineageHash
         self.survivingNonWhitespaceCount = survivingNonWhitespaceCount ?? survivingCount
         self.drawnCellRuleExcludedCount = drawnCellRuleExcludedCount
+        self.pageRotation = pageRotation
     }
 }
 

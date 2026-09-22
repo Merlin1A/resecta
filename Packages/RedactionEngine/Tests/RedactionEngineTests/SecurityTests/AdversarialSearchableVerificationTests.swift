@@ -807,7 +807,7 @@ struct AdversarialSearchableVerificationTests {
         ctx.beginPDFPage(nil)
         TextLayerReconstructor.drawInvisibleTextLayer(
             context: ctx, entries: characters,
-            pageWidth: pageSize.width
+            pageSize: pageSize
         )
         ctx.endPDFPage()
         ctx.closePDF()

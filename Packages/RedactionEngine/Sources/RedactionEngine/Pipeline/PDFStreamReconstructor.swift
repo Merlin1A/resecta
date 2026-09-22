@@ -60,6 +60,7 @@ public actor PDFStreamReconstructor {
         let size: CGSize
         let textLayerEntries: [CharacterInfo]?
         let redactionRectsInPoints: [CGRect]
+        let rotation: Int
     }
 
     public init(tempURL: URL) {
@@ -117,7 +118,7 @@ public actor PDFStreamReconstructor {
     func appendUnencodedPageForTesting(jpegData: Data, size: CGSize) {
         drawBufferedPage(BufferedPage(
             jpegData: jpegData, size: size,
-            textLayerEntries: nil, redactionRectsInPoints: []))
+            textLayerEntries: nil, redactionRectsInPoints: [], rotation: 0))
         _appendedPageCount += 1
     }
 
@@ -182,8 +183,9 @@ public actor PDFStreamReconstructor {
                 TextLayerReconstructor.drawInvisibleTextLayer(
                     context: ctx,
                     entries: entries,
-                    pageWidth: page.size.width,
-                    redactionRects: page.redactionRectsInPoints
+                    pageSize: page.size,
+                    redactionRects: page.redactionRectsInPoints,
+                    rotation: page.rotation
                 )
             }
 
@@ -408,7 +410,8 @@ public actor PDFStreamReconstructor {
             jpegData: data as Data,
             size: output.size,
             textLayerEntries: output.textLayerEntries,
-            redactionRectsInPoints: output.redactionRectsInPoints
+            redactionRectsInPoints: output.redactionRectsInPoints,
+            rotation: output.rotation
         )
     }
 }

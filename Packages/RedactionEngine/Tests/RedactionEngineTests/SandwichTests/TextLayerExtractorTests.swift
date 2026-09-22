@@ -312,6 +312,75 @@ struct TextLayerExtractorTests {
         }
         return (scanned, operands)
     }
+
+    // MARK: 5 — the rotation transform's inverse (the source frame)
+
+    /// `unrotateRectIntoSourceSpace` inverts `rotateRectIntoOutputSpace` on
+    /// every rotation, for rects and for points, and `PageFrame` carries
+    /// both maps with the source size derived from the displayed size. The
+    /// concrete values are the `tRotFourCaseTransform` pins read backwards
+    /// (non-circular: hand-derived, not a re-run of the forward formula).
+    @Test("The inverse rotation transform round-trips every rotation",
+          arguments: [0, 90, 180, 270])
+    func inverseRotationTransformRoundTrips(rotation: Int) {
+        let source = CGSize(width: 612, height: 792)
+        let displayed = rotation == 90 || rotation == 270
+            ? CGSize(width: 792, height: 612) : source
+        let frame = PageFrame(rotation: rotation, displayedSize: displayed)
+        #expect(frame.sourceSize == source)
+        #expect(frame.isUnrotated == (rotation == 0))
+
+        func close(_ a: CGRect, _ b: CGRect) -> Bool {
+            abs(a.minX - b.minX) < 1e-9 && abs(a.minY - b.minY) < 1e-9
+                && abs(a.width - b.width) < 1e-9 && abs(a.height - b.height) < 1e-9
+        }
+        let locals = [
+            CGRect(x: 0, y: 0, width: 10, height: 10),
+            CGRect(x: 100, y: 700, width: 40, height: 12),
+            CGRect(x: 463.383, y: 529.829, width: 2.148, height: 10.89),
+        ]
+        for local in locals {
+            let forward = TextLayerExtractor.rotateRectIntoOutputSpace(
+                local, sourceCropSize: source, rotation: rotation)
+            let back = TextLayerExtractor.unrotateRectIntoSourceSpace(
+                forward, sourceCropSize: source, rotation: rotation)
+            #expect(close(back, local), "r=\(rotation) \(local) → \(forward) → \(back)")
+            #expect(close(frame.displayedRect(local), forward))
+            #expect(close(frame.sourceRect(forward), local))
+            // Points: the rect's min corner maps as a point of its own.
+            let p = local.origin
+            let fp = frame.displayedPoint(p)
+            #expect(abs(frame.sourcePoint(fp).x - p.x) < 1e-9
+                    && abs(frame.sourcePoint(fp).y - p.y) < 1e-9)
+            // The displayed direction of +X/+Y is the source direction
+            // rotated by `displayedAngle` (the CTM the writer rotates by).
+            let o = frame.displayedPoint(.zero)
+            let c = cos(frame.displayedAngle), s = sin(frame.displayedAngle)
+            let expectedX = CGPoint(x: o.x + c * p.x - s * p.y, y: o.y + s * p.x + c * p.y)
+            #expect(abs(fp.x - expectedX.x) < 1e-9 && abs(fp.y - expectedX.y) < 1e-9,
+                    "r=\(rotation): displayedPoint must equal the rotation by displayedAngle about the displayed origin")
+        }
+
+        // Hand-derived concrete inverses (the forward pins, read backwards).
+        let square = CGRect(x: 0, y: 0, width: 10, height: 10)
+        let displayedSquare: CGRect
+        switch rotation {
+        case 90: displayedSquare = CGRect(x: 0, y: 602, width: 10, height: 10)
+        case 180: displayedSquare = CGRect(x: 602, y: 782, width: 10, height: 10)
+        case 270: displayedSquare = CGRect(x: 782, y: 0, width: 10, height: 10)
+        default: displayedSquare = square
+        }
+        #expect(TextLayerExtractor.unrotateRectIntoSourceSpace(
+            displayedSquare, sourceCropSize: source, rotation: rotation) == square)
+        if rotation == 90 {
+            // Asymmetric: displayed (700, 472, 12 × 40) is local (100, 700, 40 × 12).
+            #expect(TextLayerExtractor.unrotateRectIntoSourceSpace(
+                CGRect(x: 700, y: 612 - 100 - 40, width: 12, height: 40),
+                sourceCropSize: source, rotation: 90)
+                == CGRect(x: 100, y: 700, width: 40, height: 12))
+        }
+    }
+
 }
 
 // MARK: - Scanner callback helpers
@@ -330,6 +399,7 @@ private func extractorTestAppendPoppedOperand(
           let o = obj,
           let info else { return }
     extractorTestAppendObjectText(o, into: info.assumingMemoryBound(to: [String].self))
+
 }
 
 private func extractorTestAppendObjectText(
