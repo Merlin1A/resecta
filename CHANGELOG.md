@@ -25,6 +25,7 @@ The entries below follow the Keep-a-Changelog index format.
 - Temporary files: the orphan sweep also runs when the app returns to the foreground; a region change removes the previous output file at once; closing a session removes any leftover intermediate file.
 - Documentation: storage wording for Custom Terms and saved regexes, the supported-versions table, the outbound-links and export-metadata passages, a rotated-page note, and the audit-lint check ids; the documented-counts check runs in the pull-request gate.
 - Sharing: a verification result in which a check could not run on part of the output routes Share through the same slide-to-confirm as a skipped verification, listing the checks that reported it.
+- Verification: the operator re-extraction check scans the decoded operator text in its normalized form as well, as the string search already does, so a term spelled with a compatibility character is reported by both checks.
 
 ### Fixed
 
@@ -33,6 +34,7 @@ The entries below follow the Keep-a-Changelog index format.
 ### Security
 
 - Links inside an imported document are not followed when tapped in the editor, and data detectors are turned off for the document the editor shows.
+- Export: the file identifier the system PDF writer adds is rewritten to a value derived from the file's own contents, so it carries nothing about the device, the build or the moment of export; the metadata check confirms it. Two exports of identical content carry the same identifier.
 
 ## [1.1.0] — 2026-08-28
 
