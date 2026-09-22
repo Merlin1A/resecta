@@ -448,6 +448,11 @@ struct VerificationCorpusRunnerTests {
                 input, modes: [.secureRasterization, .searchableRedaction])
         }
 
+        // --- D2. The Layer-10 normalization-parity cell (searchable only) ---
+        for input in Self.compatResidueInputs() {
+            try await execute(input, modes: [.searchableRedaction])
+        }
+
         // --- E. PB-86 hidden-text probe (searchable path; 1.2 P1.4) ---
         var pb86Rows: [PB86PlantRow] = []
         for (input, rows) in Self.pb86FactoryInputs()

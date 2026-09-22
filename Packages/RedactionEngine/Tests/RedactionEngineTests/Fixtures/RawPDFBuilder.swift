@@ -767,6 +767,56 @@ enum TestFixtures {
         return singleTextPagePDF(stream: stream)
     }
 
+    /// Layer-10 normalization parity (C12-108). A page whose only surviving
+    /// spelling of a term is a COMPATIBILITY form: one that NFKC-folds to the
+    /// term, that the search automaton's variant set does not enumerate
+    /// (`AhoCorasick.encodeForSearch` emits each case variant as typed, in
+    /// its normalized form and in its ligature-composed form), and that
+    /// Courier draws — Latin-1's ordinal indicator ª (U+00AA, NFKC image `a`).
+    /// Three lines: the visible anchor at the shared anchor Td, the term
+    /// spelled plainly on a burn line (a region covers exactly that line),
+    /// and the compatibility-form plant at the shared hidden Td, outside the
+    /// region, so it survives into the rebuilt text layer. Every literal is
+    /// written in WinAnsi (the ª as the octal escape `\252`), so the source
+    /// text layer extracts the ordinal indicator itself and the rebuilt
+    /// Courier layer carries it into the output.
+    static let compatPlantBurnTd = CGPoint(x: 72, y: 550)   // 18 pt burned plain line
+
+    static func compatFormResiduePDF(
+        visible: String = "COMPAT VISIBLE ANCHOR LINE",
+        burned: String? = "plant-engcompat-01",
+        planted: String = "pl\u{AA}nt-engcompat-01"
+    ) -> Data {
+        // WinAnsi covers 0x20–0x7E and 0xA0–0xFF as single bytes; anything
+        // else has no place in this fixture (a scalar outside that set would
+        // be silently mis-encoded and the cell would measure nothing).
+        func winAnsiLiteral(_ text: String) -> String {
+            var out = ""
+            for scalar in text.unicodeScalars {
+                let v = scalar.value
+                switch v {
+                case 0x28, 0x29, 0x5C:  // ( ) \ — escaped inside a literal
+                    out += "\\" + String(Character(scalar))
+                case 0x20...0x7E:
+                    out += String(Character(scalar))
+                case 0xA0...0xFF:
+                    out += String(format: "\\%03o", v)
+                default:
+                    preconditionFailure("compatFormResiduePDF: scalar U+\(String(v, radix: 16)) has no WinAnsi byte")
+                }
+            }
+            return out
+        }
+        var lines = [
+            "BT /F1 18 Tf \(Int(hiddenPlantAnchorTd.x)) \(Int(hiddenPlantAnchorTd.y)) Td (\(winAnsiLiteral(visible))) Tj ET",
+        ]
+        if let burned {
+            lines.append("BT /F1 18 Tf \(Int(compatPlantBurnTd.x)) \(Int(compatPlantBurnTd.y)) Td (\(winAnsiLiteral(burned))) Tj ET")
+        }
+        lines.append("BT /F1 18 Tf \(Int(hiddenPlantHiddenTd.x)) \(Int(hiddenPlantHiddenTd.y)) Td (\(winAnsiLiteral(planted))) Tj ET")
+        return singleTextPagePDF(stream: lines.joined(separator: "\n"))
+    }
+
     private static func singleTextPagePDF(stream: String) -> Data {
         buildRawPDF(objects: [
             PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
