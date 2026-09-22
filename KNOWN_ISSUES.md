@@ -104,7 +104,8 @@ While drawing, rectangle edges align to other boxes and page guides; alignment t
 
 ### KI-3: doc.text.redact SF Symbol Availability Unverified (Medium) — FIXED 2026-03-29
 **Resolution:** Runtime availability check with fallback implemented in Phase 8.
-`EULAGateView.swift`, `EmptyStateView.swift`, and `HomeView.swift` check `UIImage(systemName: "doc.text.redact")`
+`EULAGateView.swift`, `EmptyStateView.swift`, `HomeView.swift`, and (since 2026-09-22) the app-snapshot
+privacy overlay `SnapshotPrivacyOverlay.swift` check `UIImage(systemName: "doc.text.redact")`
 at runtime and fall back to `doc.viewfinder` if unavailable.
 
 ---
