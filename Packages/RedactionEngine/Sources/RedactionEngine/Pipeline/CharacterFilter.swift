@@ -584,7 +584,7 @@ extension FilterResult {
             boundaryCharacters: boundaryChars,
             lineageHash: Self.computeLineageHash(over: surviving, frame: frame),
             survivingNonWhitespaceCount: surviving.count(where: {
-                !Self.isLineageWhitespace($0.character)
+                !SandwichMetrics.isLineageWhitespace($0.character)
             }),
             drawnCellRuleExcludedCount: drawnCellRuleExcludedCount,
             pageRotation: frame?.rotation ?? 0
@@ -612,7 +612,7 @@ extension FilterResult {
 
     /// SHA-256 over `(character, globalPos)` for each non-whitespace
     /// composed-character sequence in CANONICAL order (J-12, 2026-06-09):
-    /// run groups band by the shared Y sweep (`SandwichVerification.yBands`),
+    /// run groups band by the shared Y sweep (`SandwichMetrics.yBands`),
     /// X ascending within a band — mirroring `computeOutputLineageHash`'s
     /// canonical sort of the output units. PDFKit's string order on
     /// multi-baseline form rows is a layout heuristic no filter-side walk
@@ -655,7 +655,7 @@ extension FilterResult {
         let separator = Data([0x1F])
         var globalPos = 0
         let groups = TextLayerReconstructor.runMemberGroups(characters)
-        let bands = SandwichVerification.yBands(
+        let bands = SandwichMetrics.yBands(
             groups.map { characters[$0[0]].bounds.origin.y })
         let order = groups.indices.sorted {
             bands[$0] != bands[$1]
@@ -672,7 +672,7 @@ extension FilterResult {
                 let range = nsText.rangeOfComposedCharacterSequence(at: offset)
                 let charString = nsText.substring(with: range)
                 offset += max(range.length, 1)
-                guard !isLineageWhitespace(charString) else { continue }
+                guard !SandwichMetrics.isLineageWhitespace(charString) else { continue }
                 hasher.update(data: Data(charString.utf8))
                 hasher.update(data: separator)
                 hasher.update(data: Data(String(globalPos).utf8))
@@ -683,13 +683,4 @@ extension FilterResult {
         return Data(hasher.finalize())
     }
 
-    /// Whitespace skip predicate shared with `SandwichVerification.computeOutputLineageHash`.
-    /// PDFKit's `page.string` synthesizes inter-run whitespace asymmetrically
-    /// between the source (`extractCharacters`) and output (reconstructed)
-    /// views; skipping whitespace on both sides keeps the hash domain a
-    /// content/ordering signal (N2 residual).
-    static func isLineageWhitespace(_ charString: String) -> Bool {
-        guard !charString.isEmpty else { return true }
-        return charString.allSatisfy { $0.isWhitespace }
-    }
 }
