@@ -286,7 +286,7 @@ struct LineAwareFilterTests {
             let found = ns.range(of: "DELIA HARTWELL", options: [], range: search)
             guard found.location != NSNotFound else { break }
             let member = entries.filter {
-                !FilterResult.isLineageWhitespace($0.character)
+                !SandwichMetrics.isLineageWhitespace($0.character)
                     && $0.stringIndex >= found.location
                     && $0.stringIndex < found.location + found.length
             }
@@ -378,7 +378,7 @@ struct LineAwareFilterTests {
         while offset < outPage.numberOfCharacters {
             let range = nsOut.rangeOfComposedCharacterSequence(at: offset)
             defer { offset += max(range.length, 1) }
-            guard !FilterResult.isLineageWhitespace(nsOut.substring(with: range)),
+            guard !SandwichMetrics.isLineageWhitespace(nsOut.substring(with: range)),
                   let sel = outPage.selection(for: range) else { continue }
             let bounds = sel.bounds(for: outPage)
             guard bounds.width > 0, bounds.height > 0 else { continue }
@@ -399,7 +399,7 @@ struct LineAwareFilterTests {
                 pointSize = font.pointSize
             }
             #endif
-            let fraction = SandwichVerification.descentFraction(
+            let fraction = SandwichMetrics.descentFraction(
                 family: family, pointSize: pointSize)
             let core = bounds.insetBy(dx: 0, dy: fraction * bounds.height)
             if outRects.contains(where: { core.intersects($0) }) {
@@ -431,7 +431,7 @@ struct LineAwareFilterTests {
         while offset < page.numberOfCharacters {
             let range = ns.rangeOfComposedCharacterSequence(at: offset)
             defer { offset += max(range.length, 1) }
-            guard !FilterResult.isLineageWhitespace(ns.substring(with: range)),
+            guard !SandwichMetrics.isLineageWhitespace(ns.substring(with: range)),
                   let sel = page.selection(for: range) else { continue }
             let bounds = sel.bounds(for: page)
             if bounds.width > 0, bounds.height > 0 { count += 1 }

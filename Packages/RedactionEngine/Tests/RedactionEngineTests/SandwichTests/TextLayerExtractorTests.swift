@@ -70,7 +70,7 @@ struct TextLayerExtractorTests {
                 let range = ns.rangeOfComposedCharacterSequence(at: offset)
                 let sub = ns.substring(with: range)
                 composedAt[range.location] = sub
-                if !FilterResult.isLineageWhitespace(sub) {
+                if !SandwichMetrics.isLineageWhitespace(sub) {
                     nonWhitespaceCount += 1
                 }
                 offset += max(range.length, 1)
@@ -98,7 +98,7 @@ struct TextLayerExtractorTests {
 
             // (c) non-whitespace count parity.
             let nonWhitespaceEntries = entries.filter {
-                !FilterResult.isLineageWhitespace($0.character)
+                !SandwichMetrics.isLineageWhitespace($0.character)
             }
             #expect(
                 nonWhitespaceEntries.count == nonWhitespaceCount,
@@ -171,7 +171,7 @@ struct TextLayerExtractorTests {
             var whitespaceCount = 0
             var breakWide: [(index: Int, width: CGFloat, reference: CGFloat)] = []
             for (k, entry) in entries.enumerated()
-            where FilterResult.isLineageWhitespace(entry.character) {
+            where SandwichMetrics.isLineageWhitespace(entry.character) {
                 whitespaceCount += 1
                 let reference = k > 0
                     ? entries[k - 1].bounds.width : entry.bounds.height
@@ -239,10 +239,10 @@ struct TextLayerExtractorTests {
         of needle: String, in entries: [CharacterInfo]
     ) -> CGFloat? {
         let nonWS = entries.filter {
-            !FilterResult.isLineageWhitespace($0.character)
+            !SandwichMetrics.isLineageWhitespace($0.character)
         }
         guard !nonWS.isEmpty else { return nil }
-        let bands = SandwichVerification.yBands(nonWS.map(\.bounds.minY))
+        let bands = SandwichMetrics.yBands(nonWS.map(\.bounds.minY))
         let bandCount = (bands.max() ?? 0) + 1
         var members: [[Int]] = Array(repeating: [], count: bandCount)
         for (k, band) in bands.enumerated() { members[band].append(k) }
