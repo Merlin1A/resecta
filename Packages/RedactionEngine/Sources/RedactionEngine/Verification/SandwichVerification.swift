@@ -1093,7 +1093,14 @@ public struct SandwichVerification: Sendable {
                 // forgiving viewer — is observed alongside well-formed
                 // String operands. CGPDFStringCopyTextString is the
                 // independent decoder vs. PDFKit's `page.string` (Layer 3's
-                // decoder). nil decodes are tolerated — false negatives are
+                // decoder): it reads each operand as PDFDocEncoding (or
+                // UTF-16 behind a byte-order mark) without consulting the
+                // page's font encodings, so a byte above ASCII drawn through
+                // a font whose encoding differs from PDFDocEncoding there
+                // (the writer's Courier subset is MacRoman-encoded) reads
+                // back as PDFDocEncoding's character for that byte. The
+                // corpus cell `factory-compat-residue` measures that gap.
+                // nil decodes are tolerated — false negatives are
                 // acceptable on a defense-in-depth layer; false positives
                 // are not.
                 CGPDFOperatorTableSetCallback(table, "Tj") { scanner, info in
@@ -1147,15 +1154,31 @@ public struct SandwichVerification: Sendable {
             // survives OUTSIDE every region (in-region content is removed
             // from the stream) — residual, user-recoverable via text search
             // → ATTENTION, not FAIL.
+            // The decoded operator text is scanned as decoded and, when the
+            // search path's normalizer changes it (a ligature or another
+            // compatibility form in an operand), in that normalized form as
+            // well — the mirror of Layer 3's decoded pass in
+            // `VerificationEngine.runLayer3BinarySearch`. A page counts once;
+            // its instance count is the larger of the two scans, so one
+            // occurrence never double-counts. The accumulator holds UTF-8
+            // (decoded strings + the 0x1F separator), so the round trip
+            // through String is lossless.
             let matches = termAutomaton.tokenFilteredMatches(in: accumulator)
-            if !matches.isEmpty {
+            let decodedText = String(decoding: accumulator, as: UTF8.self)
+            let normalizedText = TextNormalizer.normalize(decodedText)
+            let normalizedMatches = normalizedText == decodedText
+                ? []
+                : termAutomaton.tokenFilteredMatches(in: Data(normalizedText.utf8))
+            if !matches.isEmpty || !normalizedMatches.isEmpty {
                 // Physical-occurrence count: unique (position, length), so one
                 // occurrence never multi-counts across case/encoding variants.
-                let count = AhoCorasick.uniqueOccurrenceCount(matches)
+                let count = max(
+                    AhoCorasick.uniqueOccurrenceCount(matches),
+                    AhoCorasick.uniqueOccurrenceCount(normalizedMatches))
                 return (.attention(
                     "Text matching your redactions is readable in page \(pageIdx + 1) content "
                     + "(\(count) instance\(count == 1 ? "" : "s"))"
-                ), [pageIdx], termAutomaton.matchedTermTexts(matches), false)
+                ), [pageIdx], termAutomaton.matchedTermTexts(matches + normalizedMatches), false)
             }
         }
         if droppedTermCount > 0 {
