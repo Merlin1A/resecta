@@ -133,7 +133,7 @@ Vulnerability disclosure goes through [`SECURITY.md`](./SECURITY.md), not the pu
 
 ## Tests
 
-Tests run locally before opening a PR and before any merge to `main`: the pre-push hook runs both suites through the batched runner, and the pull-request gate builds the app and both test bundles without running them. The full suites also run on GitHub Actions on demand and on release tags — `engine-suite.yml` (the engine package on the macOS host; `FileProtectionTests` is skipped there because a macOS host filesystem cannot exercise the iOS file-protection classes, which the simulator suite covers) and `sim-suite.yml` (the batched app suite on a hosted simulator) — neither is required for a merge. The two suites:
+Tests run locally before opening a PR and before any merge to `main`: the pre-push hook runs both suites through the batched runner, and the pull-request gate builds the app and both test bundles without running them; the batched suites run weekly on a hosted simulator and before every push locally. On GitHub Actions, `sim-suite.yml` runs both schemes through the batched runner on a hosted simulator every Monday, on demand and on release tags (GitHub pauses a scheduled workflow after sixty days without a commit; any commit resumes it), and `engine-suite.yml` runs the engine package on the macOS host on demand and on release tags (`FileProtectionTests` is skipped there because a macOS host filesystem cannot exercise the iOS file-protection classes, which the simulator suite covers) — neither is required for a merge. The two suites:
 
 - `ResectaApp` — app-target tests, on the iPhone 17 simulator via the batched runner.
 - `RedactionEngine` — engine package tests, via SwiftPM on the Mac host.
