@@ -79,6 +79,8 @@ struct RuleCatalogTests {
             "dl.regex", "passport.regex", "mrn.regex", "npi.80840",
             "dea.letter-check", "account.regex", "name.nltagger",
             "licensePlate.labeled",
+            // The label-anchor routes in detectNames (pass 4).
+            "name.label-anchor",
             // Emitted by RoutingNumberDetector
             // and defaultRuleID(for: .routingNumber).
             "routingNumber.aba-checksum",
