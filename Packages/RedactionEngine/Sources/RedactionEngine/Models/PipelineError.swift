@@ -21,6 +21,10 @@ public enum PipelineError: Sendable, LocalizedError {
         case tooLarge(bytesRead: Int)
         case unsupportedFormat
         case invalidPageDimensions(pageIndex: Int)
+        // The import-time active-content walk (`ActiveContentScan`) saw
+        // JavaScript or a launch action at one of the locations it covers.
+        // Its own case so the refusal is not reported as a damaged file.
+        case activeContent(location: ActiveContentLocation)
     }
 
     public enum DetectionFailure: Sendable {
@@ -76,6 +80,7 @@ public enum PipelineError: Sendable, LocalizedError {
             case .tooLarge: "This document is too large to process on this device."
             case .unsupportedFormat: "This file format is not supported. Resecta works with PDF and image files."
             case .invalidPageDimensions(let p): "Page \(p + 1) has unsupported dimensions and cannot be processed."
+            case .activeContent: "This document contains JavaScript or a launch action and was not imported."
             }
         case .detectionError(let f):
             switch f {

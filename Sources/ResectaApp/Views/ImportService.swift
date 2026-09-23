@@ -431,8 +431,12 @@ enum ImportService {
         }
 
         // Early rejection of PDFs with active content. Also checked in
-        // verification Layer 4, but PDFKit parses the document during import
-        // so we reject upfront to avoid loading malicious payloads.
+        // verification Layer 4 on the output, but PDFKit parses the document
+        // during import so we reject upfront to avoid loading malicious
+        // payloads. The engine's walk covers the catalog-top keys and the
+        // ISO-canonical carriers (/Names → /JavaScript, /OpenAction, page
+        // /AA, annotation /A); the refusal carries its own case so the
+        // failed screen names active content, not a damaged file.
         //
         // While we have a CGPDFDocument open, also walk
         // /OCProperties/D/OFF for hidden Optional Content Groups. The engine
@@ -441,14 +445,9 @@ enum ImportService {
         // every PDFPageData via DocumentState.sourceHasHiddenOCG.
         var hasHiddenOCG = false
         if let provider = CGDataProvider(data: data as CFData),
-           let cgDoc = CGPDFDocument(provider),
-           let catalog = cgDoc.catalog {
-            let dangerousKeys = ["JavaScript", "JS", "Launch"]
-            for key in dangerousKeys {
-                var obj: CGPDFObjectRef?
-                if CGPDFDictionaryGetObject(catalog, key, &obj) {
-                    throw PipelineError.importError(.corrupt)
-                }
+           let cgDoc = CGPDFDocument(provider) {
+            if let location = ActiveContentScan.firstLocation(in: cgDoc) {
+                throw PipelineError.importError(.activeContent(location: location))
             }
             hasHiddenOCG = TextLayerExtractor.documentHasHiddenOCG(cgDoc)
         }

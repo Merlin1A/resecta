@@ -22,6 +22,8 @@ extension PipelineError {
                 "Unsupported File Format"
             case .invalidPageDimensions:
                 "Invalid Page Dimensions"
+            case .activeContent:
+                "Document Contains Active Content"
             }
 
         case .detectionError(let f):
@@ -94,6 +96,10 @@ extension PipelineError {
                 "Resecta works with PDF and image files (JPEG, PNG, HEIC). Other formats are not supported."
             case .invalidPageDimensions(let p):
                 "Page \(p + 1) has dimensions outside the supported range. Each page must be between 1 and 5,000 points."
+            case .activeContent:
+                // Mechanism description: names what the import walk saw and
+                // what the app does with it. Not the damaged-file copy.
+                "This document contains JavaScript or a launch action. Resecta does not import documents with active content. Print or export the document to a new PDF from another app, then import it again."
             }
 
         case .detectionError(let f):

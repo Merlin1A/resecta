@@ -35,6 +35,7 @@ The entries below follow the Keep-a-Changelog index format.
 ### Security
 
 - Links inside an imported document are not followed when tapped in the editor, and data detectors are turned off for the document the editor shows.
+- Import: a document that carries JavaScript or a launch action in its catalog's name tree, in its open action, in a page's additional actions, or in an annotation's action is refused at import, as a document with those entries at the top of the catalog already was. The refusal names active content instead of a damaged file.
 - Export: the file identifier the system PDF writer adds is rewritten to a value derived from the file's own contents, so it carries nothing about the device, the build or the moment of export; the metadata check confirms it. Two exports of identical content carry the same identifier.
 
 ## [1.1.0] — 2026-08-28
