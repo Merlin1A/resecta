@@ -1995,20 +1995,12 @@ public actor DocumentSearcher {
                 // display analog drifted (the `displaySlice` fallback) the
                 // window comes from the searched line at the searched
                 // offsets, matching that fallback slice instead.
-                let window: ContextWindow
-                if displayLineChars.count == ext.baseText.count,
-                   let span = Self.baseSpan(
-                       start: displayStart, length: displayLength, offsetMap: ext.offsetMap
-                   ),
-                   span.upperBound <= displayLineChars.count {
-                    window = contextSnippet(
-                        text: displayLineText, matchStart: span.lowerBound, matchLength: span.count
-                    )
-                } else {
-                    window = contextSnippet(
-                        text: lineText, matchStart: displayStart, matchLength: displayLength
-                    )
-                }
+                let window = displayWindow(
+                    displayChars: displayLineChars, displayText: displayLineText,
+                    baseCount: ext.baseText.count,
+                    start: displayStart, length: displayLength, offsetMap: ext.offsetMap,
+                    searchedText: lineText, searchedStart: displayStart, searchedLength: displayLength
+                )
 
                 results.append(SearchResult(
                     pageIndex: pageIndex,
@@ -2434,20 +2426,12 @@ public actor DocumentSearcher {
                 // at the base span, so its match slice IS `matchedText`; on
                 // display drift (the `displaySlice` fallback) it comes from
                 // the searched text at the searched offsets instead.
-                let window: ContextWindow
-                if displayBaseChars.count == ext.baseText.count,
-                   let span = Self.baseSpan(
-                       start: baseStartOffset, length: baseLength, offsetMap: nil
-                   ),
-                   span.upperBound <= displayBaseChars.count {
-                    window = contextSnippet(
-                        text: displayBaseText, matchStart: span.lowerBound, matchLength: span.count
-                    )
-                } else {
-                    window = contextSnippet(
-                        text: searchPageText, matchStart: matchStartOffset, matchLength: matchLength
-                    )
-                }
+                let window = displayWindow(
+                    displayChars: displayBaseChars, displayText: displayBaseText,
+                    baseCount: ext.baseText.count,
+                    start: baseStartOffset, length: baseLength, offsetMap: nil,
+                    searchedText: searchPageText, searchedStart: matchStartOffset, searchedLength: matchLength
+                )
 
                 results.append(SearchResult(
                     pageIndex: pageIndex,
@@ -2717,6 +2701,26 @@ public actor DocumentSearcher {
         let charStart = text.distance(from: text.startIndex, to: range.lowerBound)
         let charLength = text.distance(from: range.lowerBound, to: range.upperBound)
         return contextSnippet(text: text, matchStart: charStart, matchLength: charLength)
+    }
+
+    /// The context window over the case-preserved display analog at the
+    /// base span `displaySlice` re-sliced from (so the window's match
+    /// slice IS the displayed text), or — when the analog drifted from the
+    /// base Character count, the `displaySlice` fallback — over the
+    /// searched text at the searched offsets, matching that fallback slice
+    /// instead. The one pairing for the OCR literal path and
+    /// `findTextMatches`.
+    private func displayWindow(
+        displayChars: [Character], displayText: String, baseCount: Int,
+        start: Int, length: Int, offsetMap: [Int]?,
+        searchedText: String, searchedStart: Int, searchedLength: Int
+    ) -> ContextWindow {
+        if displayChars.count == baseCount,
+           let span = Self.baseSpan(start: start, length: length, offsetMap: offsetMap),
+           span.upperBound <= displayChars.count {
+            return contextSnippet(text: displayText, matchStart: span.lowerBound, matchLength: span.count)
+        }
+        return contextSnippet(text: searchedText, matchStart: searchedStart, matchLength: searchedLength)
     }
 
     /// Word character for the window trim: letters and digits; every
