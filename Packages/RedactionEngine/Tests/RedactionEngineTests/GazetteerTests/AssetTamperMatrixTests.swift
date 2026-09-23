@@ -198,10 +198,20 @@ struct AssetTamperMatrixTests {
 
     static func measure(_ bundle: Bundle) -> Outcome {
         let (detector, diagnostics) = PIIDetector.loadWithDiagnostics(bundle: bundle)
+        // The five gated loaders live on the detector and on the families
+        // the registry hands them to; `Mirror` reads each once.
+        var seen: Set<String> = []
         var nilCount = 0
-        for child in Mirror(reflecting: detector).children {
-            guard let label = child.label, gatedLabels.contains(label) else { continue }
-            if isNilOptional(child.value) { nilCount += 1 }
+        let holders: [Any] = [
+            detector, detector.families.name, detector.families.driversLicense,
+            detector.families.passport, detector.families.ssn,
+        ]
+        for holder in holders {
+            for child in Mirror(reflecting: holder).children {
+                guard let label = child.label, gatedLabels.contains(label), !seen.contains(label) else { continue }
+                seen.insert(label)
+                if isNilOptional(child.value) { nilCount += 1 }
+            }
         }
         return Outcome(
             withheld: nilCount == gatedLabels.count,
