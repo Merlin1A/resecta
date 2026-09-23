@@ -1582,13 +1582,10 @@ public actor DocumentSearcher {
                             term: "Custom",
                             piiCategory: nil,
                             piiConfidence: nil,
-                            rationale: MatchRationale(
-                                ruleID: "user.alwaysFlag",
-                                signals: [.userAlwaysFlag(pattern: hit.pattern)],
-                                preThresholdScore: 1.0,
-                                finalScore: 1.0,
-                                appliedThreshold: nil
-                            ),
+                            rationale: MatchRationale.Builder(
+                                ruleID: "user.alwaysFlag", preThresholdScore: 1.0,
+                                signals: [.userAlwaysFlag(pattern: hit.pattern)]
+                            ).build(finalScore: 1.0),
                             matchRangeInSnippet: window.matchRange
                         ))
                         totalYielded += 1
@@ -1799,20 +1796,8 @@ public actor DocumentSearcher {
 
             // Fold OCR confidence into the rationale so power users can
             // see the OCR contribution alongside detector evidence.
-            let rationale: MatchRationale?
-            if let base = match.rationale {
-                var signals = base.signals
-                signals.append(.ocrConfidence(value: Double(mapped.ocrConfidence)))
-                rationale = MatchRationale(
-                    ruleID: base.ruleID,
-                    signals: signals,
-                    preThresholdScore: base.preThresholdScore,
-                    finalScore: base.finalScore,
-                    appliedThreshold: base.appliedThreshold
-                )
-            } else {
-                rationale = nil
-            }
+            let rationale = match.rationale?.appending(
+                .ocrConfidence(value: Double(mapped.ocrConfidence)))
 
             results.append(SearchResult(
                 pageIndex: pageIndex,
@@ -1849,16 +1834,13 @@ public actor DocumentSearcher {
                     term: "Custom",
                     piiCategory: nil,
                     piiConfidence: nil,
-                    rationale: MatchRationale(
-                        ruleID: "user.alwaysFlag",
+                    rationale: MatchRationale.Builder(
+                        ruleID: "user.alwaysFlag", preThresholdScore: 1.0,
                         signals: [
                             .userAlwaysFlag(pattern: hit.pattern),
                             .ocrConfidence(value: Double(mapped.ocrConfidence)),
-                        ],
-                        preThresholdScore: 1.0,
-                        finalScore: 1.0,
-                        appliedThreshold: nil
-                    ),
+                        ]
+                    ).build(finalScore: 1.0),
                     matchRangeInSnippet: mapped.window.matchRange
                 ))
             }
