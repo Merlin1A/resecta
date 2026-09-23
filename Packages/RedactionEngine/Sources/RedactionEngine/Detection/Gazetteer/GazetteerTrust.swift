@@ -1,16 +1,23 @@
 import Foundation
 
-// RF: one memoized corpus verdict for every consumer.
+// RF: one memoized corpus verdict for every signature-gated consumer.
 //
-// The verdict is the manifest's Ed25519 signature AND the per-asset digests
-// it carries for the trust-gated files (`AssetIntegrity`). Every gated load
-// must consult the same answer: the explicit diagnostics loader
+// This type is the ONE signature gate the trust-gated corpora share: the
+// manifest's Ed25519 signature is checked here and nowhere else, and every
+// gated load reads the same memoized answer — the explicit diagnostics loader
 // (`PIIDetector.loadWithDiagnostics`) and the public `PIIDetector.init`
 // default arguments both route through this type, so the public initializer
-// cannot construct a corpus the check would have withheld. The shipped bundle
-// (`Bundle.module`) is verified once per process and the verdict cached; any
-// other bundle (a test fixture) is evaluated live on every call, so tampering
-// with a fixture between calls is observed.
+// cannot construct a corpus the check would have withheld. The verdict also
+// carries the per-asset digests the signed manifest lists for the trust-gated
+// files (`AssetIntegrity`): a second, different check — an asset's bytes
+// against its signed entry — that rides the same verdict rather than a gate
+// of its own, so a consumer never sees a valid signature without the digests.
+// Three corpora sit outside the manifest signature by design and do not
+// consult this type: the OCR custom-words builder, the address-components
+// table and the ZIP→state table (each says so where it loads). The shipped
+// bundle (`Bundle.module`) is verified once per process and the verdict
+// cached; any other bundle (a test fixture) is evaluated live on every call,
+// so tampering with a fixture between calls is observed.
 public enum GazetteerTrust {
 
     /// The full answer for a bundle. `Bool` consumers read `isTrusted`; the
