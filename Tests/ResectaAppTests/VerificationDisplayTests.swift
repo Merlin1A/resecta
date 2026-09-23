@@ -295,6 +295,49 @@ struct VerificationDisplayTests {
         #expect(VerificationResultsView.shareTintColor(report: report(.pass)) == nil)
     }
 
+    // MARK: - Privacy-sensitive marking
+
+    // The masthead subtitle and the collapsed row subtitle render user text
+    // on exactly one arm each — the ATTENTION sentence that quotes the
+    // review terms. The views read these predicates for `.privacySensitive`,
+    // so the mechanism copy on every other arm stays readable under a
+    // capture while the quoted text does not.
+
+    @Test("Masthead subtitle is privacy-sensitive on ATTENTION only — the one arm that quotes user text",
+          arguments: [
+            (VerificationStatus.attention("a"), true),
+            (.pass, false),
+            (.warn("w"), false),
+            (.fail("f"), false),
+            (.skipped, false),
+            (.info("i"), false),
+          ])
+    func mastheadSubtitlePrivacyPredicate(status: VerificationStatus, expected: Bool) {
+        #expect(VerificationResultsView.mastheadSubtitleIsPrivacySensitive(status: status) == expected)
+    }
+
+    @Test("Row subtitle is privacy-sensitive only for an ATTENTION row that names terms")
+    func rowSubtitlePrivacyPredicate() {
+        func row(_ status: VerificationStatus, terms: [String]?) -> LayerResult {
+            LayerResult(name: "Binary String Search", symbolName: "shield", status: status,
+                        shortDescription: "short", detailDescription: "",
+                        pageReferences: [1], durationSeconds: 0,
+                        reviewTermTexts: terms)
+        }
+        // The one true combination: attention plus at least one term.
+        #expect(LayerResultRow.rowSubtitleIsPrivacySensitive(layer: row(.attention("a"), terms: ["DELIA"])))
+        // Attention without terms falls back to `shortDescription` — mechanism copy.
+        #expect(!LayerResultRow.rowSubtitleIsPrivacySensitive(layer: row(.attention("a"), terms: nil)))
+        #expect(!LayerResultRow.rowSubtitleIsPrivacySensitive(layer: row(.attention("a"), terms: [])))
+        // Every other status shows its own description, terms or not.
+        for status in [VerificationStatus.pass, .warn("w"), .fail("f"), .skipped, .info("i")] {
+            #expect(!LayerResultRow.rowSubtitleIsPrivacySensitive(layer: row(status, terms: ["DELIA"])),
+                    "\(status) must not be marked")
+            #expect(!LayerResultRow.rowSubtitleIsPrivacySensitive(layer: row(status, terms: nil)),
+                    "\(status) must not be marked")
+        }
+    }
+
     // MARK: - Details summary line (stock copy; exact-string pins)
 
     private func layer(_ status: VerificationStatus) -> LayerResult {
@@ -619,5 +662,39 @@ struct SearchRecheckQueryLineDisplayTests {
         // fork for a third layer.
         #expect(LayerResultRow.rowSubtitleText(layer: layer2)
                 == LayerResultRow.reviewRowText(termTexts: ["Delia"], pages: [1]))
+    }
+
+    // MARK: - Privacy-sensitive marking
+
+    // Every query line and per-term sub-line quotes the user's own query,
+    // pattern or term list, so the row renders them under the same
+    // privacy marking as the search sheet's rows and the review surfaces.
+    // The modifier is not introspectable: the row reads one static
+    // constant, the first pin holds it true, and the second pins the
+    // source so both `Text`s keep reading it.
+
+    @Test("Query lines and per-term sub-lines render under the privacy-sensitive marking")
+    func queryLinesArePrivacySensitive() {
+        #expect(LayerResultRow.queryLinesArePrivacySensitive == true)
+    }
+
+    @Test("Source pin: both query-line Texts read the privacy constant")
+    func bothQueryLineTextsReadThePrivacyConstant() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/Views/LayerResultRow.swift")
+        let marker = ".privacySensitive(Self.queryLinesArePrivacySensitive)"
+        #expect(source.components(separatedBy: marker).count - 1 == 2,
+                "the query line and the per-term sub-line must both carry the marking")
+    }
+
+    private func loadRepoFile(
+        _ relativePath: String, from file: StaticString = #filePath
+    ) throws -> String {
+        let repoRoot = URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+        return try String(
+            contentsOf: repoRoot.appendingPathComponent(relativePath),
+            encoding: .utf8)
     }
 }

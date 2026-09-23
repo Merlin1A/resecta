@@ -26,10 +26,10 @@ struct SavedRegexLibraryView: View {
     var body: some View {
         Form {
             aboutSection
-            builtInSection
+            addRow
             userSavedSection
             clearAllSection
-            addRow
+            builtInSection
         }
         .navigationTitle("Saved regexes")
         .navigationBarTitleDisplayMode(.inline)
@@ -100,7 +100,7 @@ struct SavedRegexLibraryView: View {
     private var userSavedSection: some View {
         Section {
             if savedRegexStore.userSavedRegexes.isEmpty {
-                Text("No user-saved patterns yet. Add one below or save one from the regex search bar.")
+                Text("No user-saved patterns yet. Add one above or save one from the regex search bar.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .listRowSeparator(.hidden)

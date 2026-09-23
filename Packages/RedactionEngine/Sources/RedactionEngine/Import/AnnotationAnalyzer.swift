@@ -28,7 +28,11 @@ public struct AnnotationAnalyzer: Sendable {
             for annotation in annotations {
                 let subtype = annotation.type ?? "Unknown"
 
-                // Skip widget annotations — form fields are reported via /AcroForm
+                // Skip widget annotations. A form field's value is drawn by
+                // the viewer from the field dictionary, not as an appearance
+                // over page content, so it is not reported here as an
+                // annotation; the app's import notice counts the filled
+                // fields on its own.
                 if subtype == "Widget" { continue }
 
                 // Track counts per type

@@ -516,15 +516,24 @@ extension SearchAndRedactSheet {
     }
 
     /// Compose the callout text: hint first (when one matched), the
-    /// engine's original description preserved after it.
+    /// engine's original description preserved after it, then the
+    /// built-in detector the pattern's shape already spells out (when one
+    /// does) — a refused email or number pattern is not a dead end when
+    /// the detector that covers it is one tap away. Both refusal paths
+    /// (the pre-validation here and the engine's rejection sink) compose
+    /// through this one function.
     static func regexErrorDisplayMessage(
         pattern: String,
         engineDescription: String
     ) -> String {
-        guard let hint = regexErrorHint(pattern: pattern) else {
-            return engineDescription
+        var message = engineDescription
+        if let hint = regexErrorHint(pattern: pattern) {
+            message = "\(hint) (\(engineDescription))"
         }
-        return "\(hint) (\(engineDescription))"
+        if let category = SearchToolbarSection.builtInDetectorCovering(pattern: pattern) {
+            message += " \(SearchToolbarSection.builtInDetectorSentence(for: category))"
+        }
+        return message
     }
 
     // MARK: - Helpers

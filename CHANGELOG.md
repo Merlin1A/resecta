@@ -26,6 +26,11 @@ The entries below follow the Keep-a-Changelog index format.
 - Documentation: storage wording for Custom Terms and saved regexes, the supported-versions table, the outbound-links and export-metadata passages, a rotated-page note, and the audit-lint check ids; the documented-counts check runs in the pull-request gate.
 - Sharing: a verification result in which a check could not run on part of the output routes Share through the same slide-to-confirm as a skipped verification, listing the checks that reported it.
 - Verification: the operator re-extraction check scans the decoded operator text in its normalized form as well, as the string search already does, so a term spelled with a compatibility character is reported by both checks.
+- Verification results: the text a check names for review and the searches the re-check lists are marked privacy-sensitive, matching the search and review surfaces.
+- Saved regexes: the add row and your own patterns now sit above the built-in list.
+- Trust strip reads "On-device" again, matching the home screen's tagline.
+- Import: the annotation notice also counts filled form fields; their values are drawn by the viewer but are not carried into the output.
+- Search: when a regular expression is refused and its shape is one a built-in detector covers, the reason names that detector.
 
 ### Fixed
 

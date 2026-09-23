@@ -5,13 +5,14 @@ import PDFKit
 @testable import RedactionEngine
 
 // Import annotation notice — the import path runs the engine's
-// `AnnotationAnalyzer` over the validated document and stages its
-// results on `DocumentState`; `DocumentEditorView` surfaces them as a
-// banner while editing. These pins cover the app-side wiring: an
-// annotated source stages results, clean sources stage nothing, the
-// visibility contract, and the mechanism copy. Subtype filtering
-// (Widget skip, black-square classification) is the engine's contract,
-// pinned in the engine's own `AnnotationAnalyzerTests`.
+// `AnnotationAnalyzer` over the validated document, counts the form
+// fields that carry a value, and stages both on `DocumentState`;
+// `DocumentEditorView` surfaces them as one banner while editing. These
+// pins cover the app-side wiring: an annotated source stages results,
+// clean sources stage nothing, a form stages its filled-field count, the
+// visibility contract, and the mechanism copy. Subtype filtering (Widget
+// skip, black-square classification) is the engine's contract, pinned in
+// the engine's own `AnnotationAnalyzerTests`.
 
 @Suite("Import annotation notice", .tags(.importFlow))
 @MainActor
@@ -178,6 +179,122 @@ struct ImportAnnotationNoticeTests {
         #expect(ImportAnnotationNoticeBanner.isVisible(
             phaseKind: .editing, annotationTypeCount: count, dismissed: false,
             pausedBannerActive: false, detectionBannerActive: false))
+    }
+
+    // MARK: - Filled form fields
+
+    /// Objects numbered from 1 in order, a valid cross-reference table
+    /// (the engine's fixture factories are not visible to this target).
+    private static func rawPDF(_ objects: [String]) -> Data {
+        var body = "%PDF-1.7\n"
+        var offsets: [Int] = []
+        for (index, content) in objects.enumerated() {
+            offsets.append(body.utf8.count)
+            body += "\(index + 1) 0 obj\n\(content)\nendobj\n"
+        }
+        let xrefOffset = body.utf8.count
+        body += "xref\n0 \(objects.count + 1)\n0000000000 65535 f \n"
+        for offset in offsets {
+            body += String(format: "%010d 00000 n \n", offset)
+        }
+        body += "trailer\n<< /Size \(objects.count + 1) /Root 1 0 R >>\nstartxref\n\(xrefOffset)\n%%EOF\n"
+        return Data(body.utf8)
+    }
+
+    /// A real AcroForm: `/AcroForm` in the catalog, one merged
+    /// field-plus-widget dictionary per entry (`/FT /Tx`, `/T`, `/V`), no
+    /// appearance streams — the shape a filled form carries when its
+    /// values live in the field dictionaries and nowhere on the page.
+    private static func acroFormPDF(fields: [(name: String, value: String)]) -> Data {
+        let firstFieldID = 5
+        let refs = fields.indices.map { "\(firstFieldID + $0) 0 R" }.joined(separator: " ")
+        var objects = [
+            "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [\(refs)] /DA (/Helv 0 Tf 0 g) /NeedAppearances true >> >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << >> /Annots [\(refs)] >>",
+            "<< /Length 0 >>\nstream\n\nendstream",
+        ]
+        for (index, field) in fields.enumerated() {
+            let y = 640 - index * 40
+            objects.append(
+                "<< /Type /Annot /Subtype /Widget /FT /Tx /T (\(field.name)) /V (\(field.value)) "
+                + "/Rect [72 \(y) 372 \(y + 24)] /F 4 /DA (/Helv 12 Tf 0 g) /P 3 0 R >>")
+        }
+        return rawPDF(objects)
+    }
+
+    private static let filledForm: [(name: String, value: String)] = [
+        ("applicant_ssn", "987-65-4329"),
+        ("applicant_phone", "(208) 555-0147"),
+        ("notes", ""),
+    ]
+
+    @Test("Filled form fields are counted by value; an empty field is not")
+    func filledFormFieldsCountedByValue() throws {
+        let doc = try #require(PDFDocument(data: Self.acroFormPDF(fields: Self.filledForm)))
+        // Guard against a vacuous pass: PDFKit must see all three widgets
+        // and read the values, or the count below would be checking a
+        // document without fields.
+        let page = try #require(doc.page(at: 0))
+        let widgets = page.annotations.filter { $0.type == "Widget" }
+        #expect(widgets.count == 3)
+        #expect(widgets.contains { $0.widgetStringValue == "987-65-4329" })
+
+        #expect(ImportAnnotationNoticeBanner.filledFormFieldCount(in: doc) == 2)
+
+        let empty = try #require(PDFDocument(data: makeTextPDFData(text: "No fields")))
+        #expect(ImportAnnotationNoticeBanner.filledFormFieldCount(in: empty) == 0)
+    }
+
+    @Test("A filled form stages its count and shows the notice with no annotation result staged")
+    func filledFormImportStagesCountAndShowsNotice() async {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        // Stale count from a previously-open document: import must replace it.
+        doc.sourceFilledFormFieldCount = 9
+
+        await ImportService.importDocument(
+            data: Self.acroFormPDF(fields: Self.filledForm), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+
+        #expect(doc.phaseKind == .editing)
+        #expect(doc.sourceFilledFormFieldCount == 2)
+        // Widgets stay out of the analyzer's findings — the count is the
+        // notice's only read of them.
+        #expect(doc.sourceAnnotationFindings.isEmpty)
+        let annotationCount = ImportAnnotationNoticeBanner.noticeWorthyCount(doc.sourceAnnotationFindings)
+        #expect(annotationCount == 0)
+        #expect(ImportAnnotationNoticeBanner.isVisible(
+            phaseKind: .editing, annotationTypeCount: annotationCount,
+            filledFormFieldCount: doc.sourceFilledFormFieldCount, dismissed: false,
+            pausedBannerActive: false, detectionBannerActive: false))
+
+        // An image import resets the count: a rendered page has no fields.
+        await ImportService.importDocument(
+            data: makeJPEGImageData(), suggestedType: "image",
+            documentState: doc, redactionState: redaction)
+        #expect(doc.sourceFilledFormFieldCount == 0)
+    }
+
+    @Test("Notice copy: annotations alone, fields alone, both — one paragraph on one surface")
+    func noticeCopyPerSource() {
+        let annotationsOnly = ImportAnnotationNoticeBanner.noticeMessage(
+            annotationCount: 1, filledFormFieldCount: 0)
+        #expect(annotationsOnly == ImportAnnotationNoticeBanner.noticeMessage)
+
+        #expect(ImportAnnotationNoticeBanner.noticeMessage(annotationCount: 0, filledFormFieldCount: 2)
+                == "This document contains 2 filled form fields; their values are not carried into the output. Check the preview before sharing.")
+        #expect(ImportAnnotationNoticeBanner.noticeMessage(annotationCount: 0, filledFormFieldCount: 1)
+                == "This document contains 1 filled form field; its value is not carried into the output. Check the preview before sharing.")
+
+        let both = ImportAnnotationNoticeBanner.noticeMessage(annotationCount: 2, filledFormFieldCount: 3)
+        #expect(both.hasPrefix("This document contains annotations such as boxes, stamps, or notes."))
+        #expect(both.contains("It also contains 3 filled form fields; their values are not carried into the output."))
+        #expect(both.hasSuffix("Check the preview before sharing."))
+        #expect(both.components(separatedBy: "Check the preview before sharing.").count == 2,
+                "the preview sentence closes the paragraph once")
+
+        #expect(ImportAnnotationNoticeBanner.noticeMessage(annotationCount: 0, filledFormFieldCount: 0).isEmpty)
     }
 
     // MARK: - Visibility contract

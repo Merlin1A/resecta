@@ -306,21 +306,27 @@ struct DocumentEditorView: View {
                         }
                     }
                     // Import annotation notice: the imported source
-                    // carries annotations, which the on-screen view draws
-                    // but the export raster (built from the page content
-                    // stream) does not include. Persistent until the user
-                    // dismisses it; yields to the two banners above via
-                    // the visibility predicate rather than stacking.
+                    // carries annotations or filled form fields, which the
+                    // on-screen view draws but the export raster (built
+                    // from the page content stream) does not include.
+                    // Persistent until the user dismisses it; yields to
+                    // the two banners above via the visibility predicate
+                    // rather than stacking.
                     .overlay(alignment: .top) {
+                        let annotationCount = ImportAnnotationNoticeBanner.noticeWorthyCount(
+                            documentState.sourceAnnotationFindings)
                         if ImportAnnotationNoticeBanner.isVisible(
                             phaseKind: documentState.phaseKind,
-                            annotationTypeCount: ImportAnnotationNoticeBanner.noticeWorthyCount(
-                                documentState.sourceAnnotationFindings),
+                            annotationTypeCount: annotationCount,
+                            filledFormFieldCount: documentState.sourceFilledFormFieldCount,
                             dismissed: documentState.annotationNoticeDismissed,
                             pausedBannerActive: documentState.wasPausedByBackground,
                             detectionBannerActive: detectionBanner != nil
                         ) {
-                            ImportAnnotationNoticeBanner {
+                            ImportAnnotationNoticeBanner(
+                                annotationCount: annotationCount,
+                                filledFormFieldCount: documentState.sourceFilledFormFieldCount
+                            ) {
                                 withAnimation(ResectaTokens.Anim.overlayDismiss) {
                                     documentState.annotationNoticeDismissed = true
                                 }

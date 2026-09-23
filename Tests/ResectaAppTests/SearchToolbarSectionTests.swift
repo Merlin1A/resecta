@@ -146,6 +146,33 @@ struct SearchToolbarSectionTests {
             queryCount: 2, isMultiTerm: true, hasRegexError: false) == false)
     }
 
+    // MARK: - Refused patterns a built-in detector covers
+
+    @Test("Built-in detector shape rules: email, SSN, phone, card; nothing for other shapes")
+    func builtInDetectorCoveringShapes() {
+        // The email shape: an unescaped @ anywhere in the pattern.
+        #expect(SearchToolbarSection.builtInDetectorCovering(pattern: #"\S+@\S+\.\S+"#) == .email)
+        #expect(SearchToolbarSection.builtInDetectorCovering(pattern: #"[\w.]+@example\.com"#) == .email)
+        // An escaped @ is a literal the user means, not the email shape.
+        #expect(SearchToolbarSection.builtInDetectorCovering(pattern: #"user\@host"#) == nil)
+        // The number shapes, in each of the spellings the rules read.
+        #expect(SearchToolbarSection.builtInDetectorCovering(pattern: #"\d{3}-\d{2}-\d{4}"#) == .ssn)
+        #expect(SearchToolbarSection.builtInDetectorCovering(pattern: #"[0-9]{3}[- ]?[0-9]{2}[- ]?[0-9]{4}"#) == .ssn)
+        #expect(SearchToolbarSection.builtInDetectorCovering(pattern: #"\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}"#) == .phone)
+        #expect(SearchToolbarSection.builtInDetectorCovering(pattern: #"\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}"#) == .creditCard)
+        #expect(SearchToolbarSection.builtInDetectorCovering(pattern: #"\d{16}"#) == .creditCard)
+        // Shapes no detector covers stay silent.
+        #expect(SearchToolbarSection.builtInDetectorCovering(pattern: #"(a|aa)*b"#) == nil)
+        #expect(SearchToolbarSection.builtInDetectorCovering(pattern: #"\d{4}-\d{2}-\d{2}"#) == nil)
+        #expect(SearchToolbarSection.builtInDetectorCovering(pattern: "invoice \\d+") == nil)
+        #expect(SearchToolbarSection.builtInDetectorCovering(pattern: "") == nil)
+        // The sentence names the detector the way the app does.
+        #expect(SearchToolbarSection.builtInDetectorSentence(for: .email)
+                == "Use the built-in Email detector.")
+        #expect(SearchToolbarSection.builtInDetectorSentence(for: .creditCard)
+                == "Use the built-in Credit Card detector.")
+    }
+
     // MARK: - Option controls disable mid-run
 
     @Test("Option controls disable exactly while a run is in flight")
