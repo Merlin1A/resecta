@@ -8,12 +8,6 @@ import OSLog
 /// Detection runs regex-based passes first, then NLTagger-based name detection.
 public struct PIIDetector: Sendable {
 
-    // Phase 3 detectors — lazy instances reused across calls.
-    private let npiDetector = NPIDetector()
-    private let deaDetector = DEADetector()
-    private let accountDetector = AccountDetector()
-    private let routingNumberDetector = RoutingNumberDetector()
-
     // Optional because NameGazetteer.init?() fails when bundled
     // resources are stripped (test-bundle-only builds). `runNLTagger` reads
     // this via `?.` so a nil gazetteer preserves the 0.70 baseline.
@@ -466,17 +460,17 @@ public struct PIIDetector: Sendable {
                                      documentHeader: currentHeader)
             })
         }
-        if Self.runsNPI(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("npi") { npiDetector.detect(in: nsText, range: fullRange) })
+        if families.npi.runs(doctype: doctype) {
+            results.append(contentsOf: withPerPageTimeout("npi") { families.npi.detect(in: nsText, range: fullRange) })
         }
-        if Self.runsDEA(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("dea") { deaDetector.detect(in: nsText, range: fullRange) })
+        if families.dea.runs(doctype: doctype) {
+            results.append(contentsOf: withPerPageTimeout("dea") { families.dea.detect(in: nsText, range: fullRange) })
         }
-        if Self.runsAccount(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("account") { accountDetector.detect(in: nsText, range: fullRange) })
+        if families.account.runs(doctype: doctype) {
+            results.append(contentsOf: withPerPageTimeout("account") { families.account.detect(in: nsText, range: fullRange) })
         }
-        if Self.runsRoutingNumber(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("routingNumber") { routingNumberDetector.detect(in: nsText, range: fullRange) })
+        if families.routingNumber.runs(doctype: doctype) {
+            results.append(contentsOf: withPerPageTimeout("routingNumber") { families.routingNumber.detect(in: nsText, range: fullRange) })
         }
         if families.licensePlate.runs(doctype: doctype) {
             results.append(contentsOf: withPerPageTimeout("licensePlate") {
@@ -553,17 +547,17 @@ public struct PIIDetector: Sendable {
                                      documentHeader: currentHeader)
             })
         }
-        if categories.contains(.npi), Self.runsNPI(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("npi") { npiDetector.detect(in: nsText, range: fullRange) })
+        if categories.contains(.npi), families.npi.runs(doctype: doctype) {
+            results.append(contentsOf: withPerPageTimeout("npi") { families.npi.detect(in: nsText, range: fullRange) })
         }
-        if categories.contains(.dea), Self.runsDEA(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("dea") { deaDetector.detect(in: nsText, range: fullRange) })
+        if categories.contains(.dea), families.dea.runs(doctype: doctype) {
+            results.append(contentsOf: withPerPageTimeout("dea") { families.dea.detect(in: nsText, range: fullRange) })
         }
-        if categories.contains(.account), Self.runsAccount(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("account") { accountDetector.detect(in: nsText, range: fullRange) })
+        if categories.contains(.account), families.account.runs(doctype: doctype) {
+            results.append(contentsOf: withPerPageTimeout("account") { families.account.detect(in: nsText, range: fullRange) })
         }
-        if categories.contains(.routingNumber), Self.runsRoutingNumber(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("routingNumber") { routingNumberDetector.detect(in: nsText, range: fullRange) })
+        if categories.contains(.routingNumber), families.routingNumber.runs(doctype: doctype) {
+            results.append(contentsOf: withPerPageTimeout("routingNumber") { families.routingNumber.detect(in: nsText, range: fullRange) })
         }
         if categories.contains(.licensePlate), families.licensePlate.runs(doctype: doctype) {
             results.append(contentsOf: withPerPageTimeout("licensePlate") {
@@ -665,40 +659,6 @@ public struct PIIDetector: Sendable {
     }
 
     // MARK: - Doctype Gating
-
-    /// NPI: medical + FOIA (provider rosters commonly appear in both).
-    /// nil doctype → run.
-    private static func runsNPI(doctype: DoctypeClass?) -> Bool {
-        guard let doctype else { return true }
-        return doctype == .medical || doctype == .foia
-    }
-
-    /// DEA: medical only. nil doctype → run.
-    private static func runsDEA(doctype: DoctypeClass?) -> Bool {
-        guard let doctype else { return true }
-        return doctype == .medical
-    }
-
-    /// Account: financial + medical + court + generic. nil doctype → run.
-    /// Court and generic doctypes were added to close the
-    /// account-recall doctype gap — bank/loan account numbers recur in court
-    /// filings (garnishment, financial affidavits) and untyped uploads. The
-    /// account context window (AccountDetector requires a label near the digit
-    /// run) carries the false-positive load on these broader doctypes; the gate
-    /// only governs whether the detector runs at all. `.foia` stays held.
-    private static func runsAccount(doctype: DoctypeClass?) -> Bool {
-        guard let doctype else { return true }
-        return doctype == .financial || doctype == .medical
-            || doctype == .court || doctype == .generic
-    }
-
-    /// Routing number: financial (primary target) + generic. nil doctype → run.
-    /// Suppressed on medical/court/foia — those contexts carry too many
-    /// 9-digit document IDs.
-    private static func runsRoutingNumber(doctype: DoctypeClass?) -> Bool {
-        guard let doctype else { return true }
-        return doctype == .financial || doctype == .generic
-    }
 
     // MARK: - Name Detection via NLTagger
 
@@ -1678,10 +1638,10 @@ public struct PIIDetector: Sendable {
     ) -> Bool {
         switch category {
         case .dateOfBirth:   return !families.dateOfBirth.runs(doctype: doctype)
-        case .npi:           return !Self.runsNPI(doctype: doctype)
-        case .dea:           return !Self.runsDEA(doctype: doctype)
-        case .account:       return !Self.runsAccount(doctype: doctype)
-        case .routingNumber: return !Self.runsRoutingNumber(doctype: doctype)
+        case .npi:           return !families.npi.runs(doctype: doctype)
+        case .dea:           return !families.dea.runs(doctype: doctype)
+        case .account:       return !families.account.runs(doctype: doctype)
+        case .routingNumber: return !families.routingNumber.runs(doctype: doctype)
         case .medicalRecord: return !families.medicalRecord.runs(doctype: doctype)
         case .licensePlate:  return !families.licensePlate.runs(doctype: doctype)
         default:             return false
@@ -1709,10 +1669,10 @@ public struct PIIDetector: Sendable {
         case .driversLicense: return families.driversLicense.detect(in: context, range: contextRange)
         case .passport:       return families.passport.detect(in: context, range: contextRange)
         case .medicalRecord:  return families.medicalRecord.detect(in: context, range: contextRange)
-        case .npi:            return npiDetector.detect(in: context, range: contextRange)
-        case .dea:            return deaDetector.detect(in: context, range: contextRange)
-        case .account:        return accountDetector.detect(in: context, range: contextRange)
-        case .routingNumber:  return routingNumberDetector.detect(in: context, range: contextRange)
+        case .npi:            return families.npi.detect(in: context, range: contextRange)
+        case .dea:            return families.dea.detect(in: context, range: contextRange)
+        case .account:        return families.account.detect(in: context, range: contextRange)
+        case .routingNumber:  return families.routingNumber.detect(in: context, range: contextRange)
         case .name:           return detectNames(in: textString)
         case .licensePlate:   return families.licensePlate.detect(in: context, range: contextRange)
         }

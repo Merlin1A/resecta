@@ -6,7 +6,11 @@ import Foundation
 // ("NPI", "provider ID") boost confidence; base 0.60 with no context since
 // the checksum alone is a strong signal.
 
-struct NPIDetector: Sendable {
+struct NPIDetector: FamilyDetector {
+
+    let category: PIICategory = .npi
+    let telemetryLabel = "npi"
+
 
     static let pattern = try! NSRegularExpression(
         pattern: #"(?<!\d)[12]\d{9}(?!\d)"#
@@ -82,5 +86,18 @@ struct NPIDetector: Sendable {
                 rationale: rationale
             )
         }
+    }
+
+    // MARK: - Family
+
+    /// NPI: medical + FOIA (provider rosters commonly appear in both).
+    /// nil doctype → run.
+    func runs(doctype: DoctypeClass?) -> Bool {
+        guard let doctype else { return true }
+        return doctype == .medical || doctype == .foia
+    }
+
+    func detect(in context: DetectionContext) -> [PIIDetector.PIIMatch] {
+        detect(in: context.nsText, range: context.range)
     }
 }

@@ -6,7 +6,11 @@ import Foundation
 // Checksum: (d1 + d3 + d5) + 2·(d2 + d4 + d6) with last digit of result
 // matching d7.
 
-struct DEADetector: Sendable {
+struct DEADetector: FamilyDetector {
+
+    let category: PIICategory = .dea
+    let telemetryLabel = "dea"
+
 
     static let pattern = try! NSRegularExpression(
         pattern: #"(?<![A-Z])[A-Z]{2}\d{7}(?!\d)"#
@@ -120,5 +124,17 @@ struct DEADetector: Sendable {
                 rationale: rationale
             )
         }
+    }
+
+    // MARK: - Family
+
+    /// DEA: medical only. nil doctype → run.
+    func runs(doctype: DoctypeClass?) -> Bool {
+        guard let doctype else { return true }
+        return doctype == .medical
+    }
+
+    func detect(in context: DetectionContext) -> [PIIDetector.PIIMatch] {
+        detect(in: context.nsText, range: context.range)
     }
 }

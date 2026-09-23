@@ -79,6 +79,10 @@ struct DetectorRegistry: Sendable {
     let driversLicense: DriversLicenseDetector
     let passport: PassportDetector
     let medicalRecord: MRNDetector
+    let npi: NPIDetector
+    let dea: DEADetector
+    let account: AccountDetector
+    let routingNumber: RoutingNumberDetector
     let licensePlate: LicensePlateDetector
 
     /// Evaluation order: the structured families first, the name passes
@@ -105,8 +109,12 @@ struct DetectorRegistry: Sendable {
         driversLicense = DriversLicenseDetector(dlPatternGazetteer: dlPatternGazetteer)
         passport = PassportDetector(passportPatternGazetteer: passportPatternGazetteer)
         medicalRecord = MRNDetector(contextScorer: contextScorer, contextLoader: contextLoader)
+        npi = NPIDetector()
+        dea = DEADetector()
+        account = AccountDetector()
+        routingNumber = RoutingNumberDetector()
         licensePlate = LicensePlateDetector(contextScorer: contextScorer, contextLoader: contextLoader)
-        rows = [ssn, creditCard, email, phone, ein, address, dateOfBirth, itin, driversLicense, passport, medicalRecord, licensePlate]
+        rows = [ssn, creditCard, email, phone, ein, address, dateOfBirth, itin, driversLicense, passport, medicalRecord, npi, dea, account, routingNumber, licensePlate]
         table = Dictionary(uniqueKeysWithValues: rows.map { ($0.category, $0) })
     }
 
