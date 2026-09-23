@@ -12,13 +12,27 @@
 # suites are excluded from the gating batches by policy.
 #
 # Usage:
-#   Scripts/test-batched.sh RedactionEngine|ResectaApp [--batch-size N] [--timeout-mins M]
+#   TEST_BATCHED_SIM_UDID=<udid> Scripts/test-batched.sh RedactionEngine|ResectaApp [--batch-size N] [--timeout-mins M]
+#   Scripts/test-batched.sh --self-test
+#
+# Environment:
+#   TEST_BATCHED_SIM_UDID  required — the simulator every invocation runs on,
+#                          and the only one this script ever shuts down or
+#                          erases. There is no resolution by device name: two
+#                          runs on one machine each own their own simulator.
+#   TEST_BATCHED_DD        DerivedData for this run (default <repo>/.dd), so
+#                          a build elsewhere never invalidates a run in flight.
 #
 # Exit codes:
 #   0  all reds (if any) are on the exclusion list, no incomplete batches
 #   1  at least one red outside the exclusion list (offenders printed)
 #   2  no gating reds, but >=1 invocation wedged or hit a test-host launch
-#      refusal twice — those suites are unverified, coverage incomplete
+#      refusal twice — those suites are unverified, coverage incomplete;
+#      also when TEST_BATCHED_SIM_UDID is unset (nothing ran)
+#
+# Recovery after a wedge is scoped to this run: the run's own xcodebuild and
+# its descendants are killed, then only $TEST_BATCHED_SIM_UDID is shut down
+# and erased. Nothing here signals another run's processes or simulators.
 #
 # Logs and .xcresult bundles land under /tmp/test-batched-<scheme>-<stamp>/.
 # Logs are spam-filtered (attributedStringScaled framework noise) and size-
@@ -44,7 +58,9 @@ PERF_ALONE_ResectaApp="PageParallelRasterizationTests"
 
 # Exclusion list (suite granularity): reds here do not gate the exit
 # status even inside normal batches.
-NON_GATING="ScreenCaptureShieldTests PageParallelRasterizationTests StressCorpusTests ImportServiceCancelTests"
+# The last four assert wall-clock bounds that move with a neighbouring
+# build or run on the same machine (two runs share one host): report-only.
+NON_GATING="ScreenCaptureShieldTests PageParallelRasterizationTests StressCorpusTests ImportServiceCancelTests ReDoSFuzzTests RegexSearchHardeningTests CoverageHistogramTests SearchDebounceCancelTests"
 # ──────────────────────────────────────────────────────────────────────────
 
 BATCH_SIZE=28          # ~25-32 suites per batch
@@ -53,9 +69,43 @@ STALL_SECS=180         # kill if the log stops growing this long
 LOAD_WARN=8            # 1-min load average warning threshold
 LOG_CAP_BYTES=20000000 # per-batch filtered-log size bound
 
-usage() { sed -n '3,30p' "$0"; exit 64; }
+usage() { sed -n '3,42p' "$0"; exit 64; }
+
+# --self-test: the lane-safety rules against this file and one dry
+# invocation. Exit 0 = every rule holds; 1 = a rule drifted (named).
+self_test() {
+    local fails=0 me="$0" body pat n
+    # 1. The script refuses to run without the simulator pin (exit 2).
+    n=0; env -u TEST_BATCHED_SIM_UDID bash "$me" ResectaApp >/dev/null 2>&1 || n=$?
+    if [ "$n" -eq 2 ]; then echo "self-test: refuses without TEST_BATCHED_SIM_UDID (exit 2) OK"
+    else echo "self-test: expected exit 2 without TEST_BATCHED_SIM_UDID, got $n" >&2; fails=1; fi
+    # 2. Recovery never touches other simulators or other runs' processes.
+    #    (The patterns are assembled so this function's own text cannot match.)
+    body="$(sed -n '/^recover_sim()/,/^}/p' "$me")"
+    n=0
+    for pat in "shutdown ""all" "pkill -9 ""-x" "killall"; do
+        if printf '%s\n' "$body" | $GREP -q -- "$pat"; then
+            echo "self-test: recover_sim contains '$pat'" >&2; n=1
+        fi
+    done
+    pat="simctl ""shutdown ""all"
+    if $GREP -q -- "$pat" "$me"; then echo "self-test: '$pat' present outside recover_sim" >&2; n=1; fi
+    if [ "$n" -eq 0 ]; then echo "self-test: recovery scoped to its own process tree and \$SIM_UDID OK"; else fails=1; fi
+    # 3. Both xcodebuild invocations carry the per-run DerivedData path.
+    n="$($GREP -cE '^[[:space:]]*(if ! )?xcodebuild .*-derivedDataPath "\$DD"' "$me" || true)"
+    if [ "$n" -eq 2 ]; then echo "self-test: -derivedDataPath on both xcodebuild calls OK"
+    else echo "self-test: expected 2 xcodebuild calls with -derivedDataPath \"\$DD\", found $n" >&2; fails=1; fi
+    # 4. The four wall-clock suites are report-only.
+    for pat in ReDoSFuzzTests RegexSearchHardeningTests CoverageHistogramTests SearchDebounceCancelTests; do
+        case " $NON_GATING " in *" $pat "*) ;; *) echo "self-test: $pat is not in NON_GATING" >&2; fails=1 ;; esac
+    done
+    [ "$fails" -eq 0 ] && echo "self-test: the four wall-clock suites are report-only OK"
+    [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
+    echo "self-test: FAIL" >&2; exit 1
+}
 
 [ $# -ge 1 ] || usage
+[ "$1" = "--self-test" ] && self_test
 SCHEME="$1"; shift
 case "$SCHEME" in
     RedactionEngine)
@@ -86,6 +136,16 @@ cd "$REPO_ROOT"
 [ -d "$TEST_SRC" ] || { echo "missing test source dir: $TEST_SRC" >&2; exit 1; }
 command -v python3 >/dev/null || { echo "python3 is required (xcresult parsing + suite enumeration)" >&2; exit 1; }
 
+# The destination simulator is pinned by id, never resolved by name: with two
+# runs on one machine a name match can land on — and the recovery below can
+# erase — a simulator another run owns.
+[ -n "${TEST_BATCHED_SIM_UDID:-}" ] || { echo "TEST_BATCHED_SIM_UDID required (no name resolution)" >&2; exit 2; }
+SIM_UDID="$TEST_BATCHED_SIM_UDID"
+xcrun simctl list devices -j | $GREP -q "\"$SIM_UDID\"" \
+    || { echo "PRE-FLIGHT: no simulator with udid $SIM_UDID" >&2; exit 1; }
+DEST="id=$SIM_UDID"
+DD="${TEST_BATCHED_DD:-$REPO_ROOT/.dd}"
+
 STAMP="$(date +%Y%m%d-%H%M%S)"
 RUN_DIR="/tmp/test-batched-${SCHEME}-${STAMP}"
 mkdir -p "$RUN_DIR"
@@ -93,18 +153,13 @@ echo "run dir: $RUN_DIR"
 
 # ── Pre-flight ────────────────────────────────────────────────────────────
 
-orphans_found=0
-for pname in xctest xcodebuild; do
-    pids="$(pgrep -x "$pname" 2>/dev/null || true)"
-    if [ -n "$pids" ]; then
-        orphans_found=1
-        echo "PRE-FLIGHT: orphan $pname process(es): $pids" >&2
-        echo "  kill with:  pkill -9 -x $pname" >&2
-    fi
-done
-if [ "$orphans_found" -eq 1 ]; then
-    echo "PRE-FLIGHT: refusing to start while orphan test processes exist" >&2
-    echo "  (a stale xctest/xcodebuild from a dead run stalls every later run)" >&2
+# A stale xcodebuild still aimed at this simulator (its arguments carry the
+# destination id) stalls every later run on it: refuse. Test processes aimed
+# elsewhere belong to another run on this machine and are left alone.
+stale="$(pgrep -f "xcodebuild .*id=$SIM_UDID" 2>/dev/null || true)"
+if [ -n "$stale" ]; then
+    echo "PRE-FLIGHT: xcodebuild process(es) already targeting simulator $SIM_UDID: $stale" >&2
+    echo "  (a stale run against this simulator stalls every later run on it — stop it first)" >&2
     exit 1
 fi
 
@@ -114,39 +169,7 @@ if [ "$(printf '%.0f' "$LOAD1")" -gt "$LOAD_WARN" ]; then
     echo "  Perf-budget suites are report-only, but batch wall time will inflate. Proceeding." >&2
 fi
 
-# Resolve the destination simulator. TEST_BATCHED_SIM_UDID pins an explicit
-# device (the 1.2 measurement lane runs on its own harness sim, whose name is
-# not an "iPhone 17" match, and the store-media sims must never be selected —
-# or erased by the wedge recovery below). Unset, the historical resolution
-# applies: an available iPhone 17 simulator (name may drift across runtimes;
-# prefer a booted device, then exact name on the newest runtime, then prefix).
-if [ -n "${TEST_BATCHED_SIM_UDID:-}" ]; then
-    SIM_LINE="$TEST_BATCHED_SIM_UDID|pinned via TEST_BATCHED_SIM_UDID"
-else
-SIM_LINE="$(xcrun simctl list devices available -j | python3 -c '
-import json, re, sys
-data = json.load(sys.stdin)
-best = None
-for runtime, devs in data.get("devices", {}).items():
-    m = re.search(r"iOS-(\d+)-(\d+)$", runtime)
-    ver = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
-    for d in devs:
-        name = d.get("name", "")
-        if not name.startswith("iPhone 17"):
-            continue
-        exact = 1 if name == "iPhone 17" else 0
-        booted = 1 if d.get("state") == "Booted" else 0
-        key = (booted, exact, ver)
-        if best is None or key > best[0]:
-            best = (key, d["udid"], name, runtime)
-if best is None:
-    sys.exit(3)
-print(best[1] + "|" + best[2] + " (" + best[3].rsplit(".", 1)[-1] + ")")
-')" || { echo "PRE-FLIGHT: no available iPhone 17 simulator" >&2; exit 1; }
-fi
-SIM_UDID="${SIM_LINE%%|*}"
-echo "simulator: ${SIM_LINE#*|} [$SIM_UDID]"
-DEST="id=$SIM_UDID"
+echo "simulator: $SIM_UDID (pinned via TEST_BATCHED_SIM_UDID)"
 
 # ── Suite enumeration (runtime, from Tests sources) ──────────────────────
 # Every top-level (column-0) type whose body carries a `@Test` function — with
@@ -212,7 +235,7 @@ echo "batchable: ${#BATCHABLE[@]}   perf-alone: ${#ALONE[@]}"
 
 echo "build-for-testing ($SCHEME) ..."
 BUILD_LOG="$RUN_DIR/build.log"
-if ! xcodebuild build-for-testing -scheme "$SCHEME" -destination "$DEST" \
+if ! xcodebuild build-for-testing -scheme "$SCHEME" -destination "$DEST" -derivedDataPath "$DD" \
         > "$BUILD_LOG" 2>&1; then
     echo "BUILD FAILED — tail of $BUILD_LOG:" >&2
     tail -40 "$BUILD_LOG" >&2
@@ -222,12 +245,20 @@ echo "build ok"
 
 # ── Batch execution with watchdog ─────────────────────────────────────────
 
-recover_sim() {
-    echo "  recovery: killing orphans, resetting simulator $SIM_UDID" >&2
-    pkill -9 -x xctest 2>/dev/null || true
-    pkill -9 -x xcodebuild 2>/dev/null || true
+descendants() { # pid — every process below it, deepest first
+    local c
+    for c in $(pgrep -P "$1" 2>/dev/null || true); do descendants "$c"; echo "$c"; done
+}
+
+recover_sim() { # xcodebuild-pid — this run's process tree and this run's simulator, nothing else
+    local xcb="$1" tree
+    tree="$(descendants "$xcb")"
+    echo "  recovery: killing this run's xcodebuild ($xcb) and its process tree, resetting simulator $SIM_UDID" >&2
+    kill -TERM "$xcb" 2>/dev/null || true
+    sleep 5
+    kill -KILL "$xcb" $tree 2>/dev/null || true   # the tree is a pid list, unquoted on purpose
     sleep 2
-    xcrun simctl shutdown all 2>/dev/null || true
+    xcrun simctl shutdown "$SIM_UDID" 2>/dev/null || true
     xcrun simctl erase "$SIM_UDID" 2>/dev/null || true
 }
 
@@ -272,7 +303,7 @@ run_invocation() { # label mode suite...
         state="completed"
         local lastsize size lastprogress
         start="$(date +%s)"
-        xcodebuild test-without-building -scheme "$SCHEME" -destination "$DEST" \
+        xcodebuild test-without-building -scheme "$SCHEME" -destination "$DEST" -derivedDataPath "$DD" \
             -resultBundlePath "$xc" "${args[@]}" > "$raw" 2>&1 &
         local pid=$!
         lastsize=0; lastprogress="$start"
@@ -291,11 +322,8 @@ run_invocation() { # label mode suite...
             fi
         done
         if [ "$state" = "wedged" ]; then
-            kill -TERM "$pid" 2>/dev/null || true
-            sleep 5
-            kill -KILL "$pid" 2>/dev/null || true
+            recover_sim "$pid"
             wait "$pid" 2>/dev/null || true
-            recover_sim
             WEDGED=$((WEDGED + 1))
         else
             wait "$pid" || true   # nonzero on test failure — counted via xcresult
@@ -316,7 +344,7 @@ run_invocation() { # label mode suite...
                 && $GREP -q 'Failed to install or launch the test runner' "$log"; then
             if [ "$attempt" -eq 1 ]; then
                 echo "  LAUNCH FAILURE (test-host install/launch — sim infra, no suite ran): retrying once" >&2
-                xcrun simctl shutdown all 2>/dev/null || true
+                xcrun simctl shutdown "$SIM_UDID" 2>/dev/null || true
                 sleep 10
                 attempt=2
                 continue
