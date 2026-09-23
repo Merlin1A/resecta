@@ -170,9 +170,9 @@ struct RobustnessRunnerTests {
                     notes: "appended /Prev revision (IM-23 shape)"),
             Fixture(id: "user-unit-2", source: "factory",
                     data: TestFixtures.userUnitPDF(), path: nil,
-                    expected: exp("open", nil, "reject", "insufficientMemory"),
-                    notes: "import has no /UserUnit gate (opens); rasterize pre-flight rejects — "
-                         + "today's class is insufficientMemory (C12-16: misleading, specific-reason candidate)"),
+                    expected: exp("open", nil, "reject", "unsupportedPageGeometry"),
+                    notes: "import has no /UserUnit gate (opens); the rasterize pre-flight's geometry half "
+                         + "rejects it as unsupportedPageGeometry (formerly reported under insufficientMemory)"),
             Fixture(id: "acroform-v", source: "factory",
                     data: TestFixtures.acroFormPDF(), path: nil,
                     expected: exp("open", nil, "open"),
@@ -500,6 +500,8 @@ struct Family4FactorySmokeTests {
                 "text layer must survive so the scan leg has work")
         #expect(validatePage(page) == false,
                 "the H-16 /UserUnit guard must reject this page")
+        #expect(validatePageGeometry(page) == false,
+                "the refusal is the geometry half's, not the memory half's")
     }
 
     @Test("acroFormPDF opens with its fields and /V values readable from the form tree")

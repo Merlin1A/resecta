@@ -41,6 +41,8 @@ extension PipelineError {
             switch f {
             case .insufficientMemory:
                 "Not Enough Memory"
+            case .unsupportedPageGeometry:
+                "Unsupported Page Geometry"
             case .bitmapCreationFailed:
                 "Image Buffer Error"
             case .fillVerificationFailed:
@@ -113,6 +115,10 @@ extension PipelineError {
             switch f {
             case .insufficientMemory(let p):
                 "Page \(p + 1) could not be processed due to available memory. Try reducing output quality in Settings, or close other apps and try again."
+            case .unsupportedPageGeometry(let p):
+                // Mechanism description: names the two page properties the
+                // rasterizer does not process and the range it does.
+                "Page \(p + 1) uses a page size or scale factor that is not processed. Pages must be between 10 and 5,000 points per side at the standard scale. Export the page from another app at a standard size, then import it again."
             case .bitmapCreationFailed(let p):
                 "An image buffer could not be created for page \(p + 1). Try reducing output quality in Settings."
             case .fillVerificationFailed(let p):

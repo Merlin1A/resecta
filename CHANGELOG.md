@@ -30,6 +30,7 @@ The entries below follow the Keep-a-Changelog index format.
 ### Fixed
 
 - Searchable Redaction: on pages stored with a rotation, the text layer is rebuilt along the source lines and reads in the source's order; the spatial check reads the layer along the axis its lines run on. The rebuilt layer on such pages was previously assembled across lines and could run off the page.
+- A page with an unsupported size or scale factor is reported as unsupported page geometry instead of a memory failure.
 
 ### Security
 

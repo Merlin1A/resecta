@@ -128,6 +128,47 @@ struct ValidatePageTests {
         }
     }
 
+    // MARK: - The two halves (geometry vs. memory)
+
+    @Test("Sub-10pt page fails the geometry half and passes the memory half")
+    func tinyPageFailsGeometryNotMemory() throws {
+        let page = try makePDFPage(width: 5, height: 5)
+        #expect(validatePageGeometry(page) == false,
+                "a 5×5 pt page is outside the 10…5,000 pt range")
+        // ~11×11 px at 150 DPI, a few hundred bytes: the memory half admits
+        // it wherever the availability reading is usable and defers (true)
+        // where it is not — so the refusal of a tiny page is never memory's.
+        #expect(validatePageMemory(page, effectiveDPI: 150) == true,
+                "the memory half must not be the half that refuses a tiny page")
+    }
+
+    @Test("/UserUnit 2 page fails the geometry half")
+    func userUnitPageFailsGeometry() throws {
+        let data = TestFixtures.userUnitPDF(userUnit: 2.0)
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+        #expect(validatePageGeometry(page) == false,
+                "a non-default /UserUnit is a geometry refusal")
+        #expect(validatePage(page, effectiveDPI: 150) == false,
+                "the combined verdict still refuses the page")
+    }
+
+    @Test("Oversized page fails the geometry half")
+    func oversizedPageFailsGeometry() throws {
+        let page = try makePDFPage(width: 6000, height: 792)
+        #expect(validatePageGeometry(page) == false,
+                "a 6,000 pt side is outside the 10…5,000 pt range")
+    }
+
+    @Test("Standard page passes both halves")
+    func standardPagePassesBothHalves() throws {
+        let page = try makePDFPage(width: 612, height: 792)
+        #expect(validatePageGeometry(page) == true)
+        // Fits the estimate on hardware; defers (true) where the
+        // availability reading is unusable (simulator, macOS host).
+        #expect(validatePageMemory(page, effectiveDPI: 300) == true)
+    }
+
     // MARK: - Helpers
 
     private func makePDFPage(width: Int, height: Int) throws -> PDFPage {
