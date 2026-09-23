@@ -188,8 +188,10 @@ struct FailedStateViewStartOverTests {
         redactionState.regions = makeRegions(count: 2)
 
         // Seed a file in the coordinator's session subtree at `.complete`,
-        // the state a live (then-failed) session leaves behind.
-        let child = try coordinator.tempExportDirectory.childURL(named: "recon_failed.pdf")
+        // the state a live (then-failed) session leaves behind. Not a
+        // `recon_` name: session close unlinks those intermediates, and this
+        // test measures the protection downgrade, not that sweep.
+        let child = try coordinator.tempExportDirectory.childURL(named: "session_failed.pdf")
         defer { coordinator.tempExportDirectory.tearDown() }
         try Data([0x25, 0x50, 0x44, 0x46]).write(to: child)
         try TempFileHardening.applyProtection(child, level: .complete)
