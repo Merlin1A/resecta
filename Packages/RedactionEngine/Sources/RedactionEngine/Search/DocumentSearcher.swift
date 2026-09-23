@@ -837,6 +837,17 @@ public actor DocumentSearcher {
         var currentPageMatches: [NSRange] = []
         var saturated = false
 
+        // AND mode (multi-term conjunction) counts a page only when every
+        // term matched on it — the page set the full search yields from —
+        // so a page's hits are buffered and committed after its last term.
+        // OR mode and single-term text commit every page, as before.
+        let conjunction: Bool
+        if case .multiTerm = mode {
+            conjunction = options.multiTermConjunction
+        } else {
+            conjunction = false
+        }
+
         let normalizedTerms: [String] = options.normalizeUnicode
             ? terms.map { TextNormalizer.normalizeForSearch($0, caseSensitive: options.caseSensitive) }
             : (options.caseSensitive ? terms : terms.map { $0.lowercased() })
@@ -868,14 +879,19 @@ public actor DocumentSearcher {
             let nsString = searchText as NSString
             let nsLength = nsString.length
 
+            var pageCount = 0
+            var pageMatches: [NSRange] = []
+            var everyTermMatched = true
+
             for term in normalizedTerms where !term.isEmpty {
                 if Task.isCancelled { break }
-                if totalCount >= Self.maxPreviewMatches { saturated = true; break }
+                if totalCount + pageCount >= Self.maxPreviewMatches { saturated = true; break }
                 let extTerm = TextNormalizer.applySearchExtensions(
                     pageText: "", query: term, options: options
                 ).query
-                if extTerm.isEmpty { continue }
+                if extTerm.isEmpty { everyTermMatched = false; continue }
 
+                var termMatched = false
                 var searchLocation = 0
                 while searchLocation < nsLength {
                     if Task.isCancelled { break }
@@ -921,14 +937,22 @@ public actor DocumentSearcher {
                         }
                     }
 
-                    totalCount += 1
-                    if isVisiblePage && currentPageMatches.count < Self.maxCurrentPageHighlights {
-                        currentPageMatches.append(emitRange)
+                    pageCount += 1
+                    termMatched = true
+                    if isVisiblePage && currentPageMatches.count + pageMatches.count < Self.maxCurrentPageHighlights {
+                        pageMatches.append(emitRange)
                     }
 
-                    if totalCount >= Self.maxPreviewMatches { saturated = true; break }
+                    if totalCount + pageCount >= Self.maxPreviewMatches { saturated = true; break }
                     searchLocation = matchRange.location + max(matchRange.length, 1)
                 }
+                if !termMatched { everyTermMatched = false }
+            }
+            // A saturated page is committed as counted: past the cap the
+            // count is a ceiling, not a page-exact total.
+            if !conjunction || everyTermMatched || saturated {
+                totalCount += pageCount
+                currentPageMatches.append(contentsOf: pageMatches)
             }
             if saturated { break }
         }
