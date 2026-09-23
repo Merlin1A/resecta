@@ -394,6 +394,35 @@ public actor DocumentSearcher {
         return (matches, spatialRectByText)
     }
 
+    // MARK: - Site-B gate (both PII-scan legs)
+
+    /// The Site-B gate over one page's resolved matches: partition, then
+    /// gate (Option A) — the five scored families route through the
+    /// composed posterior (`composedSurvivors`); every other family keeps
+    /// the raw `applying(thresholdVector:)` path byte-for-byte, and its
+    /// below-threshold drops fire `belowThresholdSink` (the scored
+    /// families' posterior drops are a separate concern and are not
+    /// counted; counting at only one leg would under-report). The
+    /// recombined survivors are re-sorted by position so the result list
+    /// and J/K navigation keep the positional order `resolveOverlaps`
+    /// produced — the partition alone groups non-scored ahead of scored.
+    /// The sort is stable, so its input order (the raw-gated survivors,
+    /// then the composed scored survivors) is part of the contract.
+    /// `pageText` is the text the detector ran on: the page string on the
+    /// text leg, the normalized concatenation on the OCR leg.
+    private func gateAndCompose(
+        _ matches: [PIIDetector.PIIMatch],
+        pageText: String
+    ) -> [PIIDetector.PIIMatch] {
+        let (scored, rest) = matches.partitionedByScoredFamily()
+        let gated = rest.applyingCountingDrops(thresholdVector: thresholdVector)
+        if gated.droppedBelowThreshold > 0 {
+            belowThresholdSink?(gated.droppedBelowThreshold)
+        }
+        return (gated.survivors + composedSurvivors(scored, pageText: pageText))
+            .sorted { $0.range.location < $1.range.location }
+    }
+
     // MARK: - Test Seams (internal, observation/seeding only)
 
     #if DEBUG
@@ -1482,26 +1511,9 @@ public actor DocumentSearcher {
                 let merged = userTermsIndex?.merge(
                     into: resolution.surviving, doctype: nil
                 ) ?? resolution.surviving
-                // Site-B parity. Partition, then gate (Option A): the five
-                // scored families route through the composed posterior; every
-                // other family keeps the raw `applying(thresholdVector:)` path
-                // byte-for-byte. Text feature source is `pageText` (in scope). The
-                // recombined survivors are re-sorted by position so the result list
-                // and J/K navigation keep the positional order resolveOverlaps
-                // produced — the partition alone groups non-scored ahead of scored.
-                let (scoredText, restText) = merged.partitionedByScoredFamily()
-                // Count the raw-gate below-threshold drops on the
-                // text path and fire the sink (mirrors the overlapSink guard
-                // above). Only `restText` is gated by `applying(...)`; the scored
-                // families flow through `composedSurvivors` and are intentionally
-                // NOT counted here (their posterior drops are a separate concern).
-                let gatedText = restText.applyingCountingDrops(thresholdVector: thresholdVector)
-                if gatedText.droppedBelowThreshold > 0 {
-                    belowThresholdSink?(gatedText.droppedBelowThreshold)
-                }
-                let matches = (gatedText.survivors
-                    + composedSurvivors(scoredText, pageText: pageText))
-                    .sorted { $0.range.location < $1.range.location }
+                // Site-B parity: partition, gate, compose, re-sort — the
+                // text feature source is `pageText` (in scope).
+                let matches = gateAndCompose(merged, pageText: pageText)
                 for match in matches {
                     if Task.isCancelled || totalYielded >= Self.maxResults { break }
 
@@ -1708,22 +1720,10 @@ public actor DocumentSearcher {
             overlapSink?(resolution.suppressedCountByCategory)
         }
         // Site-B parity on the OCR path too (an un-routed site would leak
-        // raw-gated FP for the scored families). Same partition-then-gate split;
-        // the OCR feature text is `concatenated` (the normalized page text the
-        // detector ran on at :1330), NOT a `pageText` variable. Re-sorted by
-        // position so the recombined survivors keep positional order (the
-        // partition groups non-scored ahead of scored otherwise).
-        let (scoredOCR, restOCR) = resolution.surviving.partitionedByScoredFamily()
-        // Symmetric below-threshold drop count on the OCR path
-        // (counting at only one path would under-report). Same scoped gate: only
-        // `restOCR` is raw-gated; scored families route through `composedSurvivors`.
-        let gatedOCR = restOCR.applyingCountingDrops(thresholdVector: thresholdVector)
-        if gatedOCR.droppedBelowThreshold > 0 {
-            belowThresholdSink?(gatedOCR.droppedBelowThreshold)
-        }
-        let matches = (gatedOCR.survivors
-            + composedSurvivors(scoredOCR, pageText: concatenated))
-            .sorted { $0.range.location < $1.range.location }
+        // raw-gated FP for the scored families): the OCR feature text is
+        // `concatenated` (the normalized page text the detector ran on),
+        // NOT a `pageText` variable.
+        let matches = gateAndCompose(resolution.surviving, pageText: concatenated)
         var results: [SearchResult] = []
 
         // Spatial mapping shared between detector matches and
