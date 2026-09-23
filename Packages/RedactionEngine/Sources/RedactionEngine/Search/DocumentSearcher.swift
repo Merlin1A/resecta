@@ -216,27 +216,12 @@ public actor DocumentSearcher {
 
     // MARK: - Per-Session Caches
 
-    private var ocrCache: [Int: [OCREngine.TextLine]] = [:]
-    /// LRU access tracking for OCR cache eviction.
-    private var ocrCacheAccess: [Int: Int] = [:]
-    private var ocrAccessCounter: Int = 0
-
-    // Parallel cache of normalized PII-scan inputs,
-    // keyed identically to `ocrCache` and LRU-evicted in lockstep. The PII
-    // path (`scanPagePIIViaOCR`) reads this cache; user text search
-    // (`searchPageViaOCR`) continues reading verbatim `ocrCache`. Normalizer
-    // runs once per page at cache-miss time; cached results stay authoritative.
-    private struct NormalizedOCRPage {
-        let concatenated: String
-        let entries: [NormalizedLineEntry]
-    }
-    private struct NormalizedLineEntry {
-        let start: Int
-        let normalizedText: String
-        let normalizedRect: CGRect
-        let confidence: Float
-    }
-    private var ocrNormalizedConcat: [Int: NormalizedOCRPage] = [:]
+    /// The OCR page caches — the verbatim Vision lines, the LRU access
+    /// order and the normalized PII-scan inputs — one value owned by this
+    /// actor. See `OCRPageCache`.
+    private var ocrPageCache = OCRPageCache()
+    private typealias NormalizedOCRPage = OCRPageCache.NormalizedPage
+    private typealias NormalizedLineEntry = OCRPageCache.NormalizedLineEntry
     private let ocrNormalizer = OCRTextNormalizer()
 
     public init(
@@ -412,14 +397,14 @@ public actor DocumentSearcher {
     // MARK: - Test Seams (internal, observation/seeding only)
 
     #if DEBUG
-    internal var _testOCRCacheKeys: Set<Int> { Set(ocrCache.keys) }
-    internal var _testOCRNormalizedConcatKeys: Set<Int> { Set(ocrNormalizedConcat.keys) }
+    internal var _testOCRCacheKeys: Set<Int> { ocrPageCache.cachedKeys }
+    internal var _testOCRNormalizedConcatKeys: Set<Int> { ocrPageCache.normalizedKeys }
     /// H3.1 (1.2 instrumentation plan §6) — read-only view of one page's
     /// cached Vision lines so the search-GT harness can emit the exact OCR
     /// text the OCR leg matched against. Observation-only, same contract as
     /// `_testOCRCacheKeys` above; never touches the LRU access ordering.
     internal func _testOCRCachedLines(forPageIndex pageIndex: Int) -> [OCREngine.TextLine]? {
-        ocrCache[pageIndex]
+        ocrPageCache.cachedLines(forPageIndex: pageIndex)
     }
 
     /// Seeds the three OCR caches with `occupiedCount` placeholder entries,
@@ -431,22 +416,8 @@ public actor DocumentSearcher {
         skippingPageIndex: Int,
         occupiedCount: Int
     ) {
-        ocrCache.removeAll()
-        ocrCacheAccess.removeAll()
-        ocrNormalizedConcat.removeAll()
-        ocrAccessCounter = 0
-        var added = 0
-        var idx = 0
-        while added < occupiedCount {
-            if idx != skippingPageIndex {
-                ocrAccessCounter += 1
-                ocrCacheAccess[idx] = ocrAccessCounter
-                ocrCache[idx] = []
-                ocrNormalizedConcat[idx] = NormalizedOCRPage(concatenated: "", entries: [])
-                added += 1
-            }
-            idx += 1
-        }
+        ocrPageCache.seedForCoherence(
+            skippingPageIndex: skippingPageIndex, occupiedCount: occupiedCount)
     }
 
     /// Seeds the OCR cache with known lines for a specific page index,
@@ -455,12 +426,7 @@ public actor DocumentSearcher {
     /// The normalized-concat cache entry is NOT pre-seeded here (the PII
     /// path rebuilds it on demand; the text/regex paths do not read it).
     internal func _testSeedOCRLines(_ lines: [OCREngine.TextLine], forPageIndex pageIndex: Int) {
-        ocrAccessCounter += 1
-        ocrCacheAccess[pageIndex] = ocrAccessCounter
-        ocrCache[pageIndex] = lines
-        // Invalidate any stale normalized-concat entry so a subsequent PII
-        // scan rebuilds it from the newly seeded raw lines.
-        ocrNormalizedConcat.removeValue(forKey: pageIndex)
+        ocrPageCache.seedLines(lines, forPageIndex: pageIndex)
     }
 
     /// Test seam: base address of the copy-on-write-shared surname
@@ -983,11 +949,6 @@ public actor DocumentSearcher {
         }
         return true
     }
-
-    // MARK: - Search Dispatch
-
-    /// Maximum OCR cache entries before eviction.
-    private static let maxOCRCacheEntries = 50
 
     // MARK: - Text-layer routing
 
@@ -1717,7 +1678,7 @@ public actor DocumentSearcher {
         // cache, not verbatim Vision output. On miss, run OCRTextNormalizer
         // per line and record offsets against the normalized concatenation.
         let normalizedPage: NormalizedOCRPage
-        if let cached = ocrNormalizedConcat[pageIndex] {
+        if let cached = ocrPageCache.normalizedPage(for: pageIndex) {
             normalizedPage = cached
         } else {
             var concat = ""
@@ -1734,7 +1695,7 @@ public actor DocumentSearcher {
                 concat += normalized + "\n"
             }
             normalizedPage = NormalizedOCRPage(concatenated: concat, entries: entries)
-            ocrNormalizedConcat[pageIndex] = normalizedPage
+            ocrPageCache.setNormalizedPage(normalizedPage, for: pageIndex)
         }
         let concatenated = normalizedPage.concatenated
         let lineOffsets = normalizedPage.entries
@@ -1939,22 +1900,6 @@ public actor DocumentSearcher {
         return results
     }
 
-    // MARK: - OCR Cache Eviction (shared across all OCR paths)
-
-    /// Evict the least-recently-used entry from the OCR caches when the capacity
-    /// ceiling is reached. Both `ocrCache` and `ocrNormalizedConcat` are always
-    /// evicted in lockstep so the two parallel caches never diverge.
-    /// Callers invoke this BEFORE inserting a new entry.
-    private func evictOCRCacheIfNeeded() {
-        if ocrCache.count >= Self.maxOCRCacheEntries {
-            if let lruPage = ocrCacheAccess.min(by: { $0.value < $1.value })?.key {
-                ocrCache.removeValue(forKey: lruPage)
-                ocrCacheAccess.removeValue(forKey: lruPage)
-                ocrNormalizedConcat.removeValue(forKey: lruPage)
-            }
-        }
-    }
-
     // MARK: - OCR Search Path
 
     /// Search a page via OCR when no text layer is available.
@@ -2124,8 +2069,8 @@ public actor DocumentSearcher {
     /// The OCR lines for a page, from the per-session cache when present.
     /// On a cache miss the page is rendered at 300 DPI off-actor (the
     /// SendablePDFPage + thumbnail-in-detached-Task idiom), read by Vision,
-    /// and inserted through the shared eviction path so `ocrCache` and
-    /// `ocrNormalizedConcat` stay in lockstep. The three OCR entry paths
+    /// and inserted through the shared eviction path so the verbatim lines
+    /// and the normalized inputs stay in lockstep. The three OCR entry paths
     /// (manual OCR search, PII scan, regex OCR fallback) share this body.
     ///
     /// Memory guard: oversized pages (e.g., architectural drawings) can
@@ -2140,10 +2085,7 @@ public actor DocumentSearcher {
     /// or unreadable page reports its own route and returns no lines.
     private func ocrLines(for page: PDFPage, pageIndex: Int) async -> [OCREngine.TextLine] {
         let textLines: [OCREngine.TextLine]
-        if let cached = ocrCache[pageIndex] {
-            // LRU: record access for eviction ordering
-            ocrAccessCounter += 1
-            ocrCacheAccess[pageIndex] = ocrAccessCounter
+        if let cached = ocrPageCache.touch(pageIndex) {
             textLines = cached
         } else {
             let pageBounds = page.bounds(for: .cropBox)
@@ -2176,10 +2118,7 @@ public actor DocumentSearcher {
                 let lines = try await ocrEngine.recognizeText(
                     in: cgImage, recognitionLevel: .accurate
                 )
-                evictOCRCacheIfNeeded()
-                ocrAccessCounter += 1
-                ocrCacheAccess[pageIndex] = ocrAccessCounter
-                ocrCache[pageIndex] = lines
+                ocrPageCache.insert(lines, for: pageIndex)
                 textLines = lines
             } catch { // LegalPhrases:safe (Swift keyword)
                 pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
