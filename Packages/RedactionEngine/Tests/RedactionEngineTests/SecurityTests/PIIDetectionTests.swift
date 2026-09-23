@@ -174,7 +174,7 @@ struct PIIDetectionTests {
     ])
     func phoneAcceptsBalancedParens(_ input: String) {
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.phonePattern.matches(in: input, range: range)
+        let matches = PhoneDetector.phonePattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected phone match for '\(input)'")
     }
 
@@ -186,7 +186,7 @@ struct PIIDetectionTests {
     ])
     func phoneAcceptsNoParens(_ input: String) {
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.phonePattern.matches(in: input, range: range)
+        let matches = PhoneDetector.phonePattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected phone match for '\(input)'")
     }
 
@@ -197,7 +197,7 @@ struct PIIDetectionTests {
     ])
     func phoneAcceptsPlus1Prefix(_ input: String) {
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.phonePattern.matches(in: input, range: range)
+        let matches = PhoneDetector.phonePattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected phone match for '\(input)'")
         // +1 should be inside the match.
         let matched = (input as NSString).substring(with: matches.first!.range)
@@ -208,7 +208,7 @@ struct PIIDetectionTests {
     func phoneRejectsBarePlus() {
         let input = "+555-123-4567"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.phonePattern.matches(in: input, range: range)
+        let matches = PhoneDetector.phonePattern.matches(in: input, range: range)
         for match in matches {
             let matched = (input as NSString).substring(with: match.range)
             #expect(!matched.hasPrefix("+"),
@@ -220,7 +220,7 @@ struct PIIDetectionTests {
     func phoneRejectsUnbalancedLeftParen() {
         let input = "(555 123-4567"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.phonePattern.matches(in: input, range: range)
+        let matches = PhoneDetector.phonePattern.matches(in: input, range: range)
         for match in matches {
             let matched = (input as NSString).substring(with: match.range)
             #expect(!matched.hasPrefix("("),
@@ -232,7 +232,7 @@ struct PIIDetectionTests {
     func phoneRejectsUnbalancedRightParen() {
         let input = "555)123-4567"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.phonePattern.matches(in: input, range: range)
+        let matches = PhoneDetector.phonePattern.matches(in: input, range: range)
         for match in matches {
             let matched = (input as NSString).substring(with: match.range)
             #expect(!matched.contains(")") || matched.hasPrefix("("),
@@ -603,7 +603,7 @@ struct PIIDetectionTests {
         // but this test makes that guarantee explicit and CI-enforced.
         _ = CreditCardDetector.ccPattern
         _ = EmailDetector.emailPattern
-        _ = PIIDetector.phonePattern
+        _ = PhoneDetector.phonePattern
         _ = PIIDetector.addressPattern
         _ = PIIDetector.dobPattern
         _ = PIIDetector.itinPattern

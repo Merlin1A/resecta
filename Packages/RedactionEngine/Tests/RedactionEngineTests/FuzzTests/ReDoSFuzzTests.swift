@@ -48,7 +48,7 @@ struct ReDoSFuzzTests {
     static let piiPatterns: [(name: String, pattern: NSRegularExpression)] = [
         ("creditCard", CreditCardDetector.ccPattern),
         ("email",      EmailDetector.emailPattern),
-        ("phone",      PIIDetector.phonePattern),
+        ("phone",      PhoneDetector.phonePattern),
         ("address",    PIIDetector.addressPattern),
         ("dob",        PIIDetector.dobPattern),
         ("itin",       PIIDetector.itinPattern),

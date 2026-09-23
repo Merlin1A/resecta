@@ -21,7 +21,7 @@ import Foundation
 //                   foia, generic).
 //
 // Per-family keyword sets are the shipped KeywordProfile vocabularies read
-// VERBATIM (AccountDetector.positiveKeywords; PIIDetector.phoneContextKeywords /
+// VERBATIM (AccountDetector.positiveKeywords; PhoneDetector.phoneContextKeywords /
 // phoneNegativeKeywords; MRNContextKeywords.profile; PIIDetector.einProfile /
 // itinProfile) — no re-typed lists. A non-scored family yields empty sets, so
 // features 1-4 are 0 for it (the builder is total over every kind, but only the
@@ -71,10 +71,10 @@ private enum ContextFeatureKeywords {
             // AccountDetector.positiveKeywords (negative set empty — profile :26).
             return (AccountDetector.positiveKeywords.map { $0.lowercased() }, [])
         case "phone":
-            // PIIDetector phone keyword sets (PIIDetector.swift:871 / :880).
+            // PhoneDetector phone keyword sets.
             return (
-                PIIDetector.phoneContextKeywords.map { $0.lowercased() },
-                PIIDetector.phoneNegativeKeywords.map { $0.lowercased() }
+                PhoneDetector.phoneContextKeywords.map { $0.lowercased() },
+                PhoneDetector.phoneNegativeKeywords.map { $0.lowercased() }
             )
         case "mrn":
             // MRNContextKeywords.profile (positive + negative; MRNContextKeywords.swift:16/31).
