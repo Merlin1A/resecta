@@ -73,4 +73,39 @@ struct PhoneVectorTests {
         #expect(phoneConfidence("Telephone: (312) 621-4862") == 0.80)
         #expect(phoneConfidence("Reach us by calling (312) 621-4862") == 0.80)
     }
+
+    // MARK: - Phrase cues and labelled non-phones (C12-33)
+
+    @Test("a labelled account, reference, member or record number is not a phone when no phone cue is in the window")
+    func labelledNonPhoneNumbersAreNotEmitted() {
+        #expect(phoneConfidence("Account Number: 2252921109") == nil)
+        #expect(phoneConfidence("Your reference number 2928559816 is on file") == nil)
+        #expect(phoneConfidence("Member Number: 5551234567") == nil)
+        #expect(phoneConfidence("MRN 5551234567") == nil)
+    }
+
+    @Test("the bare word number is not a phone cue; a labelled number 43 chars away no longer boosts a neighbour")
+    func bareNumberIsNotACue() {
+        #expect(phoneConfidence("Callback line: (520) 520-2006.\n\nIdentity verified at intake -- Passport Number: O57885498") == 0.60)
+    }
+
+    @Test("the phone cues still boost: a label, a phrase, a call-us line")
+    func phoneCuesStillBoost() {
+        #expect(phoneConfidence("Phone: (555) 010-0100") == 0.80)
+        #expect(phoneConfidence("Contact number 555-010-0100") == 0.80)
+        #expect(phoneConfidence("Fax number: 555-010-0100") == 0.80)
+        #expect(phoneConfidence("Call us at 555-010-0100") == 0.80)
+        #expect(phoneConfidence("Tel no. 555-010-0100") == 0.80)
+    }
+
+    @Test("a phone cue beside a labelled number keeps the phone: the positive overrides the negative")
+    func positiveOverridesNegative() {
+        #expect(phoneConfidence("Account Number: 2252921109 -- phone (555) 010-0100") == 0.80)
+    }
+
+    @Test("a bare ten-digit run with no cue keeps the 0.60 base")
+    func bareRunKeepsTheBase() {
+        #expect(phoneConfidence("5551234567") == 0.60)
+        #expect(phoneConfidence("(555) 010-0100") == 0.60)
+    }
 }

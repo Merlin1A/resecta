@@ -88,6 +88,13 @@ struct ContextFeatureParityTests {
         Case(name: "phone/whole-token-keyword", text: "Tel 5551234567", loc: 4, len: 10,
              kind: .phone, doctype: .generic,
              golden: [1, 0, 0.9090909090909091, 0, 10, 0, 0, 0, 0, 0, 0, 0, 1]),
+        // A labelled account number: the bare word "number" is not a phone cue,
+        // and the phrase "account number" is a phone negative — kw_negative_window
+        // 1, nearest_negative 1/(1 + 2/10) from the end of the phrase, left_is_label
+        // 1. Shared byte-for-byte with the Python port.
+        Case(name: "phone/labelled-account-number", text: "Account Number: 5551234567", loc: 16, len: 10,
+             kind: .phone, doctype: .generic,
+             golden: [0, 1, 0, 0.8333333333333334, 10, 0, 1, 0, 0, 0, 0, 0, 1]),
     ]
 
     @Test("contextFeatures matches the golden 13-vectors on fixed ASCII")
