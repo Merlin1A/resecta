@@ -77,11 +77,14 @@ struct SSNDetector: FamilyDetector {
                 documentHeader: documentHeader
             )
 
-            var signals: [MatchRationale.Signal] = [
-                .regexPattern(name: "ssn.state-machine"),
-                .structuralValidator(name: "ssn.area-group-serial"),
-            ]
-            if let contextSignal = contextScorer.signal(
+            var rationale = MatchRationale.Builder(
+                ruleID: "ssn.state-machine", preThresholdScore: profile.baseConfidence,
+                signals: [
+                    .regexPattern(name: "ssn.state-machine"),
+                    .structuralValidator(name: "ssn.area-group-serial"),
+                ]
+            )
+            rationale.append(contextScorer.signal(
                 text: fullText,
                 matchRange: candidate.range,
                 profile: profile,
@@ -89,32 +92,22 @@ struct SSNDetector: FamilyDetector {
                 doctype: doctype,
                 gazetteer: gazetteer,
                 documentHeader: documentHeader
-            ) {
-                signals.append(contextSignal)
-            }
+            ))
             // Attach negativeContextSuppressed signal when gazetteer fired.
             // Note: header-anchor suppression has no keyword to attach here;
             // it is reflected only in the final score.
-            if let gaz = gazetteer, let dt = doctype,
-               let suppSignal = contextScorer.gazetteerSignal(
-                   text: fullText, matchRange: candidate.range,
-                   category: .ssn, doctype: dt, gazetteer: gaz) {
-                signals.append(suppSignal)
+            if let gaz = gazetteer, let dt = doctype {
+                rationale.append(contextScorer.gazetteerSignal(
+                    text: fullText, matchRange: candidate.range,
+                    category: .ssn, doctype: dt, gazetteer: gaz))
             }
-
-            let rationale = MatchRationale(
-                ruleID: "ssn.state-machine",
-                signals: signals,
-                preThresholdScore: profile.baseConfidence,
-                finalScore: confidence
-            )
 
             return PIIMatch(
                 text: candidate.matchedText,
                 range: candidate.range,
                 kind: .ssn,
                 confidence: confidence,
-                rationale: rationale
+                rationale: rationale.build(finalScore: confidence)
             )
         }
     }

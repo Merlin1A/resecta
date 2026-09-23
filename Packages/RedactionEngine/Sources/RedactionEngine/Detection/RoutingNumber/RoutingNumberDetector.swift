@@ -86,40 +86,33 @@ struct RoutingNumberDetector: FamilyDetector {
                 profile: Self.profile,
                 category: .routingNumber
             )
-            var signals: [MatchRationale.Signal] = [
-                .regexPattern(name: ruleID),
-                .structuralValidator(name: "routingNumber.aba-prefix"),
-                .structuralValidator(name: "routingNumber.aba-mod10"),
-            ]
-            if let ctxSignal = scorer.signal(
+            var rationale = MatchRationale.Builder(
+                ruleID: ruleID, preThresholdScore: Self.profile.baseConfidence,
+                signals: [
+                    .regexPattern(name: ruleID),
+                    .structuralValidator(name: "routingNumber.aba-prefix"),
+                    .structuralValidator(name: "routingNumber.aba-mod10"),
+                ]
+            )
+            rationale.append(scorer.signal(
                 text: fullText,
                 matchRange: match.range,
                 profile: Self.profile,
                 category: .routingNumber
-            ) {
-                signals.append(ctxSignal)
-            }
+            ))
             // Per-keyword breakdown alongside the scalar
             // (mirrors DEADetector).
-            if let ctxDetail = scorer.signalDetail(
+            rationale.append(scorer.signalDetail(
                 text: fullText,
                 matchRange: match.range,
                 profile: Self.profile
-            ) {
-                signals.append(ctxDetail)
-            }
-            let rationale = MatchRationale(
-                ruleID: ruleID,
-                signals: signals,
-                preThresholdScore: Self.profile.baseConfidence,
-                finalScore: confidence
-            )
+            ))
             return PIIDetector.PIIMatch(
                 text: matchedText,
                 range: match.range,
                 kind: .routingNumber,
                 confidence: confidence,
-                rationale: rationale
+                rationale: rationale.build(finalScore: confidence)
             )
         }
     }

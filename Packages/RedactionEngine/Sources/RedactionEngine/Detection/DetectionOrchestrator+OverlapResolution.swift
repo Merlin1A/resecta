@@ -212,16 +212,12 @@ extension DetectionOrchestrator {
             winnerCategory: winnerCategory,
             loserCategory: PIICategory(piiKind: loser.kind)
         )
+        // A loser with no rationale gets the minimal one (an empty rule id,
+        // its confidence as both scores) and then the signal.
         let existing = loser.rationale
-        let newSignals: [MatchRationale.Signal] = (existing?.signals ?? []) + [signal]
-        let newRationale = MatchRationale(
-            ruleID: existing?.ruleID ?? "",
-            signals: newSignals,
-            preThresholdScore: existing?.preThresholdScore ?? loser.confidence,
-            finalScore: existing?.finalScore ?? loser.confidence,
-            appliedThreshold: existing?.appliedThreshold
-        )
-        return loser.withRationale(newRationale)
+            ?? MatchRationale.Builder(ruleID: "", preThresholdScore: loser.confidence)
+                .build(finalScore: loser.confidence)
+        return loser.withRationale(existing.appending(signal))
     }
 
     /// Priority rank used as a tie-breaker when two overlapping matches

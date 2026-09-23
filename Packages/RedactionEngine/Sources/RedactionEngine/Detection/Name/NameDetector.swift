@@ -184,22 +184,18 @@ struct NameDetector: FamilyDetector {
                     }
                 }
 
-                var signals: [MatchRationale.Signal] = [.regexPattern(name: "name.nltagger")]
-                if verdict.surnameHit { signals.append(.bloomSurnameHit) }
-                if verdict.givenHit || givenNameOnlyHit { signals.append(.bloomGivenHit) }
+                var rationale = MatchRationale.Builder(ruleID: "name.nltagger", preThresholdScore: 0.70)
+                rationale.append(.regexPattern(name: "name.nltagger"))
+                if verdict.surnameHit { rationale.append(.bloomSurnameHit) }
+                if verdict.givenHit || givenNameOnlyHit { rationale.append(.bloomGivenHit) }
                 if verdict.fuzzySurnameHit {
-                    signals.append(.bloomFuzzySurnameHit(score: verdict.fuzzyScore ?? 0.6))
+                    rationale.append(.bloomFuzzySurnameHit(score: verdict.fuzzyScore ?? 0.6))
                 }
 
                 let confidence = 0.70 + verdict.boost
-                let rationale = MatchRationale(
-                    ruleID: "name.nltagger",
-                    signals: signals,
-                    preThresholdScore: 0.70,
-                    finalScore: confidence
-                )
                 results.append(PIIMatch(text: matchedText, range: nsRange, kind: .name,
-                                       confidence: confidence, rationale: rationale))
+                                       confidence: confidence,
+                                       rationale: rationale.build(finalScore: confidence)))
             }
             return true
         }

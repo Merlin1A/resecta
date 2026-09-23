@@ -108,33 +108,27 @@ struct MRNDetector: FamilyDetector {
                     category: .medicalRecord, doctype: doctype, gazetteer: gazetteer,
                     documentHeader: documentHeader
                 )
-                var signals: [MatchRationale.Signal] = [.regexPattern(name: ruleID)]
-                if let ctxSignal = contextScorer.signal(
+                var rationale = MatchRationale.Builder(
+                    ruleID: ruleID, preThresholdScore: profile.baseConfidence,
+                    signals: [.regexPattern(name: ruleID)]
+                )
+                rationale.append(contextScorer.signal(
                     text: fullText, matchRange: match.range, profile: profile,
                     category: .medicalRecord, doctype: doctype, gazetteer: gazetteer,
                     documentHeader: documentHeader
-                ) {
-                    signals.append(ctxSignal)
-                }
+                ))
                 // Attach negativeContextSuppressed signal when gazetteer fired.
-                if let gaz = gazetteer, let dt = doctype,
-                   let suppSignal = contextScorer.gazetteerSignal(
-                       text: fullText, matchRange: match.range,
-                       category: .medicalRecord, doctype: dt, gazetteer: gaz) {
-                    signals.append(suppSignal)
+                if let gaz = gazetteer, let dt = doctype {
+                    rationale.append(contextScorer.gazetteerSignal(
+                        text: fullText, matchRange: match.range,
+                        category: .medicalRecord, doctype: dt, gazetteer: gaz))
                 }
-                let rationale = MatchRationale(
-                    ruleID: ruleID,
-                    signals: signals,
-                    preThresholdScore: profile.baseConfidence,
-                    finalScore: confidence
-                )
                 out.append(PIIMatch(
                     text: text.substring(with: match.range),
                     range: match.range,
                     kind: .medicalRecord,
                     confidence: confidence,
-                    rationale: rationale
+                    rationale: rationale.build(finalScore: confidence)
                 ))
             }
         }

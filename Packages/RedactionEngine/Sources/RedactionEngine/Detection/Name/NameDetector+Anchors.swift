@@ -258,12 +258,10 @@ extension NameDetector {
         PIIMatch(
             text: candidate.text, range: candidate.range, kind: .name,
             confidence: labelAnchorConfidence,
-            rationale: MatchRationale(
-                ruleID: labelAnchorRuleID,
-                signals: [.regexPattern(name: "\(labelAnchorRuleID).\(route)")],
-                preThresholdScore: labelAnchorConfidence,
-                finalScore: labelAnchorConfidence
-            )
+            rationale: MatchRationale.Builder(
+                ruleID: labelAnchorRuleID, preThresholdScore: labelAnchorConfidence,
+                signals: [.regexPattern(name: "\(labelAnchorRuleID).\(route)")]
+            ).build(finalScore: labelAnchorConfidence)
         )
     }
 

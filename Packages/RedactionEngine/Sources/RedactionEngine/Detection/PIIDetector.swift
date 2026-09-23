@@ -463,34 +463,13 @@ public struct PIIDetector: Sendable {
                     return false
                 }
                 if alreadyTagged { return match }
-                var signals = existing.signals
-                signals.append(.doctypeGate(doctype: doctype))
-                let annotated = MatchRationale(
-                    ruleID: existing.ruleID,
-                    signals: signals,
-                    preThresholdScore: existing.preThresholdScore,
-                    finalScore: existing.finalScore,
-                    appliedThreshold: existing.appliedThreshold
-                )
-                return match.withRationale(annotated)
+                return match.withRationale(existing.appending(.doctypeGate(doctype: doctype)))
             }
             let ruleID = defaultRuleID(for: match.kind)
-            var signals: [MatchRationale.Signal] = [.regexPattern(name: ruleID)]
-            if let doctype {
-                signals.append(.doctypeGate(doctype: doctype))
-            }
-            return PIIMatch(
-                text: match.text,
-                range: match.range,
-                kind: match.kind,
-                confidence: match.confidence,
-                rationale: MatchRationale(
-                    ruleID: ruleID,
-                    signals: signals,
-                    preThresholdScore: match.confidence,
-                    finalScore: match.confidence
-                )
-            )
+            var rationale = MatchRationale.Builder(ruleID: ruleID, preThresholdScore: match.confidence)
+            rationale.append(.regexPattern(name: ruleID))
+            rationale.append(doctype.map { .doctypeGate(doctype: $0) })
+            return match.withRationale(rationale.build(finalScore: match.confidence))
         }
     }
 
