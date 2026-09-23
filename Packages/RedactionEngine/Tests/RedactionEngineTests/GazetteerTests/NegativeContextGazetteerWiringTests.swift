@@ -276,7 +276,7 @@ struct NegativeContextGazetteerWiringTests {
 
         // EIN detection: 12-3456789 is a hyphenated EIN; detectEINs uses inline contains()
         // checks via einScorer, not the NegativeContextGazetteer. The EIN is unaffected.
-        let eins = detector.detectEINs(in: nsText, range: fullRange)
+        let eins = detector.families.ein.detect(in: nsText, range: fullRange)
         #expect(!eins.isEmpty,
                 "EIN 12-3456789 must be detected; EIN path does not pass through NegativeContextGazetteer")
     }

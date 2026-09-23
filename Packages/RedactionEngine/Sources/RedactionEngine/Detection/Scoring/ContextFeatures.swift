@@ -22,7 +22,7 @@ import Foundation
 //
 // Per-family keyword sets are the shipped KeywordProfile vocabularies read
 // VERBATIM (AccountDetector.positiveKeywords; PhoneDetector.phoneContextKeywords /
-// phoneNegativeKeywords; MRNContextKeywords.profile; PIIDetector.einProfile /
+// phoneNegativeKeywords; MRNContextKeywords.profile; EINDetector.einProfile /
 // itinProfile) — no re-typed lists. A non-scored family yields empty sets, so
 // features 1-4 are 0 for it (the builder is total over every kind, but only the
 // five scored families have non-empty vocabularies).
@@ -84,8 +84,8 @@ private enum ContextFeatureKeywords {
                 p.negativeKeywords.map { $0.lowercased() }
             )
         case "ein":
-            // PIIDetector.einProfile (negative set empty — profile :38).
-            let p = PIIDetector.einProfile
+            // EINDetector.einProfile (negative set empty).
+            let p = EINDetector.einProfile
             return (
                 p.positiveKeywords.map { $0.lowercased() },
                 p.negativeKeywords.map { $0.lowercased() }
