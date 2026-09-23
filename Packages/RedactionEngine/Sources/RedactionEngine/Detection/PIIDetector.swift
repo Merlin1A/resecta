@@ -8,8 +8,6 @@ import OSLog
 /// Detection runs regex-based passes first, then NLTagger-based name detection.
 public struct PIIDetector: Sendable {
 
-    private let contextScorer = ContextWindowScorer()
-
     // Phase 3 detectors — lazy instances reused across calls.
     private let npiDetector = NPIDetector()
     private let deaDetector = DEADetector()
@@ -480,9 +478,9 @@ public struct PIIDetector: Sendable {
         if Self.runsRoutingNumber(doctype: doctype) {
             results.append(contentsOf: withPerPageTimeout("routingNumber") { routingNumberDetector.detect(in: nsText, range: fullRange) })
         }
-        if Self.runsLicensePlate(doctype: doctype) {
+        if families.licensePlate.runs(doctype: doctype) {
             results.append(contentsOf: withPerPageTimeout("licensePlate") {
-                detectLicensePlate(in: nsText, range: fullRange,
+                families.licensePlate.detect(in: nsText, range: fullRange,
                                    doctype: currentDoctype, gazetteer: negCtxGazetteer,
                                    documentHeader: currentHeader)
             })
@@ -567,9 +565,9 @@ public struct PIIDetector: Sendable {
         if categories.contains(.routingNumber), Self.runsRoutingNumber(doctype: doctype) {
             results.append(contentsOf: withPerPageTimeout("routingNumber") { routingNumberDetector.detect(in: nsText, range: fullRange) })
         }
-        if categories.contains(.licensePlate), Self.runsLicensePlate(doctype: doctype) {
+        if categories.contains(.licensePlate), families.licensePlate.runs(doctype: doctype) {
             results.append(contentsOf: withPerPageTimeout("licensePlate") {
-                detectLicensePlate(in: nsText, range: fullRange,
+                families.licensePlate.detect(in: nsText, range: fullRange,
                                    doctype: currentDoctype, gazetteer: negCtxGazetteer,
                                    documentHeader: currentHeader)
             })
@@ -700,87 +698,6 @@ public struct PIIDetector: Sendable {
     private static func runsRoutingNumber(doctype: DoctypeClass?) -> Bool {
         guard let doctype else { return true }
         return doctype == .financial || doctype == .generic
-    }
-
-    /// License plate: court + FOIA + generic. nil doctype → run.
-    private static func runsLicensePlate(doctype: DoctypeClass?) -> Bool {
-        guard let doctype else { return true }
-        return doctype == .court || doctype == .foia || doctype == .generic
-    }
-
-    // MARK: - License Plate Detection
-
-    /// License plate labels: accepts "License plate", "Plate No", "Tag #",
-    /// "LP #", "Reg #", "Vehicle plate" followed by the plate value.
-    static let licensePlateLabeled = try! NSRegularExpression(
-        pattern: #"\b(?:license\s+plate|plate\s+(?:no|number|#)\.?|tag\s+(?:no|number|#)\.?|lp\s*#|reg(?:istration)?\s*#|veh(?:icle)?\s+plate)[:#\s]+[A-Z0-9]{2,3}[-\s]?[A-Z0-9]{2,5}\b"#,
-        options: [.caseInsensitive]
-    )
-
-    /// Detect license plates (labeled only). Gated by `runsLicensePlate`.
-    ///
-    /// `doctype` and `gazetteer` enable per-(category, doctype) negative-context
-    /// suppression. Both default to nil for backward-compatibility.
-    ///
-    /// `documentHeader` enables institution-anchor suppression. Nil = inactive.
-    func detectLicensePlate(
-        in text: NSString,
-        range: NSRange,
-        doctype: DoctypeClass? = nil,
-        gazetteer: NegativeContextGazetteer? = nil,
-        documentHeader: String? = nil
-    ) -> [PIIMatch] {
-        let fullText = text as String
-        let ruleID = "licensePlate.labeled"
-        // Positive set from the bundled corpus; engine-side const fallback. See
-        // detectSSNs for scope rationale (positive-only V1).
-        let baseline = LicensePlateContextKeywords.profile
-        let positives = contextLoader?.positiveKeywords(for: .licensePlate, doctype: nil)
-            ?? baseline.positiveKeywords
-        let profile = KeywordProfile(
-            positiveKeywords: positives,
-            negativeKeywords: baseline.negativeKeywords,
-            windowRadius: baseline.windowRadius,
-            baseConfidence: baseline.baseConfidence,
-            boostedConfidence: baseline.boostedConfidence,
-            floor: baseline.floor
-        )
-        return Self.licensePlateLabeled.matches(in: fullText, range: range).map { match in
-            // Pass doctype + gazetteer + documentHeader.
-            let confidence = contextScorer.score(
-                text: fullText, matchRange: match.range, profile: profile,
-                category: .licensePlate, doctype: doctype, gazetteer: gazetteer,
-                documentHeader: documentHeader
-            )
-            var signals: [MatchRationale.Signal] = [.regexPattern(name: ruleID)]
-            if let ctxSignal = contextScorer.signal(
-                text: fullText, matchRange: match.range, profile: profile,
-                category: .licensePlate, doctype: doctype, gazetteer: gazetteer,
-                documentHeader: documentHeader
-            ) {
-                signals.append(ctxSignal)
-            }
-            // Attach negativeContextSuppressed signal when gazetteer fired.
-            if let gaz = gazetteer, let dt = doctype,
-               let suppSignal = contextScorer.gazetteerSignal(
-                   text: fullText, matchRange: match.range,
-                   category: .licensePlate, doctype: dt, gazetteer: gaz) {
-                signals.append(suppSignal)
-            }
-            let rationale = MatchRationale(
-                ruleID: ruleID,
-                signals: signals,
-                preThresholdScore: profile.baseConfidence,
-                finalScore: confidence
-            )
-            return PIIMatch(
-                text: text.substring(with: match.range),
-                range: match.range,
-                kind: .licensePlate,
-                confidence: confidence,
-                rationale: rationale
-            )
-        }
     }
 
     // MARK: - Name Detection via NLTagger
@@ -1766,7 +1683,7 @@ public struct PIIDetector: Sendable {
         case .account:       return !Self.runsAccount(doctype: doctype)
         case .routingNumber: return !Self.runsRoutingNumber(doctype: doctype)
         case .medicalRecord: return !families.medicalRecord.runs(doctype: doctype)
-        case .licensePlate:  return !Self.runsLicensePlate(doctype: doctype)
+        case .licensePlate:  return !families.licensePlate.runs(doctype: doctype)
         default:             return false
         }
     }
@@ -1797,7 +1714,7 @@ public struct PIIDetector: Sendable {
         case .account:        return accountDetector.detect(in: context, range: contextRange)
         case .routingNumber:  return routingNumberDetector.detect(in: context, range: contextRange)
         case .name:           return detectNames(in: textString)
-        case .licensePlate:   return detectLicensePlate(in: context, range: contextRange)
+        case .licensePlate:   return families.licensePlate.detect(in: context, range: contextRange)
         }
     }
 }

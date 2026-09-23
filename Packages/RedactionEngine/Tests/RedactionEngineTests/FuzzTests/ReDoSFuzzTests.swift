@@ -57,7 +57,7 @@ struct ReDoSFuzzTests {
         ("mrn.labeled",     MRNDetector.mrnPatternLabeled),
         ("mrn.patientID",   MRNDetector.mrnPatternPatientID),
         ("mrn.institution", MRNDetector.mrnPatternInstitution),
-        ("licensePlate.labeled", PIIDetector.licensePlateLabeled),
+        ("licensePlate.labeled", LicensePlateDetector.licensePlateLabeled),
     ]
 
     // MARK: - Tests

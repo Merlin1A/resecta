@@ -612,6 +612,6 @@ struct PIIDetectionTests {
         _ = MRNDetector.mrnPatternLabeled
         _ = MRNDetector.mrnPatternPatientID
         _ = MRNDetector.mrnPatternInstitution
-        _ = PIIDetector.licensePlateLabeled
+        _ = LicensePlateDetector.licensePlateLabeled
     }
 }
