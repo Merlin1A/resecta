@@ -766,7 +766,7 @@ public actor DocumentSearcher {
                 guard let match, match.range.location != NSNotFound else { return }
 
                 if options.wholeWord, let swiftRange = Range(match.range, in: searchText) {
-                    if !Self.previewIsWholeWord(swiftRange, in: searchText) { return }
+                    if !Self.isWholeWord(swiftRange, in: searchText) { return }
                 }
 
                 totalCount += 1
@@ -893,7 +893,7 @@ public actor DocumentSearcher {
                                 chars: baseChars, start: bounds.start, endExclusive: bounds.endExclusive
                             )
                         } else if let swiftRange = Range(matchRange, in: searchText) {
-                            isBoundaried = Self.previewIsWholeWord(swiftRange, in: searchText)
+                            isBoundaried = Self.isWholeWord(swiftRange, in: searchText)
                         } else {
                             isBoundaried = true
                         }
@@ -930,24 +930,6 @@ public actor DocumentSearcher {
             regexInvalid: false,
             currentPageMatches: currentPageMatches
         )
-    }
-
-    /// Local whole-word check for the preview path. Mirrors the
-    /// instance `isWholeWord` but is callable from nonisolated context.
-    private nonisolated static func previewIsWholeWord(_ range: Range<String.Index>, in text: String) -> Bool {
-        if range.lowerBound > text.startIndex {
-            let charBefore = text[text.index(before: range.lowerBound)]
-            if charBefore.isLetter || charBefore.isNumber || charBefore == "_" {
-                return false
-            }
-        }
-        if range.upperBound < text.endIndex {
-            let charAfter = text[range.upperBound]
-            if charAfter.isLetter || charAfter.isNumber || charAfter == "_" {
-                return false
-            }
-        }
-        return true
     }
 
     // MARK: - Text-layer routing
@@ -1257,7 +1239,7 @@ public actor DocumentSearcher {
                 // Whole-word check
                 if options.wholeWord {
                     guard let swiftRange = Range(matchRange, in: searchText) else { return }
-                    if !isWholeWord(swiftRange, in: searchText) {
+                    if !Self.isWholeWord(swiftRange, in: searchText) {
                         return
                     }
                 }
@@ -1981,7 +1963,7 @@ public actor DocumentSearcher {
                             isBoundaried = false
                         }
                     } else {
-                        isBoundaried = isWholeWord(matchRange, in: lineText)
+                        isBoundaried = Self.isWholeWord(matchRange, in: lineText)
                     }
                     if !isBoundaried {
                         searchStart = matchRange.upperBound
@@ -2248,7 +2230,7 @@ public actor DocumentSearcher {
 
             if options.wholeWord {
                 guard let swiftRange = Range(matchRange, in: searchText) else { return }
-                if !isWholeWord(swiftRange, in: searchText) { return }
+                if !Self.isWholeWord(swiftRange, in: searchText) { return }
             }
 
             // Map the match start character offset to the containing OCR
@@ -2427,7 +2409,7 @@ public actor DocumentSearcher {
                         chars: baseChars, start: baseStartOffset, endExclusive: baseStartOffset + baseLength
                     )
                 } else {
-                    isBoundaried = isWholeWord(matchRange, in: searchPageText)
+                    isBoundaried = Self.isWholeWord(matchRange, in: searchPageText)
                 }
                 if !isBoundaried {
                     searchStart = matchRange.upperBound
@@ -2554,8 +2536,11 @@ public actor DocumentSearcher {
 
     // MARK: - Whole-Word Check
 
-    /// Check if the match range is surrounded by word boundaries.
-    private func isWholeWord(_ range: Range<String.Index>, in text: String) -> Bool {
+    /// Check if the match range is surrounded by word boundaries. The one
+    /// String-index predicate for the preview and full tiers (`nonisolated`
+    /// so the preview path can call it without an actor hop); the
+    /// base-coordinate `isWholeWordInBase` covers the offset-map case.
+    private nonisolated static func isWholeWord(_ range: Range<String.Index>, in text: String) -> Bool {
         if range.lowerBound > text.startIndex {
             let charBefore = text[text.index(before: range.lowerBound)]
             if charBefore.isLetter || charBefore.isNumber || charBefore == "_" {
