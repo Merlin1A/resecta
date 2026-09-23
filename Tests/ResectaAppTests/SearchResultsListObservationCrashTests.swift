@@ -130,6 +130,8 @@ struct SearchResultsListObservationCrashTests {
         let section = SearchResultsSection(
             searchState: searchState,
             selectedDetent: .constant(.large),
+            tempExportDirectory: TempExportDirectory(),
+            captureMonitor: ScreenCaptureMonitor(),
             onRequestWhy: { _ in },
             onApplyShortcut: {},
             applyShortcutEnabled: true,

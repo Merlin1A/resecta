@@ -54,7 +54,7 @@ struct BackupExclusionTests {
     }
 
     // --- Test 3 ------------------------------------------------------------
-    @Test("No write at temporaryDirectory root during an export session")
+    @Test("Session child URLs stay inside the session subdirectory; nothing lands at the temp root")
     func testNoWriteAtTempRootDuringSession() throws {
         // Scope the snapshot to a per-test parent directory rather than the
         // shared `FileManager.temporaryDirectory`. Other tests run in

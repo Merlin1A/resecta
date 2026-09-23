@@ -253,6 +253,8 @@ struct SearchAndRedactSheet: View {
                     SearchResultsSection(
                         searchState: searchState,
                         selectedDetent: $selectedDetent,
+                        tempExportDirectory: pipelineCoordinator.tempExportDirectory,
+                        captureMonitor: captureMonitor,
                         onRequestWhy: presentReverseRationale,
                         onApplyShortcut: applyFromKeyboardShortcut,
                         applyShortcutEnabled: applyShortcutEnabled,
