@@ -2,10 +2,13 @@
 # hosted macos-26 runner: build once, then serial suite-level batches on
 # an iPhone 17 simulator under a watchdog, perf suites alone and
 # report-only. Both schemes run every Monday and on release tags, one job
-# each; a dispatch runs the scheme it names. RedactionEngine here runs the
-# engine package's suites on the simulator instead of the macOS host,
-# where the whole-package run stalls (engine-suite.yml). Twenty to forty
-# minutes per scheme. Not part of the pull-request gate.
+# each; a dispatch runs the scheme it names; ResectaApp alone runs on every
+# pull request as a non-required check (about twenty minutes). RedactionEngine
+# here runs the engine package's suites on the simulator instead of the
+# macOS host, where the whole-package run stalls (engine-suite.yml), and
+# stays off pull requests for its length. Twenty to forty minutes per
+# scheme. The runner takes its simulator by id and its DerivedData path from
+# the environment set below.
 name: sim-suite
 
 on:
@@ -22,12 +25,14 @@ on:
     - cron: '0 9 * * 1' # Monday 09:00 UTC
   push:
     tags: ['v*']
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: sim-suite-${{ github.ref }}-${{ inputs.scheme || 'both' }}
+  group: sim-suite-${{ github.event.pull_request.number || github.ref }}-${{ inputs.scheme || 'both' }}
   cancel-in-progress: true
 
 defaults:
@@ -46,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scheme: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.scheme || 'ResectaApp')) || fromJSON('["ResectaApp", "RedactionEngine"]') }}
+        scheme: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.scheme || 'ResectaApp')) || github.event_name == 'pull_request' && fromJSON('["ResectaApp"]') || fromJSON('["ResectaApp", "RedactionEngine"]') }}
     env:
       SCHEME: ${{ matrix.scheme }}
     steps:
@@ -80,6 +85,8 @@ jobs:
       # A cold first boot on a 3-vCPU runner takes longer than the batched
       # runner's 180-second no-output watchdog, which then kills the first
       # invocation and erases the device; boot once here and wait for it.
+      # The runner does not resolve simulators by name: the id found here is
+      # exported as TEST_BATCHED_SIM_UDID (the job fails when none exists).
       - name: Boot the simulator
         run: |
           udid=$(xcrun simctl list devices available -j | python3 -c '
@@ -102,6 +109,8 @@ jobs:
           xcrun simctl boot "$udid"
           xcrun simctl bootstatus "$udid" -b
           echo "boot: $((SECONDS - t0)) s"
+          echo "TEST_BATCHED_SIM_UDID=$udid" >> "$GITHUB_ENV"
+          echo "TEST_BATCHED_DD=${RUNNER_TEMP}/dd" >> "$GITHUB_ENV"
 
       - name: Batched suite
         run: |
