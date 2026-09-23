@@ -43,6 +43,26 @@ struct RegexErrorCalloutTests {
         #expect(SearchToolbarSection.regexErrorCalloutShouldShow(error: " \n\t ") == false)
     }
 
+    @Test("A refused pattern a built-in detector covers ends with that detector's sentence")
+    func refusedPatternNamesBuiltInDetector() {
+        // The safety gate's own copy, then the pointer — one message,
+        // the same composer both refusal paths use.
+        let gate = "Pattern may cause performance issues and has not been accepted."
+        #expect(SearchAndRedactSheet.regexErrorDisplayMessage(
+            pattern: #"\S+@\S+\.\S+"#, engineDescription: gate)
+                == "\(gate) Use the built-in Email detector.")
+        // A shape hint and the detector sentence compose in that order.
+        #expect(SearchAndRedactSheet.regexErrorDisplayMessage(
+            pattern: #"(\S+@\S+"#, engineDescription: "engine says no")
+                == "A ( group is never closed — add the matching ). (engine says no) Use the built-in Email detector.")
+        // No covering detector: the message is as it was.
+        #expect(SearchAndRedactSheet.regexErrorDisplayMessage(
+            pattern: #"(a|aa)*b"#, engineDescription: gate) == gate)
+        // The composed message still drives the callout's visible branch.
+        #expect(SearchToolbarSection.regexErrorCalloutShouldShow(
+            error: "\(gate) Use the built-in Email detector.") == true)
+    }
+
     @Test("Real engine error strings drive the callout into the visible branch")
     func realisticEngineErrorsAreVisible() {
         // The regex engine's NSError descriptions feed `regexError`

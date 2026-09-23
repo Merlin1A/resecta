@@ -351,12 +351,14 @@ struct SearchToolbarSection: View {
                     .foregroundStyle(.red)
                 // Small error TEXT routes through the measured
                 // text tier; the glyph above stays on the system-color tier.
-                // Two lines so the reason is never cut short by the action
-                // beside it; the floor below reserves both.
+                // Up to three lines so the reason is never cut short by the
+                // action beside it: the floor below reserves two, and a
+                // gate refusal that also names a built-in detector takes
+                // the third, growing the slot once on submit.
                 Text(error ?? "")
                     .font(.caption)
                     .foregroundStyle(ResectaTokens.SemanticColor.failText)
-                    .lineLimit(2)
+                    .lineLimit(3)
                     .layoutPriority(1)
             }
             .accessibilityHidden(!visible)
