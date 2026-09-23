@@ -304,25 +304,25 @@ struct PIIDetectionTests {
 
     @Test("Card prefix validation accepts major card types")
     func cardPrefixes() {
-        #expect(PIIDetector.hasValidCardPrefix("4111111111111111"))  // Visa
-        #expect(PIIDetector.hasValidCardPrefix("5500000000000004"))  // MC
-        #expect(PIIDetector.hasValidCardPrefix("340000000000009"))   // Amex
-        #expect(PIIDetector.hasValidCardPrefix("6011000000000004"))  // Discover
+        #expect(CreditCardDetector.hasValidCardPrefix("4111111111111111"))  // Visa
+        #expect(CreditCardDetector.hasValidCardPrefix("5500000000000004"))  // MC
+        #expect(CreditCardDetector.hasValidCardPrefix("340000000000009"))   // Amex
+        #expect(CreditCardDetector.hasValidCardPrefix("6011000000000004"))  // Discover
     }
 
     @Test("Card prefix validation rejects unknown prefixes")
     func cardPrefixReject() {
-        #expect(!PIIDetector.hasValidCardPrefix("9999999999999999")) // Unknown
-        #expect(!PIIDetector.hasValidCardPrefix("123"))             // Too short
+        #expect(!CreditCardDetector.hasValidCardPrefix("9999999999999999")) // Unknown
+        #expect(!CreditCardDetector.hasValidCardPrefix("123"))             // Too short
     }
 
     @Test("Card prefix validation accepts JCB and UnionPay")
     func cardPrefixJCBUnionPay() {
-        #expect(PIIDetector.hasValidCardPrefix("3528000000000000"))  // JCB low
-        #expect(PIIDetector.hasValidCardPrefix("3589000000000000"))  // JCB high
-        #expect(PIIDetector.hasValidCardPrefix("6200000000000000"))  // UnionPay
-        #expect(!PIIDetector.hasValidCardPrefix("3527000000000000")) // Below JCB
-        #expect(!PIIDetector.hasValidCardPrefix("3590000000000000")) // Above JCB
+        #expect(CreditCardDetector.hasValidCardPrefix("3528000000000000"))  // JCB low
+        #expect(CreditCardDetector.hasValidCardPrefix("3589000000000000"))  // JCB high
+        #expect(CreditCardDetector.hasValidCardPrefix("6200000000000000"))  // UnionPay
+        #expect(!CreditCardDetector.hasValidCardPrefix("3527000000000000")) // Below JCB
+        #expect(!CreditCardDetector.hasValidCardPrefix("3590000000000000")) // Above JCB
     }
 
     // MARK: - Address Detection
@@ -601,7 +601,7 @@ struct PIIDetectionTests {
         // Validates the try! safety documented in PIIDetector.swift.
         // These are hardcoded constant patterns that cannot fail at runtime,
         // but this test makes that guarantee explicit and CI-enforced.
-        _ = PIIDetector.ccPattern
+        _ = CreditCardDetector.ccPattern
         _ = PIIDetector.emailPattern
         _ = PIIDetector.phonePattern
         _ = PIIDetector.addressPattern

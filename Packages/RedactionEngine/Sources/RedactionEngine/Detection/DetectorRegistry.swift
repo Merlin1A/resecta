@@ -69,6 +69,7 @@ extension FamilyDetector {
 /// instances by category for the explainer.
 struct DetectorRegistry: Sendable {
     let ssn: SSNDetector
+    let creditCard: CreditCardDetector
 
     /// Evaluation order: the structured families first, the name passes
     /// last. Adding a family = a row here, keyed by its `PIICategory`.
@@ -84,7 +85,8 @@ struct DetectorRegistry: Sendable {
         // One stateless scorer shared by the three scored families.
         let contextScorer = ContextWindowScorer()
         ssn = SSNDetector(contextScorer: contextScorer, contextLoader: contextLoader)
-        rows = [ssn]
+        creditCard = CreditCardDetector()
+        rows = [ssn, creditCard]
         table = Dictionary(uniqueKeysWithValues: rows.map { ($0.category, $0) })
     }
 
