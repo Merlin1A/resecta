@@ -46,7 +46,7 @@ struct DOBVectorTests {
         guard let vectors = try loadVectors() else { return }
         for vec in vectors where vec.valid {
             let ns = vec.text as NSString
-            let count = PIIDetector.dobPattern.numberOfMatches(
+            let count = DOBDetector.dobPattern.numberOfMatches(
                 in: vec.text, range: NSRange(location: 0, length: ns.length)
             )
             #expect(count >= 1, "dobPattern did not match: \(vec.text) (\(vec.notes))")

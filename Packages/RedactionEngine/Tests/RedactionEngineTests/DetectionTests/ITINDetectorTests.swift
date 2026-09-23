@@ -60,7 +60,7 @@ struct ITINDetectorTests {
         let input = "912-34-5678"
         let nsInput = input as NSString
         let range = NSRange(location: 0, length: nsInput.length)
-        let patternMatches = PIIDetector.itinPattern.matches(in: input, range: range)
+        let patternMatches = ITINDetector.itinPattern.matches(in: input, range: range)
         #expect(!patternMatches.isEmpty, "Regex should still match shape")
 
         let detector = PIIDetector()

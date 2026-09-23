@@ -6,7 +6,10 @@ import Foundation
 // ("NPI", "provider ID") boost confidence; base 0.60 with no context since
 // the checksum alone is a strong signal.
 
-struct NPIDetector: Sendable {
+struct NPIDetector: FamilyDetector {
+
+    let category: PIICategory = .npi
+    let telemetryLabel = "npi"
 
     static let pattern = try! NSRegularExpression(
         pattern: #"(?<!\d)[12]\d{9}(?!\d)"#
@@ -48,39 +51,45 @@ struct NPIDetector: Sendable {
                 profile: Self.profile,
                 category: .npi
             )
-            var signals: [MatchRationale.Signal] = [
-                .regexPattern(name: ruleID),
-                .structuralValidator(name: ruleID),
-            ]
-            if let ctxSignal = scorer.signal(
+            var rationale = MatchRationale.Builder(
+                ruleID: ruleID, preThresholdScore: Self.profile.baseConfidence,
+                signals: [
+                    .regexPattern(name: ruleID),
+                    .structuralValidator(name: ruleID),
+                ]
+            )
+            rationale.append(scorer.signal(
                 text: fullText,
                 matchRange: match.range,
                 profile: Self.profile,
                 category: .npi
-            ) {
-                signals.append(ctxSignal)
-            }
+            ))
             // Per-keyword breakdown alongside the scalar.
-            if let ctxDetail = scorer.signalDetail(
+            rationale.append(scorer.signalDetail(
                 text: fullText,
                 matchRange: match.range,
                 profile: Self.profile
-            ) {
-                signals.append(ctxDetail)
-            }
-            let rationale = MatchRationale(
-                ruleID: ruleID,
-                signals: signals,
-                preThresholdScore: Self.profile.baseConfidence,
-                finalScore: confidence
-            )
+            ))
             return PIIDetector.PIIMatch(
                 text: matchedText,
                 range: match.range,
                 kind: .npi,
                 confidence: confidence,
-                rationale: rationale
+                rationale: rationale.build(finalScore: confidence)
             )
         }
+    }
+
+    // MARK: - Family
+
+    /// NPI: medical + FOIA (provider rosters commonly appear in both).
+    /// nil doctype → run.
+    func runs(doctype: DoctypeClass?) -> Bool {
+        guard let doctype else { return true }
+        return doctype == .medical || doctype == .foia
+    }
+
+    func detect(in context: DetectionContext) -> [PIIDetector.PIIMatch] {
+        detect(in: context.nsText, range: context.range)
     }
 }

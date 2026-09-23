@@ -46,7 +46,7 @@ struct PhoneVectorTests {
         guard let vectors = try loadVectors() else { return }
         for vec in vectors where vec.valid {
             let ns = vec.phone as NSString
-            let count = PIIDetector.phonePattern.numberOfMatches(
+            let count = PhoneDetector.phonePattern.numberOfMatches(
                 in: vec.phone, range: NSRange(location: 0, length: ns.length)
             )
             #expect(count >= 1, "phonePattern did not match: \(vec.phone) (\(vec.notes))")
@@ -57,7 +57,7 @@ struct PhoneVectorTests {
 
     private func phoneConfidence(_ text: String) -> Double? {
         let ns = text as NSString
-        return PIIDetector().detectPhones(in: ns, range: NSRange(location: 0, length: ns.length)).first?.confidence
+        return PIIDetector().families.phone.detect(in: ns, range: NSRange(location: 0, length: ns.length)).first?.confidence
     }
 
     @Test("a context keyword inside another word does not boost: Patel ∌ tel, next ∌ ext")

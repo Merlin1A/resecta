@@ -19,7 +19,7 @@ import Foundation
 struct LegalPrefixBoundaryTests {
 
     private static func names(in text: String) -> [PIIDetector.PIIMatch] {
-        PIIDetector().detectNames(in: text)
+        PIIDetector().families.name.detect(in: text)
     }
 
     private static func range(of needle: String, in text: String) -> NSRange {

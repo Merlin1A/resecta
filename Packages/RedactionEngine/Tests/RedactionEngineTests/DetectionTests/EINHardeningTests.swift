@@ -19,7 +19,7 @@ struct EINHardeningTests {
     private func einMatches(in text: String) -> [PIIDetector.PIIMatch] {
         let detector = PIIDetector()
         let ns = text as NSString
-        return detector.detectEINs(in: ns, range: NSRange(location: 0, length: ns.length))
+        return detector.families.ein.detect(in: ns, range: NSRange(location: 0, length: ns.length))
     }
 
     // MARK: - Space-separated format

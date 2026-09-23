@@ -5,7 +5,8 @@ import Foundation
 // The public `PIIDetector.init` default arguments consult the shared
 // memoized signature verdict (`GazetteerTrust`), so `PIIDetector()` cannot
 // load a corpus the manifest-signature check would have withheld. The
-// stored properties are private; `Mirror` reads their nil-ness.
+// stored properties are private; `Mirror` reads their nil-ness. The five
+// live on the detector and on the families the registry hands them to.
 @Suite("PIIDetector public init honours the signature verdict")
 struct PIIDetectorPublicInitTrustTests {
 
@@ -16,8 +17,14 @@ struct PIIDetectorPublicInitTrustTests {
 
     private static func storedProperties(of detector: PIIDetector) -> [String: Any] {
         var result: [String: Any] = [:]
-        for child in Mirror(reflecting: detector).children {
-            if let label = child.label { result[label] = child.value }
+        let holders: [Any] = [
+            detector, detector.families.name, detector.families.driversLicense,
+            detector.families.passport, detector.families.ssn,
+        ]
+        for holder in holders {
+            for child in Mirror(reflecting: holder).children {
+                if let label = child.label, result[label] == nil { result[label] = child.value }
+            }
         }
         return result
     }

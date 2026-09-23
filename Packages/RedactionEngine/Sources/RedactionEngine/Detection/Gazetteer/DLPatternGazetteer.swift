@@ -10,7 +10,7 @@ import OSLog
 // Schema: ../resecta-datapipeline/schemas/dl_patterns.schema.json
 //
 // Layered onto the existing inline label-prefix detector at
-// PIIDetector.detectDriversLicenses; this gazetteer supplies per-state
+// DriversLicenseDetector.detect; this gazetteer supplies per-state
 // validation patterns (candidate from inline regex must match
 // at least one state's pattern, otherwise it is suppressed).
 //

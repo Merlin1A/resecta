@@ -80,7 +80,7 @@ struct PIIDetectionTests {
     ])
     func emailStillAcceptsValidAddresses(_ input: String) {
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.emailPattern.matches(in: input, range: range)
+        let matches = EmailDetector.emailPattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected email match for '\(input)'")
         // Exact-span match: the entire input is the match.
         let matched = (input as NSString).substring(with: matches.first!.range)
@@ -91,7 +91,7 @@ struct PIIDetectionTests {
     func emailRejectsLeadingDotLocal() {
         let input = ".a@b.co"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.emailPattern.matches(in: input, range: range)
+        let matches = EmailDetector.emailPattern.matches(in: input, range: range)
         for match in matches {
             let matched = (input as NSString).substring(with: match.range)
             #expect(!matched.hasPrefix("."),
@@ -103,7 +103,7 @@ struct PIIDetectionTests {
     func emailRejectsLeadingDotDomain() {
         let input = "a@.b.co"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.emailPattern.matches(in: input, range: range)
+        let matches = EmailDetector.emailPattern.matches(in: input, range: range)
         #expect(matches.isEmpty,
                 "domain must not start with a dot — got \(matches.count) match(es)")
     }
@@ -112,7 +112,7 @@ struct PIIDetectionTests {
     func emailRejectsConsecutiveDotsLocal() {
         let input = "a..b@c.co"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.emailPattern.matches(in: input, range: range)
+        let matches = EmailDetector.emailPattern.matches(in: input, range: range)
         for match in matches {
             let matched = (input as NSString).substring(with: match.range)
             #expect(!matched.contains(".."),
@@ -124,7 +124,7 @@ struct PIIDetectionTests {
     func emailRejectsConsecutiveDotsDomain() {
         let input = "a@b..co"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.emailPattern.matches(in: input, range: range)
+        let matches = EmailDetector.emailPattern.matches(in: input, range: range)
         for match in matches {
             let matched = (input as NSString).substring(with: match.range)
             #expect(!matched.contains(".."),
@@ -174,7 +174,7 @@ struct PIIDetectionTests {
     ])
     func phoneAcceptsBalancedParens(_ input: String) {
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.phonePattern.matches(in: input, range: range)
+        let matches = PhoneDetector.phonePattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected phone match for '\(input)'")
     }
 
@@ -186,7 +186,7 @@ struct PIIDetectionTests {
     ])
     func phoneAcceptsNoParens(_ input: String) {
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.phonePattern.matches(in: input, range: range)
+        let matches = PhoneDetector.phonePattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected phone match for '\(input)'")
     }
 
@@ -197,7 +197,7 @@ struct PIIDetectionTests {
     ])
     func phoneAcceptsPlus1Prefix(_ input: String) {
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.phonePattern.matches(in: input, range: range)
+        let matches = PhoneDetector.phonePattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected phone match for '\(input)'")
         // +1 should be inside the match.
         let matched = (input as NSString).substring(with: matches.first!.range)
@@ -208,7 +208,7 @@ struct PIIDetectionTests {
     func phoneRejectsBarePlus() {
         let input = "+555-123-4567"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.phonePattern.matches(in: input, range: range)
+        let matches = PhoneDetector.phonePattern.matches(in: input, range: range)
         for match in matches {
             let matched = (input as NSString).substring(with: match.range)
             #expect(!matched.hasPrefix("+"),
@@ -220,7 +220,7 @@ struct PIIDetectionTests {
     func phoneRejectsUnbalancedLeftParen() {
         let input = "(555 123-4567"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.phonePattern.matches(in: input, range: range)
+        let matches = PhoneDetector.phonePattern.matches(in: input, range: range)
         for match in matches {
             let matched = (input as NSString).substring(with: match.range)
             #expect(!matched.hasPrefix("("),
@@ -232,7 +232,7 @@ struct PIIDetectionTests {
     func phoneRejectsUnbalancedRightParen() {
         let input = "555)123-4567"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.phonePattern.matches(in: input, range: range)
+        let matches = PhoneDetector.phonePattern.matches(in: input, range: range)
         for match in matches {
             let matched = (input as NSString).substring(with: match.range)
             #expect(!matched.contains(")") || matched.hasPrefix("("),
@@ -304,25 +304,25 @@ struct PIIDetectionTests {
 
     @Test("Card prefix validation accepts major card types")
     func cardPrefixes() {
-        #expect(PIIDetector.hasValidCardPrefix("4111111111111111"))  // Visa
-        #expect(PIIDetector.hasValidCardPrefix("5500000000000004"))  // MC
-        #expect(PIIDetector.hasValidCardPrefix("340000000000009"))   // Amex
-        #expect(PIIDetector.hasValidCardPrefix("6011000000000004"))  // Discover
+        #expect(CreditCardDetector.hasValidCardPrefix("4111111111111111"))  // Visa
+        #expect(CreditCardDetector.hasValidCardPrefix("5500000000000004"))  // MC
+        #expect(CreditCardDetector.hasValidCardPrefix("340000000000009"))   // Amex
+        #expect(CreditCardDetector.hasValidCardPrefix("6011000000000004"))  // Discover
     }
 
     @Test("Card prefix validation rejects unknown prefixes")
     func cardPrefixReject() {
-        #expect(!PIIDetector.hasValidCardPrefix("9999999999999999")) // Unknown
-        #expect(!PIIDetector.hasValidCardPrefix("123"))             // Too short
+        #expect(!CreditCardDetector.hasValidCardPrefix("9999999999999999")) // Unknown
+        #expect(!CreditCardDetector.hasValidCardPrefix("123"))             // Too short
     }
 
     @Test("Card prefix validation accepts JCB and UnionPay")
     func cardPrefixJCBUnionPay() {
-        #expect(PIIDetector.hasValidCardPrefix("3528000000000000"))  // JCB low
-        #expect(PIIDetector.hasValidCardPrefix("3589000000000000"))  // JCB high
-        #expect(PIIDetector.hasValidCardPrefix("6200000000000000"))  // UnionPay
-        #expect(!PIIDetector.hasValidCardPrefix("3527000000000000")) // Below JCB
-        #expect(!PIIDetector.hasValidCardPrefix("3590000000000000")) // Above JCB
+        #expect(CreditCardDetector.hasValidCardPrefix("3528000000000000"))  // JCB low
+        #expect(CreditCardDetector.hasValidCardPrefix("3589000000000000"))  // JCB high
+        #expect(CreditCardDetector.hasValidCardPrefix("6200000000000000"))  // UnionPay
+        #expect(!CreditCardDetector.hasValidCardPrefix("3527000000000000")) // Below JCB
+        #expect(!CreditCardDetector.hasValidCardPrefix("3590000000000000")) // Above JCB
     }
 
     // MARK: - Address Detection
@@ -390,7 +390,7 @@ struct PIIDetectionTests {
     func validITIN(_ input: String) {
         let nsInput = input as NSString
         let range = NSRange(location: 0, length: nsInput.length)
-        let matches = PIIDetector.itinPattern.matches(in: input, range: range)
+        let matches = ITINDetector.itinPattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected ITIN match for '\(input)'")
     }
 
@@ -402,7 +402,7 @@ struct PIIDetectionTests {
     func invalidITIN(_ input: String) {
         let nsInput = input as NSString
         let range = NSRange(location: 0, length: nsInput.length)
-        let matches = PIIDetector.itinPattern.matches(in: input, range: range)
+        let matches = ITINDetector.itinPattern.matches(in: input, range: range)
         #expect(matches.isEmpty, "Expected no ITIN match for '\(input)'")
     }
 
@@ -506,10 +506,10 @@ struct PIIDetectionTests {
     // MARK: - Medical Record Number Detection
 
     @Test("MRN detector locates labeled medical record numbers", arguments: [
-        ("MRN: 12345678", PIIDetector.mrnPatternLabeled),
-        ("Patient ID: AB12345", PIIDetector.mrnPatternPatientID),
+        ("MRN: 12345678", MRNDetector.mrnPatternLabeled),
+        ("Patient ID: AB12345", MRNDetector.mrnPatternPatientID),
         ("Community Hospital ABC-1234567 discharge",
-         PIIDetector.mrnPatternInstitution),
+         MRNDetector.mrnPatternInstitution),
     ])
     func validMRN(_ input: String, _ pattern: NSRegularExpression) {
         let nsInput = input as NSString
@@ -523,7 +523,7 @@ struct PIIDetectionTests {
         let input = "The value 12345678 is a count"
         let nsInput = input as NSString
         let range = NSRange(location: 0, length: nsInput.length)
-        let matches = PIIDetector.mrnPatternLabeled.matches(in: input, range: range)
+        let matches = MRNDetector.mrnPatternLabeled.matches(in: input, range: range)
         #expect(matches.isEmpty, "Should not match bare digits without MRN label")
     }
 
@@ -601,17 +601,17 @@ struct PIIDetectionTests {
         // Validates the try! safety documented in PIIDetector.swift.
         // These are hardcoded constant patterns that cannot fail at runtime,
         // but this test makes that guarantee explicit and CI-enforced.
-        _ = PIIDetector.ccPattern
-        _ = PIIDetector.emailPattern
-        _ = PIIDetector.phonePattern
-        _ = PIIDetector.addressPattern
-        _ = PIIDetector.dobPattern
-        _ = PIIDetector.itinPattern
-        _ = PIIDetector.driversLicensePattern
-        _ = PIIDetector.passportPattern
-        _ = PIIDetector.mrnPatternLabeled
-        _ = PIIDetector.mrnPatternPatientID
-        _ = PIIDetector.mrnPatternInstitution
-        _ = PIIDetector.licensePlateLabeled
+        _ = CreditCardDetector.ccPattern
+        _ = EmailDetector.emailPattern
+        _ = PhoneDetector.phonePattern
+        _ = AddressDetector.addressPattern
+        _ = DOBDetector.dobPattern
+        _ = ITINDetector.itinPattern
+        _ = DriversLicenseDetector.driversLicensePattern
+        _ = PassportDetector.passportPattern
+        _ = MRNDetector.mrnPatternLabeled
+        _ = MRNDetector.mrnPatternPatientID
+        _ = MRNDetector.mrnPatternInstitution
+        _ = LicensePlateDetector.licensePlateLabeled
     }
 }

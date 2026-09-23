@@ -5,7 +5,7 @@ import Foundation
 // The seam is `#if DEBUG`-gated so release builds carry zero state and no
 // hooks. Callers inside `PageRasterizer.rasterize` reach the seam through
 // `PageRasterizerTestSeam.shared.recordCallAndShouldFail(...)`; in release
-// the entire type compiles to a no-op shim with the same public surface so
+// the entire type compiles to a no-op shim with the same surface so
 // the call sites don't need extra gating around individual properties.
 //
 // **Isolation model.** Earlier drafts used process-wide globals, which
@@ -25,27 +25,27 @@ import Foundation
 // scope.
 
 #if DEBUG
-public enum PageRasterizerTestSeam {
+enum PageRasterizerTestSeam {
     /// Per-test recorder. Tests construct one inside `withActivated` so the
     /// state is scoped to the surrounding Task — concurrent tests using the
     /// rasterizer do not contend for the same counters.
-    public final class Recorder: @unchecked Sendable {
+    final class Recorder: @unchecked Sendable {
         private let lock = NSLock()
         private var _simulatedVerifyFailures: Set<Int>
         private var _rasterizeCallCount: Int = 0
         private var _dpiCapHistory: [(pageIndex: Int, dpiCap: Int)] = []
 
-        public init(simulatedVerifyFailures: Set<Int> = []) {
+        init(simulatedVerifyFailures: Set<Int> = []) {
             self._simulatedVerifyFailures = simulatedVerifyFailures
         }
 
         /// Total rasterize calls observed during the activation.
-        public var rasterizeCallCount: Int {
+        var rasterizeCallCount: Int {
             lock.lock(); defer { lock.unlock() }; return _rasterizeCallCount
         }
 
         /// Per-call (pageIndex, dpiCap) tuples in observation order.
-        public var dpiCapHistory: [(pageIndex: Int, dpiCap: Int)] {
+        var dpiCapHistory: [(pageIndex: Int, dpiCap: Int)] {
             lock.lock(); defer { lock.unlock() }; return _dpiCapHistory
         }
 
@@ -53,7 +53,7 @@ public enum PageRasterizerTestSeam {
         /// "second-failure propagates" test which needs both attempts to
         /// throw — between them it inserts the index again so the retry
         /// also sees a simulated failure.
-        public func insertSimulatedFailure(_ pageIndex: Int) {
+        func insertSimulatedFailure(_ pageIndex: Int) {
             lock.lock(); defer { lock.unlock() }
             _simulatedVerifyFailures.insert(pageIndex)
         }
@@ -62,7 +62,7 @@ public enum PageRasterizerTestSeam {
         /// set includes `pageIndex`, in which case the caller should throw
         /// `fillVerificationFailed`; the page index is consumed atomically
         /// so only the first attempt for that page fails.
-        public func recordCallAndShouldFail(pageIndex: Int, dpiCap: Int) -> Bool {
+        func recordCallAndShouldFail(pageIndex: Int, dpiCap: Int) -> Bool {
             lock.lock(); defer { lock.unlock() }
             _rasterizeCallCount += 1
             _dpiCapHistory.append((pageIndex: pageIndex, dpiCap: dpiCap))
@@ -78,13 +78,13 @@ public enum PageRasterizerTestSeam {
     /// rasterize hook short-circuits to `false` and no telemetry is
     /// captured. Concurrent tests are isolated automatically because each
     /// activation scope is its own Task subtree.
-    @TaskLocal public static var activeRecorder: Recorder?
+    @TaskLocal static var activeRecorder: Recorder?
 
     /// Run `body` with the seam activated; calls into
     /// `PageRasterizer.rasterize` inside the closure observe `recorder`,
     /// nothing outside does.
     @discardableResult
-    public static func withActivated<R>(
+    static func withActivated<R>(
         _ recorder: Recorder,
         body: () async throws -> R
     ) async rethrows -> R {
@@ -94,33 +94,33 @@ public enum PageRasterizerTestSeam {
     /// Hook entry point. Returns true to request a simulated
     /// `fillVerificationFailed`; false otherwise. No-op when the seam is
     /// not activated.
-    public static func recordCallAndShouldFail(pageIndex: Int, dpiCap: Int) -> Bool {
+    static func recordCallAndShouldFail(pageIndex: Int, dpiCap: Int) -> Bool {
         guard let recorder = activeRecorder else { return false }
         return recorder.recordCallAndShouldFail(pageIndex: pageIndex, dpiCap: dpiCap)
     }
 }
 #else
-public enum PageRasterizerTestSeam {
-    /// Release-build no-op shim. The recorder retains the public surface
+enum PageRasterizerTestSeam {
+    /// Release-build no-op shim. The recorder retains the surface
     /// for binary compatibility with debug callers but holds no state.
-    public final class Recorder: @unchecked Sendable {
-        public init(simulatedVerifyFailures: Set<Int> = []) { _ = simulatedVerifyFailures }
-        public var rasterizeCallCount: Int { 0 }
-        public var dpiCapHistory: [(pageIndex: Int, dpiCap: Int)] { [] }
-        public func insertSimulatedFailure(_ pageIndex: Int) {}
-        public func recordCallAndShouldFail(pageIndex: Int, dpiCap: Int) -> Bool { false }
+    final class Recorder: @unchecked Sendable {
+        init(simulatedVerifyFailures: Set<Int> = []) { _ = simulatedVerifyFailures }
+        var rasterizeCallCount: Int { 0 }
+        var dpiCapHistory: [(pageIndex: Int, dpiCap: Int)] { [] }
+        func insertSimulatedFailure(_ pageIndex: Int) {}
+        func recordCallAndShouldFail(pageIndex: Int, dpiCap: Int) -> Bool { false }
     }
 
-    @TaskLocal public static var activeRecorder: Recorder?
+    @TaskLocal static var activeRecorder: Recorder?
 
     @discardableResult
-    public static func withActivated<R>(
+    static func withActivated<R>(
         _ recorder: Recorder,
         body: () async throws -> R
     ) async rethrows -> R {
         try await body()
     }
 
-    public static func recordCallAndShouldFail(pageIndex: Int, dpiCap: Int) -> Bool { false }
+    static func recordCallAndShouldFail(pageIndex: Int, dpiCap: Int) -> Bool { false }
 }
 #endif

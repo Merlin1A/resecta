@@ -9,7 +9,7 @@ import Foundation
 //
 // These tests live in a sibling file (AddressArmTests.swift) rather than
 // DetectionOrchestratorTests.swift because they exercise only
-// PIIDetector.detectAddresses directly, without Vision/orchestrator
+// AddressDetector.detect directly, without Vision/orchestrator
 // machinery — keeping them in DetectionOrchestratorTests (which is
 // .serialized for Vision) would unnecessarily serialize fast unit tests.
 
@@ -19,7 +19,7 @@ struct AddressArmTests {
     private func addressMatches(in text: String) -> [PIIDetector.PIIMatch] {
         let detector = PIIDetector()
         let ns = text as NSString
-        return detector.detectAddresses(in: ns, range: NSRange(location: 0, length: ns.length))
+        return detector.families.address.detect(in: ns, range: NSRange(location: 0, length: ns.length))
             .filter { $0.kind == .address }
     }
 

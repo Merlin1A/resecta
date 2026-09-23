@@ -46,7 +46,7 @@ struct EINVectorTests {
         let detector = PIIDetector()
         for vec in vectors {
             let ns = vec.ein as NSString
-            let matches = detector.detectEINs(
+            let matches = detector.families.ein.detect(
                 in: ns, range: NSRange(location: 0, length: ns.length)
             )
             let surfaced = matches.contains(where: { $0.text == vec.ein })

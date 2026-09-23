@@ -46,18 +46,18 @@ struct ReDoSFuzzTests {
     /// All compiled regex patterns in PIIDetector, keyed by detector name.
     /// Updated when Phase-3 adds NPI/DEA/Address-spatial/DOB/Account detectors.
     static let piiPatterns: [(name: String, pattern: NSRegularExpression)] = [
-        ("creditCard", PIIDetector.ccPattern),
-        ("email",      PIIDetector.emailPattern),
-        ("phone",      PIIDetector.phonePattern),
-        ("address",    PIIDetector.addressPattern),
-        ("dob",        PIIDetector.dobPattern),
-        ("itin",       PIIDetector.itinPattern),
-        ("dl",         PIIDetector.driversLicensePattern),
-        ("passport",   PIIDetector.passportPattern),
-        ("mrn.labeled",     PIIDetector.mrnPatternLabeled),
-        ("mrn.patientID",   PIIDetector.mrnPatternPatientID),
-        ("mrn.institution", PIIDetector.mrnPatternInstitution),
-        ("licensePlate.labeled", PIIDetector.licensePlateLabeled),
+        ("creditCard", CreditCardDetector.ccPattern),
+        ("email",      EmailDetector.emailPattern),
+        ("phone",      PhoneDetector.phonePattern),
+        ("address",    AddressDetector.addressPattern),
+        ("dob",        DOBDetector.dobPattern),
+        ("itin",       ITINDetector.itinPattern),
+        ("dl",         DriversLicenseDetector.driversLicensePattern),
+        ("passport",   PassportDetector.passportPattern),
+        ("mrn.labeled",     MRNDetector.mrnPatternLabeled),
+        ("mrn.patientID",   MRNDetector.mrnPatternPatientID),
+        ("mrn.institution", MRNDetector.mrnPatternInstitution),
+        ("licensePlate.labeled", LicensePlateDetector.licensePlateLabeled),
     ]
 
     // MARK: - Tests

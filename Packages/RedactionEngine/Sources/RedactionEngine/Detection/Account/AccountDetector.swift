@@ -7,7 +7,10 @@ import Foundation
 // structured checksums or labels; Account is the "catch-all" for numbers
 // users call accounts but that carry no intrinsic structure.
 
-struct AccountDetector: Sendable {
+struct AccountDetector: FamilyDetector {
+
+    let category: PIICategory = .account
+    let telemetryLabel = "account"
 
     static let pattern = try! NSRegularExpression(
         pattern: #"(?<![A-Za-z0-9])([A-Z]{0,3}\d{6,15})(?![A-Za-z0-9])"#
@@ -58,36 +61,48 @@ struct AccountDetector: Sendable {
             // applied downstream by PresetThresholdVector ("account"); this
             // guard's remaining role is to reject genuinely zero-signal hits.
             guard confidence > 0.0 else { return nil }
-            var signals: [MatchRationale.Signal] = [.regexPattern(name: ruleID)]
-            if let ctxSignal = scorer.signal(
+            var rationale = MatchRationale.Builder(
+                ruleID: ruleID, preThresholdScore: Self.profile.baseConfidence,
+                signals: [.regexPattern(name: ruleID)]
+            )
+            rationale.append(scorer.signal(
                 text: fullText,
                 matchRange: match.range,
                 profile: Self.profile,
                 category: .account
-            ) {
-                signals.append(ctxSignal)
-            }
+            ))
             // Per-keyword breakdown alongside the scalar.
-            if let ctxDetail = scorer.signalDetail(
+            rationale.append(scorer.signalDetail(
                 text: fullText,
                 matchRange: match.range,
                 profile: Self.profile
-            ) {
-                signals.append(ctxDetail)
-            }
-            let rationale = MatchRationale(
-                ruleID: ruleID,
-                signals: signals,
-                preThresholdScore: Self.profile.baseConfidence,
-                finalScore: confidence
-            )
+            ))
             return PIIDetector.PIIMatch(
                 text: matchedText,
                 range: match.range,
                 kind: .account,
                 confidence: confidence,
-                rationale: rationale
+                rationale: rationale.build(finalScore: confidence)
             )
         }
+    }
+
+    // MARK: - Family
+
+    /// Account: financial + medical + court + generic. nil doctype → run.
+    /// Court and generic doctypes were added to close the
+    /// account-recall doctype gap — bank/loan account numbers recur in court
+    /// filings (garnishment, financial affidavits) and untyped uploads. The
+    /// account context window (AccountDetector requires a label near the digit
+    /// run) carries the false-positive load on these broader doctypes; the gate
+    /// only governs whether the detector runs at all. `.foia` stays held.
+    func runs(doctype: DoctypeClass?) -> Bool {
+        guard let doctype else { return true }
+        return doctype == .financial || doctype == .medical
+            || doctype == .court || doctype == .generic
+    }
+
+    func detect(in context: DetectionContext) -> [PIIDetector.PIIMatch] {
+        detect(in: context.nsText, range: context.range)
     }
 }

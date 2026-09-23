@@ -22,7 +22,7 @@ struct DriversLicenseDetectorTests {
     ])
     func validDriversLicense(_ input: String) {
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.driversLicensePattern.matches(in: input, range: range)
+        let matches = DriversLicenseDetector.driversLicensePattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected DL match for '\(input)'")
     }
 
@@ -30,7 +30,7 @@ struct DriversLicenseDetectorTests {
     func dlRejectsUnlabeled() {
         let input = "A1234567 is a code"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.driversLicensePattern.matches(in: input, range: range)
+        let matches = DriversLicenseDetector.driversLicensePattern.matches(in: input, range: range)
         #expect(matches.isEmpty, "Should not match without DL label prefix")
     }
 
@@ -43,7 +43,7 @@ struct DriversLicenseDetectorTests {
     ])
     func dlRejects3Digit(_ input: String) {
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.driversLicensePattern.matches(in: input, range: range)
+        let matches = DriversLicenseDetector.driversLicensePattern.matches(in: input, range: range)
         #expect(matches.isEmpty,
                 "Expected no DL match for '\(input)' — numeric portion too short")
     }
@@ -52,7 +52,7 @@ struct DriversLicenseDetectorTests {
     func dlAccepts6Digit() {
         let input = "DL: 123456"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.driversLicensePattern.matches(in: input, range: range)
+        let matches = DriversLicenseDetector.driversLicensePattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected DL match at 6-digit boundary")
     }
 
@@ -60,7 +60,7 @@ struct DriversLicenseDetectorTests {
     func dlAccepts7Digit() {
         let input = "DL: 1234567"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.driversLicensePattern.matches(in: input, range: range)
+        let matches = DriversLicenseDetector.driversLicensePattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected DL match for 7-digit numeric ID")
     }
 

@@ -27,11 +27,11 @@ struct LabelAnchorRouteTests {
 
     /// The route matches for `text`, read from the pass on its own.
     private static func anchors(in text: String, doctype: DoctypeClass? = nil) -> [PIIDetector.PIIMatch] {
-        PIIDetector().scanLabelAnchors(in: text, doctype: doctype)
+        PIIDetector().families.name.scanLabelAnchors(in: text, doctype: doctype)
     }
 
     private static func names(in text: String, doctype: DoctypeClass? = nil) -> [PIIDetector.PIIMatch] {
-        PIIDetector().detectNames(in: text, doctype: doctype)
+        PIIDetector().families.name.detect(in: text, doctype: doctype)
     }
 
     private static func range(of needle: String, in text: String) -> NSRange {
@@ -214,7 +214,7 @@ struct LabelAnchorRouteTests {
         let hits = Self.anchors(in: "PLAINTIFF: Marcus Bellamy")
         let hit = try #require(hits.first)
         #expect(hit.confidence == 0.65)
-        #expect(hit.confidence == PIIDetector.labelAnchorConfidence)
+        #expect(hit.confidence == NameDetector.labelAnchorConfidence)
         #expect(hit.rationale?.ruleID == Self.ruleID)
         #expect(hit.rationale?.preThresholdScore == 0.65)
         #expect(hit.rationale?.finalScore == 0.65)
@@ -224,11 +224,11 @@ struct LabelAnchorRouteTests {
 
     @Test("The organisation marker set is case-folded and period-free")
     func organisationMarkerSetIsCaseFoldedAndPeriodFree() {
-        for marker in PIIDetector.organizationMarkers {
+        for marker in NameDetector.organizationMarkers {
             #expect(marker == marker.lowercased())
             #expect(!marker.hasSuffix("."))
         }
-        #expect(PIIDetector.organizationMarkers.isSuperset(of: ["inc", "corp", "llc", "county"]))
+        #expect(NameDetector.organizationMarkers.isSuperset(of: ["inc", "corp", "llc", "county"]))
     }
 
     @Test("An empty page and a page with no label read nothing")

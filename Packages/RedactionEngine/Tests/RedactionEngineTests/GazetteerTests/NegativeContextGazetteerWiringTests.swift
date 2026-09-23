@@ -78,7 +78,7 @@ struct NegativeContextGazetteerWiringTests {
             contextLoader: nil,
             negativeContextGazetteer: gazetteer
         )
-        let ssns = detector.detectSSNs(
+        let ssns = detector.families.ssn.detect(
             in: nsText,
             range: NSRange(location: 0, length: nsText.length),
             doctype: .financial,
@@ -138,7 +138,7 @@ struct NegativeContextGazetteerWiringTests {
         )
 
         // Baseline: score with nil gazetteer (no suppression at all).
-        let baselineSSNs = detector.detectSSNs(
+        let baselineSSNs = detector.families.ssn.detect(
             in: nsText,
             range: NSRange(location: 0, length: nsText.length),
             doctype: .financial,
@@ -147,7 +147,7 @@ struct NegativeContextGazetteerWiringTests {
 
         // Test: score with the gazetteer but .financial doctype — court-scoped
         // "transit identifier" must NOT fire for (ssn, financial) scope.
-        let ssns = detector.detectSSNs(
+        let ssns = detector.families.ssn.detect(
             in: nsText,
             range: NSRange(location: 0, length: nsText.length),
             doctype: .financial,
@@ -192,7 +192,7 @@ struct NegativeContextGazetteerWiringTests {
         let text = "Invoice number 123-45-6789 for services rendered."
         let nsText = text as NSString
         // detectSSNs with nil gazetteer returns base score.
-        let ssns = detector.detectSSNs(
+        let ssns = detector.families.ssn.detect(
             in: nsText,
             range: NSRange(location: 0, length: nsText.length),
             doctype: .financial,
@@ -262,7 +262,7 @@ struct NegativeContextGazetteerWiringTests {
         )
 
         // SSN detection: 234-56-7890 should be suppressed by "employer's ein" context.
-        let ssns = detector.detectSSNs(
+        let ssns = detector.families.ssn.detect(
             in: nsText, range: fullRange,
             doctype: .financial, gazetteer: gazetteer
         )
@@ -276,7 +276,7 @@ struct NegativeContextGazetteerWiringTests {
 
         // EIN detection: 12-3456789 is a hyphenated EIN; detectEINs uses inline contains()
         // checks via einScorer, not the NegativeContextGazetteer. The EIN is unaffected.
-        let eins = detector.detectEINs(in: nsText, range: fullRange)
+        let eins = detector.families.ein.detect(in: nsText, range: fullRange)
         #expect(!eins.isEmpty,
                 "EIN 12-3456789 must be detected; EIN path does not pass through NegativeContextGazetteer")
     }
@@ -300,7 +300,7 @@ struct NegativeContextGazetteerWiringTests {
         )
         func confidence(_ text: String) -> Double? {
             let ns = text as NSString
-            return detector.detectSSNs(
+            return detector.families.ssn.detect(
                 in: ns, range: NSRange(location: 0, length: ns.length),
                 doctype: .financial, gazetteer: gazetteer
             ).first?.confidence

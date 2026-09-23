@@ -48,7 +48,7 @@ struct ITINVectorTests {
         let detector = PIIDetector()
         for vec in vectors {
             let ns = vec.itin as NSString
-            let matches = detector.detectITINs(
+            let matches = detector.families.itin.detect(
                 in: ns, range: NSRange(location: 0, length: ns.length)
             )
             let surfaced = matches.contains(where: { $0.text == vec.itin })

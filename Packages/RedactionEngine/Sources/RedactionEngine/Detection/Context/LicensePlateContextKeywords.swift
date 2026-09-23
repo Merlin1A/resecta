@@ -1,7 +1,7 @@
 import Foundation
 
 // License-plate keyword profile for ContextWindowScorer.
-// Scoped per-category per G4; used by PIIDetector.detectLicensePlate.
+// Scoped per-category per G4; used by LicensePlateDetector.detect.
 
 /// License plate context keyword configuration.
 /// Positive: vehicle/DMV labels that corroborate a plate.

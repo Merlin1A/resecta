@@ -46,7 +46,7 @@ struct CreditCardVectorTests {
         guard let vectors = try loadVectors() else { return }
         for vec in vectors {
             let digits = vec.pan.filter(\.isWholeNumber)
-            let passes = PIIDetector.luhnCheck(digits) && PIIDetector.hasValidCardPrefix(digits)
+            let passes = PIIDetector.luhnCheck(digits) && CreditCardDetector.hasValidCardPrefix(digits)
             #expect(passes == vec.valid, "Mismatch for \(vec.pan) (\(vec.notes))")
         }
     }
@@ -57,7 +57,7 @@ struct CreditCardVectorTests {
         let detector = PIIDetector()
         for vec in vectors {
             let ns = vec.pan as NSString
-            let matches = detector.detectCreditCards(
+            let matches = detector.families.creditCard.detect(
                 in: ns, range: NSRange(location: 0, length: ns.length)
             )
             let surfaced = matches.contains(where: { $0.text == vec.pan })
@@ -69,7 +69,7 @@ struct CreditCardVectorTests {
 
     private func cards(in text: String) -> [String] {
         let ns = text as NSString
-        return PIIDetector().detectCreditCards(in: ns, range: NSRange(location: 0, length: ns.length)).map(\.text)
+        return PIIDetector().families.creditCard.detect(in: ns, range: NSRange(location: 0, length: ns.length)).map(\.text)
     }
 
     @Test("a Luhn-valid run glued to a letter is not a card: the DL-shaped token U48670409492471")

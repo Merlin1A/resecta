@@ -36,7 +36,7 @@ struct NameStopTokenTests {
     }
 
     private static func names(in text: String) -> [PIIDetector.PIIMatch] {
-        PIIDetector().detectNames(in: text)
+        PIIDetector().families.name.detect(in: text)
     }
 
     private static func range(of needle: String, in text: String) -> NSRange {
@@ -51,7 +51,7 @@ struct NameStopTokenTests {
 
     @Test("The stop set is exactly the ten measured tokens")
     func stopSetIsTheTenTokens() {
-        #expect(PIIDetector.nameStopTokens == [
+        #expect(NameDetector.nameStopTokens == [
             "Plaintiff", "Reg", "PP", "Lic", "DL",
             "Dr.", "Dr", "Patient", "Pursuant", "Counsel",
         ])
@@ -68,7 +68,7 @@ struct NameStopTokenTests {
         #expect(!hits.contains { $0.text == "Plaintiff" },
                 "the bare role noun is never a name candidate")
         for hit in hits {
-            #expect(!PIIDetector.nameStopTokens.contains(hit.text))
+            #expect(!NameDetector.nameStopTokens.contains(hit.text))
         }
     }
 
@@ -91,7 +91,7 @@ struct NameStopTokenTests {
                         "\(token) surfaced as a lone name after a prefix in: \(text)")
             }
             for hit in hits {
-                #expect(!PIIDetector.nameStopTokens.contains(hit.text))
+                #expect(!NameDetector.nameStopTokens.contains(hit.text))
             }
         }
     }
@@ -108,7 +108,7 @@ struct NameStopTokenTests {
             #expect(Self.overlaps(hits, Self.range(of: c.name, in: c.text)),
                     "the name after the furniture token must surface: \(c.text)")
             for hit in hits {
-                #expect(!PIIDetector.nameStopTokens.contains(hit.text))
+                #expect(!NameDetector.nameStopTokens.contains(hit.text))
             }
         }
     }
@@ -117,8 +117,8 @@ struct NameStopTokenTests {
     func honorificWithNameIsNotAStopToken() {
         // Whole-candidate equality only: "Dr." alone is stopped, "Dr. Jane
         // Smith" is not a member and the name after the honorific surfaces.
-        #expect(!PIIDetector.nameStopTokens.contains("Dr. Jane Smith"))
-        #expect(!PIIDetector.nameStopTokens.contains("Jane Smith"))
+        #expect(!NameDetector.nameStopTokens.contains("Dr. Jane Smith"))
+        #expect(!NameDetector.nameStopTokens.contains("Jane Smith"))
         let text = "Dr. Jane Smith reviewed the chart before rounds."
         let hits = Self.names(in: text)
         #expect(Self.overlaps(hits, Self.range(of: "Jane Smith", in: text)),
@@ -140,7 +140,7 @@ struct NameStopTokenTests {
         #expect(!Self.overlaps(hits, Self.range(of: "Plaintiff", in: text)),
                 "the sentence-initial role noun must not be redacted as a name")
         for hit in hits {
-            #expect(!PIIDetector.nameStopTokens.contains(hit.text))
+            #expect(!NameDetector.nameStopTokens.contains(hit.text))
         }
     }
 
@@ -158,7 +158,7 @@ struct NameStopTokenTests {
         for text in lines {
             let hits = Self.names(in: text)
             for hit in hits {
-                #expect(!PIIDetector.nameStopTokens.contains(hit.text),
+                #expect(!NameDetector.nameStopTokens.contains(hit.text),
                         "a stop token surfaced as a name in a label line")
             }
         }
@@ -183,7 +183,7 @@ struct NameStopTokenTests {
                         "\(token) surfaced as a lone name in: \(text)")
             }
             for hit in hits {
-                #expect(!PIIDetector.nameStopTokens.contains(hit.text),
+                #expect(!NameDetector.nameStopTokens.contains(hit.text),
                         "a stop token surfaced as a name in a furniture line")
             }
         }
@@ -225,12 +225,12 @@ struct NameStopTokenTests {
         }
         #expect(tokens.count == 129, "the G8 name-token inventory moved (\(tokens.count)); re-pin with the corpus")
         // Case-folded and period-trimmed, so "Dr." and "dr" meet on the same key.
-        let folded = Set(PIIDetector.nameStopTokens.map {
+        let folded = Set(NameDetector.nameStopTokens.map {
             $0.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".,"))
         })
         let overlap = tokens.intersection(folded)
         #expect(overlap.isEmpty, "G8 name tokens in the stop set: \(overlap.sorted())")
-        let whole = values.intersection(PIIDetector.nameStopTokens)
+        let whole = values.intersection(NameDetector.nameStopTokens)
         #expect(whole.isEmpty, "a G8 name value equals a stop token: \(whole.sorted())")
     }
 }

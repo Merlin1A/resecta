@@ -45,9 +45,9 @@ struct MRNVectorTests {
     func inlineRegexMatchesValidRows() throws {
         guard let vectors = try loadVectors() else { return }
         let patterns = [
-            PIIDetector.mrnPatternLabeled,
-            PIIDetector.mrnPatternPatientID,
-            PIIDetector.mrnPatternInstitution,
+            MRNDetector.mrnPatternLabeled,
+            MRNDetector.mrnPatternPatientID,
+            MRNDetector.mrnPatternInstitution,
         ]
         for vec in vectors where vec.valid {
             let ns = vec.text as NSString

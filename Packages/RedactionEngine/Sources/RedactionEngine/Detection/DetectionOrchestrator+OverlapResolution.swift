@@ -164,7 +164,9 @@ extension DetectionOrchestrator {
                 // NSMaxRange computed above. Identical/contained ranges are the
                 // no-op case (coalescedRange == winner.range → survivor is the
                 // winner).
-                let groupStart = group.map { $0.range.location }.min()!
+                // `group` opened with `sorted[i]`, so the minimum exists; the
+                // fallback keeps the expression total without a force unwrap.
+                let groupStart = group.map { $0.range.location }.min() ?? winner.range.location
                 let coalescedRange = NSRange(location: groupStart, length: unionEnd - groupStart)
                 let survivor = NSEqualRanges(coalescedRange, winner.range)
                     ? winner
@@ -210,16 +212,12 @@ extension DetectionOrchestrator {
             winnerCategory: winnerCategory,
             loserCategory: PIICategory(piiKind: loser.kind)
         )
+        // A loser with no rationale gets the minimal one (an empty rule id,
+        // its confidence as both scores) and then the signal.
         let existing = loser.rationale
-        let newSignals: [MatchRationale.Signal] = (existing?.signals ?? []) + [signal]
-        let newRationale = MatchRationale(
-            ruleID: existing?.ruleID ?? "",
-            signals: newSignals,
-            preThresholdScore: existing?.preThresholdScore ?? loser.confidence,
-            finalScore: existing?.finalScore ?? loser.confidence,
-            appliedThreshold: existing?.appliedThreshold
-        )
-        return loser.withRationale(newRationale)
+            ?? MatchRationale.Builder(ruleID: "", preThresholdScore: loser.confidence)
+                .build(finalScore: loser.confidence)
+        return loser.withRationale(existing.appending(signal))
     }
 
     /// Priority rank used as a tie-breaker when two overlapping matches
