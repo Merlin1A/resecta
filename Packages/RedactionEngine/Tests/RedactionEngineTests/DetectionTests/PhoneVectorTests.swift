@@ -66,9 +66,11 @@ struct PhoneVectorTests {
         #expect(phoneConfidence("Next: 312-621-4862") == 0.60)
     }
 
-    @Test("whole-token keywords still boost")
+    @Test("whole-token keywords still boost; telephone and calling are cues of their own")
     func wholeTokenKeywordsStillBoost() {
         #expect(phoneConfidence("Tel: (312) 621-4862") == 0.80)
         #expect(phoneConfidence("Ext. 312-621-4862") == 0.80)
+        #expect(phoneConfidence("Telephone: (312) 621-4862") == 0.80)
+        #expect(phoneConfidence("Reach us by calling (312) 621-4862") == 0.80)
     }
 }

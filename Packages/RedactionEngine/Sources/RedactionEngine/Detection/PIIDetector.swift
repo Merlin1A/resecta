@@ -958,7 +958,10 @@ public struct PIIDetector: Sendable {
     static let phoneContextKeywords = [
         "phone", "tel", "fax", "call", "contact", "mobile", "cell",
         "dial", "sms", "text", "reach", "voicemail", "ext", "extension",
-        "number"
+        "number",
+        // Whole-token reading (KeywordMatch): `tel`, `phone` and `call` no
+        // longer read inside these two words, so they are listed on their own.
+        "telephone", "calling"
     ]
 
     /// Keywords that indicate a 10-digit number is NOT a phone number.
