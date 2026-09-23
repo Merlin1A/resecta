@@ -2,10 +2,14 @@ import Foundation
 import NaturalLanguage
 import OSLog
 
-// PII detection runs as regex-based passes plus NLTagger-based name detection.
+// PII detection: one detector per family behind `DetectorRegistry`. This
+// type runs the families for a page, backfills a rationale on every match,
+// loads the corpus with diagnostics and explains a snippet through every
+// family (the reverse rationale).
 
 /// Detects PII patterns in OCR text. Stateless, runs on cooperative thread pool.
-/// Detection runs regex-based passes first, then NLTagger-based name detection.
+/// Runs the family detectors in registry order (the regex and structured
+/// families, then the name passes) and backfills a rationale on every match.
 public struct PIIDetector: Sendable {
 
     // Negative-context gazetteer wired into the three scored
@@ -17,7 +21,7 @@ public struct PIIDetector: Sendable {
 
     /// The family detectors in evaluation order (`DetectorRegistry.rows`),
     /// keyed by category for the reverse-rationale explainer. Constructed
-    /// once from the loaders above.
+    /// once from the loaders the initializer receives.
     let families: DetectorRegistry
 
     // The default arguments consult the same memoized corpus verdict the
@@ -379,14 +383,13 @@ public struct PIIDetector: Sendable {
         }
     }
 
-    /// Detect all PII in the given text. Returns matches from all passes.
-    /// Pass 1: Regex (SSN, CC, email, phone, EIN, ITIN, DL, passport, MRN).
-    /// Pass 2: NLTagger (names).
+    /// Detect all PII in the given text: every family in the registry's
+    /// evaluation order, each behind its own doctype gate.
     ///
-    /// Phase 3: `doctype` is an optional context hint that gates the new
-    /// NPI/DEA/DOB/Account detectors. `nil` = run all (back-compat for
-    /// pre-Phase-3 callers). When non-nil, medical/financial-only detectors
-    /// are activated per the doctype gating rules below.
+    /// `doctype` is an optional context hint. `nil` = run every family
+    /// (back-compat for callers without one); when non-nil the gated
+    /// families (the DOB path, NPI, DEA, account, routing number, MRN,
+    /// licence plate) consult their `runs(doctype:)`.
     ///
     /// `documentHeader` is an optional first-page text prefix used
     /// by the institution-anchor suppression path. When
@@ -401,86 +404,17 @@ public struct PIIDetector: Sendable {
         doctype: DoctypeClass? = nil,
         documentHeader: String? = nil
     ) async -> [PIIMatch] {
-        var results: [PIIMatch] = []
-
-        let nsText = text as NSString
-        let fullRange = NSRange(location: 0, length: nsText.length)
-
-        // Capture doctype, negativeContextGazetteer, and
-        // documentHeader for threaded scorer calls in detectSSNs /
-        // detectMedicalRecords / detectLicensePlate.
-        let currentDoctype = doctype
-        let negCtxGazetteer = negativeContextGazetteer
-        let currentHeader = documentHeader
-
-        // Pass 1: Regex patterns. Each detector wrapped
-        // with per-page timeout measurement.
-        results.append(contentsOf: withPerPageTimeout("ssn") {
-            families.ssn.detect(in: nsText, range: fullRange,
-                       doctype: currentDoctype, gazetteer: negCtxGazetteer,
-                       documentHeader: currentHeader)
-        })
-        results.append(contentsOf: withPerPageTimeout("creditCard") { families.creditCard.detect(in: nsText, range: fullRange) })
-        results.append(contentsOf: withPerPageTimeout("email") { families.email.detect(in: nsText, range: fullRange) })
-        results.append(contentsOf: withPerPageTimeout("phone") { families.phone.detect(in: nsText, range: fullRange) })
-        results.append(contentsOf: withPerPageTimeout("ein") { families.ein.detect(in: nsText, range: fullRange) })
-        results.append(contentsOf: withPerPageTimeout("address") { families.address.detect(in: nsText, range: fullRange) })
-        if DOBDetector.runsDOBFull(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("dob") {
-                families.dateOfBirth.detect(in: nsText, range: fullRange)
-            })
-        } else if doctype == .financial {
-            // Financial doctype gets the label-anchored path only (fixed 0.85).
-            results.append(contentsOf: withPerPageTimeout("dob.label") {
-                families.dateOfBirth.detectLabelAnchored(in: nsText, range: fullRange)
-            })
-        }
-        results.append(contentsOf: withPerPageTimeout("itin") { families.itin.detect(in: nsText, range: fullRange) })
-        results.append(contentsOf: withPerPageTimeout("dl") { families.driversLicense.detect(in: nsText, range: fullRange) })
-        results.append(contentsOf: withPerPageTimeout("passport") { families.passport.detect(in: nsText, range: fullRange) })
-        if families.medicalRecord.runs(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("mrn") {
-                families.medicalRecord.detect(in: nsText, range: fullRange,
-                                     doctype: currentDoctype, gazetteer: negCtxGazetteer,
-                                     documentHeader: currentHeader)
-            })
-        }
-        if families.npi.runs(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("npi") { families.npi.detect(in: nsText, range: fullRange) })
-        }
-        if families.dea.runs(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("dea") { families.dea.detect(in: nsText, range: fullRange) })
-        }
-        if families.account.runs(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("account") { families.account.detect(in: nsText, range: fullRange) })
-        }
-        if families.routingNumber.runs(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("routingNumber") { families.routingNumber.detect(in: nsText, range: fullRange) })
-        }
-        if families.licensePlate.runs(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("licensePlate") {
-                families.licensePlate.detect(in: nsText, range: fullRange,
-                                   doctype: currentDoctype, gazetteer: negCtxGazetteer,
-                                   documentHeader: currentHeader)
-            })
-        }
-
-        // Pass 2: NLTagger
-        results.append(contentsOf: withPerPageTimeout("name") { families.name.detect(in: text, doctype: currentDoctype) })
-
-        return Self.ensureRationales(results, doctype: doctype)
+        await detect(in: text, categories: Set(PIICategory.allCases),
+                     doctype: doctype, documentHeader: documentHeader)
     }
 
-    /// Detect PII, filtering to only the specified categories.
-    /// More efficient than detect(in:) + post-filter because it skips
-    /// regex passes for categories not in the set.
+    /// Detect PII, filtering to only the specified categories: the families
+    /// whose category is requested run, in registry order; the others are
+    /// skipped (their passes never execute).
     ///
-    /// Phase 3: accepts optional doctype. When set, Phase-3 detectors are
-    /// gated per the doctype gating rules below. When nil and the category is requested, the
-    /// detector runs unconditionally (back-compat for the user-search
-    /// path which has no doctype context).
-    ///
-    /// `documentHeader` mirrors the overload above.
+    /// `doctype` and `documentHeader` as in the overload above. A nil doctype
+    /// runs every requested family unconditionally (the user-search path has
+    /// no doctype context).
     @concurrent
     public func detect(
         in text: String,
@@ -488,73 +422,17 @@ public struct PIIDetector: Sendable {
         doctype: DoctypeClass? = nil,
         documentHeader: String? = nil
     ) async -> [PIIMatch] {
+        let context = DetectionContext(
+            text: text, doctype: doctype,
+            gazetteer: negativeContextGazetteer, documentHeader: documentHeader
+        )
         var results: [PIIMatch] = []
-
-        let nsText = text as NSString
-        let fullRange = NSRange(location: 0, length: nsText.length)
-
-        let currentDoctype = doctype
-        let negCtxGazetteer = negativeContextGazetteer
-        let currentHeader = documentHeader
-
-        // Pass 1: Only run regex patterns for requested categories
-        if categories.contains(.ssn) {
-            results.append(contentsOf: withPerPageTimeout("ssn") {
-                families.ssn.detect(in: nsText, range: fullRange,
-                           doctype: currentDoctype, gazetteer: negCtxGazetteer,
-                           documentHeader: currentHeader)
+        for family in families.rows
+        where categories.contains(family.category) && family.runs(doctype: doctype) {
+            results.append(contentsOf: withPerPageTimeout(family.telemetryName(doctype: doctype)) {
+                family.detect(in: context)
             })
         }
-        if categories.contains(.creditCard) { results.append(contentsOf: withPerPageTimeout("creditCard") { families.creditCard.detect(in: nsText, range: fullRange) }) }
-        if categories.contains(.email) { results.append(contentsOf: withPerPageTimeout("email") { families.email.detect(in: nsText, range: fullRange) }) }
-        if categories.contains(.phone) { results.append(contentsOf: withPerPageTimeout("phone") { families.phone.detect(in: nsText, range: fullRange) }) }
-        if categories.contains(.ein) { results.append(contentsOf: withPerPageTimeout("ein") { families.ein.detect(in: nsText, range: fullRange) }) }
-        if categories.contains(.address) { results.append(contentsOf: withPerPageTimeout("address") { families.address.detect(in: nsText, range: fullRange) }) }
-        if categories.contains(.dateOfBirth) {
-            if DOBDetector.runsDOBFull(doctype: doctype) {
-                results.append(contentsOf: withPerPageTimeout("dob") {
-                    families.dateOfBirth.detect(in: nsText, range: fullRange)
-                })
-            } else if doctype == .financial {
-                // Financial doctype gets the label-anchored path only (fixed 0.85).
-                results.append(contentsOf: withPerPageTimeout("dob.label") {
-                    families.dateOfBirth.detectLabelAnchored(in: nsText, range: fullRange)
-                })
-            }
-        }
-        if categories.contains(.itin) { results.append(contentsOf: withPerPageTimeout("itin") { families.itin.detect(in: nsText, range: fullRange) }) }
-        if categories.contains(.driversLicense) { results.append(contentsOf: withPerPageTimeout("dl") { families.driversLicense.detect(in: nsText, range: fullRange) }) }
-        if categories.contains(.passport) { results.append(contentsOf: withPerPageTimeout("passport") { families.passport.detect(in: nsText, range: fullRange) }) }
-        if categories.contains(.medicalRecord), families.medicalRecord.runs(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("mrn") {
-                families.medicalRecord.detect(in: nsText, range: fullRange,
-                                     doctype: currentDoctype, gazetteer: negCtxGazetteer,
-                                     documentHeader: currentHeader)
-            })
-        }
-        if categories.contains(.npi), families.npi.runs(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("npi") { families.npi.detect(in: nsText, range: fullRange) })
-        }
-        if categories.contains(.dea), families.dea.runs(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("dea") { families.dea.detect(in: nsText, range: fullRange) })
-        }
-        if categories.contains(.account), families.account.runs(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("account") { families.account.detect(in: nsText, range: fullRange) })
-        }
-        if categories.contains(.routingNumber), families.routingNumber.runs(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("routingNumber") { families.routingNumber.detect(in: nsText, range: fullRange) })
-        }
-        if categories.contains(.licensePlate), families.licensePlate.runs(doctype: doctype) {
-            results.append(contentsOf: withPerPageTimeout("licensePlate") {
-                families.licensePlate.detect(in: nsText, range: fullRange,
-                                   doctype: currentDoctype, gazetteer: negCtxGazetteer,
-                                   documentHeader: currentHeader)
-            })
-        }
-
-        // Pass 2: NLTagger (names) — only if requested
-        if categories.contains(.name) { results.append(contentsOf: withPerPageTimeout("name") { families.name.detect(in: text, doctype: currentDoctype) }) }
-
         return Self.ensureRationales(results, doctype: doctype)
     }
 
@@ -642,8 +520,6 @@ public struct PIIDetector: Sendable {
         case .other:          "pii.other"
         }
     }
-
-    // MARK: - Doctype Gating
 
     // MARK: - NER availability (the loader's probe)
 
@@ -863,52 +739,24 @@ public struct PIIDetector: Sendable {
         )
     }
 
-    /// Mirror of the private `runsXxx(doctype:)` gates used by `detect(...)`.
-    /// Categories with no doctype rule return `false`. License Plate mirrors
-    /// its forward gate so the reverse-rationale popover reports gating
-    /// accurately for every doctype-aware category.
+    /// Mirror of the forward gates: true when `category`'s family does not
+    /// run on `doctype`. A category with no doctype rule reads `false` (its
+    /// family inherits `runs(doctype:) == true`).
     private func isDoctypeGatedOut(
         category: PIICategory, doctype: DoctypeClass?
     ) -> Bool {
-        switch category {
-        case .dateOfBirth:   return !families.dateOfBirth.runs(doctype: doctype)
-        case .npi:           return !families.npi.runs(doctype: doctype)
-        case .dea:           return !families.dea.runs(doctype: doctype)
-        case .account:       return !families.account.runs(doctype: doctype)
-        case .routingNumber: return !families.routingNumber.runs(doctype: doctype)
-        case .medicalRecord: return !families.medicalRecord.runs(doctype: doctype)
-        case .licensePlate:  return !families.licensePlate.runs(doctype: doctype)
-        default:             return false
-        }
+        !(families[category]?.runs(doctype: doctype) ?? true)
     }
 
-    /// Dispatch to the private detector for `category` against the supplied
-    /// context buffer. Categories with no v1 detector (License Plate, Other)
-    /// return an empty array, yielding `.noMatch` in the caller.
+    /// Run `category`'s family against the supplied context buffer with no
+    /// doctype, gazetteer or header (the snippet-as-page contract). A
+    /// category no row serves returns an empty array, yielding `.noMatch`
+    /// in the caller.
     private func runDetector(
         for category: PIICategory,
         context: NSString,
         contextRange: NSRange
     ) -> [PIIMatch] {
-        let textString = context as String
-        switch category {
-        case .ssn:            return families.ssn.detect(in: context, range: contextRange)
-        case .creditCard:     return families.creditCard.detect(in: context, range: contextRange)
-        case .email:          return families.email.detect(in: context, range: contextRange)
-        case .phone:          return families.phone.detect(in: context, range: contextRange)
-        case .ein:            return families.ein.detect(in: context, range: contextRange)
-        case .address:        return families.address.detect(in: context, range: contextRange)
-        case .dateOfBirth:    return families.dateOfBirth.detect(in: context, range: contextRange)
-        case .itin:           return families.itin.detect(in: context, range: contextRange)
-        case .driversLicense: return families.driversLicense.detect(in: context, range: contextRange)
-        case .passport:       return families.passport.detect(in: context, range: contextRange)
-        case .medicalRecord:  return families.medicalRecord.detect(in: context, range: contextRange)
-        case .npi:            return families.npi.detect(in: context, range: contextRange)
-        case .dea:            return families.dea.detect(in: context, range: contextRange)
-        case .account:        return families.account.detect(in: context, range: contextRange)
-        case .routingNumber:  return families.routingNumber.detect(in: context, range: contextRange)
-        case .name:           return families.name.detect(in: textString)
-        case .licensePlate:   return families.licensePlate.detect(in: context, range: contextRange)
-        }
+        families[category]?.detect(in: DetectionContext(buffer: context, range: contextRange)) ?? []
     }
 }

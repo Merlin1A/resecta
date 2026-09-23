@@ -21,7 +21,7 @@ public struct SSNStructuralValidator: Sendable {
         // Rule 2: Area "666" — never assigned (historically excluded)
         if area == "666" { return false }
 
-        // Rule 3: Area 900–999 — reserved for ITIN (handled by detectITINs)
+        // Rule 3: Area 900–999 — reserved for ITIN (handled by ITINDetector)
         if let areaInt = Int(area), areaInt >= 900 { return false }
 
         // Rule 4: Group "00" — never assigned

@@ -55,7 +55,7 @@ struct MRNDetector: FamilyDetector {
     )
 
     /// Detect medical record numbers using three labeled patterns + context
-    /// scoring. Signature mirrors `detectSSNs(in:range:)` (no scorer/fullText
+    /// scoring. Signature mirrors `SSNDetector.detect(in:range:)` (no scorer/fullText
     /// param — derive inline, use `self.contextScorer`).
     ///
     /// `doctype` and `gazetteer` enable per-(category, doctype) negative-context
@@ -76,7 +76,7 @@ struct MRNDetector: FamilyDetector {
             (Self.mrnPatternInstitution, "mrn.institution"),
         ]
         // Positive set from the bundled corpus; engine-side const fallback. See
-        // detectSSNs for scope rationale (positive-only V1).
+        // SSNDetector for scope rationale (positive-only V1).
         // Sentinel-prefix tweak: drop MRN positives flagged
         // `detector_requires_secondary` from the firing set so a sentinel
         // term does not score on its own; co-occurrence with a non-

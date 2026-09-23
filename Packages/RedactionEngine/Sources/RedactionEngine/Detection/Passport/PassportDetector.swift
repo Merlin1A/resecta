@@ -8,7 +8,7 @@ struct PassportDetector: FamilyDetector {
     let telemetryLabel = "passport"
 
     // Passport pattern gazetteer (validation gate over the
-    // inline label-prefix regex in detectPassports). Optional for the
+    // inline label-prefix regex below). Optional for the
     // same reason as nameGazetteer/dlPatternGazetteer:
     // passport_patterns.json may be absent in test-bundle-only builds.
     // nil preserves pass-through behavior when absent; non-nil enables per-

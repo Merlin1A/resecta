@@ -12,12 +12,9 @@ struct NameDetector: FamilyDetector {
     // resources are stripped (test-bundle-only builds). `runNLTagger` reads
     // this via `?.` so a nil gazetteer preserves the 0.70 baseline.
     let nameGazetteer: NameGazetteer?
-    // Context-keywords loader. Drives the positive-keyword set for the
-    // retired *ContextKeywords.swift files (SSN / MRN / LP). nil
-    // preserves the const-array fallback via the call-site `??` fallback
-    // in detectSSNs / detectMedicalRecords / detectLicensePlate, so
-    // test-bundle-only builds and any context that can't load the corpus
-    // keep working with the engine-side baseline.
+    // Context-keywords loader: the label-anchor routes read the shipped
+    // name positives in scope for the doctype from it. nil = the legal
+    // prefixes alone label the routes (test-bundle-only builds).
     let contextLoader: ContextKeywordsLoader?
 
     init(nameGazetteer: NameGazetteer?, contextLoader: ContextKeywordsLoader?) {

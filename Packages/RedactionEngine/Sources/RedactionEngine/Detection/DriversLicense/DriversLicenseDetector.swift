@@ -8,10 +8,10 @@ struct DriversLicenseDetector: FamilyDetector {
     let telemetryLabel = "dl"
 
     // DL pattern gazetteer (validation gate over the inline
-    // label-prefix regex at line 643). Optional for the same reason as
+    // label-prefix regex below). Optional for the same reason as
     // nameGazetteer: dl_patterns.json may be absent in test-bundle-only
     // builds. nil preserves pass-through behavior when absent; non-nil enables
-    // per-state gating in detectDriversLicenses.
+    // per-state gating in `detect`.
     private let dlPatternGazetteer: DLPatternGazetteer?
 
     init(dlPatternGazetteer: DLPatternGazetteer?) {

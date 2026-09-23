@@ -267,12 +267,12 @@ extension NameDetector {
         )
     }
 
-    /// Pass 4 of `detectNames`: the label-anchor routes, one line at a time.
+    /// Pass 4 of `detect`: the label-anchor routes, one line at a time.
     /// The vocabulary of the label route is the legal prefixes plus the
     /// shipped name positives in scope for `doctype` (the court role words
     /// are court-scoped; with no doctype only the global rows read).
     /// Internal so the routes can be exercised on their own, apart from the
-    /// tagger rows that win the overlap in `detectNames`.
+    /// tagger rows that win the overlap in `detect`.
     func scanLabelAnchors(in text: String, doctype: DoctypeClass? = nil) -> [PIIMatch] {
         let ns = text as NSString
         guard ns.length > 0 else { return [] }

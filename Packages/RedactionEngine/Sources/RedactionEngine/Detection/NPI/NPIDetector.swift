@@ -11,7 +11,6 @@ struct NPIDetector: FamilyDetector {
     let category: PIICategory = .npi
     let telemetryLabel = "npi"
 
-
     static let pattern = try! NSRegularExpression(
         pattern: #"(?<!\d)[12]\d{9}(?!\d)"#
     )

@@ -64,7 +64,7 @@ struct EINDetector: FamilyDetector {
         "28", "29", "49", "69", "70", "78", "79", "89", "96", "97"
     ]
 
-    // detectEINs: three format arms with prefix validation and scorer.
+    // Three format arms with prefix validation and scorer.
     func detect(in text: NSString, range: NSRange) -> [PIIMatch] {
         var results: [PIIMatch] = []
         let fullText = text as String

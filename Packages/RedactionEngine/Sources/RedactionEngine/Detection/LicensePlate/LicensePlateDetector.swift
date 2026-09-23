@@ -53,7 +53,7 @@ struct LicensePlateDetector: FamilyDetector {
         let fullText = text as String
         let ruleID = "licensePlate.labeled"
         // Positive set from the bundled corpus; engine-side const fallback. See
-        // detectSSNs for scope rationale (positive-only V1).
+        // SSNDetector for scope rationale (positive-only V1).
         let baseline = LicensePlateContextKeywords.profile
         let positives = contextLoader?.positiveKeywords(for: .licensePlate, doctype: nil)
             ?? baseline.positiveKeywords

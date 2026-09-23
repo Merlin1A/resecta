@@ -12,7 +12,6 @@ struct AccountDetector: FamilyDetector {
     let category: PIICategory = .account
     let telemetryLabel = "account"
 
-
     static let pattern = try! NSRegularExpression(
         pattern: #"(?<![A-Za-z0-9])([A-Z]{0,3}\d{6,15})(?![A-Za-z0-9])"#
     )

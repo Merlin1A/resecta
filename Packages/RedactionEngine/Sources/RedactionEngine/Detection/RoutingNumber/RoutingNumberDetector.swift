@@ -24,7 +24,6 @@ struct RoutingNumberDetector: FamilyDetector {
     let category: PIICategory = .routingNumber
     let telemetryLabel = "routingNumber"
 
-
     // 9 digits with digit-boundary guards so substrings of longer numbers
     // never match (e.g. the first 9 digits of a 10-digit account number).
     static let pattern = try! NSRegularExpression(

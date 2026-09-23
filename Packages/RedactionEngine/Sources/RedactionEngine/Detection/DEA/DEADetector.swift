@@ -11,7 +11,6 @@ struct DEADetector: FamilyDetector {
     let category: PIICategory = .dea
     let telemetryLabel = "dea"
 
-
     static let pattern = try! NSRegularExpression(
         pattern: #"(?<![A-Z])[A-Z]{2}\d{7}(?!\d)"#
     )
