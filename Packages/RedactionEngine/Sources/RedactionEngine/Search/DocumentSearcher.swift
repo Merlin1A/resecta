@@ -1766,14 +1766,7 @@ public actor DocumentSearcher {
                 unionRect = unionRect.union(entry.normalizedRect)
             }
 
-            let padX = 2.0 / page.bounds(for: .cropBox).width
-            let padY = 2.0 / page.bounds(for: .cropBox).height
-            let paddedRect = CGRect(
-                x: max(0, unionRect.minX - padX),
-                y: max(0, unionRect.minY - padY),
-                width: min(1, unionRect.width + padX * 2),
-                height: min(1, unionRect.height + padY * 2)
-            )
+            let paddedRect = Self.paddedNormalizedRect(unionRect, in: page)
 
             // The canonical context window over the
             // normalized concatenation the detector matched in — the same
@@ -1998,15 +1991,7 @@ public actor DocumentSearcher {
 
                 // Vision bounding boxes are already normalized 0–1, bottom-left origin.
                 // Add padding for OCR imprecision (2pt in normalized coords).
-                let pageBounds = page.bounds(for: .cropBox)
-                let padX = 2.0 / pageBounds.width
-                let padY = 2.0 / pageBounds.height
-                let paddedRect = CGRect(
-                    x: max(0, line.normalizedRect.minX - padX),
-                    y: max(0, line.normalizedRect.minY - padY),
-                    width: min(1, line.normalizedRect.width + padX * 2),
-                    height: min(1, line.normalizedRect.height + padY * 2)
-                )
+                let paddedRect = Self.paddedNormalizedRect(line.normalizedRect, in: page)
 
                 // The display span re-slices from the case-preserved
                 // analog at base offsets; matching stays on the normalized
@@ -2159,19 +2144,28 @@ public actor DocumentSearcher {
             let lineLength = line.text.count
             let lineEnd = cursor + lineLength  // exclusive, before the "\n"
             if offset >= cursor && offset <= lineEnd {
-                let pageBounds = page.bounds(for: .cropBox)
-                let padX = 2.0 / pageBounds.width
-                let padY = 2.0 / pageBounds.height
-                return CGRect(
-                    x: max(0, line.normalizedRect.minX - padX),
-                    y: max(0, line.normalizedRect.minY - padY),
-                    width: min(1, line.normalizedRect.width + padX * 2),
-                    height: min(1, line.normalizedRect.height + padY * 2)
-                )
+                return Self.paddedNormalizedRect(line.normalizedRect, in: page)
             }
             cursor += lineLength + 1  // +1 for the "\n"
         }
         return nil
+    }
+
+    /// A Vision line rect (normalized 0–1, bottom-left origin) padded by
+    /// 2 pt in normalized coordinates for OCR imprecision and clamped to
+    /// the unit square — the one padding arithmetic for every OCR result
+    /// rect (the PII scan's union rect, the literal OCR search's line rect
+    /// and the regex fallback's line rect).
+    nonisolated static func paddedNormalizedRect(_ rect: CGRect, in page: PDFPage) -> CGRect {
+        let pageBounds = page.bounds(for: .cropBox)
+        let padX = 2.0 / pageBounds.width
+        let padY = 2.0 / pageBounds.height
+        return CGRect(
+            x: max(0, rect.minX - padX),
+            y: max(0, rect.minY - padY),
+            width: min(1, rect.width + padX * 2),
+            height: min(1, rect.height + padY * 2)
+        )
     }
 
     /// Average OCR confidence across a set of lines. Returns 0 for an empty
