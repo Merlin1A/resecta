@@ -21,13 +21,6 @@ public struct PIIDetector: Sendable {
     // this via `?.` so a nil gazetteer preserves the 0.70 baseline.
     private let nameGazetteer: NameGazetteer?
 
-    // DL pattern gazetteer (validation gate over the inline
-    // label-prefix regex at line 643). Optional for the same reason as
-    // nameGazetteer: dl_patterns.json may be absent in test-bundle-only
-    // builds. nil preserves pass-through behavior when absent; non-nil enables
-    // per-state gating in detectDriversLicenses.
-    private let dlPatternGazetteer: DLPatternGazetteer?
-
     // Passport pattern gazetteer (validation gate over the
     // inline label-prefix regex in detectPassports). Optional for the
     // same reason as nameGazetteer/dlPatternGazetteer:
@@ -75,7 +68,6 @@ public struct PIIDetector: Sendable {
             GazetteerTrust.isShippedCorpusTrusted() ? (try? NegativeContextGazetteer()) : nil
     ) {
         self.nameGazetteer = nameGazetteer
-        self.dlPatternGazetteer = dlPatternGazetteer
         self.passportPatternGazetteer = passportPatternGazetteer
         self.contextLoader = contextLoader
         self.negativeContextGazetteer = negativeContextGazetteer
@@ -477,7 +469,7 @@ public struct PIIDetector: Sendable {
             })
         }
         results.append(contentsOf: withPerPageTimeout("itin") { families.itin.detect(in: nsText, range: fullRange) })
-        results.append(contentsOf: withPerPageTimeout("dl") { detectDriversLicenses(in: nsText, range: fullRange) })
+        results.append(contentsOf: withPerPageTimeout("dl") { families.driversLicense.detect(in: nsText, range: fullRange) })
         results.append(contentsOf: withPerPageTimeout("passport") { detectPassports(in: nsText, range: fullRange) })
         if Self.runsMRN(doctype: doctype) {
             results.append(contentsOf: withPerPageTimeout("mrn") {
@@ -564,7 +556,7 @@ public struct PIIDetector: Sendable {
             }
         }
         if categories.contains(.itin) { results.append(contentsOf: withPerPageTimeout("itin") { families.itin.detect(in: nsText, range: fullRange) }) }
-        if categories.contains(.driversLicense) { results.append(contentsOf: withPerPageTimeout("dl") { detectDriversLicenses(in: nsText, range: fullRange) }) }
+        if categories.contains(.driversLicense) { results.append(contentsOf: withPerPageTimeout("dl") { families.driversLicense.detect(in: nsText, range: fullRange) }) }
         if categories.contains(.passport) { results.append(contentsOf: withPerPageTimeout("passport") { detectPassports(in: nsText, range: fullRange) }) }
         if categories.contains(.medicalRecord), Self.runsMRN(doctype: doctype) {
             results.append(contentsOf: withPerPageTimeout("mrn") {
@@ -730,46 +722,6 @@ public struct PIIDetector: Sendable {
     private static func runsLicensePlate(doctype: DoctypeClass?) -> Bool {
         guard let doctype else { return true }
         return doctype == .court || doctype == .foia || doctype == .generic
-    }
-
-    // MARK: - Driver's License Detection
-
-    /// Detect driver's license numbers. Requires a label prefix (DL, Driver's License)
-    /// to avoid false positives on generic alphanumeric sequences.
-    // Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
-    // Tightened numeric lower bound from 3 to 6 digits. US DLs
-    // are universally ≥ 6 characters; the label prefix gate narrowed
-    // the blast radius but did not close it (e.g. "DL 123 Main St").
-    static let driversLicensePattern = try! NSRegularExpression(
-        pattern: #"(?:Driver(?:'?s)?\s+Lic(?:ense)?|DL|D\.?L\.?)\s*[:#]?\s*([A-Z]\d{4,14}|\d{6,12})"#,
-        options: [.caseInsensitive]
-    )
-
-    func detectDriversLicenses(in text: NSString, range: NSRange) -> [PIIMatch] {
-        Self.driversLicensePattern.matches(in: text as String, range: range).compactMap { match in
-            // Capture group 1 is the actual DL number
-            let dlRange = match.range(at: 1)
-            let matchedText = text.substring(with: dlRange)
-            // DLPatternGazetteer validation gate. When the
-            // per-state gazetteer is bundled, the candidate must match
-            // at least one jurisdiction's pattern (or be passed through
-            // when the gazetteer is absent in test-bundle-only builds).
-            // The inline regex above matches case-insensitively to
-            // tolerate OCR-noise; JSON patterns are case-sensitive (most
-            // state alphabets are A-Z), so the candidate is uppercased
-            // before lookup. SSN/DLN ambiguity (AR/HI/ID/LA/MS) is
-            // preserved — multi-state hits keep the candidate. Confidence
-            // stays at the 0.80 baseline; state-conditioned scanning
-            // with a jurisdiction hint is a possible future refinement.
-            if let gazetteer = dlPatternGazetteer {
-                let normalized = matchedText.uppercased()
-                if gazetteer.matches(normalized, anyState: ()).isEmpty {
-                    return nil
-                }
-            }
-            return PIIMatch(text: matchedText, range: match.range, kind: .driversLicense,
-                           confidence: 0.80)
-        }
     }
 
     // MARK: - Passport Detection
@@ -2008,7 +1960,7 @@ public struct PIIDetector: Sendable {
         case .address:        return families.address.detect(in: context, range: contextRange)
         case .dateOfBirth:    return families.dateOfBirth.detect(in: context, range: contextRange)
         case .itin:           return families.itin.detect(in: context, range: contextRange)
-        case .driversLicense: return detectDriversLicenses(in: context, range: contextRange)
+        case .driversLicense: return families.driversLicense.detect(in: context, range: contextRange)
         case .passport:       return detectPassports(in: context, range: contextRange)
         case .medicalRecord:  return detectMedicalRecords(in: context, range: contextRange)
         case .npi:            return npiDetector.detect(in: context, range: contextRange)

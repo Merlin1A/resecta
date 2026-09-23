@@ -51,7 +51,7 @@ struct EnvelopeReachabilityTests {
         ("creditCard",    0.95, "PIIDetector.families.creditCard.detect() fixed 0.95 (Luhn+prefix gate)"),
         ("email",         0.90, "PIIDetector.families.email.detect() fixed 0.90"),
         ("phone",         0.80, "PIIDetector.families.phone.detect() max 0.80 (context-boosted path)"),
-        ("driversLicense", 0.80, "PIIDetector.detectDriversLicenses() fixed 0.80"),
+        ("driversLicense", 0.80, "PIIDetector.families.driversLicense.detect() fixed 0.80"),
         ("passport",      0.80, "PIIDetector.detectPassports() fixed 0.80"),
         ("licensePlate",  0.88, "LicensePlateContextKeywords.swift boostedConfidence=0.88"),
     ]
