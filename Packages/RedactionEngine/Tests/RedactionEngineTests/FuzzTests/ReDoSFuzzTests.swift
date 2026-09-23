@@ -51,7 +51,7 @@ struct ReDoSFuzzTests {
         ("phone",      PhoneDetector.phonePattern),
         ("address",    AddressDetector.addressPattern),
         ("dob",        DOBDetector.dobPattern),
-        ("itin",       PIIDetector.itinPattern),
+        ("itin",       ITINDetector.itinPattern),
         ("dl",         PIIDetector.driversLicensePattern),
         ("passport",   PIIDetector.passportPattern),
         ("mrn.labeled",     PIIDetector.mrnPatternLabeled),

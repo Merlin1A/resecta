@@ -91,8 +91,8 @@ private enum ContextFeatureKeywords {
                 p.negativeKeywords.map { $0.lowercased() }
             )
         case "itin":
-            // PIIDetector.itinProfile (negative set empty — profile :53).
-            let p = PIIDetector.itinProfile
+            // ITINDetector.itinProfile (negative set empty).
+            let p = ITINDetector.itinProfile
             return (
                 p.positiveKeywords.map { $0.lowercased() },
                 p.negativeKeywords.map { $0.lowercased() }

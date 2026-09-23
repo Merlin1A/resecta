@@ -390,7 +390,7 @@ struct PIIDetectionTests {
     func validITIN(_ input: String) {
         let nsInput = input as NSString
         let range = NSRange(location: 0, length: nsInput.length)
-        let matches = PIIDetector.itinPattern.matches(in: input, range: range)
+        let matches = ITINDetector.itinPattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected ITIN match for '\(input)'")
     }
 
@@ -402,7 +402,7 @@ struct PIIDetectionTests {
     func invalidITIN(_ input: String) {
         let nsInput = input as NSString
         let range = NSRange(location: 0, length: nsInput.length)
-        let matches = PIIDetector.itinPattern.matches(in: input, range: range)
+        let matches = ITINDetector.itinPattern.matches(in: input, range: range)
         #expect(matches.isEmpty, "Expected no ITIN match for '\(input)'")
     }
 
@@ -606,7 +606,7 @@ struct PIIDetectionTests {
         _ = PhoneDetector.phonePattern
         _ = AddressDetector.addressPattern
         _ = DOBDetector.dobPattern
-        _ = PIIDetector.itinPattern
+        _ = ITINDetector.itinPattern
         _ = PIIDetector.driversLicensePattern
         _ = PIIDetector.passportPattern
         _ = PIIDetector.mrnPatternLabeled

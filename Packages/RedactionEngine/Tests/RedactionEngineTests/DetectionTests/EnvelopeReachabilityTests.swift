@@ -47,7 +47,7 @@ struct EnvelopeReachabilityTests {
         ("routingNumber", 0.88, "RoutingNumberDetector.swift boostedConfidence=0.88"),
         // Eight newly-wired categories (hand-set ceilings):
         ("ein",           0.85, "EINDetector.einProfile boostedConfidence=0.85"),
-        ("itin",          0.85, "PIIDetector.itinProfile boostedConfidence=0.85"),
+        ("itin",          0.85, "ITINDetector.itinProfile boostedConfidence=0.85"),
         ("creditCard",    0.95, "PIIDetector.families.creditCard.detect() fixed 0.95 (Luhn+prefix gate)"),
         ("email",         0.90, "PIIDetector.families.email.detect() fixed 0.90"),
         ("phone",         0.80, "PIIDetector.families.phone.detect() max 0.80 (context-boosted path)"),
