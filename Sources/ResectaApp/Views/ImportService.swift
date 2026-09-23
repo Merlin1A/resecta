@@ -108,6 +108,12 @@ enum ImportService {
         /// part of the page content stream the export raster is built
         /// from, so their presence is surfaced to the user at import.
         let annotationFindings: [PDFFinding]
+        /// Widget annotations whose field carries a value, counted by
+        /// `ImportAnnotationNoticeBanner.filledFormFieldCount(in:)`. The
+        /// analyzer skips widgets; the viewer draws their values and the
+        /// export raster does not carry them, so the count feeds the same
+        /// import notice.
+        let filledFormFieldCount: Int
     }
 
     // MARK: - Import from Security-Scoped URL (Files app, drag-and-drop)
@@ -341,6 +347,7 @@ enum ImportService {
             documentState.textLayerStatus = result.textLayerStatus
             documentState.sourceHasHiddenOCG = result.hasHiddenOCG
             documentState.sourceAnnotationFindings = result.annotationFindings
+            documentState.sourceFilledFormFieldCount = result.filledFormFieldCount
             documentState.annotationNoticeDismissed = false
             documentState.lastUsedPipelineMode = nil
             documentState.wasPausedByBackground = false
@@ -370,8 +377,10 @@ enum ImportService {
             documentState.currentPageIndex = 0
             documentState.textLayerStatus = [:]
             documentState.sourceHasHiddenOCG = false
-            // A page rendered from image pixels carries no annotations.
+            // A page rendered from image pixels carries no annotations
+            // and no form fields.
             documentState.sourceAnnotationFindings = []
+            documentState.sourceFilledFormFieldCount = 0
             documentState.annotationNoticeDismissed = false
             documentState.lastUsedPipelineMode = nil
             documentState.wasPausedByBackground = false
@@ -471,18 +480,21 @@ enum ImportService {
         }
 
         // Walk source annotations through the engine's analyzer (skips
-        // Widget/form annotations by design). The on-screen PDFKit view
-        // draws annotations; the export raster is built from the page
-        // content stream, which does not include them — the result feeds
-        // the import notice banner so the user hears that mechanism
-        // before exporting.
+        // Widget/form annotations by design), then count the form fields
+        // that carry a value. The on-screen PDFKit view draws annotations
+        // and field values; the export raster is built from the page
+        // content stream, which includes neither — both results feed the
+        // import notice banner so the user hears that mechanism before
+        // exporting.
         let annotationResult = await AnnotationAnalyzer().analyze(document: doc)
+        let filledFormFieldCount = ImportAnnotationNoticeBanner.filledFormFieldCount(in: doc)
 
         return PDFValidationResult(
             document: SendablePDFDocument(doc),
             textLayerStatus: textLayerStatus,
             hasHiddenOCG: hasHiddenOCG,
-            annotationFindings: annotationResult.findings
+            annotationFindings: annotationResult.findings,
+            filledFormFieldCount: filledFormFieldCount
         )
     }
 
