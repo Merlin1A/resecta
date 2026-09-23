@@ -604,7 +604,7 @@ struct PIIDetectionTests {
         _ = CreditCardDetector.ccPattern
         _ = EmailDetector.emailPattern
         _ = PhoneDetector.phonePattern
-        _ = PIIDetector.addressPattern
+        _ = AddressDetector.addressPattern
         _ = PIIDetector.dobPattern
         _ = PIIDetector.itinPattern
         _ = PIIDetector.driversLicensePattern

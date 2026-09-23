@@ -49,7 +49,7 @@ struct ReDoSFuzzTests {
         ("creditCard", CreditCardDetector.ccPattern),
         ("email",      EmailDetector.emailPattern),
         ("phone",      PhoneDetector.phonePattern),
-        ("address",    PIIDetector.addressPattern),
+        ("address",    AddressDetector.addressPattern),
         ("dob",        PIIDetector.dobPattern),
         ("itin",       PIIDetector.itinPattern),
         ("dl",         PIIDetector.driversLicensePattern),

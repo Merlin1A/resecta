@@ -2,7 +2,7 @@ import Foundation
 import CoreGraphics
 
 // Multi-line address assembly on Vision line boxes.
-// Replaces the inline PIIDetector.addressPattern regex when OCR lines are
+// Replaces the inline AddressDetector.addressPattern regex when OCR lines are
 // available. Strategy:
 //
 //   1. Group OCR lines by y-proximity (own y-gap tolerance, defined below).
@@ -14,7 +14,7 @@ import CoreGraphics
 //      ZIPStateTable. Mismatch → reject.
 //   5. Concatenate participating lines into one address; compute union bbox.
 //
-// The regex-only path inside PIIDetector stays available as a fallback for
+// The regex-only path inside AddressDetector stays available as a fallback for
 // callers without line-level data. Line-level callers run assembly ALONGSIDE
 // the regex arms: DetectionOrchestrator Phase 3 and both
 // DocumentSearcher PII-scan legs (`searchPII` over
