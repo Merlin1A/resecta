@@ -574,7 +574,7 @@ public actor DocumentSearcher {
     /// Install the per-page coverage sink — the search-side seam for the
     /// verification search re-check (C-5, 1.1.1). Reporting-only; pass nil
     /// to disable. See `PageSearchCoverage`.
-    public func setPageCoverageSink(_ sink: (@Sendable (PageSearchCoverage) -> Void)?) {
+    func setPageCoverageSink(_ sink: (@Sendable (PageSearchCoverage) -> Void)?) {
         self.pageCoverageSink = sink
     }
 
@@ -637,11 +637,11 @@ public actor DocumentSearcher {
     /// Total cap on live-preview match count. Above this we report
     /// `saturated` and stop counting. The full search has its own cap
     /// (`maxResults`) and is unaffected.
-    public static let maxPreviewMatches = 10_000
+    static let maxPreviewMatches = 10_000
 
     /// Per-page cap on the highlighted ranges returned for the
     /// visible page. Bounds the overlay redraw cost on dense pages.
-    public static let maxCurrentPageHighlights = 500
+    static let maxCurrentPageHighlights = 500
 
     /// Fast-path counterpart to `search(...)`. Walks the requested
     /// scope, counts matches, and (for the visible page only) collects
@@ -1627,7 +1627,9 @@ public actor DocumentSearcher {
     /// so the harness's forced-OCR measurement (rotated / born-digital pages)
     /// needs a direct entry to the same private OCR body the product runs on
     /// `.sparse`/`.none` pages. Observation-only, no new behavior; internal for
-    /// `@testable` reach, mirroring `_testComposeSiteB`.
+    /// `@testable` reach, mirroring `_testComposeSiteB` (DEBUG-only like it —
+    /// the harness runs Debug builds).
+    #if DEBUG
     func _testScanPagePIIViaOCR(
         page: SendablePDFPage,
         pageIndex: Int,
@@ -1635,6 +1637,7 @@ public actor DocumentSearcher {
     ) async -> [SearchResult] {
         await scanPagePIIViaOCR(page: page.page, pageIndex: pageIndex, categories: categories)
     }
+    #endif
 
     /// Run PII detection on a page via OCR when no text layer is available.
     /// Concatenates OCR lines into a single text block, runs PIIDetector,
