@@ -50,7 +50,7 @@ struct ReDoSFuzzTests {
         ("email",      EmailDetector.emailPattern),
         ("phone",      PhoneDetector.phonePattern),
         ("address",    AddressDetector.addressPattern),
-        ("dob",        PIIDetector.dobPattern),
+        ("dob",        DOBDetector.dobPattern),
         ("itin",       PIIDetector.itinPattern),
         ("dl",         PIIDetector.driversLicensePattern),
         ("passport",   PIIDetector.passportPattern),

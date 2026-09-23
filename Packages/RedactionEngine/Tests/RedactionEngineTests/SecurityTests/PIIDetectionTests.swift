@@ -605,7 +605,7 @@ struct PIIDetectionTests {
         _ = EmailDetector.emailPattern
         _ = PhoneDetector.phonePattern
         _ = AddressDetector.addressPattern
-        _ = PIIDetector.dobPattern
+        _ = DOBDetector.dobPattern
         _ = PIIDetector.itinPattern
         _ = PIIDetector.driversLicensePattern
         _ = PIIDetector.passportPattern

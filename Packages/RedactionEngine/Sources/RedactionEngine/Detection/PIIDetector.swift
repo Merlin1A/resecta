@@ -13,7 +13,6 @@ public struct PIIDetector: Sendable {
     // Phase 3 detectors — lazy instances reused across calls.
     private let npiDetector = NPIDetector()
     private let deaDetector = DEADetector()
-    private let dobDetectorAdvanced = DOBDetector()
     private let accountDetector = AccountDetector()
     private let routingNumberDetector = RoutingNumberDetector()
 
@@ -484,15 +483,14 @@ public struct PIIDetector: Sendable {
         results.append(contentsOf: withPerPageTimeout("phone") { families.phone.detect(in: nsText, range: fullRange) })
         results.append(contentsOf: withPerPageTimeout("ein") { families.ein.detect(in: nsText, range: fullRange) })
         results.append(contentsOf: withPerPageTimeout("address") { families.address.detect(in: nsText, range: fullRange) })
-        if Self.runsDOBFull(doctype: doctype) {
+        if DOBDetector.runsDOBFull(doctype: doctype) {
             results.append(contentsOf: withPerPageTimeout("dob") {
-                dobDetectorAdvanced.detect(in: nsText, range: fullRange)
+                families.dateOfBirth.detect(in: nsText, range: fullRange)
             })
         } else if doctype == .financial {
-            // Financial doctype gets label-anchored path only (detectDOBs emits 0.85).
-            // Legacy detectDOBs() uses dobPattern (PIIDetector.swift dobPattern).
+            // Financial doctype gets the label-anchored path only (fixed 0.85).
             results.append(contentsOf: withPerPageTimeout("dob.label") {
-                detectDOBs(in: nsText, range: fullRange)
+                families.dateOfBirth.detectLabelAnchored(in: nsText, range: fullRange)
             })
         }
         results.append(contentsOf: withPerPageTimeout("itin") { detectITINs(in: nsText, range: fullRange) })
@@ -571,15 +569,14 @@ public struct PIIDetector: Sendable {
         if categories.contains(.ein) { results.append(contentsOf: withPerPageTimeout("ein") { families.ein.detect(in: nsText, range: fullRange) }) }
         if categories.contains(.address) { results.append(contentsOf: withPerPageTimeout("address") { families.address.detect(in: nsText, range: fullRange) }) }
         if categories.contains(.dateOfBirth) {
-            if Self.runsDOBFull(doctype: doctype) {
+            if DOBDetector.runsDOBFull(doctype: doctype) {
                 results.append(contentsOf: withPerPageTimeout("dob") {
-                    dobDetectorAdvanced.detect(in: nsText, range: fullRange)
+                    families.dateOfBirth.detect(in: nsText, range: fullRange)
                 })
             } else if doctype == .financial {
-                // Financial doctype gets label-anchored path only (detectDOBs emits 0.85).
-                // Legacy detectDOBs() uses dobPattern (PIIDetector.swift dobPattern).
+                // Financial doctype gets the label-anchored path only (fixed 0.85).
                 results.append(contentsOf: withPerPageTimeout("dob.label") {
-                    detectDOBs(in: nsText, range: fullRange)
+                    families.dateOfBirth.detectLabelAnchored(in: nsText, range: fullRange)
                 })
             }
         }
@@ -706,19 +703,6 @@ public struct PIIDetector: Sendable {
 
     // MARK: - Doctype Gating
 
-    // DOB on .financial runs label-anchored path only.
-    // Bare-date detection on financial stays suppressed until (dob,financial) negatives
-    // are wired and calibrated. Non-financial: always run full DOBDetector.
-    private static func runsDOB() -> Bool {
-        true  // gate removed; per-doctype branching moved into dispatch block
-    }
-
-    /// Non-financial doctypes: run full DOBDetector.
-    private static func runsDOBFull(doctype: DoctypeClass?) -> Bool {
-        guard let doctype else { return true }
-        return doctype != .financial
-    }
-
     /// NPI: medical + FOIA (provider rosters commonly appear in both).
     /// nil doctype → run.
     private static func runsNPI(doctype: DoctypeClass?) -> Bool {
@@ -763,37 +747,6 @@ public struct PIIDetector: Sendable {
     private static func runsLicensePlate(doctype: DoctypeClass?) -> Bool {
         guard let doctype else { return true }
         return doctype == .court || doctype == .foia || doctype == .generic
-    }
-
-    // MARK: - Date of Birth Detection
-
-    /// Detect date-of-birth patterns: "DOB:", "Date of Birth:", "Born:", "Birthdate:", etc.
-    /// Common in legal and medical documents.
-    // Hardcoded constant pattern — try! safe
-    static let dobPattern = try! NSRegularExpression(
-        pattern: #"(?:D\.?O\.?B\.?|Date\s+of\s+Birth|Born|Birth\s*Date|Birthdate)\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\w+\s+\d{1,2},?\s+\d{4})"#,
-        options: [.caseInsensitive]
-    )
-
-    func detectDOBs(in text: NSString, range: NSRange) -> [PIIMatch] {
-        Self.dobPattern.matches(in: text as String, range: range).compactMap { match in
-            let matchedText = text.substring(with: match.range)
-            // Validate numeric date components when capture group 1 matches (MM/DD/YYYY format).
-            let datePartRange = match.range(at: 1)
-            if datePartRange.location != NSNotFound {
-                let datePart = text.substring(with: datePartRange)
-                // Check for numeric format: digits separated by / or -
-                let components = datePart.components(separatedBy: CharacterSet(charactersIn: "/-"))
-                if components.count == 3,
-                   let month = Int(components[0]),
-                   let day = Int(components[1]) {
-                    // Reject obviously invalid dates
-                    guard month >= 1, month <= 12, day >= 1, day <= 31 else { return nil }
-                }
-            }
-            return PIIMatch(text: matchedText, range: match.range,
-                    kind: .dateOfBirth, confidence: 0.85)
-        }
     }
 
     // MARK: - ITIN Detection
@@ -2025,7 +1978,7 @@ public struct PIIDetector: Sendable {
         let effectiveThreshold = threshold ?? Self.defaultReverseRationaleThreshold
 
         // 1. Doctype-gated out.
-        if Self.isDoctypeGatedOut(category: category, doctype: doctype) {
+        if isDoctypeGatedOut(category: category, doctype: doctype) {
             return ConsiderationResult(
                 category: category,
                 ruleID: ruleID,
@@ -2096,17 +2049,17 @@ public struct PIIDetector: Sendable {
     /// Categories with no doctype rule return `false`. License Plate mirrors
     /// its forward gate so the reverse-rationale popover reports gating
     /// accurately for every doctype-aware category.
-    private static func isDoctypeGatedOut(
+    private func isDoctypeGatedOut(
         category: PIICategory, doctype: DoctypeClass?
     ) -> Bool {
         switch category {
-        case .dateOfBirth:   return !runsDOB()
-        case .npi:           return !runsNPI(doctype: doctype)
-        case .dea:           return !runsDEA(doctype: doctype)
-        case .account:       return !runsAccount(doctype: doctype)
-        case .routingNumber: return !runsRoutingNumber(doctype: doctype)
-        case .medicalRecord: return !runsMRN(doctype: doctype)
-        case .licensePlate:  return !runsLicensePlate(doctype: doctype)
+        case .dateOfBirth:   return !families.dateOfBirth.runs(doctype: doctype)
+        case .npi:           return !Self.runsNPI(doctype: doctype)
+        case .dea:           return !Self.runsDEA(doctype: doctype)
+        case .account:       return !Self.runsAccount(doctype: doctype)
+        case .routingNumber: return !Self.runsRoutingNumber(doctype: doctype)
+        case .medicalRecord: return !Self.runsMRN(doctype: doctype)
+        case .licensePlate:  return !Self.runsLicensePlate(doctype: doctype)
         default:             return false
         }
     }
@@ -2127,7 +2080,7 @@ public struct PIIDetector: Sendable {
         case .phone:          return families.phone.detect(in: context, range: contextRange)
         case .ein:            return families.ein.detect(in: context, range: contextRange)
         case .address:        return families.address.detect(in: context, range: contextRange)
-        case .dateOfBirth:    return dobDetectorAdvanced.detect(in: context, range: contextRange)
+        case .dateOfBirth:    return families.dateOfBirth.detect(in: context, range: contextRange)
         case .itin:           return detectITINs(in: context, range: contextRange)
         case .driversLicense: return detectDriversLicenses(in: context, range: contextRange)
         case .passport:       return detectPassports(in: context, range: contextRange)

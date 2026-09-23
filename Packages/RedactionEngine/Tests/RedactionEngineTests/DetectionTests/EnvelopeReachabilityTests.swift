@@ -41,7 +41,7 @@ struct EnvelopeReachabilityTests {
         ("mrn",     0.92, "MRNContextKeywords.swift boostedConfidence=0.92"),
         ("npi",     0.90, "NPIDetector.swift boostedConfidence=0.90"),
         ("dea",     0.90, "DEADetector.swift boostedConfidence=0.90"),
-        ("dob",     0.85, "PIIDetector.detectDOBs() fixed 0.85 (label-anchored path, D4)"),
+        ("dob",     0.85, "DOBDetector.detectLabelAnchored() fixed 0.85 (label-anchored path, D4)"),
         ("account", 0.75, "AccountDetector.swift boostedConfidence=0.75"),
         ("address", 0.80, "AddressSpatialAssembler.swift max 0.80 (item 1.6 gated)"),
         ("routingNumber", 0.88, "RoutingNumberDetector.swift boostedConfidence=0.88"),

@@ -1,7 +1,7 @@
 import Foundation
 
-// Structured DOB with age-proximity heuristic. Replaces the
-// inline `PIIDetector.dobPattern` once doctype-aware routing is live.
+// Structured DOB with age-proximity heuristic; the label-anchored
+// `dobPattern` path below is what the financial doctype runs instead.
 //
 // Strategy:
 //   • Broad regex for numeric dates (M/D/YY, MM-DD-YYYY, etc.) at base 0.01.
@@ -11,10 +11,9 @@ import Foundation
 //   • Structural date validation (month 1–12, day 1–31, year 1900–2030)
 //     rejects obvious garbage.
 //
-// Doctype gating lives in PIIDetector.detect(in:doctype:); this struct is
-// gate-agnostic.
+// The family always runs; `runsDOBFull(doctype:)` picks the path.
 
-struct DOBDetector: Sendable {
+struct DOBDetector: FamilyDetector {
 
     /// Numeric MM/DD/YYYY (or M-D-YY, etc.). Structurally validated below.
     static let numericPattern = try! NSRegularExpression(
@@ -129,5 +128,61 @@ struct DOBDetector: Sendable {
         }
         guard (1...maxDay).contains(day) else { return false }
         return (1900...2030).contains(year)
+    }
+
+    // MARK: - Family
+
+    let category: PIICategory = .dateOfBirth
+    let telemetryLabel = "dob"
+
+    /// Non-financial doctypes: run full DOBDetector.
+    static func runsDOBFull(doctype: DoctypeClass?) -> Bool {
+        guard let doctype else { return true }
+        return doctype != .financial
+    }
+
+    /// The label-anchored path (`detectLabelAnchored`) is the financial
+    /// doctype's; the full detector is every other doctype's and the
+    /// nil-doctype default. The telemetry label names the path taken.
+    func telemetryName(doctype: DoctypeClass?) -> String {
+        Self.runsDOBFull(doctype: doctype) ? telemetryLabel : "dob.label"
+    }
+
+    func detect(in context: DetectionContext) -> [PIIDetector.PIIMatch] {
+        if Self.runsDOBFull(doctype: context.doctype) {
+            return detect(in: context.nsText, range: context.range)
+        }
+        return detectLabelAnchored(in: context.nsText, range: context.range)
+    }
+
+    // MARK: - Label-anchored path (financial doctype)
+
+    /// Detect date-of-birth patterns: "DOB:", "Date of Birth:", "Born:", "Birthdate:", etc.
+    /// Common in legal and medical documents.
+    // Hardcoded constant pattern — try! safe
+    static let dobPattern = try! NSRegularExpression(
+        pattern: #"(?:D\.?O\.?B\.?|Date\s+of\s+Birth|Born|Birth\s*Date|Birthdate)\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\w+\s+\d{1,2},?\s+\d{4})"#,
+        options: [.caseInsensitive]
+    )
+
+    func detectLabelAnchored(in text: NSString, range: NSRange) -> [PIIDetector.PIIMatch] {
+        Self.dobPattern.matches(in: text as String, range: range).compactMap { match in
+            let matchedText = text.substring(with: match.range)
+            // Validate numeric date components when capture group 1 matches (MM/DD/YYYY format).
+            let datePartRange = match.range(at: 1)
+            if datePartRange.location != NSNotFound {
+                let datePart = text.substring(with: datePartRange)
+                // Check for numeric format: digits separated by / or -
+                let components = datePart.components(separatedBy: CharacterSet(charactersIn: "/-"))
+                if components.count == 3,
+                   let month = Int(components[0]),
+                   let day = Int(components[1]) {
+                    // Reject obviously invalid dates
+                    guard month >= 1, month <= 12, day >= 1, day <= 31 else { return nil }
+                }
+            }
+            return PIIDetector.PIIMatch(text: matchedText, range: match.range,
+                    kind: .dateOfBirth, confidence: 0.85)
+        }
     }
 }

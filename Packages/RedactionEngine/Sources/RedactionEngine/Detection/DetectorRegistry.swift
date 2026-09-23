@@ -74,6 +74,7 @@ struct DetectorRegistry: Sendable {
     let phone: PhoneDetector
     let ein: EINDetector
     let address: AddressDetector
+    let dateOfBirth: DOBDetector
 
     /// Evaluation order: the structured families first, the name passes
     /// last. Adding a family = a row here, keyed by its `PIICategory`.
@@ -94,7 +95,8 @@ struct DetectorRegistry: Sendable {
         phone = PhoneDetector()
         ein = EINDetector()
         address = AddressDetector()
-        rows = [ssn, creditCard, email, phone, ein, address]
+        dateOfBirth = DOBDetector()
+        rows = [ssn, creditCard, email, phone, ein, address, dateOfBirth]
         table = Dictionary(uniqueKeysWithValues: rows.map { ($0.category, $0) })
     }
 
