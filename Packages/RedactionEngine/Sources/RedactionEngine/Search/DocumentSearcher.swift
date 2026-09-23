@@ -873,14 +873,12 @@ public actor DocumentSearcher {
                     if let map = ext.offsetMap, let swiftRange = Range(matchRange, in: searchText) {
                         let start = searchText.distance(from: searchText.startIndex, to: swiftRange.lowerBound)
                         let len = searchText.distance(from: swiftRange.lowerBound, to: swiftRange.upperBound)
-                        guard len > 0, start < map.count, start + len - 1 < map.count else {
+                        guard let span = Self.baseSpan(start: start, length: len, offsetMap: map) else {
                             searchLocation = matchRange.location + max(matchRange.length, 1)
                             continue
                         }
-                        let baseStart = map[start]
-                        let baseEnd = map[start + len - 1] + 1
-                        emitRange = NSRange(location: baseStart, length: baseEnd - baseStart)
-                        baseBounds = (baseStart, baseEnd)
+                        emitRange = NSRange(location: span.lowerBound, length: span.count)
+                        baseBounds = (span.lowerBound, span.upperBound)
                     }
 
                     // The magic-wand `exactMatch` gates the same
@@ -1953,11 +1951,9 @@ public actor DocumentSearcher {
                     if let baseLineChars, let map = ext.offsetMap {
                         let start = lineText.distance(from: lineText.startIndex, to: matchRange.lowerBound)
                         let len = lineText.distance(from: matchRange.lowerBound, to: matchRange.upperBound)
-                        if start < map.count, start + len - 1 < map.count {
-                            let baseStart = map[start]
-                            let baseEnd = map[start + len - 1] + 1
+                        if let span = Self.baseSpan(start: start, length: len, offsetMap: map) {
                             isBoundaried = Self.isWholeWordInBase(
-                                chars: baseLineChars, start: baseStart, endExclusive: baseEnd
+                                chars: baseLineChars, start: span.lowerBound, endExclusive: span.upperBound
                             )
                         } else {
                             isBoundaried = false
@@ -2378,18 +2374,19 @@ public actor DocumentSearcher {
             let baseStartOffset: Int
             let baseLength: Int
             if let map = ext.offsetMap {
-                guard matchStartOffset < map.count,
-                      matchStartOffset + matchLength - 1 < map.count else {
-                    // Structurally unreachable (map covers every searched
-                    // char); refuse the match rather than risk a bad rect.
+                // The base span ends AFTER the last matched character's
+                // base position, so a match spanning removed separators
+                // covers them in the rect. A span the map cannot cover is
+                // structurally unreachable (the map covers every searched
+                // char); the match is refused rather than risk a bad rect.
+                guard let span = Self.baseSpan(
+                    start: matchStartOffset, length: matchLength, offsetMap: map
+                ) else {
                     searchStart = matchRange.upperBound
                     continue
                 }
-                baseStartOffset = map[matchStartOffset]
-                // End = index AFTER the last matched character's base
-                // position, so a match spanning removed separators covers
-                // them in the rect.
-                baseLength = map[matchStartOffset + matchLength - 1] + 1 - baseStartOffset
+                baseStartOffset = span.lowerBound
+                baseLength = span.count
             } else {
                 baseStartOffset = matchStartOffset
                 baseLength = matchLength
@@ -2505,9 +2502,14 @@ public actor DocumentSearcher {
         return String(displayChars[baseStart..<baseEndExclusive])
     }
 
-    /// The base-coordinate span `displaySlice` re-slices, or nil
-    /// under the same bound guards, so the context-window builder and the
-    /// display slice agree on when the fallback is taken.
+    /// The base-coordinate span of a match measured on the searched
+    /// (most-transformed) text: `offsetMap` routes it to base coordinates
+    /// when a length-changing extension is active, ending AFTER the last
+    /// matched character's base position; nil when the map cannot cover
+    /// the span. The one remap for the preview, the OCR literal path and
+    /// `findTextMatches`, and the span `displaySlice` re-slices under the
+    /// same bound guards, so the context-window builder and the display
+    /// slice agree on when the fallback is taken.
     static func baseSpan(start: Int, length: Int, offsetMap: [Int]?) -> Range<Int>? {
         guard length > 0, start >= 0 else { return nil }
         if let map = offsetMap {
