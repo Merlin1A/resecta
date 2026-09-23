@@ -872,8 +872,12 @@ public struct PIIDetector: Sendable {
     // MARK: - Credit Card Detection
 
     // Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
+    // A digit run that starts or ends inside a letter-or-digit token is not a
+    // card (a DL-shaped `U48670409492471` is refused before Luhn); a `#`, `.`,
+    // space or line edge still admits one. Both lookarounds are one scalar
+    // wide, so the pattern stays linear (ReDoSFuzzTests).
     static let ccPattern = try! NSRegularExpression(
-        pattern: #"(?<!\d)\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,7}(?!\d)"#
+        pattern: #"(?<![\p{L}\p{N}])\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,7}(?![\p{L}\p{N}])"#
     )
 
     func detectCreditCards(in text: NSString, range: NSRange) -> [PIIMatch] {
@@ -955,24 +959,36 @@ public struct PIIDetector: Sendable {
     /// rather than a case number, reference ID, or other numeric sequence.
     // Visibility widened private→internal: ContextFeatures.swift reads
     // these two shipped phone keyword sets verbatim. Read-only; no behavior change.
+    // The bare word "number" is not a cue: it labels account, reference,
+    // passport and record numbers as readily as phones, so the phone reading
+    // of "number" is carried by the phrases at the end of the list (each read
+    // as a whole token by KeywordMatch).
     static let phoneContextKeywords = [
         "phone", "tel", "fax", "call", "contact", "mobile", "cell",
         "dial", "sms", "text", "reach", "voicemail", "ext", "extension",
-        "number",
         // Whole-token reading (KeywordMatch): `tel`, `phone` and `call` no
         // longer read inside these two words, so they are listed on their own.
-        "telephone", "calling"
+        "telephone", "calling",
+        // The phrase cues that carry "number" for a phone.
+        "phone number", "telephone number", "contact number", "fax number",
+        "mobile number", "cell number", "phone no", "tel no",
+        "call us at", "reach us at"
     ]
 
     /// Keywords that indicate a 10-digit number is NOT a phone number.
-    /// Reduces false positives on case/docket/reference numbers common in legal docs.
-    /// Only multi-word phrases to avoid over-suppression on single common words.
+    /// Reduces false positives on case/docket/reference numbers common in legal
+    /// docs and on labelled account, routing, member, policy, loan, confirmation,
+    /// control and record numbers. Multi-word phrases (plus the MRN label) to
+    /// avoid over-suppression on single common words. A negative drops the
+    /// candidate only when no positive cue is in the window.
     static let phoneNegativeKeywords = [
         "case no", "case #", "case number", "docket no", "docket #",
         "ref #", "ref no", "reference no", "reference #", "reference number",
         "claim no", "claim #", "invoice no", "invoice #",
-        "order no", "order #", "account no", "account #",
-        "policy no", "policy #", "file no", "file #"
+        "order no", "order #", "account no", "account #", "account number",
+        "policy no", "policy #", "policy number", "file no", "file #",
+        "routing number", "member number", "loan number",
+        "confirmation number", "control number", "record number", "mrn"
     ]
 
     func detectPhones(in text: NSString, range: NSRange) -> [PIIMatch] {

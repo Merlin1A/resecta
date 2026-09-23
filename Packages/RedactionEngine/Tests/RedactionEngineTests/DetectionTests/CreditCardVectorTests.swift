@@ -64,4 +64,28 @@ struct CreditCardVectorTests {
             #expect(surfaced == vec.valid, "Mismatch for \(vec.pan) (\(vec.notes))")
         }
     }
+
+    // MARK: - Token-bound edges (C12-87 / F12-12)
+
+    private func cards(in text: String) -> [String] {
+        let ns = text as NSString
+        return PIIDetector().detectCreditCards(in: ns, range: NSRange(location: 0, length: ns.length)).map(\.text)
+    }
+
+    @Test("a Luhn-valid run glued to a letter is not a card: the DL-shaped token U48670409492471")
+    func letterAdjacentRunIsNotACard() {
+        #expect(cards(in: "Secondary ID on file -- Driver Lic: U48670409492471").isEmpty)
+        #expect(cards(in: "Card 4111111111111111x on file").isEmpty)
+    }
+
+    @Test("the same digits after a space are a card: 14 digits, Luhn-valid, Visa IIN")
+    func spaceSeparatedRunIsACard() {
+        #expect(cards(in: "Driver Lic: U 48670409492471") == ["48670409492471"])
+    }
+
+    @Test("punctuation edges still admit a card")
+    func punctuationEdgesAdmitACard() {
+        #expect(cards(in: "#4111 1111 1111 1111.") == ["4111 1111 1111 1111"])
+        #expect(cards(in: "Card: 4111-1111-1111-1111, exp 12/29") == ["4111-1111-1111-1111"])
+    }
 }
