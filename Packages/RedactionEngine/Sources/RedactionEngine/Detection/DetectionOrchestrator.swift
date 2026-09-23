@@ -266,11 +266,11 @@ public struct DetectionOrchestrator: Sendable {
     /// path actually bypassed Vision. Mutated under a serial lock; safe to
     /// read from any actor. Test-only helpers live in
     /// `OCRInvocationCounter` below.
-    public enum OCRInvocationCounter {
+    enum OCRInvocationCounter {
         private static let lock = NSLock()
         nonisolated(unsafe) private static var _count: Int = 0
 
-        public static var count: Int {
+        static var count: Int {
             lock.lock(); defer { lock.unlock() }
             return _count
         }
