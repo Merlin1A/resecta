@@ -90,7 +90,7 @@ struct G8SearchParityHarnessTests {
         let detector = PIIDetector()
         var cells: [String: Cell] = [:]
         var byFamily: [String: FamilyTally] = [:]
-        let families = ContextFeatureContract.scoredFamilies
+        let families = ContextFeatureContract.scoredFamilyWireNames
 
         for doc in sortedDocs {
             guard let doctype = gateDoctypeClass(doc.doctype) else { continue }
@@ -233,7 +233,7 @@ struct G8SearchParityHarnessTests {
         }
         let sortedDocs = corpus.documents.sorted { $0.id < $1.id }
         let installed = ContextScorerWeights.loadFromEngineBundle()
-        let families = ContextFeatureContract.scoredFamilies.sorted()
+        let families = ContextFeatureContract.scoredFamilyWireNames.sorted()
         let epsilon = 0.01  // Recall floor ε = 1pt.
 
         // (1) Raw BEFORE + identity control.
@@ -455,7 +455,7 @@ struct G8SearchParityHarnessTests {
 
                 if let family = PIICategory(piiKind: match.kind)
                     .flatMap({ PresetThresholdVector.wireName(for: $0) }),
-                    ContextFeatureContract.scoredFamilies.contains(family) {
+                    ContextFeatureContract.scoredFamilyWireNames.contains(family) {
                     let feats = contextFeatures(
                         match: match,
                         effectiveDoctype: .generic,

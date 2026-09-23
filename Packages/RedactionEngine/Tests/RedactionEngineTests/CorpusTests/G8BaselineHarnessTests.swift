@@ -585,7 +585,7 @@ struct G8BaselineHarnessTests {
                     // the doctype and effectiveDoctype params.
                     if let family = PIICategory(piiKind: match.kind)
                         .flatMap({ PresetThresholdVector.wireName(for: $0) }),
-                        ContextFeatureContract.scoredFamilies.contains(family) {
+                        ContextFeatureContract.scoredFamilyWireNames.contains(family) {
                         let feats = contextFeatures(
                             match: match,
                             effectiveDoctype: doctype,

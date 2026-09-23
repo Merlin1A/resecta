@@ -23,7 +23,8 @@ struct ContextPosteriorFloorTests {
 
     @Test("Floored families are exactly account + phone; the keyword bar is 0.70")
     func wiringConstants() {
-        #expect(ContextPosteriorFloor.flooredFamilies == ["account", "phone"])
+        #expect(ContextPosteriorFloor.flooredFamilies == [.account, .phone])
+        #expect(Set(ContextPosteriorFloor.flooredFamilies.map(\.rawValue)) == ["account", "phone"])
         #expect(ContextPosteriorFloor.keywordConfirmedRaw == 0.70)
     }
 

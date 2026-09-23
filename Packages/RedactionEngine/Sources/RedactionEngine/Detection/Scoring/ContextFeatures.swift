@@ -54,8 +54,13 @@ enum ContextFeatureContract {
         "doctype_is_generic",
     ]
 
-    /// The five families the scorer covers, keyed by `wireName(for:)`.
-    static let scoredFamilies: Set<String> = ["account", "phone", "mrn", "ein", "itin"]
+    /// The five families the scorer covers (`ScoredFamily`; the raw values
+    /// are the wire names `wireName(for:)` yields).
+    static let scoredFamilies: Set<ScoredFamily> = Set(ScoredFamily.allCases)
+
+    /// The same five as wire names, for readers keyed by string (the
+    /// corpus emitters' family tallies).
+    static var scoredFamilyWireNames: Set<String> { Set(scoredFamilies.map(\.rawValue)) }
 }
 
 /// Per-family keyword vocabularies, sourced VERBATIM from the shipped detector
