@@ -64,8 +64,9 @@ struct PosteriorChainParityTests {
         return !survivors.isEmpty
     }
 
-    /// The Site-B posterior to ~1e-16 by bisection on the cutoff (for the
-    /// reported delta); the bit-equality assertion uses the two-probe form.
+    /// The Site-B posterior to ~5e-20 by bisection on the cutoff — the
+    /// reported delta when the two-probe form does not hold; the
+    /// bit-equality assertion itself uses the two probes.
     static func siteBPosterior(
         _ match: PIIDetector.PIIMatch, pageText: String, wire: String,
         scorer: ContextScorerWeights
@@ -150,7 +151,12 @@ struct PosteriorChainParityTests {
                     match, pageText: page.text, wire: page.family, cutoff: siteA.nextUp, scorer: scorer)
                 #expect(survivesAtP && !survivesAboveP,
                         "Site B's posterior is not \(siteA) for \(page.family) raw \(raw): '\(page.text)'")
-                let siteB = Self.siteBPosterior(match, pageText: page.text, wire: page.family, scorer: scorer)
+                // The delta reads the exact probe when it holds (Δ = 0 by
+                // construction); the bisection value stands in only when
+                // it does not, so a real gap is measured, not rounded.
+                let siteB = (survivesAtP && !survivesAboveP)
+                    ? siteA
+                    : Self.siteBPosterior(match, pageText: page.text, wire: page.family, scorer: scorer)
                 maxDelta = max(maxDelta, abs(siteA - siteB))
                 compared += 1
             }
