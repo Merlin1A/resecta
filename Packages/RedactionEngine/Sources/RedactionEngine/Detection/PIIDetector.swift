@@ -872,8 +872,12 @@ public struct PIIDetector: Sendable {
     // MARK: - Credit Card Detection
 
     // Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
+    // A digit run that starts or ends inside a letter-or-digit token is not a
+    // card (a DL-shaped `U48670409492471` is refused before Luhn); a `#`, `.`,
+    // space or line edge still admits one. Both lookarounds are one scalar
+    // wide, so the pattern stays linear (ReDoSFuzzTests).
     static let ccPattern = try! NSRegularExpression(
-        pattern: #"(?<!\d)\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,7}(?!\d)"#
+        pattern: #"(?<![\p{L}\p{N}])\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,7}(?![\p{L}\p{N}])"#
     )
 
     func detectCreditCards(in text: NSString, range: NSRange) -> [PIIMatch] {
