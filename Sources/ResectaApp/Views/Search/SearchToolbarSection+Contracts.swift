@@ -206,6 +206,58 @@ extension SearchToolbarSection {
         return !error.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// The built-in detector whose shape a pattern already spells out, or
+    /// nil. A refused pattern is a dead end when the user wrote it for
+    /// something a built-in detector already covers, so the callout's
+    /// reason then names that detector. Shape rules over the pattern's
+    /// text, not semantics: an unescaped `@` is the email shape; a
+    /// three-two-four digit run is the SSN shape and a three-three-four
+    /// run the phone shape; four four-digit runs, or one run of fifteen
+    /// or sixteen digits, is the credit card shape. Pinned by
+    /// `SearchToolbarSectionTests`.
+    static func builtInDetectorCovering(pattern: String) -> PIICategory? {
+        if hasUnescapedAt(pattern) { return .email }
+        for (shape, category) in digitRunShapes
+        where pattern.range(of: shape, options: .regularExpression) != nil {
+            return category
+        }
+        return nil
+    }
+
+    /// The sentence the callout appends after the refusal reason. Reads
+    /// like the reason it follows: what to use, no outcome promise.
+    static func builtInDetectorSentence(for category: PIICategory) -> String {
+        "Use the built-in \(category.rawValue) detector."
+    }
+
+    /// One digit run of the given width: `\d{n}`, `[0-9]{n}`, or `n`
+    /// literal `\d` / `[0-9]` atoms.
+    private static func digitRun(_ width: Int) -> String {
+        "(?:\\\\d\\{\(width)\\}|\\[0-9\\]\\{\(width)\\}|(?:\\\\d|\\[0-9\\]){\(width)})"
+    }
+
+    /// Up to a dozen characters of separator between runs — a literal, an
+    /// escaped literal, an optional class such as `[-. ]?`, an optional
+    /// escaped parenthesis such as `\)?`.
+    private static let separator = ".{0,12}"
+
+    private static let digitRunShapes: [(shape: String, category: PIICategory)] = [
+        (digitRun(3) + separator + digitRun(2) + separator + digitRun(4), .ssn),
+        (digitRun(3) + separator + digitRun(3) + separator + digitRun(4), .phone),
+        (digitRun(4) + separator + digitRun(4) + separator + digitRun(4) + separator + digitRun(4), .creditCard),
+        ("\\\\d\\{1[56]\\}|\\[0-9\\]\\{1[56]\\}", .creditCard),
+    ]
+
+    private static func hasUnescapedAt(_ pattern: String) -> Bool {
+        var escaped = false
+        for character in pattern {
+            if escaped { escaped = false; continue }
+            if character == "\\" { escaped = true; continue }
+            if character == "@" { return true }
+        }
+        return false
+    }
+
     /// The one action the regex error callout offers: run the same
     /// query as a plain text search. Title-cased like its sibling
     /// "Search Anyway" in the short-term warning. Pinned by

@@ -232,6 +232,13 @@ class DocumentState {
     /// a page rendered from image pixels carries no annotations.
     var sourceAnnotationFindings: [PDFFinding] = []
 
+    /// Form fields in the imported source that carry a value, counted at
+    /// import by `ImportAnnotationNoticeBanner.filledFormFieldCount(in:)`.
+    /// The on-screen view draws a field's value; the export raster does
+    /// not carry it, so the count drives the same import notice as the
+    /// annotation findings. Zero for image imports.
+    var sourceFilledFormFieldCount: Int = 0
+
     /// True once the user dismisses the import annotation notice for
     /// the current document. Reset to false on every import.
     var annotationNoticeDismissed: Bool = false
@@ -592,6 +599,7 @@ class DocumentState {
         sourceDocument = nil
         textLayerStatus = [:]
         sourceAnnotationFindings = []
+        sourceFilledFormFieldCount = 0
         annotationNoticeDismissed = false
         currentPageIndex = 0
         lastUsedPipelineMode = nil
