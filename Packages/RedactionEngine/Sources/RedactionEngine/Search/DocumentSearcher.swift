@@ -1710,54 +1710,7 @@ public actor DocumentSearcher {
         categories: Set<PIICategory>
     ) async -> [SearchResult] {
         // Render and OCR the page (reuses OCR cache)
-        let textLines: [OCREngine.TextLine]
-        if let cached = ocrCache[pageIndex] {
-            ocrAccessCounter += 1
-            ocrCacheAccess[pageIndex] = ocrAccessCounter
-            textLines = cached
-        } else {
-            let pageBounds = page.bounds(for: .cropBox)
-            let thumbnailSize = Self.ocrThumbnailSize(
-                pageBounds: pageBounds, rotation: page.rotation)
-            let pixelCount = thumbnailSize.width * thumbnailSize.height
-            guard thumbnailSize.width <= Self.maxOCRPixelDimension,
-                  thumbnailSize.height <= Self.maxOCRPixelDimension,
-                  pixelCount <= Self.maxOCRPixelCount else {
-                // Report the skip so the app layer can tell the
-                // user this page's image content was never text-scanned.
-                ocrSkipSink?(pageIndex)
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrSkippedOversize))
-                return []
-            }
-
-            // Render off-actor — page.thumbnail is synchronous PDFKit and
-            // can take seconds on a near-cap page. Holding the actor for
-            // that span starves queued setters (sinks, thresholds).
-            let sendablePage = SendablePDFPage(page)
-            let thumbnail = await Task.detached(priority: .userInitiated) {
-                sendablePage.page.thumbnail(of: thumbnailSize, for: .cropBox)
-            }.value
-            guard let cgImage = thumbnail.cgImage else {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
-                return []
-            }
-
-            do {
-                let lines = try await ocrEngine.recognizeText(
-                    in: cgImage, recognitionLevel: .accurate
-                )
-                evictOCRCacheIfNeeded()
-                ocrAccessCounter += 1
-                ocrCacheAccess[pageIndex] = ocrAccessCounter
-                ocrCache[pageIndex] = lines
-                textLines = lines
-            } catch {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
-                return []
-            }
-        }
-
-        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
+        let textLines = await ocrLines(for: page, pageIndex: pageIndex)
         guard !textLines.isEmpty else { return [] }
 
         // PII detection reads the normalized parallel
@@ -2015,64 +1968,7 @@ public actor DocumentSearcher {
         term: String
     ) async -> [SearchResult] {
         // Get or compute OCR results for this page
-        let textLines: [OCREngine.TextLine]
-        if let cached = ocrCache[pageIndex] {
-            // LRU: record access for eviction ordering
-            ocrAccessCounter += 1
-            ocrCacheAccess[pageIndex] = ocrAccessCounter
-            textLines = cached
-        } else {
-            // Render page at 300 DPI for OCR accuracy
-            let pageBounds = page.bounds(for: .cropBox)
-            let thumbnailSize = Self.ocrThumbnailSize(
-                pageBounds: pageBounds, rotation: page.rotation)
-
-            // Memory guard for OCR rendering.
-            // Oversized pages (e.g., architectural drawings) can produce
-            // multi-gigabyte bitmaps at 300 DPI. Skip OCR rather than risk
-            // an allocation crash. See KI-5 re: os_proc_available_memory().
-            // The per-axis cap admits a 10000 × 10000 (~ 400 MB) bitmap
-            // that can still trip jetsam; the pixel-count cap rejects
-            // near-axis-cap pages on top of the per-axis check.
-            let pixelCount = thumbnailSize.width * thumbnailSize.height
-            guard thumbnailSize.width <= Self.maxOCRPixelDimension,
-                  thumbnailSize.height <= Self.maxOCRPixelDimension,
-                  pixelCount <= Self.maxOCRPixelCount else {
-                // Report the skip so the app layer can tell the
-                // user this page's image content was never text-scanned.
-                ocrSkipSink?(pageIndex)
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrSkippedOversize))
-                return []
-            }
-
-            // Render off-actor — page.thumbnail is synchronous PDFKit and
-            // can take seconds on a near-cap page. Holding the actor for
-            // that span starves queued setters (sinks, thresholds).
-            let sendablePage = SendablePDFPage(page)
-            let thumbnail = await Task.detached(priority: .userInitiated) {
-                sendablePage.page.thumbnail(of: thumbnailSize, for: .cropBox)
-            }.value
-            guard let cgImage = thumbnail.cgImage else {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
-                return []
-            }
-
-            do {
-                let lines = try await ocrEngine.recognizeText(
-                    in: cgImage, recognitionLevel: .accurate
-                )
-                evictOCRCacheIfNeeded()
-                ocrAccessCounter += 1
-                ocrCacheAccess[pageIndex] = ocrAccessCounter
-                ocrCache[pageIndex] = lines
-                textLines = lines
-            } catch {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
-                return []
-            }
-        }
-
-        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
+        let textLines = await ocrLines(for: page, pageIndex: pageIndex)
 
         // Search within OCR results
         var results: [SearchResult] = []
@@ -2223,63 +2119,79 @@ public actor DocumentSearcher {
         return results
     }
 
-    // MARK: - Regex OCR Fallback Helpers
+    // MARK: - OCR page lines (the one render→cache→evict body for every OCR path)
 
-    /// Retrieve OCR lines for a page, using the cache when available.
-    /// On a cache miss, renders the page at 300 DPI using the same
-    /// SendablePDFPage + thumbnail-in-detached-Task idiom as
-    /// `searchPageViaOCR`, then inserts through the shared eviction path
-    /// so `ocrCache` and `ocrNormalizedConcat` stay in lockstep.
-    private func ocrPage(_ page: PDFPage, pageIndex: Int) async -> [OCREngine.TextLine] {
-        // Cache hit path — update LRU timestamp, return cached lines.
+    /// The OCR lines for a page, from the per-session cache when present.
+    /// On a cache miss the page is rendered at 300 DPI off-actor (the
+    /// SendablePDFPage + thumbnail-in-detached-Task idiom), read by Vision,
+    /// and inserted through the shared eviction path so `ocrCache` and
+    /// `ocrNormalizedConcat` stay in lockstep. The three OCR entry paths
+    /// (manual OCR search, PII scan, regex OCR fallback) share this body.
+    ///
+    /// Memory guard: oversized pages (e.g., architectural drawings) can
+    /// produce multi-gigabyte bitmaps at 300 DPI, so a page past the OCR
+    /// pixel caps is skipped rather than risk an allocation crash (see KI-5
+    /// re: os_proc_available_memory()). The per-axis cap admits a
+    /// 10000 × 10000 (~ 400 MB) bitmap that can still trip jetsam; the
+    /// pixel-count cap rejects near-axis-cap pages on top of it.
+    ///
+    /// Coverage: the `.ocr` route is reported once per call, after the
+    /// get-or-compute block, on both the hit and the miss path; a skipped
+    /// or unreadable page reports its own route and returns no lines.
+    private func ocrLines(for page: PDFPage, pageIndex: Int) async -> [OCREngine.TextLine] {
+        let textLines: [OCREngine.TextLine]
         if let cached = ocrCache[pageIndex] {
+            // LRU: record access for eviction ordering
             ocrAccessCounter += 1
             ocrCacheAccess[pageIndex] = ocrAccessCounter
-            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
-            return cached
+            textLines = cached
+        } else {
+            let pageBounds = page.bounds(for: .cropBox)
+            let thumbnailSize = Self.ocrThumbnailSize(
+                pageBounds: pageBounds, rotation: page.rotation)
+            let pixelCount = thumbnailSize.width * thumbnailSize.height
+            guard thumbnailSize.width <= Self.maxOCRPixelDimension,
+                  thumbnailSize.height <= Self.maxOCRPixelDimension,
+                  pixelCount <= Self.maxOCRPixelCount else {
+                // Report the skip so the app layer can tell the
+                // user this page's image content was never text-scanned.
+                ocrSkipSink?(pageIndex)
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrSkippedOversize))
+                return []
+            }
+
+            // Render off-actor — page.thumbnail is synchronous PDFKit and
+            // can take seconds on a near-cap page. Holding the actor for
+            // that span starves queued setters (sinks, thresholds).
+            let sendablePage = SendablePDFPage(page)
+            let thumbnail = await Task.detached(priority: .userInitiated) {
+                sendablePage.page.thumbnail(of: thumbnailSize, for: .cropBox)
+            }.value
+            guard let cgImage = thumbnail.cgImage else {
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
+                return []
+            }
+
+            do {
+                let lines = try await ocrEngine.recognizeText(
+                    in: cgImage, recognitionLevel: .accurate
+                )
+                evictOCRCacheIfNeeded()
+                ocrAccessCounter += 1
+                ocrCacheAccess[pageIndex] = ocrAccessCounter
+                ocrCache[pageIndex] = lines
+                textLines = lines
+            } catch { // LegalPhrases:safe (Swift keyword)
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
+                return []
+            }
         }
 
-        // Cache miss — render then OCR.
-        let pageBounds = page.bounds(for: .cropBox)
-        let thumbnailSize = Self.ocrThumbnailSize(
-            pageBounds: pageBounds, rotation: page.rotation)
-        let pixelCount = thumbnailSize.width * thumbnailSize.height
-        guard thumbnailSize.width <= Self.maxOCRPixelDimension,
-              thumbnailSize.height <= Self.maxOCRPixelDimension,
-              pixelCount <= Self.maxOCRPixelCount else {
-            // Report the skip so the app layer can tell the
-            // user this page's image content was never text-scanned.
-            ocrSkipSink?(pageIndex)
-            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrSkippedOversize))
-            return []
-        }
-
-        let sendablePage = SendablePDFPage(page)
-        let thumbnail = await Task.detached(priority: .userInitiated) {
-            sendablePage.page.thumbnail(of: thumbnailSize, for: .cropBox)
-        }.value
-        guard let cgImage = thumbnail.cgImage else {
-            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
-            return []
-        }
-
-        do {
-            let lines = try await ocrEngine.recognizeText(
-                in: cgImage, recognitionLevel: .accurate
-            )
-            // Insert through the shared eviction path so
-            // ocrCache and ocrNormalizedConcat are always evicted in lockstep.
-            evictOCRCacheIfNeeded()
-            ocrAccessCounter += 1
-            ocrCacheAccess[pageIndex] = ocrAccessCounter
-            ocrCache[pageIndex] = lines
-            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
-            return lines
-        } catch { // LegalPhrases:safe (Swift keyword)
-            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
-            return []
-        }
+        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
+        return textLines
     }
+
+    // MARK: - Regex OCR Fallback Helpers
 
     /// Map a character offset in a newline-joined OCR text to the bounding
     /// rect of the containing OCR line. Used by the regex fallback to
@@ -2349,7 +2261,7 @@ public actor DocumentSearcher {
         regex: NSRegularExpression,
         options: SearchOptions
     ) async -> [SearchResult] {
-        let lines = await ocrPage(page, pageIndex: pageIndex)
+        let lines = await ocrLines(for: page, pageIndex: pageIndex)
         guard !lines.isEmpty else { return [] }
 
         // Normalize each line through OCRTextNormalizer (confusable correction)
