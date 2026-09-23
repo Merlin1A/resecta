@@ -194,6 +194,79 @@ struct LivePreviewTests {
         #expect(result.currentPageMatches.isEmpty)
     }
 
+    // MARK: - Multi-term AND mode
+
+    /// Three-page PDF: page 0 "alpha alpha", page 1 "alpha beta", page 2
+    /// "beta beta beta". In AND mode only page 1 carries every term.
+    private func conjunctionFixture() -> PDFDocument {
+        let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 18),
+            .foregroundColor: UIColor.black
+        ]
+        let data = renderer.pdfData { context in
+            for text in ["alpha alpha", "alpha beta", "beta beta beta"] {
+                context.beginPage()
+                (text as NSString).draw(at: CGPoint(x: 72, y: 72), withAttributes: attrs)
+            }
+        }
+        return PDFDocument(data: data)!
+    }
+
+    /// The full search's result count for a mode, drained from the stream.
+    private func fullSearchCount(_ doc: PDFDocument, mode: SearchMode, searcher: DocumentSearcher) async -> Int {
+        var count = 0
+        for await _ in searcher.search(SendablePDFDocument(doc), mode: mode, progress: { _, _ in }) {
+            count += 1
+        }
+        return count
+    }
+
+    @Test("AND mode counts the pages where every term matched and agrees with the full search")
+    func multiTermConjunctionCount() async throws {
+        let searcher = DocumentSearcher()
+        var andOptions = SearchOptions()
+        andOptions.multiTermConjunction = true
+
+        // The synthetic fixture: OR counts every page (7); AND counts page 1 only (2).
+        let doc = conjunctionFixture()
+        let orMode = SearchMode.multiTerm(["alpha", "beta"], options: SearchOptions())
+        let andMode = SearchMode.multiTerm(["alpha", "beta"], options: andOptions)
+        let orResult = await searcher.previewMatches(
+            mode: orMode, scope: .wholeDocument, currentPageIndex: 1,
+            totalPageCount: doc.pageCount, pageTextProvider: providerFor(doc))
+        let andResult = await searcher.previewMatches(
+            mode: andMode, scope: .wholeDocument, currentPageIndex: 1,
+            totalPageCount: doc.pageCount, pageTextProvider: providerFor(doc))
+        #expect(orResult.totalCount == 7)
+        #expect(andResult.totalCount == 2)
+        #expect(andResult.totalCount <= orResult.totalCount)
+        #expect(andResult.currentPageMatches.count == 2)
+        #expect(andResult.totalCount == (await fullSearchCount(doc, mode: andMode, searcher: searcher)))
+
+        // A visible page that lacks a term draws no AND highlights.
+        let offPage = await searcher.previewMatches(
+            mode: andMode, scope: .wholeDocument, currentPageIndex: 0,
+            totalPageCount: doc.pageCount, pageTextProvider: providerFor(doc))
+        #expect(offPage.currentPageMatches.isEmpty)
+
+        // The packet: AND stays at or below OR and equals the full AND search.
+        let packetURL = try #require(Bundle.module.url(
+            forResource: "packet", withExtension: "pdf", subdirectory: "TestResources"))
+        let packet = try #require(PDFDocument(url: packetURL))
+        let packetTerms = ["Boise", "Hartwell"]
+        let packetOr = await searcher.previewMatches(
+            mode: .multiTerm(packetTerms, options: SearchOptions()), scope: .wholeDocument,
+            currentPageIndex: 0, totalPageCount: packet.pageCount, pageTextProvider: providerFor(packet))
+        let packetAnd = await searcher.previewMatches(
+            mode: .multiTerm(packetTerms, options: andOptions), scope: .wholeDocument,
+            currentPageIndex: 0, totalPageCount: packet.pageCount, pageTextProvider: providerFor(packet))
+        #expect(packetAnd.totalCount <= packetOr.totalCount)
+        #expect(packetAnd.totalCount == (await fullSearchCount(
+            packet, mode: .multiTerm(packetTerms, options: andOptions), searcher: searcher)))
+    }
+
     // MARK: - Empty / boundary inputs
 
     @Test("Empty query yields zero matches without crashing")
