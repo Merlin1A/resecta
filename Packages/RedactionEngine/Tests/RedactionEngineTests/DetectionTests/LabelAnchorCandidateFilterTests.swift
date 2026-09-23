@@ -19,7 +19,7 @@ import Foundation
 struct LabelAnchorCandidateFilterTests {
 
     private static func anchors(in text: String) -> [PIIDetector.PIIMatch] {
-        PIIDetector().scanLabelAnchors(in: text)
+        PIIDetector().families.name.scanLabelAnchors(in: text)
     }
 
     @Test("A role word on any token makes the candidate a title, not a name")

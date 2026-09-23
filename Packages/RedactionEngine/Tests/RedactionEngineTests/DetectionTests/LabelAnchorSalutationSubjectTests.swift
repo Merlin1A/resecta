@@ -21,7 +21,7 @@ import Foundation
 struct LabelAnchorSalutationSubjectTests {
 
     private static func route(_ name: String, in text: String) -> [PIIDetector.PIIMatch] {
-        PIIDetector().scanLabelAnchors(in: text).filter { match in
+        PIIDetector().families.name.scanLabelAnchors(in: text).filter { match in
             match.rationale?.signals.contains(.regexPattern(name: "name.label-anchor.\(name)")) == true
         }
     }

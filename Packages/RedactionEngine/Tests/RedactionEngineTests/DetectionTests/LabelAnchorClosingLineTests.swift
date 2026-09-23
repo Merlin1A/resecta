@@ -20,7 +20,7 @@ import Foundation
 struct LabelAnchorClosingLineTests {
 
     private static func closings(in text: String) -> [PIIDetector.PIIMatch] {
-        PIIDetector().scanLabelAnchors(in: text).filter { match in
+        PIIDetector().families.name.scanLabelAnchors(in: text).filter { match in
             match.rationale?.signals.contains(.regexPattern(name: "name.label-anchor.closing-line")) == true
         }
     }
@@ -31,8 +31,8 @@ struct LabelAnchorClosingLineTests {
         let hits = Self.closings(in: text)
         #expect(hits.map(\.text) == ["Delia Hartwell"])
         #expect(hits.first.map { $0.range == (text as NSString).range(of: "Delia Hartwell") } == true)
-        #expect(hits.first?.confidence == PIIDetector.labelAnchorConfidence)
-        #expect(hits.first?.rationale?.ruleID == PIIDetector.labelAnchorRuleID)
+        #expect(hits.first?.confidence == NameDetector.labelAnchorConfidence)
+        #expect(hits.first?.rationale?.ruleID == NameDetector.labelAnchorRuleID)
     }
 
     @Test("Blank lines for a handwritten signature are skipped, up to three")

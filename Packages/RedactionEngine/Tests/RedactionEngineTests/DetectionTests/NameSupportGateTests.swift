@@ -83,7 +83,7 @@ struct NameSupportGateTests {
         guard PIIDetector.isNameNERAvailable() else { Self.skipNER("unsupportedPairDropped"); return }
         let text = "Delia Hartwell signed the intake form on Tuesday."
         let d = try Self.detector(surnames: Self.emptyFilter())
-        let hits = Self.hits(d.detectNames(in: text), covering: "Delia Hartwell", in: text)
+        let hits = Self.hits(d.families.name.detect(in: text), covering: "Delia Hartwell", in: text)
         #expect(hits.isEmpty, "an inventory-unsupported name must not surface on the tagger's word alone: \(Self.summary(hits))")
     }
 
@@ -92,7 +92,7 @@ struct NameSupportGateTests {
         guard PIIDetector.isNameNERAvailable() else { Self.skipNER("supportedPairKept"); return }
         let text = "James Garcia signed the intake form on Tuesday."
         let d = try Self.detector(surnames: Self.goldenFilter())
-        let hits = Self.hits(d.detectNames(in: text), covering: "Garcia", in: text)
+        let hits = Self.hits(d.families.name.detect(in: text), covering: "Garcia", in: text)
         #expect(hits.contains { $0.confidence > 0.75 }, "the surname credit is applied: \(Self.summary(hits))")
     }
 
@@ -103,10 +103,10 @@ struct NameSupportGateTests {
         // filter only → the lone token surfaces at the base score.
         let text = "Please forward the packet to James before noon."
         let d = try Self.detector(surnames: Self.emptyFilter(), givenNames: Self.goldenFilter())
-        let hits = Self.hits(d.detectNames(in: text), covering: "James", in: text)
+        let hits = Self.hits(d.families.name.detect(in: text), covering: "James", in: text)
         #expect(hits.contains { $0.confidence == 0.70 }, "the lone given name is kept at the base score: \(Self.summary(hits))")
         let none = try Self.detector(surnames: Self.emptyFilter())
-        #expect(Self.hits(none.detectNames(in: text), covering: "James", in: text).isEmpty,
+        #expect(Self.hits(none.families.name.detect(in: text), covering: "James", in: text).isEmpty,
                 "and without given-name membership it is dropped")
     }
 
@@ -114,10 +114,10 @@ struct NameSupportGateTests {
     func commonWordSurnameDropped() throws {
         guard PIIDetector.isNameNERAvailable() else { Self.skipNER("commonWordSurnameDropped"); return }
         let text = "James Garcia signed the intake form on Tuesday."
-        let plain = Self.hits(try Self.detector(surnames: Self.goldenFilter()).detectNames(in: text),
+        let plain = Self.hits(try Self.detector(surnames: Self.goldenFilter()).families.name.detect(in: text),
                               covering: "Garcia", in: text)
         #expect(plain.contains { $0.confidence > 0.75 }, "without the curation the surname earns credit: \(Self.summary(plain))")
-        let curated = Self.hits(try Self.detector(surnames: Self.goldenFilter(), curating: ["garcia"]).detectNames(in: text),
+        let curated = Self.hits(try Self.detector(surnames: Self.goldenFilter(), curating: ["garcia"]).families.name.detect(in: text),
                                 covering: "Garcia", in: text)
         #expect(curated.isEmpty, "a curated surname with no other support is dropped: \(Self.summary(curated))")
     }
@@ -128,7 +128,7 @@ struct NameSupportGateTests {
     func prefixPassUntouched() throws {
         let text = "Plaintiff Delia Hartwell moved for summary judgment."
         let d = try Self.detector(surnames: Self.emptyFilter())
-        let hits = Self.hits(d.detectNames(in: text), covering: "Delia Hartwell", in: text)
+        let hits = Self.hits(d.families.name.detect(in: text), covering: "Delia Hartwell", in: text)
         #expect(hits.contains { $0.confidence == 0.65 }, "the prefix pass yields the name at its own confidence: \(Self.summary(hits))")
     }
 
@@ -136,16 +136,16 @@ struct NameSupportGateTests {
     func strictPassUnchanged() throws {
         guard PIIDetector.isNameNERAvailable() else { Self.skipNER("strictPassUnchanged"); return }
         let unsupported = "DELIA HARTWELL signed the intake form on Tuesday."
-        let dropped = Self.hits(try Self.detector(surnames: Self.emptyFilter()).detectNames(in: unsupported),
+        let dropped = Self.hits(try Self.detector(surnames: Self.emptyFilter()).families.name.detect(in: unsupported),
                                 covering: "DELIA HARTWELL", in: unsupported)
         #expect(dropped.isEmpty, Comment(rawValue: Self.summary(dropped)))
         let supported = "JAMES GARCIA signed the intake form on Tuesday."
-        let kept = Self.hits(try Self.detector(surnames: Self.goldenFilter()).detectNames(in: supported),
+        let kept = Self.hits(try Self.detector(surnames: Self.goldenFilter()).families.name.detect(in: supported),
                              covering: "GARCIA", in: supported)
         #expect(!kept.isEmpty, "a supported ALL-CAPS name still surfaces")
         // A curated member the filter carries: the strict pass keeps reading
         // the membership (hit set unchanged) and the credit is withheld.
-        let member = Self.hits(try Self.detector(surnames: Self.goldenFilter(), curating: ["garcia"]).detectNames(in: supported),
+        let member = Self.hits(try Self.detector(surnames: Self.goldenFilter(), curating: ["garcia"]).families.name.detect(in: supported),
                                covering: "GARCIA", in: supported)
         #expect(!member.isEmpty, "the strict pass's hit set does not move for a member the filter carries")
         #expect(member.allSatisfy { $0.confidence <= 0.70 }, "and the credit is withheld: \(Self.summary(member))")
@@ -155,7 +155,7 @@ struct NameSupportGateTests {
     func noGazetteerInert() {
         guard PIIDetector.isNameNERAvailable() else { Self.skipNER("noGazetteerInert"); return }
         let text = "Delia Hartwell signed the intake form on Tuesday."
-        let hits = Self.hits(PIIDetector(nameGazetteer: nil).detectNames(in: text), covering: "Delia Hartwell", in: text)
+        let hits = Self.hits(PIIDetector(nameGazetteer: nil).families.name.detect(in: text), covering: "Delia Hartwell", in: text)
         #expect(!hits.isEmpty, "with no inventory the tagger's word stands, as before")
     }
 }

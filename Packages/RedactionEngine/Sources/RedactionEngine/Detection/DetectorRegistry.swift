@@ -84,6 +84,7 @@ struct DetectorRegistry: Sendable {
     let account: AccountDetector
     let routingNumber: RoutingNumberDetector
     let licensePlate: LicensePlateDetector
+    let name: NameDetector
 
     /// Evaluation order: the structured families first, the name passes
     /// last. Adding a family = a row here, keyed by its `PIICategory`.
@@ -114,7 +115,8 @@ struct DetectorRegistry: Sendable {
         account = AccountDetector()
         routingNumber = RoutingNumberDetector()
         licensePlate = LicensePlateDetector(contextScorer: contextScorer, contextLoader: contextLoader)
-        rows = [ssn, creditCard, email, phone, ein, address, dateOfBirth, itin, driversLicense, passport, medicalRecord, npi, dea, account, routingNumber, licensePlate]
+        name = NameDetector(nameGazetteer: nameGazetteer, contextLoader: contextLoader)
+        rows = [ssn, creditCard, email, phone, ein, address, dateOfBirth, itin, driversLicense, passport, medicalRecord, npi, dea, account, routingNumber, licensePlate, name]
         table = Dictionary(uniqueKeysWithValues: rows.map { ($0.category, $0) })
     }
 

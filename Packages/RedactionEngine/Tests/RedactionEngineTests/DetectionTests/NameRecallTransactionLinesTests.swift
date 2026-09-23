@@ -82,16 +82,16 @@ struct NameRecallTransactionLinesTests {
 
     @Test("Shadow segments label-glued tokens into tagger-visible words")
     func shadowSegmentsLabelGluedTokens() {
-        #expect(PIIDetector.nerShadow("INDN:DELIA HARTWELL CO ID:1364419872")
+        #expect(NameDetector.nerShadow("INDN:DELIA HARTWELL CO ID:1364419872")
                 == "Indn Delia Hartwell Co Id 1364419872")
-        #expect(PIIDetector.nerShadow("PAYMENT TO DELIA HARTWELL,CHECKING")
+        #expect(NameDetector.nerShadow("PAYMENT TO DELIA HARTWELL,CHECKING")
                 == "Payment To Delia Hartwell Checking")
     }
 
     @Test("Shadow title-cases plain ALL-CAPS text word-by-word")
     func shadowMatchesLegacyOnPlainAllCaps() {
         let text = "JOHN SMITH FILED A CLAIM"
-        #expect(PIIDetector.nerShadow(text) == "John Smith Filed A Claim")
+        #expect(NameDetector.nerShadow(text) == "John Smith Filed A Claim")
     }
 
     @Test("Shadow preserves UTF-16 length across edge cases",
@@ -108,7 +108,7 @@ struct NameRecallTransactionLinesTests {
             " :;,/ ",                                  // separators only
           ])
     func shadowPreservesUTF16Length(_ text: String) {
-        let shadow = PIIDetector.nerShadow(text)
+        let shadow = NameDetector.nerShadow(text)
         #expect(shadow.utf16.count == text.utf16.count,
                 "shadow must be UTF-16 length-preserving for offset anchoring")
     }
@@ -124,7 +124,7 @@ struct NameRecallTransactionLinesTests {
         ]
         for text in battery {
             let original = Array(text)
-            let shadow = Array(PIIDetector.nerShadow(text))
+            let shadow = Array(NameDetector.nerShadow(text))
             #expect(original.count == shadow.count)
             for (o, s) in zip(original, shadow) where o != s {
                 let isSeparatorSub = separators.contains(o) && s == " "
@@ -137,21 +137,21 @@ struct NameRecallTransactionLinesTests {
 
     @Test("Shadow treats newlines as word boundaries")
     func shadowNewlineIsBoundary() {
-        #expect(PIIDetector.nerShadow("ACME CORP\nDELIA HARTWELL")
+        #expect(NameDetector.nerShadow("ACME CORP\nDELIA HARTWELL")
                 == "Acme Corp\nDelia Hartwell")
     }
 
     @Test("Shadow keeps whitelisted acronyms and mixed-case words intact")
     func shadowKeepsAcronymsAndMixedCase() {
-        #expect(PIIDetector.nerShadow("FBI AGENT SSN: 123") == "FBI Agent SSN  123")
-        #expect(PIIDetector.nerShadow("Hello World test") == "Hello World test")
-        #expect(PIIDetector.nerShadow("IRS FORM") == "IRS Form")
+        #expect(NameDetector.nerShadow("FBI AGENT SSN: 123") == "FBI Agent SSN  123")
+        #expect(NameDetector.nerShadow("Hello World test") == "Hello World test")
+        #expect(NameDetector.nerShadow("IRS FORM") == "IRS Form")
     }
 
     @Test("Shadow keeps the first letter of each letter run uppercase")
     func shadowUppercasesLetterRunStarts() {
-        #expect(PIIDetector.nerShadow("MARY-JANE O'BRIEN") == "Mary-Jane O'Brien")
-        #expect(PIIDetector.nerShadow("U.S. BANK STATEMENT") == "U.S. Bank Statement")
+        #expect(NameDetector.nerShadow("MARY-JANE O'BRIEN") == "Mary-Jane O'Brien")
+        #expect(NameDetector.nerShadow("U.S. BANK STATEMENT") == "U.S. Bank Statement")
     }
 
     // MARK: - Section B: detector recall + anchoring (NER-gated)
@@ -181,7 +181,7 @@ struct NameRecallTransactionLinesTests {
             return
         }
         let detector = PIIDetector()
-        let names = detector.detectNames(in: line).filter { $0.kind == .name }
+        let names = detector.families.name.detect(in: line).filter { $0.kind == .name }
 
         for word in ["DELIA", "HARTWELL"] {
             let spans = Self.occurrences(of: word, in: line)
@@ -210,7 +210,7 @@ struct NameRecallTransactionLinesTests {
             INDN: DELIA HARTWELL DES: PAYROLL
             """
         let detector = PIIDetector()
-        let names = detector.detectNames(in: page).filter { $0.kind == .name }
+        let names = detector.families.name.detect(in: page).filter { $0.kind == .name }
 
         for word in ["DELIA", "HARTWELL"] {
             let spans = Self.occurrences(of: word, in: page)
@@ -244,7 +244,7 @@ struct NameRecallTransactionLinesTests {
         let line = "INDN:DELIA HARTWELL CO ID:1364419872"
         let ns = line as NSString
         let detector = PIIDetector()
-        let names = detector.detectNames(in: line).filter { $0.kind == .name }
+        let names = detector.families.name.detect(in: line).filter { $0.kind == .name }
         #expect(!names.isEmpty)
 
         for match in names {
@@ -271,7 +271,7 @@ struct NameRecallTransactionLinesTests {
         // datapipeline ingest caches).
         let line = "INDN:KORRIN SABLEBROOK CO ID:1364419872"
         let detector = PIIDetector(nameGazetteer: gazetteer)
-        let names = detector.detectNames(in: line).filter {
+        let names = detector.families.name.detect(in: line).filter {
             $0.kind == .name && (
                 $0.text.lowercased().contains("korrin")
                 || $0.text.lowercased().contains("sablebrook")
@@ -296,7 +296,7 @@ struct NameRecallTransactionLinesTests {
         let line = "INDN:KATELYN HARTWELL CO ID:1364419872"
         let ns = line as NSString
         let detector = PIIDetector()
-        let names = detector.detectNames(in: line).filter { $0.kind == .name }
+        let names = detector.families.name.detect(in: line).filter { $0.kind == .name }
 
         let katelyn = names.first {
             NSIntersectionRange($0.range, ns.range(of: "KATELYN")).length > 0
@@ -329,7 +329,7 @@ struct NameRecallTransactionLinesTests {
         let ns = text as NSString
 
         let detector = PIIDetector()
-        let names = detector.detectNames(in: text).filter { $0.kind == .name }
+        let names = detector.families.name.detect(in: text).filter { $0.kind == .name }
 
         let surnameSpans = Self.occurrences(of: "HARTWELL", in: text)
             + Self.occurrences(of: "Hartwell", in: text)
