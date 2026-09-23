@@ -63,8 +63,8 @@ enum ContextFeatureContract {
 /// Returns empty sets for any non-scored family (⇒ window features collapse to 0).
 private enum ContextFeatureKeywords {
     /// (positive, negative) keyword sets for `family` (= wireName). Both
-    /// lowercased for case-insensitive substring testing, mirroring the live
-    /// scorer which lowercases the window before `contains` (ContextWindowScorer.swift:103/106).
+    /// lowercased for case-insensitive whole-token testing (KeywordMatch),
+    /// mirroring the live scorer which lowercases the window first (ContextWindowScorer.swift:103/106).
     static func sets(for family: String) -> (positive: [String], negative: [String]) {
         switch family {
         case "account":
@@ -120,10 +120,10 @@ func contextFeatures(
     let (positives, negatives) = ContextFeatureKeywords.sets(for: family)
 
     // Features 1-2: ±5-token presence window (radius 5, ±200-char cap),
-    // lowercased, substring test — the exact live-scorer semantics.
-    let window = Self_extractContextWindow(text: nsText, matchRange: match.range, radius: 5).lowercased()
-    let kwPositiveWindow = positives.contains(where: { window.contains($0) }) ? 1.0 : 0.0
-    let kwNegativeWindow = negatives.contains(where: { window.contains($0) }) ? 1.0 : 0.0
+    // lowercased, whole-token test (KeywordMatch) — the exact live-scorer semantics.
+    let window = Self_extractContextWindow(text: nsText, matchRange: match.range, radius: 5).lowercased() as NSString
+    let kwPositiveWindow = positives.contains(where: { KeywordMatch.containsToken($0, in: window) }) ? 1.0 : 0.0
+    let kwNegativeWindow = negatives.contains(where: { KeywordMatch.containsToken($0, in: window) }) ? 1.0 : 0.0
 
     // Features 3-4: nearest-keyword distance over the ±200-char neighborhood,
     // mapped 1/(1+gap/10); 0 when no keyword occurs in the neighborhood.
@@ -218,22 +218,18 @@ private func Self_neighborhood(text: NSString, matchRange: NSRange, radius: Int)
 }
 
 /// `1/(1+gap/10)` where gap = the smallest UTF-16 char distance from a match
-/// edge to any occurrence of any keyword in the neighborhood; 0 when none occur.
+/// edge to any whole-token occurrence of any keyword in the neighborhood; 0 when none occur.
 /// Distance is 0 when an occurrence overlaps the match span itself.
 private func Self_nearestDistanceFeature(
     neighborhood: ContextNeighborhood, keywords: [String]
 ) -> Double {
     guard !keywords.isEmpty else { return 0.0 }
     let hay = neighborhood.lowered as NSString
-    let hayLen = hay.length
     var bestGap: Int? = nil
     for kw in keywords where !kw.isEmpty {
-        var searchFrom = 0
-        while searchFrom < hayLen {
-            let r = hay.range(
-                of: kw, options: [],
-                range: NSRange(location: searchFrom, length: hayLen - searchFrom))
-            if r.location == NSNotFound { break }
+        // Every whole-token occurrence (KeywordMatch's range twin — the same
+        // predicate the window features and the live scorer read).
+        for r in KeywordMatch.rangesOfToken(kw, in: hay) {
             let kwStart = r.location
             let kwEnd = r.location + r.length
             // Gap from the keyword span to the match span (0 if they overlap).
@@ -246,7 +242,6 @@ private func Self_nearestDistanceFeature(
                 gap = 0
             }
             if bestGap == nil || gap < bestGap! { bestGap = gap }
-            searchFrom = kwEnd > searchFrom ? kwEnd : searchFrom + 1
         }
     }
     guard let gap = bestGap else { return 0.0 }

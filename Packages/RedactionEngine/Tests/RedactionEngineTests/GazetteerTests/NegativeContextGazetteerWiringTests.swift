@@ -280,4 +280,34 @@ struct NegativeContextGazetteerWiringTests {
         #expect(!eins.isEmpty,
                 "EIN 12-3456789 must be detected; EIN path does not pass through NegativeContextGazetteer")
     }
+
+    // MARK: - Token-bound keyword matching (C12-135)
+
+    /// A scoped negative keyword inside another word is not a match: `tin`
+    /// inside "consulting" must not suppress; `tin` as a whole token still does.
+    @Test("Gazetteer keyword inside another word does not suppress: consulting ∌ tin")
+    func testKeywordInsideAnotherWordDoesNotSuppress() throws {
+        let (bundle, base) = try makeWiringFixtureBundle(
+            keyword: "tin", categoryScope: "ssn", doctypeScope: "financial", weight: 0.75)
+        defer { try? FileManager.default.removeItem(at: base) }
+        let gazetteer = try NegativeContextGazetteer(bundle: bundle)
+        let detector = PIIDetector(
+            nameGazetteer: nil,
+            dlPatternGazetteer: nil,
+            passportPatternGazetteer: nil,
+            contextLoader: nil,
+            negativeContextGazetteer: gazetteer
+        )
+        func confidence(_ text: String) -> Double? {
+            let ns = text as NSString
+            return detector.detectSSNs(
+                in: ns, range: NSRange(location: 0, length: ns.length),
+                doctype: .financial, gazetteer: gazetteer
+            ).first?.confidence
+        }
+        let inside = try #require(confidence("Consulting fees for 234-56-7890 were paid."))
+        #expect(inside == 0.75, "'consulting' is not a 'tin' occurrence; the base 0.75 must stand, got \(inside)")
+        let whole = try #require(confidence("TIN 234-56-7890 on file."))
+        #expect(whole < 0.75, "the whole-token keyword must still suppress; got \(whole)")
+    }
 }

@@ -52,4 +52,25 @@ struct PhoneVectorTests {
             #expect(count >= 1, "phonePattern did not match: \(vec.phone) (\(vec.notes))")
         }
     }
+
+    // MARK: - Token-bound context keywords (C12-134)
+
+    private func phoneConfidence(_ text: String) -> Double? {
+        let ns = text as NSString
+        return PIIDetector().detectPhones(in: ns, range: NSRange(location: 0, length: ns.length)).first?.confidence
+    }
+
+    @Test("a context keyword inside another word does not boost: Patel ∌ tel, next ∌ ext")
+    func keywordInsideAnotherWordDoesNotBoost() {
+        #expect(phoneConfidence("Priya Patel (312) 621-4862") == 0.60)
+        #expect(phoneConfidence("Next: 312-621-4862") == 0.60)
+    }
+
+    @Test("whole-token keywords still boost; telephone and calling are cues of their own")
+    func wholeTokenKeywordsStillBoost() {
+        #expect(phoneConfidence("Tel: (312) 621-4862") == 0.80)
+        #expect(phoneConfidence("Ext. 312-621-4862") == 0.80)
+        #expect(phoneConfidence("Telephone: (312) 621-4862") == 0.80)
+        #expect(phoneConfidence("Reach us by calling (312) 621-4862") == 0.80)
+    }
 }

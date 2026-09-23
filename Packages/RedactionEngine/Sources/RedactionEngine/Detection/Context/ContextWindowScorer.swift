@@ -102,9 +102,11 @@ public struct ContextWindowScorer: Sendable {
             text: nsText, matchRange: matchRange, radius: profile.windowRadius
         ).lowercased()
 
-        // Check for positive and negative keywords.
-        let hasPositive = profile.positiveKeywords.contains { contextWindow.contains($0) }
-        let hasNegative = profile.negativeKeywords.contains { contextWindow.contains($0) }
+        // Check for positive and negative keywords as whole tokens
+        // (KeywordMatch: a keyword inside a longer word is not a keyword).
+        let windowText = contextWindow as NSString
+        let hasPositive = profile.positiveKeywords.contains { KeywordMatch.containsToken($0, in: windowText) }
+        let hasNegative = profile.negativeKeywords.contains { KeywordMatch.containsToken($0, in: windowText) }
 
         let baseScore: Double
         if hasPositive {
@@ -215,7 +217,8 @@ public struct ContextWindowScorer: Sendable {
             text: nsText, matchRange: matchRange, radius: profile.windowRadius
         ).lowercased()
 
-        let matchedPositives = profile.positiveKeywords.filter { window.contains($0) }
+        let windowText = window as NSString
+        let matchedPositives = profile.positiveKeywords.filter { KeywordMatch.containsToken($0, in: windowText) }
         if !matchedPositives.isEmpty {
             let share = (profile.boostedConfidence - profile.baseConfidence) /
                         Double(matchedPositives.count)
@@ -225,7 +228,7 @@ public struct ContextWindowScorer: Sendable {
             return .contextPositiveDetail(keywords: contributions)
         }
 
-        let matchedNegatives = profile.negativeKeywords.filter { window.contains($0) }
+        let matchedNegatives = profile.negativeKeywords.filter { KeywordMatch.containsToken($0, in: windowText) }
         if !matchedNegatives.isEmpty {
             let penalty = (profile.baseConfidence - profile.floor) * 0.5
             let share = penalty / Double(matchedNegatives.count)
