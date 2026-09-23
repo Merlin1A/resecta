@@ -53,7 +53,7 @@ struct ReDoSFuzzTests {
         ("dob",        DOBDetector.dobPattern),
         ("itin",       ITINDetector.itinPattern),
         ("dl",         DriversLicenseDetector.driversLicensePattern),
-        ("passport",   PIIDetector.passportPattern),
+        ("passport",   PassportDetector.passportPattern),
         ("mrn.labeled",     PIIDetector.mrnPatternLabeled),
         ("mrn.patientID",   PIIDetector.mrnPatternPatientID),
         ("mrn.institution", PIIDetector.mrnPatternInstitution),

@@ -22,7 +22,7 @@ struct PassportDetectorTests {
     ])
     func validPassport(_ input: String) {
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.passportPattern.matches(in: input, range: range)
+        let matches = PassportDetector.passportPattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected passport match for '\(input)'")
     }
 
@@ -30,7 +30,7 @@ struct PassportDetectorTests {
     func passportRejectsUnlabeled() {
         let input = "A1234567 appears in the ledger"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.passportPattern.matches(in: input, range: range)
+        let matches = PassportDetector.passportPattern.matches(in: input, range: range)
         #expect(matches.isEmpty, "Should not match without passport label prefix")
     }
 
@@ -38,7 +38,7 @@ struct PassportDetectorTests {
     func passportRejectsShortNumeric() {
         let input = "Passport A12345"  // 5 digits — below 6-digit floor
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.passportPattern.matches(in: input, range: range)
+        let matches = PassportDetector.passportPattern.matches(in: input, range: range)
         #expect(matches.isEmpty,
                 "Passport body requires ≥ 6 digits after alpha prefix")
     }

@@ -47,7 +47,7 @@ struct PassportVectorTests {
         guard let vectors = try loadVectors() else { return }
         for vec in vectors where vec.valid {
             let ns = vec.text as NSString
-            let count = PIIDetector.passportPattern.numberOfMatches(
+            let count = PassportDetector.passportPattern.numberOfMatches(
                 in: vec.text, range: NSRange(location: 0, length: ns.length)
             )
             #expect(count >= 1, "passportPattern did not match: \(vec.text) (\(vec.notes))")

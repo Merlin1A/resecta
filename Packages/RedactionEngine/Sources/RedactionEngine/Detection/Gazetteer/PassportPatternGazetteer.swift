@@ -12,7 +12,7 @@ import OSLog
 // Schema: ../resecta-datapipeline/schemas/passport_patterns.schema.json
 //
 // Layered onto the existing inline labeled-prefix detector at
-// PIIDetector.detectPassports; this gazetteer supplies per-issuer
+// PassportDetector.detect; this gazetteer supplies per-issuer
 // validation patterns (candidate from inline regex must
 // match at least one issuer's pattern, otherwise it is suppressed).
 //

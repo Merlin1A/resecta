@@ -608,7 +608,7 @@ struct PIIDetectionTests {
         _ = DOBDetector.dobPattern
         _ = ITINDetector.itinPattern
         _ = DriversLicenseDetector.driversLicensePattern
-        _ = PIIDetector.passportPattern
+        _ = PassportDetector.passportPattern
         _ = PIIDetector.mrnPatternLabeled
         _ = PIIDetector.mrnPatternPatientID
         _ = PIIDetector.mrnPatternInstitution
