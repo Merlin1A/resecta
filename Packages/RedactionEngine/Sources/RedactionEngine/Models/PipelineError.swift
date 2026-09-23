@@ -21,6 +21,10 @@ public enum PipelineError: Sendable, LocalizedError {
         case tooLarge(bytesRead: Int)
         case unsupportedFormat
         case invalidPageDimensions(pageIndex: Int)
+        // The import-time active-content walk (`ActiveContentScan`) saw
+        // JavaScript or a launch action at one of the locations it covers.
+        // Its own case so the refusal is not reported as a damaged file.
+        case activeContent(location: ActiveContentLocation)
     }
 
     public enum DetectionFailure: Sendable {
@@ -36,7 +40,16 @@ public enum PipelineError: Sendable, LocalizedError {
     }
 
     public enum RedactionFailure: Sendable {
+        // The memory half of the rasterizer's pre-flight only: the page's
+        // raster at the effective DPI does not fit the three-bitmap
+        // estimate. Geometry refusals have their own case below.
         case insufficientMemory(pageIndex: Int)
+        // The geometry half of the rasterizer's pre-flight: a side under
+        // 10 pt or over 5,000 pt, or a non-default `/UserUnit`. Such a page
+        // passes import (which checks 0 < side <= 5,000 pt only) and is
+        // refused at redaction; it used to be reported under the memory
+        // label.
+        case unsupportedPageGeometry(pageIndex: Int)
         case bitmapCreationFailed(pageIndex: Int)
         case fillVerificationFailed(pageIndex: Int)
         case renderTimeout(pageIndex: Int)
@@ -67,6 +80,7 @@ public enum PipelineError: Sendable, LocalizedError {
             case .tooLarge: "This document is too large to process on this device."
             case .unsupportedFormat: "This file format is not supported. Resecta works with PDF and image files."
             case .invalidPageDimensions(let p): "Page \(p + 1) has unsupported dimensions and cannot be processed."
+            case .activeContent: "This document contains JavaScript or a launch action and was not imported."
             }
         case .detectionError(let f):
             switch f {
@@ -78,12 +92,11 @@ public enum PipelineError: Sendable, LocalizedError {
             }
         case .redactionError(let f):
             switch f {
-            // Broadened to cover
-            // both refusal paths now that `validatePage` wires into the
-            // `.insufficientMemory` throw — an oversized page (>5,000 pt per
-            // side) and a genuine memory shortfall both surface here.
+            // Memory only. The geometry refusal is its own case, so this
+            // copy no longer carries the page-size clause.
             // Mechanism-description copy — no outcome-promise language.
-            case .insufficientMemory: "This page could not be processed. Pages up to 5,000 points (about 69 inches) per side are supported; for memory-related failures, reducing output quality in Settings may help."
+            case .insufficientMemory(let p): "Page \(p + 1) could not be processed with the memory available; reducing output quality in Settings may help."
+            case .unsupportedPageGeometry(let p): "Page \(p + 1) uses a page size or scale factor that is not processed. Pages must be between 10 and 5,000 points per side at the standard scale."
             case .bitmapCreationFailed(let p): "Could not create image buffer for page \(p + 1)."
             case .fillVerificationFailed(let p): "Redaction fill verification failed for page \(p + 1). The page may not be fully redacted."
             case .renderTimeout(let p): "Page \(p + 1) could not be rendered within the time limit."

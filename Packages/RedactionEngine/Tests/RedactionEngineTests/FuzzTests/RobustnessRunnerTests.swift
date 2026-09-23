@@ -13,8 +13,8 @@ import CryptoKit
 // — through the product pipeline in the app's order:
 //
 //   import validation (ImportService.validatePDFOffMainActor MIRROR: open →
-//   isLocked → page count 0 → 500-page cap → per-page dimensions → active-
-//   content catalog keys) → Scan (DocumentSearcher.performSearch(.piiScan),
+//   isLocked → page count 0 → 500-page cap → per-page dimensions → the
+//   engine's active-content walk) → Scan (DocumentSearcher.performSearch(.piiScan),
 //   the H1.2 natural-run shape) → redact (H2.2 processDocument mirror) →
 //   verify (H2.2 runVerification mirror).
 //
@@ -88,13 +88,11 @@ struct RobustnessRunnerTests {
         }
         var hasHiddenOCG = false
         if let provider = CGDataProvider(data: data as CFData),
-           let cgDoc = CGPDFDocument(provider),
-           let catalog = cgDoc.catalog {
-            for key in ["JavaScript", "JS", "Launch"] {
-                var obj: CGPDFObjectRef?
-                if CGPDFDictionaryGetObject(catalog, key, &obj) {
-                    return .reject(errorClass: "corrupt")
-                }
+           let cgDoc = CGPDFDocument(provider) {
+            // The app's guard and this mirror call the same engine walk, so
+            // this stage cannot drift; the class is the refusal's own case.
+            if ActiveContentScan.firstLocation(in: cgDoc) != nil {
+                return .reject(errorClass: "activeContent")
             }
             hasHiddenOCG = TextLayerExtractor.documentHasHiddenOCG(cgDoc)
         }
@@ -150,8 +148,28 @@ struct RobustnessRunnerTests {
                     notes: "valid structure, empty page tree"),
             Fixture(id: "javascript-catalog", source: "factory",
                     data: TestFixtures.withJavaScript(), path: nil,
-                    expected: exp("reject", "corrupt", "skip"),
-                    notes: "active-content early rejection (catalog /JavaScript)"),
+                    expected: exp("reject", "activeContent", "skip"),
+                    notes: "active-content early rejection (catalog /JavaScript; its own class since the walk widened)"),
+            Fixture(id: "javascript-names-tree", source: "factory",
+                    data: TestFixtures.withNamesJavaScript(), path: nil,
+                    expected: exp("reject", "activeContent", "skip"),
+                    notes: "active-content early rejection (/Names → /JavaScript, the ISO-canonical carrier)"),
+            Fixture(id: "javascript-open-action", source: "factory",
+                    data: TestFixtures.withOpenActionJavaScript(), path: nil,
+                    expected: exp("reject", "activeContent", "skip"),
+                    notes: "active-content early rejection (/OpenAction JavaScript action)"),
+            Fixture(id: "javascript-page-aa", source: "factory",
+                    data: TestFixtures.withPageAdditionalActionJavaScript(), path: nil,
+                    expected: exp("reject", "activeContent", "skip"),
+                    notes: "active-content early rejection (page /AA JavaScript trigger)"),
+            Fixture(id: "javascript-annotation-a", source: "factory",
+                    data: TestFixtures.withAnnotationActionJavaScript(), path: nil,
+                    expected: exp("reject", "activeContent", "skip"),
+                    notes: "active-content early rejection (annotation /A JavaScript action)"),
+            Fixture(id: "open-action-destination", source: "factory",
+                    data: TestFixtures.withOpenActionDestination(), path: nil,
+                    expected: exp("open", nil, "open"),
+                    notes: "clean /OpenAction destination array (the widened walk must not refuse it)"),
             Fixture(id: "page-without-resources", source: "factory",
                     data: TestFixtures.pageWithoutResources(), path: nil,
                     expected: exp("open", nil, "open"),
@@ -170,9 +188,9 @@ struct RobustnessRunnerTests {
                     notes: "appended /Prev revision (IM-23 shape)"),
             Fixture(id: "user-unit-2", source: "factory",
                     data: TestFixtures.userUnitPDF(), path: nil,
-                    expected: exp("open", nil, "reject", "insufficientMemory"),
-                    notes: "import has no /UserUnit gate (opens); rasterize pre-flight rejects — "
-                         + "today's class is insufficientMemory (C12-16: misleading, specific-reason candidate)"),
+                    expected: exp("open", nil, "reject", "unsupportedPageGeometry"),
+                    notes: "import has no /UserUnit gate (opens); the rasterize pre-flight's geometry half "
+                         + "rejects it as unsupportedPageGeometry (formerly reported under insufficientMemory)"),
             Fixture(id: "acroform-v", source: "factory",
                     data: TestFixtures.acroFormPDF(), path: nil,
                     expected: exp("open", nil, "open"),
@@ -500,6 +518,8 @@ struct Family4FactorySmokeTests {
                 "text layer must survive so the scan leg has work")
         #expect(validatePage(page) == false,
                 "the H-16 /UserUnit guard must reject this page")
+        #expect(validatePageGeometry(page) == false,
+                "the refusal is the geometry half's, not the memory half's")
     }
 
     @Test("acroFormPDF opens with its fields and /V values readable from the form tree")

@@ -15,10 +15,11 @@ import os
 /// PipelineCoordinator) is the effective memory guard. A large sentinel is
 /// passed into `selectDPI` so the ceiling is imposed via `userMaxDPI`.
 ///
-/// `rasterize` runs `validatePage` as a pre-flight
-/// front gate — it rejects out-of-range dimensions / non-default `/UserUnit`
-/// pages and, on real hardware, pages whose raster would exceed half
-/// of available memory. The 10,000-pt `pageDimensionLimit` pre-flight inside
+/// `rasterize` runs the two pre-flight halves as its front gate —
+/// `validatePageGeometry` rejects out-of-range dimensions / non-default
+/// `/UserUnit` pages as `.unsupportedPageGeometry`, then `validatePageMemory`
+/// rejects, on real hardware, pages whose raster would not fit the
+/// three-bitmap estimate as `.insufficientMemory`. The 10,000-pt `pageDimensionLimit` pre-flight inside
 /// `renderCGPageWithTimeout` sits behind it as defense-in-depth for any
 /// path that reaches the synchronous draw without the front gate.
 private let dpiBudgetSentinel: Int = Int.max / 4
@@ -113,16 +114,23 @@ public final class PageRasterizer: @unchecked Sendable {
     public func rasterize(_ page: PDFPageData, dpiCap: Int = defaultDPICap) async throws -> RasterizeResult {
         try Task.checkCancellation()
 
-        // Pre-flight page validation is the front gate.
-        // Rejects pages whose dimensions exceed the supported range (≤5,000 pt
-        // per side / no non-default /UserUnit) and, on real hardware, whose
-        // raster would exceed half of available memory; the memory clause
-        // defers to the runtime DPI cap + selectDPI when
-        // os_proc_available_memory() is unreadable. The 10,000-pt dimension
-        // guard inside renderCGPageWithTimeout remains a defense-in-depth
-        // backstop behind this. effectiveDPI mirrors the cap applied below so
-        // the estimate matches what will actually be rendered.
-        guard validatePage(page.page, effectiveDPI: min(page.targetDPI, dpiCap)) else {
+        // Pre-flight page validation is the front gate, in two halves so
+        // each refusal carries its own error case. Geometry first: a side
+        // outside 10…5,000 pt or a non-default /UserUnit is
+        // `.unsupportedPageGeometry` (import checks 0 < side ≤ 5,000 pt
+        // only, so such a page reaches this point). Then memory: on real
+        // hardware, a raster that would not fit the three-bitmap estimate
+        // is `.insufficientMemory`; the memory clause defers to the runtime
+        // DPI cap + selectDPI when os_proc_available_memory() is
+        // unreadable. The 10,000-pt dimension guard inside
+        // renderCGPageWithTimeout remains a defense-in-depth backstop behind
+        // this. effectiveDPI mirrors the cap applied below so the estimate
+        // matches what will actually be rendered.
+        let effectiveDPI = min(page.targetDPI, dpiCap)
+        guard validatePageGeometry(page.page) else {
+            throw PipelineError.redactionError(.unsupportedPageGeometry(pageIndex: page.pageIndex))
+        }
+        guard validatePageMemory(page.page, effectiveDPI: effectiveDPI) else {
             throw PipelineError.redactionError(.insufficientMemory(pageIndex: page.pageIndex))
         }
 
@@ -162,6 +170,10 @@ public final class PageRasterizer: @unchecked Sendable {
             availableMemory: dpiBudgetSentinel, userMaxDPI: effectiveMaxDPI,
             pageWidth: effectiveSize.width, pageHeight: effectiveSize.height
         ) else {
+            // selectDPI returns nil only when no DPI tier fits under the
+            // cap — a memory/DPI-budget condition, never geometry (the
+            // geometry half above has already passed), so the memory case
+            // is the honest class here.
             throw PipelineError.redactionError(.insufficientMemory(pageIndex: page.pageIndex))
         }
 

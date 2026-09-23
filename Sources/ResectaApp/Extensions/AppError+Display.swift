@@ -22,6 +22,8 @@ extension PipelineError {
                 "Unsupported File Format"
             case .invalidPageDimensions:
                 "Invalid Page Dimensions"
+            case .activeContent:
+                "Document Contains Active Content"
             }
 
         case .detectionError(let f):
@@ -41,6 +43,8 @@ extension PipelineError {
             switch f {
             case .insufficientMemory:
                 "Not Enough Memory"
+            case .unsupportedPageGeometry:
+                "Unsupported Page Geometry"
             case .bitmapCreationFailed:
                 "Image Buffer Error"
             case .fillVerificationFailed:
@@ -92,6 +96,10 @@ extension PipelineError {
                 "Resecta works with PDF and image files (JPEG, PNG, HEIC). Other formats are not supported."
             case .invalidPageDimensions(let p):
                 "Page \(p + 1) has dimensions outside the supported range. Each page must be between 1 and 5,000 points."
+            case .activeContent:
+                // Mechanism description: names what the import walk saw and
+                // what the app does with it. Not the damaged-file copy.
+                "This document contains JavaScript or a launch action. Resecta does not import documents with active content. Print or export the document to a new PDF from another app, then import it again."
             }
 
         case .detectionError(let f):
@@ -113,6 +121,10 @@ extension PipelineError {
             switch f {
             case .insufficientMemory(let p):
                 "Page \(p + 1) could not be processed due to available memory. Try reducing output quality in Settings, or close other apps and try again."
+            case .unsupportedPageGeometry(let p):
+                // Mechanism description: names the two page properties the
+                // rasterizer does not process and the range it does.
+                "Page \(p + 1) uses a page size or scale factor that is not processed. Pages must be between 10 and 5,000 points per side at the standard scale. Export the page from another app at a standard size, then import it again."
             case .bitmapCreationFailed(let p):
                 "An image buffer could not be created for page \(p + 1). Try reducing output quality in Settings."
             case .fillVerificationFailed(let p):

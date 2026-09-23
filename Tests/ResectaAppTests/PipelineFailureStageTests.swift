@@ -34,6 +34,7 @@ struct PipelineFailureStageTests {
             PipelineError.redactionError(.pageTooLarge(pageIndex: 0)),
             PipelineError.redactionError(.bitmapCreationFailed(pageIndex: 1)),
             PipelineError.redactionError(.insufficientMemory(pageIndex: 0)),
+            PipelineError.redactionError(.unsupportedPageGeometry(pageIndex: 0)),
             PipelineError.redactionError(.reconstructionFailed),
           ])
     func prePromotionErrorsClassifyAsRedaction(error: PipelineError) {
@@ -88,8 +89,8 @@ struct PipelineFailureStageTests {
 
         let failure = try #require(terminal,
                                    "Oversized-page run must land on .failed")
-        guard case .redactionError(.insufficientMemory) = failure.error else {
-            Issue.record("Expected .redactionError(.insufficientMemory) from the pre-flight check, got \(failure.error)")
+        guard case .redactionError(.unsupportedPageGeometry) = failure.error else {
+            Issue.record("Expected .redactionError(.unsupportedPageGeometry) from the pre-flight check, got \(failure.error)")
             return
         }
         guard case .editing = failure.returnPhase else {
@@ -165,9 +166,9 @@ struct PipelineFailureStageTests {
     /// validatePage dimension cap but cheap to build. Loaded
     /// directly onto the coordinator, which bypasses the import-time
     /// dimension gate so the page reaches `PageRasterizer.rasterize`, where
-    /// the pre-flight check refuses it with `.insufficientMemory` — a
-    /// deterministic redaction-stage throw for the recovery-route tests
-    /// (same fixture as FullPipelineFlowTests).
+    /// the pre-flight's geometry half refuses it with
+    /// `.unsupportedPageGeometry` — a deterministic redaction-stage throw
+    /// for the recovery-route tests (same fixture as FullPipelineFlowTests).
     private func makeOversizedPDFDocument() -> PDFDocument {
         let renderer = UIGraphicsPDFRenderer(
             bounds: CGRect(x: 0, y: 0, width: 5200, height: 300))

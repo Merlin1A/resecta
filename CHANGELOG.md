@@ -30,10 +30,12 @@ The entries below follow the Keep-a-Changelog index format.
 ### Fixed
 
 - Searchable Redaction: on pages stored with a rotation, the text layer is rebuilt along the source lines and reads in the source's order; the spatial check reads the layer along the axis its lines run on. The rebuilt layer on such pages was previously assembled across lines and could run off the page.
+- A page with an unsupported size or scale factor is reported as unsupported page geometry instead of a memory failure.
 
 ### Security
 
 - Links inside an imported document are not followed when tapped in the editor, and data detectors are turned off for the document the editor shows.
+- Import: a document that carries JavaScript or a launch action in its catalog's name tree, in its open action, in a page's additional actions, or in an annotation's action is refused at import, as a document with those entries at the top of the catalog already was. The refusal names active content instead of a damaged file.
 - Export: the file identifier the system PDF writer adds is rewritten to a value derived from the file's own contents, so it carries nothing about the device, the build or the moment of export; the metadata check confirms it. Two exports of identical content carry the same identifier.
 
 ## [1.1.0] — 2026-08-28

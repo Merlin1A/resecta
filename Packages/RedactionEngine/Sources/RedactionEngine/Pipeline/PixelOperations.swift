@@ -713,9 +713,20 @@ public func selectDPI(
 
 // MARK: - Input Validation
 
-/// Validate a page before rendering. Checks dimensions, /UserUnit, and
-/// memory budget at the effective DPI.
+/// Validate a page before rendering: the geometry half
+/// (`validatePageGeometry`) and the memory half (`validatePageMemory`)
+/// together. Kept as the one-call form for callers and tests that only
+/// need the combined verdict; `PageRasterizer.rasterize` calls the two
+/// halves separately so each refusal carries its own error case.
 public func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
+    validatePageGeometry(page) && validatePageMemory(page, effectiveDPI: effectiveDPI)
+}
+
+/// The geometry half of the pre-flight: every side of the cropBox between
+/// 10 and 5,000 pt, and no non-default `/UserUnit` on the page dictionary.
+/// Independent of DPI and of available memory. A page that fails here is
+/// reported as `.unsupportedPageGeometry`, never as a memory failure.
+public func validatePageGeometry(_ page: PDFPage) -> Bool {
     let box = page.bounds(for: .cropBox)
     guard box.width >= 10, box.height >= 10,
           box.width <= 5000, box.height <= 5000 else { return false }
@@ -729,6 +740,16 @@ public func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
             return false
         }
     }
+    return true
+}
+
+/// The memory half of the pre-flight: the page's raster at `effectiveDPI`
+/// must fit the three-bitmap estimate against available memory. The
+/// rasterizer runs the geometry half first, so an out-of-range page never
+/// reaches this estimate; called alone, an oversized page's estimate is
+/// simply large.
+public func validatePageMemory(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
+    let box = page.bounds(for: .cropBox)
 
     // Use effective DPI for memory budget check.
     let scale: CGFloat = CGFloat(effectiveDPI) / 72.0
@@ -741,9 +762,9 @@ public func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
     // When the reading is at or below the 150 MB headroom — the same
     // floor at which `selectDPI` yields zero budget — treat it as unusable and
     // defer the memory decision to the runtime DPI cap + `selectDPI` (KI-5),
-    // which are the effective memory defense. The dimension/UserUnit guards
-    // above still run in every case, so the pre-flight keeps rejecting
-    // oversized pages.
+    // which are the effective memory defense. The geometry half
+    // (`validatePageGeometry`) runs first in every case, so the pre-flight
+    // keeps rejecting out-of-range pages.
     #if canImport(UIKit)
     let available = os_proc_available_memory()
     guard available > 150_000_000 else { return true }

@@ -70,8 +70,8 @@ struct FullPipelineFlowTests {
             try await Task.sleep(for: .milliseconds(10))
         }
 
-        guard case .redactionError(.insufficientMemory) = failure else {
-            Issue.record("Expected .redactionError(.insufficientMemory) from the pre-flight check, got \(String(describing: failure))")
+        guard case .redactionError(.unsupportedPageGeometry) = failure else {
+            Issue.record("Expected .redactionError(.unsupportedPageGeometry) from the pre-flight's geometry half, got \(String(describing: failure))")
             return
         }
     }
@@ -110,7 +110,7 @@ struct FullPipelineFlowTests {
     /// validatePage dimension cap but cheap to build. Loaded
     /// directly onto the coordinator, which bypasses the import-time dimension
     /// gate so the page reaches `PageRasterizer.rasterize`, where the
-    /// pre-flight check refuses it with `.insufficientMemory`.
+    /// pre-flight's geometry half refuses it with `.unsupportedPageGeometry`.
     private func makeOversizedPDFDocument() -> PDFDocument {
         let renderer = UIGraphicsPDFRenderer(
             bounds: CGRect(x: 0, y: 0, width: 5200, height: 300))

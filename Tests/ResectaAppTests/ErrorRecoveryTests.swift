@@ -102,9 +102,68 @@ struct ErrorRecoveryTests {
             PipelineError.redactionError(.reconstructionFailed),
             PipelineError.redactionError(.renderTimeout(pageIndex: 0)),
             PipelineError.redactionError(.insufficientMemory(pageIndex: 0)),
+            PipelineError.redactionError(.unsupportedPageGeometry(pageIndex: 0)),
           ])
     func redactionErrorDescriptions(error: PipelineError) {
         #expect(!error.localizedDescription.isEmpty)
+    }
+
+    // MARK: - Geometry vs. memory copy
+
+    // The rasterizer's pre-flight has two halves with their own cases; the
+    // copy on each must describe only its own mechanism. The memory copy
+    // used to carry the page-size clause because both refusals shared it.
+
+    @Test("Unsupported page geometry: title and message name the page range and scale, not memory")
+    func unsupportedPageGeometryCopy() {
+        let error = PipelineError.redactionError(.unsupportedPageGeometry(pageIndex: 2))
+        #expect(error.localizedTitle == "Unsupported Page Geometry")
+        #expect(error.localizedRecovery.hasPrefix("Page 3 uses a page size or scale factor that is not processed."))
+        #expect(error.localizedRecovery.contains("between 10 and 5,000 points per side at the standard scale"))
+        #expect(error.localizedDescription.contains("Page 3 uses a page size or scale factor"))
+        for text in [error.localizedTitle, error.localizedRecovery, error.localizedDescription] {
+            #expect(!text.lowercased().contains("memory"),
+                    "geometry copy must not mention memory: \(text)")
+        }
+    }
+
+    @Test("Insufficient memory: title and message describe memory only, with no page-size clause")
+    func insufficientMemoryCopy() {
+        let error = PipelineError.redactionError(.insufficientMemory(pageIndex: 0))
+        #expect(error.localizedTitle == "Not Enough Memory")
+        #expect(error.localizedRecovery.contains("memory"))
+        #expect(error.localizedDescription.contains("memory available"))
+        for text in [error.localizedRecovery, error.localizedDescription] {
+            let lower = text.lowercased()
+            #expect(!lower.contains("5,000") && !lower.contains("points") && !lower.contains("scale"),
+                    "memory copy must not carry the geometry clause: \(text)")
+        }
+    }
+
+    @Test("The split copy carries no banned or forbidden vocabulary")
+    func splitCopyVocabularyFence() {
+        let errors: [PipelineError] = [
+            .redactionError(.unsupportedPageGeometry(pageIndex: 0)),
+            .redactionError(.insufficientMemory(pageIndex: 0)),
+        ]
+        // Forbidden absolutes assembled from halves so this source does not
+        // itself trip the M-1 sweep (mirrors HonestySurfacesTests).
+        let halves: [(String, String)] = [
+            ("guaran", "tee"), ("ens", "ure"), ("imposs", "ible"),
+            ("perfect", "ly"), ("flaw", "lessly"), ("10", "0%"),
+        ]
+        for error in errors {
+            for text in [error.localizedTitle, error.localizedRecovery, error.localizedDescription] {
+                let lower = text.lowercased()
+                for banned in LegalPhrases.bannedTerms {
+                    #expect(!lower.contains(banned.lowercased()),
+                            "banned term '\(banned)' in: \(text)")
+                }
+                for (a, b) in halves {
+                    #expect(!lower.contains(a + b), "forbidden phrase '\(a + b)' in: \(text)")
+                }
+            }
+        }
     }
 
     @Test("All PipelineError verification cases have non-empty localizedDescription",

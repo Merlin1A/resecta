@@ -239,6 +239,71 @@ struct PageRasterizerTests {
         }
     }
 
+    // MARK: - Pre-flight geometry vs. memory
+
+    /// A page with a non-default `/UserUnit` passes import (which checks
+    /// 0 < side ≤ 5,000 pt only) and reaches rasterization, where the
+    /// pre-flight's geometry half refuses it. The refusal must carry the
+    /// geometry case — it used to be reported as a memory failure.
+    @Test("rasterize refuses a /UserUnit 2 page as unsupportedPageGeometry, never insufficientMemory")
+    func userUnitPageThrowsUnsupportedPageGeometry() async throws {
+        let doc = try #require(PDFDocument(data: TestFixtures.userUnitPDF(userUnit: 2.0)))
+        let page = try #require(doc.page(at: 0))
+        let pageData = PDFPageData(
+            page: page, pageIndex: 0, regions: [],
+            fillColor: .black, targetDPI: 150,
+            pipelineMode: .secureRasterization, rotation: 0,
+            cropBoxBounds: page.bounds(for: .cropBox),
+            cgPage: page.pageRef,
+            hasText: false
+        )
+
+        let rasterizer = PageRasterizer()
+        do {
+            _ = try await rasterizer.rasterize(pageData, dpiCap: 150)
+            Issue.record("Expected unsupportedPageGeometry, got success")
+        } catch let error as PipelineError {
+            if case .redactionError(.insufficientMemory) = error {
+                Issue.record("A /UserUnit page must not be reported as a memory failure")
+            }
+            guard case .redactionError(.unsupportedPageGeometry(let p)) = error else {
+                Issue.record("Expected .unsupportedPageGeometry, got \(error)")
+                return
+            }
+            #expect(p == 0)
+        }
+    }
+
+    @Test("rasterize refuses an over-5,000-pt page as unsupportedPageGeometry")
+    func oversizedPageThrowsUnsupportedPageGeometry() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pagegeometry_\(UUID().uuidString).pdf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try synthesizeOversizedPDF(at: url, width: 6_000, height: 300)
+        let doc = try #require(PDFDocument(url: url))
+        let page = try #require(doc.page(at: 0))
+        let pageData = PDFPageData(
+            page: page, pageIndex: 4, regions: [],
+            fillColor: .black, targetDPI: 150,
+            pipelineMode: .secureRasterization, rotation: 0,
+            cropBoxBounds: page.bounds(for: .cropBox),
+            cgPage: page.pageRef,
+            hasText: false
+        )
+
+        let rasterizer = PageRasterizer()
+        do {
+            _ = try await rasterizer.rasterize(pageData, dpiCap: 150)
+            Issue.record("Expected unsupportedPageGeometry, got success")
+        } catch let error as PipelineError {
+            guard case .redactionError(.unsupportedPageGeometry(let p)) = error else {
+                Issue.record("Expected .unsupportedPageGeometry, got \(error)")
+                return
+            }
+            #expect(p == 4, "the page index rides the error")
+        }
+    }
+
     // MARK: - Helpers
 
     /// Synthesize a single-page PDF at the given point dimensions. Used to
