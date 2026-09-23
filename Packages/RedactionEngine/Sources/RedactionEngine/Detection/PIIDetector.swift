@@ -504,7 +504,7 @@ public struct PIIDetector: Sendable {
                        documentHeader: currentHeader)
         })
         results.append(contentsOf: withPerPageTimeout("creditCard") { families.creditCard.detect(in: nsText, range: fullRange) })
-        results.append(contentsOf: withPerPageTimeout("email") { detectEmails(in: nsText, range: fullRange) })
+        results.append(contentsOf: withPerPageTimeout("email") { families.email.detect(in: nsText, range: fullRange) })
         results.append(contentsOf: withPerPageTimeout("phone") { detectPhones(in: nsText, range: fullRange) })
         results.append(contentsOf: withPerPageTimeout("ein") { detectEINs(in: nsText, range: fullRange) })
         results.append(contentsOf: withPerPageTimeout("address") { detectAddresses(in: nsText, range: fullRange) })
@@ -590,7 +590,7 @@ public struct PIIDetector: Sendable {
             })
         }
         if categories.contains(.creditCard) { results.append(contentsOf: withPerPageTimeout("creditCard") { families.creditCard.detect(in: nsText, range: fullRange) }) }
-        if categories.contains(.email) { results.append(contentsOf: withPerPageTimeout("email") { detectEmails(in: nsText, range: fullRange) }) }
+        if categories.contains(.email) { results.append(contentsOf: withPerPageTimeout("email") { families.email.detect(in: nsText, range: fullRange) }) }
         if categories.contains(.phone) { results.append(contentsOf: withPerPageTimeout("phone") { detectPhones(in: nsText, range: fullRange) }) }
         if categories.contains(.ein) { results.append(contentsOf: withPerPageTimeout("ein") { detectEINs(in: nsText, range: fullRange) }) }
         if categories.contains(.address) { results.append(contentsOf: withPerPageTimeout("address") { detectAddresses(in: nsText, range: fullRange) }) }
@@ -787,28 +787,6 @@ public struct PIIDetector: Sendable {
     private static func runsLicensePlate(doctype: DoctypeClass?) -> Bool {
         guard let doctype else { return true }
         return doctype == .court || doctype == .foia || doctype == .generic
-    }
-
-    // MARK: - Email Detection
-
-    // Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
-    // The local part is anchored on a non-dot character; subsequent
-    // dots are allowed only before an alphanumeric (forbids leading
-    // and consecutive dots: `.a@b.co`, `a..b@c.co`). The domain anchors
-    // on alphanumeric at both ends so leading-dot (`a@.b.co`) and
-    // trailing-dot (`a@b..co`) domains no longer match.
-    static let emailPattern = try! NSRegularExpression(
-        pattern: #"[a-zA-Z0-9_%+-](?:[a-zA-Z0-9_%+-]|\.(?=[a-zA-Z0-9_%+-]))*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?)\.[a-zA-Z]{2,}"#
-    )
-
-    func detectEmails(in text: NSString, range: NSRange) -> [PIIMatch] {
-        Self.emailPattern.matches(in: text as String, range: range).compactMap { match in
-            let matchedText = text.substring(with: match.range)
-            // RFC 5321: maximum email address length is 254 characters
-            guard matchedText.count <= 254 else { return nil }
-            return PIIMatch(text: matchedText, range: match.range,
-                           kind: .email, confidence: 0.90)
-        }
     }
 
     // MARK: - Phone Detection
@@ -2348,7 +2326,7 @@ public struct PIIDetector: Sendable {
         switch category {
         case .ssn:            return families.ssn.detect(in: context, range: contextRange)
         case .creditCard:     return families.creditCard.detect(in: context, range: contextRange)
-        case .email:          return detectEmails(in: context, range: contextRange)
+        case .email:          return families.email.detect(in: context, range: contextRange)
         case .phone:          return detectPhones(in: context, range: contextRange)
         case .ein:            return detectEINs(in: context, range: contextRange)
         case .address:        return detectAddresses(in: context, range: contextRange)

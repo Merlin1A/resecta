@@ -80,7 +80,7 @@ struct PIIDetectionTests {
     ])
     func emailStillAcceptsValidAddresses(_ input: String) {
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.emailPattern.matches(in: input, range: range)
+        let matches = EmailDetector.emailPattern.matches(in: input, range: range)
         #expect(!matches.isEmpty, "Expected email match for '\(input)'")
         // Exact-span match: the entire input is the match.
         let matched = (input as NSString).substring(with: matches.first!.range)
@@ -91,7 +91,7 @@ struct PIIDetectionTests {
     func emailRejectsLeadingDotLocal() {
         let input = ".a@b.co"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.emailPattern.matches(in: input, range: range)
+        let matches = EmailDetector.emailPattern.matches(in: input, range: range)
         for match in matches {
             let matched = (input as NSString).substring(with: match.range)
             #expect(!matched.hasPrefix("."),
@@ -103,7 +103,7 @@ struct PIIDetectionTests {
     func emailRejectsLeadingDotDomain() {
         let input = "a@.b.co"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.emailPattern.matches(in: input, range: range)
+        let matches = EmailDetector.emailPattern.matches(in: input, range: range)
         #expect(matches.isEmpty,
                 "domain must not start with a dot — got \(matches.count) match(es)")
     }
@@ -112,7 +112,7 @@ struct PIIDetectionTests {
     func emailRejectsConsecutiveDotsLocal() {
         let input = "a..b@c.co"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.emailPattern.matches(in: input, range: range)
+        let matches = EmailDetector.emailPattern.matches(in: input, range: range)
         for match in matches {
             let matched = (input as NSString).substring(with: match.range)
             #expect(!matched.contains(".."),
@@ -124,7 +124,7 @@ struct PIIDetectionTests {
     func emailRejectsConsecutiveDotsDomain() {
         let input = "a@b..co"
         let range = NSRange(location: 0, length: (input as NSString).length)
-        let matches = PIIDetector.emailPattern.matches(in: input, range: range)
+        let matches = EmailDetector.emailPattern.matches(in: input, range: range)
         for match in matches {
             let matched = (input as NSString).substring(with: match.range)
             #expect(!matched.contains(".."),
@@ -602,7 +602,7 @@ struct PIIDetectionTests {
         // These are hardcoded constant patterns that cannot fail at runtime,
         // but this test makes that guarantee explicit and CI-enforced.
         _ = CreditCardDetector.ccPattern
-        _ = PIIDetector.emailPattern
+        _ = EmailDetector.emailPattern
         _ = PIIDetector.phonePattern
         _ = PIIDetector.addressPattern
         _ = PIIDetector.dobPattern

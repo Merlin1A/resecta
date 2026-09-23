@@ -49,7 +49,7 @@ struct EnvelopeReachabilityTests {
         ("ein",           0.85, "PIIDetector.einProfile boostedConfidence=0.85"),
         ("itin",          0.85, "PIIDetector.itinProfile boostedConfidence=0.85"),
         ("creditCard",    0.95, "PIIDetector.families.creditCard.detect() fixed 0.95 (Luhn+prefix gate)"),
-        ("email",         0.90, "PIIDetector.detectEmails() fixed 0.90"),
+        ("email",         0.90, "PIIDetector.families.email.detect() fixed 0.90"),
         ("phone",         0.80, "PIIDetector.detectPhones() max 0.80 (context-boosted path)"),
         ("driversLicense", 0.80, "PIIDetector.detectDriversLicenses() fixed 0.80"),
         ("passport",      0.80, "PIIDetector.detectPassports() fixed 0.80"),

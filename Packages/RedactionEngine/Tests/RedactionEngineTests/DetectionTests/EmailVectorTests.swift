@@ -45,7 +45,7 @@ struct EmailVectorTests {
         guard let vectors = try loadVectors() else { return }
         for vec in vectors where vec.valid {
             let ns = vec.email as NSString
-            let count = PIIDetector.emailPattern.numberOfMatches(
+            let count = EmailDetector.emailPattern.numberOfMatches(
                 in: vec.email, range: NSRange(location: 0, length: ns.length)
             )
             #expect(count >= 1, "emailPattern did not match: \(vec.email) (\(vec.notes))")
