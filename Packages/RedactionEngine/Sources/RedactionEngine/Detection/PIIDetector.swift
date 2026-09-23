@@ -97,6 +97,11 @@ public struct PIIDetector: Sendable {
     // is live in the struct but not called here.
     private let negativeContextGazetteer: NegativeContextGazetteer?
 
+    /// The family detectors in evaluation order (`DetectorRegistry.rows`),
+    /// keyed by category for the reverse-rationale explainer. Constructed
+    /// once from the loaders above.
+    let families: DetectorRegistry
+
     // The default arguments consult the same memoized corpus verdict the
     // diagnostics loader uses (the manifest signature plus the signed digests
     // of the files these five read), so `PIIDetector()` cannot load a corpus
@@ -119,6 +124,12 @@ public struct PIIDetector: Sendable {
         self.passportPatternGazetteer = passportPatternGazetteer
         self.contextLoader = contextLoader
         self.negativeContextGazetteer = negativeContextGazetteer
+        self.families = DetectorRegistry(
+            nameGazetteer: nameGazetteer,
+            dlPatternGazetteer: dlPatternGazetteer,
+            passportPatternGazetteer: passportPatternGazetteer,
+            contextLoader: contextLoader
+        )
     }
 
     // MARK: - Explicit-degrade loader
