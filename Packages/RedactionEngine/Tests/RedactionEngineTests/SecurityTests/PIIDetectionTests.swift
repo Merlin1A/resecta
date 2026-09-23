@@ -506,10 +506,10 @@ struct PIIDetectionTests {
     // MARK: - Medical Record Number Detection
 
     @Test("MRN detector locates labeled medical record numbers", arguments: [
-        ("MRN: 12345678", PIIDetector.mrnPatternLabeled),
-        ("Patient ID: AB12345", PIIDetector.mrnPatternPatientID),
+        ("MRN: 12345678", MRNDetector.mrnPatternLabeled),
+        ("Patient ID: AB12345", MRNDetector.mrnPatternPatientID),
         ("Community Hospital ABC-1234567 discharge",
-         PIIDetector.mrnPatternInstitution),
+         MRNDetector.mrnPatternInstitution),
     ])
     func validMRN(_ input: String, _ pattern: NSRegularExpression) {
         let nsInput = input as NSString
@@ -523,7 +523,7 @@ struct PIIDetectionTests {
         let input = "The value 12345678 is a count"
         let nsInput = input as NSString
         let range = NSRange(location: 0, length: nsInput.length)
-        let matches = PIIDetector.mrnPatternLabeled.matches(in: input, range: range)
+        let matches = MRNDetector.mrnPatternLabeled.matches(in: input, range: range)
         #expect(matches.isEmpty, "Should not match bare digits without MRN label")
     }
 
@@ -609,9 +609,9 @@ struct PIIDetectionTests {
         _ = ITINDetector.itinPattern
         _ = DriversLicenseDetector.driversLicensePattern
         _ = PassportDetector.passportPattern
-        _ = PIIDetector.mrnPatternLabeled
-        _ = PIIDetector.mrnPatternPatientID
-        _ = PIIDetector.mrnPatternInstitution
+        _ = MRNDetector.mrnPatternLabeled
+        _ = MRNDetector.mrnPatternPatientID
+        _ = MRNDetector.mrnPatternInstitution
         _ = PIIDetector.licensePlateLabeled
     }
 }

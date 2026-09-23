@@ -78,6 +78,7 @@ struct DetectorRegistry: Sendable {
     let itin: ITINDetector
     let driversLicense: DriversLicenseDetector
     let passport: PassportDetector
+    let medicalRecord: MRNDetector
 
     /// Evaluation order: the structured families first, the name passes
     /// last. Adding a family = a row here, keyed by its `PIICategory`.
@@ -102,7 +103,8 @@ struct DetectorRegistry: Sendable {
         itin = ITINDetector()
         driversLicense = DriversLicenseDetector(dlPatternGazetteer: dlPatternGazetteer)
         passport = PassportDetector(passportPatternGazetteer: passportPatternGazetteer)
-        rows = [ssn, creditCard, email, phone, ein, address, dateOfBirth, itin, driversLicense, passport]
+        medicalRecord = MRNDetector(contextScorer: contextScorer, contextLoader: contextLoader)
+        rows = [ssn, creditCard, email, phone, ein, address, dateOfBirth, itin, driversLicense, passport, medicalRecord]
         table = Dictionary(uniqueKeysWithValues: rows.map { ($0.category, $0) })
     }
 

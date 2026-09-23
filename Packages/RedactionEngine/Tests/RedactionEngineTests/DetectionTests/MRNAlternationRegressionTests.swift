@@ -78,7 +78,7 @@ struct MRNAlternationRegressionTests {
             let oldMatches = Self.oldAlternation.matches(in: doc.text, range: fullRange)
 
             // Collect the new set's ranges once per doc.
-            let newMatches = detector.detectMedicalRecords(in: ns, range: fullRange)
+            let newMatches = detector.families.medicalRecord.detect(in: ns, range: fullRange)
 
             for old in oldMatches {
                 let covered = newMatches.contains { new in
@@ -109,7 +109,7 @@ struct MRNAlternationRegressionTests {
         for doc in medical {
             let ns = doc.text as NSString
             let fullRange = NSRange(location: 0, length: ns.length)
-            let newMatches = detector.detectMedicalRecords(in: ns, range: fullRange)
+            let newMatches = detector.families.medicalRecord.detect(in: ns, range: fullRange)
 
             for span in doc.piiSpans where span.category == "mrn" {
                 let expected = NSRange(location: span.start, length: span.end - span.start)
