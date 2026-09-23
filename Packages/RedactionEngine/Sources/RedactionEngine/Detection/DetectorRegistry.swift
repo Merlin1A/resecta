@@ -68,6 +68,7 @@ extension FamilyDetector {
 /// order the matches reach the overlap resolver in); the table keys the same
 /// instances by category for the explainer.
 struct DetectorRegistry: Sendable {
+    let ssn: SSNDetector
 
     /// Evaluation order: the structured families first, the name passes
     /// last. Adding a family = a row here, keyed by its `PIICategory`.
@@ -82,7 +83,8 @@ struct DetectorRegistry: Sendable {
     ) {
         // One stateless scorer shared by the three scored families.
         let contextScorer = ContextWindowScorer()
-        rows = []
+        ssn = SSNDetector(contextScorer: contextScorer, contextLoader: contextLoader)
+        rows = [ssn]
         table = Dictionary(uniqueKeysWithValues: rows.map { ($0.category, $0) })
     }
 
