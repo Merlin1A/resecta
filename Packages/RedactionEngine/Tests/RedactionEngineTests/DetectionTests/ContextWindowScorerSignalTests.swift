@@ -119,6 +119,52 @@ struct ContextWindowScorerSignalTests {
         #expect(signal == nil)
     }
 
+    // MARK: - Token-bound keyword matching (C12-134 / C12-135)
+    //
+    // A keyword matches only as a whole token: each alphanumeric edge of the
+    // keyword meets a non-alphanumeric character or the window edge. `lp`
+    // inside "help", `tag` inside "stage", `plate` inside "template" and `sku`
+    // inside "skull" are not keyword occurrences; `ss#` keeps its free
+    // punctuation edge so "SS#123-45-6789" still reads the label.
+
+    private static let plateLikeProfile = KeywordProfile(
+        positiveKeywords: ["lp", "tag", "plate"],
+        negativeKeywords: ["sku"],
+        windowRadius: 5,
+        baseConfidence: 0.55,
+        boostedConfidence: 0.88,
+        floor: 0.20
+    )
+
+    @Test("a keyword inside another word is not a match: help ∌ lp, stage ∌ tag, template ∌ plate, skull ∌ sku")
+    func keywordInsideAnotherWordDoesNotScore() {
+        let scorer = ContextWindowScorer()
+        let text = "Need help with the template 7ABC123 at this stage of the skull scan"
+        let matchRange = range(of: "7ABC123", in: text)
+        let confidence = scorer.score(text: text, matchRange: matchRange, profile: Self.plateLikeProfile)
+        #expect(confidence == Self.plateLikeProfile.baseConfidence,
+                "substring-only keywords must neither boost nor dampen; got \(confidence)")
+        #expect(scorer.signal(text: text, matchRange: matchRange, profile: Self.plateLikeProfile) == nil)
+        #expect(scorer.signalDetail(text: text, matchRange: matchRange, profile: Self.plateLikeProfile) == nil)
+    }
+
+    @Test("whole-token keywords still score, and a punctuation-edged keyword keeps its free edge")
+    func wholeTokenKeywordsStillScore() {
+        let scorer = ContextWindowScorer()
+        let plateText = "Plate: 7ABC123"
+        #expect(scorer.score(text: plateText, matchRange: range(of: "7ABC123", in: plateText),
+                             profile: Self.plateLikeProfile) == Self.plateLikeProfile.boostedConfidence)
+        let skuText = "SKU 7ABC123"
+        let dampened = scorer.score(text: skuText, matchRange: range(of: "7ABC123", in: skuText),
+                                    profile: Self.plateLikeProfile)
+        #expect(dampened < Self.plateLikeProfile.baseConfidence, "a whole-token negative keyword dampens; got \(dampened)")
+        let ssProfile = KeywordProfile(
+            positiveKeywords: ["ss#"], negativeKeywords: [], windowRadius: 5,
+            baseConfidence: 0.75, boostedConfidence: 0.95, floor: 0.25)
+        let ssText = "SS#123-45-6789 on file"
+        #expect(scorer.score(text: ssText, matchRange: range(of: "123-45-6789", in: ssText), profile: ssProfile) == 0.95)
+    }
+
     // MARK: - W-N regression guard
     //
     // Aggregate-recall delta surrogate for the recall-parity target

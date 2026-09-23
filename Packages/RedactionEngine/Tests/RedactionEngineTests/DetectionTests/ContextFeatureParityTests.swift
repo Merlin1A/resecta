@@ -75,6 +75,19 @@ struct ContextFeatureParityTests {
         Case(name: "account/supplementary", text: "Acct: \u{10437}1234567890", loc: 8, len: 10,
              kind: .account, doctype: .financial,
              golden: [1, 0, 0.7142857142857143, 0, 10, 0, 0, 0, 0, 0, 1, 0, 0]),
+
+        // --- C12-134 — a keyword inside another word is not a keyword occurrence.
+        // `tel` inside "Patel" reads kw_positive_window 0 and nearest_positive
+        // distance 0 (no occurrence in the neighborhood); the whole token "Tel"
+        // one place earlier reads 1 and 1/(1 + 1/10). The Python port applies the
+        // same token boundary (each alphanumeric edge of the keyword meets a
+        // non-alphanumeric character or the text edge).
+        Case(name: "phone/keyword-inside-word", text: "Patel 5551234567", loc: 6, len: 10,
+             kind: .phone, doctype: .generic,
+             golden: [0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 1]),
+        Case(name: "phone/whole-token-keyword", text: "Tel 5551234567", loc: 4, len: 10,
+             kind: .phone, doctype: .generic,
+             golden: [1, 0, 0.9090909090909091, 0, 10, 0, 0, 0, 0, 0, 0, 0, 1]),
     ]
 
     @Test("contextFeatures matches the golden 13-vectors on fixed ASCII")

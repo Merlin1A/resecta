@@ -982,11 +982,12 @@ public struct PIIDetector: Sendable {
                 location: max(0, match.range.location - 80),
                 length: min(text.length, match.range.location + match.range.length + 80) - max(0, match.range.location - 80)
             )
-            let context = text.substring(with: contextRange).lowercased()
+            let context = text.substring(with: contextRange).lowercased() as NSString
 
-            // Negative context: skip matches near case/docket/reference labels
-            let hasNegativeContext = Self.phoneNegativeKeywords.contains { context.contains($0) }
-            let hasPositiveContext = Self.phoneContextKeywords.contains { context.contains($0) }
+            // Negative context: skip matches near case/docket/reference labels.
+            // Keywords read as whole tokens (KeywordMatch).
+            let hasNegativeContext = Self.phoneNegativeKeywords.contains { KeywordMatch.containsToken($0, in: context) }
+            let hasPositiveContext = Self.phoneContextKeywords.contains { KeywordMatch.containsToken($0, in: context) }
 
             // If negative context found and no positive context to override, skip
             if hasNegativeContext && !hasPositiveContext { return nil }

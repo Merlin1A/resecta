@@ -85,8 +85,8 @@ struct DOBDetector: Sendable {
             location: max(0, matchRange.location - 80),
             length: min(text.length, matchRange.location + matchRange.length + 80) - max(0, matchRange.location - 80)
         )
-        let contextLower = text.substring(with: contextRange).lowercased()
-        let hasLabel = labelKeywords.contains { contextLower.contains($0) }
+        let contextLower = text.substring(with: contextRange).lowercased() as NSString
+        let hasLabel = labelKeywords.contains { KeywordMatch.containsToken($0, in: contextLower) }
         if hasLabel { confidence += 0.30 }
 
         let lineRange = NSRange(

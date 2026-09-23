@@ -71,7 +71,7 @@ public struct NegativeContextGazetteer: Sendable {
         }
         let key = ScopeKey(category: wire, doctype: doctype.rawValue)
         guard let entry = byScope[key] else { return 1.0 }
-        let lowered = context.lowercased()
+        let lowered = context.lowercased() as NSString
         // Per-matched-keyword semantics:
         // collect the weights of every keyword actually found in the context
         // window and use the MAX matched weight — not the bucket max.
@@ -79,7 +79,7 @@ public struct NegativeContextGazetteer: Sendable {
         // every keyword in a bucket suppress at the strongest member's weight,
         // rendering per-keyword weight values decorative.
         var maxMatchedWeight: Double? = nil
-        for (kw, weight) in zip(entry.keywords, entry.weights) where lowered.contains(kw) {
+        for (kw, weight) in zip(entry.keywords, entry.weights) where KeywordMatch.containsToken(kw, in: lowered) {
             maxMatchedWeight = max(maxMatchedWeight ?? 0.0, weight)
         }
         guard let matched = maxMatchedWeight else { return 1.0 }
@@ -103,10 +103,10 @@ public struct NegativeContextGazetteer: Sendable {
         }
         let key = ScopeKey(category: wire, doctype: doctype.rawValue)
         guard let entry = byScope[key] else { return (1.0, nil, nil) }
-        let lowered = context.lowercased()
+        let lowered = context.lowercased() as NSString
         var maxMatchedWeight: Double? = nil
         var maxMatchedKeyword: String? = nil
-        for (kw, weight) in zip(entry.keywords, entry.weights) where lowered.contains(kw) {
+        for (kw, weight) in zip(entry.keywords, entry.weights) where KeywordMatch.containsToken(kw, in: lowered) {
             if weight > (maxMatchedWeight ?? -1.0) {
                 maxMatchedWeight = weight
                 maxMatchedKeyword = kw
