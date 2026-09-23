@@ -43,6 +43,11 @@ struct LayerResultRow: View {
                         Text(Self.rowSubtitleText(layer: layer))
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            // An attention row's sentence quotes the
+                            // review terms; the layer name, status
+                            // phrase and every other row's description
+                            // stay readable under a capture.
+                            .privacySensitive(Self.rowSubtitleIsPrivacySensitive(layer: layer))
                     }
 
                     Spacer()
@@ -87,14 +92,19 @@ struct LayerResultRow: View {
                     if let lines = layer.queryLines, !lines.isEmpty {
                         VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
                             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                                // Each line quotes the user's own query,
+                                // pattern or terms — marked like the
+                                // search sheet's rows.
                                 Text(Self.queryLineText(line))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                    .privacySensitive(Self.queryLinesArePrivacySensitive)
                                 ForEach(Array(Self.perTermLineTexts(line).enumerated()), id: \.offset) { _, text in
                                     Text(text)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                         .padding(.leading, ResectaTokens.Spacing.sm)
+                                        .privacySensitive(Self.queryLinesArePrivacySensitive)
                                 }
                             }
                         }
@@ -155,6 +165,14 @@ struct LayerResultRow: View {
         return reviewRowText(termTexts: terms, pages: layer.pageReferences)
     }
 
+    /// Whether the collapsed-row subtitle names user text: true exactly
+    /// when `rowSubtitleText(layer:)` takes the attention arm and composes
+    /// its sentence from the review terms. Static so the predicate is
+    /// unit-testable without a SwiftUI host.
+    static func rowSubtitleIsPrivacySensitive(layer: LayerResult) -> Bool {
+        layer.status.isAttention && !(layer.reviewTermTexts ?? []).isEmpty
+    }
+
     /// Attention-row sentence: names the term(s), where they remain, and
     /// the remedy. Pages are 0-based storage, displayed 1-based (PageChip
     /// convention).
@@ -180,6 +198,12 @@ struct LayerResultRow: View {
     }
 
     // MARK: - Search Re-check query lines (static for unit testability)
+
+    /// The query lines and per-term sub-lines always render under
+    /// `.privacySensitive()`: every one quotes the user's query, pattern or
+    /// term list. The modifier is not introspectable, so the row reads this
+    /// constant and the display pin holds it true.
+    static let queryLinesArePrivacySensitive = true
 
     /// The per-query line as displayed: "{label} · found {N} · applied {M}
     /// · {R} remain", then the option badges ("case-sensitive", "whole

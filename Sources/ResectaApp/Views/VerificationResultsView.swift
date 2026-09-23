@@ -215,6 +215,12 @@ struct VerificationResultsView: View {
                     .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 320)
+                    // The ATTENTION arm quotes the review terms — text the
+                    // checks found still readable in the output — so it
+                    // carries the same privacy marking as the search and
+                    // review surfaces; every other arm is mechanism copy.
+                    .privacySensitive(Self.mastheadSubtitleIsPrivacySensitive(
+                        status: report.overallStatus))
             }
         }
         .accessibilityElement(children: .combine)
@@ -250,6 +256,14 @@ struct VerificationResultsView: View {
     /// Nil on PASS — the masthead mounts no subtitle at all.
     private var mastheadSubtitle: String? {
         Self.mastheadSubtitle(report: report)
+    }
+
+    /// Whether the masthead subtitle names user text. Only the ATTENTION
+    /// arm of `mastheadSubtitle(report:)` quotes the review terms; the
+    /// WARN, FAIL and skipped lines describe what the checks did. Static so
+    /// the predicate is unit-testable without a SwiftUI host.
+    static func mastheadSubtitleIsPrivacySensitive(status: VerificationStatus) -> Bool {
+        status.isAttention
     }
 
     /// Subtitle derivation, lifted to a `static` helper so the skip-induced
