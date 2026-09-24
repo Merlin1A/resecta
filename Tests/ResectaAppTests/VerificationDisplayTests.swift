@@ -452,6 +452,50 @@ struct VerificationDisplayTests {
         #expect(ResectaTokens.Opacity.tileWashDark == 0.18)
     }
 
+    // The ROW wash (an attention or fail row's tint across the whole row):
+    // light shares the tile's 0.10; dark is its own, lighter value — 0.18
+    // across a whole row reads muddy and greys the teal page chip.
+    @Test("The row wash's dark opacity token is pinned")
+    func rowWashDarkTokenIsPinned() {
+        #expect(ResectaTokens.Opacity.rowWashDark == 0.12)
+    }
+
+    // MARK: - Badge symbols
+
+    // The ledger's shape badge — a filled circle glyph per status, hung off
+    // the status tile's corner so the status reads by shape, not hue alone.
+    @Test("badgeSymbolName maps each status to its filled-circle badge",
+          arguments: [
+            (VerificationStatus.pass, "checkmark.circle.fill"),
+            (VerificationStatus.warn("w"), "exclamationmark.circle.fill"),
+            (VerificationStatus.info("i"), "info.circle.fill"),
+            (VerificationStatus.attention("a"), "eye.circle.fill"),
+            (VerificationStatus.fail("f"), "xmark.circle.fill"),
+            (VerificationStatus.skipped, "minus.circle.fill"),
+          ])
+    func badgeSymbolNameForAllCases(status: VerificationStatus, expected: String) {
+        #expect(status.badgeSymbolName == expected)
+    }
+
+    // MARK: - Glyph on wash
+
+    // The one deliberate exception to "glyphs stay on the system tier": a
+    // glyph drawn on its own status's tinted wash routes through the text
+    // tier (the system hue on a wash of the same hue measures ≈ 2:1).
+    @Test("glyphOnWash is the status's text-tier shade",
+          arguments: [
+            (VerificationStatus.pass, ResectaTokens.SemanticColor.passText),
+            (VerificationStatus.warn("w"), ResectaTokens.SemanticColor.warnText),
+            (VerificationStatus.info("i"), ResectaTokens.SemanticColor.infoText),
+            (VerificationStatus.attention("a"), ResectaTokens.SemanticColor.attentionText),
+            (VerificationStatus.fail("f"), ResectaTokens.SemanticColor.failText),
+            (VerificationStatus.skipped, Color.secondary),
+          ])
+    func glyphOnWashEqualsTextColorForAllCases(status: VerificationStatus, expected: Color) {
+        #expect(status.glyphOnWash == expected)
+        #expect(status.glyphOnWash == status.textColor)
+    }
+
     @Test("detailsSummaryText: a WARN run keeps the completed + notes shape")
     func detailsSummaryWarnShape() {
         let report = VerificationReport(

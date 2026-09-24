@@ -19,6 +19,21 @@ extension VerificationStatus {
         }
     }
 
+    /// The ledger's shape badge: a filled-circle glyph hung off the status
+    /// tile's corner (`LayerResultRow`), so a row's status reads by shape
+    /// and not by hue alone. Pass rows never carry it — the ledger marks a
+    /// clean pass with its ✓ column instead.
+    var badgeSymbolName: String {
+        switch self {
+        case .pass:      "checkmark.circle.fill"
+        case .warn:      "exclamationmark.circle.fill"
+        case .info:      "info.circle.fill"
+        case .attention: "eye.circle.fill"
+        case .fail:      "xmark.circle.fill"
+        case .skipped:   "minus.circle.fill"
+        }
+    }
+
     // MARK: - Colors
 
     var color: Color {
@@ -62,6 +77,13 @@ extension VerificationStatus {
         case .skipped:   .secondary
         }
     }
+
+    /// The text-tier shade for a GLYPH drawn on this status's tinted wash
+    /// (LayerResultRow's tile). The deliberate exception to "glyphs stay on
+    /// the system tier": on a 10 %/18 % wash of the same hue the system
+    /// glyph measures ≈ 2:1, the text tier 4.4–6.1:1 (contrast.py,
+    /// 2026-09-24). Never for text; never off a wash.
+    var glyphOnWash: Color { textColor }
 
     // MARK: - Titles
 

@@ -39,6 +39,13 @@ enum VerificationSymbol {
         assetName(forLayerNamed: layer.layer?.name ?? layer.name)
     }
 
+    /// Whether the row icon is one of the custom assets (drawn at its
+    /// optical size — the sources render ≈ 15 % smaller than an SF symbol
+    /// at the same point size) rather than the stored SF fallback.
+    static func isCustom(_ layer: LayerResult) -> Bool {
+        assetName(for: layer) != nil
+    }
+
     /// Row icon: custom asset by identity, stored-symbol fallback for
     /// unmapped identities (legacy persisted reports, future layers).
     static func icon(for layer: LayerResult) -> Image {

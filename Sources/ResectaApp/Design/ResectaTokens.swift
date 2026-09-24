@@ -100,6 +100,14 @@ enum ResectaTokens {
         /// on it).
         static let tileWashLight: Double = 0.10
         static let tileWashDark: Double = 0.18
+
+        /// The ROW wash's dark value — an attention or fail row of the
+        /// verification ledger tinted across its whole width. Light shares
+        /// the tile's `tileWashLight`; dark is lighter than `tileWashDark`
+        /// because 0.18 across a whole row reads muddy and greys the teal
+        /// page chip sitting on it (the visual lead, 2026-09-24). 0.18 stays
+        /// for tiles.
+        static let rowWashDark: Double = 0.12
     }
 
     // MARK: - Borders

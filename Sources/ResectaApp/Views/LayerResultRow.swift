@@ -38,6 +38,20 @@ struct LayerResultRow: View {
     /// (`iconColumn + Spacing.sm`), so the detail starts at the name's
     /// left edge.
     @ScaledMetric(relativeTo: .title3) private var iconColumn: CGFloat = 30
+    /// A custom glyph's optical size in a full row: 23 = 1.15 × 20 — the
+    /// sources render ≈ 15 % smaller than an SF symbol at the same point
+    /// size (the stopgap until they are retuned). SF fallbacks (the Search
+    /// Re-check) sit at `.title3`.
+    @ScaledMetric(relativeTo: .title3) private var glyphSize: CGFloat = 23
+    /// The shape badge's glyph, hung off the tile's corner. Scaled with the
+    /// tile (`.title3`), not with `.caption`: caption grows faster, and at
+    /// AX3 a caption-scaled badge covered most of the glyph.
+    @ScaledMetric(relativeTo: .title3) private var badgeSize: CGFloat = 11
+    /// The compact row's glyph — identity only, in the support tier; 23 in
+    /// `supportText` would compete with the tiles.
+    @ScaledMetric(relativeTo: .subheadline) private var compactGlyphSize: CGFloat = 17
+    // The tile's and the row's washes are per appearance.
+    @Environment(\.colorScheme) private var colorScheme
 
     let layer: LayerResult
     let layerIndex: Int
@@ -71,7 +85,49 @@ struct LayerResultRow: View {
         chrome == .card ? ResectaTokens.Spacing.sm : 0
     }
 
+    /// The ledger's status treatment — the tinted tile with its shape
+    /// badge, the attention / fail row wash — is for a finished run's rows.
+    /// While the run is in progress (`useIntermediateColors`) the rows keep
+    /// the bare glyph.
+    private var showsStatusTreatment: Bool { !useIntermediateColors }
+
+    /// An attention or fail row is washed across its width in its status
+    /// hue — supplementary to the tile and badge, which carry the status;
+    /// warn never washes, and status-coloured text never sits on the wash.
+    private var isWashed: Bool {
+        showsStatusTreatment && (layer.status.isAttention || layer.status.isFail)
+    }
+
+    /// A non-pass full row sits its glyph on a tinted tile with the badge;
+    /// a pass row — a full one with something to expand, or a compact one —
+    /// carries neither (a clean pass is marked by the ledger's ✓ column).
+    private var showsTile: Bool { showsStatusTreatment && layer.status != .pass }
+
+    private var tileWash: Double {
+        colorScheme == .dark
+            ? ResectaTokens.Opacity.tileWashDark
+            : ResectaTokens.Opacity.tileWashLight
+    }
+
+    /// The row wash: the tile's light value, its own lighter dark value
+    /// (`rowWashDark` — 0.18 across a whole row reads muddy).
+    private var rowWash: Double {
+        colorScheme == .dark
+            ? ResectaTokens.Opacity.rowWashDark
+            : ResectaTokens.Opacity.tileWashLight
+    }
+
     var body: some View {
+        if style == .compact {
+            compactRow
+        } else {
+            fullRow
+        }
+    }
+
+    // MARK: - Full row
+
+    private var fullRow: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header — always visible. A Button only when the row opens;
             // otherwise the header renders directly, with no chevron and
@@ -104,10 +160,57 @@ struct LayerResultRow: View {
         .background(
             chrome == .card ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.clear),
             in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.toast))
+        // The attention / fail wash across the row, outset 4 pt into the
+        // content column so the tile sits inside it (an inset would cut
+        // the tile); the section's hairlines above and below are untouched.
+        .background {
+            if isWashed {
+                RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.small, style: .continuous)
+                    .fill(layer.status.color.opacity(rowWash))
+                    .padding(.horizontal, -ResectaTokens.Spacing.xs)
+            }
+        }
         // Collapsed: one combined element (header label above). Expanded:
         // a container, so VoiceOver can reach the detail text and the
         // "Go to page N" chips instead of having them flattened away.
         .accessibilityElement(children: isExpanded ? .contain : .combine)
+        .accessibilityIdentifier("layerResult_\(layerIndex - 1)") // zero-indexed
+    }
+
+    // MARK: - Compact row
+
+    /// The compact ledger row — a clean pass: the glyph in the support
+    /// tier, the name, and a ✓ in the pass text tier in the same 16 pt
+    /// trailing slot the full rows give their chevron. Not a button (there
+    /// is nothing to open), no subtitle, no chevron; the same VoiceOver
+    /// label and identifier as a full row. At accessibility sizes the name
+    /// wraps and the glyph and ✓ hold the first line's baseline.
+    private var compactRow: some View {
+        HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .firstTextBaseline : .center,
+               spacing: ResectaTokens.Spacing.sm) {
+            VerificationSymbol.icon(for: layer)
+                .font(VerificationSymbol.isCustom(layer)
+                      ? .system(size: compactGlyphSize)
+                      : .subheadline)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                .frame(width: iconColumn)
+
+            Text(layer.name)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+
+            Spacer(minLength: ResectaTokens.Spacing.sm)
+
+            Image(systemName: "checkmark")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(ResectaTokens.SemanticColor.passText)
+                .frame(width: 16)
+                .accessibilityHidden(true)
+        }
+        .padding(.vertical, ResectaTokens.Spacing.sm)
+        .padding(.horizontal, horizontalInset)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Self.accessibilityLabel(layerIndex: layerIndex, layer: layer))
         .accessibilityIdentifier("layerResult_\(layerIndex - 1)") // zero-indexed
     }
 
@@ -116,12 +219,7 @@ struct LayerResultRow: View {
     private var header: some View {
         HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center,
                spacing: ResectaTokens.Spacing.sm) {
-            VerificationSymbol.icon(for: layer)
-                .foregroundStyle(useIntermediateColors
-                                 ? layer.status.intermediateColor
-                                 : layer.status.color)
-                .font(.title3)
-                .frame(width: iconColumn)
+            iconColumnView
 
             VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
                 // The check's name alone — the ledger lists every check
@@ -149,6 +247,89 @@ struct LayerResultRow: View {
         .padding(.vertical, ResectaTokens.Spacing.sm)
         .padding(.horizontal, horizontalInset)
     }
+
+    // MARK: - Icon column: the tile and the badge
+
+    /// On a non-pass row of a finished run, the tinted tile with the shape
+    /// badge; otherwise the bare glyph as before (the progress view's rows,
+    /// a full pass row).
+    @ViewBuilder
+    private var iconColumnView: some View {
+        if showsTile {
+            tile
+        } else {
+            statusGlyph
+                .foregroundStyle(useIntermediateColors
+                                 ? layer.status.intermediateColor
+                                 : layer.status.color)
+                .frame(width: iconColumn)
+        }
+    }
+
+    /// The glyph at its optical size: a custom asset at `glyphSize`, an SF
+    /// fallback at `.title3`.
+    private var statusGlyph: some View {
+        VerificationSymbol.icon(for: layer)
+            .font(VerificationSymbol.isCustom(layer) ? .system(size: glyphSize) : .title3)
+    }
+
+    /// The status tile: the glyph in the text tier on a wash of the status
+    /// hue, in a continuous-corner square the size of the icon column. On
+    /// a washed row the tile draws no wash of its own — the glyph and the
+    /// badge sit on the row wash.
+    private var tile: some View {
+        statusGlyph
+            .foregroundStyle(layer.status.glyphOnWash)
+            .frame(width: iconColumn, height: iconColumn)
+            .background {
+                if !isWashed {
+                    RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.small, style: .continuous)
+                        .fill(layer.status.color.opacity(tileWash))
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                badge
+            }
+    }
+
+    /// The shape badge, hung 4 pt off the tile's bottom-trailing corner
+    /// (inside the corner it collides with the glyph), knocked out of its
+    /// surroundings by a ring in the card surface. Hidden from VoiceOver:
+    /// the row's label speaks the status phrase.
+    private var badge: some View {
+        Image(systemName: layer.status.badgeSymbolName)
+            .font(.system(size: badgeSize, weight: .bold))
+            .foregroundStyle(layer.status.glyphOnWash)
+            .background(badgeRing.padding(-1.5))
+            .offset(x: ResectaTokens.Spacing.xs, y: ResectaTokens.Spacing.xs)
+            .accessibilityHidden(true)
+    }
+
+    /// The knock-out ring: the card surface on a plain row; on a washed row
+    /// the surface with the row wash composited over it — a `ZStack`, so
+    /// SwiftUI blends the same colour the row wash renders — never the bare
+    /// surface, which would halo grey on the wash.
+    private var badgeRing: some View {
+        ZStack {
+            Circle().fill(Self.cardSurface)
+            if isWashed {
+                Circle().fill(layer.status.color.opacity(rowWash))
+            }
+        }
+    }
+
+    /// The disclosure's card surface as rendered — its material over the
+    /// results page, sampled from the captures (light #F5F5F5 · dark
+    /// #202020). A `Color`, because the `.background` shape style resolves
+    /// to the system background (black in dark), which would halo the badge
+    /// on the card.
+    static let cardSurface = Color(
+        uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .dark
+                ? UIColor(red: 0x20/255, green: 0x20/255, blue: 0x20/255, alpha: 1)
+                : UIColor(red: 0xF5/255, green: 0xF5/255, blue: 0xF5/255, alpha: 1)
+        }
+    )
 
     // MARK: - Expanded block
 
