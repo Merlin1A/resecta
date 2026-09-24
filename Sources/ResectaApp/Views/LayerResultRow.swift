@@ -48,7 +48,7 @@ struct LayerResultRow: View {
     /// The compact row's glyph — identity only, in the support tier; 23 in
     /// `supportText` would compete with the tiles.
     @ScaledMetric(relativeTo: .subheadline) private var compactGlyphSize: CGFloat = 17
-    // The tile's wash is per appearance (tileWashLight / tileWashDark).
+    // The tile's and the row's washes are per appearance.
     @Environment(\.colorScheme) private var colorScheme
 
     let layer: LayerResult
@@ -84,9 +84,17 @@ struct LayerResultRow: View {
     }
 
     /// The ledger's status treatment — the tinted tile with its shape
-    /// badge — is for a finished run's rows. While the run is in progress
-    /// (`useIntermediateColors`) the rows keep the bare glyph.
+    /// badge, the attention / fail row wash — is for a finished run's rows.
+    /// While the run is in progress (`useIntermediateColors`) the rows keep
+    /// the bare glyph.
     private var showsStatusTreatment: Bool { !useIntermediateColors }
+
+    /// An attention or fail row is washed across its width in its status
+    /// hue — supplementary to the tile and badge, which carry the status;
+    /// warn never washes, and status-coloured text never sits on the wash.
+    private var isWashed: Bool {
+        showsStatusTreatment && (layer.status.isAttention || layer.status.isFail)
+    }
 
     /// A non-pass full row sits its glyph on a tinted tile with the badge;
     /// a pass row — a full one with something to expand, or a compact one —
@@ -96,6 +104,14 @@ struct LayerResultRow: View {
     private var tileWash: Double {
         colorScheme == .dark
             ? ResectaTokens.Opacity.tileWashDark
+            : ResectaTokens.Opacity.tileWashLight
+    }
+
+    /// The row wash: the tile's light value, its own lighter dark value
+    /// (`rowWashDark` — 0.18 across a whole row reads muddy).
+    private var rowWash: Double {
+        colorScheme == .dark
+            ? ResectaTokens.Opacity.rowWashDark
             : ResectaTokens.Opacity.tileWashLight
     }
 
@@ -142,6 +158,16 @@ struct LayerResultRow: View {
         .background(
             chrome == .card ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.clear),
             in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.toast))
+        // The attention / fail wash across the row, outset 4 pt into the
+        // content column so the tile sits inside it (an inset would cut
+        // the tile); the section's hairlines above and below are untouched.
+        .background {
+            if isWashed {
+                RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.small, style: .continuous)
+                    .fill(layer.status.color.opacity(rowWash))
+                    .padding(.horizontal, -ResectaTokens.Spacing.xs)
+            }
+        }
         // Collapsed: one combined element (header label above). Expanded:
         // a container, so VoiceOver can reach the detail text and the
         // "Go to page N" chips instead of having them flattened away.
@@ -246,14 +272,19 @@ struct LayerResultRow: View {
     }
 
     /// The status tile: the glyph in the text tier on a wash of the status
-    /// hue, in a continuous-corner square the size of the icon column.
+    /// hue, in a continuous-corner square the size of the icon column. On
+    /// a washed row the tile draws no wash of its own — the glyph and the
+    /// badge sit on the row wash.
     private var tile: some View {
         statusGlyph
             .foregroundStyle(layer.status.glyphOnWash)
             .frame(width: iconColumn, height: iconColumn)
-            .background(
-                layer.status.color.opacity(tileWash),
-                in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.small, style: .continuous))
+            .background {
+                if !isWashed {
+                    RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.small, style: .continuous)
+                        .fill(layer.status.color.opacity(tileWash))
+                }
+            }
             .overlay(alignment: .bottomTrailing) {
                 badge
             }
@@ -272,9 +303,17 @@ struct LayerResultRow: View {
             .accessibilityHidden(true)
     }
 
-    /// The knock-out ring, in the card surface.
+    /// The knock-out ring: the card surface on a plain row; on a washed row
+    /// the surface with the row wash composited over it — a `ZStack`, so
+    /// SwiftUI blends the same colour the row wash renders — never the bare
+    /// surface, which would halo grey on the wash.
     private var badgeRing: some View {
-        Circle().fill(Self.cardSurface)
+        ZStack {
+            Circle().fill(Self.cardSurface)
+            if isWashed {
+                Circle().fill(layer.status.color.opacity(rowWash))
+            }
+        }
     }
 
     /// The disclosure's card surface as rendered — its material over the
