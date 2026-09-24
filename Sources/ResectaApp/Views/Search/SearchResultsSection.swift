@@ -21,6 +21,15 @@ struct SearchResultsSection: View {
     // `appliedResultIDs` lives on `searchState`.
     // Reads go through `searchState.appliedResultIDs`.
     @Binding var selectedDetent: PresentationDetent
+    /// The coordinator's hardened session directory, passed down from the
+    /// sheet as a value (it is a `let` on the coordinator; the sheet holds
+    /// the environment read): the coverage snapshot pair is written there,
+    /// as the audit export's is.
+    let tempExportDirectory: TempExportDirectory
+    /// Passed down from the sheet as a value (the let-injection pattern
+    /// the sheet documents), never read from the environment here: the
+    /// share is withheld while the screen is captured or mirrored.
+    let captureMonitor: ScreenCaptureMonitor
     let onRequestWhy: (SearchResult) -> Void
     let onApplyShortcut: () -> Void
     /// Gates the invisible Return-key Button. Held-Return key-repeat
@@ -929,7 +938,9 @@ struct SearchResultsSection: View {
     /// Build counts-only export metadata + invoke the system
     /// share sheet via `MatchExportService.shareCoverageSnapshot`. The
     /// payload is structurally counts-only (no per-match data);
-    /// the existing share surface stays unchanged.
+    /// the existing share surface stays unchanged. The pair lands in the
+    /// hardened session directory and the share is withheld while
+    /// shielded, the way the audit export threads both.
     private func shareCoverageSnapshot(report: CoverageReport) {
         guard let presenter = MatchExportService.topViewController() else { return }
         let metadata = ExportMetadata(
@@ -948,6 +959,8 @@ struct SearchResultsSection: View {
             await MatchExportService.shareCoverageSnapshot(
                 report: report,
                 metadata: metadata,
+                tempDirectory: tempExportDirectory,
+                captureMonitor: captureMonitor,
                 toastManager: toastManager,
                 from: presenter
             )

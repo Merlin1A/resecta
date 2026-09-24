@@ -4,15 +4,15 @@ import UIKit
 import RedactionEngine
 @testable import ResectaApp
 
-// Share-export failure toast wiring.
-// Today the audit CSV/JSON share path silently returns when the temp
-// write fails; the share-sheet path is then indistinguishable from a UI
-// bug. This wires a Tier 1 `.error` toast (top, red) onto the error
-// path. The `writeTriageExport(...into:toastManager:)` and
+// Share-export failure toast wiring, the hardened session directory and
+// the capture-shield intercept — for the audit pair and the coverage
+// snapshot pair alike. The `writeTriageExport(...into:toastManager:)` and
 // `writeCoverageSnapshot(...into:toastManager:)` testable seams take a
 // caller-provided directory so we can pass one that is read-only (or
 // nonexistent) and assert the toast enqueue without invoking
-// `UIActivityViewController`.
+// `UIActivityViewController`; the two share entry points take a
+// `TempExportDirectory` and a `ScreenCaptureMonitor` so the shielded
+// path can be driven with a test monitor.
 
 @Suite("MatchExportService failure-toast wiring")
 @MainActor
@@ -195,6 +195,73 @@ struct MatchExportServiceFailureTests {
         #expect(FileManager.default.fileExists(atPath: pair.json.path))
     }
 
+    @Test("Coverage snapshot pair lands inside the hardened session directory")
+    func testCoverageSnapshotWrittenToHardenedPath() async throws {
+        let toastManager = ToastQueueManager()
+        let parent = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cov-hardened-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: parent) }
+
+        let tempDirectory = TempExportDirectory(parent: parent)
+        try tempDirectory.prepare()
+
+        let result = await MatchExportService.writeCoverageSnapshot(
+            report: makeCoverageReport(),
+            metadata: makeMetadata(),
+            into: tempDirectory.url,
+            toastManager: toastManager
+        )
+        let pair = try #require(result)
+        // Both artifacts live under the `redacted_session_<UUID>/`
+        // subdirectory — not the bare temp root — like the audit pair.
+        #expect(pair.csv.path.hasPrefix(tempDirectory.url.path))
+        #expect(pair.json.path.hasPrefix(tempDirectory.url.path))
+        #expect(tempDirectory.url.lastPathComponent
+            .hasPrefix(TempExportDirectory.sessionDirectoryPrefix))
+        #expect(FileManager.default.fileExists(atPath: pair.csv.path))
+        #expect(FileManager.default.fileExists(atPath: pair.json.path))
+        // Nothing of the pair at the parent (the stand-in for the temp root).
+        let atParent = try FileManager.default.contentsOfDirectory(atPath: parent.path)
+        #expect(!atParent.contains { $0.hasPrefix("resecta_coverage_") })
+    }
+
+    @Test("Adversarial: coverage share is withheld while shielded — no presentation, pair unlinked, .info toast")
+    func testCoverageShareBlockedWhenShielded() async throws {
+        let toastManager = ToastQueueManager()
+        let monitor = ScreenCaptureMonitor()
+        monitor._setForTesting(isCaptured: true, isMirroring: false)
+
+        let parent = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cov-shielded-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let tempDirectory = TempExportDirectory(parent: parent)
+
+        let presenter = UIViewController()
+        await MatchExportService.shareCoverageSnapshot(
+            report: makeCoverageReport(),
+            metadata: makeMetadata(),
+            tempDirectory: tempDirectory,
+            captureMonitor: monitor,
+            toastManager: toastManager,
+            from: presenter
+        )
+
+        // UIActivityViewController was never presented.
+        #expect(presenter.presentedViewController == nil)
+        // The intercept explains itself with the same copy as the audit share.
+        #expect(toastManager.activeToasts.count == 1)
+        #expect(toastManager.activeToasts.first?.message
+                == MatchExportService.shareWhileShieldedToastMessage)
+        #expect(toastManager.activeToasts.first?.severity == .info)
+        // shareCoverageSnapshot routed through the hardened directory (prepare ran)…
+        #expect(FileManager.default.fileExists(atPath: tempDirectory.url.path))
+        // …and the just-written pair was unlinked on abort.
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: tempDirectory.url.path)
+        #expect(leftovers.isEmpty)
+    }
+
     @Test("Adversarial: share is withheld while shielded — no presentation, pair unlinked, .info toast")
     func testShareSheetBlockedWhenShielded() async throws {
         let toastManager = ToastQueueManager()
@@ -277,22 +344,24 @@ struct MatchExportServiceFailureTests {
     @Test("Coverage snapshot pair is hardened — file-protection applied + excluded from backup")
     func testCoverageSnapshotWriteAppliesProtection() async throws {
         let toastManager = ToastQueueManager()
-        let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("catk-cov-prot-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: tmp) }
+        let parent = FileManager.default.temporaryDirectory
+            .appendingPathComponent("catk-cov-prot-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let tempDirectory = TempExportDirectory(parent: parent)
+        try tempDirectory.prepare()
 
         let pair = try #require(await MatchExportService.writeCoverageSnapshot(
             report: makeCoverageReport(),
             metadata: makeMetadata(),
-            into: tmp,
+            into: tempDirectory.url,
             toastManager: toastManager
         ))
 
         for url in [pair.csv, pair.json] {
-            // Flat `temporaryDirectory` (no session subdirectory), so
-            // the per-file flag is the only backup exclusion — unset at pin,
-            // true after the hardening fix.
+            // The pair now lives in the session subdirectory (excluded at
+            // the directory level); the per-file flag stays set beside it
+            // and is the read-back that is not coalesced on the simulator.
             let backup = try url.resourceValues(forKeys: [.isExcludedFromBackupKey])
                 .isExcludedFromBackup
             #expect(backup == true)

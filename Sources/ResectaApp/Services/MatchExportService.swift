@@ -234,9 +234,12 @@ enum MatchExportService {
                 let jsonData = try MatchAuditExporter.json(
                     records, metadata: metadata, includeSensitive: includeSensitive
                 )
-                try csvData.write(to: csvURL, options: [.atomic])
-                try jsonData.write(to: jsonURL, options: [.atomic])
-                // Harden the just-written pair, best-effort.
+                // Protected from the first byte: the write option sets
+                // `.complete` on the file as it is created, so no window
+                // exists between the write and the attribute.
+                try csvData.write(to: csvURL, options: [.atomic, .completeFileProtection])
+                try jsonData.write(to: jsonURL, options: [.atomic, .completeFileProtection])
+                // Re-apply the class after the atomic rename, best-effort.
                 try? TempFileHardening.applyProtection(csvURL, level: .complete)
                 try? TempFileHardening.applyProtection(jsonURL, level: .complete)
                 // Per-file backup exclusion. These already live in the
@@ -335,44 +338,62 @@ enum MatchExportService {
         )) ?? Data()
     }
 
-    /// Write counts-only CSV+JSON to temp + present
-    /// `UIActivityViewController`. Mirrors `share` for the temp-file +
-    /// activity-view-controller plumbing; payload is structurally
-    /// different (no per-match data) so it ships through this dedicated
-    /// entry point. No new user-facing share surface — same
-    /// system share sheet.
+    /// Write counts-only CSV+JSON into the hardened per-session directory
+    /// and present `UIActivityViewController`. Mirrors `share` for the
+    /// directory, write-time protection and capture-shield plumbing; the
+    /// payload is structurally different (no per-match data) so it ships
+    /// through this dedicated entry point. No new user-facing share
+    /// surface — same system share sheet.
     @MainActor
     static func shareCoverageSnapshot(
         report: CoverageReport,
         metadata: ExportMetadata,
+        tempDirectory: TempExportDirectory,
+        captureMonitor: ScreenCaptureMonitor,
         toastManager: ToastQueueManager,
         from presenter: UIViewController
     ) async {
+        do {
+            // Idempotent; the coordinator may not have created the session
+            // directory yet.
+            try tempDirectory.prepare()
+        } catch { // LegalPhrases:safe (Swift keyword)
+            toastManager.enqueue(Self.coverageSnapshotWriteFailureToastMessage, severity: .error)
+            return
+        }
         guard let pair = await writeCoverageSnapshot(
             report: report,
             metadata: metadata,
-            into: FileManager.default.temporaryDirectory,
+            into: tempDirectory.url,
             toastManager: toastManager
         ) else { return }
-        let csvURL = pair.csv
-        let jsonURL = pair.json
+
+        // Same intercept as `share`: the system share sheet sits outside
+        // SwiftUI's shield, so a capture or mirror at presentation time
+        // withholds it, unlinks the pair and says why.
+        guard !captureMonitor.isShielded else {
+            try? FileManager.default.removeItem(at: pair.csv)
+            try? FileManager.default.removeItem(at: pair.json)
+            toastManager.enqueue(Self.shareWhileShieldedToastMessage, severity: .info)
+            return
+        }
 
         let activity = UIActivityViewController(
-            activityItems: [csvURL, jsonURL],
+            activityItems: [pair.csv, pair.json],
             applicationActivities: nil
         )
         // The pair is unlinked on share dismiss by this handler. If it does
         // not fire (app killed before dismissal), `cleanOrphanedTempFiles()`
-        // removes the files at next launch within the 1-hour TTL (the
-        // `resecta_` prefix matches `resecta_coverage_*`). While they exist
-        // the files are protected at `.complete` (best-effort) and excluded
-        // from backup per-file — coverage shares write to flat
-        // `temporaryDirectory`, not a session subdirectory. A `removeItem`
+        // removes the files at next launch within the 1-hour TTL — the
+        // enclosing `redacted_session_…/` subtree matches the `redacted_`
+        // prefix and `resecta_coverage_*` matches the `resecta_` prefix.
+        // While they exist the files are written at `.complete` and live
+        // in the backup-excluded session subdirectory. A `removeItem`
         // failure here leaves the file at `.complete` until that sweep — a
         // known-bounded residual.
         activity.completionWithItemsHandler = { _, _, _, _ in
-            try? FileManager.default.removeItem(at: csvURL)
-            try? FileManager.default.removeItem(at: jsonURL)
+            try? FileManager.default.removeItem(at: pair.csv)
+            try? FileManager.default.removeItem(at: pair.json)
         }
         activity.popoverPresentationController?.sourceView = presenter.view
         presenter.present(activity, animated: true)
@@ -384,7 +405,7 @@ enum MatchExportService {
     /// `internal` so `MatchExportServiceFailureTests` can pass a read-only
     /// directory and assert the toast enqueue without invoking
     /// `UIActivityViewController`. Production calls pass
-    /// `FileManager.default.temporaryDirectory`.
+    /// `TempExportDirectory.url`.
     @MainActor
     static func writeCoverageSnapshot(
         report: CoverageReport,
@@ -405,14 +426,18 @@ enum MatchExportService {
             let csvData = Self.coverageSnapshotCSV(report, metadata: metadata)
             let jsonData = Self.coverageSnapshotJSON(report, metadata: metadata)
             do {
-                try csvData.write(to: csvURL, options: [.atomic])
-                try jsonData.write(to: jsonURL, options: [.atomic])
-                // Harden the just-written pair, best-effort.
+                // Protected from the first byte: the write option sets
+                // `.complete` on the file as it is created, so no window
+                // exists between the write and the attribute.
+                try csvData.write(to: csvURL, options: [.atomic, .completeFileProtection])
+                try jsonData.write(to: jsonURL, options: [.atomic, .completeFileProtection])
+                // Re-apply the class after the atomic rename, best-effort.
                 try? TempFileHardening.applyProtection(csvURL, level: .complete)
                 try? TempFileHardening.applyProtection(jsonURL, level: .complete)
-                // Per-file backup exclusion — coverage share files write to
-                // flat `temporaryDirectory` (no session subdirectory), so the
-                // per-file flag is the exclusion.
+                // Per-file backup exclusion. The pair lives in the
+                // `redacted_session_<UUID>/` subdirectory (excluded at the
+                // directory level), so the per-file flag is belt-and-suspenders,
+                // as for the audit pair.
                 Self.excludeFromBackup(csvURL)
                 Self.excludeFromBackup(jsonURL)
                 return true
@@ -451,12 +476,11 @@ enum MatchExportService {
     // MARK: - Helpers
 
     /// Exclude a single share-sheet temp file from iCloud / local backup.
-    /// The export share files are transient (unlinked on dismiss) and have
-    /// no `TempExportDirectory` lifecycle owner, so the directory-level
-    /// exclusion `TempExportDirectory.prepare()` applies is unavailable
-    /// here; the per-file flag is the chosen mechanism. Best-effort
-    /// (`try?`), mirroring the directory-level call in
-    /// `TempExportDirectory.prepare()`.
+    /// Both export pairs live in the session subdirectory that
+    /// `TempExportDirectory.prepare()` already excludes at the directory
+    /// level; the per-file flag is the belt beside those braces, and the
+    /// one the hardening pins read back. Best-effort (`try?`), mirroring
+    /// the directory-level call in `TempExportDirectory.prepare()`.
     /// `nonisolated` so it can run inside the `Task.detached` write blocks.
     nonisolated private static func excludeFromBackup(_ url: URL) {
         var values = URLResourceValues()
