@@ -78,11 +78,20 @@ struct CompactDetentAnchoredRowTests {
                 "the per-item Apply must reference the shared 46-pt floor token")
     }
 
-    @Test("The bottom toast host lifts by the hug while the sheet is parked at the compact float")
+    @Test("The bottom toast hosts lift by the hug while the sheet is parked at the compact float")
     func toastClearanceFollowsTheHug() {
-        #expect(SearchAndRedactSheet.toastBottomClearance(for: .compactFloat) == CompactFloatDetent.hugHeight)
-        #expect(SearchAndRedactSheet.toastBottomClearance(for: .medium) == 0)
-        #expect(SearchAndRedactSheet.toastBottomClearance(for: .large) == 0)
+        // The clearance is the bottom-chrome model's (`ParkedChromeLayout`);
+        // with the page bar hidden by the live walk it is the hug alone.
+        func clearance(_ detent: PresentationDetent) -> CGFloat {
+            ParkedChromeLayout(
+                sheetPresented: true, detent: detent, walkLive: true,
+                pageCount: 3, sizeClass: .compact, phase: .editing,
+                hugHeight: CompactFloatDetent.hug(for: .large)
+            ).toastClearance
+        }
+        #expect(clearance(.compactFloat) == CompactFloatDetent.hugHeight)
+        #expect(clearance(.medium) == 0)
+        #expect(clearance(.large) == 0)
     }
 
     @Test("Clamped to the available height when it is below the hug")

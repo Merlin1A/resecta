@@ -28,14 +28,24 @@ extension SearchAndRedactSheet {
 
     // MARK: - Toast clearance at the compact float
 
-    /// How far ContentView's bottom toast host lifts while this
-    /// sheet is parked at the compact float — the hug, read symbolically
-    /// — so the "Marked 1 …" toast clears the strip instead of
-    /// sitting beneath it; zero at every other detent, where the sheet
-    /// covers that host and renders its own copy. Pure; the detent
-    /// tests pin it beside the hug.
-    static func toastBottomClearance(for detent: PresentationDetent) -> CGFloat {
-        detent == .compactFloat ? CompactFloatDetent.hugHeight : 0
+    /// How far the bottom toast hosts lift, from the one bottom-chrome
+    /// model (`ParkedChromeLayout`, the editor's own inputs read here):
+    /// the hug while this sheet is parked at the compact float — so the
+    /// "Marked 1 …" toast clears the strip instead of sitting beneath it
+    /// — plus the page bar's height while the bar is up and uncovered;
+    /// zero with the sheet up at a taller detent, where the sheet-local
+    /// host renders inside the sheet. `sheetPresented: false` is the
+    /// value the sheet leaves behind on disappearance (the bar alone).
+    func toastBottomClearance(sheetPresented: Bool) -> CGFloat {
+        ParkedChromeLayout(
+            sheetPresented: sheetPresented,
+            detent: selectedDetent,
+            walkLive: searchState.isWalkLive(reviewPending: redactionState.pendingTriage != nil),
+            pageCount: documentState.pageCount,
+            sizeClass: horizontalSizeClass,
+            phase: documentState.phaseKind,
+            hugHeight: CompactFloatDetent.hug(for: dynamicTypeSize)
+        ).toastClearance
     }
 
     // MARK: - Per-item Apply (compact handle)

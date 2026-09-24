@@ -60,8 +60,10 @@ struct ContentView: View {
                         .onTapGesture { toastManager.dismiss(item) }
                 }
             }
-            // Clear page nav bar — and the Search/Scan sheet parked at
-            // the compact float (`bottomClearance`).
+            // Clear the page nav bar and the Search/Scan sheet parked at
+            // the compact float — `bottomClearance` is the bottom-chrome
+            // model's one clearance (`ParkedChromeLayout.toastClearance`),
+            // written by the editor's page-bar inset and by the sheet.
             .padding(.bottom, ResectaTokens.Spacing.xl + toastManager.bottomClearance)
             .animation(
                 ResectaTokens.Anim.resolved(ResectaTokens.Anim.toastIn, reduceMotion: reduceMotion),

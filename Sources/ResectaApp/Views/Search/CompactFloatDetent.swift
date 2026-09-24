@@ -41,6 +41,15 @@ struct CompactFloatDetent: CustomPresentationDetent {
     /// parked-canvas inset read this symbolically. Was 60 under
     /// the title-only handle and 72 under the cluster handle.
     static let hugHeight: CGFloat = 80
+
+    /// The ONE hug value the chrome outside the sheet reads — the
+    /// page-bar / parked-canvas inset and the toast clearance, through
+    /// `ParkedChromeLayout` — keyed to the type size so those consumers
+    /// move with the hug the detent reports. One value at every size
+    /// today; the accessibility branch lands with the strip's second line.
+    static func hug(for size: DynamicTypeSize) -> CGFloat {
+        hugHeight
+    }
 }
 
 extension PresentationDetent {

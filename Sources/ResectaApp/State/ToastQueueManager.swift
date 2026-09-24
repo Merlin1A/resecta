@@ -108,13 +108,14 @@ final class ToastQueueManager {
     /// activeToasts.map(\.id) on every render cycle.
     private(set) var toastVersion: Int = 0
 
-    /// Extra bottom inset ContentView's bottom
-    /// host applies so a toast clears a Search/Scan sheet parked at the
-    /// compact float. The sheet's own host yields there (an 80-pt float
-    /// has no room for a toast), and the app-level copy — no longer
-    /// covered by the sheet — would otherwise sit beneath it. Set by
-    /// the sheet on detent changes, reset when it disappears; zero at
-    /// every other detent and whenever no sheet is up.
+    /// Extra bottom inset the bottom toast hosts apply so a toast clears
+    /// the bottom chrome — the page bar while it is up and uncovered,
+    /// and a Search/Scan sheet parked at the compact float (the sheet's
+    /// own host yields there; the app-level copy, no longer covered,
+    /// would otherwise sit beneath the strip). The value is the
+    /// bottom-chrome model's (`ParkedChromeLayout.toastClearance`),
+    /// written by the editor's page-bar inset as the bar comes and goes
+    /// and by the sheet on its detent changes and disappearance.
     var bottomClearance: CGFloat = 0
 
     /// Pre-filtered active toasts by position — avoids per-render .filter allocations.

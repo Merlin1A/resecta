@@ -73,8 +73,13 @@ struct SearchAndRedactSheet: View {
     /// Measured on-sim: the compact handle hides the result counter
     /// from the XXXL Dynamic Type size up and lays the row out as a
     /// plain HStack at accessibility sizes so the title never
-    /// collides with the trailing cluster.
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// collides with the trailing cluster. Read by the `+CompactApply`
+    /// extension too (the hug for the toast clearance).
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
+    /// The bottom-chrome model reads the size class beside the editor's
+    /// own read (`ParkedChromeLayout`); the toast clearance is derived
+    /// from it here on detent changes.
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State var searchDebounceTask: Task<Void, Never>?
     // The prior `applyResultMessage`
     // state field drove an `.alert("Redaction Applied", ...)` that blocked
@@ -506,7 +511,8 @@ struct SearchAndRedactSheet: View {
             #endif
         }
         .onDisappear {
-            toastManager.bottomClearance = 0 // Nothing to clear at this detent
+            // The app-level host clears the page bar alone from here.
+            toastManager.bottomClearance = toastBottomClearance(sheetPresented: false)
             // Cancel the in-flight debounce task on sheet
             // dismissal. Without this, a search debounce sleep that was
             // started just before `.onDisappear` fires would still resolve
@@ -643,8 +649,8 @@ struct SearchAndRedactSheet: View {
             if newDetent == .compactFloat {
                 isSearchFieldFocused = false
             }
-            // ContentView's toast host clears the parked float.
-            toastManager.bottomClearance = Self.toastBottomClearance(for: newDetent)
+            // Both toast hosts clear the parked float + the page bar.
+            toastManager.bottomClearance = toastBottomClearance(sheetPresented: true)
         }
         // Observed on-sim: the app's single toast host
         // lives on ContentView, which renders BEHIND this presented
@@ -656,9 +662,10 @@ struct SearchAndRedactSheet: View {
         // render in the presented layer. ContentView's copy stays —
         // it is covered while the sheet is up and takes over if the
         // toast outlives the sheet (e.g. a dismissal toast) — and at
-        // the compact float, where this host yields (the 80-pt float
+        // the compact float, where this host yields (the parked strip
         // has no room, and the uncovered ContentView copy lifts by
-        // `bottomClearance` to clear it).
+        // `bottomClearance` to clear it). Both hosts read the one
+        // clearance (`ParkedChromeLayout.toastClearance`).
         .overlay(alignment: .bottom) {
             if selectedDetent != .compactFloat {
             VStack(spacing: ResectaTokens.Spacing.sm) {
@@ -675,7 +682,7 @@ struct SearchAndRedactSheet: View {
                         .onTapGesture { toastManager.dismiss(item) }
                 }
             }
-            .padding(.bottom, ResectaTokens.Spacing.xl)
+            .padding(.bottom, ResectaTokens.Spacing.xl + toastManager.bottomClearance)
             .animation(
                 ResectaTokens.Anim.resolved(ResectaTokens.Anim.toastIn, reduceMotion: reduceMotion),
                 value: toastManager.toastVersion
@@ -999,13 +1006,13 @@ struct SearchAndRedactSheet: View {
 
     // MARK: - Result Navigation
 
-    /// The ‹ k/N › cluster renders at EITHER site only with search
-    /// results on board and no pipeline review pending — stale
-    /// sheet-scan results must not show a walk over a detections list,
-    /// which has no "current". The compact handle's per-item Apply
+    /// The ‹ k/N › cluster renders at EITHER site only while the walk is
+    /// live — the ONE published predicate (`SearchState.isWalkLive`,
+    /// which the editor's page-bar hide reads through
+    /// `RedactionState.walkLive`). The compact handle's per-item Apply
     /// rides the same gate.
     private var showsResultNavCluster: Bool {
-        !searchState.results.isEmpty && !isReviewActive
+        searchState.isWalkLive(reviewPending: redactionState.pendingTriage != nil)
     }
 
     /// The medium+ search-bar site of the ‹ k/N › cluster. Geometry
