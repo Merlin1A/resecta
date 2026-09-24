@@ -2239,9 +2239,12 @@ final class PipelineCoordinator: @unchecked Sendable {
                 insert(text, requiresTokenBoundary: isSingleTokenName)
             }
         }
+        // Sorted by text: the Dictionary traversal order is unspecified and
+        // would make the verifier's term order (and Layer 3's review-term
+        // list) differ run to run; the corpus mirror sorts the same way.
         return requiresBoundaryByText.map {
             SensitiveTerm(text: $0.key, requiresTokenBoundary: $0.value)
-        }
+        }.sorted { $0.text < $1.text }
     }
 
     /// True when `text` is a single whitespace-delimited token.
