@@ -722,36 +722,19 @@ public actor DocumentSearcher {
             conjunction = false
         }
 
-        let normalizedTerms: [String] = options.normalizeUnicode
-            ? terms.map { TextNormalizer.normalizeForSearch($0, caseSensitive: options.caseSensitive) }
-            : (options.caseSensitive ? terms : terms.map { $0.lowercased() })
+        let normalizedTerms: [String] = terms.map { SearchCore.normalizedText($0, options: options) }
 
         for pageIndex in pageRange {
             if Task.isCancelled { break }
             guard let pageText = await pageTextProvider(pageIndex), !pageText.isEmpty else { continue }
 
-            let nfkcText: String
-            if options.normalizeUnicode {
-                nfkcText = TextNormalizer.normalizeForSearch(pageText, caseSensitive: options.caseSensitive)
-            } else if !options.caseSensitive {
-                nfkcText = pageText.lowercased()
-            } else {
-                nfkcText = pageText
-            }
-
-            // Same extension pipeline as findTextMatches so
-            // preview counts agree with the full search. Emitted ranges
-            // are mapped back to base coordinates before they reach the
-            // highlight-rect resolver (leak-class otherwise).
-            let ext = TextNormalizer.applySearchExtensions(
-                pageText: nfkcText, query: "", options: options
-            )
-            let searchText = ext.pageText
-            let baseChars: [Character]? = ext.offsetMap != nil ? Array(ext.baseText) : nil
-
+            // The same normalization and extension pipeline as
+            // `findTextMatches`, so preview counts agree with the full search;
+            // the preview does not detect CJK. Emitted ranges are mapped back
+            // to base coordinates before they reach the highlight-rect
+            // resolver (leak-class otherwise).
+            let page = SearchCore.preparePage(pageText, options: options)
             let isVisiblePage = (pageIndex == currentPageIndex)
-            let nsString = searchText as NSString
-            let nsLength = nsString.length
 
             var pageCount = 0
             var pageMatches: [NSRange] = []
@@ -759,66 +742,31 @@ public actor DocumentSearcher {
 
             for term in normalizedTerms where !term.isEmpty {
                 if Task.isCancelled { break }
-                if totalCount + pageCount >= Self.maxPreviewMatches { saturated = true; break }
-                let extTerm = TextNormalizer.applySearchExtensions(
-                    pageText: "", query: term, options: options
-                ).query
+                let remaining = Self.maxPreviewMatches - (totalCount + pageCount)
+                if remaining <= 0 { saturated = true; break }
+                let extTerm = SearchCore.preparedQuery(normalized: term, options: options)
                 if extTerm.isEmpty { everyTermMatched = false; continue }
 
-                var termMatched = false
-                var searchLocation = 0
-                while searchLocation < nsLength {
-                    if Task.isCancelled { break }
-                    let searchRange = NSRange(location: searchLocation, length: nsLength - searchLocation)
-                    let matchRange = nsString.range(of: extTerm, options: [.literal], range: searchRange)
-                    if matchRange.location == NSNotFound { break }
-
-                    // Map to base coordinates when a length-changing
-                    // extension is active (Character-offset convention,
-                    // same as findTextMatches).
-                    var emitRange = matchRange
-                    var baseBounds: (start: Int, endExclusive: Int)? = nil
-                    if let map = ext.offsetMap, let swiftRange = Range(matchRange, in: searchText) {
-                        let start = searchText.distance(from: searchText.startIndex, to: swiftRange.lowerBound)
-                        let len = searchText.distance(from: swiftRange.lowerBound, to: swiftRange.upperBound)
-                        guard let span = Self.baseSpan(start: start, length: len, offsetMap: map) else {
-                            searchLocation = matchRange.location + max(matchRange.length, 1)
-                            continue
-                        }
-                        emitRange = NSRange(location: span.lowerBound, length: span.count)
-                        baseBounds = (span.lowerBound, span.upperBound)
-                    }
-
-                    // The magic-wand `exactMatch` gates the same
-                    // live-preview word-boundary check as `wholeWord`.
-                    // Base-coordinate variant when an offset map is active.
-                    if options.wholeWord || options.exactMatch {
-                        let isBoundaried: Bool
-                        if let baseChars, let bounds = baseBounds {
-                            isBoundaried = Self.isWholeWordInBase(
-                                chars: baseChars, start: bounds.start, endExclusive: bounds.endExclusive
-                            )
-                        } else if let swiftRange = Range(matchRange, in: searchText) {
-                            isBoundaried = Self.isWholeWord(swiftRange, in: searchText)
-                        } else {
-                            isBoundaried = true
-                        }
-                        if !isBoundaried {
-                            searchLocation = matchRange.location + max(matchRange.length, 1)
-                            continue
-                        }
-                    }
-
+                // The magic-wand `exactMatch` gates the same live-preview
+                // word-boundary check as `wholeWord`.
+                let (spans, stoppedAtCap) = SearchCore.literalSpans(
+                    in: page, query: extTerm, comparison: [.literal],
+                    wholeWord: options.wholeWord || options.exactMatch,
+                    cap: remaining
+                )
+                for span in spans {
                     pageCount += 1
-                    termMatched = true
                     if isVisiblePage && currentPageMatches.count + pageMatches.count < Self.maxCurrentPageHighlights {
+                        // Base coordinates when a length-changing extension is
+                        // active (Character-offset convention, same as
+                        // `findTextMatches`); the searched range otherwise.
+                        let emitRange = span.base.map { NSRange(location: $0.lowerBound, length: $0.count) }
+                            ?? span.searchedRange
                         pageMatches.append(emitRange)
                     }
-
-                    if totalCount + pageCount >= Self.maxPreviewMatches { saturated = true; break }
-                    searchLocation = matchRange.location + max(matchRange.length, 1)
                 }
-                if !termMatched { everyTermMatched = false }
+                if spans.isEmpty { everyTermMatched = false }
+                if stoppedAtCap { saturated = true; break }
             }
             // A saturated page is committed as counted: past the cap the
             // count is a ceiling, not a page-exact total.
@@ -1770,15 +1718,15 @@ public actor DocumentSearcher {
                     if let baseLineChars, let map = ext.offsetMap {
                         let start = lineText.distance(from: lineText.startIndex, to: matchRange.lowerBound)
                         let len = lineText.distance(from: matchRange.lowerBound, to: matchRange.upperBound)
-                        if let span = Self.baseSpan(start: start, length: len, offsetMap: map) {
-                            isBoundaried = Self.isWholeWordInBase(
+                        if let span = SearchCore.baseSpan(start: start, length: len, offsetMap: map) {
+                            isBoundaried = SearchCore.isWholeWordInBase(
                                 chars: baseLineChars, start: span.lowerBound, endExclusive: span.upperBound
                             )
                         } else {
                             isBoundaried = false
                         }
                     } else {
-                        isBoundaried = Self.isWholeWord(matchRange, in: lineText)
+                        isBoundaried = SearchCore.isWholeWord(matchRange, in: lineText)
                     }
                     if !isBoundaried {
                         searchStart = matchRange.upperBound
@@ -2076,65 +2024,28 @@ public actor DocumentSearcher {
         pageIndex: Int,
         term: String
     ) -> [SearchResult] {
-        // Detect CJK text per-page and disable whole-word matching.
-        // Per-page detection is necessary for multilingual documents (e.g.,
-        // Japanese-English contracts) where language varies across pages.
-        // NLLanguageRecognizer on 500 chars is sub-millisecond.
-        let recognizer = NLLanguageRecognizer()
-        recognizer.processString(String(pageText.prefix(500)))
-        let cjkLanguages: Set<NLLanguage> = [
-            .japanese, .korean, .simplifiedChinese, .traditionalChinese
-        ]
-        let isCJK = recognizer.dominantLanguage.map { cjkLanguages.contains($0) } ?? false
-        var effectiveOptions = options
-        // `exactMatch` rides the same CJK-disable shape as
-        // `wholeWord`. CJK runs lack the alphanumeric run-boundaries the
-        // predicate relies on, so the boundary check would always pass
-        // (or always fail) and add no signal.
-        if isCJK {
-            effectiveOptions.wholeWord = false
-            effectiveOptions.exactMatch = false
-        }
+        // Per-page CJK detection disables the boundary check (see
+        // `SearchCore.effectiveOptions`); the full tier detects, the preview
+        // does not.
+        let effectiveOptions = SearchCore.effectiveOptions(options, pageText: pageText, detectCJK: true)
 
-        let normalizedPageText: String
-        let normalizedQuery: String
-
-        if effectiveOptions.normalizeUnicode {
-            normalizedPageText = TextNormalizer.normalizeForSearch(pageText, caseSensitive: effectiveOptions.caseSensitive)
-            normalizedQuery = TextNormalizer.normalizeForSearch(query, caseSensitive: effectiveOptions.caseSensitive)
-        } else if !effectiveOptions.caseSensitive {
-            normalizedPageText = pageText.lowercased()
-            normalizedQuery = query.lowercased()
-        } else {
-            normalizedPageText = pageText
-            normalizedQuery = query
-        }
-
+        let normalizedQuery = SearchCore.normalizedText(query, options: effectiveOptions)
         guard !normalizedQuery.isEmpty else { return [] }
 
-        // Recall extensions on top of the NFKC path.
-        // Smart punctuation is 1:1 (length-preserving), so rect NSRanges
-        // stay in the normalized text's coordinates. Diacritic fold and
-        // separator strip are length-changing: matching runs on the
-        // transformed text and every match range routes through
-        // `ext.offsetMap` back to base coordinates BEFORE the rect is
-        // computed (Risk 1: a wrong rect is a misplaced redaction).
-        let ext = TextNormalizer.applySearchExtensions(
-            pageText: normalizedPageText,
-            query: normalizedQuery,
-            options: effectiveOptions
-        )
-        let searchPageText = ext.pageText
-        let searchQuery = ext.query
+        // Recall extensions on top of the NFKC path (the shared
+        // preparation). Smart punctuation is 1:1 (length-preserving), so rect
+        // NSRanges stay in the normalized text's coordinates. Diacritic fold
+        // and separator strip are length-changing: matching runs on the
+        // transformed text and every match range routes through the offset
+        // map back to base coordinates BEFORE the rect is computed (Risk 1: a
+        // wrong rect is a misplaced redaction).
+        let prepared = SearchCore.preparePage(pageText, options: effectiveOptions)
+        let searchPageText = prepared.searchText
+        let searchQuery = SearchCore.preparedQuery(normalized: normalizedQuery, options: effectiveOptions)
         // The strip path can empty a query made of separators only.
         guard !searchQuery.isEmpty else { return [] }
-        // Boundary checks must run against the PRE-strip text — the
-        // stripped text has no separators left, so word boundaries only
-        // exist in base coordinates. Materialized once per page for O(1)
-        // integer indexing.
-        let baseChars: [Character]? = ext.offsetMap != nil ? Array(ext.baseText) : nil
 
-        // Case-preserved analog of `ext.baseText`, used only to
+        // Case-preserved analog of the base text, used only to
         // re-slice the DISPLAYED span (see `displaySlice`). Mirrors the
         // base chain minus the case fold: page text → (ligature/NFKC
         // normalize) → (smart punctuation).
@@ -2150,66 +2061,23 @@ public actor DocumentSearcher {
         let displayBaseText = String(displayBaseChars)
 
         var results: [SearchResult] = []
-        var searchStart = searchPageText.startIndex
 
-        while searchStart < searchPageText.endIndex {
-            guard let matchRange = searchPageText.range(
-                of: searchQuery,
-                range: searchStart..<searchPageText.endIndex
-            ) else { break }
-
-            // Offsets measured on the searched (most-transformed) text.
-            let matchStartOffset = searchPageText.distance(
-                from: searchPageText.startIndex, to: matchRange.lowerBound
-            )
-            let matchLength = searchPageText.distance(
-                from: matchRange.lowerBound, to: matchRange.upperBound
-            )
-
-            // Map back to base (NFKC-normalized) coordinates when a
-            // length-changing extension is active.
-            let baseStartOffset: Int
-            let baseLength: Int
-            if let map = ext.offsetMap {
-                // The base span ends AFTER the last matched character's
-                // base position, so a match spanning removed separators
-                // covers them in the rect. A span the map cannot cover is
-                // structurally unreachable (the map covers every searched
-                // char); the match is refused rather than risk a bad rect.
-                guard let span = Self.baseSpan(
-                    start: matchStartOffset, length: matchLength, offsetMap: map
-                ) else {
-                    searchStart = matchRange.upperBound
-                    continue
-                }
-                baseStartOffset = span.lowerBound
-                baseLength = span.count
-            } else {
-                baseStartOffset = matchStartOffset
-                baseLength = matchLength
-            }
-
-            // Whole-word check: verify word boundaries around match.
-            // `exactMatch` is the magic-wand select-by-similar-text
-            // call-site flag; semantically equivalent to
-            // `wholeWord` on the text/multi-term/OCR paths. With an offset
-            // map active the predicate evaluates in base coordinates
-            // (separators are gone from the searched text, so boundaries
-            // are only meaningful there).
-            if effectiveOptions.wholeWord || effectiveOptions.exactMatch {
-                let isBoundaried: Bool
-                if let baseChars {
-                    isBoundaried = Self.isWholeWordInBase(
-                        chars: baseChars, start: baseStartOffset, endExclusive: baseStartOffset + baseLength
-                    )
-                } else {
-                    isBoundaried = Self.isWholeWord(matchRange, in: searchPageText)
-                }
-                if !isBoundaried {
-                    searchStart = matchRange.upperBound
-                    continue
-                }
-            }
+        // `exactMatch` is the magic-wand select-by-similar-text call-site
+        // flag; semantically equivalent to `wholeWord` on the
+        // text/multi-term/OCR paths.
+        let (spans, _) = SearchCore.literalSpans(
+            in: prepared, query: searchQuery, comparison: [],
+            wholeWord: effectiveOptions.wholeWord || effectiveOptions.exactMatch,
+            cap: nil
+        )
+        for span in spans {
+            // Offsets measured on the searched (most-transformed) text; the
+            // base span is the remapped one under an offset map, else the
+            // searched offsets themselves.
+            let matchStartOffset = span.searchedCharacters.lowerBound
+            let matchLength = span.searchedCharacters.count
+            let baseStartOffset = span.base?.lowerBound ?? matchStartOffset
+            let baseLength = span.base?.count ?? matchLength
 
             // Get bounding rect via PDFKit selection — base coordinates.
             let nsRange = NSRange(location: baseStartOffset, length: baseLength)
@@ -2219,12 +2087,12 @@ public actor DocumentSearcher {
                 // on the normalized text. The
                 // norm-drift trap is guarded inside `displaySlice`,
                 // which falls back to the normalized slice on drift.
-                let normalizedSlice = String(searchPageText[matchRange.lowerBound..<matchRange.upperBound])
+                let normalizedSlice = String(searchPageText[span.searchedIndices])
                 let matchedText = Self.displaySlice(
                     start: baseStartOffset, length: baseLength,
                     offsetMap: nil,
                     displayChars: displayBaseChars,
-                    baseCount: ext.baseText.count,
+                    baseCount: prepared.baseText.count,
                     fallback: normalizedSlice)
                 // The context window is built over the
                 // same case-preserved analog `displaySlice` re-sliced from,
@@ -2233,7 +2101,7 @@ public actor DocumentSearcher {
                 // the searched text at the searched offsets instead.
                 let window = displayWindow(
                     displayChars: displayBaseChars, displayText: displayBaseText,
-                    baseCount: ext.baseText.count,
+                    baseCount: prepared.baseText.count,
                     start: baseStartOffset, length: baseLength, offsetMap: nil,
                     searchedText: searchPageText, searchedStart: matchStartOffset, searchedLength: matchLength
                 )
@@ -2248,8 +2116,6 @@ public actor DocumentSearcher {
                     matchRangeInSnippet: window.matchRange
                 ))
             }
-
-            searchStart = matchRange.upperBound
         }
 
         return results
@@ -2289,62 +2155,6 @@ public actor DocumentSearcher {
             return fallback
         }
         return String(displayChars[baseStart..<baseEndExclusive])
-    }
-
-    /// The base-coordinate span of a match measured on the searched
-    /// (most-transformed) text: `offsetMap` routes it to base coordinates
-    /// when a length-changing extension is active, ending AFTER the last
-    /// matched character's base position; nil when the map cannot cover
-    /// the span. The one remap for the preview, the OCR literal path and
-    /// `findTextMatches`, and the span `displaySlice` re-slices under the
-    /// same bound guards, so the context-window builder and the display
-    /// slice agree on when the fallback is taken.
-    static func baseSpan(start: Int, length: Int, offsetMap: [Int]?) -> Range<Int>? {
-        guard length > 0, start >= 0 else { return nil }
-        if let map = offsetMap {
-            guard start < map.count, start + length - 1 < map.count else { return nil }
-            return map[start] ..< (map[start + length - 1] + 1)
-        }
-        return start ..< start + length
-    }
-
-    /// Word-boundary predicate in base-text coordinates, used when a
-    /// length-changing normalization (offset map) is active. Mirrors
-    /// `isWholeWord`'s alphanumeric/underscore rule.
-    private static func isWholeWordInBase(
-        chars: [Character], start: Int, endExclusive: Int
-    ) -> Bool {
-        if start > 0 {
-            let c = chars[start - 1]
-            if c.isLetter || c.isNumber || c == "_" { return false }
-        }
-        if endExclusive < chars.count {
-            let c = chars[endExclusive]
-            if c.isLetter || c.isNumber || c == "_" { return false }
-        }
-        return true
-    }
-
-    // MARK: - Whole-Word Check
-
-    /// Check if the match range is surrounded by word boundaries. The one
-    /// String-index predicate for the preview and full tiers (`nonisolated`
-    /// so the preview path can call it without an actor hop); the
-    /// base-coordinate `isWholeWordInBase` covers the offset-map case.
-    private nonisolated static func isWholeWord(_ range: Range<String.Index>, in text: String) -> Bool {
-        if range.lowerBound > text.startIndex {
-            let charBefore = text[text.index(before: range.lowerBound)]
-            if charBefore.isLetter || charBefore.isNumber || charBefore == "_" {
-                return false
-            }
-        }
-        if range.upperBound < text.endIndex {
-            let charAfter = text[range.upperBound]
-            if charAfter.isLetter || charAfter.isNumber || charAfter == "_" {
-                return false
-            }
-        }
-        return true
     }
 
     // MARK: - Coordinate Conversion
@@ -2521,7 +2331,7 @@ public actor DocumentSearcher {
         searchedText: String, searchedStart: Int, searchedLength: Int
     ) -> ContextWindow {
         if displayChars.count == baseCount,
-           let span = Self.baseSpan(start: start, length: length, offsetMap: offsetMap),
+           let span = SearchCore.baseSpan(start: start, length: length, offsetMap: offsetMap),
            span.upperBound <= displayChars.count {
             return contextSnippet(text: displayText, matchStart: span.lowerBound, matchLength: span.count)
         }
