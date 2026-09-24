@@ -442,6 +442,16 @@ struct VerificationDisplayTests {
                 == "1 of 2 checks passed · 1\u{00A0}needs review")
     }
 
+    // MARK: - Tile wash tokens
+
+    // The tinted-tile wash (the header's teal tile, the page chips): the
+    // `HomeChoiceCardContent` subtle-tile rule, tokenised.
+    @Test("The tile wash opacity tokens are pinned")
+    func tileWashOpacityTokensArePinned() {
+        #expect(ResectaTokens.Opacity.tileWashLight == 0.10)
+        #expect(ResectaTokens.Opacity.tileWashDark == 0.18)
+    }
+
     @Test("detailsSummaryText: a WARN run keeps the completed + notes shape")
     func detailsSummaryWarnShape() {
         let report = VerificationReport(

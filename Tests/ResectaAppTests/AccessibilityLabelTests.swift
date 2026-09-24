@@ -256,6 +256,20 @@ struct AccessibilityLabelTests {
         #expect(label == "Layer 2, OCR Check, Check found a note. OCR could not be run on 1 page., 2 affected pages")
     }
 
+    // The expanded row's last line: "Took under 0.1 s" for every duration
+    // below a tenth of a second (six of ten layers finish there — "0.0s"
+    // read as "did not run"), else one decimal with a space before the unit.
+    @Test("The expanded timing line prints the under-0.1 s floor and one decimal above it",
+          arguments: [
+            (0.04, "Took under 0.1 s"),
+            (0.1, "Took 0.1 s"),
+            (1.34, "Took 1.3 s"),
+            (0.0, "Took under 0.1 s"),
+          ])
+    func expandedTimingTextPinsTheUnderOneTenthFloor(seconds: Double, expected: String) {
+        #expect(LayerResultRow.expandedTimingText(durationSeconds: seconds) == expected)
+    }
+
     @Test("Row label singular page suffix")
     func testRowLabelSingularPage() {
         let label = LayerResultRow.accessibilityLabel(

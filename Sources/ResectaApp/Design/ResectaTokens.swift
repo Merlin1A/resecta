@@ -90,6 +90,16 @@ enum ResectaTokens {
 
         // Severity tint overlays
         static let severityTint: Double = 0.10
+
+        /// The tinted-tile wash — a brand or status hue behind a glyph or a
+        /// chip's numeral (the Verification Details header's teal tile, the
+        /// page chips): the `HomeChoiceCardContent` subtle-tile rule,
+        /// tokenised. Light 0.10; dark 0.18, where the darker surface needs
+        /// the stronger wash to read as a tile. Text on the wash stays on
+        /// the text tier (`BrandTeal.text` measures 9.24 light / 7.62 dark
+        /// on it).
+        static let tileWashLight: Double = 0.10
+        static let tileWashDark: Double = 0.18
     }
 
     // MARK: - Borders
