@@ -34,9 +34,9 @@ struct FaceDetectorTests {
     }
 
     @Test("Small image does not crash")
-    func smallImageNoCrash() async {
-        guard let ctx = createBitmapContext(width: 10, height: 10),
-              let image = ctx.makeImage() else { return }
+    func smallImageNoCrash() async throws {
+        let ctx = try #require(createBitmapContext(width: 10, height: 10), "bitmap context")
+        let image = try #require(ctx.makeImage(), "bitmap image")
         let detector = FaceDetector()
         do {
             _ = try await detector.detect(in: image)
@@ -60,9 +60,9 @@ struct FaceDetectorTests {
     }
 
     @Test("Detection result kind is face")
-    func detectionResultKindIsFace() async {
-        guard let ctx = createBitmapContext(width: 200, height: 200),
-              let image = ctx.makeImage() else { return }
+    func detectionResultKindIsFace() async throws {
+        let ctx = try #require(createBitmapContext(width: 200, height: 200), "bitmap context")
+        let image = try #require(ctx.makeImage(), "bitmap image")
         let detector = FaceDetector()
         do {
             let results = try await detector.detect(in: image)

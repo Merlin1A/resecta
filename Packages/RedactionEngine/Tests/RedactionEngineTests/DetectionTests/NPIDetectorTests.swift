@@ -34,10 +34,7 @@ struct NPIDetectorTests {
 
     @Test("Luhn-80840 checksum validates against check-digit vectors")
     func luhnChecksum() throws {
-        guard let vectors = try loadVectors() else {
-            print("[NPI gate] npi_test_vectors.json not bundled; skipping.")
-            return
-        }
+        let vectors = try #require(try loadVectors(), "npi_test_vectors.json not bundled")
         #expect(!vectors.isEmpty)
         // NPILuhn80840 only validates the checksum — length + prefix rules live
         // in NPIDetector's regex gate. Restrict this assertion to vectors whose
@@ -57,7 +54,7 @@ struct NPIDetectorTests {
 
     @Test("Detector surfaces every valid vector and rejects every invalid one")
     func fullDetectorSweep() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "npi_test_vectors.json not bundled")
         let detector = NPIDetector()
         for vec in vectors {
             let text = "NPI: \(vec.npi)"
@@ -70,7 +67,7 @@ struct NPIDetectorTests {
 
     @Test("Detector surfaces valid NPI embedded in a sentence")
     func validNPISurfaces() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "npi_test_vectors.json not bundled")
         let detector = NPIDetector()
         let sample = vectors.first(where: { $0.valid })!
         let text = "Provider NPI: \(sample.npi), ready for billing."
@@ -81,7 +78,7 @@ struct NPIDetectorTests {
 
     @Test("Detector rejects invalid NPI (checksum fail)")
     func invalidNPIDoesNotSurface() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "npi_test_vectors.json not bundled")
         let detector = NPIDetector()
         let invalid = vectors.first(where: { !$0.valid })
         // If fixture has no invalid samples, construct one by flipping a digit.

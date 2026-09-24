@@ -44,7 +44,7 @@ struct PassportVectorTests {
 
     @Test("Inline passportPattern matches every valid row's text")
     func inlineRegexMatchesValidRows() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "passport_test_vectors.json not bundled")
         for vec in vectors where vec.valid {
             let ns = vec.text as NSString
             let count = PassportDetector.passportPattern.numberOfMatches(

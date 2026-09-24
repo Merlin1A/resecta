@@ -393,7 +393,7 @@ struct SearchGroundTruthRunnerTests {
     @Test("Emit search-GT product hits over the T3.1 bank")
     func emitSearchGroundTruth() async throws {
         guard let out = Self.searchOut() else {
-            print("[H3.1] RESECTA_SEARCH_OUT not set; search GT runner skipped.")
+            TestGate.skip("[H3.1] RESECTA_SEARCH_OUT unset — the search GT runner was not requested")
             return
         }
         let (file, queriesSHA) = try Self.loadQueryFile()

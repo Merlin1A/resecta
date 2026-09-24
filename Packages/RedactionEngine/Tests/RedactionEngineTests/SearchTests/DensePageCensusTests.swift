@@ -78,7 +78,7 @@ struct DensePageCensusTests {
     @Test("Census over RESECTA_CENSUS_DOCS (skips when the env is unset)")
     func census() async throws {
         guard let out = Self.censusOut(), let root = Self.docsRoot(), let docs = Self.censusDocs() else {
-            print("[census] RESECTA_CENSUS_OUT / RESECTA_DOCS_ROOT / RESECTA_CENSUS_DOCS unset; skipped")
+            TestGate.skip("RESECTA_CENSUS_OUT / RESECTA_DOCS_ROOT / RESECTA_CENSUS_DOCS unset — the census was not requested")
             return
         }
         let outURL = URL(fileURLWithPath: out)

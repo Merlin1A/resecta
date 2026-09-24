@@ -45,10 +45,7 @@ struct DoctypeSoftmaxDumpTests {
 
     @Test("Emit softmax_dump.json from the G8 corpus")
     func emitSoftmaxDump() async throws {
-        guard let corpus = try loadCorpus() else {
-            print("[softmax dump gate] g8_corpus.json not bundled; skipping")
-            return
-        }
+        let corpus = try #require(try loadCorpus(), "g8_corpus.json not bundled")
 
         let classifier = DocumentTypeClassifier()
         let sortedDocs = corpus.documents.sorted { $0.id < $1.id }

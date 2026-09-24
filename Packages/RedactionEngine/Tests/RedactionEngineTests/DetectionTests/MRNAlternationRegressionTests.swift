@@ -63,10 +63,7 @@ struct MRNAlternationRegressionTests {
 
     @Test("The three-pattern MRN set is a superset of the previous single alternation")
     func noRegressionOnOldAlternation() throws {
-        guard let medical = try loadMedicalDocs() else {
-            print("[MRN regression] g8_corpus.json not bundled; skipping.")
-            return
-        }
+        let medical = try #require(try loadMedicalDocs(), "g8_corpus.json not bundled")
         #expect(!medical.isEmpty, "G8 medical slice must be non-empty")
 
         let detector = PIIDetector()
@@ -102,7 +99,7 @@ struct MRNAlternationRegressionTests {
 
     @Test("Three-pattern set recalls every G8 medical ground-truth MRN span")
     func groundTruthRecall() throws {
-        guard let medical = try loadMedicalDocs() else { return }
+        let medical = try #require(try loadMedicalDocs(), "g8_corpus.json not bundled")
         let detector = PIIDetector()
         var misses: [String] = []
 

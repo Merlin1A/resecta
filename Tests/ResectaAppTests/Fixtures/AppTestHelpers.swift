@@ -26,13 +26,15 @@ extension Tag {
 
 // MARK: - Coordinator Factory
 
-/// Create a PipelineCoordinator with fresh state objects.
+/// Create a PipelineCoordinator with fresh state objects. Pass a
+/// `SettingsState(defaults:)` built on a scratch suite to keep the test off
+/// `UserDefaults.standard`.
 @MainActor
-func makeCoordinator() -> PipelineCoordinator {
+func makeCoordinator(settingsState: SettingsState? = nil) -> PipelineCoordinator {
     PipelineCoordinator(
         documentState: DocumentState(),
         redactionState: RedactionState(),
-        settingsState: SettingsState()
+        settingsState: settingsState ?? SettingsState()
     )
 }
 

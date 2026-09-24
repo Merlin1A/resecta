@@ -23,13 +23,6 @@ struct SavedSearchStoreTests {
             .appendingPathComponent("saved-searches.v2.json")
     }
 
-    /// Scratch UserDefaults suite for the legacy-key cleanup seam so
-    /// tests never touch `.standard`.
-    private static func makeScratchDefaults() -> (UserDefaults, suiteName: String) {
-        let name = UUID().uuidString
-        return (UserDefaults(suiteName: name)!, name)
-    }
-
     // MARK: - Round-trip
 
     @Test("Round-trip encode/decode preserves single-mode SavedSearch")
@@ -149,7 +142,7 @@ struct SavedSearchStoreTests {
     @Test("Rename preserves the normalization-extension and v2 option flags")
     func renamePreservesNormalizationFlags() {
         let fileURL = Self.makeScratchFileURL()
-        let (defaults, suiteName) = Self.makeScratchDefaults()
+        let (defaults, suiteName) = makeScratchDefaults()
         defer {
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
             defaults.removePersistentDomain(forName: suiteName)
@@ -477,7 +470,7 @@ struct SavedSearchStoreTests {
     @Test("Store add/remove/rename round-trips through the storage file")
     func storeMutationRoundTrip() {
         let fileURL = Self.makeScratchFileURL()
-        let (defaults, suiteName) = Self.makeScratchDefaults()
+        let (defaults, suiteName) = makeScratchDefaults()
         defer {
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
             defaults.removePersistentDomain(forName: suiteName)
@@ -507,7 +500,7 @@ struct SavedSearchStoreTests {
     @Test("clearAll(interface:) removes only that interface's entries and round-trips through the storage file")
     func clearAllRemovesOnlyThatInterface() {
         let fileURL = Self.makeScratchFileURL()
-        let (defaults, suiteName) = Self.makeScratchDefaults()
+        let (defaults, suiteName) = makeScratchDefaults()
         defer {
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
             defaults.removePersistentDomain(forName: suiteName)
@@ -540,7 +533,7 @@ struct SavedSearchStoreTests {
     @Test("clearAll(interface:) that empties the store drops the parked undecodable rows too")
     func clearAllLastEntriesDropsParkedRows() throws {
         let fileURL = Self.makeScratchFileURL()
-        let (defaults, suiteName) = Self.makeScratchDefaults()
+        let (defaults, suiteName) = makeScratchDefaults()
         defer {
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
             defaults.removePersistentDomain(forName: suiteName)
@@ -578,7 +571,7 @@ struct SavedSearchStoreTests {
     @Test("clearAll(interface:) keeps the parked rows while the other interface still has entries")
     func clearAllKeepsParkedRowsWhileOtherInterfaceRemains() throws {
         let fileURL = Self.makeScratchFileURL()
-        let (defaults, suiteName) = Self.makeScratchDefaults()
+        let (defaults, suiteName) = makeScratchDefaults()
         defer {
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
             defaults.removePersistentDomain(forName: suiteName)
@@ -607,7 +600,7 @@ struct SavedSearchStoreTests {
     @Test("Empty store hydrates as empty list, not crash")
     func emptyStoreHydrate() {
         let fileURL = Self.makeScratchFileURL()
-        let (defaults, suiteName) = Self.makeScratchDefaults()
+        let (defaults, suiteName) = makeScratchDefaults()
         defer {
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
             defaults.removePersistentDomain(forName: suiteName)
@@ -667,7 +660,7 @@ struct SavedSearchStoreTests {
     @Test("A parked undecodable row survives an unrelated save")
     func parkedRowSurvivesResave() throws {
         let fileURL = Self.makeScratchFileURL()
-        let (defaults, suiteName) = Self.makeScratchDefaults()
+        let (defaults, suiteName) = makeScratchDefaults()
         defer {
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
             defaults.removePersistentDomain(forName: suiteName)
@@ -706,7 +699,7 @@ struct SavedSearchStoreTests {
     @Test("Store hydrating a file with one bad row keeps the good rows")
     func storeHydratesPastBadRow() throws {
         let fileURL = Self.makeScratchFileURL()
-        let (defaults, suiteName) = Self.makeScratchDefaults()
+        let (defaults, suiteName) = makeScratchDefaults()
         defer {
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
             defaults.removePersistentDomain(forName: suiteName)
@@ -730,7 +723,7 @@ struct SavedSearchStoreTests {
     @Test("A v1-versioned storage file reads as the empty fallback (deliberate clean break)")
     func v1FileFallsBackEmpty() throws {
         let fileURL = Self.makeScratchFileURL()
-        let (defaults, suiteName) = Self.makeScratchDefaults()
+        let (defaults, suiteName) = makeScratchDefaults()
         defer {
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
             defaults.removePersistentDomain(forName: suiteName)
@@ -749,7 +742,7 @@ struct SavedSearchStoreTests {
     @Test("An inner-envelope version mismatch alone reads as empty (both declared versions are load-bearing)")
     func innerVersionMismatchFallsBackEmpty() throws {
         let fileURL = Self.makeScratchFileURL()
-        let (defaults, suiteName) = Self.makeScratchDefaults()
+        let (defaults, suiteName) = makeScratchDefaults()
         defer {
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
             defaults.removePersistentDomain(forName: suiteName)
@@ -770,7 +763,7 @@ struct SavedSearchStoreTests {
     @Test("The store's storage file carries protection + backup exclusion after a write")
     func storeFileIsProtectedAndBackupExcluded() throws {
         let fileURL = Self.makeScratchFileURL()
-        let (defaults, suiteName) = Self.makeScratchDefaults()
+        let (defaults, suiteName) = makeScratchDefaults()
         defer {
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
             defaults.removePersistentDomain(forName: suiteName)
@@ -796,7 +789,7 @@ struct SavedSearchStoreTests {
     @Test("Init removes the pre-v2 UserDefaults blob (no data migration)")
     func initRemovesLegacyDefaultsKey() {
         let fileURL = Self.makeScratchFileURL()
-        let (defaults, suiteName) = Self.makeScratchDefaults()
+        let (defaults, suiteName) = makeScratchDefaults()
         defer {
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
             defaults.removePersistentDomain(forName: suiteName)
@@ -843,7 +836,7 @@ struct SavedSearchStoreTests {
     @Test("Rename clamps a 300-char name to nameLengthCap, matching decoder")
     func testRenameAndDecoderClampMatch() {
         let fileURL = Self.makeScratchFileURL()
-        let (defaults, suiteName) = Self.makeScratchDefaults()
+        let (defaults, suiteName) = makeScratchDefaults()
         defer {
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
             defaults.removePersistentDomain(forName: suiteName)

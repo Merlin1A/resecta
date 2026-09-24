@@ -40,10 +40,7 @@ struct DEADetectorTests {
 
     @Test("Checksum matches every vector")
     func checksum() throws {
-        guard let vectors = try loadVectors() else {
-            print("[DEA gate] dea_test_vectors.json not bundled; skipping.")
-            return
-        }
+        let vectors = try #require(try loadVectors(), "dea_test_vectors.json not bundled")
         #expect(!vectors.isEmpty)
         for vec in vectors {
             #expect(
@@ -55,12 +52,12 @@ struct DEADetectorTests {
 
     @Test("Detector surfaces valid DEA with context")
     func validDEASurfaces() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "dea_test_vectors.json not bundled")
         let detector = DEADetector()
         // Must use a vector with a valid registrant-type first letter;
         // the vector file includes checksum-valid entries with non-registrant letters
         // (e.g. I, W, V, Z) that detect() correctly rejects.
-        guard let sample = firstRegistrantValidVector(from: vectors) else { return }
+        let sample = try #require(firstRegistrantValidVector(from: vectors), "no registrant-type valid DEA vector in fixture")
         let text = "Dr. Smith DEA \(sample.dea) writing prescription."
         let ns = text as NSString
         let matches = detector.detect(in: ns, range: NSRange(location: 0, length: ns.length))
@@ -69,9 +66,9 @@ struct DEADetectorTests {
 
     @Test("Invalid DEA does not surface")
     func invalidDoesNotSurface() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "dea_test_vectors.json not bundled")
         let detector = DEADetector()
-        guard let invalid = vectors.first(where: { !$0.valid }) else { return }
+        let invalid = try #require(vectors.first(where: { !$0.valid }), "no invalid DEA vector in fixture")
         let text = "DEA \(invalid.dea) on file"
         let ns = text as NSString
         let matches = detector.detect(in: ns, range: NSRange(location: 0, length: ns.length))
@@ -80,9 +77,9 @@ struct DEADetectorTests {
 
     @Test("Positive context emits .contextPositive signal in rationale")
     func signalEmitsContextPositive() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "dea_test_vectors.json not bundled")
         let detector = DEADetector()
-        guard let sample = firstRegistrantValidVector(from: vectors) else { return }
+        let sample = try #require(firstRegistrantValidVector(from: vectors), "no registrant-type valid DEA vector in fixture")
         let text = "Dr. Smith DEA \(sample.dea) writing prescription."
         let ns = text as NSString
         let matches = detector.detect(in: ns, range: NSRange(location: 0, length: ns.length))
@@ -97,9 +94,9 @@ struct DEADetectorTests {
 
     @Test("Rationale always includes regexPattern + structuralValidator signals")
     func signalCarriesStructuralFingerprint() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "dea_test_vectors.json not bundled")
         let detector = DEADetector()
-        guard let sample = firstRegistrantValidVector(from: vectors) else { return }
+        let sample = try #require(firstRegistrantValidVector(from: vectors), "no registrant-type valid DEA vector in fixture")
         let text = "DEA \(sample.dea)"
         let ns = text as NSString
         let matches = detector.detect(in: ns, range: NSRange(location: 0, length: ns.length))

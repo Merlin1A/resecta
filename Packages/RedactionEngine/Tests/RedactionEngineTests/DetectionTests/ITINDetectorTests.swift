@@ -94,10 +94,7 @@ struct ITINDetectorTests {
 
     @Test("Detector verdict matches DataPipeline yy_bucket for every vector")
     func vectorCrossCheck() async throws {
-        guard let vectors = try loadVectors() else {
-            print("[ITIN gate] itin_vectors.json not bundled; skipping.")
-            return
-        }
+        let vectors = try #require(try loadVectors(), "itin_vectors.json not bundled")
         #expect(!vectors.isEmpty)
         for vec in vectors {
             let detected = await detects(vec.itin)

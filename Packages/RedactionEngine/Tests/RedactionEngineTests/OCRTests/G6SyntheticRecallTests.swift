@@ -49,14 +49,14 @@ struct G6SyntheticRecallTests {
 
     @Test("Normalizer recall on noise-injected g8 sample ≥ raw recall")
     func normalizerRecallHolds() async throws {
-        guard let url = Bundle.module.url(
-            forResource: "g8_corpus",
-            withExtension: "json",
-            subdirectory: "corpus"
-        ) else {
-            print("[G6 regression] g8_corpus.json absent; skipped until `make install-assets` runs.")
-            return
-        }
+        let url = try #require(
+            Bundle.module.url(
+                forResource: "g8_corpus",
+                withExtension: "json",
+                subdirectory: "corpus"
+            ),
+            "g8_corpus.json not bundled"
+        )
 
         let data = try Data(contentsOf: url)
         let corpus = try JSONDecoder().decode(Corpus.self, from: data)

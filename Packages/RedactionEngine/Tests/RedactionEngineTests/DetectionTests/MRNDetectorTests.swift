@@ -105,7 +105,7 @@ struct MRNDetectorTests {
 
     @Test("Every old-alternation hit is covered by the new detector (G8 medical slice)")
     func mrnAlternationRegressionOnG8Medical() async throws {
-        guard let corpus = try loadCorpus() else { return }
+        let corpus = try #require(try loadCorpus(), "g8_corpus.json not bundled")
         let medical = corpus.documents.filter { $0.doctype == "medical" }
         // Pre-W10 pattern — kept inline for regression parity.
         let oldPattern = try NSRegularExpression(
@@ -138,7 +138,7 @@ struct MRNDetectorTests {
 
     @Test("Medical-slice recall clears 40 %")
     func mrnMedicalSliceRecall() async throws {
-        guard let corpus = try loadCorpus() else { return }
+        let corpus = try #require(try loadCorpus(), "g8_corpus.json not bundled")
         let medical = corpus.documents.filter { $0.doctype == "medical" }
         var spansSeen = 0
         var spansHit = 0
@@ -154,7 +154,7 @@ struct MRNDetectorTests {
                 }
             }
         }
-        guard spansSeen > 0 else { return }
+        try #require(spansSeen > 0, "no mrn ground-truth spans in G8 medical slice")
         let recall = Double(spansHit) / Double(spansSeen)
         #expect(recall >= 0.40,
                 "medical-slice recall \(recall) below 0.40 floor")
