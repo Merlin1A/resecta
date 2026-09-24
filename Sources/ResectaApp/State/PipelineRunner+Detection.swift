@@ -96,6 +96,104 @@ extension PipelineRunner {
         // per-word enumeration on searchable-redaction pages.
         let textLayerStatusSnapshot = coordinator.documentState.textLayerStatus
 
+        let loop = try await detectPages(
+            orchestrator: orchestrator, recognitionLevel: recognitionLevel,
+            runSettings: runSettings, priors: priorsSnapshot,
+            surfaceForms: surfaceFormsSnapshot,
+            thresholdVector: thresholdVectorSnapshot,
+            textLayerStatus: textLayerStatusSnapshot)
+        let accumulated: DetectionAccumulators
+        switch loop {
+        case .stopped(let outcome): return outcome
+        case .completed(let filled): accumulated = filled
+        }
+        let accumulatedResults = accumulated.results
+        let accumulatedDiagnostics = accumulated.diagnostics
+        let accumulatedOCRCapSkips = accumulated.ocrPixelCapSkippedPages
+
+
+        // Cooperative check between detect
+        // loop completion and Jaro-Winkler / cross-page clustering.
+        // Both clusterers are synchronous O(n²) in the worst case;
+        // a cancel arriving here without this check would otherwise
+        // wait for the entire clustering pass to complete.
+        try Task.checkCancellation()
+
+        // Document-level Stage 5: entity clustering on name detections.
+        // Bare-surname clusters ≥15 get flagged for inline ambiguity hints.
+        let clusterer = EntityClusterer()
+        var clusterInputs: [EntityClusterer.ClusterInput] = []
+        // Page order, not Dictionary order: two runs over the same
+        // detections hand the clusterer the same input sequence.
+        for page in accumulatedResults.keys.sorted() {
+            for result in accumulatedResults[page] ?? [] {
+                guard case .pii(let kind) = result.kind, kind == .name else { continue }
+                guard let text = result.matchedText,
+                      let input = EntityClusterer.clusterInput(
+                        for: result.id, rawName: text
+                      ) else { continue }
+                clusterInputs.append(input)
+            }
+        }
+        let clusterReport = clusterer.cluster(names: clusterInputs)
+
+        // Second cooperative check between the
+        // two clustering passes.
+        try Task.checkCancellation()
+
+        // Document-level Stage 5b: cross-page entity
+        // linking across **all** PII categories using
+        // normalize-and-exact-match. Peer to the name-only
+        // clusterer above (which uses Jaro-Winkler over surname
+        // blocks). Drives the "Grouped" view mode in the scan
+        // review surface (`ScanReviewSection`).
+        let crossPageGroups =
+            CrossPageEntityGroup.clusters(from: accumulatedResults)
+
+        // Hand the accumulators to the coordinator only after all pages
+        // succeed: it writes them, then stages the review or records
+        // that nothing was found.
+        sink(.detectionFinished(DetectionResults(
+            results: accumulatedResults,
+            diagnostics: accumulatedDiagnostics,
+            ocrPixelCapSkippedPages: accumulatedOCRCapSkips,
+            ambiguousSurnameDetectionIDs: clusterReport.bareSurnameFlags,
+            crossPageEntityGroups: crossPageGroups)))
+        return .completed
+    }
+
+    /// What the page loop fills — handed back whole so the clustering
+    /// passes and the coordinator's write see one consistent set.
+    struct DetectionAccumulators {
+        let results: [Int: [DetectionResult]]
+        let diagnostics: [Int: ClassificationDiagnostic]
+        let ocrPixelCapSkippedPages: Set<Int>
+    }
+
+    /// How the page loop ended: every page detected, or an early exit whose
+    /// outcome the run returns as-is.
+    enum PageLoopEnd {
+        case completed(DetectionAccumulators)
+        case stopped(PipelineRunOutcome)
+    }
+
+    /// Detect every page: the page-0 bootstrap render, then the depth-2
+    /// lookahead loop (`renderPageForDetection` for page N+1 concurrent
+    /// with `detectPage` for page N), folding each page into the
+    /// accumulators.
+    private func detectPages(
+        orchestrator: DetectionOrchestrator,
+        recognitionLevel: VNRequestTextRecognitionLevel,
+        runSettings: PipelineCoordinator.RunSettings,
+        priors: PerCategoryPriors,
+        surfaceForms: SurfaceFormDictionary,
+        thresholdVector: PresetThresholdVector?,
+        textLayerStatus: [Int: TextLayerStatus]
+    ) async throws -> PageLoopEnd {
+        // The coordinator is `@unchecked Sendable`; the detached hint
+        // closure below captures this reference.
+        let coordinator = self.coordinator
+
         // Accumulate results locally instead of writing to
         // redactionState.detectionResults during the loop. This avoids
         // intermediate state leakage on cancellation, so that
@@ -147,10 +245,10 @@ extension PipelineRunner {
                 pageResult = try await orchestrator.detectPage(
                     image: pageImage,
                     pageIndex: i,
-                    priors: priorsSnapshot,
-                    surfaceForms: surfaceFormsSnapshot,
+                    priors: priors,
+                    surfaceForms: surfaceForms,
                     doctypeContext: doctypeCtx,
-                    thresholdVector: thresholdVectorSnapshot,
+                    thresholdVector: thresholdVector,
                     embeddedText: embeddedSource,
                     ocrSkipReason: skipReason
                 )
@@ -216,7 +314,7 @@ extension PipelineRunner {
                 // none is added). The degrade (a toast + the run
                 // record) is the coordinator's — an event here.
                 sink(.detectionBootstrapFailed)
-                return .detectionBootstrapFailed
+                return .stopped(.detectionBootstrapFailed)
             }
             var pendingImage: CGImage = try await
                 coordinator.renderPageForDetection(
@@ -257,7 +355,7 @@ extension PipelineRunner {
                             for: hintPage,
                             pageIndex: i,
                             runSettings: runSettings,
-                            textLayerStatus: textLayerStatusSnapshot)
+                            textLayerStatus: textLayerStatus)
                     }.value
 
                 // Depth-2 lookahead. Per page, two paths:
@@ -275,7 +373,7 @@ extension PipelineRunner {
                             error: .detectionError(.visionError(pageIndex: i + 1)),
                             returnPhase: .editing
                         )))
-                        return .detectionLookaheadPageMissing(pageIndex: i + 1)
+                        return .stopped(.detectionLookaheadPageMissing(pageIndex: i + 1))
                     }
                     // Structured-concurrency lookahead. The
                     // `nonisolated(unsafe)` capture is the same
@@ -331,54 +429,9 @@ extension PipelineRunner {
                 }
             }
         }
-
-        // Cooperative check between detect
-        // loop completion and Jaro-Winkler / cross-page clustering.
-        // Both clusterers are synchronous O(n²) in the worst case;
-        // a cancel arriving here without this check would otherwise
-        // wait for the entire clustering pass to complete.
-        try Task.checkCancellation()
-
-        // Document-level Stage 5: entity clustering on name detections.
-        // Bare-surname clusters ≥15 get flagged for inline ambiguity hints.
-        let clusterer = EntityClusterer()
-        var clusterInputs: [EntityClusterer.ClusterInput] = []
-        // Page order, not Dictionary order: two runs over the same
-        // detections hand the clusterer the same input sequence.
-        for page in accumulatedResults.keys.sorted() {
-            for result in accumulatedResults[page] ?? [] {
-                guard case .pii(let kind) = result.kind, kind == .name else { continue }
-                guard let text = result.matchedText,
-                      let input = EntityClusterer.clusterInput(
-                        for: result.id, rawName: text
-                      ) else { continue }
-                clusterInputs.append(input)
-            }
-        }
-        let clusterReport = clusterer.cluster(names: clusterInputs)
-
-        // Second cooperative check between the
-        // two clustering passes.
-        try Task.checkCancellation()
-
-        // Document-level Stage 5b: cross-page entity
-        // linking across **all** PII categories using
-        // normalize-and-exact-match. Peer to the name-only
-        // clusterer above (which uses Jaro-Winkler over surname
-        // blocks). Drives the "Grouped" view mode in the scan
-        // review surface (`ScanReviewSection`).
-        let crossPageGroups =
-            CrossPageEntityGroup.clusters(from: accumulatedResults)
-
-        // Hand the accumulators to the coordinator only after all pages
-        // succeed: it writes them, then stages the review or records
-        // that nothing was found.
-        sink(.detectionFinished(DetectionResults(
+        return .completed(DetectionAccumulators(
             results: accumulatedResults,
             diagnostics: accumulatedDiagnostics,
-            ocrPixelCapSkippedPages: accumulatedOCRCapSkips,
-            ambiguousSurnameDetectionIDs: clusterReport.bareSurnameFlags,
-            crossPageEntityGroups: crossPageGroups)))
-        return .completed
+            ocrPixelCapSkippedPages: accumulatedOCRCapSkips))
     }
 }
