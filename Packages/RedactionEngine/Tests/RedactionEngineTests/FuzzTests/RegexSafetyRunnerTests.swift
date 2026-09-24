@@ -277,7 +277,7 @@ struct RegexSafetyRunnerTests {
     @Test("Emit regex-safety verdicts over the adversarial + benign corpora")
     func emitRegexSafety() async throws {
         guard let out = Self.regexOut() else {
-            print("[H3.4] RESECTA_REGEX_OUT not set; regex-safety runner skipped.")
+            TestGate.skip("[H3.4] RESECTA_REGEX_OUT unset — the regex-safety runner was not requested")
             return
         }
         let advData = try Self.fixtureData("redos_payloads")

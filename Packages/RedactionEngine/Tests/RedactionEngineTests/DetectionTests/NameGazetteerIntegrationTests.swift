@@ -17,14 +17,10 @@ struct NameGazetteerIntegrationTests {
     @Test("Known surname triggers bloomSurnameHit + boost above baseline")
     func knownSurnameGetsBoostAndSignal() async throws {
         guard Self.nlTaggerNamesAvailable() else {
-            print("[NLTagger gate] .nameType scheme unavailable on this build; "
-                  + "skipping.")
+            TestGate.skip("[NLTagger gate] .nameType scheme unavailable on this build; skipping.")
             return
         }
-        guard let gazetteer = NameGazetteer() else {
-            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
-            return
-        }
+        let gazetteer = try #require(NameGazetteer(), "production gazetteers not bundled")
         let detector = PIIDetector(nameGazetteer: gazetteer)
         // Clean subject-verb construction so NLTagger reliably emits a
         // .personalName candidate; "Smith" is in the bundled surname bloom
@@ -41,10 +37,7 @@ struct NameGazetteerIntegrationTests {
 
     @Test("Given + surname on bundled gazetteer produces max boost (direct queryBoosted)")
     func bundledGazetteer_givenAndSurnameBoost() throws {
-        guard let gazetteer = NameGazetteer() else {
-            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
-            return
-        }
+        let gazetteer = try #require(NameGazetteer(), "production gazetteers not bundled")
         // queryBoosted skips the NLTagger tokenization variability — the
         // boost path itself is what we're validating. "maria johnson" has
         // both common SSA + Census bundled keys.
@@ -59,10 +52,7 @@ struct NameGazetteerIntegrationTests {
 
     @Test("Unknown candidate keeps baseline 0.70 and emits no bloom signals")
     func unknownCandidateKeepsBaseline() async throws {
-        guard let gazetteer = NameGazetteer() else {
-            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
-            return
-        }
+        let gazetteer = try #require(NameGazetteer(), "production gazetteers not bundled")
         let detector = PIIDetector(nameGazetteer: gazetteer)
         // Use a construction NLTagger is likely to flag as a person so we
         // actually exercise the non-strict path; two tokens absent from
@@ -82,10 +72,7 @@ struct NameGazetteerIntegrationTests {
 
     @Test("ALL-CAPS strict pass suppresses gibberish candidates")
     func allCapsStrictPassSuppressesUnknown() async throws {
-        guard let gazetteer = NameGazetteer() else {
-            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
-            return
-        }
+        let gazetteer = try #require(NameGazetteer(), "production gazetteers not bundled")
         let detector = PIIDetector(nameGazetteer: gazetteer)
         // Gibberish tokens NLTagger might flag in a title-cased pass must
         // not survive the strict gate.
@@ -170,8 +157,7 @@ struct NameGazetteerIntegrationTests {
     @Test("nil gazetteer preserves pre-W2 baseline and emits no bloom signals")
     func nilGazetteerBackCompat() async throws {
         guard Self.nlTaggerNamesAvailable() else {
-            print("[NLTagger gate] .nameType scheme unavailable on this build; "
-                  + "skipping.")
+            TestGate.skip("[NLTagger gate] .nameType scheme unavailable on this build; skipping.")
             return
         }
         let detector = PIIDetector(nameGazetteer: nil)

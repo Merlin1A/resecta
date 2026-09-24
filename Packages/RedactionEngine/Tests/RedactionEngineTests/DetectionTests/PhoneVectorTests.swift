@@ -43,7 +43,7 @@ struct PhoneVectorTests {
 
     @Test("Inline phonePattern matches every valid row")
     func inlineRegexMatchesValidRows() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "phone_test_vectors.json not bundled")
         for vec in vectors where vec.valid {
             let ns = vec.phone as NSString
             let count = PhoneDetector.phonePattern.numberOfMatches(

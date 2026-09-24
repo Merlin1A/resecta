@@ -247,9 +247,7 @@ struct BarcodeDetectorTests {
 
     @Test("Detector confidence stays within [0,1] for synthetic input")
     func testConfidenceInUnitRange() async throws {
-        guard let (image, _) = renderQRCode(payload: "unit-range-check") else {
-            return
-        }
+        let (image, _) = try #require(renderQRCode(payload: "unit-range-check"), "QR render failed")
         let detector = BarcodeDetector()
         do {
             let results = try await detector.detect(in: image)
@@ -264,9 +262,7 @@ struct BarcodeDetectorTests {
 
     @Test("Detector tags every result as .pii(.barcode)")
     func testKindIsAlwaysBarcode() async throws {
-        guard let (image, _) = renderQRCode(payload: "kind-check") else {
-            return
-        }
+        let (image, _) = try #require(renderQRCode(payload: "kind-check"), "QR render failed")
         let detector = BarcodeDetector()
         do {
             let results = try await detector.detect(in: image)

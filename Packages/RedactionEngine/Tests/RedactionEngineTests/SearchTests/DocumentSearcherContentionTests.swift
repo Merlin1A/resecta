@@ -106,10 +106,10 @@ struct DocumentSearcherContentionTests {
     /// #7 — guard against a future edit dropping one of the per-page yields.
     /// Best-effort: on the build machine `#filePath` resolves and the count is
     /// asserted strictly (searchText + searchRegex + both searchMultiTerm arms
-    /// = 4). Off-machine the source is unreachable and the guard is vacuous —
+    /// = 4). Off-machine the source is unreachable and the test fails —
     /// the behavioral drain tests above are the portable coverage.
     @Test("DocumentSearcher has exactly four per-page Task.yield() calls")
-    func yieldCountGuard() {
+    func yieldCountGuard() throws {
         let packageRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()   // SearchTests
             .deletingLastPathComponent()   // RedactionEngineTests
@@ -117,7 +117,7 @@ struct DocumentSearcherContentionTests {
             .deletingLastPathComponent()   // <package root>
         let source = packageRoot
             .appendingPathComponent("Sources/RedactionEngine/Search/DocumentSearcher.swift")
-        guard let text = try? String(contentsOf: source, encoding: .utf8) else { return }
+        let text = try #require(try? String(contentsOf: source, encoding: .utf8), "DocumentSearcher.swift not readable from the package root")
         let count = text.components(separatedBy: "await Task.yield()").count - 1
         #expect(count == 4, "expected 4 await Task.yield() in DocumentSearcher.swift, found \(count)")
     }

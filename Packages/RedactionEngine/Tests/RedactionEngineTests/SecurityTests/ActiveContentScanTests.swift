@@ -96,12 +96,15 @@ struct ActiveContentScanTests {
     /// Walks every PDF under RESECTA_DOCS_ROOT. A document outside the
     /// corpus' deliberately hostile directories must not be reported: a hit
     /// there is a clean document the widened guard would newly refuse.
-    /// Skips silently when the root is not set.
+    /// Records a visible skip when the root is not set.
     @Test("No clean document in the sample corpus is reported")
     func corpusCleanDocumentsPass() throws {
         let env = ProcessInfo.processInfo.environment
         guard let root = env["RESECTA_DOCS_ROOT"] ?? env["TEST_RUNNER_RESECTA_DOCS_ROOT"],
-              !root.isEmpty else { return }
+              !root.isEmpty else {
+            TestGate.skip("RESECTA_DOCS_ROOT unset — the active-content corpus walk was not requested")
+            return
+        }
         // The corpus' deliberately hostile sets: robustness and fuzz
         // shapes, and the planted-payload documents (one carries a
         // catalog-top /JavaScript, which the original guard refused too).

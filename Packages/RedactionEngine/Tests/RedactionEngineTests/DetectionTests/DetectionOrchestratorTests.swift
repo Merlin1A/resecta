@@ -158,12 +158,9 @@ struct DetectionOrchestratorTests {
         // 6_001 × 6_001 = 36_012_001 pixels, just over maxOCRPixelCount.
         // Each axis is below the per-axis cap; only the product gate fires.
         // The raw image is allocated with a black-fill bitmap context (≈ 144 MB
-        // RGBA8). Skipped on memory-constrained CI; otherwise asserts that
-        // the total-pixel cap fires before Vision is invoked.
-        guard let image = makeRawImage(width: 6_001, height: 6_001) else {
-            // Allocation failed (memory-constrained simulator) — skip.
-            return
-        }
+        // RGBA8); the test asserts that the total-pixel cap fires before Vision
+        // is invoked.
+        let image = try #require(makeRawImage(width: 6_001, height: 6_001), "raw image allocation")
         let orchestrator = DetectionOrchestrator()
 
         let (text, bounds, lines) = try await orchestrator.runOCR(on: image)

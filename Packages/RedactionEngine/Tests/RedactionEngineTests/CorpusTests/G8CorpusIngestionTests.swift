@@ -65,11 +65,7 @@ struct G8CorpusIngestionTests {
 
     @Test("Corpus decodes and counts match plan (gated on fixture presence)")
     func corpusDecodes() throws {
-        let corpus = try loadCorpus()
-        guard let corpus else {
-            print("[G8 gate] g8_corpus.json not bundled; test skipped until `make install-assets` runs.")
-            return
-        }
+        let corpus = try #require(try loadCorpus(), "g8_corpus.json not bundled")
 
         // Counts: 1 100 documents split 300/250/300/150/100 — financial grew
         // 200 → 300 with the W-2 (`financial_tax`) sub-template third.
@@ -96,8 +92,7 @@ struct G8CorpusIngestionTests {
 
     @Test("Every document has well-formed PII spans (gated on fixture presence)")
     func allSpansWellFormed() throws {
-        let corpus = try loadCorpus()
-        guard let corpus else { return }
+        let corpus = try #require(try loadCorpus(), "g8_corpus.json not bundled")
 
         // 17/17 since 1.2 T1.1 (C12-25): itin / creditCard / driversLicense /
         // passport / licensePlate joined the original twelve.
@@ -142,6 +137,7 @@ struct G8CorpusIngestionTests {
     func overrideLoadsAnnouncedFile() throws {
         guard let (url, overridden) = G8BaselineHarnessTests.baselineCorpusURL(),
               overridden else {
+            TestGate.skip("RESECTA_G8_CORPUS_PATH override not in force — nothing to check")
             return
         }
         let data = try Data(contentsOf: url)

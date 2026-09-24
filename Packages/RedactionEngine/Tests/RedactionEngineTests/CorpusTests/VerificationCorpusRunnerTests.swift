@@ -336,7 +336,7 @@ struct VerificationCorpusRunnerTests {
     @Test("Emit the verification corpus over the T1.4 manifest + fixture set")
     func emitVerificationCorpus() async throws {
         guard let out = Self.verifyOut() else {
-            print("[H2.2] RESECTA_VERIFY_OUT not set; verification corpus runner skipped.")
+            TestGate.skip("[H2.2] RESECTA_VERIFY_OUT unset — the verification corpus runner was not requested")
             return
         }
         let root = Self.docsRoot()

@@ -44,7 +44,7 @@ struct DriversLicenseVectorTests {
 
     @Test("Inline driversLicensePattern matches every valid row's text")
     func inlineRegexMatchesValidRows() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "drivers_license_test_vectors.json not bundled")
         for vec in vectors where vec.valid {
             let ns = vec.text as NSString
             let count = DriversLicenseDetector.driversLicensePattern.numberOfMatches(

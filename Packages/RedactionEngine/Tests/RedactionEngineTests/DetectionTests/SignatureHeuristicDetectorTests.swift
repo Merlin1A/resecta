@@ -327,10 +327,10 @@ struct SignatureHeuristicDetectorTests {
     @Test("Detector skips the Sobel pass when there are no OCR blocks")
     func skipsWithoutOCR() async throws {
         let w = 100, h = 100
-        guard let ctx = createBitmapContext(width: w, height: h) else { return }
+        let ctx = try #require(createBitmapContext(width: w, height: h), "bitmap context")
         ctx.setFillColor(red: 0, green: 0, blue: 0, alpha: 1)
         ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
-        guard let image = ctx.makeImage() else { return }
+        let image = try #require(ctx.makeImage(), "bitmap image")
 
         let detector = SignatureHeuristicDetector()
         let results = try await detector.detect(in: image, ocrBlocks: [])
@@ -340,10 +340,10 @@ struct SignatureHeuristicDetectorTests {
     @Test("Detector skips the Sobel pass when no OCR block matches a signature label")
     func skipsWithoutLabel() async throws {
         let w = 100, h = 100
-        guard let ctx = createBitmapContext(width: w, height: h) else { return }
+        let ctx = try #require(createBitmapContext(width: w, height: h), "bitmap context")
         ctx.setFillColor(red: 0, green: 0, blue: 0, alpha: 1)
         ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
-        guard let image = ctx.makeImage() else { return }
+        let image = try #require(ctx.makeImage(), "bitmap image")
 
         let detector = SignatureHeuristicDetector()
         let blocks = [

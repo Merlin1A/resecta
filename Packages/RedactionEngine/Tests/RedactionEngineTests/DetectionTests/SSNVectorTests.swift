@@ -48,7 +48,7 @@ struct SSNVectorTests {
 
     @Test("State machine extracts exactly 1 candidate from every valid row")
     func stateMachineExtractsValidRows() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "ssn_structural_vectors.json not bundled")
         let sm = SSNStateMachine()
         for vec in vectors where vec.valid {
             let candidates = sm.scan(vec.ssn)
@@ -61,7 +61,7 @@ struct SSNVectorTests {
 
     @Test("Validator accepts every valid row's candidate")
     func validatorAcceptsValidRows() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "ssn_structural_vectors.json not bundled")
         let sm = SSNStateMachine()
         let validator = SSNStructuralValidator()
         for vec in vectors where vec.valid {
@@ -78,7 +78,7 @@ struct SSNVectorTests {
 
     @Test("Invalid rows rejected at state-machine OR validator level")
     func validatorRejectsInvalidRows() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "ssn_structural_vectors.json not bundled")
         let sm = SSNStateMachine()
         let validator = SSNStructuralValidator()
         for vec in vectors where !vec.valid {

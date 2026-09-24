@@ -43,7 +43,7 @@ struct CreditCardVectorTests {
 
     @Test("Luhn + prefix gates agree with fixture validity")
     func checksumMatchesValidFlag() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "credit_card_vectors.json not bundled")
         for vec in vectors {
             let digits = vec.pan.filter(\.isWholeNumber)
             let passes = PIIDetector.luhnCheck(digits) && CreditCardDetector.hasValidCardPrefix(digits)
@@ -53,7 +53,7 @@ struct CreditCardVectorTests {
 
     @Test("Detector surfaces every valid PAN and rejects every invalid one")
     func detectorRespectsValidFlag() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "credit_card_vectors.json not bundled")
         let detector = PIIDetector()
         for vec in vectors {
             let ns = vec.pan as NSString

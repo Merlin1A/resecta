@@ -135,8 +135,8 @@ struct PageParallelRasterizationTests {
         // exhibit any speedup and the test would be a coin flip.
         let cores = ProcessInfo.processInfo.activeProcessorCount
         guard cores >= 2 else {
-            // Recorded as a no-op so the suite still signals the host
-            // limitation; not a failure.
+            // Recorded as a visible skip, not a failure.
+            TestGate.skip("single-core host — the parallel-vs-serial comparison needs at least two cores")
             return
         }
 

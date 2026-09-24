@@ -30,9 +30,8 @@ struct NameStopTokenTests {
     /// period, two role nouns and the legal opener.
     private static let furnitureTokens: [String] = ["Dr.", "Dr", "Patient", "Pursuant", "Counsel"]
 
-    private static func skipNER(_ test: String) {
-        print("[NLTagger gate] .nameType NER asset unavailable on this runtime; "
-              + "skipping \(test) (harness pin = iOS 26.4).")
+    private static func skipNER(_ test: String, sourceLocation: SourceLocation = #_sourceLocation) {
+        TestGate.skip("[NLTagger gate] .nameType NER asset unavailable on this runtime; skipping \(test) (harness pin = iOS 26.4).", sourceLocation: sourceLocation)
     }
 
     private static func names(in text: String) -> [PIIDetector.PIIMatch] {

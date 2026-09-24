@@ -25,24 +25,11 @@ import Foundation
 @MainActor
 struct SettingsViewResetConfirmationTests {
 
-    /// Remove the SettingsState UserDefaults keys before each test so
-    /// `SettingsState()` constructs from a known-clean baseline.
-    private func cleanDefaults() {
-        let keys = [
-            "paranoidMode", "autoVerify", "pipelineMode.v2",
-            "exportDPI", "fillColor",
-            "snapToTextEnabled", "appearancePreference.v1",
-            "successfulExportCount",
-        ]
-        for key in keys {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
-    }
-
     @Test("Reset button shows confirmation — opening the dialog alone does not reset state")
     func testResetButtonShowsConfirmation() {
-        cleanDefaults()
-        let settings = SettingsState()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SettingsState(defaults: defaults)
         // Move every persisted toggle off-default so we can detect any
         // accidental reset.
         settings.exportDPI = 150
@@ -70,8 +57,9 @@ struct SettingsViewResetConfirmationTests {
 
     @Test("Cancel role leaves state untouched")
     func testCancelRolePreservesState() {
-        cleanDefaults()
-        let settings = SettingsState()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SettingsState(defaults: defaults)
         settings.exportDPI = 200
         settings.fillColor = .white
         settings.autoVerify = false
@@ -86,8 +74,9 @@ struct SettingsViewResetConfirmationTests {
 
     @Test("Destructive role invokes resetToDefaults — matches the prior one-tap semantics")
     func testDestructiveRoleResetsToDefaults() {
-        cleanDefaults()
-        let settings = SettingsState()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SettingsState(defaults: defaults)
         settings.exportDPI = 150
         settings.fillColor = .white
         settings.autoVerify = false

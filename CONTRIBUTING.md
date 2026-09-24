@@ -86,12 +86,13 @@ The hook (`Scripts/audit-lint.sh`) runs on every commit and blocks the commit on
 
 ### Script-local checks (hook-enforced)
 
-`Scripts/audit-lint.sh` also carries four checks of its own, numbered `AL-*` so they do not collide with the `M-*` list on this page; a hook message naming one of these refers to the script, not to this checklist:
+`Scripts/audit-lint.sh` also carries five checks of its own, numbered `AL-*` so they do not collide with the `M-*` list on this page; a hook message naming one of these refers to the script, not to this checklist:
 
 - **AL-1.** XcodeGen sync: a staged `project.yml` change needs a regenerated `project.pbxproj` (skipped in range mode, where CI regenerates the project first).
 - **AL-2.** The ResectaApp target's `resources:` block silently enumerates nothing; a new entry there is reported as a warning only (route shipped resources through `sources:`).
 - **AL-3.** Sample-statement dual copy: the app-bundle statement and the engine test fixture stay byte-identical.
 - **AL-4.** Loan-packet dual copy: the app-bundle packet and the engine test fixture stay byte-identical.
+- **AL-5.** Silent test guard: a test function that `return`s before its first assertion can report PASS with zero assertions. `Scripts/lint-silent-guards.py` walks every test body in a staged test file (comments and strings blanked; a `return` inside a closure, a nested func or a computed property is not an exit) and the hook reports each such guard on a line this commit added. Two shapes pass: `try #require(...)` for a resource the repository tracks (a fixture, a bundled gazetteer, a value the test computes — its absence is a failure), and `TestGate.skip("<why>")` before the `return` for an environmental gate (a runtime asset, an emitter's env var, the host's core count — a warning-severity issue in the result, never silence). The same-line marker `SilentGuard:ok <reason>` exempts a guard; it is a migration aid, not a style. `python3 Scripts/lint-silent-guards.py --census` prints the whole-tree count.
 
 ### Manual checks (session discipline)
 
