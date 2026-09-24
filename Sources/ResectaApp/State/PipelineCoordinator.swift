@@ -1315,6 +1315,73 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // other accumulators on success.
                 var accumulatedOCRCapSkips: Set<Int> = []
 
+                /// Detect one page and fold its results into the three
+                /// accumulators — the body both detect branches share.
+                /// Stamps the `detectPage` signpost interval so
+                /// DetectionRasterizeOverlapTests can assert overlap with the
+                /// lookahead rasterize; the trailing page (no overlapping
+                /// rasterize counterpart) carries `trailing=true` so the
+                /// overlap-rate metric omits it from the denominator.
+                func detectOne(
+                    _ i: Int, image pageImage: CGImage,
+                    embeddedText embeddedSource: EmbeddedTextSource?,
+                    ocrSkipReason skipReason: DetectionResult.Provenance.OCRSkipReason?,
+                    trailing: Bool
+                ) async throws {
+                    let detectSignpostID = detectionRasterizeSignposter
+                        .makeSignpostID()
+                    let detectSignpostState = trailing
+                        ? detectionRasterizeSignposter.beginInterval(
+                            "detectPage", id: detectSignpostID,
+                            "page=\(i) trailing=true"
+                        )
+                        : detectionRasterizeSignposter.beginInterval(
+                            "detectPage", id: detectSignpostID,
+                            "page=\(i)"
+                        )
+                    // Seed the doctype
+                    // window with the previous page's classification.
+                    // Detection is serial across pages, so the i-1
+                    // diagnostic is already recorded when page i
+                    // dispatches; missing diagnostic → nil context
+                    // (degrade, never race).
+                    let prevPrimary: DoctypeClass? =
+                        i > 0 ? accumulatedDiagnostics[i - 1]?.primary : nil
+                    let doctypeCtx = prevPrimary.map { prev in
+                        DoctypeWindow(primary: prev)
+                    }
+                    let pageResult: PageDetectionResult
+                    do {
+                        pageResult = try await orchestrator.detectPage(
+                            image: pageImage,
+                            pageIndex: i,
+                            priors: priorsSnapshot,
+                            surfaceForms: surfaceFormsSnapshot,
+                            doctypeContext: doctypeCtx,
+                            thresholdVector: thresholdVectorSnapshot,
+                            embeddedText: embeddedSource,
+                            ocrSkipReason: skipReason
+                        )
+                    } catch { // LegalPhrases:safe (Swift keyword)
+                        detectionRasterizeSignposter.endInterval(
+                            "detectPage", detectSignpostState
+                        )
+                        throw error
+                    }
+                    detectionRasterizeSignposter.endInterval(
+                        "detectPage", detectSignpostState
+                    )
+                    accumulatedResults[i] = pageResult.detections
+                    if let diag = pageResult.classificationDiagnostic {
+                        accumulatedDiagnostics[i] = diag
+                    }
+                    // Record the page-level OCR pixel-cap
+                    // skip so the triage banner can surface it.
+                    if pageResult.ocrProvenance.ocrSkipReason == .pixelCapExceeded {
+                        accumulatedOCRCapSkips.insert(i)
+                    }
+                }
+
                 // Depth-2 lookahead via structured concurrency.
                 //
                 // Locked decision:
@@ -1447,58 +1514,9 @@ final class PipelineCoordinator: @unchecked Sendable {
                             // Doctype-aware, prior-scored
                             // detection. Runs CONCURRENT with the
                             // lookahead rasterize above (depth-2).
-                            // Stamp the detect interval so
-                            // DetectionRasterizeOverlapTests can assert
-                            // overlap with the lookahead rasterize.
-                            let detectSignpostID = detectionRasterizeSignposter
-                                .makeSignpostID()
-                            let detectSignpostState =
-                                detectionRasterizeSignposter.beginInterval(
-                                    "detectPage", id: detectSignpostID,
-                                    "page=\(i)"
-                                )
-                            let detectStart = Date()
-                            // Seed the doctype
-                            // window with the previous page's classification.
-                            // Detection is serial across pages, so the i-1
-                            // diagnostic is already recorded when page i
-                            // dispatches; missing diagnostic → nil context
-                            // (degrade, never race).
-                            let prevPrimary: DoctypeClass? =
-                                i > 0 ? accumulatedDiagnostics[i - 1]?.primary : nil
-                            let doctypeCtx = prevPrimary.map { prev in
-                                DoctypeWindow(primary: prev)
-                            }
-                            let pageResult: PageDetectionResult
-                            do {
-                                pageResult = try await orchestrator.detectPage(
-                                    image: pageImage,
-                                    pageIndex: i,
-                                    priors: priorsSnapshot,
-                                    surfaceForms: surfaceFormsSnapshot,
-                                    doctypeContext: doctypeCtx,
-                                    thresholdVector: thresholdVectorSnapshot,
-                                    embeddedText: embeddedSource,
-                                    ocrSkipReason: skipReason
-                                )
-                            } catch { // LegalPhrases:safe (Swift keyword)
-                                detectionRasterizeSignposter.endInterval(
-                                    "detectPage", detectSignpostState
-                                )
-                                throw error
-                            }
-                            detectionRasterizeSignposter.endInterval(
-                                "detectPage", detectSignpostState
-                            )
-                            accumulatedResults[i] = pageResult.detections
-                            if let diag = pageResult.classificationDiagnostic {
-                                accumulatedDiagnostics[i] = diag
-                            }
-                            // Record the page-level OCR pixel-cap
-                            // skip so the triage banner can surface it.
-                            if pageResult.ocrProvenance.ocrSkipReason == .pixelCapExceeded {
-                                accumulatedOCRCapSkips.insert(i)
-                            }
+                            try await detectOne(
+                                i, image: pageImage, embeddedText: embeddedSource,
+                                ocrSkipReason: skipReason, trailing: false)
 
                             // Cooperative check between
                             // the just-completed detect await and the
@@ -1515,58 +1533,11 @@ final class PipelineCoordinator: @unchecked Sendable {
                             pendingImage = try await nextImage
                             pendingPage = lookaheadPage
                         } else {
-                            // Last page — no lookahead to dispatch.
-                            // Still stamp the detect interval
-                            // for the trailing page (it lacks an
-                            // overlapping rasterize counterpart, so the
-                            // overlap-rate metric in
-                            // DetectionRasterizeOverlapTests omits it
-                            // from the denominator).
-                            let detectSignpostID = detectionRasterizeSignposter
-                                .makeSignpostID()
-                            let detectSignpostState =
-                                detectionRasterizeSignposter.beginInterval(
-                                    "detectPage", id: detectSignpostID,
-                                    "page=\(i) trailing=true"
-                                )
-                            let detectStart = Date()
-                            // Same previous-page
-                            // doctype window as the lookahead branch above.
-                            let prevPrimary: DoctypeClass? =
-                                i > 0 ? accumulatedDiagnostics[i - 1]?.primary : nil
-                            let doctypeCtx = prevPrimary.map { prev in
-                                DoctypeWindow(primary: prev)
-                            }
-                            let pageResult: PageDetectionResult
-                            do {
-                                pageResult = try await orchestrator.detectPage(
-                                    image: pageImage,
-                                    pageIndex: i,
-                                    priors: priorsSnapshot,
-                                    surfaceForms: surfaceFormsSnapshot,
-                                    doctypeContext: doctypeCtx,
-                                    thresholdVector: thresholdVectorSnapshot,
-                                    embeddedText: embeddedSource,
-                                    ocrSkipReason: skipReason
-                                )
-                            } catch { // LegalPhrases:safe (Swift keyword)
-                                detectionRasterizeSignposter.endInterval(
-                                    "detectPage", detectSignpostState
-                                )
-                                throw error
-                            }
-                            detectionRasterizeSignposter.endInterval(
-                                "detectPage", detectSignpostState
-                            )
-                            accumulatedResults[i] = pageResult.detections
-                            if let diag = pageResult.classificationDiagnostic {
-                                accumulatedDiagnostics[i] = diag
-                            }
-                            // Record the page-level OCR pixel-cap
-                            // skip so the triage banner can surface it.
-                            if pageResult.ocrProvenance.ocrSkipReason == .pixelCapExceeded {
-                                accumulatedOCRCapSkips.insert(i)
-                            }
+                            // Last page — no lookahead to dispatch; the
+                            // detect runs alone.
+                            try await detectOne(
+                                i, image: pageImage, embeddedText: embeddedSource,
+                                ocrSkipReason: skipReason, trailing: true)
                         }
                     }
                 }
@@ -1582,8 +1553,10 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // Bare-surname clusters ≥15 get flagged for inline ambiguity hints.
                 let clusterer = EntityClusterer()
                 var clusterInputs: [EntityClusterer.ClusterInput] = []
-                for (_, results) in accumulatedResults {
-                    for result in results {
+                // Page order, not Dictionary order: two runs over the same
+                // detections hand the clusterer the same input sequence.
+                for page in accumulatedResults.keys.sorted() {
+                    for result in accumulatedResults[page] ?? [] {
                         guard case .pii(let kind) = result.kind, kind == .name else { continue }
                         guard let text = result.matchedText,
                               let input = EntityClusterer.clusterInput(
