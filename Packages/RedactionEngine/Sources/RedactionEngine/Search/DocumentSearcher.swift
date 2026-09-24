@@ -656,56 +656,32 @@ public actor DocumentSearcher {
             if Task.isCancelled { break }
             guard let pageText = await pageTextProvider(pageIndex), !pageText.isEmpty else { continue }
 
-            var searchText: String
-            if options.normalizeUnicode {
-                searchText = TextNormalizer.normalize(pageText)
-            } else {
-                searchText = pageText
-            }
-            // Page-side smart punctuation (1:1, UTF-16
-            // length-preserving, so emitted NSRanges stay valid). The
-            // pattern itself is never transformed; see SearchOptions.
-            if options.normalizeSmartPunctuation {
-                searchText = TextNormalizer.normalizeSmartPunctuation(searchText)
-            }
-
-            let nsString = searchText as NSString
-            let fullRange = NSRange(location: 0, length: nsString.length)
+            let searchText = SearchCore.regexSearchText(pageText, options: options)
             let isVisiblePage = (pageIndex == currentPageIndex)
             let startTime = ContinuousClock.now
             let effectiveTimeout: Duration =
                 regexTimeoutOverride ?? Self.perPageRegexTimeout
 
-            // `.reportProgress` parity with `searchRegex`: the
-            // closure fires periodically during a long match attempt
-            // so the timeout / cancellation check actually samples.
-            regex.enumerateMatches(
-                in: searchText,
-                options: [.reportProgress],
-                range: fullRange
-            ) { match, _, stop in
-                if Task.isCancelled || totalCount >= Self.maxPreviewMatches {
-                    if totalCount >= Self.maxPreviewMatches { saturated = true }
-                    stop.pointee = true
-                    return
-                }
-                if ContinuousClock.now - startTime > effectiveTimeout {
+            // The shared enumeration (`.reportProgress` parity with
+            // `searchRegex`); the preview counts every surviving match and
+            // keeps the visible page's ranges up to the highlight cap.
+            let (count, stoppedAtCap) = SearchCore.enumerateRegexMatches(
+                in: searchText, regex: regex,
+                wholeWord: options.wholeWord, unconvertibleRangePasses: true,
+                cap: Self.maxPreviewMatches - totalCount,
+                timeout: effectiveTimeout, startTime: startTime,
+                onTimeout: {
                     // Preview-path timeout branch.
                     timeoutSink?(pageIndex)
-                    stop.pointee = true
-                    return
                 }
-                guard let match, match.range.location != NSNotFound else { return }
-
-                if options.wholeWord, let swiftRange = Range(match.range, in: searchText) {
-                    if !Self.isWholeWord(swiftRange, in: searchText) { return }
-                }
-
-                totalCount += 1
+            ) { matchRange in
                 if isVisiblePage && currentPageMatches.count < Self.maxCurrentPageHighlights {
-                    currentPageMatches.append(match.range)
+                    currentPageMatches.append(matchRange)
                 }
+                return true
             }
+            totalCount += count
+            if stoppedAtCap { saturated = true }
 
             if saturated || totalCount >= Self.maxPreviewMatches {
                 if totalCount >= Self.maxPreviewMatches { saturated = true }
@@ -864,20 +840,12 @@ public actor DocumentSearcher {
 
     // MARK: - Text-layer routing
 
-    /// Whether the page's import-time classification permits
-    /// the text-layer fast path. `.rich` (or unknown — a page absent from the
-    /// status map, including the default `[:]`) stays on the text layer;
-    /// `.sparse`/`.none` fall through to OCR so a header-only layer over a
-    /// scanned body cannot suppress the body text. See `TextLayerStatus`.
+    /// Whether the page's import-time classification permits the
+    /// text-layer fast path — the core's predicate over this actor's status
+    /// map (`.rich` or unknown stays on the text layer; `.sparse`/`.none`
+    /// fall through to OCR). See `SearchCore.textLayerIsSearchable`.
     private func pageHasRichTextLayer(_ pageIndex: Int) -> Bool {
-        // Unwrap first: a page absent from the map (nil → unknown) takes the
-        // text-layer fast path. Switching the Optional directly would bind a bare
-        // `.none` to `Optional.none` rather than `TextLayerStatus.none`.
-        guard let status = textLayerStatusByPage[pageIndex] else { return true }
-        switch status {
-        case .rich: return true
-        case .sparse, .none: return false
-        }
+        SearchCore.textLayerIsSearchable(textLayerStatusByPage[pageIndex])
     }
 
     private func performSearch(
@@ -1109,90 +1077,53 @@ public actor DocumentSearcher {
 
             pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
 
-            // PDFPage isn't Sendable; the `enumerateMatches` closure below
-            // captures the page reference and the compiler (Swift 6.2 / Xcode
-            // 26.3 on CI) flags it. enumerateMatches invokes the closure
-            // synchronously per match on the current thread, so the capture
-            // is treated as @unchecked Sendable via the wrapper.
+            // PDFPage isn't Sendable; the per-match closure below captures
+            // the page reference and the compiler (Swift 6.2 / Xcode 26.3 on
+            // CI) flags it. The enumeration invokes the closure synchronously
+            // per match on the current thread, so the capture is treated as
+            // @unchecked Sendable via the wrapper.
             let sendablePage = SendablePDFPage(page)
 
-            var searchText: String
-            if options.normalizeUnicode {
-                searchText = TextNormalizer.normalize(pageText)
-            } else {
-                searchText = pageText
-            }
-            // Page-side smart punctuation only (1:1, UTF-16
-            // length-preserving, so match NSRanges still index the page
-            // correctly). The pattern is never transformed, and the
-            // length-changing extensions are excluded from regex paths;
-            // see SearchOptions.
-            if options.normalizeSmartPunctuation {
-                searchText = TextNormalizer.normalizeSmartPunctuation(searchText)
-            }
-
+            let searchText = SearchCore.regexSearchText(pageText, options: options)
             let nsString = searchText as NSString
-            let fullRange = NSRange(location: 0, length: nsString.length)
 
-            // enumerateMatches with per-match time check — allows bailing
-            // mid-enumeration instead of waiting for all matches to complete.
-            // `.reportProgress` lets the engine invoke the closure
-            // between match-attempt iterations even when no match has been
-            // found, so the timeout / cancellation check below fires on
-            // long-running alternation walks instead of waiting for the
-            // next match. Catastrophic backtracking inside a single
-            // match attempt still blocks the synchronous C call;
-            // validation in `validateRegexPattern` remains the primary
-            // defense.
+            // The shared enumeration with the per-match time check — bails
+            // mid-enumeration instead of waiting for all matches to complete;
+            // the cap counts only the results that could be placed on the page.
             let startTime = ContinuousClock.now
             let effectiveTimeout: Duration =
                 regexTimeoutOverride ?? Self.perPageRegexTimeout
-            regex.enumerateMatches(
-                in: searchText,
-                options: [.reportProgress],
-                range: fullRange
-            ) { match, _, stop in
-                if Task.isCancelled || totalYielded >= Self.maxResults {
-                    stop.pointee = true
-                    return
-                }
-                if ContinuousClock.now - startTime > effectiveTimeout {
+            let (yielded, _) = SearchCore.enumerateRegexMatches(
+                in: searchText, regex: regex,
+                wholeWord: options.wholeWord, unconvertibleRangePasses: false,
+                cap: Self.maxResults - totalYielded,
+                timeout: effectiveTimeout, startTime: startTime,
+                onTimeout: {
                     // Search-path timeout branch.
                     timeoutSink?(pageIndex)
-                    stop.pointee = true
-                    return
                 }
-
-                guard let match, match.range.location != NSNotFound else { return }
-                let matchRange = match.range
-
-                // Whole-word check
-                if options.wholeWord {
-                    guard let swiftRange = Range(matchRange, in: searchText) else { return }
-                    if !Self.isWholeWord(swiftRange, in: searchText) {
-                        return
-                    }
+            ) { matchRange in
+                guard let normalizedRect = boundingRect(for: matchRange, page: sendablePage.page) else {
+                    return false
                 }
+                let matchedText = nsString.substring(with: matchRange)
+                let window = contextSnippet(
+                    text: searchText,
+                    matchNSRange: matchRange
+                )
 
-                if let normalizedRect = boundingRect(for: matchRange, page: sendablePage.page) {
-                    let matchedText = nsString.substring(with: matchRange)
-                    let window = contextSnippet(
-                        text: searchText,
-                        matchNSRange: matchRange
-                    )
-
-                    continuation.yield(SearchResult(
-                        pageIndex: pageIndex,
-                        normalizedRect: normalizedRect,
-                        matchedText: matchedText,
-                        contextSnippet: window.snippet,
-                        source: .textLayer,
-                        term: pattern,
-                        matchRangeInSnippet: window.matchRange
-                    ))
-                    totalYielded += 1
-                }
+                continuation.yield(SearchResult(
+                    pageIndex: pageIndex,
+                    normalizedRect: normalizedRect,
+                    matchedText: matchedText,
+                    contextSnippet: window.snippet,
+                    source: .textLayer,
+                    term: pattern,
+                    matchRangeInSnippet: window.matchRange
+                ))
+                return true
             }
+            totalYielded += yielded
 
             if totalYielded >= Self.maxResults { break }
         }
@@ -2087,28 +2018,13 @@ public actor DocumentSearcher {
         // enumerateMatches closure where actor re-entry is not permitted.
         let snapshotTimeoutSink = self.regexTimeoutSink
 
-        regex.enumerateMatches(
-            in: searchText,
-            options: [.reportProgress],
-            range: fullRange
-        ) { match, _, stop in
-            if Task.isCancelled {
-                stop.pointee = true
-                return
-            }
-            if ContinuousClock.now - startTime > effectiveTimeout {
-                snapshotTimeoutSink?(pageIndex)
-                stop.pointee = true
-                return
-            }
-            guard let match, match.range.location != NSNotFound else { return }
-            let matchRange = match.range
-
-            if options.wholeWord {
-                guard let swiftRange = Range(matchRange, in: searchText) else { return }
-                if !Self.isWholeWord(swiftRange, in: searchText) { return }
-            }
-
+        SearchCore.enumerateRegexMatches(
+            in: searchText, regex: regex,
+            wholeWord: options.wholeWord, unconvertibleRangePasses: false,
+            cap: nil,
+            timeout: effectiveTimeout, startTime: startTime,
+            onTimeout: { snapshotTimeoutSink?(pageIndex) }
+        ) { matchRange in
             // Map the match start character offset to the containing OCR
             // line's bounding rect. The NSRange location is a UTF-16 offset;
             // convert to a Character offset first for the line-walk cursor.
@@ -2129,7 +2045,7 @@ public actor DocumentSearcher {
                 inText: searchText,
                 lines: lines,
                 page: sendablePage.page
-            ) else { return }
+            ) else { return false }
 
             let matchedText = nsString.substring(with: matchRange)
             let window = contextSnippet(text: searchText, matchNSRange: matchRange)
@@ -2143,6 +2059,7 @@ public actor DocumentSearcher {
                 term: regex.pattern,
                 matchRangeInSnippet: window.matchRange
             ))
+            return true
         }
 
         return results
