@@ -88,7 +88,7 @@ public actor DocumentSearcher {
     // NER-asset-absent OS build, `sharedLoadDiagnostics` records it and the
     // scan kickoff surfaces the degraded-detection banner instead of degrading silently.
     private static let sharedPIIDetectorLoad = PIIDetector.loadWithDiagnostics()
-    private let piiDetector = DocumentSearcher.sharedPIIDetectorLoad.detector
+    let piiDetector = DocumentSearcher.sharedPIIDetectorLoad.detector
 
     /// Diagnostics for the process-shared search detector.
     /// Cached with the detector — the probe reflects load-time state, which
@@ -219,7 +219,7 @@ public actor DocumentSearcher {
     /// The OCR page caches — the verbatim Vision lines, the LRU access
     /// order and the normalized PII-scan inputs — one value owned by this
     /// actor. See `OCRPageCache`.
-    private var ocrPageCache = OCRPageCache()
+    var ocrPageCache = OCRPageCache()
     private typealias NormalizedOCRPage = OCRPageCache.NormalizedPage
     private typealias NormalizedLineEntry = OCRPageCache.NormalizedLineEntry
     private let ocrNormalizer = OCRTextNormalizer()
@@ -325,74 +325,6 @@ public actor DocumentSearcher {
         return (gated.survivors + composedSurvivors(scored, pageText: pageText))
             .sorted { $0.range.location < $1.range.location }
     }
-
-    // MARK: - Test Seams (internal, observation/seeding only)
-
-    #if DEBUG
-    internal var _testOCRCacheKeys: Set<Int> { ocrPageCache.cachedKeys }
-    internal var _testOCRNormalizedConcatKeys: Set<Int> { ocrPageCache.normalizedKeys }
-    /// H3.1 (1.2 instrumentation plan §6) — read-only view of one page's
-    /// cached Vision lines so the search-GT harness can emit the exact OCR
-    /// text the OCR leg matched against. Observation-only, same contract as
-    /// `_testOCRCacheKeys` above; never touches the LRU access ordering.
-    internal func _testOCRCachedLines(forPageIndex pageIndex: Int) -> [OCREngine.TextLine]? {
-        ocrPageCache.cachedLines(forPageIndex: pageIndex)
-    }
-
-    /// Seeds the three OCR caches with `occupiedCount` placeholder entries,
-    /// inserted in ascending page-index order so the smallest index is the
-    /// least-recently-used. Page indices equal to `skippingPageIndex` are
-    /// skipped so a subsequent OCR pass on that page forces a miss + LRU
-    /// eviction — driving the production eviction code path under test.
-    internal func _testSeedOCRCacheForCoherence(
-        skippingPageIndex: Int,
-        occupiedCount: Int
-    ) {
-        ocrPageCache.seedForCoherence(
-            skippingPageIndex: skippingPageIndex, occupiedCount: occupiedCount)
-    }
-
-    /// Seeds the OCR cache with known lines for a specific page index,
-    /// allowing tests to exercise search paths (text-mode OCR, regex OCR
-    /// fallback) without invoking real Vision OCR on the simulator.
-    /// The normalized-concat cache entry is NOT pre-seeded here (the PII
-    /// path rebuilds it on demand; the text/regex paths do not read it).
-    internal func _testSeedOCRLines(_ lines: [OCREngine.TextLine], forPageIndex pageIndex: Int) {
-        ocrPageCache.seedLines(lines, forPageIndex: pageIndex)
-    }
-
-    /// Test seam: base address of the copy-on-write-shared surname
-    /// Bloom buffer behind this searcher's PIIDetector. Two searchers backed by
-    /// the process-shared static detector report the SAME address (shared COW
-    /// storage); per-instance detectors report different addresses. nil when the
-    /// name gazetteer is absent from the bundle. `nonisolated` — reads only the
-    /// immutable Sendable `piiDetector` let.
-    nonisolated var _testNameBloomBufferAddress: Int? { piiDetector._testNameBloomBufferAddress }
-
-    /// Observation-only seam over the Site-B composition (the same
-    /// `composedSurvivors` core production calls). The G8 Site-B parity harness
-    /// drives this with a chosen scorer — `ContextScorerWeights.identity` for the
-    /// w=0 identity control (composed-at-identity == raw), the installed bundle
-    /// for the AFTER — so the harness exercises the production path rather than a
-    /// re-implementation. `nonisolated static` (the core is pure / injected); it
-    /// changes nothing on the actor. Mirrors the `_testSeed*` seams' contract:
-    /// internal, DEBUG-only, no production caller.
-    nonisolated static func _testComposeSiteB(
-        _ matches: [PIIDetector.PIIMatch],
-        pageText: String,
-        thresholdVector: PresetThresholdVector?,
-        scorer: ContextScorerWeights
-    ) -> [PIIDetector.PIIMatch] {
-        composedSurvivors(
-            matches,
-            pageText: pageText,
-            thresholdVector: thresholdVector,
-            calibratedScorer: CalibratedScorer(),
-            contextScorer: scorer,
-            priors: PerCategoryPriors()
-        )
-    }
-    #endif
 
     /// Install the threshold vector to apply on future PII scans.
     /// Pass nil to disable gating entirely.
