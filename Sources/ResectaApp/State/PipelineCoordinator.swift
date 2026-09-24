@@ -458,10 +458,6 @@ final class PipelineCoordinator: @unchecked Sendable {
                     }
                 }
             } catch { // LegalPhrases:safe (Swift keyword)
-                // Same UUID guard as the cancellation path —
-                // a late recovery from a superseded run must not stomp the
-                // newer run's state.
-                guard coordinator.documentState.activeRunId == runId else { return }
                 // Classify by the FAILING STAGE, not by outputURL presence.
                 // `outputURL` registers eagerly (before
                 // `processDocument`), so a non-nil URL no longer means
@@ -473,61 +469,37 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // keep it and return to the skipped-report screen.
                 let stage = Self.classifyPipelineFailure(
                     error, redactionSucceeded: redactionSucceeded)
-                if stage == .verification {
-                    // Verification crashed, but redacted output is VALID.
-                    coordinator.documentState.transition(to: .failed(
-                        error: error as? PipelineError
-                            ?? .verificationError(.engineCrash(layerIndex: 0)),
-                        returnPhase: .verified(report: .skipped(reason: .error))
-                    ))
-                } else {
-                    // Redaction failed — discard partial output
-                    coordinator.redactionState.clearOutput()
-                    coordinator.documentState.transition(to: .failed(
-                        error: error as? PipelineError
-                            ?? .redactionError(.reconstructionFailed),
-                        returnPhase: .editing
-                    ))
+                // MainActor.run: a thrown error can resume this handler OFF the
+                // MainActor (the same off-main-resume mechanism the
+                // cancellation sibling above and runDetectionPipeline's
+                // general handler already hop for), so hop back before
+                // touching @Observable state. The run-ownership guard moves
+                // inside the hop so it, too, reads MainActor state on the
+                // MainActor. Transition table unchanged (threading context
+                // only).
+                await MainActor.run {
+                    // Same UUID guard as the cancellation path —
+                    // a late recovery from a superseded run must not stomp the
+                    // newer run's state.
+                    guard coordinator.documentState.activeRunId == runId else { return }
+                    if stage == .verification {
+                        // Verification crashed, but redacted output is VALID.
+                        coordinator.documentState.transition(to: .failed(
+                            error: error as? PipelineError
+                                ?? .verificationError(.engineCrash(layerIndex: 0)),
+                            returnPhase: .verified(report: .skipped(reason: .error))
+                        ))
+                    } else {
+                        // Redaction failed — discard partial output
+                        coordinator.redactionState.clearOutput()
+                        coordinator.documentState.transition(to: .failed(
+                            error: error as? PipelineError
+                                ?? .redactionError(.reconstructionFailed),
+                            returnPhase: .editing
+                        ))
+                    }
                 }
             }
-        }
-    }
-
-    /// Which pipeline stage a `runFullPipeline` throw is attributed to.
-    /// Drives the generic error handler's recovery split: `.redaction`
-    /// discards the never-promoted output and returns to the editor;
-    /// `.verification` keeps the valid promoted output and returns to the
-    /// skipped-report screen.
-    enum PipelineFailureStage {
-        case redaction
-        case verification
-    }
-
-    /// Attribute a `runFullPipeline` throw to its failing stage.
-    ///
-    /// Typed `PipelineError`s classify by case: verification/export-stage
-    /// errors mean redaction had already promoted a valid output;
-    /// import/detection/redaction-stage errors mean it had not. Untyped
-    /// throws fall back to `redactionSucceeded` — whether `processDocument`
-    /// had returned when the error was thrown. The published
-    /// `redactionState.outputURL` deliberately plays no part: it
-    /// registers eagerly, before `processDocument` runs, so it is
-    /// non-nil for every throw after run start.
-    ///
-    /// `nonisolated static` seam so the stage discrimination is
-    /// unit-testable without driving a live pipeline run (same precedent
-    /// as `loadOutputDocumentOffMainActor`).
-    nonisolated static func classifyPipelineFailure(
-        _ error: Error, redactionSucceeded: Bool
-    ) -> PipelineFailureStage {
-        guard let pipelineError = error as? PipelineError else {
-            return redactionSucceeded ? .verification : .redaction
-        }
-        switch pipelineError {
-        case .verificationError, .exportError:
-            return .verification
-        case .importError, .detectionError, .redactionError:
-            return .redaction
         }
     }
 
@@ -655,18 +627,26 @@ final class PipelineCoordinator: @unchecked Sendable {
                     }
                 }
             } catch { // LegalPhrases:safe (Swift keyword)
-                // Same UUID guard as the cancellation
-                // path — a late recovery from a superseded run must not
-                // stomp the newer run's state.
-                guard coordinator.documentState.activeRunId == runId else { return }
-                // Re-verify crashed, but the redacted
-                // output remains valid. Surface as a failure that returns
-                // the user to the skipped state (matching runFullPipeline).
-                coordinator.documentState.transition(to: .failed(
-                    error: error as? PipelineError
-                        ?? .verificationError(.engineCrash(layerIndex: 0)),
-                    returnPhase: .verified(report: .skipped(reason: .error))
-                ))
+                // MainActor.run: the same off-main-resume hop as the
+                // cancellation sibling above and runFullPipeline's general
+                // handler — a thrown error can resume this handler OFF the
+                // MainActor, so hop back before touching @Observable state;
+                // the run-ownership guard moves inside the hop. Transition
+                // table unchanged (threading context only).
+                await MainActor.run {
+                    // Same UUID guard as the cancellation
+                    // path — a late recovery from a superseded run must not
+                    // stomp the newer run's state.
+                    guard coordinator.documentState.activeRunId == runId else { return }
+                    // Re-verify crashed, but the redacted
+                    // output remains valid. Surface as a failure that returns
+                    // the user to the skipped state (matching runFullPipeline).
+                    coordinator.documentState.transition(to: .failed(
+                        error: error as? PipelineError
+                            ?? .verificationError(.engineCrash(layerIndex: 0)),
+                        returnPhase: .verified(report: .skipped(reason: .error))
+                    ))
+                }
             }
         }
     }
@@ -823,42 +803,15 @@ final class PipelineCoordinator: @unchecked Sendable {
 
     // MARK: - Page-Parallel Rasterization
 
-    /// Submit per-page rasterize work into a bounded `withThrowingTaskGroup`
-    /// and STREAM each result to `onPageReady` as soon as it is next-in-order.
-    /// Out-of-order completions buffer in `pending`; a
-    /// residency gate (`inFlight + pending.count < bound * 2`) back-pressures
-    /// new submissions so peak full-res CGImage residency is page-count-
-    /// INDEPENDENT (supersedes the collect-then-drain mechanism; the
-    /// 0..<count append-ORDER invariant is preserved by construction — the
-    /// in-order drain only fires `onPageReady` for the contiguous next index,
-    /// and the reconstructor's state model is order-sensitive, locked
-    /// decision).
-    ///
-    /// Memory: the honest live-image bound is ≈ `(3·inFlight + pending + 1)`
-    /// pagefuls + ≤4 pool buffers ≈ `(4·bound + 5)` pagefuls — each running
-    /// task holds ~3 pagefuls of its own (render context + renderedImage +
-    /// pooled fill context + redactedImage; see `PageRasterizer`). The DEBUG
-    /// `maxResidentResults` counter (`inFlight + pending.count + 1`) is an
-    /// accounting bound on completed-result residency, NOT this full census.
-    /// Liveness rests on the 10,000-pt pre-flight + finiteness of
-    /// `drawPDFPage` (NOT the 30 s render timeout — it cannot interrupt the
-    /// uninterruptible render child; see PageRasterizer's pre-flight comments).
-    ///
-    /// Each parallel task wraps the rasterize call in
-    /// `rasterizeWithRetry`, so the per-page half-DPI retry on
-    /// `fillVerificationFailed` happens inside the task — preserving the
+    /// Rasterize `pages` page-parallel with STREAMING ordered append: the
+    /// schedule — the bounded submission, the index-tagged in-order drain,
+    /// the residency gate — is `PageRasterizationScheduler`'s; this method
+    /// binds it to the coordinator's live `dpiCap` / `parallelismOverride`
+    /// reads, its `rasterizeWithRetry`, the `.redacting` progress transition
+    /// and the DEBUG residency telemetry. Each parallel task wraps the
+    /// rasterize call in `rasterizeWithRetry`, so the per-page half-DPI retry
+    /// on `fillVerificationFailed` happens inside the task — preserving the
     /// per-page retry semantics under parallel execution.
-    ///
-    /// Concurrency bound: `max(1, min(cores - 1, dynamicMemoryBudgetPages))`
-    /// where `dynamicMemoryBudgetPages` is recomputed each loop iteration
-    /// from `os_proc_available_memory()` (so the bound shrinks under
-    /// pressure even before a `didReceiveMemoryWarningNotification` fires).
-    /// `parallelismOverride == 1` (set on memory warning) collapses to
-    /// sequential behavior until workspace teardown.
-    ///
-    /// Progress UI is updated as each task COMPLETES (`currentPage` reflects
-    /// the count of finished pages, not the most recently scheduled one) —
-    /// this keeps progress monotonic under out-of-order completion.
     ///
     /// `internal` access (rather than `private`) so the page-parallel test suite
     /// can exercise the parallel orchestration without driving the full
@@ -869,76 +822,34 @@ final class PipelineCoordinator: @unchecked Sendable {
     ) async throws {
         guard !pages.isEmpty else { return }
 
-        // The DPI cap is read FRESH per submission (see the
-        // `let cap = dpiCap` captures and the `computeParallelismBound` calls
-        // below), NOT snapshotted once per run. `rasterizePagesInParallel` is
-        // @MainActor, so a read between `await` suspension points observes the
-        // latest value written by the memory-warning handler (which lowers
-        // `dpiCap` to 150). A stale run-level snapshot would pin every page to
-        // the pre-warning cap, defeating the mid-run memory response.
-
-        var pending: [Int: RasterizeResult] = [:]
-        var nextAppendIndex = 0
-        var nextSubmitIndex = 0
-        var inFlight = 0
-        var completed = 0
-        let totalPages = pages.count
-
         #if DEBUG
         maxResidentResults = 0
         #endif
 
-        try await withThrowingTaskGroup(of: (Int, RasterizeResult).self) { group in
-            // Prime the group up to the initial bound. Bound is recomputed
-            // before every submission so it can shrink under live memory
-            // pressure (and after a memory warning collapses it to 1).
-            while nextSubmitIndex < totalPages {
-                let bound = computeParallelismBound(
-                    remainingPages: pages[nextSubmitIndex...], dpiCap: dpiCap
-                )
-                // Residency gate: block new submissions when the
-                // completed-but-unappended buffer would reach 2× the bound, so
-                // out-of-order completions can't accumulate N full-res
-                // CGImages. `pending` is empty in the prime loop, so this
-                // reduces to `inFlight < bound` here.
-                let residentCap = bound * 2
-                guard inFlight < bound && inFlight + pending.count < residentCap else { break }
-                let page = pages[nextSubmitIndex]
-                let idx = nextSubmitIndex
-                // Capture the live cap per submission (read on the
-                // MainActor) so a mid-run memory warning lowers DPI for this
-                // page too. The captured `Int` is sendable into the child task.
-                let cap = dpiCap
-                group.addTask { [self] in
-                    let result = try await self.rasterizeWithRetry(
-                        page, rasterizer: rasterizer, primaryDPICap: cap)
-                    return (idx, result)
-                }
-                inFlight += 1
-                nextSubmitIndex += 1
-            }
-
-            // Consume completions; drain in order; refill up to the
-            // (re-evaluated) bound.
-            while let (idx, result) = try await group.next() {
-                pending[idx] = result
-                inFlight -= 1
-                completed += 1
-
+        var scheduler = PageRasterizationScheduler()
+        try await scheduler.run(
+            pages: pages,
+            rasterizer: rasterizer,
+            dpiCap: { dpiCap },
+            parallelismBound: { remaining, cap in
+                computeParallelismBound(remainingPages: remaining, dpiCap: cap)
+            },
+            rasterize: { [self] page, rasterizer, cap in
+                try await self.rasterizeWithRetry(
+                    page, rasterizer: rasterizer, primaryDPICap: cap)
+            },
+            onPageReady: onPageReady,
+            onProgress: { completed, totalPages, residentAccounting in
                 #if DEBUG
-                // Sample the residency accounting bound IMMEDIATELY after the
-                // store, BEFORE the in-order drain, to capture the peak.
-                // Accounting bound on completed-result
-                // residency, not a live-CGImage census — see
-                // `maxResidentResults`.
-                maxResidentResults = max(maxResidentResults, inFlight + pending.count + 1)
+                // Accounting bound on completed-result residency, not a
+                // live-CGImage census — see `maxResidentResults`.
+                maxResidentResults = max(maxResidentResults, residentAccounting)
                 #endif
-
                 // Progress reflects completed pages. Out-of-order completion
-                // is fine: `currentPage` is monotonic even though `idx` may
-                // skip around. The currentStep label uses `completed` so it
-                // does not advertise a specific page index that may already
-                // be past tense by the time the UI repaints.
+                // is fine: `currentPage` is monotonic even though the page
+                // index may skip around. The currentStep label uses
+                // `completed` so it does not advertise a specific page index
+                // that may already be past tense by the time the UI repaints.
                 documentState.transition(to: .redacting(
                     progress: .init(
                         currentPage: completed,
@@ -946,183 +857,26 @@ final class PipelineCoordinator: @unchecked Sendable {
                         currentStep: "Processing \(completed) of \(totalPages)\u{2026}"
                     )
                 ))
-
-                // Surface cancellation BETWEEN submissions. The group itself
-                // already propagates cancellation into in-flight child tasks
-                // via structured concurrency; this check lets us bail out
-                // of the loop without scheduling more work.
-                try Task.checkCancellation()
-
-                // In-order drain: hand every now-contiguous page to
-                // `onPageReady` and release its full-res CGImage at the end of
-                // each iteration. `pending` retains only out-of-order
-                // completions. Do NOT swallow an `onPageReady` error and
-                // continue the drain: a suppressed throw here is a silent page
-                // drop the post-group guard cannot distinguish from success.
-                while let next = pending.removeValue(forKey: nextAppendIndex) {
-                    try await onPageReady(nextAppendIndex, next)
-                    nextAppendIndex += 1
-                }
-
-                // Refill: submit as many new producers as the (current) bound
-                // permits. The bound may have dropped to 1 if a memory
-                // warning fired between iterations.
-                while nextSubmitIndex < totalPages {
-                    let bound = computeParallelismBound(
-                        remainingPages: pages[nextSubmitIndex...],
-                        dpiCap: dpiCap
-                    )
-                    let residentCap = bound * 2
-                    guard inFlight < bound && inFlight + pending.count < residentCap else { break }
-                    let page = pages[nextSubmitIndex]
-                    let nextIdx = nextSubmitIndex
-                    // Per-submission live cap (see prime loop). Pages
-                    // submitted after a mid-run warning rasterize at the lowered
-                    // cap; in-flight pages plus at most one submission burst at
-                    // the pre-warning bound remain at the old cap (the one-page
-                    // figure holds only under parallelismOverride == 1).
-                    let cap = dpiCap
-                    group.addTask { [self] in
-                        let r = try await self.rasterizeWithRetry(
-                            page, rasterizer: rasterizer, primaryDPICap: cap)
-                        return (nextIdx, r)
-                    }
-                    inFlight += 1
-                    nextSubmitIndex += 1
-                }
             }
-        }
-
-        // Defensive parity with the old second-pass `guard let result =
-        // results[i]`: a correct run drains `pending` empty and appends every
-        // page. Reachable only via a future logic bug; reuses the
-        // existing error case (no PipelineError hierarchy change).
-        guard nextAppendIndex == pages.count else {
-            throw PipelineError.redactionError(.reconstructionFailed)
-        }
+        )
     }
 
-    /// Compute the active rasterization parallelism bound. Locked formula:
-    ///
-    ///     max(1, min(cores - 1, dynamicMemoryBudgetPages))
-    ///
-    /// where `dynamicMemoryBudgetPages = available / per-page-bytes`. The
-    /// per-page byte estimate is the worst-case bitmap footprint for the
-    /// next page about to be submitted, multiplied by 3 to cover the pagefuls
-    /// `PageRasterizer.rasterize` can hold concurrently — the render context,
-    /// the pooled fill context, and the JPEG-encode buffer (corrected
-    /// from 2× to a conservative 3×; intentionally tighter than `selectDPI`'s
-    /// 2× factor, which counts only render + fill). `parallelismOverride`
-    /// (set to 1 on `didReceiveMemoryWarningNotification`) clamps the result
-    /// to 1 until workspace teardown.
+    /// The active rasterization parallelism bound for the coordinator's live
+    /// `parallelismOverride` — the locked formula is
+    /// `PageRasterizationScheduler.parallelismBound(remainingPages:dpiCap:parallelismOverride:)`.
     ///
     /// `internal` rather than `private` so the dedicated page-parallel test suite
     /// can assert the bound math directly without driving the full pipeline.
     func computeParallelismBound(
         remainingPages: ArraySlice<PDFPageData>, dpiCap: Int
     ) -> Int {
-        let cores = max(1, ProcessInfo.processInfo.activeProcessorCount - 1)
-        let memoryPages = dynamicMemoryBudgetPages(
-            remainingPages: remainingPages, dpiCap: dpiCap
+        PageRasterizationScheduler.parallelismBound(
+            remainingPages: remainingPages, dpiCap: dpiCap,
+            parallelismOverride: parallelismOverride
         )
-        var bound = max(1, min(cores, memoryPages))
-        if let override = parallelismOverride {
-            bound = min(bound, max(1, override))
-        }
-        return bound
-    }
-
-    /// Estimate how many pages can be rasterized concurrently before the
-    /// summed in-flight bitmap memory exceeds the live `os_proc_available_memory()`
-    /// budget. Uses the size of the next page about to be submitted as a
-    /// worst-case proxy (pages within a single document tend to share
-    /// dimensions; mixed-size documents over-estimate per-page bytes from
-    /// the leading page, which is conservative — we err on the side of
-    /// fewer concurrent producers).
-    private func dynamicMemoryBudgetPages(
-        remainingPages: ArraySlice<PDFPageData>, dpiCap: Int
-    ) -> Int {
-        guard let head = remainingPages.first else { return 1 }
-        // Use the pre-extracted cropBox bounds (same float as
-        // `head.page.bounds(for: .cropBox)`, now read serially at build time) so
-        // the bound estimate never touches the shared document concurrently. The
-        // bound integer is unchanged.
-        let rawBounds = head.cropBoxBounds
-        let effectiveSize: CGSize = {
-            switch head.rotation {
-            case 90, 270:
-                return CGSize(width: rawBounds.height, height: rawBounds.width)
-            default:
-                return rawBounds.size
-            }
-        }()
-        let effectiveDPI = min(head.targetDPI, dpiCap)
-        let scale = CGFloat(effectiveDPI) / 72.0
-        let pixelW = Int(ceil(effectiveSize.width * scale))
-        let pixelH = Int(ceil(effectiveSize.height * scale))
-        // 4 bytes/pixel × 3: render context + pooled fill context + JPEG
-        // encode buffer can be held concurrently inside rasterize()/append
-        // (corrected from 2× to a conservative 3×; tighter than
-        // selectDPI's 2× factor, which counts only render + fill).
-        let perPageBytes = max(1, pixelW * pixelH * 4 * 3)
-        let available = Int(os_proc_available_memory())
-        // 150 MB headroom — same constant the engine's selectDPI reserves.
-        let budget = max(0, available - 150_000_000)
-        return max(1, budget / perPageBytes)
     }
 
     // MARK: - Verification
-
-    /// Off-MainActor PDF parse for the verification entry. Mirrors the
-    /// `ImportService.validatePDFOffMainActor` shape: synchronous
-    /// `nonisolated static` work invoked via `Task.detached` at the call
-    /// site, so the CPU-bound `PDFDocument(url:)` parse on a 100-page
-    /// output does not stall the `.verifying` progress UI on MainActor.
-    /// `nonisolated`: explicitly opts out of SE-0466 MainActor default.
-    /// Throws `PipelineError.verificationError(.engineCrash(layerIndex: 0))`
-    /// on parse failure to match the prior in-place guard's failure shape.
-    nonisolated static func loadOutputDocumentOffMainActor(
-        _ url: URL
-    ) throws -> SendablePDFDocument {
-        guard let doc = PDFDocument(url: url) else {
-            throw PipelineError.verificationError(.engineCrash(layerIndex: 0))
-        }
-        return SendablePDFDocument(doc)
-    }
-
-    /// Open one independent `PDFDocument(url:)` per parallel
-    /// verification layer so concurrent `runLayer` calls never share a PDFKit
-    /// object (a torn lazy read on a shared instance could otherwise produce a
-    /// false `.pass`). Opens are serial against the OS-cached output file.
-    /// Returns `nil` if ANY open fails — partial provisioning is not allowed;
-    /// the caller then runs the layers sequentially on the shared instance.
-    /// `nonisolated static`: invoked through `Task.detached` because the open
-    /// is CPU-bound on large outputs (same rationale as
-    /// `loadOutputDocumentOffMainActor`).
-    nonisolated static func loadParallelLayerDocuments(
-        _ url: URL, layers: [Int]
-    ) -> [Int: SendablePDFDocument]? {
-        loadParallelLayerDocuments(url, keys: layers)
-    }
-
-    /// Identity-keyed counterpart of the index form above.
-    nonisolated static func loadParallelLayerDocuments(
-        _ url: URL, layers: [VerificationLayer]
-    ) -> [VerificationLayer: SendablePDFDocument]? {
-        loadParallelLayerDocuments(url, keys: layers)
-    }
-
-    private nonisolated static func loadParallelLayerDocuments<Key: Hashable>(
-        _ url: URL, keys: [Key]
-    ) -> [Key: SendablePDFDocument]? {
-        var docs: [Key: SendablePDFDocument] = [:]
-        docs.reserveCapacity(keys.count)
-        for key in keys {
-            guard let doc = PDFDocument(url: url) else { return nil }
-            docs[key] = SendablePDFDocument(doc)
-        }
-        return docs
-    }
 
     /// Seam: run the parallel base-layer batch and return the
     /// `(layerIndex, LayerResult)` pairs in completion order. Index adapter
@@ -1579,6 +1333,73 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // other accumulators on success.
                 var accumulatedOCRCapSkips: Set<Int> = []
 
+                /// Detect one page and fold its results into the three
+                /// accumulators — the body both detect branches share.
+                /// Stamps the `detectPage` signpost interval so
+                /// DetectionRasterizeOverlapTests can assert overlap with the
+                /// lookahead rasterize; the trailing page (no overlapping
+                /// rasterize counterpart) carries `trailing=true` so the
+                /// overlap-rate metric omits it from the denominator.
+                func detectOne(
+                    _ i: Int, image pageImage: CGImage,
+                    embeddedText embeddedSource: EmbeddedTextSource?,
+                    ocrSkipReason skipReason: DetectionResult.Provenance.OCRSkipReason?,
+                    trailing: Bool
+                ) async throws {
+                    let detectSignpostID = detectionRasterizeSignposter
+                        .makeSignpostID()
+                    let detectSignpostState = trailing
+                        ? detectionRasterizeSignposter.beginInterval(
+                            "detectPage", id: detectSignpostID,
+                            "page=\(i) trailing=true"
+                        )
+                        : detectionRasterizeSignposter.beginInterval(
+                            "detectPage", id: detectSignpostID,
+                            "page=\(i)"
+                        )
+                    // Seed the doctype
+                    // window with the previous page's classification.
+                    // Detection is serial across pages, so the i-1
+                    // diagnostic is already recorded when page i
+                    // dispatches; missing diagnostic → nil context
+                    // (degrade, never race).
+                    let prevPrimary: DoctypeClass? =
+                        i > 0 ? accumulatedDiagnostics[i - 1]?.primary : nil
+                    let doctypeCtx = prevPrimary.map { prev in
+                        DoctypeWindow(primary: prev)
+                    }
+                    let pageResult: PageDetectionResult
+                    do {
+                        pageResult = try await orchestrator.detectPage(
+                            image: pageImage,
+                            pageIndex: i,
+                            priors: priorsSnapshot,
+                            surfaceForms: surfaceFormsSnapshot,
+                            doctypeContext: doctypeCtx,
+                            thresholdVector: thresholdVectorSnapshot,
+                            embeddedText: embeddedSource,
+                            ocrSkipReason: skipReason
+                        )
+                    } catch { // LegalPhrases:safe (Swift keyword)
+                        detectionRasterizeSignposter.endInterval(
+                            "detectPage", detectSignpostState
+                        )
+                        throw error
+                    }
+                    detectionRasterizeSignposter.endInterval(
+                        "detectPage", detectSignpostState
+                    )
+                    accumulatedResults[i] = pageResult.detections
+                    if let diag = pageResult.classificationDiagnostic {
+                        accumulatedDiagnostics[i] = diag
+                    }
+                    // Record the page-level OCR pixel-cap
+                    // skip so the triage banner can surface it.
+                    if pageResult.ocrProvenance.ocrSkipReason == .pixelCapExceeded {
+                        accumulatedOCRCapSkips.insert(i)
+                    }
+                }
+
                 // Depth-2 lookahead via structured concurrency.
                 //
                 // Locked decision:
@@ -1711,58 +1532,9 @@ final class PipelineCoordinator: @unchecked Sendable {
                             // Doctype-aware, prior-scored
                             // detection. Runs CONCURRENT with the
                             // lookahead rasterize above (depth-2).
-                            // Stamp the detect interval so
-                            // DetectionRasterizeOverlapTests can assert
-                            // overlap with the lookahead rasterize.
-                            let detectSignpostID = detectionRasterizeSignposter
-                                .makeSignpostID()
-                            let detectSignpostState =
-                                detectionRasterizeSignposter.beginInterval(
-                                    "detectPage", id: detectSignpostID,
-                                    "page=\(i)"
-                                )
-                            let detectStart = Date()
-                            // Seed the doctype
-                            // window with the previous page's classification.
-                            // Detection is serial across pages, so the i-1
-                            // diagnostic is already recorded when page i
-                            // dispatches; missing diagnostic → nil context
-                            // (degrade, never race).
-                            let prevPrimary: DoctypeClass? =
-                                i > 0 ? accumulatedDiagnostics[i - 1]?.primary : nil
-                            let doctypeCtx = prevPrimary.map { prev in
-                                DoctypeWindow(primary: prev)
-                            }
-                            let pageResult: PageDetectionResult
-                            do {
-                                pageResult = try await orchestrator.detectPage(
-                                    image: pageImage,
-                                    pageIndex: i,
-                                    priors: priorsSnapshot,
-                                    surfaceForms: surfaceFormsSnapshot,
-                                    doctypeContext: doctypeCtx,
-                                    thresholdVector: thresholdVectorSnapshot,
-                                    embeddedText: embeddedSource,
-                                    ocrSkipReason: skipReason
-                                )
-                            } catch { // LegalPhrases:safe (Swift keyword)
-                                detectionRasterizeSignposter.endInterval(
-                                    "detectPage", detectSignpostState
-                                )
-                                throw error
-                            }
-                            detectionRasterizeSignposter.endInterval(
-                                "detectPage", detectSignpostState
-                            )
-                            accumulatedResults[i] = pageResult.detections
-                            if let diag = pageResult.classificationDiagnostic {
-                                accumulatedDiagnostics[i] = diag
-                            }
-                            // Record the page-level OCR pixel-cap
-                            // skip so the triage banner can surface it.
-                            if pageResult.ocrProvenance.ocrSkipReason == .pixelCapExceeded {
-                                accumulatedOCRCapSkips.insert(i)
-                            }
+                            try await detectOne(
+                                i, image: pageImage, embeddedText: embeddedSource,
+                                ocrSkipReason: skipReason, trailing: false)
 
                             // Cooperative check between
                             // the just-completed detect await and the
@@ -1779,58 +1551,11 @@ final class PipelineCoordinator: @unchecked Sendable {
                             pendingImage = try await nextImage
                             pendingPage = lookaheadPage
                         } else {
-                            // Last page — no lookahead to dispatch.
-                            // Still stamp the detect interval
-                            // for the trailing page (it lacks an
-                            // overlapping rasterize counterpart, so the
-                            // overlap-rate metric in
-                            // DetectionRasterizeOverlapTests omits it
-                            // from the denominator).
-                            let detectSignpostID = detectionRasterizeSignposter
-                                .makeSignpostID()
-                            let detectSignpostState =
-                                detectionRasterizeSignposter.beginInterval(
-                                    "detectPage", id: detectSignpostID,
-                                    "page=\(i) trailing=true"
-                                )
-                            let detectStart = Date()
-                            // Same previous-page
-                            // doctype window as the lookahead branch above.
-                            let prevPrimary: DoctypeClass? =
-                                i > 0 ? accumulatedDiagnostics[i - 1]?.primary : nil
-                            let doctypeCtx = prevPrimary.map { prev in
-                                DoctypeWindow(primary: prev)
-                            }
-                            let pageResult: PageDetectionResult
-                            do {
-                                pageResult = try await orchestrator.detectPage(
-                                    image: pageImage,
-                                    pageIndex: i,
-                                    priors: priorsSnapshot,
-                                    surfaceForms: surfaceFormsSnapshot,
-                                    doctypeContext: doctypeCtx,
-                                    thresholdVector: thresholdVectorSnapshot,
-                                    embeddedText: embeddedSource,
-                                    ocrSkipReason: skipReason
-                                )
-                            } catch { // LegalPhrases:safe (Swift keyword)
-                                detectionRasterizeSignposter.endInterval(
-                                    "detectPage", detectSignpostState
-                                )
-                                throw error
-                            }
-                            detectionRasterizeSignposter.endInterval(
-                                "detectPage", detectSignpostState
-                            )
-                            accumulatedResults[i] = pageResult.detections
-                            if let diag = pageResult.classificationDiagnostic {
-                                accumulatedDiagnostics[i] = diag
-                            }
-                            // Record the page-level OCR pixel-cap
-                            // skip so the triage banner can surface it.
-                            if pageResult.ocrProvenance.ocrSkipReason == .pixelCapExceeded {
-                                accumulatedOCRCapSkips.insert(i)
-                            }
+                            // Last page — no lookahead to dispatch; the
+                            // detect runs alone.
+                            try await detectOne(
+                                i, image: pageImage, embeddedText: embeddedSource,
+                                ocrSkipReason: skipReason, trailing: true)
                         }
                     }
                 }
@@ -1846,8 +1571,10 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // Bare-surname clusters ≥15 get flagged for inline ambiguity hints.
                 let clusterer = EntityClusterer()
                 var clusterInputs: [EntityClusterer.ClusterInput] = []
-                for (_, results) in accumulatedResults {
-                    for result in results {
+                // Page order, not Dictionary order: two runs over the same
+                // detections hand the clusterer the same input sequence.
+                for page in accumulatedResults.keys.sorted() {
+                    for result in accumulatedResults[page] ?? [] {
                         guard case .pii(let kind) = result.kind, kind == .name else { continue }
                         guard let text = result.matchedText,
                               let input = EntityClusterer.clusterInput(
@@ -2152,22 +1879,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         )
     }
 
-    /// Remove every entry directly inside `directory` whose name carries
-    /// the reconstructor's `recon_` intermediate prefix. Best-effort: a
-    /// missing directory or an entry that cannot be removed is left for
-    /// `cleanOrphanedTempFiles()`. Output files (`redacted_*`) and
-    /// everything else are untouched.
-    nonisolated static func removeAbandonedIntermediates(in directory: URL) {
-        let fm = FileManager.default
-        guard let entries = try? fm.contentsOfDirectory(
-            at: directory, includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
-        ) else { return }
-        for entry in entries where entry.lastPathComponent.hasPrefix("recon_") {
-            try? fm.removeItem(at: entry)
-        }
-    }
-
     // MARK: - Sensitive Term Collection
 
     /// Collect unique matched PII text from the APPLIED redactions for Layer 3
@@ -2188,67 +1899,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         )
     }
 
-    /// Pure core of `collectSensitiveTerms`: given the applied regions
-    /// and their metadata, return the verifier's sensitive-term set. Split out as
-    /// a `nonisolated static` seam so it is unit-testable without a live
-    /// coordinator.
-    ///
-    /// Two contributions per region:
-    /// - The region's search TERM, only when the region came from a typed
-    ///   query (text / regex / multi-term row) — there the term IS the
-    ///   sensitive text the user searched for. Detector and user-term rows
-    ///   carry a placeholder there instead (a category label like "Name",
-    ///   or "Custom"), which is not document content and would substring-hit
-    ///   unrelated body text ("Name" inside "/FontName", "Custom" inside
-    ///   "Customer"). Typed rows are the ones with no attached rationale and
-    ///   no stamped PII category — both are nil for text/regex/multi-term
-    ///   results by the `SearchResult` contract.
-    /// - The region's MATCHED TEXT — the actual document content — for every
-    ///   region that has one. A bare single-word name token (a lone surname /
-    ///   given name from per-word NL tagging) is included WITH token-boundary
-    ///   matching: byte layers count its hits only when the match is not
-    ///   embedded in a longer alphanumeric run, which keeps a leaked
-    ///   standalone name detectable while an unrelated word containing the
-    ///   same letters ("pos" inside "Deposits") does not flag. Multi-word
-    ///   names, non-name kinds, and typed queries keep plain substring
-    ///   matching so embedded/partial leaks stay catchable.
-    nonisolated static func sensitiveTerms(
-        fromAppliedRegions regions: [Int: [RedactionRegion]],
-        metadata: [UUID: RegionMetadata]
-    ) -> [SensitiveTerm] {
-        // Dedup by text; a text contributed with AND without the boundary
-        // requirement keeps plain substring matching (the least restrictive
-        // discipline any contributor asked for).
-        var requiresBoundaryByText: [String: Bool] = [:]
-        func insert(_ text: String, requiresTokenBoundary: Bool) {
-            requiresBoundaryByText[text] =
-                (requiresBoundaryByText[text] ?? true) && requiresTokenBoundary
-        }
-        for pageRegions in regions.values {
-            for region in pageRegions {
-                let meta = metadata[region.id]
-                if case .searchMatch(let term, let rationale) = region.source,
-                   rationale == nil,
-                   meta.map({ if case .searchMatch = $0.piiKind { true } else { false } }) ?? true {
-                    insert(term, requiresTokenBoundary: false)
-                }
-                guard let meta,
-                      let text = meta.matchedText, !text.isEmpty else { continue }
-                let isSingleTokenName: Bool =
-                    if case .pii(.name) = meta.piiKind { isSingleToken(text) } else { false }
-                insert(text, requiresTokenBoundary: isSingleTokenName)
-            }
-        }
-        return requiresBoundaryByText.map {
-            SensitiveTerm(text: $0.key, requiresTokenBoundary: $0.value)
-        }
-    }
-
-    /// True when `text` is a single whitespace-delimited token.
-    nonisolated static func isSingleToken(_ text: String) -> Bool {
-        text.split(whereSeparator: { $0.isWhitespace }).count <= 1
-    }
-
     // MARK: - Applied-Search Collection
 
     /// Collect the Search Re-check requests for this run — one per
@@ -2261,73 +1911,6 @@ final class PipelineCoordinator: @unchecked Sendable {
             fromRegions: redactionState.regions,
             audit: redactionState.appliedMatchAudit
         )
-    }
-
-    /// Pure core of `collectAppliedSearches`: join the PRESENT regions to
-    /// the match audit and group the search-origin records by their stamped
-    /// query. Split out as a `nonisolated static` seam so it is
-    /// unit-testable without a live coordinator (the
-    /// `sensitiveTerms(fromAppliedRegions:metadata:)` shape).
-    ///
-    /// Why the join, not the audit alone: `removeRegion` / `removeRegions`
-    /// drop the region and its metadata but leave the audit entry, so an
-    /// orphaned audit entry means "deleted" — and deletion is the user's
-    /// intent. A query whose regions were all deleted is not re-checked.
-    /// Out by construction: scan-origin records, `.piiScan` sessions and
-    /// nudge-accepted regions (no stamped record), manual regions (no
-    /// audit entry). Overlap-skipped results never wrote an audit entry,
-    /// so they count in the record's `foundCount` but not in `appliedCount`.
-    ///
-    /// Per query: `appliedCount` = present regions citing it; `appliedPages`
-    /// = the pages carrying them (the region dictionary's key is the page
-    /// of record); the record itself — `foundCount` and the coverage facts
-    /// — is the LATEST apply's by `appliedAt`, since a later run of the same
-    /// query reports the newer result count. Requests come back in
-    /// first-seen order over pages ascending, then region order within the
-    /// page, so two derivations over the same state are equal.
-    nonisolated static func appliedSearches(
-        fromRegions regions: [Int: [RedactionRegion]],
-        audit: [UUID: MatchAuditSnapshot]
-    ) -> [SearchRecheckRequest] {
-        struct Group {
-            var record: AppliedSearchRecord
-            var recordAppliedAt: Date
-            var appliedCount: Int
-            var appliedPages: Set<Int>
-        }
-        var groups: [AppliedSearchQuery: Group] = [:]
-        var order: [AppliedSearchQuery] = []
-        for (page, pageRegions) in regions.sorted(by: { $0.key < $1.key }) {
-            for region in pageRegions {
-                guard let snapshot = audit[region.id],
-                      snapshot.origin == .search,
-                      let record = snapshot.searchRecord else { continue }
-                let query = record.query
-                if var group = groups[query] {
-                    group.appliedCount += 1
-                    group.appliedPages.insert(page)
-                    if snapshot.appliedAt > group.recordAppliedAt {
-                        group.record = record
-                        group.recordAppliedAt = snapshot.appliedAt
-                    }
-                    groups[query] = group
-                } else {
-                    groups[query] = Group(
-                        record: record,
-                        recordAppliedAt: snapshot.appliedAt,
-                        appliedCount: 1,
-                        appliedPages: [page])
-                    order.append(query)
-                }
-            }
-        }
-        return order.compactMap { query in
-            guard let group = groups[query] else { return nil }
-            return SearchRecheckRequest(
-                record: group.record,
-                appliedCount: group.appliedCount,
-                appliedPages: group.appliedPages)
-        }
     }
 
     // MARK: - Build PDFPageData
@@ -2423,71 +2006,5 @@ final class PipelineCoordinator: @unchecked Sendable {
                 fallbackReason: fallbackReason
             )
         }
-    }
-
-    // MARK: - OCR skip fast path
-
-    /// Locked coverage threshold. Selectable-text bounding-box area
-    /// as a fraction of cropBox area must strictly exceed this value before
-    /// Vision OCR is skipped for the page. Not tunable.
-    /// `nonisolated` so the now-`nonisolated`
-    /// `buildOCRSkipHint` can read it off the MainActor (mirrors
-    /// `retryDPIFloor`); an immutable Sendable constant is safe to share.
-    nonisolated static let ocrSkipCoverageThreshold: Double = 0.95
-
-    /// Decide whether Vision OCR can be skipped for `page` and, if
-    /// so, build the `EmbeddedTextSource` the orchestrator will consume in
-    /// place of running OCR. Returns `(nil, nil)` when the page must take
-    /// the OCR path.
-    ///
-    /// Locked gate (do not tune):
-    ///   * Effective mode == `.searchableRedaction`
-    ///   * Per-page text layer == `.rich`
-    ///   * Selectable-text coverage > 0.95
-    ///
-    /// In `.secureRasterization` mode the embedded text is not used by the
-    /// pipeline, so OCR always runs there regardless of settings.
-    ///
-    /// `runSettings` is the run-entry snapshot used by
-    /// `runDetectionPipeline`.
-    ///
-    /// `nonisolated`, and both MainActor
-    /// inputs are passed in as Sendable snapshots — `runSettings` (required)
-    /// and `textLayerStatus` (the per-page status dict captured once pre-loop).
-    /// The body reads no MainActor-isolated state, so `runDetectionPipeline`
-    /// runs it off the MainActor via `Task.detached`; the per-word
-    /// `EmbeddedTextSource.make` enumeration no longer occupies the UI thread.
-    nonisolated func buildOCRSkipHint(
-        for page: PDFPage, pageIndex: Int,
-        runSettings: RunSettings,
-        textLayerStatus: [Int: TextLayerStatus]
-    ) -> (EmbeddedTextSource?, DetectionResult.Provenance.OCRSkipReason?) {
-        // Condition 2 — mode gate. The user's current preference is what
-        // would drive the next pipeline run; in `.secureRasterization` we
-        // never trust embedded text, by design.
-        guard runSettings.pipelineMode == .searchableRedaction else {
-            return (nil, nil)
-        }
-        // Per-page text layer must be rich. Sparse/none layers go through
-        // OCR even when the document is mostly text — the embedded text
-        // is by definition not authoritative for those pages.
-        if let status = textLayerStatus[pageIndex],
-           status != .rich {
-            return (nil, nil)
-        }
-        // Cheap pre-filter (task body): pages with <10 characters cannot
-        // plausibly cover > 95% of the cropBox.
-        guard let pageText = page.string, pageText.count >= 10 else {
-            return (nil, nil)
-        }
-
-        // Condition 1 — coverage. The engine builder computes the union of
-        // selectable-text word bounding boxes as a fraction of cropBox area.
-        guard let source = EmbeddedTextSource.make(from: page),
-              source.coverage > Self.ocrSkipCoverageThreshold else {
-            return (nil, nil)
-        }
-
-        return (source, .coverageHighEnough)
     }
 }
