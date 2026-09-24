@@ -291,11 +291,9 @@ final class SearchState: Identifiable {
 
     /// Drop the session's filter caches. Called from the local didSet
     /// paths above when the inputs that key `_FilterCacheKey` change.
+    /// The id→index map keys on `resultVersion` alone and survives.
     func invalidateFilterCaches() {
-        _filteredResultsCache = nil
-        _resultsByPageCache = nil
-        _resultsByTermCache = nil
-        _resultsByCategoryCache = nil
+        _filterCache.invalidateFilters()
     }
 
     // MARK: - Diagnostics
@@ -593,41 +591,21 @@ final class SearchState: Identifiable {
     private(set) var capUnscannedPageCount: Int = 0
 
     /// All results after source/confidence/category filters applied.
-    /// Cached and invalidated on resultVersion change or filter change (P3).
+    /// Memoized on the filter shape; recomputed on a resultVersion
+    /// change or a filter change (P3).
     var filteredResults: [SearchResult] {
-        let cacheKey = _currentCacheKey
-        if _filteredResultsCacheKey == cacheKey, let cached = _filteredResultsCache {
-            return cached
-        }
-        let filtered = applyFilters(to: results)
-        _filteredResultsCache = filtered
-        _filteredResultsCacheKey = cacheKey
-        return filtered
+        memo(\.filtered) { applyFilters(to: results) }
     }
 
     /// Results grouped by page, with source/confidence filters applied.
-    /// Cached and invalidated on resultVersion change or filter change (P3).
+    /// Memoized on the filter shape (P3).
     var resultsByPage: [Int: [SearchResult]] {
-        let cacheKey = _currentCacheKey
-        if _resultsByPageCacheKey == cacheKey, let cached = _resultsByPageCache {
-            return cached
-        }
-        let grouped = Dictionary(grouping: filteredResults, by: \.pageIndex)
-        _resultsByPageCache = grouped
-        _resultsByPageCacheKey = cacheKey
-        return grouped
+        memo(\.byPage) { Dictionary(grouping: filteredResults, by: \.pageIndex) }
     }
 
     /// U3: Results grouped by search term, with filters applied.
     var resultsByTerm: [String: [SearchResult]] {
-        let cacheKey = _currentCacheKey
-        if _resultsByTermCacheKey == cacheKey, let cached = _resultsByTermCache {
-            return cached
-        }
-        let grouped = Dictionary(grouping: filteredResults, by: \.term)
-        _resultsByTermCache = grouped
-        _resultsByTermCacheKey = cacheKey
-        return grouped
+        memo(\.byTerm) { Dictionary(grouping: filteredResults, by: \.term) }
     }
 
     /// Filtered result count (respects source/confidence filters).
@@ -655,15 +633,10 @@ final class SearchState: Identifiable {
 
     /// Results grouped by PII category, with filters applied.
     var resultsByCategory: [PIICategory: [SearchResult]] {
-        let cacheKey = _currentCacheKey
-        if _resultsByCategoryCacheKey == cacheKey, let cached = _resultsByCategoryCache {
-            return cached
+        memo(\.byCategory) {
+            let piiOnly = filteredResults.filter { $0.piiCategory != nil }
+            return Dictionary(grouping: piiOnly, by: { $0.piiCategory! })
         }
-        let piiOnly = filteredResults.filter { $0.piiCategory != nil }
-        let grouped = Dictionary(grouping: piiOnly, by: { $0.piiCategory! })
-        _resultsByCategoryCache = grouped
-        _resultsByCategoryCacheKey = cacheKey
-        return grouped
     }
 
     /// Counts of results per PII category (for badge display).
@@ -676,33 +649,61 @@ final class SearchState: Identifiable {
         results.contains { $0.piiCategory != nil }
     }
 
-    // @ObservationIgnored: these are memoization internals, not view state.
-    // The grouping getters above WRITE them mid-body-evaluation; if the macro
-    // wraps them, that write re-enters the ObservationRegistrar during List
-    // body evaluation and trips AG::precondition_failure (SIGABRT — the
-    // Mark-for-Redaction crash). View updates still flow through the observed
-    // inputs: `results`/`resultVersion` and every field of `_currentCacheKey`,
-    // all of which the getters read on every access.
-    @ObservationIgnored private var _filteredResultsCache: [SearchResult]?
-    @ObservationIgnored private var _filteredResultsCacheKey: _FilterCacheKey?
-    @ObservationIgnored private var _resultsByPageCache: [Int: [SearchResult]]?
-    @ObservationIgnored private var _resultsByPageCacheKey: _FilterCacheKey?
-    @ObservationIgnored private var _resultsByTermCache: [String: [SearchResult]]?
-    @ObservationIgnored private var _resultsByTermCacheKey: _FilterCacheKey?
-    @ObservationIgnored private var _resultsByCategoryCache: [PIICategory: [SearchResult]]?
-    @ObservationIgnored private var _resultsByCategoryCacheKey: _FilterCacheKey?
+    // @ObservationIgnored: the memo store is a memoization internal, not
+    // view state. The getters WRITE it mid-body-evaluation; if the macro
+    // wrapped it, that write would re-enter the ObservationRegistrar
+    // during List body evaluation and trip AG::precondition_failure
+    // (SIGABRT — the Mark-for-Redaction crash). A plain struct stored on
+    // this class, never a child `@Observable`. View updates still flow
+    // through the observed inputs: `results`/`resultVersion` and every
+    // field of `_currentCacheKey`, all read by the getters on every access.
+    @ObservationIgnored private var _filterCache = FilterCache()
 
-    // O(1) id→index map backing `result(for:)` — the
-    // results list's per-row binding get previously linear-scanned
-    // `results` ~7-8× per row body, on every mounted row, on every
-    // scroll-time section invalidation. Same memoization shape as the
-    // filter caches above (@ObservationIgnored — the getter writes
-    // mid-body-evaluation); keyed on `resultVersion` alone: every
-    // in-app `results` mutation bumps it (`clear` /
-    // `flushPendingResults` / `clearResultState`), and in-place
-    // `isSelected` writes never move indices.
-    @ObservationIgnored private var _resultIndexByID: [UUID: Int]?
-    @ObservationIgnored private var _resultIndexByIDVersion: Int?
+    private struct FilterCache {
+        /// One memoized value, valid while its key still matches.
+        struct Slot<Key: Equatable, Value> {
+            private var key: Key?
+            private var value: Value?
+            func value(for key: Key) -> Value? { self.key == key ? value : nil }
+            mutating func store(_ value: Value, for key: Key) { (self.key, self.value) = (key, value) }
+        }
+        var filtered = Slot<_FilterCacheKey, [SearchResult]>()
+        var byPage = Slot<_FilterCacheKey, [Int: [SearchResult]]>()
+        var byTerm = Slot<_FilterCacheKey, [String: [SearchResult]]>()
+        var byCategory = Slot<_FilterCacheKey, [PIICategory: [SearchResult]]>()
+        /// The O(1) id→index map behind `result(for:)` (the per-row
+        /// binding get previously linear-scanned `results` ~7-8× per row
+        /// body). Keyed on `resultVersion` alone: every in-app `results`
+        /// mutation bumps it, and in-place `isSelected` writes never
+        /// move indices.
+        var indexByID = Slot<Int, [UUID: Int]>()
+
+        /// Drop the four filter slots; the id map keys on the version.
+        mutating func invalidateFilters() { self = FilterCache(indexByID: indexByID) }
+    }
+
+    /// One slot read: a hit on `key` returns the stored value; a miss
+    /// builds, stores and returns it. The build runs BETWEEN the read
+    /// and the write of `_filterCache` — never inside an access to it —
+    /// because a grouping build reads `filteredResults`, itself a slot.
+    private func memo<Key: Equatable, Value>(
+        _ slot: WritableKeyPath<FilterCache, FilterCache.Slot<Key, Value>>,
+        key: Key,
+        _ build: () -> Value
+    ) -> Value {
+        if let hit = _filterCache[keyPath: slot].value(for: key) { return hit }
+        let built = build()
+        _filterCache[keyPath: slot].store(built, for: key)
+        return built
+    }
+
+    /// The filter-shape slots, keyed on `_currentCacheKey`.
+    private func memo<Value>(
+        _ slot: WritableKeyPath<FilterCache, FilterCache.Slot<_FilterCacheKey, Value>>,
+        _ build: () -> Value
+    ) -> Value {
+        memo(slot, key: _currentCacheKey, build)
+    }
 
     /// Live result lookup by ID — O(1) through the version-keyed index
     /// map. The id re-check plus the linear rescue keep the lookup
@@ -712,17 +713,16 @@ final class SearchState: Identifiable {
     /// same observed inputs as the former scan (`results`,
     /// `resultVersion`).
     func result(for id: UUID) -> SearchResult? {
-        if _resultIndexByIDVersion != resultVersion || _resultIndexByID == nil {
+        let index = memo(\.indexByID, key: resultVersion) {
             var map = [UUID: Int](minimumCapacity: results.count)
-            for (index, result) in results.enumerated() {
-                map[result.id] = index
+            for (position, result) in results.enumerated() {
+                map[result.id] = position
             }
-            _resultIndexByID = map
-            _resultIndexByIDVersion = resultVersion
+            return map
         }
-        if let index = _resultIndexByID?[id], index < results.count,
-           results[index].id == id {
-            return results[index]
+        if let position = index[id], position < results.count,
+           results[position].id == id {
+            return results[position]
         }
         return results.first(where: { $0.id == id })
     }
