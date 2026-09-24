@@ -304,11 +304,14 @@ enum SearchCore {
 
     // MARK: - Offset-map remap
 
-    /// The one offset-map remap: the base span of a match measured in the
-    /// searched (most-transformed) text's Character offsets. The span ends
-    /// AFTER the last matched character's base position. With no map the
-    /// offsets are already base coordinates. Returns nil for an empty or
-    /// unmappable span.
+    /// The base-coordinate span of a match measured on the searched
+    /// (most-transformed) text: `offsetMap` routes it to base coordinates
+    /// when a length-changing extension is active, ending AFTER the last
+    /// matched character's base position; nil when the map cannot cover
+    /// the span. The one remap for the preview, the OCR literal path and
+    /// `findTextMatches`, and the span `displaySlice` re-slices under the
+    /// same bound guards, so the context-window builder and the display
+    /// slice agree on when the fallback is taken.
     static func baseSpan(start: Int, length: Int, offsetMap: [Int]?) -> Range<Int>? {
         guard length > 0, start >= 0 else { return nil }
         if let map = offsetMap {
