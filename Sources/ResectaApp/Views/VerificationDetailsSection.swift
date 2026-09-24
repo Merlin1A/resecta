@@ -85,12 +85,16 @@ struct VerificationDetailsSection: View {
                     // The text column takes the width a Spacer would have
                     // taken — a Spacer costs its minimum length plus two
                     // HStack gaps and wraps the PASS summary onto two lines
-                    // at 402 pt.
+                    // at 402 pt. The summary is caption-sized: at footnote
+                    // size "5 of 5 checks passed · 2 informational notes"
+                    // needs ≈ 270 pt against the 262-pt column and wraps
+                    // (measured on the iPhone 17 simulator, 2026-09-24);
+                    // at caption size it is one line and the header 60 pt.
                     VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
                         Text("Verification Details")
                             .font(.headline)
                         Text(detailsSummary)
-                            .font(.footnote)
+                            .font(.caption)
                             .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

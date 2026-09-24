@@ -714,10 +714,10 @@ struct VerificationResultsView: View {
     /// timing line to the audit-scope note. 3 × `Spacing.xxl` = 144 pt,
     /// sized from the measured PASS layout at the default type size (the
     /// 2026-09-24 re-measure, with the Verification Details header a
-    /// 61-pt mini-card): the timing line ends ≈843 pt from the top of the
-    /// screen — ≈31 pt above the 874-pt 6.3″ fold, ≈113 pt above the
-    /// 956-pt 6.9″ one — so the note's top edge lands ≈111 pt below the
-    /// 6.3″ screen (≈29 pt below the 6.9″) — the first screen, which is the
+    /// 60-pt mini-card): the timing line ends ≈847 pt from the top of the
+    /// screen — ≈27 pt above the 874-pt 6.3″ fold, ≈109 pt above the
+    /// 956-pt 6.9″ one — so the note's top edge lands ≈117 pt below the
+    /// 6.3″ screen (≈35 pt below the 6.9″) — the first screen, which is the
     /// App Store frame, shows the verdict through the timing line and the
     /// note is one scroll away. Static so the value is pinned without a
     /// SwiftUI host (`HonestySurfacesTests`).
