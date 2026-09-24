@@ -125,4 +125,30 @@ struct SearchStateClearTests {
         state.clearResults()
         #expect(state.regexError == nil)
     }
+
+    @Test("clear() after a standing list advances runToken and resultVersion by one")
+    func clearAdvancesRunTokenOnce() {
+        let state = SearchState()
+        state.results = [SearchResult(
+            pageIndex: 0,
+            normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.05),
+            matchedText: "alpha",
+            contextSnippet: "alpha shown",
+            source: .textLayer,
+            term: "alpha"
+        )]
+        state.regexError = nil
+        let token = state.runToken
+        let version = state.resultVersion
+
+        state.clear()
+
+        // One teardown path: the session-scoped reset, then the shared
+        // result reset — which mints the next run token and bumps the
+        // version exactly once. The `regexError` observer only acts on a
+        // nil → message transition, so nilling it here re-enters nothing.
+        #expect(state.results.isEmpty)
+        #expect(state.runToken == token + 1)
+        #expect(state.resultVersion == version + 1)
+    }
 }

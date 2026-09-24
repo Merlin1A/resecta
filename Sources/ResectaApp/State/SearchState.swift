@@ -1201,67 +1201,42 @@ final class SearchState: Identifiable {
 
     // MARK: - Methods
 
+    /// Full teardown at sheet dismiss / full reset: the session-scoped
+    /// fields, then the per-run result state through the one
+    /// `clearResults()` path (which nils `regexError` too).
     func clear() {
+        clearSessionState()
+        clearResults()
+    }
+
+    /// The fields only a sheet dismiss / full reset drops — a re-run
+    /// (`clearResults()`) leaves every one of them standing: the query
+    /// and the multi-term inputs, the recall ring, the in-flight task,
+    /// the three per-sheet-session trackers (the magic-wand pre-select,
+    /// the touched-selections and unreviewed-preselection dismiss gates),
+    /// an armed-but-unconsumed auto-run (normally consumed by the
+    /// sheet's `.onAppear` before any teardown can run), the exactMatch
+    /// option (back to the default substring match), the intra-session
+    /// diff snapshot (asymmetric with `clearResults()` by design — see
+    /// `priorScanFingerprints`), the navigation scope and the pending
+    /// filter write, flushed before the session tears down.
+    private func clearSessionState() {
         queryText = ""
-        regexError = nil
-        flushTask?.cancel()
-        flushTask = nil
-        runToken += 1
-        pendingResults.removeAll()
-        results = []
-        appliedResultIDs.removeAll()
-        coveredResultIDs.removeAll()
-        appliedFilter = .all
-        resultsAtCap = false
-        currentResultIndex = nil
         isSearching = false
-        currentSearchPage = 0
-        totalPages = 0
         searchTerms = []
         recentMultiTermSets = []
         activeSearchTask?.cancel()
         activeSearchTask = nil
-        lastDoctypeExplanation = nil
-        lastCoverageReport = nil
-        pendingOverlapSuppressed = [:]
-        pendingBelowThresholdSuppressed = 0
-        regexTimeoutPages = []
-        ocrSkippedPages = []
-        capUnscannedPageCount = 0
-        hasCompletedRunSinceClear = false
-        scanStartFailed = false
-        lastRunDetectorCount = nil
-        // Drop the magic-wand pre-select flag along with all
-        // other session-scoped state so a fresh sheet session starts at
-        // the engine default selection shape.
         preselectIncomingResults = false
-        // Conditional dismiss: the touched-selections tracker is per-sheet-session.
         userModifiedSelections = false
-        // Sibling tracker, same per-sheet-session lifetime.
         hasUnreviewedPreselection = false
-        // Defensive: an armed-but-unconsumed auto-run must not leak
-        // into the next sheet session (the flag is normally consumed
-        // by the sheet's `.onAppear` before any teardown can run).
         pendingAutoRunScan = false
-        // Also reset the new exactMatch options flag so the
-        // sheet's option toggles return to the default substring match.
         options.exactMatch = false
-        // Sheet dismiss / full reset wipes the intra-session
-        // diff snapshot. Cross-session diff is deferred to V1.1+.
-        // Asymmetric with `clearResults()` by design — see
-        // `priorScanFingerprints` docstring.
         priorScanFingerprints = nil
-        // Drop any in-flight preview and reset session-scoped scope.
-        livePreviewTask?.cancel()
-        livePreviewTask = nil
-        livePreview = nil
-        livePreviewRects = []
         navigationScope = .wholeDocument
-        // Flush any pending filter write before the session tears down.
         filterFlushTask?.cancel()
         filterFlushTask = nil
         flushFilterShape()
-        resultVersion += 1
     }
 
     func cancelSearch() async {
@@ -1458,10 +1433,13 @@ final class SearchState: Identifiable {
         resultVersion += 1
     }
 
-    /// Clear results and increment version for overlay refresh.
+    /// Clear results and increment version for overlay refresh. The
+    /// shared reset runs before the error is nilled (the ruled order;
+    /// the `regexError` observer acts only on a nil → message
+    /// transition, so neither order re-enters it).
     func clearResults() {
-        regexError = nil
         clearResultState()
+        regexError = nil
     }
 
     /// Result-state clear shared by `clearResults()` and the
