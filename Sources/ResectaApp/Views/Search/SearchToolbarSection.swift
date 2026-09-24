@@ -487,24 +487,12 @@ struct SearchToolbarSection: View {
         Button {
             onTriggerSearch()
         } label: {
-            // Drawn as a Ø44 circle + 18pt glyph in place of the
-            // `.bordered` wash that rendered as a ~64pt slab. The
-            // 46pt floor is a LAYOUT frame AFTER the chrome — hit
-            // area unchanged, visual back to circle scale. States
-            // live on `CircularIconButtonStyle`.
-            Image(systemName: "arrow.clockwise")
-                .font(.system(size: CircularIconButtonStyle.glyphPointSize))
-                .foregroundStyle(.tint)
-                .frame(
-                    width: CircularIconButtonStyle.diameter,
-                    height: CircularIconButtonStyle.diameter
-                )
-                .background(CircularIconButtonStyle.wash, in: Circle())
-                .frame(
-                    width: ResectaTokens.TouchTarget.minimum,
-                    height: ResectaTokens.TouchTarget.minimum
-                )
-                .contentShape(Rectangle())
+            // The sheet's circular icon chrome — a Ø44 circle + 18pt
+            // glyph in place of the `.bordered` wash that rendered as a
+            // ~64pt slab; the 46pt floor is a LAYOUT frame AFTER the
+            // chrome (hit area unchanged, visual back to circle scale).
+            // States live on `CircularIconButtonStyle`.
+            SearchAndRedactSheet.circularIconLabel("arrow.clockwise")
         }
         .buttonStyle(.circularIcon)
         // An empty chip selection does not disable the run — it means
@@ -747,103 +735,92 @@ struct SearchToolbarSection: View {
 
     // MARK: - Applied Filter Chip
 
-    /// Applied-state filter chip — `Menu` styled to match the existing
-    /// substrate capsules (PII category chips). Tapping a Menu option
-    /// drives `searchState.appliedFilter`; the field's `didSet` invokes
+    /// Applied-state filter chip — the `menuChip` chrome over
+    /// `AppliedFilter`. Tapping a Menu option drives
+    /// `searchState.appliedFilter`; the field's `didSet` invokes
     /// `invalidateFilterCaches()` so `filteredResults` recomputes on
-    /// next read. Capsule renders accent-tinted whenever a non-`.all`
-    /// state is active. Strings classified SAFE.
-    @ViewBuilder
+    /// next read. Tinted whenever a non-`.all` state is active. Strings
+    /// classified SAFE.
     private var appliedFilterChip: some View {
         let active = searchState.appliedFilter
-        let isFiltered = active != .all
-        Menu {
-            ForEach(AppliedFilter.allCases, id: \.self) { state in
-                Button {
-                    searchState.appliedFilter = state
-                } label: {
-                    if active == state {
-                        Label(state.rawValue, systemImage: "checkmark")
-                    } else {
-                        Text(state.rawValue)
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 2) {
-                Image(systemName: "checkmark.circle")
-                    .font(.caption2)
-                Text(active.rawValue)
-                    .font(.caption2)
-            }
-            // The same padding/floor
-            // chain, matching the sibling sortChip below — 12pt h-pad,
-            // 36pt drawn minimum, then the 46pt LAYOUT floor +
-            // contentShape AFTER the background.
-            .padding(.horizontal, 12)
-            .frame(minHeight: 36)
-            .background(isFiltered ? ResectaTokens.BrandTeal.tint.opacity(0.2) : Color.clear, in: Capsule())
-            .overlay(Capsule().strokeBorder(isFiltered ? ResectaTokens.BrandTeal.tint : Color.secondary.opacity(0.3)))
-            .frame(
-                minWidth: ResectaTokens.TouchTarget.minimum,
-                minHeight: ResectaTokens.TouchTarget.minimum
-            )
-            .contentShape(Rectangle())
-        }
+        return menuChip(
+            options: AppliedFilter.allCases,
+            active: active,
+            title: active.rawValue,
+            systemImage: "checkmark.circle",
+            isTinted: active != .all
+        ) { searchState.appliedFilter = $0 }
         .accessibilityLabel(Self.appliedFilterChipAccessibilityLabel(active: active))
     }
 
     // MARK: - Sort Chip
 
-    /// Sort chip — `Menu` styled to match the chip-row substrate
-    /// capsules. Was a `Menu` inside `SearchFooterSection` previously;
-    /// migrating here puts the active sort next to the active filter
-    /// chips at the top of the result list. The chip's binding sets
-    /// `searchState.sortOrder` directly; the field's existing `didSet`
-    /// invalidates filter caches so `filteredResults` recomputes with
-    /// the new sort. Capsule renders accent-tinted whenever the user
-    /// has departed from the default `.discoveryOrder`. Sort labels
-    /// come from the existing `ResultSortOrder` rawValues — no new
-    /// strings introduced.
-    @ViewBuilder
+    /// Sort chip — the same chrome over `ResultSortOrder`. Was a `Menu`
+    /// inside `SearchFooterSection` previously; migrating here puts the
+    /// active sort next to the active filter chips at the top of the
+    /// result list. The chip's binding sets `searchState.sortOrder`
+    /// directly; the field's existing `didSet` invalidates filter caches
+    /// so `filteredResults` recomputes with the new sort. Tinted
+    /// whenever the user has departed from the default
+    /// `.discoveryOrder`. Sort labels come from the existing
+    /// `ResultSortOrder` rawValues — no new strings introduced.
     private var sortChip: some View {
         let active = searchState.sortOrder
-        let isCustomSort = active != .discoveryOrder
+        return menuChip(
+            options: ResultSortOrder.allCases,
+            active: active,
+            title: Self.sortChipLabel(active: active),
+            systemImage: "arrow.up.arrow.down",
+            isTinted: active != .discoveryOrder
+        ) { searchState.sortOrder = $0 }
+        .accessibilityLabel(Self.sortChipAccessibilityLabel(active: active))
+    }
+
+    /// One capsule `Menu` chip for the substrate, styled to match the
+    /// PII category chips: the option list (the active option carries a
+    /// checkmark), then the label — icon + title in `.caption2` — on
+    /// the FilterChip padding/floor chain: 12pt h-pad, 36pt drawn
+    /// minimum, then the 46pt LAYOUT floor + contentShape AFTER the
+    /// background, so the hit area stays at the touch-target minimum
+    /// while the capsule draws compact. The caller attaches the
+    /// accessibility label.
+    private func menuChip<Option: Hashable & RawRepresentable>(
+        options: [Option],
+        active: Option,
+        title: String,
+        systemImage: String,
+        isTinted: Bool,
+        select: @escaping (Option) -> Void
+    ) -> some View where Option.RawValue == String {
         Menu {
-            ForEach(ResultSortOrder.allCases, id: \.self) { order in
+            ForEach(options, id: \.self) { option in
                 Button {
-                    searchState.sortOrder = order
+                    select(option)
                 } label: {
-                    if active == order {
-                        Label(order.rawValue, systemImage: "checkmark")
+                    if active == option {
+                        Label(option.rawValue, systemImage: "checkmark")
                     } else {
-                        Text(order.rawValue)
+                        Text(option.rawValue)
                     }
                 }
             }
         } label: {
             HStack(spacing: 2) {
-                Image(systemName: "arrow.up.arrow.down")
+                Image(systemName: systemImage)
                     .font(.caption2)
-                Text(Self.sortChipLabel(active: active))
+                Text(title)
                     .font(.caption2)
             }
-            // The same padding/floor
-            // FilterChip chain — 12pt h-pad, 36pt drawn minimum, then
-            // the 46pt LAYOUT floor + contentShape AFTER the
-            // background, so the hit area stays at the touch-target
-            // minimum while the capsule draws compact.
             .padding(.horizontal, 12)
             .frame(minHeight: 36)
-            .background(isCustomSort ? ResectaTokens.BrandTeal.tint.opacity(0.2) : Color.clear, in: Capsule())
-            .overlay(Capsule().strokeBorder(isCustomSort ? ResectaTokens.BrandTeal.tint : Color.secondary.opacity(0.3)))
+            .background(isTinted ? ResectaTokens.BrandTeal.tint.opacity(0.2) : Color.clear, in: Capsule())
+            .overlay(Capsule().strokeBorder(isTinted ? ResectaTokens.BrandTeal.tint : Color.secondary.opacity(0.3)))
             .frame(
                 minWidth: ResectaTokens.TouchTarget.minimum,
                 minHeight: ResectaTokens.TouchTarget.minimum
             )
             .contentShape(Rectangle())
         }
-        .accessibilityLabel(Self.sortChipAccessibilityLabel(active: active))
     }
 
     // MARK: - PII Category Filter Chips (Post-Scan)

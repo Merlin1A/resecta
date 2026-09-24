@@ -555,62 +555,47 @@ struct SearchAndRedactSheet: View {
             }
         }
         // Mode switch cleanup: clear stale results and mode-specific state.
-        // User-initiated transitions clear;
+        // The steps come from the one table (`modeSwitchPlan`, pinned by
+        // `ModeSwitchPlanTests`) and are applied here, in order, inside
+        // this same single handler. User-initiated transitions clear;
         // programmatic transitions (e.g. saved-search recall) set
         // `searchState.isProgrammaticModeChange = true` briefly to
         // preserve applied markers + filter chips. Today every transition
-        // is user-initiated, so the gate is always taken.
+        // is user-initiated, so the clearing steps are always planned.
         .onChange(of: searchState.searchModeType) { oldMode, newMode in
-            // Snapshot BEFORE `clearResults()` so the undo toast can
-            // restore the session (reset-after-check ordering). The
-            // unapplied-count is likewise read against the LIVE
-            // results array.
             let isProgrammatic = searchState.isProgrammaticModeChange
-            let snapshot = Self.modeSwitchSnapshot(of: searchState, previousMode: oldMode)
+            let plan = Self.modeSwitchPlan(
+                from: oldMode, to: newMode, programmatic: isProgrammatic)
+            // Snapshot BEFORE the plan's clear so the undo toast can
+            // restore the session (reset-after-check ordering). The
+            // unapplied count is likewise read against the LIVE results.
+            let snapshot = Self.modeSwitchSnapshot(
+                of: searchState, previousMode: plan.previousMode)
             let unappliedCount = Self.unappliedMatchCount(in: searchState)
-            if !isProgrammatic {
-                // Belt: no user-initiated mode/interface change may
-                // leave an in-flight scan running — an orphaned task
-                // would keep appending into the new mode's list and its
-                // completion tail would record a false run outcome. The
-                // pickers gate on `isSearching`, so this is
-                // defense-in-depth for any future un-gated write.
-                // (Programmatic recall skips this: its own
-                // `triggerSearch()` cancels-and-awaits the prior task.)
-                searchState.cancelSearchWithoutAwait()
-                // `clearResults()` already drops `appliedResultIDs` —
-                // no separate `removeAll()` here.
-                searchState.clearResults()
-                searchState.piiCategoryFilter = nil
-                searchState.sortOrder = .discoveryOrder
-                // Post-clear undo toast replaces the former pre-clear
-                // warning; fires whenever the clear dropped results —
-                // including the all-applied case that used to clear
-                // silently (pack 01 carve-out B).
-                Self.enqueueModeSwitchUndoToast(
-                    on: toastManager,
-                    redactionState: redactionState,
-                    snapshot: snapshot,
-                    isProgrammatic: isProgrammatic,
-                    unappliedCount: unappliedCount
-                )
-            }
-            // Reset the programmatic flag AFTER the gated
-            // branch so the next programmatic transition starts from
-            // `false` and a fresh user transition still defaults to `false`.
-            searchState.isProgrammaticModeChange = false
-            // Drop the previous mode's preview counters on EVERY user
-            // transition: the "Matches this page … Total …" row
-            // otherwise sits beside the new mode's empty state right
-            // after a switch. No immediate reschedule — the persisted
-            // query would repopulate the row before the user has
-            // interacted with the new mode; the `queryText` onChange
-            // below re-schedules on the first edit.
-            // Programmatic transitions (saved-search recall) keep the
-            // pre-existing schedule so recall still previews immediately.
-            searchState.clearLivePreview()
-            if newMode != .piiScan && isProgrammatic {
-                scheduleLivePreviewIfApplicable()
+            for step in plan.steps {
+                switch step {
+                case .cancelSearchWithoutAwait:
+                    searchState.cancelSearchWithoutAwait()
+                case .clearResults:
+                    searchState.clearResults()
+                case .resetFilters:
+                    searchState.piiCategoryFilter = nil
+                    searchState.sortOrder = .discoveryOrder
+                case .enqueueUndoToast:
+                    Self.enqueueModeSwitchUndoToast(
+                        on: toastManager,
+                        redactionState: redactionState,
+                        snapshot: snapshot,
+                        isProgrammatic: isProgrammatic,
+                        unappliedCount: unappliedCount
+                    )
+                case .resetProgrammaticFlag:
+                    searchState.isProgrammaticModeChange = false
+                case .clearLivePreview:
+                    searchState.clearLivePreview()
+                case .scheduleLivePreview:
+                    scheduleLivePreviewIfApplicable()
+                }
             }
         }
         // Clear stale applied markers when regions change (undo/redo), but
@@ -897,14 +882,15 @@ struct SearchAndRedactSheet: View {
         .padding(.vertical, ResectaTokens.Spacing.sm)
     }
 
-    /// Shared label chrome for this sheet's circular icon buttons — an
+    /// Shared label chrome for the sheet's circular icon buttons (the
+    /// toolbar section's `rescanButton` draws through it too) — an
     /// 18pt SF glyph in a drawn Ø44 circle whose wash is matched by eye
     /// to the retired `.bordered`-small background, floored to the
     /// `TouchTarget.minimum` LAYOUT square with the floor AFTER the
     /// chrome (hit area unchanged, visual back to circle scale; hit
     /// expansion beyond the layout frame is banned).
     /// Interaction states live on `CircularIconButtonStyle`.
-    private func circularIconLabel(_ systemName: String) -> some View {
+    static func circularIconLabel(_ systemName: String) -> some View {
         Image(systemName: systemName)
             .font(.system(size: CircularIconButtonStyle.glyphPointSize))
             .foregroundStyle(.tint)
@@ -934,7 +920,7 @@ struct SearchAndRedactSheet: View {
             // Drawn Ø44 circle + 18pt glyph in place of the
             // `.bordered` wash that rendered the touch-target floor as
             // a ~64pt slab; hit area unchanged.
-            circularIconLabel("bookmark")
+            Self.circularIconLabel("bookmark")
         }
         .buttonStyle(.circularIcon)
         .disabled(redactionState.pendingTriage != nil)
@@ -960,7 +946,7 @@ struct SearchAndRedactSheet: View {
             // SearchToolbarSection.rescanButton; identifier matches
             // that sibling since the two are mutually exclusive (only
             // one renders per `scanCategoryStripEnabled` state).
-            circularIconLabel("arrow.clockwise")
+            Self.circularIconLabel("arrow.clockwise")
         }
         .buttonStyle(.circularIcon)
         .disabled(searchState.isSearching)
@@ -1056,7 +1042,7 @@ struct SearchAndRedactSheet: View {
                     searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
                     navigateToCurrentResult(dropToCompact: true)
                 } label: {
-                    circularIconLabel("chevron.up")
+                    Self.circularIconLabel("chevron.up")
                 }
                 .accessibilityLabel("Previous result")
                 .accessibilityIdentifier("resultNavPrevious")
@@ -1066,7 +1052,7 @@ struct SearchAndRedactSheet: View {
                     searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
                     navigateToCurrentResult(dropToCompact: true)
                 } label: {
-                    circularIconLabel("chevron.down")
+                    Self.circularIconLabel("chevron.down")
                 }
                 .accessibilityLabel("Next result")
                 .accessibilityIdentifier("resultNavNext")

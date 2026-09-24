@@ -80,38 +80,16 @@ extension SearchAndRedactSheet {
             || !documentState.canMutateRegions
     }
 
-    /// One result, by id, through the one `applyFindings` seam — the
-    /// Apply Group wiring shape with the toolbar Apply's bookkeeping.
-    /// The id is captured BEFORE the await (the walk or a
-    /// re-flush can move `currentResult` while the apply waits its
-    /// turn; the seam resolves the id against the live results and
-    /// refuses a stale one with zero mutations). On success the
-    /// survivors join the applied set and the dedup-covered ids
-    /// the graying set, then the toast through the
-    /// one `CommitFeedback` builder. Focus does not move. `isApplying`
-    /// is the sheet-wide one-apply-at-a-time flag the toolbar and
-    /// shortcut paths share; the mutation guard is re-checked inside
-    /// the seam.
+    /// One result, by id, through the one search-origin apply
+    /// (`applySearchSelection`): the id is captured BEFORE the await
+    /// (the walk or a re-flush can move `currentResult` while the apply
+    /// waits its turn; the seam resolves the id against the live results
+    /// and refuses a stale one with zero mutations). On success the
+    /// survivors join the applied set and the dedup-covered ids the
+    /// graying set, then the toast through the one `CommitFeedback`
+    /// builder. Focus does not move and the page does not navigate.
     private func applyCurrentResult() {
-        guard !isApplying else { return }
-        guard documentState.canMutateRegions else { return }
         guard let id = searchState.currentResult?.id else { return }
-        isApplying = true
-        Task { @MainActor in
-            defer { isApplying = false }
-            guard let outcome = await redactionState.applyFindings(
-                .searchResult(id: id),
-                undoManager: undoManager,
-                documentState: documentState
-            ) else { return }
-            searchState.appliedResultIDs.formUnion(outcome.appliedResultIDs)
-            searchState.coveredResultIDs.formUnion(outcome.coveredResultIDs)
-            if let message = CommitFeedback.markedMessage(
-                applied: outcome.applied,
-                alreadyCovered: outcome.skippedOverlaps
-            ) {
-                toastManager.enqueue(message, severity: .success)
-            }
-        }
+        applySearchSelection(origin: .searchResult(id: id), navigateToFirst: false)
     }
 }

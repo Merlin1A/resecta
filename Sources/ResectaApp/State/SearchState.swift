@@ -291,11 +291,9 @@ final class SearchState: Identifiable {
 
     /// Drop the session's filter caches. Called from the local didSet
     /// paths above when the inputs that key `_FilterCacheKey` change.
+    /// The id→index map keys on `resultVersion` alone and survives.
     func invalidateFilterCaches() {
-        _filteredResultsCache = nil
-        _resultsByPageCache = nil
-        _resultsByTermCache = nil
-        _resultsByCategoryCache = nil
+        _filterCache.invalidateFilters()
     }
 
     // MARK: - Diagnostics
@@ -593,41 +591,21 @@ final class SearchState: Identifiable {
     private(set) var capUnscannedPageCount: Int = 0
 
     /// All results after source/confidence/category filters applied.
-    /// Cached and invalidated on resultVersion change or filter change (P3).
+    /// Memoized on the filter shape; recomputed on a resultVersion
+    /// change or a filter change (P3).
     var filteredResults: [SearchResult] {
-        let cacheKey = _currentCacheKey
-        if _filteredResultsCacheKey == cacheKey, let cached = _filteredResultsCache {
-            return cached
-        }
-        let filtered = applyFilters(to: results)
-        _filteredResultsCache = filtered
-        _filteredResultsCacheKey = cacheKey
-        return filtered
+        memo(\.filtered) { applyFilters(to: results) }
     }
 
     /// Results grouped by page, with source/confidence filters applied.
-    /// Cached and invalidated on resultVersion change or filter change (P3).
+    /// Memoized on the filter shape (P3).
     var resultsByPage: [Int: [SearchResult]] {
-        let cacheKey = _currentCacheKey
-        if _resultsByPageCacheKey == cacheKey, let cached = _resultsByPageCache {
-            return cached
-        }
-        let grouped = Dictionary(grouping: filteredResults, by: \.pageIndex)
-        _resultsByPageCache = grouped
-        _resultsByPageCacheKey = cacheKey
-        return grouped
+        memo(\.byPage) { Dictionary(grouping: filteredResults, by: \.pageIndex) }
     }
 
     /// U3: Results grouped by search term, with filters applied.
     var resultsByTerm: [String: [SearchResult]] {
-        let cacheKey = _currentCacheKey
-        if _resultsByTermCacheKey == cacheKey, let cached = _resultsByTermCache {
-            return cached
-        }
-        let grouped = Dictionary(grouping: filteredResults, by: \.term)
-        _resultsByTermCache = grouped
-        _resultsByTermCacheKey = cacheKey
-        return grouped
+        memo(\.byTerm) { Dictionary(grouping: filteredResults, by: \.term) }
     }
 
     /// Filtered result count (respects source/confidence filters).
@@ -655,15 +633,10 @@ final class SearchState: Identifiable {
 
     /// Results grouped by PII category, with filters applied.
     var resultsByCategory: [PIICategory: [SearchResult]] {
-        let cacheKey = _currentCacheKey
-        if _resultsByCategoryCacheKey == cacheKey, let cached = _resultsByCategoryCache {
-            return cached
+        memo(\.byCategory) {
+            let piiOnly = filteredResults.filter { $0.piiCategory != nil }
+            return Dictionary(grouping: piiOnly, by: { $0.piiCategory! })
         }
-        let piiOnly = filteredResults.filter { $0.piiCategory != nil }
-        let grouped = Dictionary(grouping: piiOnly, by: { $0.piiCategory! })
-        _resultsByCategoryCache = grouped
-        _resultsByCategoryCacheKey = cacheKey
-        return grouped
     }
 
     /// Counts of results per PII category (for badge display).
@@ -676,33 +649,61 @@ final class SearchState: Identifiable {
         results.contains { $0.piiCategory != nil }
     }
 
-    // @ObservationIgnored: these are memoization internals, not view state.
-    // The grouping getters above WRITE them mid-body-evaluation; if the macro
-    // wraps them, that write re-enters the ObservationRegistrar during List
-    // body evaluation and trips AG::precondition_failure (SIGABRT — the
-    // Mark-for-Redaction crash). View updates still flow through the observed
-    // inputs: `results`/`resultVersion` and every field of `_currentCacheKey`,
-    // all of which the getters read on every access.
-    @ObservationIgnored private var _filteredResultsCache: [SearchResult]?
-    @ObservationIgnored private var _filteredResultsCacheKey: _FilterCacheKey?
-    @ObservationIgnored private var _resultsByPageCache: [Int: [SearchResult]]?
-    @ObservationIgnored private var _resultsByPageCacheKey: _FilterCacheKey?
-    @ObservationIgnored private var _resultsByTermCache: [String: [SearchResult]]?
-    @ObservationIgnored private var _resultsByTermCacheKey: _FilterCacheKey?
-    @ObservationIgnored private var _resultsByCategoryCache: [PIICategory: [SearchResult]]?
-    @ObservationIgnored private var _resultsByCategoryCacheKey: _FilterCacheKey?
+    // @ObservationIgnored: the memo store is a memoization internal, not
+    // view state. The getters WRITE it mid-body-evaluation; if the macro
+    // wrapped it, that write would re-enter the ObservationRegistrar
+    // during List body evaluation and trip AG::precondition_failure
+    // (SIGABRT — the Mark-for-Redaction crash). A plain struct stored on
+    // this class, never a child `@Observable`. View updates still flow
+    // through the observed inputs: `results`/`resultVersion` and every
+    // field of `_currentCacheKey`, all read by the getters on every access.
+    @ObservationIgnored private var _filterCache = FilterCache()
 
-    // O(1) id→index map backing `result(for:)` — the
-    // results list's per-row binding get previously linear-scanned
-    // `results` ~7-8× per row body, on every mounted row, on every
-    // scroll-time section invalidation. Same memoization shape as the
-    // filter caches above (@ObservationIgnored — the getter writes
-    // mid-body-evaluation); keyed on `resultVersion` alone: every
-    // in-app `results` mutation bumps it (`clear` /
-    // `flushPendingResults` / `clearResultState`), and in-place
-    // `isSelected` writes never move indices.
-    @ObservationIgnored private var _resultIndexByID: [UUID: Int]?
-    @ObservationIgnored private var _resultIndexByIDVersion: Int?
+    private struct FilterCache {
+        /// One memoized value, valid while its key still matches.
+        struct Slot<Key: Equatable, Value> {
+            private var key: Key?
+            private var value: Value?
+            func value(for key: Key) -> Value? { self.key == key ? value : nil }
+            mutating func store(_ value: Value, for key: Key) { (self.key, self.value) = (key, value) }
+        }
+        var filtered = Slot<_FilterCacheKey, [SearchResult]>()
+        var byPage = Slot<_FilterCacheKey, [Int: [SearchResult]]>()
+        var byTerm = Slot<_FilterCacheKey, [String: [SearchResult]]>()
+        var byCategory = Slot<_FilterCacheKey, [PIICategory: [SearchResult]]>()
+        /// The O(1) id→index map behind `result(for:)` (the per-row
+        /// binding get previously linear-scanned `results` ~7-8× per row
+        /// body). Keyed on `resultVersion` alone: every in-app `results`
+        /// mutation bumps it, and in-place `isSelected` writes never
+        /// move indices.
+        var indexByID = Slot<Int, [UUID: Int]>()
+
+        /// Drop the four filter slots; the id map keys on the version.
+        mutating func invalidateFilters() { self = FilterCache(indexByID: indexByID) }
+    }
+
+    /// One slot read: a hit on `key` returns the stored value; a miss
+    /// builds, stores and returns it. The build runs BETWEEN the read
+    /// and the write of `_filterCache` — never inside an access to it —
+    /// because a grouping build reads `filteredResults`, itself a slot.
+    private func memo<Key: Equatable, Value>(
+        _ slot: WritableKeyPath<FilterCache, FilterCache.Slot<Key, Value>>,
+        key: Key,
+        _ build: () -> Value
+    ) -> Value {
+        if let hit = _filterCache[keyPath: slot].value(for: key) { return hit }
+        let built = build()
+        _filterCache[keyPath: slot].store(built, for: key)
+        return built
+    }
+
+    /// The filter-shape slots, keyed on `_currentCacheKey`.
+    private func memo<Value>(
+        _ slot: WritableKeyPath<FilterCache, FilterCache.Slot<_FilterCacheKey, Value>>,
+        _ build: () -> Value
+    ) -> Value {
+        memo(slot, key: _currentCacheKey, build)
+    }
 
     /// Live result lookup by ID — O(1) through the version-keyed index
     /// map. The id re-check plus the linear rescue keep the lookup
@@ -712,17 +713,16 @@ final class SearchState: Identifiable {
     /// same observed inputs as the former scan (`results`,
     /// `resultVersion`).
     func result(for id: UUID) -> SearchResult? {
-        if _resultIndexByIDVersion != resultVersion || _resultIndexByID == nil {
+        let index = memo(\.indexByID, key: resultVersion) {
             var map = [UUID: Int](minimumCapacity: results.count)
-            for (index, result) in results.enumerated() {
-                map[result.id] = index
+            for (position, result) in results.enumerated() {
+                map[result.id] = position
             }
-            _resultIndexByID = map
-            _resultIndexByIDVersion = resultVersion
+            return map
         }
-        if let index = _resultIndexByID?[id], index < results.count,
-           results[index].id == id {
-            return results[index]
+        if let position = index[id], position < results.count,
+           results[position].id == id {
+            return results[position]
         }
         return results.first(where: { $0.id == id })
     }
@@ -1201,67 +1201,42 @@ final class SearchState: Identifiable {
 
     // MARK: - Methods
 
+    /// Full teardown at sheet dismiss / full reset: the session-scoped
+    /// fields, then the per-run result state through the one
+    /// `clearResults()` path (which nils `regexError` too).
     func clear() {
+        clearSessionState()
+        clearResults()
+    }
+
+    /// The fields only a sheet dismiss / full reset drops — a re-run
+    /// (`clearResults()`) leaves every one of them standing: the query
+    /// and the multi-term inputs, the recall ring, the in-flight task,
+    /// the three per-sheet-session trackers (the magic-wand pre-select,
+    /// the touched-selections and unreviewed-preselection dismiss gates),
+    /// an armed-but-unconsumed auto-run (normally consumed by the
+    /// sheet's `.onAppear` before any teardown can run), the exactMatch
+    /// option (back to the default substring match), the intra-session
+    /// diff snapshot (asymmetric with `clearResults()` by design — see
+    /// `priorScanFingerprints`), the navigation scope and the pending
+    /// filter write, flushed before the session tears down.
+    private func clearSessionState() {
         queryText = ""
-        regexError = nil
-        flushTask?.cancel()
-        flushTask = nil
-        runToken += 1
-        pendingResults.removeAll()
-        results = []
-        appliedResultIDs.removeAll()
-        coveredResultIDs.removeAll()
-        appliedFilter = .all
-        resultsAtCap = false
-        currentResultIndex = nil
         isSearching = false
-        currentSearchPage = 0
-        totalPages = 0
         searchTerms = []
         recentMultiTermSets = []
         activeSearchTask?.cancel()
         activeSearchTask = nil
-        lastDoctypeExplanation = nil
-        lastCoverageReport = nil
-        pendingOverlapSuppressed = [:]
-        pendingBelowThresholdSuppressed = 0
-        regexTimeoutPages = []
-        ocrSkippedPages = []
-        capUnscannedPageCount = 0
-        hasCompletedRunSinceClear = false
-        scanStartFailed = false
-        lastRunDetectorCount = nil
-        // Drop the magic-wand pre-select flag along with all
-        // other session-scoped state so a fresh sheet session starts at
-        // the engine default selection shape.
         preselectIncomingResults = false
-        // Conditional dismiss: the touched-selections tracker is per-sheet-session.
         userModifiedSelections = false
-        // Sibling tracker, same per-sheet-session lifetime.
         hasUnreviewedPreselection = false
-        // Defensive: an armed-but-unconsumed auto-run must not leak
-        // into the next sheet session (the flag is normally consumed
-        // by the sheet's `.onAppear` before any teardown can run).
         pendingAutoRunScan = false
-        // Also reset the new exactMatch options flag so the
-        // sheet's option toggles return to the default substring match.
         options.exactMatch = false
-        // Sheet dismiss / full reset wipes the intra-session
-        // diff snapshot. Cross-session diff is deferred to V1.1+.
-        // Asymmetric with `clearResults()` by design — see
-        // `priorScanFingerprints` docstring.
         priorScanFingerprints = nil
-        // Drop any in-flight preview and reset session-scoped scope.
-        livePreviewTask?.cancel()
-        livePreviewTask = nil
-        livePreview = nil
-        livePreviewRects = []
         navigationScope = .wholeDocument
-        // Flush any pending filter write before the session tears down.
         filterFlushTask?.cancel()
         filterFlushTask = nil
         flushFilterShape()
-        resultVersion += 1
     }
 
     func cancelSearch() async {
@@ -1458,10 +1433,13 @@ final class SearchState: Identifiable {
         resultVersion += 1
     }
 
-    /// Clear results and increment version for overlay refresh.
+    /// Clear results and increment version for overlay refresh. The
+    /// shared reset runs before the error is nilled (the ruled order;
+    /// the `regexError` observer acts only on a nil → message
+    /// transition, so neither order re-enters it).
     func clearResults() {
-        regexError = nil
         clearResultState()
+        regexError = nil
     }
 
     /// Result-state clear shared by `clearResults()` and the
@@ -1509,82 +1487,4 @@ final class SearchState: Identifiable {
         livePreviewRects = []
         resultVersion += 1
     }
-}
-
-/// UI selector for search mode (simpler than SearchMode enum for picker).
-/// `Codable` conformance is consumed by `SavedSearchStore`.
-/// rawValues are stable wire identifiers (persistence + launch-arg
-/// mapping), deliberately decoupled from the user-facing strings so a
-/// display rename can never invalidate persisted data. Wire values are
-/// frozen; display strings live in `displayName` only.
-enum SearchModeType: String, CaseIterable, Sendable, Codable {
-    case text = "text"
-    case regex = "regex"
-    case multiTerm = "multiTerm"
-    case piiScan = "scan"
-
-    /// User-facing name. Display-only — never persisted, never compared
-    /// against stored data.
-    var displayName: String {
-        switch self {
-        case .text: "Text"
-        case .regex: "Regex"
-        case .multiTerm: "Multi-term"
-        case .piiScan: "Scan"
-        }
-    }
-
-    /// Which of the sheet's two peer interfaces this mode belongs to.
-    /// The scan mode IS the Scan interface's machinery; text / regex /
-    /// multi-term are the Search interface's second-level modes. The
-    /// interface is a pure derivation — mode carries interface
-    /// identity, so persistence, launch args, and saved-search recall
-    /// need no second field.
-    var interface: SearchInterface {
-        self == .piiScan ? .scan : .search
-    }
-}
-
-/// The sheet's top-level interface pair: one chassis, two peer
-/// interfaces — Scan (detector-driven) and Search (literal matching).
-/// Display-only UI selector — never persisted (the mode's wire value
-/// carries interface identity).
-enum SearchInterface: Equatable, Sendable {
-    case scan
-    case search
-
-    /// Per-interface navigation titles.
-    var displayName: String {
-        switch self {
-        case .scan: "Scan"
-        case .search: "Search"
-        }
-    }
-}
-
-/// Source type filter for search results.
-/// `Codable` conformance is consumed by `SavedSearchStore`.
-/// Case renames are migration events.
-enum SourceFilter: String, CaseIterable, Sendable, Codable {
-    case all = "All"
-    case textOnly = "Text"
-    case ocrOnly = "OCR"
-}
-
-/// Post-scan filter that hides applied or unapplied results.
-/// `Codable` conformance is consumed by `SavedSearchStore`.
-/// Case renames are migration events.
-enum AppliedFilter: String, CaseIterable, Sendable, Codable {
-    case all = "All"
-    case applied = "Applied"
-    case unapplied = "Unapplied"
-}
-
-/// Sort order for search results.
-/// `Codable` conformance is consumed by `SavedSearchStore`.
-/// Case renames are migration events.
-enum ResultSortOrder: String, CaseIterable, Sendable, Codable {
-    case discoveryOrder = "Default"
-    case confidenceDescending = "Confidence"
-    case pageAscending = "Page"
 }
