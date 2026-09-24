@@ -4,7 +4,7 @@
 
 [![Download on the App Store](https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1786492800)](https://apps.apple.com/us/app/resecta/id6786922787)
 
-On-device iOS 26 PDF and image redaction. Free, open-source, zero data collection — all processing happens on your device.
+On-device iOS 26 PDF redaction. Free, open-source, zero data collection — all processing happens on your device.
 
 **App Store:** [apps.apple.com/us/app/resecta/id6786922787](https://apps.apple.com/us/app/resecta/id6786922787) · **Website:** [resecta.app](https://resecta.app)
 
@@ -18,7 +18,7 @@ Every pull request builds the app and both test bundles, runs the audit and clai
 
 ## What it is
 
-Resecta is a focused PDF and image redaction tool that operates entirely on your device. It is designed for anyone who needs to remove sensitive regions from PDFs or images before sharing them. The app makes no network requests of its own, does not create accounts, and does not collect analytics or telemetry.
+Resecta is a focused PDF redaction tool that operates entirely on your device. It is designed for anyone who needs to remove sensitive regions from PDFs before sharing them. The app makes no network requests of its own, does not create accounts, and does not collect analytics or telemetry.
 
 ## What it does
 
@@ -26,7 +26,7 @@ The core workflow is:
 
 **Import → View → Mark → Apply → Verify → Export**
 
-1. **Import** a PDF or image from Files, Photos, or drag-and-drop.
+1. **Import** a PDF from Files, or open the bundled sample document.
 2. **View** pages and navigate the document.
 3. **Mark** regions for redaction by drawing rectangles, or by selecting and applying results from Scan (on-device text detection) or Search (text, pattern, and multi-term matching).
 4. **Apply** redaction. Each affected page is rasterized — vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer in marked regions. Source document metadata (author, editing history, etc.) is stripped; the rebuilt file carries a producer tag that Resecta replaces with a fixed value ("Resecta", identifying neither the operating system version nor the build), plus the writer's creation/modification timestamps, rewritten to a fixed date, so the export is not metadata-free — see [`PRIVACY.md`](./PRIVACY.md).
@@ -46,7 +46,7 @@ The end-to-end pipeline. The chosen export mode selects the verification pass:
 
 ```mermaid
 flowchart LR
-  A[Import PDF or image] --> B[View]
+  A[Import PDF] --> B[View]
   B --> C[Mark: scan, search, or draw regions]
   C --> D[Apply: rasterize / flatten / strip metadata]
   D --> E{Export mode}
