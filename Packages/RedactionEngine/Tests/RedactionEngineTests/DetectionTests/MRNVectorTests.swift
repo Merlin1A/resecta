@@ -43,7 +43,7 @@ struct MRNVectorTests {
 
     @Test("At least one inline MRN pattern matches every valid row's text")
     func inlineRegexMatchesValidRows() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "mrn_test_vectors.json not bundled")
         let patterns = [
             MRNDetector.mrnPatternLabeled,
             MRNDetector.mrnPatternPatientID,

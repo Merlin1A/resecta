@@ -88,11 +88,7 @@ struct AddressComponentsRecallTests {
 
     @Test("Aggregate address-heavy subset city-recall ≥ pre-cutover baseline (gated on fixture)")
     func aggregateAddressRecall() throws {
-        let corpus = try loadCorpus()
-        guard let corpus else {
-            print("[address-recall] g8_corpus.json not bundled; test skipped until `make install-assets` runs.")
-            return
-        }
+        let corpus = try #require(try loadCorpus(), "g8_corpus.json not bundled")
         let gazetteer = try AddressComponentsGazetteer()
 
         let stats = computeStats(corpus: corpus, gazetteer: gazetteer, doctypeFilter: nil)
@@ -122,11 +118,7 @@ struct AddressComponentsRecallTests {
 
     @Test("Per-stratum city-recall ≥ pre-cutover baseline (gated on fixture)")
     func perStratumAddressRecall() throws {
-        let corpus = try loadCorpus()
-        guard let corpus else {
-            print("[address-recall] g8_corpus.json not bundled; test skipped until `make install-assets` runs.")
-            return
-        }
+        let corpus = try #require(try loadCorpus(), "g8_corpus.json not bundled")
         let gazetteer = try AddressComponentsGazetteer()
 
         let strata: [(String, Int, Double)] = [

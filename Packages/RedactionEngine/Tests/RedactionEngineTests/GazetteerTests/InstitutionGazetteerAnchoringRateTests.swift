@@ -71,11 +71,7 @@ struct InstitutionGazetteerAnchoringRateTests {
 
     @Test("FOIA stratum anchoring-rate ≥ pre-cutover baseline (gated on fixture)")
     func foiaAnchoringRate() throws {
-        let corpus = try loadCorpus()
-        guard let corpus else {
-            print("[anchoring-rate] g8_corpus.json not bundled; test skipped until `make install-assets` runs.")
-            return
-        }
+        let corpus = try #require(try loadCorpus(), "g8_corpus.json not bundled")
         let gazetteer = try InstitutionGazetteer()
 
         let stats = computeStats(
@@ -113,11 +109,7 @@ struct InstitutionGazetteerAnchoringRateTests {
 
     @Test("Medical stratum anchoring-rate ≥ pre-cutover baseline (gated on fixture)")
     func medicalAnchoringRate() throws {
-        let corpus = try loadCorpus()
-        guard let corpus else {
-            print("[anchoring-rate] g8_corpus.json not bundled; test skipped until `make install-assets` runs.")
-            return
-        }
+        let corpus = try #require(try loadCorpus(), "g8_corpus.json not bundled")
         let gazetteer = try InstitutionGazetteer()
 
         let stats = computeStats(

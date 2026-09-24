@@ -42,7 +42,7 @@ struct EINVectorTests {
 
     @Test("Detector surfaces every valid EIN and rejects every invalid one")
     func detectorRespectsValidFlag() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "ein_vectors.json not bundled")
         let detector = PIIDetector()
         for vec in vectors {
             let ns = vec.ein as NSString

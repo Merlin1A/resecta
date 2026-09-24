@@ -52,7 +52,7 @@ struct PreviewFullParityCensusTests {
     @Test("Census over the T3.1 bank (skips when the env is unset)")
     func census() async throws {
         guard let out = Self.censusOut(), SearchGroundTruthRunnerTests.queriesPath() != nil else {
-            print("[preview-census] RESECTA_PREVIEW_CENSUS_OUT / RESECTA_SEARCH_QUERIES unset; skipped")
+            TestGate.skip("RESECTA_PREVIEW_CENSUS_OUT / RESECTA_SEARCH_QUERIES unset — the census was not requested")
             return
         }
         let outURL = URL(fileURLWithPath: out)

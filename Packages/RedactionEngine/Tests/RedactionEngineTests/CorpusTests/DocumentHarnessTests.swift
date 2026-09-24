@@ -328,7 +328,7 @@ struct DocumentHarnessTests {
     @Test("Emit Site-B document baselines over the T1.4 manifest")
     func emitDocumentBaselines() async throws {
         guard let out = Self.docsOut() else {
-            print("[H1.2] RESECTA_DOCS_OUT not set; document harness skipped.")
+            TestGate.skip("[H1.2] RESECTA_DOCS_OUT unset — the document harness emitter was not requested")
             return
         }
         let root = Self.docsRoot()

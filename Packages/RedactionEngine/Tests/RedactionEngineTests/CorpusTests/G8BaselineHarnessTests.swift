@@ -494,11 +494,7 @@ struct G8BaselineHarnessTests {
 
     @Test("Emit G8 baseline cells + raw scores")
     func emitBaseline() async throws {
-        guard let corpus = try Self.loadBaselineCorpus() else {
-            print("[detection-baseline] g8_corpus.json not bundled; emit skipped " +
-                  "until `make install-assets` runs.")
-            return
-        }
+        let corpus = try #require(try Self.loadBaselineCorpus(), "g8_corpus.json not bundled")
 
         let detector = PIIDetector()
         let sortedDocs = corpus.documents.sorted { $0.id < $1.id }

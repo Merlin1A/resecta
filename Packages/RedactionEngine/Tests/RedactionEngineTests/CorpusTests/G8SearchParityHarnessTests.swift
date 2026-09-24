@@ -223,14 +223,8 @@ struct G8SearchParityHarnessTests {
     /// Tests-only, additive; never touches the frozen Site-A baseline files.
     @Test("Site-B BEFORE/AFTER: w=0 identity control + composed AFTER + recall floor")
     func searchParitySiteBBeforeAfter() async throws {
-        guard let corpus = try G8BaselineHarnessTests.loadBaselineCorpus() else {
-            print("[site-b-before-after] g8_corpus.json not bundled; Site-B BEFORE/AFTER skipped.")
-            return
-        }
-        guard let vector = Self.balancedVector() else {
-            print("[site-b-before-after] balanced preset vector unavailable; skipped.")
-            return
-        }
+        let corpus = try #require(try G8BaselineHarnessTests.loadBaselineCorpus(), "g8_corpus.json not bundled")
+        let vector = try #require(Self.balancedVector(), "balanced preset vector not bundled")
         let sortedDocs = corpus.documents.sorted { $0.id < $1.id }
         let installed = ContextScorerWeights.loadFromEngineBundle()
         let families = ContextFeatureContract.scoredFamilyWireNames.sorted()
@@ -367,15 +361,8 @@ struct G8SearchParityHarnessTests {
 
     @Test("H1.1 — emit Site-B G8 baseline trio (product semantics)")
     func emitSiteBBaseline() async throws {
-        guard let corpus = try G8BaselineHarnessTests.loadBaselineCorpus() else {
-            print("[H1.1 siteB baseline] g8_corpus.json not bundled; emit skipped " +
-                  "until `make install-assets` runs.")
-            return
-        }
-        guard let vector = Self.balancedVector() else {
-            print("[H1.1 siteB baseline] balanced preset vector unavailable; skipped.")
-            return
-        }
+        let corpus = try #require(try G8BaselineHarnessTests.loadBaselineCorpus(), "g8_corpus.json not bundled")
+        let vector = try #require(Self.balancedVector(), "balanced preset vector not bundled")
 
         let detector = PIIDetector()
         let sortedDocs = corpus.documents.sorted { $0.id < $1.id }

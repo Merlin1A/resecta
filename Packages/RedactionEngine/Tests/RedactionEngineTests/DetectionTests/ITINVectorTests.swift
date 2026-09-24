@@ -44,7 +44,7 @@ struct ITINVectorTests {
 
     @Test("Detector surfaces every valid ITIN and rejects every invalid one")
     func detectorRespectsValidFlag() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "itin_vectors.json not bundled")
         let detector = PIIDetector()
         for vec in vectors {
             let ns = vec.itin as NSString

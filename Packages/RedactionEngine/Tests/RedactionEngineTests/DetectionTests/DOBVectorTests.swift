@@ -43,7 +43,7 @@ struct DOBVectorTests {
 
     @Test("Inline dobPattern matches every valid row's text")
     func inlineRegexMatchesValidRows() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "dob_vectors.json not bundled")
         for vec in vectors where vec.valid {
             let ns = vec.text as NSString
             let count = DOBDetector.dobPattern.numberOfMatches(

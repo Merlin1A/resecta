@@ -36,7 +36,7 @@ struct CorpusInputDumpTests {
     @Test("Dump every H2.2 input document by doc id")
     func dumpCorpusInputs() async throws {
         guard let out = Self.dumpOut() else {
-            print("[DUMP] RESECTA_INPUT_DUMP_OUT not set; corpus input dump skipped.")
+            TestGate.skip("RESECTA_INPUT_DUMP_OUT unset — the corpus input dump was not requested")
             return
         }
         let root = VerificationCorpusRunnerTests.docsRoot()

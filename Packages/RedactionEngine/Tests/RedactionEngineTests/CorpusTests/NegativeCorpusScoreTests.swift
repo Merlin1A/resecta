@@ -66,11 +66,7 @@ struct NegativeCorpusScoreTests {
 
     @Test("Emit negative-corpus document FP counts")
     func scoreNegativeCorpus() async throws {
-        guard let corpus = try Self.loadNegativeCorpus() else {
-            print("[negcorpus] negative_corpus.json not bundled; emit skipped " +
-                  "until the Python generator + install-assets run.")
-            return
-        }
+        let corpus = try #require(try Self.loadNegativeCorpus(), "negative_corpus.json not bundled")
 
         let detector = PIIDetector()
         let sortedDocs = corpus.documents.sorted { $0.id < $1.id }

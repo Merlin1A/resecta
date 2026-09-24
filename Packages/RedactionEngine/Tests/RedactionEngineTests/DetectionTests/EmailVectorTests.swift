@@ -42,7 +42,7 @@ struct EmailVectorTests {
 
     @Test("Inline emailPattern matches every valid row")
     func inlineRegexMatchesValidRows() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "email_test_vectors.json not bundled")
         for vec in vectors where vec.valid {
             let ns = vec.email as NSString
             let count = EmailDetector.emailPattern.numberOfMatches(

@@ -26,9 +26,8 @@ import Foundation
 @Suite("Name first-pass inventory-support gate (the pair with common-word curation)")
 struct NameSupportGateTests {
 
-    private static func skipNER(_ test: String) {
-        print("[NLTagger gate] .nameType NER asset unavailable on this runtime; "
-              + "skipping \(test) (harness pin = iOS 26.4).")
+    private static func skipNER(_ test: String, sourceLocation: SourceLocation = #_sourceLocation) {
+        TestGate.skip("[NLTagger gate] .nameType NER asset unavailable on this runtime; skipping \(test) (harness pin = iOS 26.4).", sourceLocation: sourceLocation)
     }
 
     private static func goldenFilter() throws -> BloomFilter {

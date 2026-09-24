@@ -158,21 +158,17 @@ struct BloomFilterFPRTests {
     @Test(
         "Surname Bloom membership FPR — report-only (curated asset, own bar)"
     )
-    func surnameFPR() {
+    func surnameFPR() throws {
         // NameGazetteer loads via Bundle.module resolved in the engine's
         // module context, so this reads production Resources/Gazetteers/
         // regardless of where the test bundle sits.
-        guard let gazetteer = NameGazetteer() else {
-            print("[FPR gate] NameGazetteer resources absent; skipped until `make install-assets` runs.")
-            return
-        }
+        let gazetteer = try #require(NameGazetteer(), "production gazetteers not bundled")
 
         let filter = gazetteer.surnameFilter
         let productionNThreshold: UInt64 = 10_000
         guard filter.rowCount >= productionNThreshold else {
             // Scaffold state (small n). No meaningful FPR measurement possible.
-            print("[FPR gate] surname filter n=\(filter.rowCount) (scaffold). " +
-                  "Skipping FPR report until production asset is installed.")
+            TestGate.skip("surname filter rowCount=\(filter.rowCount) (scaffold) — production asset not installed")
             return
         }
 
@@ -220,11 +216,7 @@ struct BloomFilterFPRTests {
 
     @Test("Measure name-Bloom membership FPR (surname + given) — emitter")
     func measureNameBloomMembershipFPR() throws {
-        guard let gazetteer = NameGazetteer() else {
-            print("[bloom-fpr] NameGazetteer resources absent; emit skipped " +
-                  "until `make install-assets` runs.")
-            return
-        }
+        let gazetteer = try #require(NameGazetteer(), "production gazetteers not bundled")
 
         let samples = Self.nonNames
         #expect(!samples.isEmpty)

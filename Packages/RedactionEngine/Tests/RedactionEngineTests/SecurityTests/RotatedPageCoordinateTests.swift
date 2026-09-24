@@ -112,14 +112,12 @@ struct RotatedPageCoordinateTests {
 
     // --- PDFSelection.bounds coordinate frame with /Rotate ---
     @Test("PDFSelection bounds in correct coordinate frame with /Rotate")
-    func pdfSelectionBoundsCoordinateFrame() {
+    func pdfSelectionBoundsCoordinateFrame() throws {
         let doc = makeTextPDFDocument(rotation: 90)
         let page = doc.page(at: 0)!
         let rawBounds = page.bounds(for: .cropBox)
-        guard let pageString = page.string, !pageString.isEmpty else {
-            // Rotated text PDF may not have extractable text via raw PDF streams
-            return
-        }
+        let pageString = try #require(page.string, "rotated text page has no extractable text")
+        try #require(!pageString.isEmpty)
         let firstCharSel = page.selection(for: NSRange(location: 0, length: 1))
         if let bounds = firstCharSel?.bounds(for: page) {
             let inBounds = bounds.maxX <= rawBounds.width + rawBounds.origin.x + 1

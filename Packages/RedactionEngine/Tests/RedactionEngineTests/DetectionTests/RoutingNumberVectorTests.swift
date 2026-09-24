@@ -44,7 +44,7 @@ struct RoutingNumberVectorTests {
 
     @Test("Detector agrees with every fixture vector")
     func detectorRespectsValidFlag() throws {
-        guard let vectors = try loadVectors() else { return }
+        let vectors = try #require(try loadVectors(), "routing_number_vectors.json not bundled")
         let detector = RoutingNumberDetector()
         for vec in vectors {
             // Compose the probe text exactly as the fixture describes:

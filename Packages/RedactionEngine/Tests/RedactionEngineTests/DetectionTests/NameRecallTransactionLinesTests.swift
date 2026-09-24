@@ -43,9 +43,8 @@ struct NameRecallTransactionLinesTests {
         PIIDetector.isNameNERAvailable()
     }
 
-    private static func skipNER(_ test: String) {
-        print("[NLTagger gate] .nameType NER asset unavailable on this runtime; "
-              + "skipping \(test) (harness pin = iOS 26.4).")
+    private static func skipNER(_ test: String, sourceLocation: SourceLocation = #_sourceLocation) {
+        TestGate.skip("[NLTagger gate] .nameType NER asset unavailable on this runtime; skipping \(test) (harness pin = iOS 26.4).", sourceLocation: sourceLocation)
     }
 
     /// Every occurrence of `word` in `text` as an NSRange.
@@ -172,14 +171,11 @@ struct NameRecallTransactionLinesTests {
         // macOS tooling destination: the host NLTagger name model differs
         // from the pinned iOS 26.4 runtime and misses some variants; this
         // recall battery is iOS-normative.
-        print("[macOS tooling] b1RecallTransactionVariants: iOS-normative; skipping.")
+        TestGate.skip("[macOS tooling] b1RecallTransactionVariants: iOS-normative; skipping.")
         return
         #else
         guard Self.nerAvailable() else { Self.skipNER(#function); return }
-        guard NameGazetteer() != nil else {
-            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
-            return
-        }
+        _ = try #require(NameGazetteer(), "production gazetteers not bundled")
         let detector = PIIDetector()
         let names = detector.families.name.detect(in: line).filter { $0.kind == .name }
 
@@ -200,10 +196,7 @@ struct NameRecallTransactionLinesTests {
     @Test("Same name at three offsets yields three distinct ranges")
     func b2SameNameThreeOffsetsYieldsThreeRanges() throws {
         guard Self.nerAvailable() else { Self.skipNER(#function); return }
-        guard NameGazetteer() != nil else {
-            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
-            return
-        }
+        _ = try #require(NameGazetteer(), "production gazetteers not bundled")
         let page = """
             INDN:DELIA HARTWELL CO ID:1364419872
             INDN:DELIA HARTWELL CO ID:2200457810
@@ -237,10 +230,7 @@ struct NameRecallTransactionLinesTests {
     @Test("Emitted ranges resolve to the original ALL-CAPS text")
     func rangeMapsToOriginalAllCapsText() throws {
         guard Self.nerAvailable() else { Self.skipNER(#function); return }
-        guard NameGazetteer() != nil else {
-            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
-            return
-        }
+        _ = try #require(NameGazetteer(), "production gazetteers not bundled")
         let line = "INDN:DELIA HARTWELL CO ID:1364419872"
         let ns = line as NSString
         let detector = PIIDetector()
@@ -262,10 +252,7 @@ struct NameRecallTransactionLinesTests {
     @Test("Strict shadow pass still suppresses unknown-cast candidates")
     func strictShadowPassStillSuppressesUnknownCast() throws {
         guard Self.nerAvailable() else { Self.skipNER(#function); return }
-        guard let gazetteer = NameGazetteer() else {
-            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
-            return
-        }
+        let gazetteer = try #require(NameGazetteer(), "production gazetteers not bundled")
         // 'korrin' / 'sablebrook' are in neither the surname nor the
         // given-name source list (fictional cast, verified against the
         // datapipeline ingest caches).
@@ -287,10 +274,7 @@ struct NameRecallTransactionLinesTests {
     @Test("Given-name-only candidate surfaces via the given bloom")
     func givenNameOnlyCandidateSurfacesViaGivenBloom() throws {
         guard Self.nerAvailable() else { Self.skipNER(#function); return }
-        guard NameGazetteer() != nil else {
-            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
-            return
-        }
+        _ = try #require(NameGazetteer(), "production gazetteers not bundled")
         // 'katelyn': SSA given-name list yes; census surname list no
         // (verified against the datapipeline ingest caches).
         let line = "INDN:KATELYN HARTWELL CO ID:1364419872"
@@ -318,10 +302,7 @@ struct NameRecallTransactionLinesTests {
     @Test("Packet ACH page: name occurrences anchor per-occurrence")
     func packetACHPageNameMeasurement() async throws {
         guard Self.nerAvailable() else { Self.skipNER(#function); return }
-        guard NameGazetteer() != nil else {
-            print("[name-gazetteer gate] bundle missing; skipping bundled test.")
-            return
-        }
+        _ = try #require(NameGazetteer(), "production gazetteers not bundled")
         let data = try TestFixtures.loanPacketPDF()
         let document = try #require(PDFDocument(data: data))
         let page = try #require(document.page(at: 8))

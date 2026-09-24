@@ -187,10 +187,7 @@ struct NameCommonWordsTests {
 
     @Test("Production inventory: list members the surname filter carries are demoted, never stripped")
     func productionMembersDemoted() throws {
-        guard let g = NameGazetteer() else {
-            print("[common-words] NameGazetteer resources absent; skipped until `make install-assets` runs.")
-            return
-        }
+        let g = try #require(NameGazetteer(), "production gazetteers not bundled")
         let words = try NameCommonWords()
         let members = words.entries.filter { g.surnameFilter.contains($0) }.sorted()
         print("[common-words] production surname-filter membership of the list: \(members.count)/\(words.count)")

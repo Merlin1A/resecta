@@ -386,7 +386,7 @@ struct PipelineCoordinatorParityEmitterTests {
         guard let out = Self.env("RESECTA_PARITY_OUT"),
               let cellsRoot = Self.env("RESECTA_PARITY_CELLS"),
               let docs = Self.env("RESECTA_PARITY_DOCS") else {
-            print("[PARITY] RESECTA_PARITY_OUT / _CELLS / _DOCS not all set; coordinator parity emitter skipped.")
+            TestGate.skip("[PARITY] RESECTA_PARITY_OUT / _CELLS / _DOCS not all set — the coordinator parity emitter was not requested")
             return
         }
         let only: Set<String>? = Self.env("RESECTA_PARITY_ONLY_DOCS").map {
