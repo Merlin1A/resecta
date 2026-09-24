@@ -15,7 +15,7 @@ import RedactionEngine
 // `let` becomes MainActor-isolated, which the nonisolated callers cannot touch; pin
 // it nonisolated to restore the pre-flip cross-isolation access (signposting is
 // thread-safe).
-nonisolated private let detectionRasterizeSignposter = OSSignposter(
+nonisolated let detectionRasterizeSignposter = OSSignposter(
     subsystem: "com.resecta.app", category: "DetectionRasterize"
 )
 
@@ -107,7 +107,7 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// Intermediate data produced by processDocument() and consumed by
     /// runVerification(). Scoped to a single pipeline run — not stored
     /// as coordinator state.
-    private struct PipelineRunContext {
+    struct PipelineRunContext: Sendable {
         let outputURL: URL
         let filterDigests: [PageFilterDigest?]
         let perPageModes: [PipelineMode]
@@ -283,224 +283,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         } else {
             effectiveMode = documentOverride ?? runSettings.pipelineMode
         }
-        // nonisolated(unsafe): @Observable prevents Sendable; Task captures self
-        // implicitly. Safe because all access is on MainActor (UndoManager pattern).
-        nonisolated(unsafe) let coordinator = self
-        // Stamp this run with a UUID owned by the Task.
-        // The defer / error-recovery guards below only mutate state when
-        // the active run still matches — so an older Task's late error
-        // recovery cannot clear a newer run's outputURL / activePipelineTask.
-        let runId = UUID()
-        documentState.activeRunId = runId
-        documentState.activePipelineTask = Task {
-            defer {
-                // Only clear the active task/run if this Task still
-                // owns the active run. A newer Task started by the user (via
-                // Stop → Redact) has already overwritten activeRunId; in that
-                // case leave its state alone.
-                if coordinator.documentState.activeRunId == runId {
-                    coordinator.documentState.activePipelineTask = nil
-                    coordinator.documentState.activeRunId = nil
-                }
-            }
-
-            // Stage marker for the generic error handler below: false until
-            // `processDocument` returns, so a non-PipelineError throw can be
-            // attributed to the redaction stage vs. the verification stage.
-            // The published `outputURL` cannot serve as that discriminator —
-            // it is registered eagerly, BEFORE `processDocument` runs.
-            var redactionSucceeded = false
-            do {
-                coordinator.documentState.lastUsedPipelineMode = effectiveMode
-                let pages = coordinator.buildPDFPageData(
-                    effectiveMode: effectiveMode, runSettings: runSettings)
-                let sensitiveTerms = coordinator.collectSensitiveTerms()
-                // The applied searches, read at the same point and from the
-                // same present-region set: the Search Re-check re-runs
-                // exactly the queries whose regions this run redacts.
-                let appliedSearches = coordinator.collectAppliedSearches()
-
-                // Capture the run's deselection facts at run entry,
-                // before any pipeline work. The value is recorded onto
-                // RedactionState only after `processDocument` returns
-                // (beside `recordLastRunInputs`), but reading it HERE pins
-                // the counts the user saw when they pressed Redact — a
-                // programmatic or user re-selection during `.redacting` /
-                // `.verifying` cannot drift what the results screen reports.
-                // `runEntryDeselectionSnapshot()` prefers the
-                // apply-commit snapshot (set at the moment the user last
-                // applied selected search results, even if the sheet has
-                // since dismissed and nil'd `activeSearch`) and falls back
-                // to the live search session's snapshot — nil only when
-                // neither source has one (no apply this document session
-                // and no live PII-scan session at run entry).
-                let deselectionSnapshot =
-                    coordinator.redactionState.runEntryDeselectionSnapshot()
-
-                // Sub-threshold guard — no pages with effective redactions
-                guard !pages.allSatisfy({ $0.regions.isEmpty }) else { return }
-
-                // Route all session temp writes through the
-                // backup-excluded per-session subdirectory. childURL throws
-                // on directory-creation failure (e.g., disk full); the
-                // outer error path wraps unknown throws as .redactionError.
-                let outputURL = try coordinator.tempExportDirectory.childURL(
-                    named: "redacted_\(UUID().uuidString).pdf")
-
-                // Register `outputURL` on `redactionState` BEFORE
-                // the `processDocument` → `replaceItemAt` race window. If the
-                // pipeline throws (cancellation, reconstruction failure) after
-                // `replaceItemAt` has already promoted the file but before this
-                // closure completes, the error-recovery blocks below call
-                // `clearOutput()`, which reads the published `outputURL` and
-                // removes the file from disk. Setting the URL eagerly closes
-                // the leak where a post-rename failure would otherwise orphan
-                // the file in the per-session temp subdirectory until
-                // tear-down.
-                //
-                // Orphan hygiene: if a previous run's output is still
-                // registered, clear it (which also removes its file from
-                // disk) before registering this run's URL — a bare
-                // re-assignment would overwrite the published URL and orphan
-                // the prior file until the next-launch sweep.
-                if coordinator.redactionState.outputURL != nil {
-                    coordinator.redactionState.clearOutput()
-                }
-                coordinator.redactionState.outputURL = outputURL
-
-                // --- Rasterization + Reconstruction ---
-                coordinator.documentState.transition(to: .redacting(
-                    progress: .init(currentPage: 0, totalPages: pages.count,
-                                    currentStep: "Starting\u{2026}")
-                ))
-
-                let runContext = try await coordinator.processDocument(
-                    pages, outputURL: outputURL,
-                    sensitiveTerms: sensitiveTerms,
-                    appliedSearches: appliedSearches)
-                redactionSucceeded = true
-
-                // Re-apply `.complete` to the promoted output URL.
-                // `replaceItemAt` rewrites the protection class of the
-                // destination, so the engine-side `.complete` on the temp
-                // file does not survive the rename. Best-effort: errors are
-                // non-fatal — a failure here leaves the file at the
-                // filesystem default, which is no worse than the prior
-                // contract.
-                try? TempFileHardening.applyProtection(outputURL, level: .complete)
-
-                // `outputURL` was already registered above. The
-                // explicit re-assignment here is intentional: if a redactionState
-                // mutation occurred between the eager register and `processDocument`
-                // returning, we restore the canonical published value. Idempotent.
-                coordinator.redactionState.outputURL = outputURL
-                coordinator.redactionState.clearTextExtractionBuffer()
-                // Retain the run's verification inputs beside the output so
-                // a verify-only re-run checks the terms the
-                // artifact was built with and reports the true per-page
-                // modes, instead of re-synthesizing both (see
-                // RedactionState.lastRunPerPageModes).
-                coordinator.redactionState.recordLastRunInputs(
-                    perPageModes: runContext.perPageModes,
-                    perPageFallbackReasons: runContext.perPageFallbackReasons,
-                    sensitiveTerms: runContext.sensitiveTerms,
-                    appliedSearches: runContext.appliedSearches)
-                // Record the run-entry deselection snapshot beside the run
-                // inputs (nil clears a previous run's record). Cleared with
-                // the output in `clearOutput()`.
-                coordinator.redactionState.recordLastRunDeselection(
-                    deselectionSnapshot)
-
-                // --- Verification ---
-                // Paranoid-mode override #2: paranoid
-                // mode forces verification to run on every export. The
-                // settings toggle is also UI-disabled while paranoid is on
-                // (see SettingsView), so this branch is the runtime
-                // counterpart of that constraint.
-                //
-                // Read from the run-entry snapshot so a mid-run
-                // SettingsView toggle of `autoVerify` cannot divert the
-                // verify-or-skip decision after the run is already in flight.
-                let verifyForRun =
-                    runSettings.paranoidMode
-                    || runSettings.autoVerify
-                if verifyForRun {
-                    try await coordinator.runVerification(
-                        runContext: runContext, effectiveMode: effectiveMode)
-                } else {
-                    coordinator.documentState.transition(to: .verified(report: .skipped))
-                    coordinator.redactionState.markVerificationCurrent()
-                }
-
-            } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
-                // Only mutate cancellation state if this
-                // Task still owns the active run. After Stop → restart, the
-                // older Task's CancellationError must NOT clear the newer
-                // run's outputURL or override its phase transition.
-                //
-                // Hop to the MainActor before touching
-                // @Observable state. A thrown CancellationError can resume this
-                // handler OFF the MainActor (a Task.detached intermediate breaks
-                // the actor-inheritance chain — see the general-error handler
-                // sibling's real-doc crash backtrace in runDetectionPipeline). The
-                // run-ownership guard moves inside the hop so it, too, reads
-                // MainActor state on the MainActor. `MainActor.assertIsolated()`
-                // is the canary — a CI trap if the hop is ever removed.
-                // Transition table unchanged (threading context only).
-                await MainActor.run {
-                    MainActor.assertIsolated()
-                    guard coordinator.documentState.activeRunId == runId else { return }
-                    // cancelActivePipeline() already handled cleanup and transition.
-                    if coordinator.documentState.phaseKind != .editing
-                        && coordinator.documentState.phaseKind != .verified {
-                        coordinator.redactionState.clearOutput()
-                        coordinator.documentState.transition(to: .editing)
-                    }
-                }
-            } catch { // LegalPhrases:safe (Swift keyword)
-                // Classify by the FAILING STAGE, not by outputURL presence.
-                // `outputURL` registers eagerly (before
-                // `processDocument`), so a non-nil URL no longer means
-                // "redaction succeeded" — every throw after run start sees it
-                // set. A redaction/import-stage error means the output was
-                // never promoted (`replaceItemAt` never ran); discard the
-                // dangling registration and return to the editor. A
-                // verification-stage error leaves a valid promoted output;
-                // keep it and return to the skipped-report screen.
-                let stage = Self.classifyPipelineFailure(
-                    error, redactionSucceeded: redactionSucceeded)
-                // MainActor.run: a thrown error can resume this handler OFF the
-                // MainActor (the same off-main-resume mechanism the
-                // cancellation sibling above and runDetectionPipeline's
-                // general handler already hop for), so hop back before
-                // touching @Observable state. The run-ownership guard moves
-                // inside the hop so it, too, reads MainActor state on the
-                // MainActor. Transition table unchanged (threading context
-                // only).
-                await MainActor.run {
-                    // Same UUID guard as the cancellation path —
-                    // a late recovery from a superseded run must not stomp the
-                    // newer run's state.
-                    guard coordinator.documentState.activeRunId == runId else { return }
-                    if stage == .verification {
-                        // Verification crashed, but redacted output is VALID.
-                        coordinator.documentState.transition(to: .failed(
-                            error: error as? PipelineError
-                                ?? .verificationError(.engineCrash(layerIndex: 0)),
-                            returnPhase: .verified(report: .skipped(reason: .error))
-                        ))
-                    } else {
-                        // Redaction failed — discard partial output
-                        coordinator.redactionState.clearOutput()
-                        coordinator.documentState.transition(to: .failed(
-                            error: error as? PipelineError
-                                ?? .redactionError(.reconstructionFailed),
-                            returnPhase: .editing
-                        ))
-                    }
-                }
-            }
-        }
+        launch(.full(effectiveMode: effectiveMode, runSettings: runSettings))
     }
 
     // MARK: - Verify-Only Re-Run
@@ -542,112 +325,277 @@ final class PipelineCoordinator: @unchecked Sendable {
             )
         ))
 
+        launch(.verifyOnly(outputURL: outputURL, effectiveMode: effectiveMode))
+    }
+
+    // MARK: - Launch
+
+    /// How a run ended early: the two error-handler shapes of the scaffolds.
+    enum PipelineRunEnd {
+        case cancelled
+        case failed(any Error, stage: PipelineFailureStage)
+    }
+
+    /// The state change a run's early end drives — the transitions the
+    /// three scaffolds' recovery handlers made, one case per shape.
+    enum PipelineRunRecovery {
+        /// Nothing to drive (a superseded run, or a phase already settled
+        /// by `cancelActivePipeline()`).
+        case none
+        /// `.editing`, optionally discarding the registered output first.
+        case returnToEditing(clearOutput: Bool)
+        /// `.verified(report: .skipped(reason: .cancelled))`.
+        case verifiedSkippedCancelled
+        /// `.failed(error:returnPhase:)`, optionally discarding the
+        /// registered output first.
+        case failed(PipelineError, returnPhase: DocumentState.ReturnPhase, clearOutput: Bool)
+        /// `degradeDetectionToEditing()`.
+        case degradeDetection
+    }
+
+    /// The recovery table: today's transitions per kind and end, exactly.
+    /// Pure so the table is unit-testable without a live run; `phaseKind`
+    /// is the phase read INSIDE the MainActor hop after the run-ownership
+    /// guard (the cancel shapes only transition from a still-running
+    /// phase — `cancelActivePipeline()` already handled cleanup and the
+    /// transition when the user pressed Stop).
+    static func recovery(
+        for kind: PipelineRunKind, after end: PipelineRunEnd,
+        phaseKind: DocumentState.PhaseKind
+    ) -> PipelineRunRecovery {
+        switch (kind, end) {
+        case (.full, .cancelled):
+            return phaseKind != .editing && phaseKind != .verified
+                ? .returnToEditing(clearOutput: true) : .none
+        case (.verifyOnly, .cancelled):
+            return phaseKind != .editing && phaseKind != .verified
+                ? .verifiedSkippedCancelled : .none
+        case (.detection, .cancelled):
+            return phaseKind != .editing ? .returnToEditing(clearOutput: false) : .none
+        case (.full, .failed(let error, let stage)):
+            // Classify by the FAILING STAGE, not by outputURL presence.
+            // A redaction/import-stage error means the output was never
+            // promoted (`replaceItemAt` never ran); discard the dangling
+            // registration and return to the editor. A verification-stage
+            // error leaves a valid promoted output; keep it and return to
+            // the skipped-report screen.
+            if stage == .verification {
+                return .failed(
+                    error as? PipelineError
+                        ?? .verificationError(.engineCrash(layerIndex: 0)),
+                    returnPhase: .verified(report: .skipped(reason: .error)),
+                    clearOutput: false)
+            }
+            return .failed(
+                error as? PipelineError ?? .redactionError(.reconstructionFailed),
+                returnPhase: .editing,
+                clearOutput: true)
+        case (.verifyOnly, .failed(let error, _)):
+            // Re-verify crashed, but the redacted output remains valid.
+            // Surface as a failure that returns the user to the skipped
+            // state (matching the full run).
+            return .failed(
+                error as? PipelineError
+                    ?? .verificationError(.engineCrash(layerIndex: 0)),
+                returnPhase: .verified(report: .skipped(reason: .error)),
+                clearOutput: false)
+        case (.detection, .failed):
+            // Graceful degradation: a detection/render error (notably the
+            // page-0 rasterize failing on a platform that can't service
+            // Vision/Core Graphics, e.g. the Simulator) returns to a safe
+            // `.editing` state with a mechanism-description toast.
+            return .degradeDetection
+        }
+    }
+
+    /// The one launch path behind the three entry points: mint the run
+    /// token, create the run `Task` from the MainActor, hand the run to
+    /// `PipelineRunner` with this coordinator as its event sink, and drive
+    /// the recovery table when the run ends early.
+    private func launch(_ kind: PipelineRunKind) {
         // nonisolated(unsafe): @Observable prevents Sendable; Task captures self
-        // implicitly. Safe because all access is on MainActor (same pattern as runFullPipeline).
+        // implicitly. Safe because all access is on MainActor (UndoManager pattern).
         nonisolated(unsafe) let coordinator = self
-        // Stamp this verify-only run with a UUID
-        // owned by the Task, exactly as runFullPipeline / runDetectionPipeline
-        // do. Without the stamp the defer below was unconditional and could
-        // nil a SUCCESSOR run's activePipelineTask after a cancel → restart
-        // (the older verify Task's late defer firing over the new run).
+        // Stamp this run with a UUID owned by the Task.
+        // The defer / error-recovery guards below only mutate state when
+        // the active run still matches — so an older Task's late error
+        // recovery cannot clear a newer run's outputURL / activePipelineTask.
         let runId = UUID()
         documentState.activeRunId = runId
         documentState.activePipelineTask = Task {
             defer {
                 // Only clear the active task/run if this Task still
-                // owns the active run — a newer run (Stop → Redact) has
-                // overwritten activeRunId and must be left intact.
+                // owns the active run. A newer Task started by the user (via
+                // Stop → Redact) has already overwritten activeRunId; in that
+                // case leave its state alone.
                 if coordinator.documentState.activeRunId == runId {
                     coordinator.documentState.activePipelineTask = nil
                     coordinator.documentState.activeRunId = nil
                 }
             }
-
             do {
-                // Prefer the retained inputs of the run that produced the
-                // output (recorded beside `outputURL` when `processDocument`
-                // returned): the terms snapshot keeps the re-verify checking
-                // what the artifact was built with even if regions changed
-                // since, and the retained mode array preserves a mixed run's
-                // per-page fallback record in the report. Fall back to
-                // re-synthesis when absent (resumed old session).
-                let sensitiveTerms = coordinator.redactionState.lastRunSensitiveTerms
-                    ?? coordinator.collectSensitiveTerms()
-                // Same retention contract for the Search Re-check requests:
-                // the retained set when the run recorded one, else the same
-                // derivation from the live audit (nothing is persisted; no
-                // relaunch-restore path exists to consume a serialized copy).
-                let appliedSearches = coordinator.redactionState.lastRunAppliedSearches
-                    ?? coordinator.collectAppliedSearches()
-                let pageCount = coordinator.documentState.pageCount
-                // Per-page rasterize artifacts are not available on this
-                // path; sandwich layers detect missing entries and skip.
-                // Digests stay all-nil even with retained inputs — they
-                // cannot be rebuilt from the output PDF, by design.
-                let filterDigests: [PageFilterDigest?] = Array(
-                    repeating: nil, count: pageCount)
-                let perPageModes: [PipelineMode] = coordinator.redactionState
-                    .lastRunPerPageModes
-                    ?? Array(repeating: effectiveMode, count: pageCount)
-                // Same retention contract as the mode array — the
-                // retained reasons preserve a mixed run's fallback record on
-                // re-verify; the all-nil synthesis matches the digest
-                // fallback (per-page rasterize artifacts are unavailable).
-                let perPageFallbackReasons: [TextLayerDetector.FallbackReason?] =
-                    coordinator.redactionState.lastRunPerPageFallbackReasons
-                    ?? Array(repeating: nil, count: pageCount)
-
-                let runContext = PipelineRunContext(
-                    outputURL: outputURL,
-                    filterDigests: filterDigests,
-                    perPageModes: perPageModes,
-                    perPageFallbackReasons: perPageFallbackReasons,
-                    sensitiveTerms: sensitiveTerms,
-                    appliedSearches: appliedSearches
-                )
-
-                try await coordinator.runVerification(
-                    runContext: runContext, effectiveMode: effectiveMode)
+                let runner = PipelineRunner(
+                    coordinator: coordinator, sink: { coordinator.apply($0) })
+                _ = try await runner.run(kind: kind)
             } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
-                // cancelActivePipeline() already drove the transition.
-                //
-                // MainActor hop — see the runFullPipeline
-                // CancellationError handler for the off-main-resume rationale.
-                // `MainActor.assertIsolated()` is the canary. Transition
-                // table unchanged (threading context only).
+                // Hop to the MainActor before touching @Observable state. A
+                // thrown CancellationError can resume this handler OFF the
+                // MainActor (a Task.detached intermediate breaks the
+                // actor-inheritance chain — see the general handler's
+                // real-doc crash backtrace). The run-ownership guard moves
+                // inside the hop so it, too, reads MainActor state on the
+                // MainActor. `MainActor.assertIsolated()` is the canary — a
+                // CI trap if the hop is ever removed. Transition table
+                // unchanged (threading context only).
                 await MainActor.run {
                     MainActor.assertIsolated()
-                    // A superseded run must not drive a
-                    // transition over a newer run's state.
+                    // Only mutate cancellation state if this Task still owns
+                    // the active run. After Stop → restart, the older Task's
+                    // CancellationError must NOT clear the newer run's
+                    // outputURL or override its phase transition.
                     guard coordinator.documentState.activeRunId == runId else { return }
-                    if coordinator.documentState.phaseKind != .editing
-                        && coordinator.documentState.phaseKind != .verified {
-                        coordinator.documentState.transition(
-                            to: .verified(report: .skipped(reason: .cancelled)))
-                    }
+                    coordinator.apply(recovery: Self.recovery(
+                        for: kind, after: .cancelled,
+                        phaseKind: coordinator.documentState.phaseKind))
                 }
             } catch { // LegalPhrases:safe (Swift keyword)
-                // MainActor.run: the same off-main-resume hop as the
-                // cancellation sibling above and runFullPipeline's general
-                // handler — a thrown error can resume this handler OFF the
-                // MainActor, so hop back before touching @Observable state;
-                // the run-ownership guard moves inside the hop. Transition
-                // table unchanged (threading context only).
+                let failure = error as? PipelineRunFailure
+                let underlying = failure?.underlying ?? error
+                let stage = Self.classifyPipelineFailure(
+                    underlying, redactionSucceeded: failure?.redactionSucceeded ?? false)
+                // MainActor.run: a thrown error can resume this handler OFF the
+                // MainActor — the real-doc crash backtrace shows it on
+                // com.apple.root.user-initiated-qos.cooperative — so hop back
+                // before touching MainActor-isolated state or the toast queue.
+                // The run-ownership guard moves inside the hop so it, too,
+                // reads MainActor state on the MainActor.
                 await MainActor.run {
-                    // Same UUID guard as the cancellation
-                    // path — a late recovery from a superseded run must not
-                    // stomp the newer run's state.
+                    // Same UUID guard as the cancellation path — a late
+                    // recovery from a superseded run must not stomp the
+                    // newer run's state.
                     guard coordinator.documentState.activeRunId == runId else { return }
-                    // Re-verify crashed, but the redacted
-                    // output remains valid. Surface as a failure that returns
-                    // the user to the skipped state (matching runFullPipeline).
-                    coordinator.documentState.transition(to: .failed(
-                        error: error as? PipelineError
-                            ?? .verificationError(.engineCrash(layerIndex: 0)),
-                        returnPhase: .verified(report: .skipped(reason: .error))
-                    ))
+                    coordinator.apply(recovery: Self.recovery(
+                        for: kind, after: .failed(underlying, stage: stage),
+                        phaseKind: coordinator.documentState.phaseKind))
                 }
             }
+        }
+    }
+
+    /// Drive one recovery from the table.
+    func apply(recovery: PipelineRunRecovery) {
+        switch recovery {
+        case .none:
+            break
+        case .returnToEditing(let clearOutput):
+            if clearOutput { redactionState.clearOutput() }
+            documentState.transition(to: .editing)
+        case .verifiedSkippedCancelled:
+            documentState.transition(
+                to: .verified(report: .skipped(reason: .cancelled)))
+        case .failed(let error, let returnPhase, let clearOutput):
+            if clearOutput { redactionState.clearOutput() }
+            documentState.transition(to: .failed(error: error, returnPhase: returnPhase))
+        case .degradeDetection:
+            degradeDetectionToEditing()
+        }
+    }
+
+    // MARK: - Run events (the MainActor adapter)
+
+    /// Apply one `PipelineRunEvent`: the state writes, transitions, toasts
+    /// and announcements a run causes, in the order the runner reports
+    /// them. Synchronous and MainActor-isolated, so the runner's next
+    /// statement observes the write.
+    func apply(_ event: PipelineRunEvent) {
+        switch event {
+        case .phase(let phase):
+            documentState.transition(to: phase)
+        case .announce(let announcement):
+            UIAccessibility.post(notification: .announcement, argument: announcement)
+        case .runStarted(let effectiveMode):
+            documentState.lastUsedPipelineMode = effectiveMode
+        case .outputRegistered(let outputURL):
+            // Orphan hygiene: if a previous run's output is still
+            // registered, clear it (which also removes its file from
+            // disk) before registering this run's URL — a bare
+            // re-assignment would overwrite the published URL and orphan
+            // the prior file until the next-launch sweep.
+            if redactionState.outputURL != nil {
+                redactionState.clearOutput()
+            }
+            redactionState.outputURL = outputURL
+        case .redactionFinished(let outputURL, let runContext, let deselection):
+            // `outputURL` was already registered. The explicit
+            // re-assignment here is intentional: if a redactionState
+            // mutation occurred between the eager register and
+            // `processDocument` returning, we restore the canonical
+            // published value. Idempotent.
+            redactionState.outputURL = outputURL
+            redactionState.clearTextExtractionBuffer()
+            // Retain the run's verification inputs beside the output so
+            // a verify-only re-run checks the terms the artifact was built
+            // with and reports the true per-page modes, instead of
+            // re-synthesizing both (see RedactionState.lastRunPerPageModes).
+            redactionState.recordLastRunInputs(
+                perPageModes: runContext.perPageModes,
+                perPageFallbackReasons: runContext.perPageFallbackReasons,
+                sensitiveTerms: runContext.sensitiveTerms,
+                appliedSearches: runContext.appliedSearches)
+            // Record the run-entry deselection snapshot beside the run
+            // inputs (nil clears a previous run's record). Cleared with
+            // the output in `clearOutput()`.
+            redactionState.recordLastRunDeselection(deselection)
+        case .verificationSkipped:
+            documentState.transition(to: .verified(report: .skipped))
+            redactionState.markVerificationCurrent()
+        case .verified(let report):
+            documentState.transition(to: .verified(report: report))
+            redactionState.markVerificationCurrent()
+        case .gazetteerDiagnostics(let diagnostics):
+            surfaceGazetteerLoadDiagnostics(diagnostics)
+        case .detectionBootstrapFailed:
+            degradeDetectionToEditing()
+        case .detectionFinished(let detection):
+            // Write to state only after all pages succeed
+            redactionState.detectionResults = detection.results
+            redactionState.pageDiagnostics = detection.diagnostics
+            redactionState.ocrPixelCapSkippedPages = detection.ocrPixelCapSkippedPages
+            redactionState.ambiguousSurnameDetectionIDs = detection.ambiguousSurnameDetectionIDs
+            redactionState.crossPageEntityGroups = detection.crossPageEntityGroups
+            let allResults = detection.results
+
+            if allResults.values.allSatisfy({ $0.isEmpty }) {
+                // No detections — transition to editing. The run record
+                // drives the persistent summary banner: the
+                // prior info toast was the only trace and expired in
+                // seconds, leaving no way to tell "ran and found
+                // nothing" from "never ran".
+                documentState.transition(to: .editing)
+                redactionState.recordDetectionRun(
+                    .nothingFound(pageCount: documentState.pageCount),
+                    ocrSkippedPages: redactionState.ocrPixelCapSkippedPages)
+                return
+            }
+
+            // Stage for triage review — every detection run is
+            // reviewed; the auto-apply branch retired with its
+            // Settings toggle (no region is created without an
+            // explicit user selection).
+            redactionState.pendingTriage = allResults
+
+            // Review-first arrival: detections arrive with NOTHING
+            // selected — the machine proposes, only the user
+            // selects. An empty map is the whole contract now: the
+            // one apply path reads an absent id as not accepted, so
+            // staging just clears any stale entries.
+            redactionState.triageSelections = [:]
+
+            documentState.transition(to: .editing)
+            redactionState.recordDetectionRun(
+                .staged,
+                ocrSkippedPages: redactionState.ocrPixelCapSkippedPages)
+            // Triage sheet appears automatically via .sheet binding on pendingTriage
         }
     }
 
@@ -655,12 +603,14 @@ final class PipelineCoordinator: @unchecked Sendable {
 
     /// Process all pages: rasterize → fill → reconstruct PDF.
     /// Returns a PipelineRunContext with per-page digests and modes for verification.
-    /// Reports progress via documentState self-transitions.
-    private func processDocument(
+    /// Reports progress through `onProgress` (the runner turns each tick
+    /// into a `.redacting` self-transition).
+    func processDocument(
         _ pages: [PDFPageData],
         outputURL: URL,
         sensitiveTerms: [SensitiveTerm],
-        appliedSearches: [SearchRecheckRequest]
+        appliedSearches: [SearchRecheckRequest],
+        onProgress: (DocumentState.RedactionProgress) -> Void
     ) async throws -> PipelineRunContext {
         let rasterizer = PageRasterizer()
         // Surface the active rasterizer to the memory-warning
@@ -708,7 +658,9 @@ final class PipelineCoordinator: @unchecked Sendable {
         var perPageModes: [PipelineMode] = []
         var perPageFallbackReasons: [TextLayerDetector.FallbackReason?] = []
         lastReconstructorAppendOrder.removeAll()
-        try await rasterizePagesInParallel(pages: pages, rasterizer: rasterizer) { idx, result in
+        try await rasterizePagesInParallel(
+            pages: pages, rasterizer: rasterizer, onProgress: onProgress
+        ) { idx, result in
             // Appended in 0..<count callback order — identical inputs/order to
             // the old second pass, so the Layer-7 digest cross-check and
             // per-page mode bookkeeping are unchanged.
@@ -820,6 +772,20 @@ final class PipelineCoordinator: @unchecked Sendable {
         pages: [PDFPageData], rasterizer: PageRasterizer,
         onPageReady: @MainActor (Int, RasterizeResult) async throws -> Void
     ) async throws {
+        try await rasterizePagesInParallel(
+            pages: pages, rasterizer: rasterizer,
+            onProgress: { documentState.transition(to: .redacting(progress: $0)) },
+            onPageReady: onPageReady)
+    }
+
+    /// The same schedule with the progress tick handed to `onProgress`
+    /// instead of transitioned here — the runner's form (it reports the
+    /// tick as an event; the coordinator transitions).
+    func rasterizePagesInParallel(
+        pages: [PDFPageData], rasterizer: PageRasterizer,
+        onProgress: (DocumentState.RedactionProgress) -> Void,
+        onPageReady: @MainActor (Int, RasterizeResult) async throws -> Void
+    ) async throws {
         guard !pages.isEmpty else { return }
 
         #if DEBUG
@@ -850,12 +816,10 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // index may skip around. The currentStep label uses
                 // `completed` so it does not advertise a specific page index
                 // that may already be past tense by the time the UI repaints.
-                documentState.transition(to: .redacting(
-                    progress: .init(
-                        currentPage: completed,
-                        totalPages: totalPages,
-                        currentStep: "Processing \(completed) of \(totalPages)\u{2026}"
-                    )
+                onProgress(.init(
+                    currentPage: completed,
+                    totalPages: totalPages,
+                    currentStep: "Processing \(completed) of \(totalPages)\u{2026}"
                 ))
             }
         )
@@ -913,12 +877,12 @@ final class PipelineCoordinator: @unchecked Sendable {
     }
 
     /// Seam: run the parallel base-layer batch and return the
-    /// `(layer, LayerResult)` pairs in completion order. Extracted from
-    /// `runVerification` so a guard test can drive the fan-out directly and
+    /// `(layer, LayerResult)` pairs in completion order. The batch itself is
+    /// `VerificationOrchestrator.collectParallelBaseLayerResults`; this
+    /// method binds it to the app's off-main per-layer document
+    /// provisioning so a guard test can drive the fan-out directly and
     /// assert each parallel layer receives its own `PDFDocument` instance
     /// (mirrors the deliberate `internal` precedent of `rasterizePagesInParallel`).
-    /// `runVerification` keeps the `.verifying` transitions, the canonical
-    /// report ordering and the accessibility announcements.
     ///
     /// `nonisolated`: the per-layer document provisioning is CPU-bound on
     /// large outputs and runs off MainActor; the layer fan-out is
@@ -937,275 +901,20 @@ final class PipelineCoordinator: @unchecked Sendable {
     ) async throws -> [(VerificationLayer, LayerResult)] {
         // Provision one PDFDocument instance per parallel layer off
         // MainActor. nil ⇒ at least one re-open failed.
-        let perLayerDocs: [VerificationLayer: SendablePDFDocument]? = await Task.detached {
-            Self.loadParallelLayerDocuments(outputURL, layers: layers)
-        }.value
-
-        guard let perLayerDocs else {
-            // Provisioning failed (e.g. the output file was purged mid-run):
-            // run the same layers SEQUENTIALLY on the shared instance —
-            // sequential access on one document is the sound original contract
-            // (PDFPageData.swift). Never concurrent-shared. Debug-only
-            // diagnostic; no Phase change, no PipelineError, no user string.
-            #if DEBUG
-            Logger(subsystem: "com.resecta.app", category: "verification").debug(
-                "per-layer verification document provisioning failed; running base layers sequentially on the shared document"
-            )
-            #endif
-            var collected: [(VerificationLayer, LayerResult)] = []
-            for layer in layers {
-                let result = await verifier.runLayer(
-                    layer,
-                    outputDocument: shared,
-                    sourcePageCount: sourcePageCount,
-                    regions: regions,
-                    sensitiveTerms: sensitiveTerms,
-                    pipelineMode: pipelineMode,
-                    filterDigests: filterDigests,
-                    perPageModes: perPageModes
-                )
-                collected.append((layer, result))
-            }
-            return collected
-        }
-
-        return try await withThrowingTaskGroup(of: (VerificationLayer, LayerResult).self) { group in
-            for layer in layers {
-                // Each parallel layer runs against its own instance; `shared`
-                // is only a defensive fallback for an absent map entry (the
-                // map is complete whenever provisioning succeeded).
-                let layerDoc = perLayerDocs[layer] ?? shared
-                group.addTask {
-                    let result = await verifier.runLayer(
-                        layer,
-                        outputDocument: layerDoc,
-                        sourcePageCount: sourcePageCount,
-                        regions: regions,
-                        sensitiveTerms: sensitiveTerms,
-                        pipelineMode: pipelineMode,
-                        filterDigests: filterDigests,
-                        perPageModes: perPageModes
-                    )
-                    return (layer, result)
-                }
-            }
-            var collected: [(VerificationLayer, LayerResult)] = []
-            for try await pair in group {
-                collected.append(pair)
-            }
-            return collected
-        }
-    }
-
-    /// Run all verification layers and transition to .verified.
-    private func runVerification(
-        runContext: PipelineRunContext, effectiveMode: PipelineMode
-    ) async throws {
-        // `PDFDocument(url:)` is CPU-bound on large outputs; routing
-        // through `Task.detached` keeps the MainActor-isolated
-        // `runVerification` body free to drive the progress UI.
-        let wrappedDoc: SendablePDFDocument
-        do {
-            wrappedDoc = try await Task.detached {
-                try Self.loadOutputDocumentOffMainActor(runContext.outputURL)
-            }.value
-        } catch { // LegalPhrases:safe (Swift keyword)
-            documentState.transition(to: .failed(
-                error: .verificationError(.engineCrash(layerIndex: 0)),
-                returnPhase: .verified(report: .skipped(reason: .error))
-            ))
-            return
-        }
-
-        // Page-count integrity gate,
-        // run BEFORE any layer. The redacted output must carry exactly one page
-        // per source page; a mismatch means reconstruction dropped or
-        // duplicated a page — possibly in a previous process on the verify-only
-        // resume path, where the in-process writtenPageCount postcondition
-        // (part 1) cannot help. Surface one explicit FAIL layer and return,
-        // rather than verifying a truncated document and reporting a misleading
-        // PASS/WARN. Page counts only — never document content.
-        // Both source phases here, (.redacting,.verified) and
-        // (.verifying,.verified), are legal transitions (no table change).
-        let expectedPageCount = documentState.pageCount
-        let outputPageCount = wrappedDoc.document.pageCount
-        if expectedPageCount != outputPageCount {
-            let failLayer = LayerResult(
-                name: "Page Count Check",
-                symbolName: "exclamationmark.triangle",
-                status: .fail("Output has \(outputPageCount) \(outputPageCount == 1 ? "page" : "pages"); source has \(expectedPageCount)."),
-                shortDescription: "Output page count does not match the source document.",
-                detailDescription: "The redacted output has \(outputPageCount) \(outputPageCount == 1 ? "page" : "pages") but the source document has \(expectedPageCount). Verification stopped before the layer checks because the page counts must match.",
-                pageReferences: nil,
-                durationSeconds: 0
-            )
-            let report = VerificationReport(
-                layers: [failLayer],
-                overallStatus: .fail("Output page count does not match the source document."),
-                durationSeconds: 0,
-                perPageModes: runContext.perPageModes,
-                perPageFallbackReasons: runContext.perPageFallbackReasons
-            )
-            documentState.transition(to: .verified(report: report))
-            redactionState.markVerificationCurrent()
-            let overallAnnouncement = "Verification complete. \(report.overallStatus.accessibilityLabel)"
-            await MainActor.run {
-                UIAccessibility.post(notification: .announcement, argument: overallAnnouncement)
-            }
-            return
-        }
-
-        let verifier = VerificationEngine()
-        // The schedule is the mode's layer list grouped by execution phase
-        // (`VerificationLayer.phase`) — identity, never index arithmetic.
-        // `layers` is the canonical (report) order; the count is derived.
-        let layers = verifier.layers(for: effectiveMode)
-        let globalLayerCount = layers.count
-        // Published progress: results in completion order (the progress UI
-        // reads `completedLayers` incrementally). The REPORT is assembled in
-        // canonical order from `resultsByLayer` once every phase has run, so
-        // a layer that completes early in the parallel batch (Operator
-        // Re-Extraction) still lands at its ordinal in the results list.
-        var completedLayers: [LayerResult] = []
-        var resultsByLayer: [VerificationLayer: LayerResult] = [:]
-        let startTime = CFAbsoluteTimeGetCurrent()
-
-        let sourcePageCount = documentState.pageCount
-
-        // Phases. The parallel base batch (Text Extraction, OCR, Binary
-        // String Search, and in Searchable mode Operator Re-Extraction) runs
-        // via withTaskGroup — independent reads against the output document
-        // with no shared mutable state, each layer on its own PDFDocument
-        // instance. Structure and Metadata run sequentially after because
-        // both parse the `PDFDocument` catalog; concurrent CGPDFDictionary
-        // traversal would contend on the same catalog handle. The sandwich
-        // checks run sequentially — the inter-layer character-count baseline
-        // depends on Spatial Verification's extraction work and must remain
-        // ordered. The post-sequential checks (the Search Re-check) run last:
-        // page-parallel inside the layer at Layer 2's width, never overlapped
-        // with Layer 2's own Vision pass.
-        let parallelBaseLayers = layers.filter { $0.phase == .parallelBase }
-        let catalogLayers = layers.filter { $0.phase == .catalogSequential }
-        let sandwichLayers = layers.filter { $0.phase == .sandwichSequential }
-        let postLayers = layers.filter { $0.phase == .postSequential }
-        // 1-based ordinal in the mode's order (the progress and row label).
-        func ordinal(_ layer: VerificationLayer) -> Int {
-            (layers.firstIndex(of: layer) ?? 0) + 1
-        }
-
-        // Snapshot MainActor-isolated inputs once so the @concurrent
-        // runLayer calls inside withTaskGroup do not re-cross the actor
-        // boundary on every fan-out.
-        let regionsSnapshot = redactionState.regions
-        let sensitiveTermsSnapshot = runContext.sensitiveTerms
-        let filterDigestsSnapshot = runContext.filterDigests
-        let perPageModesSnapshot = runContext.perPageModes
-        let appliedSearchesSnapshot = runContext.appliedSearches
-
-        // --- Parallel base batch ---
-        if let firstLayer = parallelBaseLayers.first {
-            try Task.checkCancellation()
-            // Surface the first parallel-batch layer in the progress UI.
-            // The transition before the parallel dispatch keeps the
-            // progress indicator continuous; per-layer announcements still
-            // fire as each layer completes below.
-            documentState.transition(to: .verifying(
-                progress: .init(
-                    currentLayer: ordinal(firstLayer),
-                    totalLayers: globalLayerCount,
-                    layerName: firstLayer.name,
-                    completedLayers: completedLayers
-                )
-            ))
-
-            let parallelResults = try await collectParallelBaseLayerResults(
-                layers: parallelBaseLayers,
-                outputURL: runContext.outputURL,
-                shared: wrappedDoc,
-                verifier: verifier,
+        let perLayerDocs = await Self.provisionLayerDocumentsOffMainActor(
+            outputURL, layers: layers)
+        return try await VerificationOrchestrator(verifier: verifier)
+            .collectParallelBaseLayerResults(
+                layers: layers,
+                shared: shared,
+                perLayerDocuments: perLayerDocs,
                 sourcePageCount: sourcePageCount,
-                regions: regionsSnapshot,
-                sensitiveTerms: sensitiveTermsSnapshot,
-                pipelineMode: effectiveMode,
-                filterDigests: filterDigestsSnapshot,
-                perPageModes: perPageModesSnapshot
+                regions: regions,
+                sensitiveTerms: sensitiveTerms,
+                pipelineMode: pipelineMode,
+                filterDigests: filterDigests,
+                perPageModes: perPageModes
             )
-
-            // Canonical order within the batch so the announcements and the
-            // published progress read ascending.
-            let orderedParallel = parallelResults.sorted { ordinal($0.0) < ordinal($1.0) }
-            for (layer, result) in orderedParallel {
-                resultsByLayer[layer] = result
-                completedLayers.append(result)
-                let layerAnnouncement = result.completionAnnouncement(layerNumber: ordinal(layer))
-                await MainActor.run {
-                    UIAccessibility.post(notification: .announcement, argument: layerAnnouncement)
-                }
-            }
-        }
-
-        // --- Sequential phases: catalog readers → sandwich checks → post checks ---
-        for phaseLayers in [catalogLayers, sandwichLayers, postLayers] {
-            for layer in phaseLayers {
-                try Task.checkCancellation()
-                documentState.transition(to: .verifying(
-                    progress: .init(
-                        currentLayer: ordinal(layer),
-                        totalLayers: globalLayerCount,
-                        layerName: layer.name,
-                        completedLayers: completedLayers
-                    )
-                ))
-
-                let result = await verifier.runLayer(
-                    layer,
-                    outputDocument: wrappedDoc,
-                    sourcePageCount: sourcePageCount,
-                    regions: regionsSnapshot,
-                    sensitiveTerms: sensitiveTermsSnapshot,
-                    pipelineMode: effectiveMode,
-                    filterDigests: filterDigestsSnapshot,
-                    perPageModes: perPageModesSnapshot,
-                    appliedSearches: appliedSearchesSnapshot
-                )
-                resultsByLayer[layer] = result
-                completedLayers.append(result)
-
-                let layerAnnouncement = result.completionAnnouncement(layerNumber: ordinal(layer))
-                await MainActor.run {
-                    UIAccessibility.post(notification: .announcement, argument: layerAnnouncement)
-                }
-            }
-        }
-
-        // Final cancellation checkpoint before
-        // the report is constructed. A cancel landing after the last in-loop
-        // checkpoint — once a layer has folded its CancellationError into a
-        // .skipped result — could otherwise still build a .verified report with
-        // a skipped layer. The throw propagates to the same CancellationError
-        // handler as the in-loop checkpoints above; no new error handling.
-        try Task.checkCancellation()
-
-        // The report lists every layer in canonical order: the results UI
-        // labels rows by ordinal position (`report.layers.enumerated()`).
-        let orderedResults = layers.compactMap { resultsByLayer[$0] }
-
-        let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-        let report = VerificationReport(
-            layers: orderedResults,
-            overallStatus: verifier.aggregateStatus(orderedResults),
-            durationSeconds: elapsed,
-            perPageModes: runContext.perPageModes,
-            perPageFallbackReasons: runContext.perPageFallbackReasons
-        )
-        documentState.transition(to: .verified(report: report))
-        redactionState.markVerificationCurrent()
-
-        // VoiceOver overall announcement
-        let overallAnnouncement = "Verification complete. \(report.overallStatus.accessibilityLabel)"
-        await MainActor.run {
-            UIAccessibility.post(notification: .announcement, argument: overallAnnouncement)
-        }
     }
 
     // MARK: - Detection Pipeline
@@ -1228,457 +937,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         // (pipelineMode). Mirrors `effectiveMode`.
         let runSettings = RunSettings.snapshot(from: settingsState)
 
-        // nonisolated(unsafe): @Observable prevents Sendable; Task captures self
-        // implicitly. Safe because all access is on MainActor (same pattern as runFullPipeline).
-        nonisolated(unsafe) let coordinator = self
-        // Stamp this run with a UUID owned by the Task.
-        // See runFullPipeline for the rationale; same pattern applies here.
-        let runId = UUID()
-        documentState.activeRunId = runId
-        documentState.activePipelineTask = Task {
-            defer {
-                // Only clear active task/run if this Task still owns it.
-                if coordinator.documentState.activeRunId == runId {
-                    coordinator.documentState.activePipelineTask = nil
-                    coordinator.documentState.activeRunId = nil
-                }
-            }
-            do {
-                // Build the detector via the diagnostic-returning
-                // loader so any gazetteer / context-keywords corpus failure
-                // can surface as a one-time warning toast + a persistent
-                // top banner in the triage sheet. Failed loaders degrade
-                // into nil-gazetteer pass-through (non-gazetteer regex
-                // detectors continue to fire). The flag is only flipped on
-                // the first qualifying failure; subsequent runs that re-
-                // discover the same failure do not re-toast because the
-                // flag is already set.
-                // PERF — both the corpus load and the orchestrator construction
-                // perform synchronous bundled-resource I/O. This Task body is
-                // MainActor-isolated (see the nonisolated(unsafe) note above) and
-                // both are nonisolated *synchronous* calls, so invoking them
-                // directly runs the whole load on the main thread and freezes the
-                // UI at Auto-Detect kickoff. Two distinct costs:
-                //
-                //   1. `loadWithDiagnostics()` reads/parses the gazetteer corpus
-                //      (two ~26 MB bloom filters). When the manifest signature
-                //      fails it short-circuits to nil-gazetteer pass-through, so
-                //      this cost is ONLY paid on the signature-valid path.
-                //
-                //   2. `DetectionOrchestrator(...)` is the offender on the
-                //      signature-FAILURE path: its stored-property defaults decode
-                //      bundled JSON in their initializers — notably the ~2.3 MB
-                //      `address_components.json` via `AddressSpatialAssembler`'s
-                //      `static let` cache. This load is NOT gated by signature
-                //      verification, so it runs on (the first) Auto-Detect per
-                //      process regardless of corpus state. The diagnostics enum
-                //      classifies it as outside the manifest signature
-                //      (`GazetteerLoadDiagnostics.outsideManifestSignature`),
-                //      so a signature failure does not attribute it.
-                //
-                // Build both off the main actor — same remedy `firstPageText`
-                // uses for synchronous PDFKit reads. `PIIDetector`,
-                // `GazetteerLoadDiagnostics`, and `DetectionOrchestrator` are all
-                // Sendable, so the results cross the detached boundary cleanly.
-                let (orchestrator, gazetteerDiagnostics) =
-                    await Task.detached(priority: .userInitiated) {
-                        let (detector, diagnostics) =
-                            PIIDetector.loadWithDiagnostics()
-                        let orchestrator = DetectionOrchestrator(
-                            recognitionLevel: recognitionLevel,
-                            detector: detector,
-                            diagnostics: diagnostics
-                        )
-                        return (orchestrator, diagnostics)
-                    }.value
-                // FREEZE FIX: the post-`await` continuation here may resume off the
-                // MainActor — the continuation after
-                // `await Task.detached { … }.value` can land on a cooperative
-                // background thread, not the MainActor. On the signature-degrade path
-                // `surfaceGazetteerLoadDiagnostics` mutates @Observable MainActor state
-                // (`autoDetectionDegraded`) AND enqueues a warning toast whose
-                // `withAnimation` + UIKit feedback generator + UIAccessibility post all
-                // require the main thread; running them off-main deadlocks the SwiftUI
-                // transaction lock and permanently hangs the UI at Auto-Detect kickoff.
-                // Hop onto the MainActor first — the same remedy the error-handler and
-                // page-0 bootstrap degrade paths already use.
-                await MainActor.run {
-                    coordinator.surfaceGazetteerLoadDiagnostics(gazetteerDiagnostics)
-                }
-
-                // Snapshot priors + surface forms once pre-loop.
-                // Sendable value types cross the @concurrent boundary safely.
-                let priorsSnapshot = coordinator.redactionState.priors
-                let surfaceFormsSnapshot = coordinator.redactionState.surfaceForms
-                // Snapshot the USER-SELECTED preset's
-                // vector once per run (was the fixed `.balanced` static).
-                let thresholdVectorSnapshot: PresetThresholdVector? = coordinator.settingsState.activeThresholdVector
-                // Snapshot the per-page text-
-                // layer status once pre-loop so `buildOCRSkipHint` can run OFF
-                // the MainActor. textLayerStatus is populated at doc-open and is
-                // not mutated during a detection run, so the copy is a faithful
-                // read; it removes the last MainActor-isolated access from the
-                // hint, freeing the UI thread from EmbeddedTextSource.make's
-                // per-word enumeration on searchable-redaction pages.
-                let textLayerStatusSnapshot = coordinator.documentState.textLayerStatus
-
-                // Accumulate results locally instead of writing to
-                // redactionState.detectionResults during the loop. This avoids
-                // intermediate state leakage on cancellation and ensures
-                // detectionResults is only written on success.
-                var accumulatedResults: [Int: [DetectionResult]] = [:]
-                var accumulatedDiagnostics: [Int: ClassificationDiagnostic] = [:]
-                // Pages whose page-level provenance reports the
-                // OCR pixel-cap skip; written to redactionState with the
-                // other accumulators on success.
-                var accumulatedOCRCapSkips: Set<Int> = []
-
-                /// Detect one page and fold its results into the three
-                /// accumulators — the body both detect branches share.
-                /// Stamps the `detectPage` signpost interval so
-                /// DetectionRasterizeOverlapTests can assert overlap with the
-                /// lookahead rasterize; the trailing page (no overlapping
-                /// rasterize counterpart) carries `trailing=true` so the
-                /// overlap-rate metric omits it from the denominator.
-                func detectOne(
-                    _ i: Int, image pageImage: CGImage,
-                    embeddedText embeddedSource: EmbeddedTextSource?,
-                    ocrSkipReason skipReason: DetectionResult.Provenance.OCRSkipReason?,
-                    trailing: Bool
-                ) async throws {
-                    let detectSignpostID = detectionRasterizeSignposter
-                        .makeSignpostID()
-                    let detectSignpostState = trailing
-                        ? detectionRasterizeSignposter.beginInterval(
-                            "detectPage", id: detectSignpostID,
-                            "page=\(i) trailing=true"
-                        )
-                        : detectionRasterizeSignposter.beginInterval(
-                            "detectPage", id: detectSignpostID,
-                            "page=\(i)"
-                        )
-                    // Seed the doctype
-                    // window with the previous page's classification.
-                    // Detection is serial across pages, so the i-1
-                    // diagnostic is already recorded when page i
-                    // dispatches; missing diagnostic → nil context
-                    // (degrade, never race).
-                    let prevPrimary: DoctypeClass? =
-                        i > 0 ? accumulatedDiagnostics[i - 1]?.primary : nil
-                    let doctypeCtx = prevPrimary.map { prev in
-                        DoctypeWindow(primary: prev)
-                    }
-                    let pageResult: PageDetectionResult
-                    do {
-                        pageResult = try await orchestrator.detectPage(
-                            image: pageImage,
-                            pageIndex: i,
-                            priors: priorsSnapshot,
-                            surfaceForms: surfaceFormsSnapshot,
-                            doctypeContext: doctypeCtx,
-                            thresholdVector: thresholdVectorSnapshot,
-                            embeddedText: embeddedSource,
-                            ocrSkipReason: skipReason
-                        )
-                    } catch { // LegalPhrases:safe (Swift keyword)
-                        detectionRasterizeSignposter.endInterval(
-                            "detectPage", detectSignpostState
-                        )
-                        throw error
-                    }
-                    detectionRasterizeSignposter.endInterval(
-                        "detectPage", detectSignpostState
-                    )
-                    accumulatedResults[i] = pageResult.detections
-                    if let diag = pageResult.classificationDiagnostic {
-                        accumulatedDiagnostics[i] = diag
-                    }
-                    // Record the page-level OCR pixel-cap
-                    // skip so the triage banner can surface it.
-                    if pageResult.ocrProvenance.ocrSkipReason == .pixelCapExceeded {
-                        accumulatedOCRCapSkips.insert(i)
-                    }
-                }
-
-                // Depth-2 lookahead via structured concurrency.
-                //
-                // Locked decision:
-                // up to 2 pages in flight. While the orchestrator detects
-                // page N, the next page's render-for-detection
-                // (`renderPageForDetection`) runs concurrently via `async
-                // let`. At the start of iteration N+1, the prefetched image
-                // is awaited — by which point the rasterize work usually
-                // completed alongside iteration N's detect.
-                //
-                // Why depth-2 (not deeper): the per-page CGImage at 150 DPI
-                // can run several hundred MB on photo-sourced PDFs; the
-                // memory model was sized for at most 2 in-flight pages
-                // (current page's image kept for detect + lookahead image
-                // settling). Depth is locked at 2.
-                //
-                // Cancellation correctness: `async let` is structured —
-                // leaving the iteration's scope without awaiting cancels
-                // and awaits the lookahead task. On a rasterize failure
-                // mid-flight, `try await nextImage` throws and the outer
-                // loop unwinds; the in-flight detect (this iteration's)
-                // completes its current await suspension, observes
-                // cancellation propagated from the enclosing Task, and
-                // surfaces it through `try Task.checkCancellation()` at the
-                // next iteration. Detected-PII parity vs. the no-overlap
-                // path is preserved — overlap is a scheduling change, not
-                // a correctness change.
-                let totalPages = coordinator.documentState.pageCount
-                if totalPages > 0 {
-                    // Bootstrap: render page 0's image. The lookahead loop
-                    // assumes "current image in hand" at iteration entry;
-                    // we satisfy that for iteration 0 by awaiting here.
-                    guard let bootstrapDoc = coordinator.documentState.sourceDocument,
-                          let bootstrapPage = bootstrapDoc.page(at: 0) else {
-                        // Graceful degradation: the page-0 bootstrap could not
-                        // start. Return to a safe `.editing` state with a
-                        // mechanism-description toast instead of the illegal
-                        // `editing → failed` transition that previously crashed
-                        // here (the transition table has no editing→failed pair, and
-                        // none is added). MainActor.run hop for
-                        // the same reason as the error handler below — the
-                        // degrade touches MainActor-isolated state + the toast
-                        // queue and this Task can be off the MainActor.
-                        await MainActor.run { coordinator.degradeDetectionToEditing() }
-                        return
-                    }
-                    var pendingImage: CGImage = try await
-                        coordinator.renderPageForDetection(
-                            bootstrapPage, pageIndex: 0,
-                            phase: .rasterizePreflight)
-                    var pendingPage: PDFPage = bootstrapPage
-
-                    for i in 0..<totalPages {
-                        try Task.checkCancellation()
-                        coordinator.documentState.transition(to: .detecting(
-                            progress: .init(
-                                currentPage: i + 1,
-                                totalPages: totalPages,
-                                currentStep: recognitionLevel == .fast
-                                    ? "Scanning page \(i + 1)\u{2026}"
-                                    : "Thorough scan \u{2014} page \(i + 1)\u{2026}"
-                            )
-                        ))
-
-                        let pageImage = pendingImage
-                        let pageForDetect = pendingPage
-
-                        // OCR confidence-based skip fast path
-                        // (decision recorded per-DetectionResult).
-                        // Route the pipelineMode read through
-                        // the run-entry snapshot.
-                        // Run the hint OFF the
-                        // MainActor. `buildOCRSkipHint` is now `nonisolated` and
-                        // reads only Sendable snapshots + the page, so its
-                        // per-word EmbeddedTextSource enumeration no longer
-                        // blocks the UI. Detached (no cancellation inheritance,
-                        // same as the loadWithDiagnostics detach above); the
-                        // per-iteration checkCancellation covers the loop.
-                        nonisolated(unsafe) let hintPage = pageForDetect
-                        let (embeddedSource, skipReason) =
-                            await Task.detached(priority: .userInitiated) {
-                                coordinator.buildOCRSkipHint(
-                                    for: hintPage,
-                                    pageIndex: i,
-                                    runSettings: runSettings,
-                                    textLayerStatus: textLayerStatusSnapshot)
-                            }.value
-
-                        // Depth-2 lookahead. Per page, two paths:
-                        //   * If a next page exists: kick off its
-                        //     render-for-detection concurrently with the
-                        //     current page's detect via `async let`. Await
-                        //     the lookahead at the end of the iteration so
-                        //     iteration N+1 enters with `pendingImage`
-                        //     already loaded.
-                        //   * Last page: no lookahead; detect runs alone.
-                        if i + 1 < totalPages {
-                            guard let doc = coordinator.documentState.sourceDocument,
-                                  let nextPage = doc.page(at: i + 1) else {
-                                coordinator.documentState.transition(to: .failed(
-                                    error: .detectionError(.visionError(pageIndex: i + 1)),
-                                    returnPhase: .editing
-                                ))
-                                return
-                            }
-                            // Structured-concurrency lookahead. The
-                            // `nonisolated(unsafe)` capture is the same
-                            // safety model the existing per-page render
-                            // uses — `PDFPage` is touched single-threaded
-                            // (this iteration's `renderPageForDetection`
-                            // is the only in-flight reader of `nextPage`;
-                            // detect runs against a separate CGImage).
-                            nonisolated(unsafe) let lookaheadPage = nextPage
-                            let lookaheadIndex = i + 1
-                            // DPI seed for the lookahead render:
-                            // the newest diagnostic recorded at dispatch time
-                            // is page i-1's (page i's detect runs CONCURRENT
-                            // with this render), so page i+1 renders with
-                            // class(i-1) — a one-page lag behind the detect
-                            // seeding below. Bootstrap and page 1 render
-                            // unseeded (nil → policy default 150 DPI).
-                            let lookaheadDoctype: DoctypeClass? =
-                                i > 0 ? accumulatedDiagnostics[i - 1]?.primary : nil
-                            async let nextImage: CGImage =
-                                coordinator.renderPageForDetection(
-                                    lookaheadPage, pageIndex: lookaheadIndex,
-                                    phase: .rasterizeLookahead,
-                                    doctype: lookaheadDoctype)
-
-                            // Doctype-aware, prior-scored
-                            // detection. Runs CONCURRENT with the
-                            // lookahead rasterize above (depth-2).
-                            try await detectOne(
-                                i, image: pageImage, embeddedText: embeddedSource,
-                                ocrSkipReason: skipReason, trailing: false)
-
-                            // Cooperative check between
-                            // the just-completed detect await and the
-                            // upcoming lookahead await. Without this a
-                            // cancel arriving here would otherwise wait for
-                            // the lookahead rasterize to complete before
-                            // surrendering.
-                            try Task.checkCancellation()
-
-                            // Await the lookahead. If the rasterize threw
-                            // mid-flight, this re-throws and exits the
-                            // loop — `async let`'s structured scope has
-                            // already awaited any cancellation cleanup.
-                            pendingImage = try await nextImage
-                            pendingPage = lookaheadPage
-                        } else {
-                            // Last page — no lookahead to dispatch; the
-                            // detect runs alone.
-                            try await detectOne(
-                                i, image: pageImage, embeddedText: embeddedSource,
-                                ocrSkipReason: skipReason, trailing: true)
-                        }
-                    }
-                }
-
-                // Cooperative check between detect
-                // loop completion and Jaro-Winkler / cross-page clustering.
-                // Both clusterers are synchronous O(n²) in the worst case;
-                // a cancel arriving here without this check would otherwise
-                // wait for the entire clustering pass to complete.
-                try Task.checkCancellation()
-
-                // Document-level Stage 5: entity clustering on name detections.
-                // Bare-surname clusters ≥15 get flagged for inline ambiguity hints.
-                let clusterer = EntityClusterer()
-                var clusterInputs: [EntityClusterer.ClusterInput] = []
-                // Page order, not Dictionary order: two runs over the same
-                // detections hand the clusterer the same input sequence.
-                for page in accumulatedResults.keys.sorted() {
-                    for result in accumulatedResults[page] ?? [] {
-                        guard case .pii(let kind) = result.kind, kind == .name else { continue }
-                        guard let text = result.matchedText,
-                              let input = EntityClusterer.clusterInput(
-                                for: result.id, rawName: text
-                              ) else { continue }
-                        clusterInputs.append(input)
-                    }
-                }
-                let clusterReport = clusterer.cluster(names: clusterInputs)
-
-                // Second cooperative check between the
-                // two clustering passes.
-                try Task.checkCancellation()
-
-                // Document-level Stage 5b: cross-page entity
-                // linking across **all** PII categories using
-                // normalize-and-exact-match. Peer to the name-only
-                // clusterer above (which uses Jaro-Winkler over surname
-                // blocks). Drives the "Grouped" view mode in the scan
-                // review surface (`ScanReviewSection`).
-                let crossPageGroups =
-                    CrossPageEntityGroup.clusters(from: accumulatedResults)
-
-                // Write to state only after all pages succeed
-                coordinator.redactionState.detectionResults = accumulatedResults
-                coordinator.redactionState.pageDiagnostics = accumulatedDiagnostics
-                coordinator.redactionState.ocrPixelCapSkippedPages = accumulatedOCRCapSkips
-                coordinator.redactionState.ambiguousSurnameDetectionIDs = clusterReport.bareSurnameFlags
-                coordinator.redactionState.crossPageEntityGroups = crossPageGroups
-                let allResults = accumulatedResults
-
-                if allResults.values.allSatisfy({ $0.isEmpty }) {
-                    // No detections — transition to editing. The run record
-                    // drives the persistent summary banner: the
-                    // prior info toast was the only trace and expired in
-                    // seconds, leaving no way to tell "ran and found
-                    // nothing" from "never ran".
-                    coordinator.documentState.transition(to: .editing)
-                    coordinator.redactionState.recordDetectionRun(
-                        .nothingFound(pageCount: coordinator.documentState.pageCount),
-                        ocrSkippedPages: coordinator.redactionState.ocrPixelCapSkippedPages)
-                    return
-                }
-
-                // Stage for triage review — every detection run is
-                // reviewed; the auto-apply branch retired with its
-                // Settings toggle (no region is created without an
-                // explicit user selection).
-                coordinator.redactionState.pendingTriage = allResults
-
-                // Review-first arrival: detections arrive with NOTHING
-                // selected — the machine proposes, only the user
-                // selects. An empty map is the whole contract now: the
-                // one apply path reads an absent id as not accepted, so
-                // staging just clears any stale entries.
-                coordinator.redactionState.triageSelections = [:]
-
-                coordinator.documentState.transition(to: .editing)
-                coordinator.redactionState.recordDetectionRun(
-                    .staged,
-                    ocrSkippedPages: coordinator.redactionState.ocrPixelCapSkippedPages)
-                // Triage sheet appears automatically via .sheet binding on pendingTriage
-
-            } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
-                // Only mutate cancellation state if this
-                // Task still owns the active run. Prevents a superseded
-                // detection Task from clobbering a newer run's phase.
-                //
-                // MainActor hop mirroring the general-error
-                // handler sibling below (which carries the real-doc crash backtrace for
-                // the same off-main-resume mechanism). The run-ownership guard
-                // moves inside the hop. `MainActor.assertIsolated()` is the
-                // canary. Transition table unchanged (threading context only).
-                await MainActor.run {
-                    MainActor.assertIsolated()
-                    guard coordinator.documentState.activeRunId == runId else { return }
-                    if coordinator.documentState.phaseKind != .editing {
-                        coordinator.documentState.transition(to: .editing)
-                    }
-                }
-            } catch { // LegalPhrases:safe (Swift keyword)
-                // Graceful degradation: a detection/render error (notably the
-                // page-0 rasterize failing on a platform that can't service
-                // Vision/Core Graphics, e.g. the Simulator) returns to a safe
-                // `.editing` state with a mechanism-description toast. Detection
-                // is an optional enhancement and the source document is intact,
-                // so we degrade rather than perform the illegal `editing →
-                // failed` transition that crashed here when the throw occurred
-                // during the page-0 bootstrap (before the per-page loop entered
-                // `.detecting`). Transition table unchanged.
-                //
-                // MainActor.run: a thrown error can resume this handler OFF the
-                // MainActor — the real-doc crash backtrace shows it on
-                // com.apple.root.user-initiated-qos.cooperative — so hop back
-                // before touching MainActor-isolated state or the toast queue
-                // (both MainActor-isolated, enforced at compile time). The
-                // run-ownership guard moves inside the hop so it, too,
-                // reads MainActor state on the MainActor.
-                await MainActor.run {
-                    guard coordinator.documentState.activeRunId == runId else { return }
-                    coordinator.degradeDetectionToEditing()
-                }
-            }
-        }
+        launch(.detection(recognitionLevel: recognitionLevel, runSettings: runSettings))
     }
 
     /// Graceful degradation for the detection pipeline. Returns to a safe

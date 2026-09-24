@@ -93,6 +93,18 @@ extension PipelineCoordinator {
         loadParallelLayerDocuments(url, keys: layers)
     }
 
+    /// The identity form run through `Task.detached`: the per-layer opens
+    /// are CPU-bound on large outputs and must not stall the MainActor
+    /// progress UI. The one provisioning call site the runner and the
+    /// parallel-batch seam share.
+    nonisolated static func provisionLayerDocumentsOffMainActor(
+        _ url: URL, layers: [VerificationLayer]
+    ) async -> [VerificationLayer: SendablePDFDocument]? {
+        await Task.detached {
+            loadParallelLayerDocuments(url, layers: layers)
+        }.value
+    }
+
     private nonisolated static func loadParallelLayerDocuments<Key: Hashable>(
         _ url: URL, keys: [Key]
     ) -> [Key: SendablePDFDocument]? {
