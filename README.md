@@ -174,7 +174,7 @@ A stranger can clone, build, and start contributing with these steps:
 
 ## Testing
 
-The test tree is larger than the source tree: roughly 63,000 lines of Swift source to roughly 96,000 lines of test code, about 1.5×. Counted from the current tree:
+The test tree is larger than the source tree: roughly 65,000 lines of Swift source to roughly 96,000 lines of test code, about 1.5×. Counted from the current tree:
 
 - **Engine package** (`Packages/RedactionEngine/Tests`) — 1,914 Swift Testing `@Test` functions across 256 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
 - **App target** (`Tests/ResectaAppTests`) — 1,606 `@Test` functions across 227 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
