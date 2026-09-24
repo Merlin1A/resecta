@@ -310,6 +310,9 @@ struct VerificationDetailsSection: View {
                 documentState.currentPageIndex = pageIndex
                 documentState.transition(to: .editing)
             },
+            // A clean pass is the compact ledger row; every other row is
+            // full (`LayerResultRow.rowStyle(for:)`).
+            style: LayerResultRow.rowStyle(for: layer),
             chrome: .plain
         )
     }

@@ -45,6 +45,9 @@ struct LayerResultRow: View {
     @ScaledMetric(relativeTo: .title3) private var glyphSize: CGFloat = 23
     /// The shape badge's glyph, hung off the tile's corner.
     @ScaledMetric(relativeTo: .caption) private var badgeSize: CGFloat = 11
+    /// The compact row's glyph — identity only, in the support tier; 23 in
+    /// `supportText` would compete with the tiles.
+    @ScaledMetric(relativeTo: .subheadline) private var compactGlyphSize: CGFloat = 17
     // The tile's wash is per appearance (tileWashLight / tileWashDark).
     @Environment(\.colorScheme) private var colorScheme
 
@@ -97,6 +100,16 @@ struct LayerResultRow: View {
     }
 
     var body: some View {
+        if style == .compact {
+            compactRow
+        } else {
+            fullRow
+        }
+    }
+
+    // MARK: - Full row
+
+    private var fullRow: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header — always visible. A Button only when the row opens;
             // otherwise the header renders directly, with no chevron and
@@ -133,6 +146,43 @@ struct LayerResultRow: View {
         // a container, so VoiceOver can reach the detail text and the
         // "Go to page N" chips instead of having them flattened away.
         .accessibilityElement(children: isExpanded ? .contain : .combine)
+        .accessibilityIdentifier("layerResult_\(layerIndex - 1)") // zero-indexed
+    }
+
+    // MARK: - Compact row
+
+    /// The compact ledger row — a clean pass: the glyph in the support
+    /// tier, the name, and a ✓ in the pass text tier in the same 16 pt
+    /// trailing slot the full rows give their chevron. Not a button (there
+    /// is nothing to open), no subtitle, no chevron; the same VoiceOver
+    /// label and identifier as a full row. At accessibility sizes the name
+    /// wraps and the glyph and ✓ hold the first line's baseline.
+    private var compactRow: some View {
+        HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .firstTextBaseline : .center,
+               spacing: ResectaTokens.Spacing.sm) {
+            VerificationSymbol.icon(for: layer)
+                .font(VerificationSymbol.isCustom(layer)
+                      ? .system(size: compactGlyphSize)
+                      : .subheadline)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                .frame(width: iconColumn)
+
+            Text(layer.name)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+
+            Spacer(minLength: ResectaTokens.Spacing.sm)
+
+            Image(systemName: "checkmark")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(ResectaTokens.SemanticColor.passText)
+                .frame(width: 16)
+                .accessibilityHidden(true)
+        }
+        .padding(.vertical, ResectaTokens.Spacing.sm)
+        .padding(.horizontal, horizontalInset)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Self.accessibilityLabel(layerIndex: layerIndex, layer: layer))
         .accessibilityIdentifier("layerResult_\(layerIndex - 1)") // zero-indexed
     }
 
