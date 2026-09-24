@@ -323,24 +323,20 @@ public struct VerificationEngine: Sendable {
         let name = layer.name
         let symbol = layer.symbolName
 
+        // The short line is the row; the detail line is EMPTY unless the
+        // check has something to add to it (`LayerResult.hasDetail`). The
+        // status message already says what the check saw, so no arm
+        // restates it behind the layer name. The skipped arm keeps its
+        // sentence: it adds the why.
         var shortDesc: String
         var detailDesc: String
         switch status {
         case .pass:
             shortDesc = "No issues found."
-            detailDesc = "\(name) completed with no findings."
-        case .warn(let msg):
+            detailDesc = ""
+        case .warn(let msg), .info(let msg), .attention(let msg), .fail(let msg):
             shortDesc = msg
-            detailDesc = "\(name) found a non-critical issue: \(msg)"
-        case .info(let msg):
-            shortDesc = msg
-            detailDesc = "\(name) reported informational metadata: \(msg)"
-        case .attention(let msg):
-            shortDesc = msg
-            detailDesc = "\(name) flagged text for review: \(msg)"
-        case .fail(let msg):
-            shortDesc = msg
-            detailDesc = "\(name) found a critical issue: \(msg)"
+            detailDesc = ""
         case .skipped:
             shortDesc = "Skipped."
             detailDesc = "\(name) was not applicable for this pipeline mode."
@@ -354,8 +350,9 @@ public struct VerificationEngine: Sendable {
             let totalBoundary = filterDigests.compactMap { $0 }
                 .reduce(0) { $0 + $1.boundaryCharacters.count }
             if totalBoundary > 0 {
+                // The short line carries the count; nothing to add.
                 shortDesc = "\(totalBoundary) character\(totalBoundary == 1 ? "" : "s") near redaction boundaries."
-                detailDesc = "\(name) completed with no findings. \(totalBoundary) character\(totalBoundary == 1 ? "" : "s") detected near redaction boundaries."
+                detailDesc = ""
                 status = .info(shortDesc)
             }
         }
@@ -1139,16 +1136,18 @@ public struct VerificationEngine: Sendable {
         // layer. Image-only output must carry none, so this FAIL outranks
         // every other outcome of the layer.
         var secureDeclaredTextPages: [Int] = []
-        // Per-page WARNs from the exclusion pass (a positional edge graze,
-        // or characters whose position could not be measured): fold below
-        // FAIL and above the unreadable-page WARN, first message in page
-        // order.
-        var exclusionWarnPages: [Int] = []
-        var firstExclusionWarnMessage: String?
-        // The classification of that first WARN: true when the verifier
-        // could not place characters (the unmeasured-position note), false
-        // for a positional edge graze.
-        var firstExclusionCouldNotVerify = false
+        // Per-page WARNs from the exclusion pass, in two classes: a
+        // positional edge graze (the check ran; a note) and characters whose
+        // position could not be measured (the check did not fully run).
+        // They fold below FAIL and above the unreadable-page WARN; the class
+        // of the first WARN page in page order is the one reported, its
+        // sentence composed ONCE over that class's pages, which are exactly
+        // the page references.
+        var grazePages: [Int] = []
+        var unmeasuredPages: [Int] = []
+        var firstUnmeasuredMessage: String?
+        // nil until the first WARN page: true = graze, false = unmeasured.
+        var firstWarnIsGraze: Bool?
         // Eligible pages PDFKit cannot open surface as a WARN when the
         // layer would otherwise PASS — see runLayer1TextExtraction.
         var unreadablePages: [Int] = []
@@ -1229,11 +1228,13 @@ public struct VerificationEngine: Sendable {
                 failingPages.append(i)
                 if firstFailMessage == nil { firstFailMessage = msg }
             } else if case .warn(let msg) = outcome.status {
-                exclusionWarnPages.append(i)
-                if firstExclusionWarnMessage == nil {
-                    firstExclusionWarnMessage = msg
-                    firstExclusionCouldNotVerify = outcome.couldNotVerify
+                if outcome.grazed {
+                    grazePages.append(i)
+                } else {
+                    unmeasuredPages.append(i)
+                    if firstUnmeasuredMessage == nil { firstUnmeasuredMessage = msg }
                 }
+                if firstWarnIsGraze == nil { firstWarnIsGraze = outcome.grazed }
             }
         }
         // A text layer on a page written as image-only outranks every other
@@ -1248,9 +1249,16 @@ public struct VerificationEngine: Sendable {
         }
         // The exclusion pass's WARN outranks the unreadable-page WARN
         // (mirror of FAIL's masking above; the combined case is rare and the
-        // exclusion message is the more actionable of the two).
-        if let msg = firstExclusionWarnMessage {
-            return (.warn(msg), exclusionWarnPages, firstExclusionCouldNotVerify)
+        // exclusion message is the more actionable of the two). A graze is
+        // a positional note (the check ran); an unmeasured position means
+        // the check did not fully run.
+        if let firstWarnIsGraze {
+            if firstWarnIsGraze {
+                return (SandwichVerification.grazeWarning(pages: grazePages), grazePages, false)
+            }
+            if let msg = firstUnmeasuredMessage {
+                return (.warn(msg), unmeasuredPages, true)
+            }
         }
         if !unreadablePages.isEmpty {
             return (unreadablePagesWarn(unreadablePages), unreadablePages, true)

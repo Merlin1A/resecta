@@ -116,7 +116,10 @@ public struct LayerResult: Sendable {
     public let status: VerificationStatus
     /// Brief description of what this check found (1 line, shown in collapsed row)
     public let shortDescription: String
-    /// Detailed explanation (shown when the row is expanded)
+    /// Expanded-row detail. Empty when the check has nothing to add to
+    /// `shortDescription` — the row then shows only its page references,
+    /// query lines and timing. `hasDetail` is the consumer's seam; the app
+    /// never string-matches this copy.
     public let detailDescription: String
     /// Page indices where issues were found (nil if check is document-wide)
     public let pageReferences: [Int]?
@@ -146,6 +149,10 @@ public struct LayerResult: Sendable {
     /// never true on a non-WARN status. Set by the engine at the site that
     /// composes the WARN, so consumers key on it instead of the message.
     public let couldNotVerify: Bool
+
+    /// Whether the expanded row has a detail line to show — false when
+    /// the check's short line already says everything it has to say.
+    public var hasDetail: Bool { !detailDescription.isEmpty }
 
     public init(name: String, symbolName: String, status: VerificationStatus,
                 shortDescription: String, detailDescription: String,

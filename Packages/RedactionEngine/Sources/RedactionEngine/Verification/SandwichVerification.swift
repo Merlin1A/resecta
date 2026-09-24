@@ -176,19 +176,20 @@ public struct SandwichVerification: Sendable {
         ).status
     }
 
-    /// The exclusion check with its could-not-verify classification: the
+    /// The exclusion check with its WARN classification: the
     /// unmeasured-position WARN (`zeroBoundsWarning`) says the check did not
-    /// fully run, the edge-graze WARN is a positional note. The Layer-6
-    /// dispatcher reads the pair; `verifySpatialExclusion` is the status
-    /// alone.
+    /// fully run (`couldNotVerify`); the edge-graze WARN is a positional
+    /// note (`grazed`). The Layer-6 dispatcher reads the classes and
+    /// composes the graze sentence once over every grazed page;
+    /// `verifySpatialExclusion` is this page's status alone.
     func spatialExclusionOutcome(
         outputPage: PDFPage,
         regionShapes: [RegionShape],
         pageIndex: Int = 0
-    ) async throws -> (status: VerificationStatus, couldNotVerify: Bool) {
+    ) async throws -> (status: VerificationStatus, couldNotVerify: Bool, grazed: Bool) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
-        guard let pageText = outputPage.string else { return (.pass, false) }
+        guard let pageText = outputPage.string else { return (.pass, false, false) }
         let nsText = pageText as NSString
         let count = outputPage.numberOfCharacters
         // Count-only guard. `!regionShapes.isEmpty` was dropped so the
@@ -198,7 +199,7 @@ public struct SandwichVerification: Sendable {
         // no-op on [] shapes, and the lattice gap-skip skips no pairs (strictly
         // more pairs validated). The nil-`string` guard above still covers a
         // page with no text layer.
-        guard count > 0 else { return (.pass, false) }
+        guard count > 0 else { return (.pass, false, false) }
 
         // 256-iteration band counter in the per-character
         // walk. A 10k-character page would otherwise exceed the 50 ms p95
@@ -293,7 +294,10 @@ public struct SandwichVerification: Sendable {
         // edge with its center outside) is held as a positional note and
         // returned WARN after the lattice pass below, so a lattice FAIL is
         // never masked by it.
-        var firstGrazeMessage: String?
+        // Set on the first edge graze; the graze is held (never returned
+        // from inside the loop) so a later in-region hit on this page is
+        // never masked by it.
+        var grazed = false
         try Task.checkCancellation()
         if !regionShapes.isEmpty, !exclusionUnits.isEmpty {
             var fractionCache: [String: CGFloat] = [:]
@@ -361,8 +365,10 @@ public struct SandwichVerification: Sendable {
                         // edge while its content stays outside — a
                         // writer↔verifier contract note, not exposed content
                         // (content leaks stay covered by Layers 7/9). The
-                        // first graze is held so a later in-region hit on
-                        // this page is never masked by it.
+                        // graze is held so a later in-region hit on this
+                        // page is never masked by it. Messages name the page
+                        // and nothing else — the read-back offset is not
+                        // user copy.
                         let center = CGPoint(x: core.midX, y: core.midY)
                         let centerInRegion: Bool
                         if let vertices = shape.polygonVertices {
@@ -373,14 +379,10 @@ public struct SandwichVerification: Sendable {
                         }
                         if centerInRegion {
                             return (.fail(
-                                "A character overlaps a redacted area on page \(pageIndex + 1) (position \(unit.utf16Offset))"
-                            ), false)
+                                "A character overlaps a redacted area on page \(pageIndex + 1)"
+                            ), false, false)
                         }
-                        if firstGrazeMessage == nil {
-                            firstGrazeMessage =
-                                "A character touches the edge of a redacted area on page \(pageIndex + 1). "
-                                + "Its content is outside the redacted area. (position \(unit.utf16Offset))"
-                        }
+                        grazed = true
                         continue unitLoop
                     }
                 }
@@ -461,8 +463,8 @@ public struct SandwichVerification: Sendable {
                         continue
                     }
                     return (.fail(
-                        "Non-uniform glyph advance on page \(pageIndex + 1) at offset \(curr.utf16Offset)"
-                    ), false)
+                        "Non-uniform glyph advance on page \(pageIndex + 1)"
+                    ), false, false)
                 }
                 let delta = along(curr.bounds) - along(prev.bounds)
                 guard delta > 0 else { continue }
@@ -495,21 +497,33 @@ public struct SandwichVerification: Sendable {
                 let j = max(0, ((delta - natural) / cell).rounded())
                 if abs(delta - (natural + j * cell)) > tolerance {
                     return (.fail(
-                        "Non-uniform glyph advance on page \(pageIndex + 1) at offset \(curr.utf16Offset)"
-                    ), false)
+                        "Non-uniform glyph advance on page \(pageIndex + 1)"
+                    ), false, false)
                 }
             }
         }
-        if let firstGrazeMessage {
+        if grazed {
             // A positional note: the character's content is outside the
             // region; the check ran.
-            return (.warn(firstGrazeMessage), false)
+            return (Self.grazeWarning(pages: [pageIndex]), false, true)
         }
         if zeroBoundsUnits > 0 {
             // Characters the check could not place — it did not fully run.
-            return (Self.zeroBoundsWarning(count: zeroBoundsUnits, pageIndex: pageIndex), true)
+            return (Self.zeroBoundsWarning(count: zeroBoundsUnits, pageIndex: pageIndex), true, false)
         }
-        return (.pass, false)
+        return (.pass, false, false)
+    }
+
+    /// WARN copy for the edge-graze class, composed once over every grazed
+    /// page: "on page 2" for one page, "on 2 pages: 2, 3" for more.
+    /// `pages` are 0-based (the UI chip convention); the copy prints
+    /// 1-based numbers. Mechanism only — no read-back offset.
+    static func grazeWarning(pages: [Int]) -> VerificationStatus {
+        let list = pages.map { String($0 + 1) }.joined(separator: ", ")
+        return .warn(
+            "A character touches the edge of a redacted area on \(pagePhrase(pages, list: list)). "
+            + "Its content is outside the redacted area."
+        )
     }
 
     /// WARN copy for non-whitespace read-back units whose selection bounds
