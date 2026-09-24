@@ -28,6 +28,8 @@ struct VerificationDetailsSection: View {
     let columnMaxWidth: CGFloat?
 
     @Environment(DocumentState.self) private var documentState
+    // The header tile's wash is per appearance (tileWashLight / tileWashDark).
+    @Environment(\.colorScheme) private var colorScheme
     // Routes the
     // page-modes / layer-detail `.move(edge:)` transitions through
     // `Anim.resolvedTransition`.
@@ -44,12 +46,20 @@ struct VerificationDetailsSection: View {
 
     private var hairlineInset: CGFloat { iconColumn + ResectaTokens.Spacing.sm }
 
+    /// The header's teal tile, scaling with the headline it sits beside.
+    /// 36 pt with 12 pt of padding is the measured ceiling that keeps the
+    /// PASS summary on one line and the timing line above the 6.3″ fold.
+    @ScaledMetric(relativeTo: .headline) private var headerTile: CGFloat = 36
+
     // MARK: - Details disclosure
     //
     // Phase 2 lock: collapsed by default; closed-state row carries the
     // pass/note/issue summary; chevron rotates 90° on expand (mirrors the
-    // pageModesSection pattern). The existing pageModesSection body and
-    // the ForEach(LayerResultRow) body are preserved verbatim inside.
+    // pageModesSection pattern). The header is a mini-card in the action
+    // cards' grammar: the brand glyph on a teal tile, the title and the
+    // summary, one chevron; the card's material and shadow are the
+    // HomeChoiceCardButtonStyle chrome minus the press scale — a
+    // disclosure, not a navigation card.
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -58,28 +68,40 @@ struct VerificationDetailsSection: View {
                     isExpanded.toggle()
                 }
             } label: {
-                HStack(spacing: ResectaTokens.Spacing.sm) {
+                HStack(spacing: ResectaTokens.Spacing.md) {
+                    // The brand glyph on the tile wash (the
+                    // HomeChoiceCardContent subtle-tile rule).
                     Image(systemName: "list.bullet.rectangle")
-                        .font(.system(size: 20))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(ResectaTokens.BrandTeal.text)
-                        .frame(width: 28)
+                        .frame(width: headerTile, height: headerTile)
+                        .background(
+                            ResectaTokens.BrandTeal.tint.opacity(
+                                colorScheme == .dark
+                                    ? ResectaTokens.Opacity.tileWashDark
+                                    : ResectaTokens.Opacity.tileWashLight),
+                            in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.medium, style: .continuous))
 
-                    VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
+                    // The text column takes the width a Spacer would have
+                    // taken — a Spacer costs its minimum length plus two
+                    // HStack gaps and wraps the PASS summary onto two lines
+                    // at 402 pt.
+                    VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
                         Text("Verification Details")
-                            .font(.subheadline.weight(.medium))
+                            .font(.headline)
                         Text(detailsSummary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.footnote)
+                            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    DisclosureChevron(isExpanded: isExpanded, tint: ResectaTokens.BrandTeal.text)
+                        .frame(width: 16)
                 }
-                .padding(ResectaTokens.Spacing.sm)
+                // 12 pt: the disclosure's own row pads tighter than the
+                // 16 pt action cards above it; with the 36 pt tile this
+                // keeps the timing line ≈31 pt above the 6.3″ fold.
+                .padding(ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xs)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -175,8 +197,15 @@ struct VerificationDetailsSection: View {
                     reduceMotion: reduceMotion))
             }
         }
-        .background(.regularMaterial, in: RoundedRectangle(
-            cornerRadius: ResectaTokens.CornerRadius.medium, style: .continuous))
+        // One material for the whole disclosure (the rows inside are flat).
+        .background(
+            .regularMaterial,
+            in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.card, style: .continuous))
+        .shadow(
+            color: ResectaTokens.Shadow.subtle.color,
+            radius: ResectaTokens.Shadow.subtle.radius,
+            x: ResectaTokens.Shadow.subtle.x,
+            y: ResectaTokens.Shadow.subtle.y)
         .frame(maxWidth: columnMaxWidth)
     }
 

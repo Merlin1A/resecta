@@ -712,13 +712,15 @@ struct VerificationResultsView: View {
 
     /// The footer block's spacing — the distance from the
     /// timing line to the audit-scope note. 3 × `Spacing.xxl` = 144 pt,
-    /// sized from the measured PASS layout at the default type size: the
-    /// timing line ends ≈835 pt from the top of the screen on the 6.3″ and
-    /// 6.9″ iPhones, so the note's top edge lands ≈23 pt below the 956-pt
-    /// 6.9″ screen (≈105 pt below the 874-pt 6.3″ one) — the first screen,
-    /// which is the App Store frame, shows the verdict through the timing
-    /// line and the note is one scroll away. Static so the value is pinned
-    /// without a SwiftUI host (`HonestySurfacesTests`).
+    /// sized from the measured PASS layout at the default type size (the
+    /// 2026-09-24 re-measure, with the Verification Details header a
+    /// 61-pt mini-card): the timing line ends ≈843 pt from the top of the
+    /// screen — ≈31 pt above the 874-pt 6.3″ fold, ≈113 pt above the
+    /// 956-pt 6.9″ one — so the note's top edge lands ≈111 pt below the
+    /// 6.3″ screen (≈29 pt below the 6.9″) — the first screen, which is the
+    /// App Store frame, shows the verdict through the timing line and the
+    /// note is one scroll away. Static so the value is pinned without a
+    /// SwiftUI host (`HonestySurfacesTests`).
     static let disclaimerFootGap: CGFloat = ResectaTokens.Spacing.xxl * 3
 
     /// Disclaimer mount gate. Deliberately true for EVERY verdict state —
