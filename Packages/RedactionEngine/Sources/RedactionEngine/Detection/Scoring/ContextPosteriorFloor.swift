@@ -41,7 +41,7 @@ enum ContextPosteriorFloor {
     /// veto power over them. Account is the broad keyword-only family; phone is
     /// the separator-less slice. A deliberate, non-blanket extension point —
     /// extend per measured result, never blanket-apply to checksum-bearing families.
-    static let flooredFamilies: Set<String> = ["account", "phone"]
+    static let flooredFamilies: Set<ScoredFamily> = [.account, .phone]
 
     /// CONSERVATIVE-preset cutoffs from the shipped preset-thresholds.json
     /// (`28921a52`), read once. The floor always sources the conservative vector,
@@ -78,7 +78,8 @@ enum ContextPosteriorFloor {
                       family: String,
                       raw: Double,
                       conservativeCutoff: Double) -> Double {
-        guard flooredFamilies.contains(family), raw >= keywordConfirmedRaw else {
+        guard let scored = ScoredFamily(wire: family), flooredFamilies.contains(scored),
+              raw >= keywordConfirmedRaw else {
             return posterior
         }
         return max(posterior, min(raw, conservativeCutoff))

@@ -60,7 +60,7 @@ extension Array where Element == PIIDetector.PIIMatch {
     }
 
     /// Split the matches into the five scored families
-    /// (`ContextFeatureContract.scoredFamilies`, keyed by `wireName(for:)`) and
+    /// (`ContextFeatureContract.scoredFamilies`, typed by `ScoredFamily`) and
     /// everything else, each preserving relative order. The scored partition
     /// routes through `DocumentSearcher.composedSurvivors(...)` (posterior +
     /// learned context); the rest keep `applyingCountingDrops(thresholdVector:)`. A match
@@ -70,7 +70,7 @@ extension Array where Element == PIIDetector.PIIMatch {
         var scored: [Element] = []
         var rest: [Element] = []
         for match in self {
-            let family = match.category.flatMap { PresetThresholdVector.wireName(for: $0) }
+            let family = match.category.flatMap(ScoredFamily.init(category:))
             if let family, ContextFeatureContract.scoredFamilies.contains(family) {
                 scored.append(match)
             } else {

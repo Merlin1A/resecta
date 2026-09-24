@@ -216,27 +216,12 @@ public actor DocumentSearcher {
 
     // MARK: - Per-Session Caches
 
-    private var ocrCache: [Int: [OCREngine.TextLine]] = [:]
-    /// LRU access tracking for OCR cache eviction.
-    private var ocrCacheAccess: [Int: Int] = [:]
-    private var ocrAccessCounter: Int = 0
-
-    // Parallel cache of normalized PII-scan inputs,
-    // keyed identically to `ocrCache` and LRU-evicted in lockstep. The PII
-    // path (`scanPagePIIViaOCR`) reads this cache; user text search
-    // (`searchPageViaOCR`) continues reading verbatim `ocrCache`. Normalizer
-    // runs once per page at cache-miss time; cached results stay authoritative.
-    private struct NormalizedOCRPage {
-        let concatenated: String
-        let entries: [NormalizedLineEntry]
-    }
-    private struct NormalizedLineEntry {
-        let start: Int
-        let normalizedText: String
-        let normalizedRect: CGRect
-        let confidence: Float
-    }
-    private var ocrNormalizedConcat: [Int: NormalizedOCRPage] = [:]
+    /// The OCR page caches — the verbatim Vision lines, the LRU access
+    /// order and the normalized PII-scan inputs — one value owned by this
+    /// actor. See `OCRPageCache`.
+    private var ocrPageCache = OCRPageCache()
+    private typealias NormalizedOCRPage = OCRPageCache.NormalizedPage
+    private typealias NormalizedLineEntry = OCRPageCache.NormalizedLineEntry
     private let ocrNormalizer = OCRTextNormalizer()
 
     public init(
@@ -409,17 +394,46 @@ public actor DocumentSearcher {
         return (matches, spatialRectByText)
     }
 
+    // MARK: - Site-B gate (both PII-scan legs)
+
+    /// The Site-B gate over one page's resolved matches: partition, then
+    /// gate (Option A) — the five scored families route through the
+    /// composed posterior (`composedSurvivors`); every other family keeps
+    /// the raw `applying(thresholdVector:)` path byte-for-byte, and its
+    /// below-threshold drops fire `belowThresholdSink` (the scored
+    /// families' posterior drops are a separate concern and are not
+    /// counted; counting at only one leg would under-report). The
+    /// recombined survivors are re-sorted by position so the result list
+    /// and J/K navigation keep the positional order `resolveOverlaps`
+    /// produced — the partition alone groups non-scored ahead of scored.
+    /// The sort is stable, so its input order (the raw-gated survivors,
+    /// then the composed scored survivors) is part of the contract.
+    /// `pageText` is the text the detector ran on: the page string on the
+    /// text leg, the normalized concatenation on the OCR leg.
+    private func gateAndCompose(
+        _ matches: [PIIDetector.PIIMatch],
+        pageText: String
+    ) -> [PIIDetector.PIIMatch] {
+        let (scored, rest) = matches.partitionedByScoredFamily()
+        let gated = rest.applyingCountingDrops(thresholdVector: thresholdVector)
+        if gated.droppedBelowThreshold > 0 {
+            belowThresholdSink?(gated.droppedBelowThreshold)
+        }
+        return (gated.survivors + composedSurvivors(scored, pageText: pageText))
+            .sorted { $0.range.location < $1.range.location }
+    }
+
     // MARK: - Test Seams (internal, observation/seeding only)
 
     #if DEBUG
-    internal var _testOCRCacheKeys: Set<Int> { Set(ocrCache.keys) }
-    internal var _testOCRNormalizedConcatKeys: Set<Int> { Set(ocrNormalizedConcat.keys) }
+    internal var _testOCRCacheKeys: Set<Int> { ocrPageCache.cachedKeys }
+    internal var _testOCRNormalizedConcatKeys: Set<Int> { ocrPageCache.normalizedKeys }
     /// H3.1 (1.2 instrumentation plan §6) — read-only view of one page's
     /// cached Vision lines so the search-GT harness can emit the exact OCR
     /// text the OCR leg matched against. Observation-only, same contract as
     /// `_testOCRCacheKeys` above; never touches the LRU access ordering.
     internal func _testOCRCachedLines(forPageIndex pageIndex: Int) -> [OCREngine.TextLine]? {
-        ocrCache[pageIndex]
+        ocrPageCache.cachedLines(forPageIndex: pageIndex)
     }
 
     /// Seeds the three OCR caches with `occupiedCount` placeholder entries,
@@ -431,22 +445,8 @@ public actor DocumentSearcher {
         skippingPageIndex: Int,
         occupiedCount: Int
     ) {
-        ocrCache.removeAll()
-        ocrCacheAccess.removeAll()
-        ocrNormalizedConcat.removeAll()
-        ocrAccessCounter = 0
-        var added = 0
-        var idx = 0
-        while added < occupiedCount {
-            if idx != skippingPageIndex {
-                ocrAccessCounter += 1
-                ocrCacheAccess[idx] = ocrAccessCounter
-                ocrCache[idx] = []
-                ocrNormalizedConcat[idx] = NormalizedOCRPage(concatenated: "", entries: [])
-                added += 1
-            }
-            idx += 1
-        }
+        ocrPageCache.seedForCoherence(
+            skippingPageIndex: skippingPageIndex, occupiedCount: occupiedCount)
     }
 
     /// Seeds the OCR cache with known lines for a specific page index,
@@ -455,12 +455,7 @@ public actor DocumentSearcher {
     /// The normalized-concat cache entry is NOT pre-seeded here (the PII
     /// path rebuilds it on demand; the text/regex paths do not read it).
     internal func _testSeedOCRLines(_ lines: [OCREngine.TextLine], forPageIndex pageIndex: Int) {
-        ocrAccessCounter += 1
-        ocrCacheAccess[pageIndex] = ocrAccessCounter
-        ocrCache[pageIndex] = lines
-        // Invalidate any stale normalized-concat entry so a subsequent PII
-        // scan rebuilds it from the newly seeded raw lines.
-        ocrNormalizedConcat.removeValue(forKey: pageIndex)
+        ocrPageCache.seedLines(lines, forPageIndex: pageIndex)
     }
 
     /// Test seam: base address of the copy-on-write-shared surname
@@ -579,7 +574,7 @@ public actor DocumentSearcher {
     /// Install the per-page coverage sink — the search-side seam for the
     /// verification search re-check (C-5, 1.1.1). Reporting-only; pass nil
     /// to disable. See `PageSearchCoverage`.
-    public func setPageCoverageSink(_ sink: (@Sendable (PageSearchCoverage) -> Void)?) {
+    func setPageCoverageSink(_ sink: (@Sendable (PageSearchCoverage) -> Void)?) {
         self.pageCoverageSink = sink
     }
 
@@ -642,11 +637,11 @@ public actor DocumentSearcher {
     /// Total cap on live-preview match count. Above this we report
     /// `saturated` and stop counting. The full search has its own cap
     /// (`maxResults`) and is unaffected.
-    public static let maxPreviewMatches = 10_000
+    static let maxPreviewMatches = 10_000
 
     /// Per-page cap on the highlighted ranges returned for the
     /// visible page. Bounds the overlay redraw cost on dense pages.
-    public static let maxCurrentPageHighlights = 500
+    static let maxCurrentPageHighlights = 500
 
     /// Fast-path counterpart to `search(...)`. Walks the requested
     /// scope, counts matches, and (for the visible page only) collects
@@ -800,7 +795,7 @@ public actor DocumentSearcher {
                 guard let match, match.range.location != NSNotFound else { return }
 
                 if options.wholeWord, let swiftRange = Range(match.range, in: searchText) {
-                    if !Self.previewIsWholeWord(swiftRange, in: searchText) { return }
+                    if !Self.isWholeWord(swiftRange, in: searchText) { return }
                 }
 
                 totalCount += 1
@@ -907,14 +902,12 @@ public actor DocumentSearcher {
                     if let map = ext.offsetMap, let swiftRange = Range(matchRange, in: searchText) {
                         let start = searchText.distance(from: searchText.startIndex, to: swiftRange.lowerBound)
                         let len = searchText.distance(from: swiftRange.lowerBound, to: swiftRange.upperBound)
-                        guard len > 0, start < map.count, start + len - 1 < map.count else {
+                        guard let span = Self.baseSpan(start: start, length: len, offsetMap: map) else {
                             searchLocation = matchRange.location + max(matchRange.length, 1)
                             continue
                         }
-                        let baseStart = map[start]
-                        let baseEnd = map[start + len - 1] + 1
-                        emitRange = NSRange(location: baseStart, length: baseEnd - baseStart)
-                        baseBounds = (baseStart, baseEnd)
+                        emitRange = NSRange(location: span.lowerBound, length: span.count)
+                        baseBounds = (span.lowerBound, span.upperBound)
                     }
 
                     // The magic-wand `exactMatch` gates the same
@@ -927,7 +920,7 @@ public actor DocumentSearcher {
                                 chars: baseChars, start: bounds.start, endExclusive: bounds.endExclusive
                             )
                         } else if let swiftRange = Range(matchRange, in: searchText) {
-                            isBoundaried = Self.previewIsWholeWord(swiftRange, in: searchText)
+                            isBoundaried = Self.isWholeWord(swiftRange, in: searchText)
                         } else {
                             isBoundaried = true
                         }
@@ -965,29 +958,6 @@ public actor DocumentSearcher {
             currentPageMatches: currentPageMatches
         )
     }
-
-    /// Local whole-word check for the preview path. Mirrors the
-    /// instance `isWholeWord` but is callable from nonisolated context.
-    private nonisolated static func previewIsWholeWord(_ range: Range<String.Index>, in text: String) -> Bool {
-        if range.lowerBound > text.startIndex {
-            let charBefore = text[text.index(before: range.lowerBound)]
-            if charBefore.isLetter || charBefore.isNumber || charBefore == "_" {
-                return false
-            }
-        }
-        if range.upperBound < text.endIndex {
-            let charAfter = text[range.upperBound]
-            if charAfter.isLetter || charAfter.isNumber || charAfter == "_" {
-                return false
-            }
-        }
-        return true
-    }
-
-    // MARK: - Search Dispatch
-
-    /// Maximum OCR cache entries before eviction.
-    private static let maxOCRCacheEntries = 50
 
     // MARK: - Text-layer routing
 
@@ -1296,7 +1266,7 @@ public actor DocumentSearcher {
                 // Whole-word check
                 if options.wholeWord {
                     guard let swiftRange = Range(matchRange, in: searchText) else { return }
-                    if !isWholeWord(swiftRange, in: searchText) {
+                    if !Self.isWholeWord(swiftRange, in: searchText) {
                         return
                     }
                 }
@@ -1541,26 +1511,9 @@ public actor DocumentSearcher {
                 let merged = userTermsIndex?.merge(
                     into: resolution.surviving, doctype: nil
                 ) ?? resolution.surviving
-                // Site-B parity. Partition, then gate (Option A): the five
-                // scored families route through the composed posterior; every
-                // other family keeps the raw `applying(thresholdVector:)` path
-                // byte-for-byte. Text feature source is `pageText` (in scope). The
-                // recombined survivors are re-sorted by position so the result list
-                // and J/K navigation keep the positional order resolveOverlaps
-                // produced — the partition alone groups non-scored ahead of scored.
-                let (scoredText, restText) = merged.partitionedByScoredFamily()
-                // Count the raw-gate below-threshold drops on the
-                // text path and fire the sink (mirrors the overlapSink guard
-                // above). Only `restText` is gated by `applying(...)`; the scored
-                // families flow through `composedSurvivors` and are intentionally
-                // NOT counted here (their posterior drops are a separate concern).
-                let gatedText = restText.applyingCountingDrops(thresholdVector: thresholdVector)
-                if gatedText.droppedBelowThreshold > 0 {
-                    belowThresholdSink?(gatedText.droppedBelowThreshold)
-                }
-                let matches = (gatedText.survivors
-                    + composedSurvivors(scoredText, pageText: pageText))
-                    .sorted { $0.range.location < $1.range.location }
+                // Site-B parity: partition, gate, compose, re-sort — the
+                // text feature source is `pageText` (in scope).
+                let matches = gateAndCompose(merged, pageText: pageText)
                 for match in matches {
                     if Task.isCancelled || totalYielded >= Self.maxResults { break }
 
@@ -1629,13 +1582,10 @@ public actor DocumentSearcher {
                             term: "Custom",
                             piiCategory: nil,
                             piiConfidence: nil,
-                            rationale: MatchRationale(
-                                ruleID: "user.alwaysFlag",
-                                signals: [.userAlwaysFlag(pattern: hit.pattern)],
-                                preThresholdScore: 1.0,
-                                finalScore: 1.0,
-                                appliedThreshold: nil
-                            ),
+                            rationale: MatchRationale.Builder(
+                                ruleID: "user.alwaysFlag", preThresholdScore: 1.0,
+                                signals: [.userAlwaysFlag(pattern: hit.pattern)]
+                            ).build(finalScore: 1.0),
                             matchRangeInSnippet: window.matchRange
                         ))
                         totalYielded += 1
@@ -1674,7 +1624,9 @@ public actor DocumentSearcher {
     /// so the harness's forced-OCR measurement (rotated / born-digital pages)
     /// needs a direct entry to the same private OCR body the product runs on
     /// `.sparse`/`.none` pages. Observation-only, no new behavior; internal for
-    /// `@testable` reach, mirroring `_testComposeSiteB`.
+    /// `@testable` reach, mirroring `_testComposeSiteB` (DEBUG-only like it —
+    /// the harness runs Debug builds).
+    #if DEBUG
     func _testScanPagePIIViaOCR(
         page: SendablePDFPage,
         pageIndex: Int,
@@ -1682,6 +1634,7 @@ public actor DocumentSearcher {
     ) async -> [SearchResult] {
         await scanPagePIIViaOCR(page: page.page, pageIndex: pageIndex, categories: categories)
     }
+    #endif
 
     /// Run PII detection on a page via OCR when no text layer is available.
     /// Concatenates OCR lines into a single text block, runs PIIDetector,
@@ -1710,61 +1663,14 @@ public actor DocumentSearcher {
         categories: Set<PIICategory>
     ) async -> [SearchResult] {
         // Render and OCR the page (reuses OCR cache)
-        let textLines: [OCREngine.TextLine]
-        if let cached = ocrCache[pageIndex] {
-            ocrAccessCounter += 1
-            ocrCacheAccess[pageIndex] = ocrAccessCounter
-            textLines = cached
-        } else {
-            let pageBounds = page.bounds(for: .cropBox)
-            let thumbnailSize = Self.ocrThumbnailSize(
-                pageBounds: pageBounds, rotation: page.rotation)
-            let pixelCount = thumbnailSize.width * thumbnailSize.height
-            guard thumbnailSize.width <= Self.maxOCRPixelDimension,
-                  thumbnailSize.height <= Self.maxOCRPixelDimension,
-                  pixelCount <= Self.maxOCRPixelCount else {
-                // Report the skip so the app layer can tell the
-                // user this page's image content was never text-scanned.
-                ocrSkipSink?(pageIndex)
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrSkippedOversize))
-                return []
-            }
-
-            // Render off-actor — page.thumbnail is synchronous PDFKit and
-            // can take seconds on a near-cap page. Holding the actor for
-            // that span starves queued setters (sinks, thresholds).
-            let sendablePage = SendablePDFPage(page)
-            let thumbnail = await Task.detached(priority: .userInitiated) {
-                sendablePage.page.thumbnail(of: thumbnailSize, for: .cropBox)
-            }.value
-            guard let cgImage = thumbnail.cgImage else {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
-                return []
-            }
-
-            do {
-                let lines = try await ocrEngine.recognizeText(
-                    in: cgImage, recognitionLevel: .accurate
-                )
-                evictOCRCacheIfNeeded()
-                ocrAccessCounter += 1
-                ocrCacheAccess[pageIndex] = ocrAccessCounter
-                ocrCache[pageIndex] = lines
-                textLines = lines
-            } catch {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
-                return []
-            }
-        }
-
-        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
+        let textLines = await ocrLines(for: page, pageIndex: pageIndex)
         guard !textLines.isEmpty else { return [] }
 
         // PII detection reads the normalized parallel
         // cache, not verbatim Vision output. On miss, run OCRTextNormalizer
         // per line and record offsets against the normalized concatenation.
         let normalizedPage: NormalizedOCRPage
-        if let cached = ocrNormalizedConcat[pageIndex] {
+        if let cached = ocrPageCache.normalizedPage(for: pageIndex) {
             normalizedPage = cached
         } else {
             var concat = ""
@@ -1781,7 +1687,7 @@ public actor DocumentSearcher {
                 concat += normalized + "\n"
             }
             normalizedPage = NormalizedOCRPage(concatenated: concat, entries: entries)
-            ocrNormalizedConcat[pageIndex] = normalizedPage
+            ocrPageCache.setNormalizedPage(normalizedPage, for: pageIndex)
         }
         let concatenated = normalizedPage.concatenated
         let lineOffsets = normalizedPage.entries
@@ -1814,22 +1720,10 @@ public actor DocumentSearcher {
             overlapSink?(resolution.suppressedCountByCategory)
         }
         // Site-B parity on the OCR path too (an un-routed site would leak
-        // raw-gated FP for the scored families). Same partition-then-gate split;
-        // the OCR feature text is `concatenated` (the normalized page text the
-        // detector ran on at :1330), NOT a `pageText` variable. Re-sorted by
-        // position so the recombined survivors keep positional order (the
-        // partition groups non-scored ahead of scored otherwise).
-        let (scoredOCR, restOCR) = resolution.surviving.partitionedByScoredFamily()
-        // Symmetric below-threshold drop count on the OCR path
-        // (counting at only one path would under-report). Same scoped gate: only
-        // `restOCR` is raw-gated; scored families route through `composedSurvivors`.
-        let gatedOCR = restOCR.applyingCountingDrops(thresholdVector: thresholdVector)
-        if gatedOCR.droppedBelowThreshold > 0 {
-            belowThresholdSink?(gatedOCR.droppedBelowThreshold)
-        }
-        let matches = (gatedOCR.survivors
-            + composedSurvivors(scoredOCR, pageText: concatenated))
-            .sorted { $0.range.location < $1.range.location }
+        // raw-gated FP for the scored families): the OCR feature text is
+        // `concatenated` (the normalized page text the detector ran on),
+        // NOT a `pageText` variable.
+        let matches = gateAndCompose(resolution.surviving, pageText: concatenated)
         var results: [SearchResult] = []
 
         // Spatial mapping shared between detector matches and
@@ -1852,14 +1746,7 @@ public actor DocumentSearcher {
                 unionRect = unionRect.union(entry.normalizedRect)
             }
 
-            let padX = 2.0 / page.bounds(for: .cropBox).width
-            let padY = 2.0 / page.bounds(for: .cropBox).height
-            let paddedRect = CGRect(
-                x: max(0, unionRect.minX - padX),
-                y: max(0, unionRect.minY - padY),
-                width: min(1, unionRect.width + padX * 2),
-                height: min(1, unionRect.height + padY * 2)
-            )
+            let paddedRect = Self.paddedNormalizedRect(unionRect, in: page)
 
             // The canonical context window over the
             // normalized concatenation the detector matched in — the same
@@ -1909,20 +1796,8 @@ public actor DocumentSearcher {
 
             // Fold OCR confidence into the rationale so power users can
             // see the OCR contribution alongside detector evidence.
-            let rationale: MatchRationale?
-            if let base = match.rationale {
-                var signals = base.signals
-                signals.append(.ocrConfidence(value: Double(mapped.ocrConfidence)))
-                rationale = MatchRationale(
-                    ruleID: base.ruleID,
-                    signals: signals,
-                    preThresholdScore: base.preThresholdScore,
-                    finalScore: base.finalScore,
-                    appliedThreshold: base.appliedThreshold
-                )
-            } else {
-                rationale = nil
-            }
+            let rationale = match.rationale?.appending(
+                .ocrConfidence(value: Double(mapped.ocrConfidence)))
 
             results.append(SearchResult(
                 pageIndex: pageIndex,
@@ -1959,16 +1834,13 @@ public actor DocumentSearcher {
                     term: "Custom",
                     piiCategory: nil,
                     piiConfidence: nil,
-                    rationale: MatchRationale(
-                        ruleID: "user.alwaysFlag",
+                    rationale: MatchRationale.Builder(
+                        ruleID: "user.alwaysFlag", preThresholdScore: 1.0,
                         signals: [
                             .userAlwaysFlag(pattern: hit.pattern),
                             .ocrConfidence(value: Double(mapped.ocrConfidence)),
-                        ],
-                        preThresholdScore: 1.0,
-                        finalScore: 1.0,
-                        appliedThreshold: nil
-                    ),
+                        ]
+                    ).build(finalScore: 1.0),
                     matchRangeInSnippet: mapped.window.matchRange
                 ))
             }
@@ -1986,22 +1858,6 @@ public actor DocumentSearcher {
         return results
     }
 
-    // MARK: - OCR Cache Eviction (shared across all OCR paths)
-
-    /// Evict the least-recently-used entry from the OCR caches when the capacity
-    /// ceiling is reached. Both `ocrCache` and `ocrNormalizedConcat` are always
-    /// evicted in lockstep so the two parallel caches never diverge.
-    /// Callers invoke this BEFORE inserting a new entry.
-    private func evictOCRCacheIfNeeded() {
-        if ocrCache.count >= Self.maxOCRCacheEntries {
-            if let lruPage = ocrCacheAccess.min(by: { $0.value < $1.value })?.key {
-                ocrCache.removeValue(forKey: lruPage)
-                ocrCacheAccess.removeValue(forKey: lruPage)
-                ocrNormalizedConcat.removeValue(forKey: lruPage)
-            }
-        }
-    }
-
     // MARK: - OCR Search Path
 
     /// Search a page via OCR when no text layer is available.
@@ -2015,64 +1871,7 @@ public actor DocumentSearcher {
         term: String
     ) async -> [SearchResult] {
         // Get or compute OCR results for this page
-        let textLines: [OCREngine.TextLine]
-        if let cached = ocrCache[pageIndex] {
-            // LRU: record access for eviction ordering
-            ocrAccessCounter += 1
-            ocrCacheAccess[pageIndex] = ocrAccessCounter
-            textLines = cached
-        } else {
-            // Render page at 300 DPI for OCR accuracy
-            let pageBounds = page.bounds(for: .cropBox)
-            let thumbnailSize = Self.ocrThumbnailSize(
-                pageBounds: pageBounds, rotation: page.rotation)
-
-            // Memory guard for OCR rendering.
-            // Oversized pages (e.g., architectural drawings) can produce
-            // multi-gigabyte bitmaps at 300 DPI. Skip OCR rather than risk
-            // an allocation crash. See KI-5 re: os_proc_available_memory().
-            // The per-axis cap admits a 10000 × 10000 (~ 400 MB) bitmap
-            // that can still trip jetsam; the pixel-count cap rejects
-            // near-axis-cap pages on top of the per-axis check.
-            let pixelCount = thumbnailSize.width * thumbnailSize.height
-            guard thumbnailSize.width <= Self.maxOCRPixelDimension,
-                  thumbnailSize.height <= Self.maxOCRPixelDimension,
-                  pixelCount <= Self.maxOCRPixelCount else {
-                // Report the skip so the app layer can tell the
-                // user this page's image content was never text-scanned.
-                ocrSkipSink?(pageIndex)
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrSkippedOversize))
-                return []
-            }
-
-            // Render off-actor — page.thumbnail is synchronous PDFKit and
-            // can take seconds on a near-cap page. Holding the actor for
-            // that span starves queued setters (sinks, thresholds).
-            let sendablePage = SendablePDFPage(page)
-            let thumbnail = await Task.detached(priority: .userInitiated) {
-                sendablePage.page.thumbnail(of: thumbnailSize, for: .cropBox)
-            }.value
-            guard let cgImage = thumbnail.cgImage else {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
-                return []
-            }
-
-            do {
-                let lines = try await ocrEngine.recognizeText(
-                    in: cgImage, recognitionLevel: .accurate
-                )
-                evictOCRCacheIfNeeded()
-                ocrAccessCounter += 1
-                ocrCacheAccess[pageIndex] = ocrAccessCounter
-                ocrCache[pageIndex] = lines
-                textLines = lines
-            } catch {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
-                return []
-            }
-        }
-
-        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
+        let textLines = await ocrLines(for: page, pageIndex: pageIndex)
 
         // Search within OCR results
         var results: [SearchResult] = []
@@ -2137,17 +1936,15 @@ public actor DocumentSearcher {
                     if let baseLineChars, let map = ext.offsetMap {
                         let start = lineText.distance(from: lineText.startIndex, to: matchRange.lowerBound)
                         let len = lineText.distance(from: matchRange.lowerBound, to: matchRange.upperBound)
-                        if start < map.count, start + len - 1 < map.count {
-                            let baseStart = map[start]
-                            let baseEnd = map[start + len - 1] + 1
+                        if let span = Self.baseSpan(start: start, length: len, offsetMap: map) {
                             isBoundaried = Self.isWholeWordInBase(
-                                chars: baseLineChars, start: baseStart, endExclusive: baseEnd
+                                chars: baseLineChars, start: span.lowerBound, endExclusive: span.upperBound
                             )
                         } else {
                             isBoundaried = false
                         }
                     } else {
-                        isBoundaried = isWholeWord(matchRange, in: lineText)
+                        isBoundaried = Self.isWholeWord(matchRange, in: lineText)
                     }
                     if !isBoundaried {
                         searchStart = matchRange.upperBound
@@ -2157,15 +1954,7 @@ public actor DocumentSearcher {
 
                 // Vision bounding boxes are already normalized 0–1, bottom-left origin.
                 // Add padding for OCR imprecision (2pt in normalized coords).
-                let pageBounds = page.bounds(for: .cropBox)
-                let padX = 2.0 / pageBounds.width
-                let padY = 2.0 / pageBounds.height
-                let paddedRect = CGRect(
-                    x: max(0, line.normalizedRect.minX - padX),
-                    y: max(0, line.normalizedRect.minY - padY),
-                    width: min(1, line.normalizedRect.width + padX * 2),
-                    height: min(1, line.normalizedRect.height + padY * 2)
-                )
+                let paddedRect = Self.paddedNormalizedRect(line.normalizedRect, in: page)
 
                 // The display span re-slices from the case-preserved
                 // analog at base offsets; matching stays on the normalized
@@ -2191,20 +1980,12 @@ public actor DocumentSearcher {
                 // display analog drifted (the `displaySlice` fallback) the
                 // window comes from the searched line at the searched
                 // offsets, matching that fallback slice instead.
-                let window: ContextWindow
-                if displayLineChars.count == ext.baseText.count,
-                   let span = Self.baseSpan(
-                       start: displayStart, length: displayLength, offsetMap: ext.offsetMap
-                   ),
-                   span.upperBound <= displayLineChars.count {
-                    window = contextSnippet(
-                        text: displayLineText, matchStart: span.lowerBound, matchLength: span.count
-                    )
-                } else {
-                    window = contextSnippet(
-                        text: lineText, matchStart: displayStart, matchLength: displayLength
-                    )
-                }
+                let window = displayWindow(
+                    displayChars: displayLineChars, displayText: displayLineText,
+                    baseCount: ext.baseText.count,
+                    start: displayStart, length: displayLength, offsetMap: ext.offsetMap,
+                    searchedText: lineText, searchedStart: displayStart, searchedLength: displayLength
+                )
 
                 results.append(SearchResult(
                     pageIndex: pageIndex,
@@ -2223,63 +2004,73 @@ public actor DocumentSearcher {
         return results
     }
 
-    // MARK: - Regex OCR Fallback Helpers
+    // MARK: - OCR page lines (the one render→cache→evict body for every OCR path)
 
-    /// Retrieve OCR lines for a page, using the cache when available.
-    /// On a cache miss, renders the page at 300 DPI using the same
-    /// SendablePDFPage + thumbnail-in-detached-Task idiom as
-    /// `searchPageViaOCR`, then inserts through the shared eviction path
-    /// so `ocrCache` and `ocrNormalizedConcat` stay in lockstep.
-    private func ocrPage(_ page: PDFPage, pageIndex: Int) async -> [OCREngine.TextLine] {
-        // Cache hit path — update LRU timestamp, return cached lines.
-        if let cached = ocrCache[pageIndex] {
-            ocrAccessCounter += 1
-            ocrCacheAccess[pageIndex] = ocrAccessCounter
-            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
-            return cached
+    /// The OCR lines for a page, from the per-session cache when present.
+    /// On a cache miss the page is rendered at 300 DPI off-actor (the
+    /// SendablePDFPage + thumbnail-in-detached-Task idiom), read by Vision,
+    /// and inserted through the shared eviction path so the verbatim lines
+    /// and the normalized inputs stay in lockstep. The three OCR entry paths
+    /// (manual OCR search, PII scan, regex OCR fallback) share this body.
+    ///
+    /// Memory guard: oversized pages (e.g., architectural drawings) can
+    /// produce multi-gigabyte bitmaps at 300 DPI, so a page past the OCR
+    /// pixel caps is skipped rather than risk an allocation crash (see KI-5
+    /// re: os_proc_available_memory()). The per-axis cap admits a
+    /// 10000 × 10000 (~ 400 MB) bitmap that can still trip jetsam; the
+    /// pixel-count cap rejects near-axis-cap pages on top of it.
+    ///
+    /// Coverage: the `.ocr` route is reported once per call, after the
+    /// get-or-compute block, on both the hit and the miss path; a skipped
+    /// or unreadable page reports its own route and returns no lines.
+    private func ocrLines(for page: PDFPage, pageIndex: Int) async -> [OCREngine.TextLine] {
+        let textLines: [OCREngine.TextLine]
+        if let cached = ocrPageCache.touch(pageIndex) {
+            textLines = cached
+        } else {
+            let pageBounds = page.bounds(for: .cropBox)
+            let thumbnailSize = Self.ocrThumbnailSize(
+                pageBounds: pageBounds, rotation: page.rotation)
+            let pixelCount = thumbnailSize.width * thumbnailSize.height
+            guard thumbnailSize.width <= Self.maxOCRPixelDimension,
+                  thumbnailSize.height <= Self.maxOCRPixelDimension,
+                  pixelCount <= Self.maxOCRPixelCount else {
+                // Report the skip so the app layer can tell the
+                // user this page's image content was never text-scanned.
+                ocrSkipSink?(pageIndex)
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrSkippedOversize))
+                return []
+            }
+
+            // Render off-actor — page.thumbnail is synchronous PDFKit and
+            // can take seconds on a near-cap page. Holding the actor for
+            // that span starves queued setters (sinks, thresholds).
+            let sendablePage = SendablePDFPage(page)
+            let thumbnail = await Task.detached(priority: .userInitiated) {
+                sendablePage.page.thumbnail(of: thumbnailSize, for: .cropBox)
+            }.value
+            guard let cgImage = thumbnail.cgImage else {
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
+                return []
+            }
+
+            do {
+                let lines = try await ocrEngine.recognizeText(
+                    in: cgImage, recognitionLevel: .accurate
+                )
+                ocrPageCache.insert(lines, for: pageIndex)
+                textLines = lines
+            } catch { // LegalPhrases:safe (Swift keyword)
+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
+                return []
+            }
         }
 
-        // Cache miss — render then OCR.
-        let pageBounds = page.bounds(for: .cropBox)
-        let thumbnailSize = Self.ocrThumbnailSize(
-            pageBounds: pageBounds, rotation: page.rotation)
-        let pixelCount = thumbnailSize.width * thumbnailSize.height
-        guard thumbnailSize.width <= Self.maxOCRPixelDimension,
-              thumbnailSize.height <= Self.maxOCRPixelDimension,
-              pixelCount <= Self.maxOCRPixelCount else {
-            // Report the skip so the app layer can tell the
-            // user this page's image content was never text-scanned.
-            ocrSkipSink?(pageIndex)
-            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrSkippedOversize))
-            return []
-        }
-
-        let sendablePage = SendablePDFPage(page)
-        let thumbnail = await Task.detached(priority: .userInitiated) {
-            sendablePage.page.thumbnail(of: thumbnailSize, for: .cropBox)
-        }.value
-        guard let cgImage = thumbnail.cgImage else {
-            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
-            return []
-        }
-
-        do {
-            let lines = try await ocrEngine.recognizeText(
-                in: cgImage, recognitionLevel: .accurate
-            )
-            // Insert through the shared eviction path so
-            // ocrCache and ocrNormalizedConcat are always evicted in lockstep.
-            evictOCRCacheIfNeeded()
-            ocrAccessCounter += 1
-            ocrCacheAccess[pageIndex] = ocrAccessCounter
-            ocrCache[pageIndex] = lines
-            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
-            return lines
-        } catch { // LegalPhrases:safe (Swift keyword)
-            pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
-            return []
-        }
+        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
+        return textLines
     }
+
+    // MARK: - Regex OCR Fallback Helpers
 
     /// Map a character offset in a newline-joined OCR text to the bounding
     /// rect of the containing OCR line. Used by the regex fallback to
@@ -2308,19 +2099,28 @@ public actor DocumentSearcher {
             let lineLength = line.text.count
             let lineEnd = cursor + lineLength  // exclusive, before the "\n"
             if offset >= cursor && offset <= lineEnd {
-                let pageBounds = page.bounds(for: .cropBox)
-                let padX = 2.0 / pageBounds.width
-                let padY = 2.0 / pageBounds.height
-                return CGRect(
-                    x: max(0, line.normalizedRect.minX - padX),
-                    y: max(0, line.normalizedRect.minY - padY),
-                    width: min(1, line.normalizedRect.width + padX * 2),
-                    height: min(1, line.normalizedRect.height + padY * 2)
-                )
+                return Self.paddedNormalizedRect(line.normalizedRect, in: page)
             }
             cursor += lineLength + 1  // +1 for the "\n"
         }
         return nil
+    }
+
+    /// A Vision line rect (normalized 0–1, bottom-left origin) padded by
+    /// 2 pt in normalized coordinates for OCR imprecision and clamped to
+    /// the unit square — the one padding arithmetic for every OCR result
+    /// rect (the PII scan's union rect, the literal OCR search's line rect
+    /// and the regex fallback's line rect).
+    nonisolated static func paddedNormalizedRect(_ rect: CGRect, in page: PDFPage) -> CGRect {
+        let pageBounds = page.bounds(for: .cropBox)
+        let padX = 2.0 / pageBounds.width
+        let padY = 2.0 / pageBounds.height
+        return CGRect(
+            x: max(0, rect.minX - padX),
+            y: max(0, rect.minY - padY),
+            width: min(1, rect.width + padX * 2),
+            height: min(1, rect.height + padY * 2)
+        )
     }
 
     /// Average OCR confidence across a set of lines. Returns 0 for an empty
@@ -2349,7 +2149,7 @@ public actor DocumentSearcher {
         regex: NSRegularExpression,
         options: SearchOptions
     ) async -> [SearchResult] {
-        let lines = await ocrPage(page, pageIndex: pageIndex)
+        let lines = await ocrLines(for: page, pageIndex: pageIndex)
         guard !lines.isEmpty else { return [] }
 
         // Normalize each line through OCRTextNormalizer (confusable correction)
@@ -2403,7 +2203,7 @@ public actor DocumentSearcher {
 
             if options.wholeWord {
                 guard let swiftRange = Range(matchRange, in: searchText) else { return }
-                if !isWholeWord(swiftRange, in: searchText) { return }
+                if !Self.isWholeWord(swiftRange, in: searchText) { return }
             }
 
             // Map the match start character offset to the containing OCR
@@ -2551,18 +2351,19 @@ public actor DocumentSearcher {
             let baseStartOffset: Int
             let baseLength: Int
             if let map = ext.offsetMap {
-                guard matchStartOffset < map.count,
-                      matchStartOffset + matchLength - 1 < map.count else {
-                    // Structurally unreachable (map covers every searched
-                    // char); refuse the match rather than risk a bad rect.
+                // The base span ends AFTER the last matched character's
+                // base position, so a match spanning removed separators
+                // covers them in the rect. A span the map cannot cover is
+                // structurally unreachable (the map covers every searched
+                // char); the match is refused rather than risk a bad rect.
+                guard let span = Self.baseSpan(
+                    start: matchStartOffset, length: matchLength, offsetMap: map
+                ) else {
                     searchStart = matchRange.upperBound
                     continue
                 }
-                baseStartOffset = map[matchStartOffset]
-                // End = index AFTER the last matched character's base
-                // position, so a match spanning removed separators covers
-                // them in the rect.
-                baseLength = map[matchStartOffset + matchLength - 1] + 1 - baseStartOffset
+                baseStartOffset = span.lowerBound
+                baseLength = span.count
             } else {
                 baseStartOffset = matchStartOffset
                 baseLength = matchLength
@@ -2582,7 +2383,7 @@ public actor DocumentSearcher {
                         chars: baseChars, start: baseStartOffset, endExclusive: baseStartOffset + baseLength
                     )
                 } else {
-                    isBoundaried = isWholeWord(matchRange, in: searchPageText)
+                    isBoundaried = Self.isWholeWord(matchRange, in: searchPageText)
                 }
                 if !isBoundaried {
                     searchStart = matchRange.upperBound
@@ -2610,20 +2411,12 @@ public actor DocumentSearcher {
                 // at the base span, so its match slice IS `matchedText`; on
                 // display drift (the `displaySlice` fallback) it comes from
                 // the searched text at the searched offsets instead.
-                let window: ContextWindow
-                if displayBaseChars.count == ext.baseText.count,
-                   let span = Self.baseSpan(
-                       start: baseStartOffset, length: baseLength, offsetMap: nil
-                   ),
-                   span.upperBound <= displayBaseChars.count {
-                    window = contextSnippet(
-                        text: displayBaseText, matchStart: span.lowerBound, matchLength: span.count
-                    )
-                } else {
-                    window = contextSnippet(
-                        text: searchPageText, matchStart: matchStartOffset, matchLength: matchLength
-                    )
-                }
+                let window = displayWindow(
+                    displayChars: displayBaseChars, displayText: displayBaseText,
+                    baseCount: ext.baseText.count,
+                    start: baseStartOffset, length: baseLength, offsetMap: nil,
+                    searchedText: searchPageText, searchedStart: matchStartOffset, searchedLength: matchLength
+                )
 
                 results.append(SearchResult(
                     pageIndex: pageIndex,
@@ -2678,9 +2471,14 @@ public actor DocumentSearcher {
         return String(displayChars[baseStart..<baseEndExclusive])
     }
 
-    /// The base-coordinate span `displaySlice` re-slices, or nil
-    /// under the same bound guards, so the context-window builder and the
-    /// display slice agree on when the fallback is taken.
+    /// The base-coordinate span of a match measured on the searched
+    /// (most-transformed) text: `offsetMap` routes it to base coordinates
+    /// when a length-changing extension is active, ending AFTER the last
+    /// matched character's base position; nil when the map cannot cover
+    /// the span. The one remap for the preview, the OCR literal path and
+    /// `findTextMatches`, and the span `displaySlice` re-slices under the
+    /// same bound guards, so the context-window builder and the display
+    /// slice agree on when the fallback is taken.
     static func baseSpan(start: Int, length: Int, offsetMap: [Int]?) -> Range<Int>? {
         guard length > 0, start >= 0 else { return nil }
         if let map = offsetMap {
@@ -2709,8 +2507,11 @@ public actor DocumentSearcher {
 
     // MARK: - Whole-Word Check
 
-    /// Check if the match range is surrounded by word boundaries.
-    private func isWholeWord(_ range: Range<String.Index>, in text: String) -> Bool {
+    /// Check if the match range is surrounded by word boundaries. The one
+    /// String-index predicate for the preview and full tiers (`nonisolated`
+    /// so the preview path can call it without an actor hop); the
+    /// base-coordinate `isWholeWordInBase` covers the offset-map case.
+    private nonisolated static func isWholeWord(_ range: Range<String.Index>, in text: String) -> Bool {
         if range.lowerBound > text.startIndex {
             let charBefore = text[text.index(before: range.lowerBound)]
             if charBefore.isLetter || charBefore.isNumber || charBefore == "_" {
@@ -2885,6 +2686,26 @@ public actor DocumentSearcher {
         let charStart = text.distance(from: text.startIndex, to: range.lowerBound)
         let charLength = text.distance(from: range.lowerBound, to: range.upperBound)
         return contextSnippet(text: text, matchStart: charStart, matchLength: charLength)
+    }
+
+    /// The context window over the case-preserved display analog at the
+    /// base span `displaySlice` re-sliced from (so the window's match
+    /// slice IS the displayed text), or — when the analog drifted from the
+    /// base Character count, the `displaySlice` fallback — over the
+    /// searched text at the searched offsets, matching that fallback slice
+    /// instead. The one pairing for the OCR literal path and
+    /// `findTextMatches`.
+    private func displayWindow(
+        displayChars: [Character], displayText: String, baseCount: Int,
+        start: Int, length: Int, offsetMap: [Int]?,
+        searchedText: String, searchedStart: Int, searchedLength: Int
+    ) -> ContextWindow {
+        if displayChars.count == baseCount,
+           let span = Self.baseSpan(start: start, length: length, offsetMap: offsetMap),
+           span.upperBound <= displayChars.count {
+            return contextSnippet(text: displayText, matchStart: span.lowerBound, matchLength: span.count)
+        }
+        return contextSnippet(text: searchedText, matchStart: searchedStart, matchLength: searchedLength)
     }
 
     /// Word character for the window trim: letters and digits; every

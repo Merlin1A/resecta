@@ -495,50 +495,14 @@ public struct DetectionOrchestrator: Sendable {
             if bypassScoring {
                 finalConfidence = max(match.confidence, 0.90)
             } else if let category = match.category {
-                // Absorbing-state floor (deliberate,
-                // 2026-06-10). Five consecutive rejections push the mixture
-                // mean to ≈0.16, where even a max-raw account hit (0.75)
-                // posteriors to ≈0.37 < 0.60 balanced and the category can
-                // never resurface. Flooring the prior at 0.35 keeps the
-                // weakest category's raw max above every preset threshold
-                // (0.20 was shown insufficient — see the design's math).
-                // Applied at this call site, not inside CalibratedScorer.
-                // The context-scorer augment threads a learned context log-odds term
-                // into posterior() at this same seam. posterior() takes a
-                // defaulted `contextLogit`; the shipped placeholder is all-w=0,
-                // so learnedContextLogit is 0 and finalConfidence is unchanged
-                // (the w=0 byte-identity control). The feature vector is the
-                // shared ContextFeatures builder, positional in
-                // ContextFeatureContract.featureOrder order.
-                let priorMean = max(priors.mean(category), Self.absorbingStateFloor)
-                let wire = PresetThresholdVector.wireName(for: category) ?? ""
-                let contextLogit = contextScorer.learnedContextLogit(
-                    family: wire,
-                    features: contextFeatures(
-                        match: match,
-                        effectiveDoctype: effectiveDoctype,
-                        pageText: text
-                    )
-                )
-                // Under-redaction posterior
-                // floor. The learned context term can drive a keyword-confirmed
-                // account/phone below the preset-threshold gate on a length/separator feature
-                // alone; re-floor it to the raw bar it already cleared (the
-                // preset-invariant conservative cutoff) before the gate consumes
-                // finalConfidence. Pure code,
-                // no scorer/preset blob change. No-op for non-floored families and
-                // for sub-bar raws. See ContextPosteriorFloor.
-                let scored = calibratedScorer.posterior(
-                    raw: match.confidence,
-                    priorMean: priorMean,
-                    contextLogit: contextLogit
-                )
-                finalConfidence = ContextPosteriorFloor.apply(
-                    scored,
-                    family: wire,
-                    raw: match.confidence,
-                    conservativeCutoff: ContextPosteriorFloor.conservativeCutoff(forWire: wire)
-                )
+                // The one posterior chain (absorbing-state floor → learned
+                // context term → calibrated posterior → under-redaction
+                // floor); the overlap resolver's survivability key runs the
+                // same function. See `posterior(for:category:priors:...)`.
+                finalConfidence = Self.posterior(
+                    for: match, category: category, priors: priors,
+                    effectiveDoctype: effectiveDoctype, pageText: text,
+                    contextScorer: contextScorer, calibratedScorer: calibratedScorer)
             } else {
                 finalConfidence = match.confidence
             }
@@ -927,22 +891,57 @@ public struct DetectionOrchestrator: Sendable {
     // MARK: - Survivability Posterior
 
     /// The floored posterior for a categorized match, used to rank
-    /// overlap-resolution winners by the score the preset-threshold gate will apply.
-    ///
-    /// This replicates the per-match category branch of `detectPage(...)` (the
-    /// `priorMean` → `learnedContextLogit` → `posterior` →
-    /// `ContextPosteriorFloor.apply` chain, including the under-redaction
-    /// floor seam) so the resolver's `SurvivabilityKey` scores a match exactly
-    /// as the Step 4 gate does. It is intentionally a faithful copy rather than
-    /// a shared call site so the gate seam stays byte-identical;
-    /// the two MUST stay in sync — any change to the Step 4 category branch
-    /// must be mirrored here (and vice-versa).
+    /// overlap-resolution winners by the score the preset-threshold gate
+    /// will apply. The Step 4 gate and this key run the ONE chain,
+    /// `posterior(for:category:priors:effectiveDoctype:pageText:...)`, so the
+    /// resolver scores a match exactly as the gate does by construction;
+    /// `PosteriorChainParityTests` pins that chain against the Search
+    /// path's composition.
     private func survivabilityPosterior(
         for match: PIIDetector.PIIMatch,
         category: PIICategory,
         priors: PerCategoryPriors,
         effectiveDoctype: DoctypeClass,
         pageText: String
+    ) -> Double {
+        Self.posterior(
+            for: match, category: category, priors: priors,
+            effectiveDoctype: effectiveDoctype, pageText: pageText,
+            contextScorer: contextScorer, calibratedScorer: calibratedScorer)
+    }
+
+    // MARK: - Posterior chain (the one Site-A composition)
+
+    /// The floored posterior for a categorized match — the one Site-A
+    /// chain (`priorMean` → `learnedContextLogit` → `posterior` →
+    /// `ContextPosteriorFloor.apply`) the Step 4 gate and the overlap
+    /// resolver's survivability key both run. Its twin on the search path
+    /// is `DocumentSearcher.composedSurvivors` (frozen);
+    /// `PosteriorChainParityTests` pins the two to the bit.
+    ///
+    /// Absorbing-state floor (deliberate, 2026-06-10): five consecutive
+    /// rejections push the mixture mean to ≈0.16, where even a max-raw
+    /// account hit (0.75) posteriors to ≈0.37 < 0.60 balanced and the
+    /// category can never resurface. Flooring the prior at 0.35 keeps the
+    /// weakest category's raw max above every preset threshold (0.20 was
+    /// shown insufficient — see the design's math). Applied here, not
+    /// inside CalibratedScorer.
+    ///
+    /// The context-scorer augment threads a learned context log-odds term
+    /// into posterior() at this same seam. posterior() takes a defaulted
+    /// `contextLogit`; the shipped placeholder is all-w=0, so
+    /// learnedContextLogit is 0 and the result is unchanged (the w=0
+    /// byte-identity control). The feature vector is the shared
+    /// ContextFeatures builder, positional in
+    /// ContextFeatureContract.featureOrder order.
+    static func posterior(
+        for match: PIIDetector.PIIMatch,
+        category: PIICategory,
+        priors: PerCategoryPriors,
+        effectiveDoctype: DoctypeClass,
+        pageText: String,
+        contextScorer: ContextScorerWeights,
+        calibratedScorer: CalibratedScorer
     ) -> Double {
         let priorMean = max(priors.mean(category), Self.absorbingStateFloor)
         let wire = PresetThresholdVector.wireName(for: category) ?? ""
@@ -954,6 +953,28 @@ public struct DetectionOrchestrator: Sendable {
                 pageText: pageText
             )
         )
+        return posterior(
+            for: match, category: category, priorMean: priorMean,
+            contextLogit: contextLogit, calibratedScorer: calibratedScorer)
+    }
+
+    /// The chain's arithmetic tail from a prior mean and a context
+    /// log-odds term: the calibrated posterior, then the under-redaction
+    /// floor. The learned context term can drive a keyword-confirmed
+    /// account/phone below the preset-threshold gate on a length/separator
+    /// feature alone; the floor re-admits it to the raw bar it already
+    /// cleared (the preset-invariant conservative cutoff) before the gate
+    /// consumes the value. Pure code, no scorer/preset blob change; a no-op
+    /// for non-floored families and for sub-bar raws. See
+    /// ContextPosteriorFloor.
+    static func posterior(
+        for match: PIIDetector.PIIMatch,
+        category: PIICategory,
+        priorMean: Double,
+        contextLogit: Double,
+        calibratedScorer: CalibratedScorer
+    ) -> Double {
+        let wire = PresetThresholdVector.wireName(for: category) ?? ""
         let scored = calibratedScorer.posterior(
             raw: match.confidence,
             priorMean: priorMean,
