@@ -1,8 +1,9 @@
 # Pull-request gate. Builds the app and both test bundles, runs the two
 # lints over the lines the change adds, checks the documented counts
-# against the tree, and checks the shipped-asset hashes. The four scripts
-# run from the base branch's copies, so a change cannot edit the lint it
-# is gated by; the change's own copies run once more, report-only. About
+# against the tree, checks the shipped-asset hashes and lists the growth of
+# every source file over 800 lines (the ratchet; report-only for now). The
+# scripts run from the base branch's copies, so a change cannot edit the
+# lint it is gated by; the change's own copies run once more, report-only. About
 # five minutes on a hosted macos-26 runner. The batched simulator suites
 # (sim-suite.yml) run weekly, on demand and on release tags, and the
 # engine host suite (engine-suite.yml) on demand and on release tags,
@@ -124,6 +125,35 @@ jobs:
         run: |
           "${BASE_SCRIPTS}/verify-shipped-asset-hashes.sh"
 
+      # Growth ratchet: a source file over 800 lines at the base of the change
+      # may not be larger at its head (Scripts/growth-ratchet.sh; a split along
+      # a real seam shrinks the file and passes). Report-only while
+      # RATCHET_ENFORCE is '0': every tracked file is listed in the step
+      # summary and a grown file is a warning annotation; flipping the value to
+      # '1' makes growth fail the gate. Runs the base branch's copy of the
+      # script when the base has one, this change's copy on its first landing.
+      - name: Growth ratchet (report-only)
+        env:
+          RATCHET_ENFORCE: '0'
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          t0=$SECONDS
+          base="${PR_BASE:-$PUSH_BEFORE}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="$(git rev-parse HEAD~1)"
+          fi
+          script="${BASE_SCRIPTS}/growth-ratchet.sh"
+          if git show "${base}:Scripts/growth-ratchet.sh" > "$script" 2>/dev/null && [ -s "$script" ]; then
+            chmod +x "$script"
+          else
+            script="Scripts/growth-ratchet.sh"
+            echo "growth-ratchet.sh is absent at ${base}; running this change's copy"
+          fi
+          echo "growth-ratchet range: ${base}..HEAD"
+          "$script" "$base" HEAD
+          echo "RATCHET_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
+
       # The change's own copies of the four scripts, so an edit to a lint is
       # exercised before it merges. Never gates.
       - name: Lint scripts from this change (report-only)
@@ -156,6 +186,7 @@ jobs:
             echo "| claims-lint | ${CLAIMS_SECS:-—} |"
             echo "| doc-metrics (check) | ${DOCMETRICS_SECS:-—} |"
             echo "| audit-lint (range) | ${AUDIT_SECS:-—} |"
+            echo "| growth-ratchet (report-only) | ${RATCHET_SECS:-—} |"
             echo
             echo "lint scripts from: ${LINT_SCRIPTS_FROM:-—}"
           } >> "$GITHUB_STEP_SUMMARY"
