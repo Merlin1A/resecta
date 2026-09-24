@@ -686,68 +686,9 @@ struct SearchAndRedactSheet: View {
         .shieldedSheetContent(monitor: captureMonitor)
     }
 
-    // MARK: - compactFloat Strip
-
-    /// The compact detent's WHOLE composition: one row — per-item Apply
-    /// leading, centred interface title, result-nav cluster (‹ › + k/N)
-    /// trailing. Compact is a glanceable handle — title + cluster +
-    /// per-item Apply; every OTHER control lives at medium+; the canvas
-    /// owns interaction below the sheet. The cluster is the medium+
-    /// search bar's builder (`resultNavCluster`; never co-mounted, ids
-    /// unique); cluster and Apply render only with results and no
-    /// review pending (`showsResultNavCluster`). The counter hides from
-    /// XXXL up; at accessibility sizes the row is a plain HStack
-    /// (Apply · title · chevrons) so the headline never collides.
-    /// Identifier kept for the detent-layout pins; `children: .contain`
-    /// keeps the inner ids. The Apply's contract: `+CompactApply.swift`.
-    private var compactFloatStrip: some View {
-        VStack(spacing: 0) {
-            Group {
-                if dynamicTypeSize.isAccessibilitySize {
-                    HStack(spacing: ResectaTokens.Spacing.sm) {
-                        if showsResultNavCluster {
-                            applyCurrentResultButton
-                        }
-                        Spacer(minLength: 0)
-                        compactStripTitle
-                        Spacer(minLength: 0)
-                        if showsResultNavCluster {
-                            resultNavCluster(hidesCounterAtLargeTypeSizes: true)
-                                .padding(.trailing, ResectaTokens.Spacing.md)
-                        }
-                    }
-                } else {
-                    // Overlays: title centred full-width, Apply leading, cluster trailing.
-                    ZStack {
-                        compactStripTitle
-                            .frame(maxWidth: .infinity)
-                        if showsResultNavCluster {
-                            applyCurrentResultButton
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            resultNavCluster(hidesCounterAtLargeTypeSizes: true)
-                                .padding(.trailing, ResectaTokens.Spacing.md)
-                                .frame(maxWidth: .infinity, alignment: .trailing)
-                        }
-                    }
-                }
-            }
-            // The row is always the 46-pt layout height of its controls
-            // so the title sits on the same line whether or not the
-            // cluster and the Apply render (no jump between results /
-            // no results / review; measured on-sim).
-            .frame(minHeight: ResectaTokens.TouchTarget.minimum)
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("compactFloatStrip")
-    }
-
-    /// The compact handle's title — the centred headline, unchanged.
-    private var compactStripTitle: some View {
-        Text(searchState.searchModeType.interface.displayName)
-            .font(.headline)
-            .lineLimit(1)
-    }
+    // The compact detent's composition (`compactFloatStrip`, the title,
+    // the walk's match line) lives in `Search/SearchAndRedactSheet+CompactStrip.swift`
+    // (the M-6 hub cap).
 
     // MARK: - Search Bar
 
@@ -1002,7 +943,7 @@ struct SearchAndRedactSheet: View {
     /// which the editor's page-bar hide reads through
     /// `RedactionState.walkLive`). The compact handle's per-item Apply
     /// rides the same gate.
-    private var showsResultNavCluster: Bool {
+    var showsResultNavCluster: Bool {
         searchState.isWalkLive(reviewPending: redactionState.pendingTriage != nil)
     }
 
@@ -1033,7 +974,7 @@ struct SearchAndRedactSheet: View {
     /// `SearchResultsSection`). `hidesCounterAtLargeTypeSizes` applies
     /// to the compact handle only: the counter hides from XXXL up
     /// (measured — see `compactFloatStrip`).
-    private func resultNavCluster(hidesCounterAtLargeTypeSizes: Bool) -> some View {
+    func resultNavCluster(hidesCounterAtLargeTypeSizes: Bool) -> some View {
         HStack(spacing: ResectaTokens.Spacing.xs) {
             HStack(spacing: 6) {
                 Button {

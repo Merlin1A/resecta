@@ -35,10 +35,11 @@ struct CompactDetentAnchoredRowTests {
     @Test("The compact handle mounts the result-nav cluster, which carries resultNavNext")
     func compactStripCarriesResultNavCluster() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/SearchAndRedactSheet.swift")
-        // The strip's body: from its declaration to the next MARK.
-        let strip = try slice(source,
-                              from: "private var compactFloatStrip: some View {",
-                              to: "// MARK: - Search Bar")
+        // The strip's body lives in the +CompactStrip extension file.
+        let stripFile = try loadRepoFile("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactStrip.swift")
+        let strip = try slice(stripFile,
+                              from: "var compactFloatStrip: some View {",
+                              to: "var compactStripTitle: some View {")
         #expect(strip.contains("resultNavCluster("),
                 "compactFloatStrip must mount the shared result-nav cluster builder")
         #expect(strip.contains("accessibilityIdentifier(\"compactFloatStrip\")"),
@@ -46,7 +47,7 @@ struct CompactDetentAnchoredRowTests {
         // The builder both sites share carries the ids — so the compact
         // handle carries resultNavNext by construction.
         let cluster = try slice(source,
-                                from: "private func resultNavCluster(",
+                                from: "func resultNavCluster(",
                                 to: "private var resultNavCounter: some View {")
         #expect(cluster.contains("accessibilityIdentifier(\"resultNavNext\")"),
                 "resultNavCluster must carry the resultNavNext identifier")
@@ -56,10 +57,10 @@ struct CompactDetentAnchoredRowTests {
 
     @Test("The compact handle mounts the per-item Apply, which carries applyCurrentResultButton")
     func compactStripCarriesApplyCurrentResultButton() throws {
-        let source = try loadRepoFile("Sources/ResectaApp/Views/SearchAndRedactSheet.swift")
-        let strip = try slice(source,
-                              from: "private var compactFloatStrip: some View {",
-                              to: "// MARK: - Search Bar")
+        let stripFile = try loadRepoFile("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactStrip.swift")
+        let strip = try slice(stripFile,
+                              from: "var compactFloatStrip: some View {",
+                              to: "var compactStripTitle: some View {")
         // Both branches of the strip mount the builder …
         let mounts = strip.components(separatedBy: "applyCurrentResultButton\n").count - 1
         #expect(mounts >= 2,
