@@ -36,6 +36,23 @@ extension SearchAndRedactSheet {
         }
     }
 
+    /// What `prepareSearchRun()` hands the run task: the run token, the
+    /// private document copy, the engine mode, the kickoff snapshots
+    /// (the preset's threshold vector, the per-page text-layer
+    /// classification, the compiled user terms) and the Scan facts the
+    /// coverage report reads at the tail.
+    private struct PreparedRun {
+        let run: Int
+        let searchDoc: SendablePDFDocument
+        let mode: SearchMode
+        let thresholdVector: PresetThresholdVector?
+        let textLayerStatus: [Int: TextLayerStatus]
+        let userTermsIndex: UserTermsIndex?
+        let isPIIScan: Bool
+        let enabledCategories: Set<PIICategory>
+        let scanStartedAt: Date
+    }
+
     func triggerSearch() {
         // Belt: no run may start while staged detections await
         // review — the review owns the Scan surface until resolved
@@ -52,8 +69,9 @@ extension SearchAndRedactSheet {
         // loser's scan and double-wrote the run record.
         guard searchState.beginTriggerSetup() else { return }
         // Orchestration runs inside a Task so the prior task's cleanup
-        // tail completes (via `await searchState.cancelSearch()`) before
-        // the new scan installs sinks and flips `isSearching`.
+        // tail completes (via `await searchState.cancelSearch()`, the
+        // first thing `prepareSearchRun()` does) before the new scan
+        // installs sinks and flips `isSearching`.
         Task { @MainActor in
             defer {
                 // Window closes on every exit path; a coalesced caller
@@ -63,290 +81,21 @@ extension SearchAndRedactSheet {
                     triggerSearch()
                 }
             }
-            await searchState.cancelSearch()
-            // Snapshot the just-completed scan's
-            // results (if any) into `priorScanFingerprints` BEFORE
-            // `clearResults()` wipes the array. The snapshot survives
-            // `clearResults` by design — see `SearchState.priorScanFingerprints`
-            // docstring for the asymmetric clear-paths carve-out.
-            // `diffSinceLastScan()` reads this snapshot once the new scan's
-            // results land, surfacing the Coverage Report diff line.
-            searchState.captureFingerprintsBeforeScan()
-            searchState.clearResults()
-            // The token this run's results and progress hops carry: a
-            // cancelled predecessor still draining its stream is told
-            // apart by it and dropped, so its late batch can never land
-            // in this run's list.
-            let run = searchState.beginRun()
-
-            // Pre-validate regex before starting search.
-            // Surface the rejection reason —
-            // the engine's NSError localizedDescription verbatim for
-            // compile failures,
-            // or the typed RegexValidationError's mechanism-description
-            // copy for the safety gates. The prior hardcoded "Invalid
-            // regular expression" discarded both.
-            if searchState.searchModeType == .regex {
-                do {
-                    _ = try DocumentSearcher.validateRegexPatternWithError(searchState.queryText)
-                } catch { // LegalPhrases:safe (Swift keyword)
-                    // Lead with a human hint for the common
-                    // failure shapes; the engine's original error text
-                    // stays available after it. No hint matched → the
-                    // original text alone, as before.
-                    searchState.regexError = Self.regexErrorDisplayMessage(
-                        pattern: searchState.queryText,
-                        engineDescription: error.localizedDescription
-                    )
-                    return
-                }
-            }
-
-            // Record multi-term term sets into the
-            // in-memory recall ring so the empty state can surface them
-            // as tappable chips on the next traversal through the empty
-            // state. Recording at trigger time (not at term-add time)
-            // means we only capture sets the user actually committed to.
-            if searchState.searchModeType == .multiTerm {
-                searchState.recordMultiTermSearch(terms: searchState.searchTerms)
-            }
-
-            searchState.isSearching = true
-
-            guard let liveDoc = documentState.sourceDocument else {
-                searchState.isSearching = false
-                // Same feedback contract as the copy-failure guard
-                // below — a silent exit reads as "never ran" once the
-                // sheet re-renders.
-                toastManager.enqueue(
-                    "Could not prepare the document for search. Try again.",
-                    severity: .warning
-                )
-                if searchState.searchModeType == .piiScan {
-                    searchState.scanStartFailed = true
-                    redactionState.recordDetectionRun(
-                        .failed,
-                        scanSummary: .init(foundCount: 0, pageCount: 0))
-                }
-                return
-            }
-
-            // Build a private copy off-main so the background search and
-            // the first-page classifier never read the on-screen PDFDocument
-            // the PDFView renders on the main thread. The cheap
-            // `SendablePDFDocument` wrap happens on MainActor; the costly
-            // dataRepresentation + reconstruct runs in the detached task
-            // (mirrors `firstPageText`). A nil copy ⇒ no shared-instance
-            // fallback — surface a mechanism toast and stop.
-            let liveDocBox = SendablePDFDocument(liveDoc)
-            guard let searchDoc = await Task.detached(priority: .utility, operation: {
-                DocumentState.makeSearchCopy(of: liveDocBox)
-            }).value else {
-                searchState.isSearching = false
-                toastManager.enqueue(
-                    "Could not prepare the document for search. Try again.",
-                    severity: .warning
-                )
-                // Scan-interface runs leave a durable failed record —
-                // a failure notice that only ever lived in a transient
-                // toast is no record at all (the banner persists it).
-                if searchState.searchModeType == .piiScan {
-                    searchState.scanStartFailed = true
-                    redactionState.recordDetectionRun(
-                        .failed,
-                        scanSummary: .init(foundCount: 0, pageCount: 0))
-                }
-                return
-            }
-
-            let mode = buildSearchMode()
-            searchState.totalPages = liveDoc.pageCount
-
-            // Snapshot the user-selected preset's
-            // vector before kickoff so each scan runs against a stable
-            // copy. `settingsState` is the sheet's existing @Environment
-            // read (internal, extension-visible).
-            let thresholdVector: PresetThresholdVector? = settingsState.activeThresholdVector
-
-            // Snapshot the per-page text-layer classification
-            // computed at import time. `DocumentSearcher` consults it so a
-            // `.sparse`/`.none` page (a header-only layer over a scanned body)
-            // routes to OCR instead of having its body suppressed by the thin
-            // layer. Snapshot here, like the threshold vector, so the scan runs
-            // against a stable copy.
-            let textLayerStatus: [Int: TextLayerStatus] = documentState.textLayerStatus
-
-            // Snapshot + compile user terms once per kickoff. Compile is
-            // cheap (≤100+100 patterns, most literal), same lifecycle as
-            // the threshold vector. `UserTermsIndex` wraps the matcher so
-            // the engine runs never-flag suppression pre-threshold. Only
-            // attach when non-empty to keep the hot path unchanged for
-            // users with no custom terms.
-            let userTerms = userTermsStore.blob
-            let userTermsIndex: UserTermsIndex? = {
-                let compiled = UserTermsIndex.compile(
-                    alwaysFlag: userTerms.alwaysFlag,
-                    neverFlag: userTerms.neverFlag
-                )
-                return compiled.isEmpty ? nil : compiled
-            }()
-
-            // Capture PII scan configuration for the coverage report +
-            // doctype explanation. Classifier runs on the first page only;
-            // cheap (<5ms) and gives the footer its top-3 probabilities.
-            // The EFFECTIVE set (empty selection = everything) is what
-            // the engine query requests, so the report describes the
-            // run that actually happened.
-            let isPIIScan = searchState.searchModeType == .piiScan
-            let enabledCategories = searchState.effectiveScanCategories
-            let scanStartedAt = Date()
-
-            // Freeze the executed detector count for the
-            // zero-state completion copy, beside the engine query's own
-            // category snapshot above.
-            if isPIIScan {
-                searchState.lastRunDetectorCount = enabledCategories.count
-            }
-
-            // Degrade surface for the LIVE scan path. The
-            // legacy detection pipeline surfaced its loader diagnostics via
-            // `PipelineCoordinator.surfaceGazetteerLoadDiagnostics`, but the
-            // Scan interface runs through `DocumentSearcher`, whose shared
-            // detector degraded silently (an NER-absent OS build dropped
-            // every name match with zero signal). Surface the shared
-            // detector's load diagnostics at scan kickoff: first qualifying
-            // failure posts the one-time toast and raises the persistent
-            // Scan-interface banner (same flag, same gate semantics as the
-            // legacy path).
-            if isPIIScan {
-                let diagnostics = DocumentSearcher.sharedLoadDiagnostics
-                if diagnostics.didDegrade,
-                   !redactionState.autoDetectionDegraded {
-                    redactionState.autoDetectionDegraded = true
-                    redactionState.autoDetectionDegradeFailures =
-                        diagnostics.failedGazetteers
-                    toastManager.enqueue(
-                        DetectionDegradeCopy.toast(
-                            failedGazetteers: diagnostics.failedGazetteers),
-                        severity: .warning
-                    )
-                }
-            }
-
-            // Reset the overlap-suppressed tally before kickoff so the
-            // CoverageReport only reflects this scan's counts.
-            searchState.resetOverlapSuppression()
-            // Reset the below-threshold tally for the same reason.
-            searchState.resetBelowThresholdSuppression()
-            // Reset the regex-timeout page set before kickoff so
-            // the banner only reflects pages affected by THIS scan.
-            searchState.resetRegexTimeoutPages()
-            // Reset the OCR-skip page set for the same reason.
-            searchState.resetOCRSkippedPages()
+            guard let prepared = await prepareSearchRun() else { return }
+            let run = prepared.run
 
             searchState.activeSearchTask = Task {
-                await searcher.setThresholdVector(thresholdVector)
-                await searcher.setUserTerms(userTermsIndex)
+                await searcher.setThresholdVector(prepared.thresholdVector)
+                await searcher.setUserTerms(prepared.userTermsIndex)
                 // Install the per-page text-layer classification
                 // so the engine routes `.sparse`/`.none` pages to OCR.
-                await searcher.setTextLayerStatus(textLayerStatus)
-                // Install the overlap sink. `DocumentSearcher` calls this
-                // once per page where the resolver dropped at least one loser.
-                await searcher.setOverlapSink({ [weak searchState] counts in
-                    Task { @MainActor in
-                        searchState?.accumulateOverlapSuppression(counts)
-                    }
-                })
-                // Install the below-threshold sink. `DocumentSearcher`
-                // calls this once per page where the raw threshold gate dropped at
-                // least one match, mirroring the overlap sink above.
-                await searcher.setBelowThresholdSink({ [weak searchState] count in
-                    Task { @MainActor in
-                        searchState?.accumulateBelowThresholdSuppression(count)
-                    }
-                })
-                // Install the regex-timeout sink mirroring the overlap
-                // sink. `DocumentSearcher` calls this once per page where the
-                // regex enumerator bails on the per-page timeout, in both
-                // the preview path and the search path.
-                await searcher.setRegexTimeoutSink({ [weak searchState] page in
-                    Task { @MainActor in
-                        searchState?.recordRegexTimeout(page: page)
-                    }
-                })
-                // Install the regex-rejection sink beside the timeout
-                // sink. `DocumentSearcher` fires it once when the safety
-                // gate refuses the pattern at search start (the stream then
-                // finishes empty); the same hint + engine copy the
-                // pre-validation composes reaches the callout, so a
-                // rejected pattern never reads as "0 results".
-                await searcher.setRegexRejectionSink({ [weak searchState] reason in
-                    Task { @MainActor in
-                        guard let searchState else { return }
-                        searchState.recordRegexRejection(Self.regexErrorDisplayMessage(
-                            pattern: searchState.queryText, engineDescription: reason))
-                    }
-                })
-                // Install the oversized-OCR-skip sink mirroring
-                // the regex-timeout sink. `DocumentSearcher` calls this
-                // once per OCR attempt on a page whose render exceeds the
-                // OCR pixel caps; the banner tells the user those pages'
-                // image content was never text-scanned.
-                await searcher.setOCRSkipSink({ [weak searchState] page in
-                    Task { @MainActor in
-                        searchState?.recordOCRSkip(page: page)
-                    }
-                })
-                // Install the custom-terms always-flag timeout
-                // sink. `DocumentSearcher` calls this once per (page, user-
-                // authored pattern) when `UserTermMatcher.alwaysFlagHits`
-                // reports a regex term whose enumeration bailed on the
-                // per-page timeout. Per-term-per-page semantics: the term
-                // stays active on subsequent pages within the same scan,
-                // so each affected (page, pattern) emits its own toast.
-                // Truncated to 24 user-facing chars so a long pasted pattern
-                // can't dominate the message; trailing "…" disambiguates a
-                // truncated tail.
-                await searcher.setUserTermsTimeoutSink({ [weak toastManager] page, pattern in
-                    Task { @MainActor in
-                        let truncated: String = pattern.count > 24
-                            ? "\(String(pattern.prefix(24)))…"
-                            : pattern
-                        let message =
-                            "Custom term '\(truncated)' took too long on page \(page + 1) — skipped."
-                        toastManager?.enqueue(message, severity: .warning)
-                    }
-                })
-                // Surface the "scanned region not analyzed"
-                // signal. `DocumentSearcher` fires this per page that carries a
-                // `.sparse`/`.none` region while `includeOCR` is off, so the user
-                // learns scanned content was not searched. The message omits the
-                // page number so duplicate-coalescing (ToastQueueManager)
-                // collapses a multi-page scan to a single toast.
-                //
-                // The user-facing string is mechanism-description
-                // language; it makes no outcome promise.
-                await searcher.setScannedRegionNotAnalyzedSink({ [weak toastManager] _ in
-                    Task { @MainActor in
-                        toastManager?.enqueue(
-                            "Some pages hold scanned regions that weren't text-analyzed because OCR is off. Turn on Include OCR to search scanned content.",
-                            severity: .warning
-                        )
-                    }
-                })
-
-                if isPIIScan,
-                   let firstPageText = await Self.firstPageText(of: searchDoc) {
-                    let classifier = DocumentTypeClassifier()
-                    let explanation = await classifier.explain(pageText: firstPageText)
-                    await MainActor.run {
-                        searchState.setDoctypeExplanation(explanation)
-                    }
-                }
+                await searcher.setTextLayerStatus(prepared.textLayerStatus)
+                await installEngineSinks()
+                await classifyDoctypeIfNeeded(prepared)
 
                 let stream = searcher.search(
-                    searchDoc,
-                    mode: mode,
+                    prepared.searchDoc,
+                    mode: prepared.mode,
                     progress: { current, total in
                         Task { @MainActor in
                             // A superseded run's page hops must not move
@@ -372,66 +121,387 @@ extension SearchAndRedactSheet {
 
                 // Skip the cleanup tail when cancelled — a successor task
                 // may have already installed sinks and set `isSearching`.
-                if !Task.isCancelled {
-                    searchState.flushPendingResults()
-                    // A completed (non-cancelled) run flips the
-                    // empty-state discriminator from "not run yet" to a
-                    // genuine result verdict.
-                    searchState.hasCompletedRunSinceClear = true
-                    // Magic-wand pre-select flag is single-use:
-                    // applies to the matches this scan emits, then resets
-                    // so a follow-up search from the same sheet session
-                    // doesn't carry magic-wand semantics forward.
-                    searchState.preselectIncomingResults = false
-                    searchState.isSearching = false
-
-                    if isPIIScan {
-                        let report = Self.makeCoverageReport(
-                            scannedPages: searchState.totalPages,
-                            enabled: enabledCategories,
-                            results: searchState.results,
-                            overlapSuppressed: searchState.pendingOverlapSuppressed,
-                            belowThresholdSuppressed: searchState.pendingBelowThresholdSuppressed,
-                            startedAt: scanStartedAt,
-                            completedAt: Date()
-                        )
-                        searchState.setCoverageReport(report)
-
-                        // Run-outcome record for the Scan interface —
-                        // the summary banner is the run-outcome surface
-                        // for both origins now. Found runs auto-dismiss
-                        // (the results are on screen in the sheet);
-                        // zero-found runs persist so "ran and found
-                        // nothing" stays distinguishable from "never
-                        // ran" after the sheet closes. Cancelled runs
-                        // skip this tail and leave no record.
-                        redactionState.recordDetectionRun(
-                            searchState.results.isEmpty
-                                ? .nothingFound(pageCount: searchState.totalPages)
-                                : .staged,
-                            scanSummary: .init(
-                                foundCount: searchState.results.count,
-                                pageCount: searchState.totalPages),
-                            ocrSkippedPages: searchState.ocrSkippedPages)
-                    }
-
-                    await searcher.setOverlapSink(nil)
-                    await searcher.setBelowThresholdSink(nil)
-                    await searcher.setRegexTimeoutSink(nil)
-                    await searcher.setRegexRejectionSink(nil)
-                    await searcher.setUserTermsTimeoutSink(nil)
-                    await searcher.setScannedRegionNotAnalyzedSink(nil)
-
-                    if UIAccessibility.isVoiceOverRunning {
-                        let count = searchState.totalCount
-                        UIAccessibility.post(
-                            notification: .announcement,
-                            argument: "Search complete, \(count) result\(count == 1 ? "" : "s") found"
-                        )
-                    }
-                }
+                await finishSearchRun(prepared, cancelled: Task.isCancelled)
             }
         }
+    }
+
+    /// The run's setup — everything between the prior task's
+    /// cancel-await and the run task: the fingerprint snapshot and the
+    /// clear, the run token, the regex pre-validation, the multi-term
+    /// recall, the private document copy, the kickoff snapshots, the
+    /// Scan degrade surface and the four tally resets. Nil when the run
+    /// cannot start (an invalid pattern, or no document to copy) — each
+    /// such exit has already surfaced its notice and, for a Scan, its
+    /// failed run record.
+    private func prepareSearchRun() async -> PreparedRun? {
+        await searchState.cancelSearch()
+        // Snapshot the just-completed scan's
+        // results (if any) into `priorScanFingerprints` BEFORE
+        // `clearResults()` wipes the array. The snapshot survives
+        // `clearResults` by design — see `SearchState.priorScanFingerprints`
+        // docstring for the asymmetric clear-paths carve-out.
+        // `diffSinceLastScan()` reads this snapshot once the new scan's
+        // results land, surfacing the Coverage Report diff line.
+        searchState.captureFingerprintsBeforeScan()
+        searchState.clearResults()
+        // The token this run's results and progress hops carry: a
+        // cancelled predecessor still draining its stream is told
+        // apart by it and dropped, so its late batch can never land
+        // in this run's list.
+        let run = searchState.beginRun()
+
+        // Pre-validate regex before starting search.
+        // Surface the rejection reason —
+        // the engine's NSError localizedDescription verbatim for
+        // compile failures,
+        // or the typed RegexValidationError's mechanism-description
+        // copy for the safety gates. The prior hardcoded "Invalid
+        // regular expression" discarded both.
+        if searchState.searchModeType == .regex {
+            do {
+                _ = try DocumentSearcher.validateRegexPatternWithError(searchState.queryText)
+            } catch { // LegalPhrases:safe (Swift keyword)
+                // Lead with a human hint for the common
+                // failure shapes; the engine's original error text
+                // stays available after it. No hint matched → the
+                // original text alone, as before.
+                searchState.regexError = Self.regexErrorDisplayMessage(
+                    pattern: searchState.queryText,
+                    engineDescription: error.localizedDescription
+                )
+                return nil
+            }
+        }
+
+        // Record multi-term term sets into the
+        // in-memory recall ring so the empty state can surface them
+        // as tappable chips on the next traversal through the empty
+        // state. Recording at trigger time (not at term-add time)
+        // means we only capture sets the user actually committed to.
+        if searchState.searchModeType == .multiTerm {
+            searchState.recordMultiTermSearch(terms: searchState.searchTerms)
+        }
+
+        searchState.isSearching = true
+
+        guard let liveDoc = documentState.sourceDocument else {
+            searchState.isSearching = false
+            // Same feedback contract as the copy-failure guard
+            // below — a silent exit reads as "never ran" once the
+            // sheet re-renders.
+            toastManager.enqueue(
+                "Could not prepare the document for search. Try again.",
+                severity: .warning
+            )
+            if searchState.searchModeType == .piiScan {
+                searchState.scanStartFailed = true
+                redactionState.recordDetectionRun(
+                    .failed,
+                    scanSummary: .init(foundCount: 0, pageCount: 0))
+            }
+            return nil
+        }
+
+        // Build a private copy off-main so the background search and
+        // the first-page classifier never read the on-screen PDFDocument
+        // the PDFView renders on the main thread. The cheap
+        // `SendablePDFDocument` wrap happens on MainActor; the costly
+        // dataRepresentation + reconstruct runs in the detached task
+        // (mirrors `firstPageText`). A nil copy ⇒ no shared-instance
+        // fallback — surface a mechanism toast and stop.
+        let liveDocBox = SendablePDFDocument(liveDoc)
+        guard let searchDoc = await Task.detached(priority: .utility, operation: {
+            DocumentState.makeSearchCopy(of: liveDocBox)
+        }).value else {
+            searchState.isSearching = false
+            toastManager.enqueue(
+                "Could not prepare the document for search. Try again.",
+                severity: .warning
+            )
+            // Scan-interface runs leave a durable failed record —
+            // a failure notice that only ever lived in a transient
+            // toast is no record at all (the banner persists it).
+            if searchState.searchModeType == .piiScan {
+                searchState.scanStartFailed = true
+                redactionState.recordDetectionRun(
+                    .failed,
+                    scanSummary: .init(foundCount: 0, pageCount: 0))
+            }
+            return nil
+        }
+
+        let mode = buildSearchMode()
+        searchState.totalPages = liveDoc.pageCount
+
+        // Snapshot the user-selected preset's
+        // vector before kickoff so each scan runs against a stable
+        // copy. `settingsState` is the sheet's existing @Environment
+        // read (internal, extension-visible).
+        let thresholdVector: PresetThresholdVector? = settingsState.activeThresholdVector
+
+        // Snapshot the per-page text-layer classification
+        // computed at import time. `DocumentSearcher` consults it so a
+        // `.sparse`/`.none` page (a header-only layer over a scanned body)
+        // routes to OCR instead of having its body suppressed by the thin
+        // layer. Snapshot here, like the threshold vector, so the scan runs
+        // against a stable copy.
+        let textLayerStatus: [Int: TextLayerStatus] = documentState.textLayerStatus
+
+        // Snapshot + compile user terms once per kickoff. Compile is
+        // cheap (≤100+100 patterns, most literal), same lifecycle as
+        // the threshold vector. `UserTermsIndex` wraps the matcher so
+        // the engine runs never-flag suppression pre-threshold. Only
+        // attach when non-empty to keep the hot path unchanged for
+        // users with no custom terms.
+        let userTerms = userTermsStore.blob
+        let userTermsIndex: UserTermsIndex? = {
+            let compiled = UserTermsIndex.compile(
+                alwaysFlag: userTerms.alwaysFlag,
+                neverFlag: userTerms.neverFlag
+            )
+            return compiled.isEmpty ? nil : compiled
+        }()
+
+        // Capture PII scan configuration for the coverage report +
+        // doctype explanation. Classifier runs on the first page only;
+        // cheap (<5ms) and gives the footer its top-3 probabilities.
+        // The EFFECTIVE set (empty selection = everything) is what
+        // the engine query requests, so the report describes the
+        // run that actually happened.
+        let isPIIScan = searchState.searchModeType == .piiScan
+        let enabledCategories = searchState.effectiveScanCategories
+        let scanStartedAt = Date()
+
+        // Freeze the executed detector count for the
+        // zero-state completion copy, beside the engine query's own
+        // category snapshot above.
+        if isPIIScan {
+            searchState.lastRunDetectorCount = enabledCategories.count
+        }
+
+        // Degrade surface for the LIVE scan path. The
+        // legacy detection pipeline surfaced its loader diagnostics via
+        // `PipelineCoordinator.surfaceGazetteerLoadDiagnostics`, but the
+        // Scan interface runs through `DocumentSearcher`, whose shared
+        // detector degraded silently (an NER-absent OS build dropped
+        // every name match with zero signal). Surface the shared
+        // detector's load diagnostics at scan kickoff: first qualifying
+        // failure posts the one-time toast and raises the persistent
+        // Scan-interface banner (same flag, same gate semantics as the
+        // legacy path).
+        if isPIIScan {
+            let diagnostics = DocumentSearcher.sharedLoadDiagnostics
+            if diagnostics.didDegrade,
+               !redactionState.autoDetectionDegraded {
+                redactionState.autoDetectionDegraded = true
+                redactionState.autoDetectionDegradeFailures =
+                    diagnostics.failedGazetteers
+                toastManager.enqueue(
+                    DetectionDegradeCopy.toast(
+                        failedGazetteers: diagnostics.failedGazetteers),
+                    severity: .warning
+                )
+            }
+        }
+
+        // Reset the overlap-suppressed tally before kickoff so the
+        // CoverageReport only reflects this scan's counts.
+        searchState.resetOverlapSuppression()
+        // Reset the below-threshold tally for the same reason.
+        searchState.resetBelowThresholdSuppression()
+        // Reset the regex-timeout page set before kickoff so
+        // the banner only reflects pages affected by THIS scan.
+        searchState.resetRegexTimeoutPages()
+        // Reset the OCR-skip page set for the same reason.
+        searchState.resetOCRSkippedPages()
+
+        return PreparedRun(
+            run: run,
+            searchDoc: searchDoc,
+            mode: mode,
+            thresholdVector: thresholdVector,
+            textLayerStatus: textLayerStatus,
+            userTermsIndex: userTermsIndex,
+            isPIIScan: isPIIScan,
+            enabledCategories: enabledCategories,
+            scanStartedAt: scanStartedAt)
+    }
+
+    /// The seven engine sinks, installed on the run task before the
+    /// stream opens. `tearDownEngineSinks()` nils six of them at the
+    /// tail (the OCR-skip sink has never been nilled there).
+    private func installEngineSinks() async {
+        // Install the overlap sink. `DocumentSearcher` calls this
+        // once per page where the resolver dropped at least one loser.
+        await searcher.setOverlapSink({ [weak searchState] counts in
+            Task { @MainActor in
+                searchState?.accumulateOverlapSuppression(counts)
+            }
+        })
+        // Install the below-threshold sink. `DocumentSearcher`
+        // calls this once per page where the raw threshold gate dropped at
+        // least one match, mirroring the overlap sink above.
+        await searcher.setBelowThresholdSink({ [weak searchState] count in
+            Task { @MainActor in
+                searchState?.accumulateBelowThresholdSuppression(count)
+            }
+        })
+        // Install the regex-timeout sink mirroring the overlap
+        // sink. `DocumentSearcher` calls this once per page where the
+        // regex enumerator bails on the per-page timeout, in both
+        // the preview path and the search path.
+        await searcher.setRegexTimeoutSink({ [weak searchState] page in
+            Task { @MainActor in
+                searchState?.recordRegexTimeout(page: page)
+            }
+        })
+        // Install the regex-rejection sink beside the timeout
+        // sink. `DocumentSearcher` fires it once when the safety
+        // gate refuses the pattern at search start (the stream then
+        // finishes empty); the same hint + engine copy the
+        // pre-validation composes reaches the callout, so a
+        // rejected pattern never reads as "0 results".
+        await searcher.setRegexRejectionSink({ [weak searchState] reason in
+            Task { @MainActor in
+                guard let searchState else { return }
+                searchState.recordRegexRejection(Self.regexErrorDisplayMessage(
+                    pattern: searchState.queryText, engineDescription: reason))
+            }
+        })
+        // Install the oversized-OCR-skip sink mirroring
+        // the regex-timeout sink. `DocumentSearcher` calls this
+        // once per OCR attempt on a page whose render exceeds the
+        // OCR pixel caps; the banner tells the user those pages'
+        // image content was never text-scanned.
+        await searcher.setOCRSkipSink({ [weak searchState] page in
+            Task { @MainActor in
+                searchState?.recordOCRSkip(page: page)
+            }
+        })
+        // Install the custom-terms always-flag timeout
+        // sink. `DocumentSearcher` calls this once per (page, user-
+        // authored pattern) when `UserTermMatcher.alwaysFlagHits`
+        // reports a regex term whose enumeration bailed on the
+        // per-page timeout. Per-term-per-page semantics: the term
+        // stays active on subsequent pages within the same scan,
+        // so each affected (page, pattern) emits its own toast.
+        // Truncated to 24 user-facing chars so a long pasted pattern
+        // can't dominate the message; trailing "…" disambiguates a
+        // truncated tail.
+        await searcher.setUserTermsTimeoutSink({ [weak toastManager] page, pattern in
+            Task { @MainActor in
+                let truncated: String = pattern.count > 24
+                    ? "\(String(pattern.prefix(24)))…"
+                    : pattern
+                let message =
+                    "Custom term '\(truncated)' took too long on page \(page + 1) — skipped."
+                toastManager?.enqueue(message, severity: .warning)
+            }
+        })
+        // Surface the "scanned region not analyzed"
+        // signal. `DocumentSearcher` fires this per page that carries a
+        // `.sparse`/`.none` region while `includeOCR` is off, so the user
+        // learns scanned content was not searched. The message omits the
+        // page number so duplicate-coalescing (ToastQueueManager)
+        // collapses a multi-page scan to a single toast.
+        //
+        // The user-facing string is mechanism-description
+        // language; it makes no outcome promise.
+        await searcher.setScannedRegionNotAnalyzedSink({ [weak toastManager] _ in
+            Task { @MainActor in
+                toastManager?.enqueue(
+                    "Some pages hold scanned regions that weren't text-analyzed because OCR is off. Turn on Include OCR to search scanned content.",
+                    severity: .warning
+                )
+            }
+        })
+
+    }
+
+    /// The first-page doctype classification for a Scan run: cheap
+    /// (<5 ms) and gives the footer its top-3 probabilities. The page
+    /// text comes off a detached task (`firstPageText`).
+    private func classifyDoctypeIfNeeded(_ prepared: PreparedRun) async {
+        if prepared.isPIIScan,
+           let firstPageText = await Self.firstPageText(of: prepared.searchDoc) {
+            let classifier = DocumentTypeClassifier()
+            let explanation = await classifier.explain(pageText: firstPageText)
+            await MainActor.run {
+                searchState.setDoctypeExplanation(explanation)
+            }
+        }
+
+    }
+
+    /// The run's cleanup tail: the last flush, the run-state flips, the
+    /// Scan coverage report and run record, the sink teardown and the
+    /// VoiceOver completion line. Skipped when cancelled — a successor
+    /// task may have already installed sinks and set `isSearching`.
+    private func finishSearchRun(_ prepared: PreparedRun, cancelled: Bool) async {
+        guard !cancelled else { return }
+        searchState.flushPendingResults()
+        // A completed (non-cancelled) run flips the
+        // empty-state discriminator from "not run yet" to a
+        // genuine result verdict.
+        searchState.hasCompletedRunSinceClear = true
+        // Magic-wand pre-select flag is single-use:
+        // applies to the matches this scan emits, then resets
+        // so a follow-up search from the same sheet session
+        // doesn't carry magic-wand semantics forward.
+        searchState.preselectIncomingResults = false
+        searchState.isSearching = false
+
+        if prepared.isPIIScan {
+            let report = Self.makeCoverageReport(
+                scannedPages: searchState.totalPages,
+                enabled: prepared.enabledCategories,
+                results: searchState.results,
+                overlapSuppressed: searchState.pendingOverlapSuppressed,
+                belowThresholdSuppressed: searchState.pendingBelowThresholdSuppressed,
+                startedAt: prepared.scanStartedAt,
+                completedAt: Date()
+            )
+            searchState.setCoverageReport(report)
+
+            // Run-outcome record for the Scan interface —
+            // the summary banner is the run-outcome surface
+            // for both origins now. Found runs auto-dismiss
+            // (the results are on screen in the sheet);
+            // zero-found runs persist so "ran and found
+            // nothing" stays distinguishable from "never
+            // ran" after the sheet closes. Cancelled runs
+            // skip this tail and leave no record.
+            redactionState.recordDetectionRun(
+                searchState.results.isEmpty
+                    ? .nothingFound(pageCount: searchState.totalPages)
+                    : .staged,
+                scanSummary: .init(
+                    foundCount: searchState.results.count,
+                    pageCount: searchState.totalPages),
+                ocrSkippedPages: searchState.ocrSkippedPages)
+        }
+
+        await tearDownEngineSinks()
+
+        if UIAccessibility.isVoiceOverRunning {
+            let count = searchState.totalCount
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: "Search complete, \(count) result\(count == 1 ? "" : "s") found"
+            )
+        }
+    }
+
+    /// The six sink nils of the cleanup tail.
+    private func tearDownEngineSinks() async {
+        await searcher.setOverlapSink(nil)
+        await searcher.setBelowThresholdSink(nil)
+        await searcher.setRegexTimeoutSink(nil)
+        await searcher.setRegexRejectionSink(nil)
+        await searcher.setUserTermsTimeoutSink(nil)
+        await searcher.setScannedRegionNotAnalyzedSink(nil)
+
     }
 
     /// Debounce auto-run floor on the trimmed length. The
