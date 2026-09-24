@@ -206,14 +206,18 @@ struct VerificationDetailsSection: View {
             }
         }
         // One material for the whole disclosure (the rows inside are flat).
-        .background(
-            .regularMaterial,
-            in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.card, style: .continuous))
-        .shadow(
-            color: ResectaTokens.Shadow.subtle.color,
-            radius: ResectaTokens.Shadow.subtle.radius,
-            x: ResectaTokens.Shadow.subtle.x,
-            y: ResectaTokens.Shadow.subtle.y)
+        // The shadow sits on the background shape itself: a `.shadow` on
+        // the whole view would also be cast by every opaque child — the
+        // badges' knock-out rings drew a grey crescent that way.
+        .background {
+            RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.card, style: .continuous)
+                .fill(.regularMaterial)
+                .shadow(
+                    color: ResectaTokens.Shadow.subtle.color,
+                    radius: ResectaTokens.Shadow.subtle.radius,
+                    x: ResectaTokens.Shadow.subtle.x,
+                    y: ResectaTokens.Shadow.subtle.y)
+        }
         .frame(maxWidth: columnMaxWidth)
     }
 

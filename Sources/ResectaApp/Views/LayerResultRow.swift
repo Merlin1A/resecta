@@ -43,8 +43,10 @@ struct LayerResultRow: View {
     /// size (the stopgap until they are retuned). SF fallbacks (the Search
     /// Re-check) sit at `.title3`.
     @ScaledMetric(relativeTo: .title3) private var glyphSize: CGFloat = 23
-    /// The shape badge's glyph, hung off the tile's corner.
-    @ScaledMetric(relativeTo: .caption) private var badgeSize: CGFloat = 11
+    /// The shape badge's glyph, hung off the tile's corner. Scaled with the
+    /// tile (`.title3`), not with `.caption`: caption grows faster, and at
+    /// AX3 a caption-scaled badge covered most of the glyph.
+    @ScaledMetric(relativeTo: .title3) private var badgeSize: CGFloat = 11
     /// The compact row's glyph — identity only, in the support tier; 23 in
     /// `supportText` would compete with the tiles.
     @ScaledMetric(relativeTo: .subheadline) private var compactGlyphSize: CGFloat = 17
