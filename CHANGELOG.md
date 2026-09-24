@@ -110,7 +110,7 @@ Initial public release.
 - **Custom Terms.** Single-entry CRUD for user-defined detection terms. Bulk operations (paste-many, CSV import / export, share-profile) are V1.1+ scope.
 - **Audit export schema (surface disabled in V1.0).** The v4 match-audit wire schema ships in code, with the user-facing export surface disabled for this release; enabling it is scoped to a future release (see release notes for the column list and version-bump policy).
 - **Doctype temperature and preset thresholds** calibrated against an iPhone 17 / A19 softmax dump.
-- **Core workflow** — Import → View → Mark → Apply → Verify → Export — covering PDF and image input from Files, Photos, drag-and-drop, or the bundled sample document, with export via the system share sheet.
+- **Core workflow** — Import → View → Mark → Apply → Verify → Export — covering PDF input from Files or the bundled sample document, with export via the system share sheet.
 
 ### Removed
 
