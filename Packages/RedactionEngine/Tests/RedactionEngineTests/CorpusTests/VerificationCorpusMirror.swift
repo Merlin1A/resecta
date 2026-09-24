@@ -5,10 +5,11 @@ import Testing
 import CryptoKit
 @testable import RedactionEngine
 
-// H2.2 support (1/2): ground truth -> region sets, and the three
-// PipelineCoordinator mirrors (buildPDFPageData / processDocument /
-// runVerification). See VerificationCorpusRunnerTests.swift for the
-// suite header and the mirroring-risk note.
+// H2.2 support (1/2): ground truth -> region sets, the two
+// PipelineCoordinator mirrors (buildPDFPageData / processDocument) and the
+// verification pass on the product's own `VerificationOrchestrator`. See
+// VerificationCorpusRunnerTests.swift for the suite header and the
+// mirroring-risk note.
 
 extension VerificationCorpusRunnerTests {
 
@@ -112,7 +113,7 @@ extension VerificationCorpusRunnerTests {
     }
 
     /// GT rect -> RedactionRegion, mirroring `buildPDFPageData`'s minimum
-    /// dimension floor and clamp (PipelineCoordinator.swift:2228-2235).
+    /// dimension floor and clamp (`PipelineCoordinator.buildPDFPageData`).
     /// Returns nil for a below-floor box so the caller can record the drop.
     static func region(from seed: RegionSeed, polygon: Bool) -> RedactionRegion? {
         guard seed.rect.width > 0.001, seed.rect.height > 0.001 else { return nil }
@@ -272,13 +273,15 @@ extension VerificationCorpusRunnerTests {
             perPageFallbackReasons: reasons)
     }
 
-    // MARK: - runVerification mirror
+    // MARK: - runVerification (the product's orchestrator)
 
-    /// Mirror of `PipelineCoordinator.runVerification`: page-count gate
-    /// first; parallel base batch [0,1,2] (+9 when the mode has 10 layers)
-    /// with ONE PDFDocument instance per parallel layer; sequential [3,4]
-    /// on the shared instance; sandwich [5..8] sequential; Layer-10 result
-    /// deferred so `layers` stays layer-index ascending; `aggregateStatus`.
+    /// The verification pass as the product runs it: `VerificationOrchestrator`
+    /// (the page-count gate first, the phase partition by
+    /// `VerificationLayer.phase`, the parallel base batch with ONE
+    /// PDFDocument instance per parallel layer and the sequential-shared
+    /// fallback, the sequential phases, the canonical assembly,
+    /// `aggregateStatus`). The harness applies no searches, so the Search
+    /// Re-check reports INFO on every cell.
     static func runVerificationSweep(
         outputURL: URL,
         sourcePageCount: Int,
@@ -293,144 +296,27 @@ extension VerificationCorpusRunnerTests {
             throw PipelineError.verificationError(.engineCrash(layerIndex: 0))
         }
         let wrapped = SendablePDFDocument(sharedDoc)
-
-        // Page-count integrity gate, mirrored verbatim.
-        let outputPageCount = wrapped.document.pageCount
-        if sourcePageCount != outputPageCount {
-            let failLayer = LayerResult(
-                name: "Page Count Check",
-                symbolName: "exclamationmark.triangle",
-                status: .fail("Output has \(outputPageCount) \(outputPageCount == 1 ? "page" : "pages"); source has \(sourcePageCount)."),
-                shortDescription: "Output page count does not match the source document.",
-                detailDescription: "The redacted output has \(outputPageCount) \(outputPageCount == 1 ? "page" : "pages") but the source document has \(sourcePageCount). Verification stopped before the layer checks because the page counts must match.",
-                pageReferences: nil,
-                durationSeconds: 0)
-            return VerificationReport(
-                layers: [failLayer],
-                overallStatus: .fail("Output page count does not match the source document."),
-                durationSeconds: 0,
-                perPageModes: perPageModes,
-                perPageFallbackReasons: perPageFallbackReasons)
-        }
-
-        let verifier = VerificationEngine()
-        let globalLayerCount = verifier.layerCount(for: effectiveMode)
-        let parallelBaseLayers: [Int]
-        let sandwichLayers: [Int]
-        let sequentialBaseLayers = Array(3..<min(5, globalLayerCount))
-        if globalLayerCount >= 10 {
-            parallelBaseLayers = [0, 1, 2, 9]
-            sandwichLayers = Array(5..<9)
-        } else if globalLayerCount > 5 {
-            parallelBaseLayers = Array(0..<min(3, globalLayerCount))
-            sandwichLayers = Array(5..<globalLayerCount)
-        } else {
-            parallelBaseLayers = Array(0..<min(3, globalLayerCount))
-            sandwichLayers = []
-        }
-
-        var completedLayers: [LayerResult] = []
-        var deferredLayer10Result: LayerResult? = nil
-        let startTime = CFAbsoluteTimeGetCurrent()
-
-        // One independent PDFDocument per parallel layer (the app's
-        // loadParallelLayerDocuments contract); sequential-shared fallback
-        // when any open fails.
-        var perLayerDocs: [Int: SendablePDFDocument]? = {
-            var docs: [Int: SendablePDFDocument] = [:]
-            for layer in parallelBaseLayers {
-                guard let doc = PDFDocument(url: outputURL) else { return nil }
-                docs[layer] = SendablePDFDocument(doc)
-            }
-            return docs
-        }()
-
-        let parallelResults: [(Int, LayerResult)]
-        if let docs = perLayerDocs {
-            parallelResults = await withTaskGroup(
-                of: (Int, LayerResult).self
-            ) { group in
-                for layerIndex in parallelBaseLayers {
-                    let layerDoc = docs[layerIndex] ?? wrapped
-                    group.addTask {
-                        let result = await verifier.runLayer(
-                            layerIndex,
-                            outputDocument: layerDoc,
-                            sourcePageCount: sourcePageCount,
-                            regions: regions,
-                            sensitiveTerms: sensitiveTerms,
-                            pipelineMode: effectiveMode,
-                            filterDigests: filterDigests,
-                            perPageModes: perPageModes)
-                        return (layerIndex, result)
-                    }
-                }
-                var collected: [(Int, LayerResult)] = []
-                for await pair in group { collected.append(pair) }
-                return collected
-            }
-        } else {
-            var collected: [(Int, LayerResult)] = []
-            for layerIndex in parallelBaseLayers {
-                let result = await verifier.runLayer(
-                    layerIndex,
-                    outputDocument: wrapped,
-                    sourcePageCount: sourcePageCount,
-                    regions: regions,
-                    sensitiveTerms: sensitiveTerms,
-                    pipelineMode: effectiveMode,
-                    filterDigests: filterDigests,
-                    perPageModes: perPageModes)
-                collected.append((layerIndex, result))
-            }
-            parallelResults = collected
-        }
-        perLayerDocs = nil
-
-        for (layerIndex, result) in parallelResults.sorted(by: { $0.0 < $1.0 }) {
-            if layerIndex == 9 {
-                deferredLayer10Result = result
-                continue
-            }
-            completedLayers.append(result)
-        }
-
-        for layerIndex in sequentialBaseLayers {
-            let result = await verifier.runLayer(
-                layerIndex,
-                outputDocument: wrapped,
-                sourcePageCount: sourcePageCount,
-                regions: regions,
-                sensitiveTerms: sensitiveTerms,
-                pipelineMode: effectiveMode,
-                filterDigests: filterDigests,
-                perPageModes: perPageModes)
-            completedLayers.append(result)
-        }
-
-        for layerIndex in sandwichLayers {
-            let result = await verifier.runLayer(
-                layerIndex,
-                outputDocument: wrapped,
-                sourcePageCount: sourcePageCount,
-                regions: regions,
-                sensitiveTerms: sensitiveTerms,
-                pipelineMode: effectiveMode,
-                filterDigests: filterDigests,
-                perPageModes: perPageModes)
-            completedLayers.append(result)
-        }
-
-        if let l10 = deferredLayer10Result {
-            completedLayers.append(l10)
-        }
-
-        let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-        return VerificationReport(
-            layers: completedLayers,
-            overallStatus: verifier.aggregateStatus(completedLayers),
-            durationSeconds: elapsed,
+        return try await VerificationOrchestrator().run(
+            outputDocument: wrapped,
+            sourcePageCount: sourcePageCount,
+            regions: regions,
+            sensitiveTerms: sensitiveTerms,
+            pipelineMode: effectiveMode,
+            filterDigests: filterDigests,
             perPageModes: perPageModes,
-            perPageFallbackReasons: perPageFallbackReasons)
+            perPageFallbackReasons: perPageFallbackReasons,
+            appliedSearches: [],
+            provisionLayerDocuments: { layers in
+                // One independent PDFDocument per parallel layer (the app's
+                // loadParallelLayerDocuments contract); nil ⇒ the batch runs
+                // sequentially on the shared instance.
+                var docs: [VerificationLayer: SendablePDFDocument] = [:]
+                for layer in layers {
+                    guard let doc = PDFDocument(url: outputURL) else { return nil }
+                    docs[layer] = SendablePDFDocument(doc)
+                }
+                return docs
+            },
+            events: { _ in })
     }
 }
