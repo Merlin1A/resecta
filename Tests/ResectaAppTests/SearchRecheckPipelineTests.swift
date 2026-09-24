@@ -250,7 +250,7 @@ struct SearchRecheckPipelineTests {
         #expect(VerificationResultsView.reviewTermTexts(report: report) == [Self.term])
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
                 == "Unredacted text remains: '\(Self.term)'")
-        #expect(VerificationResultsView.detailsSummaryText(for: report).contains("4 need review"),
+        #expect(VerificationResultsView.detailsSummaryText(for: report).contains("4\u{00A0}need review"),
                 "got \(VerificationResultsView.detailsSummaryText(for: report))")
     }
 
@@ -282,7 +282,7 @@ struct SearchRecheckPipelineTests {
         let passed = report.layers.filter { $0.status == .pass || $0.status.isInfo }.count
         let infoCount = report.layers.filter(\.status.isInfo).count
         #expect(infoCount >= 1)
-        #expect(summary.contains("\(infoCount) informational note"))
+        #expect(summary.contains("\(infoCount)\u{00A0}informational note"))
         if report.overallStatus.isWarn {
             #expect(summary.hasPrefix("\(total) of \(total) checks completed"))
         } else {

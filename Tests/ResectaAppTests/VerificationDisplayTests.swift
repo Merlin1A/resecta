@@ -371,7 +371,7 @@ struct VerificationDisplayTests {
         #expect(VerificationResultsView.mastheadSubtitle(report: withNotes) == nil)
         // The count and the notes pointer survive one row down.
         #expect(VerificationResultsView.detailsSummaryText(for: withNotes)
-                == "4 of 4 checks passed · 2 informational notes")
+                == "4 of 4 checks passed · 2\u{00A0}informational notes")
 
         let info = VerificationReport(
             layers: [layer(.info("i"))], overallStatus: .info("i"), durationSeconds: 0)
@@ -404,13 +404,13 @@ struct VerificationDisplayTests {
             layers: [layer(.pass), layer(.pass), layer(.info("note"))],
             overallStatus: .pass, durationSeconds: 0)
         #expect(VerificationResultsView.detailsSummaryText(for: report)
-                == "3 of 3 checks passed · 1 informational note")
+                == "3 of 3 checks passed · 1\u{00A0}informational note")
 
         let two = VerificationReport(
             layers: [layer(.pass), layer(.info("a")), layer(.info("b"))],
             overallStatus: .pass, durationSeconds: 0)
         #expect(VerificationResultsView.detailsSummaryText(for: two)
-                == "3 of 3 checks passed · 2 informational notes")
+                == "3 of 3 checks passed · 2\u{00A0}informational notes")
     }
 
     @Test("detailsSummaryText: an all-pass run carries no suffix")
@@ -433,13 +433,13 @@ struct VerificationDisplayTests {
                      layer(.warn("n"))],
             overallStatus: .attention("r1"), durationSeconds: 0)
         #expect(VerificationResultsView.detailsSummaryText(for: report)
-                == "7 of 10 checks passed · 2 need review · 1 note · 3 informational notes")
+                == "7 of 10 checks passed · 2\u{00A0}need review · 1\u{00A0}note · 3\u{00A0}informational notes")
 
         let single = VerificationReport(
             layers: [layer(.pass), layer(.attention("r"))],
             overallStatus: .attention("r"), durationSeconds: 0)
         #expect(VerificationResultsView.detailsSummaryText(for: single)
-                == "1 of 2 checks passed · 1 needs review")
+                == "1 of 2 checks passed · 1\u{00A0}needs review")
     }
 
     @Test("detailsSummaryText: a WARN run keeps the completed + notes shape")
@@ -448,7 +448,7 @@ struct VerificationDisplayTests {
             layers: [layer(.pass), layer(.warn("w")), layer(.info("i"))],
             overallStatus: .warn("w"), durationSeconds: 0)
         #expect(VerificationResultsView.detailsSummaryText(for: report)
-                == "3 of 3 checks completed · 1 note · 1 informational note")
+                == "3 of 3 checks completed · 1\u{00A0}note · 1\u{00A0}informational note")
     }
 }
 
@@ -657,7 +657,7 @@ struct SearchRecheckQueryLineDisplayTests {
             layers: [layer2, layer3, layer], overallStatus: .attention("x"), durationSeconds: 0)
         #expect(VerificationResultsView.mastheadSubtitle(report: report) == "Unredacted text remains: 'Delia'")
         #expect(VerificationResultsView.reviewTermTexts(report: report) == ["Delia"])
-        #expect(VerificationResultsView.detailsSummaryText(for: report) == "0 of 3 checks passed · 3 need review")
+        #expect(VerificationResultsView.detailsSummaryText(for: report) == "0 of 3 checks passed · 3\u{00A0}need review")
         // The OCR check's attention row reuses the same sentence — no copy
         // fork for a third layer.
         #expect(LayerResultRow.rowSubtitleText(layer: layer2)

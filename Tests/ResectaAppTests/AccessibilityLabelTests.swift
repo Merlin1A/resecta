@@ -239,7 +239,10 @@ struct AccessibilityLabelTests {
         #expect(status.layerAccessibilityPhrase != status.accessibilityLabel)
     }
 
-    @Test("Row label speaks the reported diagnostic, page count, and duration")
+    // The duration is not spoken: it is not
+    // in the collapsed row any more (the expanded row's "Took … s" line is
+    // its own reachable element), so the label ends at the page count.
+    @Test("Row label speaks the reported diagnostic and page count, never the duration")
     func testRowLabelWarnWithPagesAndDuration() {
         let label = LayerResultRow.accessibilityLabel(
             layerIndex: 2,
@@ -250,7 +253,7 @@ struct AccessibilityLabelTests {
                 durationSeconds: 1.34
             )
         )
-        #expect(label == "Layer 2, OCR Check, Check found a note. OCR could not be run on 1 page., 2 affected pages, 1.3 seconds")
+        #expect(label == "Layer 2, OCR Check, Check found a note. OCR could not be run on 1 page., 2 affected pages")
     }
 
     @Test("Row label singular page suffix")
