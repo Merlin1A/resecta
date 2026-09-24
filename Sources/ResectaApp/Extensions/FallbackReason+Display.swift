@@ -17,6 +17,7 @@ extension TextLayerDetector.FallbackReason {
         case .zeroSizeBounds: "text position data unavailable"
         case .unresolvedEncoding: "unresolved encoding"
         case .extractionFailed: "extraction failed"
+        case .hiddenText: "hidden text on the page"
         }
     }
 }

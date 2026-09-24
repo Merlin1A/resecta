@@ -14,7 +14,7 @@ struct VerificationFallbackReasonDisplayTests {
     // target's MainActor default isolation; an immutable constant is safe.
     private nonisolated static let allReasons: [TextLayerDetector.FallbackReason] = [
         .noExtractableText, .cjkEncodingFailure, .rtlText, .verticalText,
-        .zeroSizeBounds, .unresolvedEncoding, .extractionFailed,
+        .zeroSizeBounds, .unresolvedEncoding, .extractionFailed, .hiddenText,
     ]
 
     @Test("Every reason has non-empty short copy",
@@ -38,6 +38,8 @@ struct VerificationFallbackReasonDisplayTests {
                 == "unresolved encoding")
         #expect(TextLayerDetector.FallbackReason.extractionFailed.shortReasonText
                 == "extraction failed")
+        #expect(TextLayerDetector.FallbackReason.hiddenText.shortReasonText
+                == "hidden text on the page")
     }
 
     @Test("Chip reason row copy: page number + mode + reason")
