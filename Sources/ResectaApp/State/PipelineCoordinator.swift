@@ -458,10 +458,6 @@ final class PipelineCoordinator: @unchecked Sendable {
                     }
                 }
             } catch { // LegalPhrases:safe (Swift keyword)
-                // Same UUID guard as the cancellation path —
-                // a late recovery from a superseded run must not stomp the
-                // newer run's state.
-                guard coordinator.documentState.activeRunId == runId else { return }
                 // Classify by the FAILING STAGE, not by outputURL presence.
                 // `outputURL` registers eagerly (before
                 // `processDocument`), so a non-nil URL no longer means
@@ -473,21 +469,35 @@ final class PipelineCoordinator: @unchecked Sendable {
                 // keep it and return to the skipped-report screen.
                 let stage = Self.classifyPipelineFailure(
                     error, redactionSucceeded: redactionSucceeded)
-                if stage == .verification {
-                    // Verification crashed, but redacted output is VALID.
-                    coordinator.documentState.transition(to: .failed(
-                        error: error as? PipelineError
-                            ?? .verificationError(.engineCrash(layerIndex: 0)),
-                        returnPhase: .verified(report: .skipped(reason: .error))
-                    ))
-                } else {
-                    // Redaction failed — discard partial output
-                    coordinator.redactionState.clearOutput()
-                    coordinator.documentState.transition(to: .failed(
-                        error: error as? PipelineError
-                            ?? .redactionError(.reconstructionFailed),
-                        returnPhase: .editing
-                    ))
+                // MainActor.run: a thrown error can resume this handler OFF the
+                // MainActor (the same off-main-resume mechanism the
+                // cancellation sibling above and runDetectionPipeline's
+                // general handler already hop for), so hop back before
+                // touching @Observable state. The run-ownership guard moves
+                // inside the hop so it, too, reads MainActor state on the
+                // MainActor. Transition table unchanged (threading context
+                // only).
+                await MainActor.run {
+                    // Same UUID guard as the cancellation path —
+                    // a late recovery from a superseded run must not stomp the
+                    // newer run's state.
+                    guard coordinator.documentState.activeRunId == runId else { return }
+                    if stage == .verification {
+                        // Verification crashed, but redacted output is VALID.
+                        coordinator.documentState.transition(to: .failed(
+                            error: error as? PipelineError
+                                ?? .verificationError(.engineCrash(layerIndex: 0)),
+                            returnPhase: .verified(report: .skipped(reason: .error))
+                        ))
+                    } else {
+                        // Redaction failed — discard partial output
+                        coordinator.redactionState.clearOutput()
+                        coordinator.documentState.transition(to: .failed(
+                            error: error as? PipelineError
+                                ?? .redactionError(.reconstructionFailed),
+                            returnPhase: .editing
+                        ))
+                    }
                 }
             }
         }
@@ -617,18 +627,26 @@ final class PipelineCoordinator: @unchecked Sendable {
                     }
                 }
             } catch { // LegalPhrases:safe (Swift keyword)
-                // Same UUID guard as the cancellation
-                // path — a late recovery from a superseded run must not
-                // stomp the newer run's state.
-                guard coordinator.documentState.activeRunId == runId else { return }
-                // Re-verify crashed, but the redacted
-                // output remains valid. Surface as a failure that returns
-                // the user to the skipped state (matching runFullPipeline).
-                coordinator.documentState.transition(to: .failed(
-                    error: error as? PipelineError
-                        ?? .verificationError(.engineCrash(layerIndex: 0)),
-                    returnPhase: .verified(report: .skipped(reason: .error))
-                ))
+                // MainActor.run: the same off-main-resume hop as the
+                // cancellation sibling above and runFullPipeline's general
+                // handler — a thrown error can resume this handler OFF the
+                // MainActor, so hop back before touching @Observable state;
+                // the run-ownership guard moves inside the hop. Transition
+                // table unchanged (threading context only).
+                await MainActor.run {
+                    // Same UUID guard as the cancellation
+                    // path — a late recovery from a superseded run must not
+                    // stomp the newer run's state.
+                    guard coordinator.documentState.activeRunId == runId else { return }
+                    // Re-verify crashed, but the redacted
+                    // output remains valid. Surface as a failure that returns
+                    // the user to the skipped state (matching runFullPipeline).
+                    coordinator.documentState.transition(to: .failed(
+                        error: error as? PipelineError
+                            ?? .verificationError(.engineCrash(layerIndex: 0)),
+                        returnPhase: .verified(report: .skipped(reason: .error))
+                    ))
+                }
             }
         }
     }
