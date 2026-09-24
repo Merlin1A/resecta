@@ -658,108 +658,89 @@ extension SearchAndRedactSheet {
         )
     }
 
-    // MARK: - Apply (search origin, toolbar)
+    // MARK: - Apply (search origin)
 
-    /// Toolbar Apply for the search origin, routed through the one
-    /// `applyFindings` path. (Lives here with `triggerSearch()` per the
-    /// M-6 hub-cap decomposition — the run-orchestration family stays
-    /// together; internal, not private, because the hub view's toolbar
-    /// is the caller.)
-    func applySelectedSearchResults() {
+    /// The one search-origin apply: the toolbar Apply, the Return
+    /// shortcut and the compact handle's per-item Apply all run through
+    /// it (the review origin, `applyReviewFindings`, stays its own
+    /// path). `origin` is resolved by the caller BEFORE the await — the
+    /// per-item path captures the current match's id at call time; the
+    /// walk or a re-flush can move `currentResult` while the apply waits
+    /// its turn, and the seam refuses a stale id with zero mutations.
+    /// `preflight` runs after the two gates and before the apply flag is
+    /// raised (the shortcut's select-the-focused-match-if-none-selected).
+    /// `navigateToFirst` moves the page to the first selected result
+    /// once the seam returns; the per-item Apply stays put.
+    ///
+    /// The gates: `isApplying` (the sheet-wide one-apply-at-a-time flag)
+    /// and `canMutateRegions` — refuse mutations while the pipeline owns
+    /// `redactionState.regions`, the same gate as the buttons'
+    /// `.disabled`, re-checked in the action against a pipeline that
+    /// started after the last render (and again inside the path). A
+    /// refused apply (the path's post-await re-check lost to a pipeline
+    /// start) preserves the session for retry — dismissing here
+    /// destroyed the user's results and selections over a transient
+    /// refusal. Only the results that produced a region join the applied
+    /// set: overlap-skipped members of the selection get no audit entry,
+    /// so no "applied" badge either; the dedup-covered ids feed the
+    /// Apply-graying gate. The success toast goes through the one
+    /// `CommitFeedback` builder so the count stays in lockstep with the
+    /// review-apply toasts (nil for a no-op apply, so a held shortcut
+    /// against an all-overlap selection emits no "Marked 0" message;
+    /// `toastManager.enqueue` coalesces duplicates). The
+    /// conditional-dismiss tracker reset is owned by the apply path.
+    /// (Lives here with `triggerSearch()` per the M-6 hub-cap
+    /// decomposition — the run-orchestration family stays together;
+    /// internal, not private, because the hub view's toolbar and the
+    /// compact handle are callers.)
+    func applySearchSelection(
+        origin: RedactionState.ApplyOrigin,
+        preflight: () -> Bool = { true },
+        navigateToFirst: Bool
+    ) {
         guard !isApplying else { return }
-        // Refuse mutations while the pipeline owns
-        // `redactionState.regions` — same gate as the button's
-        // `.disabled`, re-checked in the action against a pipeline that
-        // started after the last render (and again inside the path).
         guard documentState.canMutateRegions else { return }
+        guard preflight() else { return }
         isApplying = true
-        // Capture selected IDs before apply clears selection
-        let selectedIDs = Set(searchState.results.filter(\.isSelected).map(\.id))
+        // Capture the selected ids before the apply clears the selection.
+        let selectedIDs = navigateToFirst
+            ? Set(searchState.results.filter(\.isSelected).map(\.id)) : []
         Task { @MainActor in
             defer { isApplying = false }
-            guard let result = await redactionState.applyFindings(
-                .selectedSearchResults,
+            guard let outcome = await redactionState.applyFindings(
+                origin,
                 undoManager: undoManager,
                 documentState: documentState
-            ) else {
-                // A refused apply (the path's post-await mutation
-                // re-check lost to a pipeline start) preserves the
-                // session for retry — same contract as the review and
-                // keyboard-shortcut apply handlers. Dismissing here
-                // destroyed the user's results and selections over a
-                // transient refusal.
-                return
-            }
-            // Union only the results that
-            // produced a region. Overlap-skipped members of
-            // the selection get no audit entry, so they must
-            // not earn the "applied" badge either. The
-            // conditional-dismiss tracker reset is owned by
-            // the apply path.
-            searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
-            // Dedup-covered IDs feed the Apply-graying
-            // gate (no badge, per the union above).
-            searchState.coveredResultIDs.formUnion(result.coveredResultIDs)
-            // Non-modal success toast via the shared
-            // copy builder (`CommitFeedback`) so
-            // the count stays in lockstep with the
-            // review-apply toasts. `toastManager.enqueue`
-            // coalesces duplicates so repeated taps can't
-            // queue a pile of identical toasts.
+            ) else { return }
+            searchState.appliedResultIDs.formUnion(outcome.appliedResultIDs)
+            searchState.coveredResultIDs.formUnion(outcome.coveredResultIDs)
             if let message = CommitFeedback.markedMessage(
-                applied: result.applied,
-                alreadyCovered: result.skippedOverlaps
+                applied: outcome.applied,
+                alreadyCovered: outcome.skippedOverlaps
             ) {
                 toastManager.enqueue(message, severity: .success)
             }
-            // Navigate to first affected page
-            if let firstPage = searchState.results.first(where: { selectedIDs.contains($0.id) })?.pageIndex {
+            if navigateToFirst,
+               let firstPage = searchState.results.first(where: { selectedIDs.contains($0.id) })?.pageIndex {
                 documentState.currentPageIndex = firstPage
             }
         }
     }
 
+    /// Toolbar Apply for the search origin.
+    func applySelectedSearchResults() {
+        applySearchSelection(origin: .selectedSearchResults, navigateToFirst: true)
+    }
+
     // MARK: - Apply (keyboard shortcut)
 
+    /// Return-shortcut Apply: the toolbar path, marking the focused
+    /// result first when nothing is selected.
     func applyFromKeyboardShortcut() {
-        guard !isApplying else { return }
-        // Keyboard-shortcut Apply path mirrors the
-        // toolbar Apply gate — refuse mutations while the
-        // pipeline owns `redactionState.regions`.
-        guard documentState.canMutateRegions else { return }
-        guard searchState.selectCurrentMatchIfNoneSelected() else { return }
-        isApplying = true
-        let selectedIDs = Set(searchState.results.filter(\.isSelected).map(\.id))
-        Task { @MainActor in
-            defer { isApplying = false }
-            guard let result = await redactionState.applyFindings(
-                .selectedSearchResults,
-                undoManager: undoManager,
-                documentState: documentState
-            ) else {
-                return
-            }
-            // Survivors only, mirroring the
-            // toolbar Apply path above. The conditional-dismiss
-            // tracker reset is owned by the apply path.
-            searchState.appliedResultIDs.formUnion(result.appliedResultIDs)
-            // Mirror of the toolbar path's covered union.
-            searchState.coveredResultIDs.formUnion(result.coveredResultIDs)
-            // Keyboard-shortcut path
-            // mirrors the toolbar Apply path — non-modal toast via
-            // the shared copy builder, which returns nil for a
-            // no-op apply so a held shortcut against an all-overlap
-            // selection still emits no "Marked 0" message.
-            if let message = CommitFeedback.markedMessage(
-                applied: result.applied,
-                alreadyCovered: result.skippedOverlaps
-            ) {
-                toastManager.enqueue(message, severity: .success)
-            }
-            if let firstPage = searchState.results.first(where: { selectedIDs.contains($0.id) })?.pageIndex {
-                documentState.currentPageIndex = firstPage
-            }
-        }
+        applySearchSelection(
+            origin: .selectedSearchResults,
+            preflight: { searchState.selectCurrentMatchIfNoneSelected() },
+            navigateToFirst: true)
     }
 
     /// Forwarded to `SearchResultsSection` so the invisible Return-shortcut
