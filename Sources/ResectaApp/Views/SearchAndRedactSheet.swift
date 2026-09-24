@@ -217,23 +217,14 @@ struct SearchAndRedactSheet: View {
                         onRequestWhy: { request in
                             activeModal = .rationale(request)
                         },
-                        // Review rows navigate the canvas with the
-                        // search rows' shipped idiom — page write plus
-                        // compact drop (the canvas stays interactive
-                        // behind the compact float). The detection's
-                        // rect rides along so the row tap frames the
-                        // detection like a search-row tap; the review
-                        // chevron walk is unchanged.
+                        // Review rows navigate the canvas through the
+                        // one walk seam's canvas half (`+Walk.swift`):
+                        // the page write, the centred readability
+                        // framing, the compact drop. The detection's
+                        // rect rides along until the review walk gives
+                        // the row an id.
                         onNavigateToFinding: { page, normalizedRect in
-                            documentState.currentPageIndex = page
-                            documentState.requestCanvasScroll(
-                                toPageIndex: page,
-                                normalizedRect: normalizedRect,
-                                zoom: .readability
-                            )
-                            if selectedDetent != .compactFloat {
-                                selectedDetent = .compactFloat
-                            }
+                            focusWalk(onPage: page, normalizedRect: normalizedRect, parking: true)
                         }
                     )
                     .safeAreaInset(edge: .top, spacing: 0) {
@@ -270,7 +261,7 @@ struct SearchAndRedactSheet: View {
                         onShowSavedSearches: {
                             activeModal = .savedSearches
                         },
-                        onNavigateToCurrentResult: navigateToCurrentResult(dropToCompact:)
+                        onFocusWalk: focusWalk(on:parking:)
                     )
                     .safeAreaInset(edge: .top, spacing: 0) {
                         // The Search interface's whole fixed chrome
@@ -1020,8 +1011,8 @@ struct SearchAndRedactSheet: View {
     /// shortcuts; each chevron is the ruled Ø44 drawn circle inside the
     /// 46pt layout floor, pair spacing 2 → 6 (≈8pt visual gap between
     /// the drawn circles). A later change to the pair's BEHAVIOUR (a
-    /// tap parks the sheet at the compact float —
-    /// `navigateToCurrentResult(dropToCompact:)`) re-homed the
+    /// tap parks the sheet at the compact float — the walk seam
+    /// `focusWalk(on:parking:)`, `+Walk.swift`) re-homed the
     /// composition into the shared `resultNavCluster` builder so this
     /// site and the compact handle never drift; the geometry here is
     /// untouched (`UIFixChromeUITests` measures it) and the counter
@@ -1047,7 +1038,7 @@ struct SearchAndRedactSheet: View {
             HStack(spacing: 6) {
                 Button {
                     searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
-                    navigateToCurrentResult(dropToCompact: true)
+                    focusWalk(on: searchState.currentResult?.id, parking: true)
                 } label: {
                     Self.circularIconLabel("chevron.up")
                 }
@@ -1057,7 +1048,7 @@ struct SearchAndRedactSheet: View {
 
                 Button {
                     searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
-                    navigateToCurrentResult(dropToCompact: true)
+                    focusWalk(on: searchState.currentResult?.id, parking: true)
                 } label: {
                     Self.circularIconLabel("chevron.down")
                 }
@@ -1101,45 +1092,6 @@ struct SearchAndRedactSheet: View {
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("Current result hidden by filters, \(searchState.filteredCount) of \(searchState.totalCount) shown")
-            }
-        }
-    }
-
-    /// The ONE result-navigation seam (the former section-side
-    /// duplicate is deleted; its J/K keyboard buttons call back
-    /// through `onNavigateToCurrentResult`). Two detent targets behind
-    /// the one seam — the chevrons and ⌘G pass `dropToCompact: true`
-    /// (step AND park the sheet at the compact float, the row-tap
-    /// idiom, so the outlined match is in view and the walk continues
-    /// from the handle's cluster); J/K pass `false` and keep the prior
-    /// large → medium rule (keyboard users read the list while
-    /// stepping). The page write + rect scroll half is shared by both.
-    private func navigateToCurrentResult(dropToCompact: Bool) {
-        guard let result = searchState.currentResult else { return }
-        documentState.currentPageIndex = result.pageIndex
-        // Rect-level half — when the canvas is zoomed past fit, the
-        // page write alone can leave the match off-screen; the canvas
-        // consumes this with the engine's canonical rect conversion.
-        // The sheet-parking walk (chevrons, ⌘G/⇧⌘G) frames the item at
-        // the readability scale; J/K keeps today's page-only intent
-        // (semantics untouched).
-        documentState.requestCanvasScroll(
-            toPageIndex: result.pageIndex,
-            normalizedRect: result.normalizedRect,
-            zoom: dropToCompact ? .readability : .none
-        )
-        if dropToCompact {
-            // The chevron walk parks the sheet (the row-tap idiom in
-            // `SearchResultsSection`). The results-arrival detent
-            // raise is untouched — the first tap from large drops
-            // straight to compact.
-            if selectedDetent != .compactFloat {
-                selectedDetent = .compactFloat
-            }
-        } else {
-            // Only minimize from .large; preserve .medium so results list stays visible
-            if selectedDetent == .large {
-                selectedDetent = .medium
             }
         }
     }

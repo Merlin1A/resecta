@@ -139,7 +139,7 @@ struct SearchResultsListObservationCrashTests {
             onTriggerSearch: {},
             onShowSavedSearches: {},
             // The seam takes `dropToCompact`; inert here.
-            onNavigateToCurrentResult: { _ in }
+            onFocusWalk: { _, _ in }
         )
         .environment(DocumentState())
         .environment(RedactionState())

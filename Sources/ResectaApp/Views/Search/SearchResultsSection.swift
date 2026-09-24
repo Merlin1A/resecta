@@ -52,15 +52,15 @@ struct SearchResultsSection: View {
     /// Present the saved-searches list — the parent owns the single
     /// modal slot. Wired to the Scan-side bookmark on the scope row.
     let onShowSavedSearches: () -> Void
-    /// Result navigation is ONE seam on the hub —
-    /// the J/K keyboard buttons call back through this instead of a
-    /// section-side duplicate (the hub's copy also carries the
-    /// rect-level scroll-to-match half). The
-    /// Bool is the seam's `dropToCompact` — J/K pass `false` (the
-    /// list stays readable while a keyboard user steps: large →
-    /// medium only); the hub's chevrons / ⌘G pass `true` and park
+    /// Result navigation is ONE seam on the hub (`focusWalk(on:parking:)`,
+    /// `+Walk.swift`) — the row tap and the J/K keyboard buttons call
+    /// back through this with the result id instead of a section-side
+    /// copy of the page write + scroll request + detent rule. The Bool
+    /// is the seam's `parking` — J/K pass `false` (the list stays
+    /// readable while a keyboard user steps: large → medium only); the
+    /// row tap, like the hub's chevrons / ⌘G, passes `true` and parks
     /// the sheet at the compact float.
-    let onNavigateToCurrentResult: (Bool) -> Void
+    let onFocusWalk: (UUID, Bool) -> Void
 
     /// Per-sheet-session dismiss state for the doctype banner.
     /// `SearchResultsSection` is re-instantiated when the sheet
@@ -521,14 +521,14 @@ struct SearchResultsSection: View {
         Group {
             Button {
                 searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
-                onNavigateToCurrentResult(false)
+                if let id = searchState.currentResult?.id { onFocusWalk(id, false) }
             } label: { EmptyView() }
                 .accessibilityLabel("Previous match")
                 .keyboardShortcut("j", modifiers: [])
 
             Button {
                 searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
-                onNavigateToCurrentResult(false)
+                if let id = searchState.currentResult?.id { onFocusWalk(id, false) }
             } label: { EmptyView() }
                 .accessibilityLabel("Next match")
                 .keyboardShortcut("k", modifiers: [])
@@ -744,30 +744,14 @@ struct SearchResultsSection: View {
             // Regex source-capsule gate — mode + rationale signal.
             searchMode: searchState.searchModeType,
             onNavigate: {
-                searchState.currentResultIndex = searchState.index(of: result.id)
-                documentState.currentPageIndex = result.pageIndex
-                // Rect-level half — the tapped match
-                // scrolls into view when the canvas is zoomed past
-                // fit (engine-canonical conversion at the consumer).
-                // The row tap parks the sheet,
-                // so it frames the match at the readability scale.
-                documentState.requestCanvasScroll(
-                    toPageIndex: result.pageIndex,
-                    normalizedRect: result.normalizedRect,
-                    zoom: .readability
-                )
-                // Tap-on-row drops to compact so the
-                // PDF gets max area. The
-                // chevron / ⌘G walk parks the sheet the same way
-                // (`navigateToCurrentResult(dropToCompact: true)` on
-                // the hub); only J/K keep the large → medium rule. Set
-                // `pendingAnchorID` BEFORE the detent transition fires
-                // so the `.onChange` on `resultsList`'s ScrollViewReader
-                // proxy snaps the tapped row to the top.
+                // The tap routes through the hub's one walk seam
+                // (index write · page write · centred readability
+                // framing · the compact drop, so the PDF gets max
+                // area). Set `pendingAnchorID` BEFORE the seam's detent
+                // transition fires so the `.onChange` on `resultsList`'s
+                // ScrollViewReader proxy snaps the tapped row to the top.
                 pendingAnchorID = result.id
-                if selectedDetent != .compactFloat {
-                    selectedDetent = .compactFloat
-                }
+                onFocusWalk(result.id, true)
             },
             onShowRationale: {
                 onRequestShowRationale(result.id)
