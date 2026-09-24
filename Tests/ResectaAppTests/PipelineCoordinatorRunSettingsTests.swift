@@ -25,22 +25,13 @@ import Foundation
 @MainActor
 struct PipelineCoordinatorRunSettingsTests {
 
-    private func cleanSettingsDefaults() {
-        let keys = [
-            "paranoidMode", "autoVerify", "pipelineMode.v2",
-            "exportDPI", "fillColor"
-        ]
-        for key in keys {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
-    }
-
     // MARK: - Snapshot capture
 
     @Test("Snapshot captures all five pipeline-affecting fields")
     func snapshotCapturesAllFields() {
-        cleanSettingsDefaults()
-        let settings = SettingsState()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SettingsState(defaults: defaults)
         settings.pipelineMode = .searchableRedaction
         settings.autoVerify = false
         settings.paranoidMode = false
@@ -60,8 +51,9 @@ struct PipelineCoordinatorRunSettingsTests {
 
     @Test("Mid-run SettingsState toggle of autoVerify does not affect a captured snapshot")
     func testMidRunSettingsToggleDoesNotAffectRun() {
-        cleanSettingsDefaults()
-        let settings = SettingsState()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SettingsState(defaults: defaults)
         settings.autoVerify = true
 
         // Snapshot captured at run entry (mirrors `runFullPipeline`).
@@ -80,8 +72,9 @@ struct PipelineCoordinatorRunSettingsTests {
 
     @Test("Mid-run toggle of paranoidMode does not affect a captured snapshot")
     func testParanoidModeSnapshotIndependence() {
-        cleanSettingsDefaults()
-        let settings = SettingsState()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SettingsState(defaults: defaults)
         settings.paranoidMode = false
 
         let snapshot = PipelineCoordinator.RunSettings.snapshot(from: settings)
@@ -93,8 +86,9 @@ struct PipelineCoordinatorRunSettingsTests {
 
     @Test("Mid-run toggle of pipelineMode does not affect a captured snapshot")
     func testPipelineModeSnapshotIndependence() {
-        cleanSettingsDefaults()
-        let settings = SettingsState()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SettingsState(defaults: defaults)
         settings.pipelineMode = .secureRasterization
 
         let snapshot = PipelineCoordinator.RunSettings.snapshot(from: settings)
@@ -106,8 +100,9 @@ struct PipelineCoordinatorRunSettingsTests {
 
     @Test("Mid-run toggle of fillColor does not affect a captured snapshot")
     func testFillColorSnapshotIndependence() {
-        cleanSettingsDefaults()
-        let settings = SettingsState()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SettingsState(defaults: defaults)
         settings.fillColor = .black
 
         let snapshot = PipelineCoordinator.RunSettings.snapshot(from: settings)
@@ -119,8 +114,9 @@ struct PipelineCoordinatorRunSettingsTests {
 
     @Test("Mid-run toggle of exportDPI does not affect a captured snapshot")
     func testExportDPISnapshotIndependence() {
-        cleanSettingsDefaults()
-        let settings = SettingsState()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SettingsState(defaults: defaults)
         settings.exportDPI = 300
 
         let snapshot = PipelineCoordinator.RunSettings.snapshot(from: settings)
@@ -134,8 +130,9 @@ struct PipelineCoordinatorRunSettingsTests {
 
     @Test("buildPDFPageData routes fillColor / DPI through the runSettings snapshot")
     func buildPDFPageDataHonorsSnapshot() {
-        cleanSettingsDefaults()
-        let coord = makeCoordinator()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let coord = makeCoordinator(settingsState: SettingsState(defaults: defaults))
         coord.documentState.sourceDocument = makeTestPDFDocument()
 
         // Stamp a region so the page survives the sub-threshold filter.
@@ -167,8 +164,9 @@ struct PipelineCoordinatorRunSettingsTests {
 
     @Test("buildPDFPageData with nil runSettings falls back to live settingsState (back-compat for tests)")
     func buildPDFPageDataNilSnapshotFallback() {
-        cleanSettingsDefaults()
-        let coord = makeCoordinator()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let coord = makeCoordinator(settingsState: SettingsState(defaults: defaults))
         coord.documentState.sourceDocument = makeTestPDFDocument()
         coord.redactionState.regions[0] = [RedactionRegion.mock()]
 
@@ -184,8 +182,9 @@ struct PipelineCoordinatorRunSettingsTests {
 
     @Test("buildOCRSkipHint routes pipelineMode through the runSettings snapshot")
     func buildOCRSkipHintHonorsSnapshot() {
-        cleanSettingsDefaults()
-        let coord = makeCoordinator()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let coord = makeCoordinator(settingsState: SettingsState(defaults: defaults))
         coord.documentState.sourceDocument = makeTestPDFDocument()
         // Mark page 0 as rich so non-mode gates pass.
         coord.documentState.textLayerStatus[0] = .rich
@@ -219,8 +218,9 @@ struct PipelineCoordinatorRunSettingsTests {
 
     @Test("buildOCRSkipHint is nonisolated and runs off the MainActor")
     func buildOCRSkipHintRunsOffMainActor() async {
-        cleanSettingsDefaults()
-        let coord = makeCoordinator()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let coord = makeCoordinator(settingsState: SettingsState(defaults: defaults))
         coord.documentState.sourceDocument = makeTestPDFDocument()
         coord.documentState.textLayerStatus[0] = .rich
 

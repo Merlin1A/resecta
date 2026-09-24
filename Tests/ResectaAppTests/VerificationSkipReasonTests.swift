@@ -48,10 +48,10 @@ struct VerificationSkipReasonTests {
 
     @Test("autoVerify-off full run lands on .skipped with .autoVerifyOff")
     func autoVerifyOffRunMapsToAutoVerifyOff() async throws {
-        cleanSettingsDefaults()
-        defer { cleanSettingsDefaults() }
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let coord = makeLoadedCoordinator()
+        let coord = makeLoadedCoordinator(defaults: defaults)
         coord.settingsState.paranoidMode = false
         coord.settingsState.autoVerify = false
         addRegion(to: coord)
@@ -78,7 +78,9 @@ struct VerificationSkipReasonTests {
 
     @Test("Verify-only run with an unloadable output lands on .skipped(.error)")
     func verifyErrorMapsToErrorReason() async throws {
-        let coord = makeLoadedCoordinator()
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let coord = makeLoadedCoordinator(defaults: defaults)
         // A path with no file behind it: the off-main document load in
         // runVerification throws, driving the .failed transition whose
         // returnPhase is the skipped report under test.
@@ -200,21 +202,11 @@ struct VerificationSkipReasonTests {
 
     // MARK: - Helpers
 
-    private func cleanSettingsDefaults() {
-        let keys = [
-            "paranoidMode", "autoVerify", "pipelineMode.v2",
-            "exportDPI", "fillColor",
-        ]
-        for key in keys {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
-    }
-
-    private func makeLoadedCoordinator() -> PipelineCoordinator {
+    private func makeLoadedCoordinator(defaults: UserDefaults) -> PipelineCoordinator {
         let coord = PipelineCoordinator(
             documentState: DocumentState(),
             redactionState: RedactionState(),
-            settingsState: SettingsState())
+            settingsState: SettingsState(defaults: defaults))
         coord.documentState.sourceDocument = makeTestPDFDocument()
         coord.documentState.phase = .editing
         return coord

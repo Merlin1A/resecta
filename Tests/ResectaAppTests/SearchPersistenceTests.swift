@@ -8,16 +8,8 @@ import Foundation
 // persisted-recents feature's retired storage keys.
 // All tests use a scratch UserDefaults suite so they don't pollute
 // UserDefaults.standard and can run in isolation without shared-state
-// hazards. Suite name is cleaned up in a defer block per test.
-
-// MARK: - Helpers
-
-/// Create a scratch UserDefaults suite and return it + a cleanup closure.
-private func makeScratchDefaults() -> (UserDefaults, suiteName: String) {
-    let name = UUID().uuidString
-    let defaults = UserDefaults(suiteName: name)!
-    return (defaults, name)
-}
+// hazards. Suite name is cleaned up in a defer block per test (the shared
+// `makeScratchDefaults()` in `Support/ScratchDefaults.swift`).
 
 // MARK: - LastFilterPersistenceTests
 
