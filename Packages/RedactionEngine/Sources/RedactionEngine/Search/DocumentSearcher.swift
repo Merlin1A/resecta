@@ -487,6 +487,13 @@ public actor DocumentSearcher {
         regexTimeoutSink
     }
 
+    /// One read of the per-page text-layer classification for the preview's
+    /// page walk (the preview is `nonisolated`; this is its one actor hop
+    /// for the routing, the shape `currentRegexTimeoutSink()` already has).
+    private func textLayerStatusSnapshot() -> [Int: TextLayerStatus] {
+        textLayerStatusByPage
+    }
+
     // MARK: - Public API
 
     /// Search the document, yielding results progressively.
@@ -558,6 +565,10 @@ public actor DocumentSearcher {
     /// - Caller supplies a `pageTextProvider` that returns the page's
     ///   text-layer string (or nil to skip a page). Live preview never
     ///   pays the OCR cost.
+    /// - A page whose installed text-layer classification is `.sparse` or
+    ///   `.none` is skipped, exactly as the full search skips its text layer
+    ///   (it routes such a page to OCR, which the preview never runs), so the
+    ///   preview's count never exceeds what the full text-layer search yields.
     /// - Per-page work is bounded by `perPageRegexTimeout` (regex path)
     ///   and `Task.isCancelled` checks (all paths).
     public nonisolated func previewMatches(
@@ -600,9 +611,11 @@ public actor DocumentSearcher {
                 )
             }
             let sink = await currentRegexTimeoutSink()
+            let textLayerStatus = await textLayerStatusSnapshot()
             return await previewRegex(
                 regex: regex, options: options, mode: mode, scope: scope,
                 pageRange: pageRange, currentPageIndex: currentPageIndex,
+                textLayerStatus: textLayerStatus,
                 pageTextProvider: pageTextProvider,
                 timeoutSink: sink
             )
@@ -615,9 +628,11 @@ public actor DocumentSearcher {
                     currentPageMatches: []
                 )
             }
+            let textLayerStatus = await textLayerStatusSnapshot()
             return await previewLiteral(
                 terms: [query], options: options, mode: mode, scope: scope,
                 pageRange: pageRange, currentPageIndex: currentPageIndex,
+                textLayerStatus: textLayerStatus,
                 pageTextProvider: pageTextProvider
             )
 
@@ -630,9 +645,11 @@ public actor DocumentSearcher {
                     currentPageMatches: []
                 )
             }
+            let textLayerStatus = await textLayerStatusSnapshot()
             return await previewLiteral(
                 terms: nonEmpty, options: options, mode: mode, scope: scope,
                 pageRange: pageRange, currentPageIndex: currentPageIndex,
+                textLayerStatus: textLayerStatus,
                 pageTextProvider: pageTextProvider
             )
         }
@@ -645,6 +662,7 @@ public actor DocumentSearcher {
         scope: SearchPreviewScope,
         pageRange: [Int],
         currentPageIndex: Int,
+        textLayerStatus: [Int: TextLayerStatus],
         pageTextProvider: @Sendable (Int) async -> String?,
         timeoutSink: (@Sendable (Int) -> Void)?
     ) async -> SearchPreviewResult {
@@ -654,6 +672,9 @@ public actor DocumentSearcher {
 
         for pageIndex in pageRange {
             if Task.isCancelled { break }
+            // The full search's text-layer gate: a `.sparse`/`.none` page is
+            // never counted from its text layer.
+            guard SearchCore.textLayerIsSearchable(textLayerStatus[pageIndex]) else { continue }
             guard let pageText = await pageTextProvider(pageIndex), !pageText.isEmpty else { continue }
 
             let searchText = SearchCore.regexSearchText(pageText, options: options)
@@ -705,6 +726,7 @@ public actor DocumentSearcher {
         scope: SearchPreviewScope,
         pageRange: [Int],
         currentPageIndex: Int,
+        textLayerStatus: [Int: TextLayerStatus],
         pageTextProvider: @Sendable (Int) async -> String?
     ) async -> SearchPreviewResult {
         var totalCount = 0
@@ -726,6 +748,9 @@ public actor DocumentSearcher {
 
         for pageIndex in pageRange {
             if Task.isCancelled { break }
+            // The full search's text-layer gate: a `.sparse`/`.none` page is
+            // never counted from its text layer.
+            guard SearchCore.textLayerIsSearchable(textLayerStatus[pageIndex]) else { continue }
             guard let pageText = await pageTextProvider(pageIndex), !pageText.isEmpty else { continue }
 
             // The same normalization and extension pipeline as
