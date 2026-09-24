@@ -76,4 +76,50 @@ struct LayerResultRowStyleTests {
         #expect(row.style == .full)
         #expect(row.chrome == .card)
     }
+
+    // MARK: - Custom glyph predicate
+
+    // The icon column sets a custom asset at its optical size (23 pt, the
+    // stopgap until the sources are retuned) and an SF fallback at
+    // `.title3`; the predicate is the router's own lookup.
+    @Test("isCustom is true exactly for a layer with a custom asset (identity first, then the stored name)")
+    func isCustomIsTrueExactlyForTheAssetLayers() {
+        let ocr = LayerResult(
+            name: "OCR Check", symbolName: "x", status: .pass, shortDescription: "",
+            detailDescription: "", pageReferences: nil, durationSeconds: 0)
+        #expect(VerificationSymbol.isCustom(ocr))
+        let stamped = LayerResult(
+            name: "Legacy Name", symbolName: "x", status: .pass, shortDescription: "",
+            detailDescription: "", pageReferences: nil, durationSeconds: 0, layer: .ocrCheck)
+        #expect(VerificationSymbol.isCustom(stamped))
+        let recheck = LayerResult(
+            name: VerificationLayer.searchRecheck.name,
+            symbolName: VerificationLayer.searchRecheck.symbolName,
+            status: .pass, shortDescription: "", detailDescription: "",
+            pageReferences: nil, durationSeconds: 0, layer: .searchRecheck)
+        #expect(!VerificationSymbol.isCustom(recheck))
+        #expect(!VerificationSymbol.isCustom(layer(status: .pass)))
+    }
+
+    // MARK: - Source pin: the section picks the row style
+
+    // The compact ledger row exists only if the section computes the style
+    // per row and passes it; the row's default stays `.full` for the
+    // progress view.
+    @Test("Source pin: VerificationDetailsSection passes rowStyle(for:) to every layer row")
+    func detailsSectionPassesTheRowStylePerRow() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/Views/VerificationDetailsSection.swift")
+        #expect(source.contains("style: LayerResultRow.rowStyle(for: layer)"),
+                "the section must compute the row style per row and pass it")
+    }
+
+    private func loadRepoFile(
+        _ relativePath: String, from file: StaticString = #filePath
+    ) throws -> String {
+        let repoRoot = URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent()  // ResectaAppTests
+            .deletingLastPathComponent()  // Tests
+            .deletingLastPathComponent()  // repo root
+        return try String(contentsOf: repoRoot.appendingPathComponent(relativePath), encoding: .utf8)
+    }
 }
