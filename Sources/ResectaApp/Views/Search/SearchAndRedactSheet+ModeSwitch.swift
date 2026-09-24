@@ -66,6 +66,76 @@ extension SearchAndRedactSheet {
         )
     }
 
+    /// What a mode change does, as a value: the steps the hub's single
+    /// `.onChange(of: searchModeType)` handler applies, in this order.
+    /// One table for every transition (`modeSwitchPlan(from:to:programmatic:)`,
+    /// pinned by `ModeSwitchPlanTests`); the handler count and order in
+    /// the hub never change (sibling `.onChange` ordering is
+    /// undocumented) — only that handler's body reads from here.
+    struct ModeSwitchPlan: Equatable {
+        enum Step: Equatable {
+            /// Belt: no user-initiated mode/interface change may leave
+            /// an in-flight scan running — an orphaned task would keep
+            /// appending into the new mode's list and its completion
+            /// tail would record a false run outcome. The pickers gate
+            /// on `isSearching`, so this is defense-in-depth for any
+            /// future un-gated write. (Programmatic recall skips this:
+            /// its own `triggerSearch()` cancels-and-awaits the prior task.)
+            case cancelSearchWithoutAwait
+            /// `clearResults()` — which already drops `appliedResultIDs`.
+            case clearResults
+            /// The category filter and the sort order back to their defaults.
+            case resetFilters
+            /// The post-clear undo toast (replaces the former pre-clear
+            /// warning; fires whenever the clear dropped results —
+            /// including the all-applied case that used to clear
+            /// silently, pack 01 carve-out B).
+            case enqueueUndoToast
+            /// AFTER the gated steps, so the next programmatic
+            /// transition starts from `false` and a fresh user
+            /// transition still defaults to `false`.
+            case resetProgrammaticFlag
+            /// Drop the previous mode's preview counters on EVERY
+            /// transition: the "Matches this page … Total …" row
+            /// otherwise sits beside the new mode's empty state right
+            /// after a switch.
+            case clearLivePreview
+            /// Programmatic transitions (saved-search recall) keep the
+            /// pre-existing schedule so recall still previews
+            /// immediately. A user transition does not reschedule — the
+            /// persisted query would repopulate the row before the user
+            /// has interacted with the new mode; the `queryText`
+            /// `.onChange` re-schedules on the first edit.
+            case scheduleLivePreview
+        }
+
+        /// The mode the undo snapshot records (the `.onChange` old value).
+        let previousMode: SearchModeType
+        let steps: [Step]
+    }
+
+    /// The one mode-switch table. User-initiated transitions clear (and
+    /// toast); programmatic ones (saved-search recall, the undo restore)
+    /// preserve applied markers + filter chips and only reset the flag,
+    /// drop the preview and — off the Scan interface — reschedule it.
+    /// Today every transition is user-initiated, so the clearing branch
+    /// is always taken.
+    static func modeSwitchPlan(
+        from previousMode: SearchModeType,
+        to newMode: SearchModeType,
+        programmatic: Bool
+    ) -> ModeSwitchPlan {
+        var steps: [ModeSwitchPlan.Step] = []
+        if !programmatic {
+            steps += [.cancelSearchWithoutAwait, .clearResults, .resetFilters, .enqueueUndoToast]
+        }
+        steps += [.resetProgrammaticFlag, .clearLivePreview]
+        if newMode != .piiScan && programmatic {
+            steps.append(.scheduleLivePreview)
+        }
+        return ModeSwitchPlan(previousMode: previousMode, steps: steps)
+    }
+
     /// Enqueue the post-clear undo toast when the gate admits it
     /// (user-initiated transition AND the clear dropped at least one
     /// result). The message names the unapplied count when unapplied
