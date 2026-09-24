@@ -184,9 +184,12 @@ struct LayerResultRow: View {
             if let pages = layer.pageReferences, !pages.isEmpty {
                 if let onPageTap {
                     FlowLayout(spacing: ResectaTokens.Spacing.xs) {
+                        // The label matches the chips' 46 pt hit frame in
+                        // height so it sits centred beside them, not above.
                         Text("Go to page")
                             .font(.caption)
                             .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                            .frame(minHeight: ResectaTokens.TouchTarget.minimum)
 
                         ForEach(pages, id: \.self) { pageRef in
                             PageChip(pageIndex: pageRef) {
