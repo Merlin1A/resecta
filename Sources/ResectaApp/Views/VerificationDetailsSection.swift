@@ -191,8 +191,12 @@ struct VerificationDetailsSection: View {
                         }
                     }
                 }
-                .padding(.horizontal, ResectaTokens.Spacing.sm)
-                .padding(.bottom, ResectaTokens.Spacing.sm)
+                // The content column pads like the action cards (16 pt);
+                // the flat rows inside carry no horizontal padding of their
+                // own, so the icon column, the hairlines and the group
+                // headers all measure from this edge.
+                .padding(.horizontal, ResectaTokens.Spacing.md)
+                .padding(.bottom, ResectaTokens.Spacing.md)
                 // Routed
                 // through the resolver so Reduce Motion swaps the slide
                 // for an opacity-only crossfade.
@@ -256,7 +260,7 @@ struct VerificationDetailsSection: View {
                         "Review deselected items. Returns to the editor and opens the scan coverage panel.")
             }
         }
-        .padding(ResectaTokens.Spacing.sm)
+        .padding(.vertical, ResectaTokens.Spacing.sm)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(rowText)
         .accessibilityIdentifier("deselectionRow")
@@ -348,7 +352,7 @@ struct VerificationDetailsSection: View {
                     DisclosureChevron(isExpanded: showPageModes)
                         .frame(width: 16)
                 }
-                .padding(ResectaTokens.Spacing.sm)
+                .padding(.vertical, ResectaTokens.Spacing.sm)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -436,7 +440,6 @@ struct VerificationDetailsSection: View {
                         }
                     }
                 }
-                .padding(.horizontal, ResectaTokens.Spacing.sm)
                 .padding(.vertical, ResectaTokens.Spacing.sm)
                 // Routed
                 // through the resolver so Reduce Motion swaps the slide

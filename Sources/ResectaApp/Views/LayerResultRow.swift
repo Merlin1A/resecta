@@ -65,6 +65,12 @@ struct LayerResultRow: View {
         isExpandable && Self.hasExpandedPayload(layer: layer)
     }
 
+    /// The row's own horizontal inset: 8 pt inside its card chrome; none
+    /// when flat, where the section's content column carries the inset.
+    private var horizontalInset: CGFloat {
+        chrome == .card ? ResectaTokens.Spacing.sm : 0
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header — always visible. A Button only when the row opens;
@@ -140,7 +146,8 @@ struct LayerResultRow: View {
                     .frame(width: 16)
             }
         }
-        .padding(ResectaTokens.Spacing.sm)
+        .padding(.vertical, ResectaTokens.Spacing.sm)
+        .padding(.horizontal, horizontalInset)
     }
 
     // MARK: - Expanded block
@@ -210,7 +217,7 @@ struct LayerResultRow: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(ResectaTokens.SemanticColor.supportText)
         }
-        .padding(.horizontal, ResectaTokens.Spacing.sm)
+        .padding(.horizontal, horizontalInset)
         .padding(.bottom, ResectaTokens.Spacing.sm)
         // Past the icon column and its gap: the detail starts at the name's
         // left edge at every Dynamic Type size.
