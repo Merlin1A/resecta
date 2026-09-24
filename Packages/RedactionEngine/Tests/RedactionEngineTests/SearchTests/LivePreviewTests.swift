@@ -286,4 +286,46 @@ struct LivePreviewTests {
         #expect(result.totalCount == 0)
         #expect(result.currentPageMatches.isEmpty)
     }
+
+    // MARK: - Text-layer routing (the full search's `.rich` gate)
+
+    /// A page classified `.sparse` or `.none` (a header-only layer over a
+    /// scanned body, or no layer) is skipped by every full-search tier, which
+    /// routes it to OCR or leaves it un-analyzed. The preview must skip it the
+    /// same way: its whole-document total equals the full text-layer search's
+    /// result count, and the visible page's highlights are empty when that
+    /// page is classified away. A page absent from the status map (unknown)
+    /// stays on the text layer, as it does for the full search.
+    @Test("Pages classified sparse or none are skipped like the full search")
+    func sparsePagesSkippedLikeTheFullSearch() async {
+        let doc = twoPageFixture()   // page 0: 7 × "alpha", page 1: 5 × "alpha"
+        var options = SearchOptions()
+        options.includeOCR = false
+
+        // Page 0 sparse: the text tier and the regex tier both drop its hits.
+        let searcher = DocumentSearcher(textLayerStatusByPage: [0: .sparse, 1: .rich])
+        for mode in [SearchMode.text("alpha", options: options), .regex("alp\\w+", options: options)] {
+            var fullCount = 0
+            for await _ in searcher.search(SendablePDFDocument(doc), mode: mode, progress: { _, _ in }) {
+                fullCount += 1
+            }
+            let preview = await searcher.previewMatches(
+                mode: mode, scope: .wholeDocument, currentPageIndex: 0,
+                totalPageCount: doc.pageCount, pageTextProvider: providerFor(doc)
+            )
+            #expect(fullCount == 5)
+            #expect(preview.totalCount == fullCount)
+            #expect(preview.currentPageMatches.isEmpty)
+            #expect(preview.saturated == false)
+        }
+
+        // Page 1 none, page 0 unknown: only the visible page counts.
+        let noneSearcher = DocumentSearcher(textLayerStatusByPage: [1: .none])
+        let nonePreview = await noneSearcher.previewMatches(
+            mode: .text("alpha", options: options), scope: .wholeDocument, currentPageIndex: 0,
+            totalPageCount: doc.pageCount, pageTextProvider: providerFor(doc)
+        )
+        #expect(nonePreview.totalCount == 7)
+        #expect(nonePreview.currentPageMatches.count == 7)
+    }
 }
