@@ -5,9 +5,39 @@ import RedactionEngine
 // Shared between VerificationProgressView and VerificationResultsView.
 
 struct LayerResultRow: View {
+    /// The row's shape. `.full` — the icon column, the name, the subtitle
+    /// and, when there is something to expand, the chevron; `.compact` —
+    /// the one-line ledger row for a clean pass (its rendering lands with
+    /// the ledger; until then every row renders full). `rowStyle(for:)`
+    /// picks, the section passes.
+    // nonisolated: a plain value read from `@Test(arguments:)` arrays,
+    // which Swift Testing hoists into a nonisolated peer (the SE-0466
+    // rationale on `ResectaTokens.SemanticColor`).
+    nonisolated enum Style: Equatable {
+        case full
+        case compact
+    }
+
+    /// The row's chrome. `.card` — the row paints its own material (the
+    /// progress view's rows; today's look); `.plain` — flat, the section
+    /// that stacks the rows owns the hairlines between them.
+    nonisolated enum Chrome: Equatable {
+        case card
+        case plain
+    }
+
     // Routes the detail-expansion `.move(edge:)` transition through
     // `Anim.resolvedTransition`.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // At accessibility sizes a subtitle wraps to many lines and a centred
+    // icon drifts down the row — the header top-aligns there.
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    /// The icon column, scaling with the row's title text. The expanded
+    /// block and the section's hairlines inset past it
+    /// (`iconColumn + Spacing.sm`), so the detail starts at the name's
+    /// left edge.
+    @ScaledMetric(relativeTo: .title3) private var iconColumn: CGFloat = 30
 
     let layer: LayerResult
     let layerIndex: Int
@@ -25,129 +55,204 @@ struct LayerResultRow: View {
     /// there advertises a no-op.
     var isExpandable: Bool = true
 
+    var style: Style = .full
+    var chrome: Chrome = .card
+
+    /// Whether the row opens: expandable by its host AND with something to
+    /// show. A row whose expanded block would carry nothing but its timing
+    /// is a full row with no chevron and no button.
+    private var opens: Bool {
+        isExpandable && Self.hasExpandedPayload(layer: layer)
+    }
+
+    /// The row's own horizontal inset: 8 pt inside its card chrome; none
+    /// when flat, where the section's content column carries the inset.
+    private var horizontalInset: CGFloat {
+        chrome == .card ? ResectaTokens.Spacing.sm : 0
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header — always visible
-            Button(action: onTap) {
-                HStack(spacing: ResectaTokens.Spacing.sm) {
-                    VerificationSymbol.icon(for: layer)
-                        .foregroundStyle(useIntermediateColors
-                                         ? layer.status.intermediateColor
-                                         : layer.status.color)
-                        .font(.title3)
-                        .frame(width: 28)
-
-                    VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
-                        Text("Layer \(layerIndex): \(layer.name)")
-                            .font(.subheadline.weight(.medium))
-                        Text(Self.rowSubtitleText(layer: layer))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            // An attention row's sentence quotes the
-                            // review terms; the layer name, status
-                            // phrase and every other row's description
-                            // stay readable under a capture.
-                            .privacySensitive(Self.rowSubtitleIsPrivacySensitive(layer: layer))
-                    }
-
-                    Spacer()
-
-                    // Per-layer timing
-                    if layer.durationSeconds > 0 {
-                        Text(String(format: "%.1fs", layer.durationSeconds))
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.tertiary)
-                    }
-
-                    Image(systemName: "chevron.down")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(isExpanded ? 0 : -90))
+            // Header — always visible. A Button only when the row opens;
+            // otherwise the header renders directly, with no chevron and
+            // no hint.
+            if opens {
+                Button(action: onTap) {
+                    header
                 }
-                .padding(ResectaTokens.Spacing.sm)
+                .buttonStyle(.plain)
+                // Explicit label so what the check reported (`shortDescription`)
+                // is spoken — combining children then labeling the CONTAINER
+                // (the prior shape) silenced it. Collapsed, the outer `.combine` merges this
+                // into the single row element; expanded (`.contain`), the header
+                // stays one focusable element with the same label while the
+                // detail text and page chips become real, reachable elements.
+                .accessibilityLabel(Self.accessibilityLabel(layerIndex: layerIndex, layer: layer))
+                .accessibilityHint(Self.accessibilityHint(isExpandable: true, isExpanded: isExpanded))
+            } else {
+                header
+                    .accessibilityLabel(Self.accessibilityLabel(layerIndex: layerIndex, layer: layer))
             }
-            .buttonStyle(.plain)
-            // Explicit label so what the check reported (`shortDescription`)
-            // is spoken — combining children then labeling the CONTAINER
-            // (the prior shape) silenced it. Collapsed, the outer `.combine` merges this
-            // into the single row element; expanded (`.contain`), the header
-            // stays one focusable element with the same label while the
-            // detail text and page chips become real, reachable elements.
-            .accessibilityLabel(Self.accessibilityLabel(layerIndex: layerIndex, layer: layer))
-            .accessibilityHint(Self.accessibilityHint(isExpandable: isExpandable, isExpanded: isExpanded))
 
             // Expanded detail
             if isExpanded {
-                VStack(alignment: .leading, spacing: ResectaTokens.Spacing.sm) {
-                    Text(layer.detailDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    // Search Re-check per-query lines (display-only, like
-                    // `reviewTermTexts`): one line per applied query with
-                    // its found / applied / remaining counts, per-term
-                    // sub-lines beneath a multi-term query. Each `Text`
-                    // is its own reachable element inside the expanded
-                    // `.contain` container.
-                    if let lines = layer.queryLines, !lines.isEmpty {
-                        VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
-                            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                                // Each line quotes the user's own query,
-                                // pattern or terms — marked like the
-                                // search sheet's rows.
-                                Text(Self.queryLineText(line))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .privacySensitive(Self.queryLinesArePrivacySensitive)
-                                ForEach(Array(Self.perTermLineTexts(line).enumerated()), id: \.offset) { _, text in
-                                    Text(text)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .padding(.leading, ResectaTokens.Spacing.sm)
-                                        .privacySensitive(Self.queryLinesArePrivacySensitive)
-                                }
-                            }
-                        }
-                    }
-
-                    // Tappable page reference chips (static fallback when onPageTap is nil)
-                    if let pages = layer.pageReferences, !pages.isEmpty {
-                        if let onPageTap {
-                            FlowLayout(spacing: ResectaTokens.Spacing.xs) {
-                                Text("Affected pages:")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-
-                                ForEach(pages, id: \.self) { pageRef in
-                                    PageChip(pageIndex: pageRef) {
-                                        onPageTap(pageRef)
-                                    }
-                                }
-                            }
-                        } else {
-                            // Same 1-based display convention as PageChip (storage is 0-based).
-                            Text("Affected pages: \(pages.map { String($0 + 1) }.joined(separator: ", "))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .padding(.horizontal, ResectaTokens.Spacing.sm)
-                .padding(.bottom, ResectaTokens.Spacing.sm)
-                .padding(.leading, 40) // Align with text, past 28pt icon + sm padding
-                // Routed through the resolver so Reduce Motion swaps
-                // the slide for an opacity-only crossfade.
-                .transition(ResectaTokens.Anim.resolvedTransition(
-                    standard: .opacity.combined(with: .move(edge: .top)),
-                    reduceMotion: reduceMotion))
+                expandedBlock
             }
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.toast))
+        // `.card` paints the row's own material (the progress view); `.plain`
+        // draws nothing — the section owns the hairlines.
+        .background(
+            chrome == .card ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.clear),
+            in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.toast))
         // Collapsed: one combined element (header label above). Expanded:
         // a container, so VoiceOver can reach the detail text and the
         // "Go to page N" chips instead of having them flattened away.
         .accessibilityElement(children: isExpanded ? .contain : .combine)
         .accessibilityIdentifier("layerResult_\(layerIndex - 1)") // zero-indexed
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center,
+               spacing: ResectaTokens.Spacing.sm) {
+            VerificationSymbol.icon(for: layer)
+                .foregroundStyle(useIntermediateColors
+                                 ? layer.status.intermediateColor
+                                 : layer.status.color)
+                .font(.title3)
+                .frame(width: iconColumn)
+
+            VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
+                // The check's name alone — the ledger lists every check
+                // and VoiceOver keeps "Layer N" in the label.
+                Text(layer.name)
+                    .font(.subheadline.weight(.medium))
+                Text(Self.rowSubtitleText(layer: layer))
+                    .font(.caption)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                    // An attention row's sentence quotes the
+                    // review terms; the layer name, status
+                    // phrase and every other row's description
+                    // stay readable under a capture.
+                    .privacySensitive(Self.rowSubtitleIsPrivacySensitive(layer: layer))
+            }
+
+            Spacer()
+
+            if opens {
+                // A fixed trailing slot, shared with the ledger's ✓ column.
+                DisclosureChevron(isExpanded: isExpanded)
+                    .frame(width: 16)
+            }
+        }
+        .padding(.vertical, ResectaTokens.Spacing.sm)
+        .padding(.horizontal, horizontalInset)
+    }
+
+    // MARK: - Expanded block
+
+    private var expandedBlock: some View {
+        VStack(alignment: .leading, spacing: ResectaTokens.Spacing.sm) {
+            if layer.hasDetail {
+                Text(layer.detailDescription)
+                    .font(.caption)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+            }
+
+            // Search Re-check per-query lines (display-only, like
+            // `reviewTermTexts`): one line per applied query with
+            // its found / applied / remaining counts, per-term
+            // sub-lines beneath a multi-term query. Each `Text`
+            // is its own reachable element inside the expanded
+            // `.contain` container.
+            if let lines = layer.queryLines, !lines.isEmpty {
+                VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
+                    ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                        // Each line quotes the user's own query,
+                        // pattern or terms — marked like the
+                        // search sheet's rows.
+                        Text(Self.queryLineText(line))
+                            .font(.caption)
+                            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                            .privacySensitive(Self.queryLinesArePrivacySensitive)
+                        ForEach(Array(Self.perTermLineTexts(line).enumerated()), id: \.offset) { _, text in
+                            Text(text)
+                                .font(.caption)
+                                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                                .padding(.leading, ResectaTokens.Spacing.sm)
+                                .privacySensitive(Self.queryLinesArePrivacySensitive)
+                        }
+                    }
+                }
+            }
+
+            // Tappable page reference chips (static fallback when onPageTap is nil)
+            if let pages = layer.pageReferences, !pages.isEmpty {
+                if let onPageTap {
+                    FlowLayout(spacing: ResectaTokens.Spacing.xs) {
+                        // The label matches the chips' 46 pt hit frame in
+                        // height so it sits centred beside them, not above.
+                        Text("Go to page")
+                            .font(.caption)
+                            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                            .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+
+                        ForEach(pages, id: \.self) { pageRef in
+                            PageChip(pageIndex: pageRef) {
+                                onPageTap(pageRef)
+                            }
+                        }
+                    }
+                } else {
+                    // Same 1-based display convention as PageChip (storage is 0-based).
+                    Text("Go to page \(pages.map { String($0 + 1) }.joined(separator: ", "))")
+                        .font(.caption)
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                }
+            }
+
+            // The check's own time, last — its own reachable element.
+            Text(Self.expandedTimingText(durationSeconds: layer.durationSeconds))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+        }
+        .padding(.horizontal, horizontalInset)
+        .padding(.bottom, ResectaTokens.Spacing.sm)
+        // Past the icon column and its gap: the detail starts at the name's
+        // left edge at every Dynamic Type size.
+        .padding(.leading, iconColumn + ResectaTokens.Spacing.sm)
+        // Routed through the resolver so Reduce Motion swaps
+        // the slide for an opacity-only crossfade.
+        .transition(ResectaTokens.Anim.resolvedTransition(
+            standard: .opacity.combined(with: .move(edge: .top)),
+            reduceMotion: reduceMotion))
+    }
+
+    // MARK: - Style + payload (static for unit testability)
+
+    /// The compact ledger row is a pass with nothing to expand; every
+    /// other row — any non-pass, or a pass carrying detail, query lines
+    /// or page references — is a full row.
+    static func rowStyle(for layer: LayerResult) -> Style {
+        layer.status == .pass && !hasExpandedPayload(layer: layer) ? .compact : .full
+    }
+
+    /// Whether the expanded block would show anything beyond its timing
+    /// line: a detail sentence, query lines or page references. The
+    /// timing alone is not a payload — a row with none is not expandable.
+    static func hasExpandedPayload(layer: LayerResult) -> Bool {
+        layer.hasDetail
+            || !(layer.queryLines ?? []).isEmpty
+            || !(layer.pageReferences ?? []).isEmpty
+    }
+
+    /// The expanded row's last line. "Took under 0.1 s" for every duration
+    /// below a tenth of a second (most checks finish there, and "0.0s"
+    /// read as "did not run"); otherwise one decimal, a space before the
+    /// unit. The footer keeps the run's total.
+    static func expandedTimingText(durationSeconds seconds: Double) -> String {
+        seconds < 0.1 ? "Took under 0.1 s" : String(format: "Took %.1f s", seconds)
     }
 
     // MARK: - Row subtitle (attention rows name the exact text)
@@ -254,15 +359,14 @@ struct LayerResultRow: View {
     /// Row label: layer ordinal + name + layer-scoped phrase + what the
     /// check reported. `shortDescription` is the payload for warn/fail/info
     /// rows, and previously was never spoken. Page count rides along when
-    /// the layer carries page references; duration tail as before.
-    /// Attention rows speak the same composed sentence they display.
+    /// the layer carries page references. The duration is not spoken: it
+    /// is not in the collapsed row, and the expanded row's timing line is
+    /// its own reachable element. Attention rows speak the same composed
+    /// sentence they display.
     static func accessibilityLabel(layerIndex: Int, layer: LayerResult) -> String {
         var label = "Layer \(layerIndex), \(layer.name), \(layer.status.layerAccessibilityPhrase) \(Self.rowSubtitleText(layer: layer))"
         if let pages = layer.pageReferences, !pages.isEmpty {
             label += ", \(pages.count) affected page\(pages.count == 1 ? "" : "s")"
-        }
-        if layer.durationSeconds > 0 {
-            label += ", \(String(format: "%.1f", layer.durationSeconds)) seconds"
         }
         return label
     }

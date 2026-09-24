@@ -21,7 +21,7 @@ struct Layer6GrazeClassificationTests {
         return bounds
     }
 
-    @Test("Center inside a region → in-region FAIL with position")
+    @Test("Center inside a region → in-region FAIL naming the page, no read-back position")
     func centerInsideFails() async throws {
         let data = TestFixtures.textLayerPDF(text: "SECRET CONTENT")
         let doc = try #require(PDFDocument(data: data))
@@ -35,8 +35,9 @@ struct Layer6GrazeClassificationTests {
             regionShapes: [RegionShape(expandedBounds: region, polygonVertices: nil)])
         #expect(result.isFail, "center-inside must FAIL; got \(result)")
         if case .fail(let msg) = result {
-            #expect(msg.contains("overlaps a redacted area on page 1 (position"),
+            #expect(msg.contains("overlaps a redacted area on page 1"),
                     "got: \(msg)")
+            #expect(!msg.contains("(position"), "no read-back offset in user copy; got: \(msg)")
         }
     }
 
@@ -62,7 +63,7 @@ struct Layer6GrazeClassificationTests {
                     "got: \(msg)")
             #expect(msg.contains("Its content is outside the redacted area."),
                     "got: \(msg)")
-            #expect(msg.contains("(position"), "got: \(msg)")
+            #expect(!msg.contains("(position"), "no read-back offset in user copy; got: \(msg)")
         }
     }
 

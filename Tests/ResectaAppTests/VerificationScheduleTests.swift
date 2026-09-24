@@ -101,7 +101,7 @@ struct VerificationScheduleTests {
             symbolName: VerificationLayer.searchRecheck.symbolName,
             status: .info(SearchRecheck.infoMessage),
             shortDescription: SearchRecheck.infoMessage,
-            detailDescription: "Search Re-check reported informational metadata: \(SearchRecheck.infoMessage)",
+            detailDescription: "",
             pageReferences: nil, durationSeconds: 0, layer: .searchRecheck)
         // The results view's grouping predicates: NOTES = info; FINDINGS =
         // warn / attention / fail / skipped.

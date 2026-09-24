@@ -86,7 +86,7 @@ struct VerificationProgressView: View {
                                 .frame(width: 28)
 
                             VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
-                                Text("Layer \(currentLayer): \(layerName)")
+                                Text(layerName)
                                     .font(.subheadline.weight(.medium))
                                 Text("Checking\u{2026}")
                                     .font(.caption)
