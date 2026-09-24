@@ -376,6 +376,29 @@ public final class PageRasterizer: @unchecked Sendable {
 
             ctx.draw(renderedImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 
+            // 4b. The hidden-text ink test (C12-01). A Searchable page's
+            // surviving glyphs are read back from the RENDERED pixels — what
+            // the reader will see. A glyph whose pixel box is uniform carries
+            // no visible ink (white-on-white text, an invisible render mode,
+            // a box painted over it); its text layer would re-expose what
+            // the page hides, so the page falls back to Secure HERE — after
+            // the render, before any fill — through the same path as the
+            // pre-render fallbacks: entries and digest dropped, the reason
+            // recorded. The box goes through the fills' own mapping and the
+            // fills' own reader (`hasInklessGlyph`).
+            if let entries = textLayerEntries,
+               try Self.hasInklessGlyph(
+                   context: ctx, entries: entries, pageSize: effectiveSize
+               ) {
+                textLayerEntries = nil
+                redactionRectsForTextLayer = []
+                pageDigest = nil
+                fallbackReason = .hiddenText
+                pageRasterizerLogger.log(
+                    "page \(page.pageIndex) fell back to secure rasterization at runtime (hidden text)"
+                )
+            }
+
             // 5. Apply fills — bitmap dimensions only, no PDF geometry.
             // 256-row band cancellation checks happen inside.
             try applyRedactionFills(
@@ -440,6 +463,57 @@ public final class PageRasterizer: @unchecked Sendable {
             return RasterizeResult(pageOutput: output, filterDigest: pageDigest,
                                    fallbackReason: fallbackReason)
         }
+    }
+
+    // MARK: - Hidden-text ink test
+
+    /// Pixel-area floor under which a glyph box is not tested (a box this
+    /// small at any DPI cannot show a glyph edge either way).
+    static let hiddenTextMinimumBoxArea: Int = 4
+
+    /// The ink test behind the `.hiddenText` fallback: true when any
+    /// surviving glyph's pixel box is UNIFORM — every pixel equal to its
+    /// first. White-on-white and invisible-render-mode text read the page
+    /// colour throughout; a content-stream box painted over text reads the
+    /// box colour throughout; real ink of any contrast breaks uniformity.
+    /// The box is the glyph's displayed-frame bounds through the fills'
+    /// own mapping (`normalizedToFillPixels`: pixel-aligned, a 1-px halo)
+    /// and the fills' own reader (`verifyFill`, against the box's first
+    /// pixel), so the test sees exactly the pixels the fills and the verify
+    /// loop see. Whitespace-lineage glyphs, off-bitmap boxes and boxes under
+    /// `hiddenTextMinimumBoxArea` are exempt. Cooperative cancellation every
+    /// 256 glyphs.
+    static func hasInklessGlyph(
+        context: CGContext, entries: [CharacterInfo], pageSize: CGSize
+    ) throws -> Bool {
+        guard let data = context.data, pageSize.width > 0, pageSize.height > 0 else {
+            return false
+        }
+        let buffer = data.assumingMemoryBound(to: UInt8.self)
+        let bitmap = CGRect(x: 0, y: 0, width: context.width, height: context.height)
+        var band = 0
+        for entry in entries {
+            band += 1
+            if band & 0xFF == 0 { try Task.checkCancellation() }
+            if SandwichMetrics.isLineageWhitespace(entry.character) { continue }
+            let b = entry.bounds
+            let normalized = CGRect(
+                x: b.minX / pageSize.width, y: b.minY / pageSize.height,
+                width: b.width / pageSize.width, height: b.height / pageSize.height
+            )
+            let box = normalizedToFillPixels(
+                normalized, bitmapWidth: context.width, bitmapHeight: context.height
+            ).intersection(bitmap)
+            guard !box.isEmpty,
+                  Int(box.width) * Int(box.height) >= hiddenTextMinimumBoxArea else { continue }
+            let memoryRow = context.height - 1 - Int(box.minY)
+            let first = buffer + memoryRow * context.bytesPerRow + Int(box.minX) * 4
+            let expected = ExpectedPixelBGRA(b: first[0], g: first[1], r: first[2], a: first[3])
+            if try verifyFill(context: context, rect: box, expectedColor: expected) {
+                return true
+            }
+        }
+        return false
     }
 
     // MARK: - Render with Timeout

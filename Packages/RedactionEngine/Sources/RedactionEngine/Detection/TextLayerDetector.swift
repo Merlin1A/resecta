@@ -85,6 +85,11 @@ public enum TextLayerDetector {
         /// Runtime text extraction threw (e.g., the OCG defense) — recorded
         /// by PageRasterizer, never returned by the pre-flight trigger check.
         case extractionFailed
+        /// The rendered page shows no ink under a surviving text-layer
+        /// glyph (white-on-white text, an invisible render mode, a box
+        /// painted over the text) — recorded by PageRasterizer after the
+        /// render, never returned by the pre-flight trigger check.
+        case hiddenText
     }
 
     // MARK: - Private Helpers
