@@ -379,7 +379,7 @@ struct CouldNotVerifyFlagTests {
 
     // MARK: - Source census
 
-    /// Every `.warn(` construction in the three verification files is
+    /// Every `.warn(` construction in the four verification files is
     /// classified here — the could-not-verify family (20 sites) and the
     /// routine-note WARNs — so a new site cannot land silently: an
     /// unclassified construction, a moved message or a changed count fails.
@@ -389,8 +389,6 @@ struct CouldNotVerifyFlagTests {
         let markers: [String: [Marker]] = [
             "VerificationEngine.swift": [
                 Marker(text: "Could not verify /AcroForm absence", family: true, sites: 1, lines: 1),
-                Marker(text: "OCR coordinates could not be mapped to page space", family: true, sites: 1, lines: 1),
-                Marker(text: "OCR could not be run on", family: true, sites: 1, lines: 1),
                 Marker(text: "All sensitive terms shorter than 3 characters", family: true, sites: 1, lines: 1),
                 Marker(text: "Sensitive term search exceeded size limit", family: true, sites: 1, lines: 1),
                 Marker(text: "Could not read output PDF for binary search", family: true, sites: 1, lines: 1),
@@ -399,11 +397,9 @@ struct CouldNotVerifyFlagTests {
                 Marker(text: "Per-page mode data covered", family: true, sites: 1, lines: 1),
                 Marker(text: "Cross-checked \\(checked) of \\(eligible)", family: true, sites: 2, lines: 2),
                 Marker(text: "could not be read for this check", family: true, sites: 1, lines: 2),
-                // Notes and aggregates — never the flag.
                 Marker(text: "return .warn(msg)", family: false, sites: 0, lines: 1),
                 Marker(text: "Verification produced warnings", family: false, sites: 0, lines: 1),
                 Marker(text: "Some verification checks were skipped", family: false, sites: 0, lines: 1),
-                Marker(text: "OCR detected text within a redacted region", family: false, sites: 0, lines: 1),
                 Marker(text: "return (.warn(warn.message), warn.pages, nil", family: false, sites: 0, lines: 1),
                 Marker(text: "Structural findings:", family: false, sites: 0, lines: 1),  // LegalPhrases:safe (the engine message)
                 Marker(text: "Auto-injected metadata present: XMP metadata", family: false, sites: 0, lines: 1),
@@ -411,6 +407,11 @@ struct CouldNotVerifyFlagTests {
                 Marker(text: "File identifier was not derived from the file contents", family: false, sites: 0, lines: 1),
                 Marker(text: "\\(prefix): \\(warnings.joined", family: false, sites: 0, lines: 1),
                 Marker(text: "return (.warn(msg), exclusionWarnPages", family: false, sites: 0, lines: 1),
+            ],
+            "Layer2OCRCheck+Sweep.swift": [
+                Marker(text: "OCR coordinates could not be mapped to page space", family: true, sites: 1, lines: 1),
+                Marker(text: "OCR could not be run on", family: true, sites: 1, lines: 1),
+                Marker(text: "OCR detected text within a redacted region", family: false, sites: 0, lines: 1),
             ],
             "SandwichVerification.swift": [
                 Marker(text: "had no measurable position", family: true, sites: 1, lines: 1),
@@ -428,7 +429,7 @@ struct CouldNotVerifyFlagTests {
             ],
         ]
         // Pinned `.warn(` construction counts (pattern matches excluded).
-        let constructionCounts = ["VerificationEngine.swift": 24, "SandwichVerification.swift": 9, "SearchRecheck.swift": 1]
+        let constructionCounts = ["VerificationEngine.swift": 21, "Layer2OCRCheck+Sweep.swift": 3, "SandwichVerification.swift": 9, "SearchRecheck.swift": 1]
 
         let sources = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()

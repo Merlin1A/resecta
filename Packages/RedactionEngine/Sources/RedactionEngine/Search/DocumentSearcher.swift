@@ -88,7 +88,7 @@ public actor DocumentSearcher {
     // NER-asset-absent OS build, `sharedLoadDiagnostics` records it and the
     // scan kickoff surfaces the degraded-detection banner instead of degrading silently.
     private static let sharedPIIDetectorLoad = PIIDetector.loadWithDiagnostics()
-    private let piiDetector = DocumentSearcher.sharedPIIDetectorLoad.detector
+    let piiDetector = DocumentSearcher.sharedPIIDetectorLoad.detector
 
     /// Diagnostics for the process-shared search detector.
     /// Cached with the detector — the probe reflects load-time state, which
@@ -219,7 +219,7 @@ public actor DocumentSearcher {
     /// The OCR page caches — the verbatim Vision lines, the LRU access
     /// order and the normalized PII-scan inputs — one value owned by this
     /// actor. See `OCRPageCache`.
-    private var ocrPageCache = OCRPageCache()
+    var ocrPageCache = OCRPageCache()
     private typealias NormalizedOCRPage = OCRPageCache.NormalizedPage
     private typealias NormalizedLineEntry = OCRPageCache.NormalizedLineEntry
     private let ocrNormalizer = OCRTextNormalizer()
@@ -234,39 +234,8 @@ public actor DocumentSearcher {
         self.textLayerStatusByPage = textLayerStatusByPage
     }
 
-    // MARK: - Site-B posterior composition
-
-    /// Site-B gate for the five scored families, composing the SAME
-    /// posterior + learned-context term the detection path applies at
-    /// DetectionOrchestrator.swift:432-446 + the posterior threshold gate at :455-460.
-    ///
-    /// For each match whose category resolves to a vector cutoff:
-    ///   finalConfidence = posterior(raw, priorMean, contextLogit)
-    ///   priorMean       = max(searchPriors.mean(category), absorbingStateFloor)
-    ///   contextLogit    = contextScorer.learnedContextLogit(family:, features:)
-    /// and the match survives iff finalConfidence >= cutoff. Survivors get the
-    /// identical rationale annotation `ThresholdFilter.applying` writes (the
-    /// `.presetThresholdPass(raw:cutoff:)` signal keyed on the RAW confidence,
-    /// plus `appliedThreshold`).
-    ///
-    /// A match with no vector cutoff (nil vector, or no entry for the category's
-    /// wire name) passes through unchanged — the same fall-through
-    /// `ThresholdFilter.applying` takes, so a non-gated scored family stays
-    /// byte-identical to the raw path.
-    ///
-    /// DOCTYPE: `DocumentSearcher` carries no doctype (the text-layer merge runs
-    /// with `doctype: nil`) and the search path has no classifier output to
-    /// mirror Site-A's `effectiveDoctype`, so the feature builder is fed
-    /// `.generic` for BOTH the `doctype` and `effectiveDoctype` parameters (the
-    /// value the detection seam uses for an unknown doctype). The SAME value is
-    /// passed to both params, mirroring the orchestrator passing `effectiveDoctype`
-    /// to both. CONSEQUENCE: Site-B parity is exact for generic-doctype documents
-    /// and for `account` (whose only non-zero weights are
-    /// `nearest_positive_distance` / `digit_run_length`); for `phone` the trained
-    /// doctype one-hots carry non-zero weight (e.g. `doctype_is_court` +1.11,
-    /// `doctype_is_medical` -0.82), so a phone match on a court/medical/foia
-    /// document composes a different posterior at Site B than at Site A. That is an
-    /// accepted limitation of the doctype-blind search path, not a measured no-op.
+    /// The instance-bound Site-B gate: the actor's vector, scorers and priors
+    /// applied through the frozen composition in DocumentSearcher+SiteB.swift.
     private func composedSurvivors(
         _ matches: [PIIDetector.PIIMatch],
         pageText: String
@@ -279,72 +248,6 @@ public actor DocumentSearcher {
             contextScorer: contextScorer,
             priors: searchPriors
         )
-    }
-
-    /// Pure, dependency-injected core of `composedSurvivors`. Static so the
-    /// observation-only test seam can drive it with a chosen scorer (identity
-    /// vs the installed calibrated artifact) without an actor instance, and so
-    /// production and the harness exercise the SAME composition code.
-    static func composedSurvivors(
-        _ matches: [PIIDetector.PIIMatch],
-        pageText: String,
-        thresholdVector: PresetThresholdVector?,
-        calibratedScorer: CalibratedScorer,
-        contextScorer: ContextScorerWeights,
-        priors: PerCategoryPriors
-    ) -> [PIIDetector.PIIMatch] {
-        matches.compactMap { match in
-            guard let category = match.category,
-                  let cutoff = thresholdVector?.threshold(for: category)
-            else { return match }
-
-            let priorMean = max(priors.mean(category), DetectionOrchestrator.absorbingStateFloor)
-            let wire = PresetThresholdVector.wireName(for: category) ?? ""
-            let contextLogit = contextScorer.learnedContextLogit(
-                family: wire,
-                features: contextFeatures(
-                    match: match,
-                    effectiveDoctype: .generic,
-                    pageText: pageText
-                )
-            )
-            // Under-redaction posterior floor,
-            // the Search-path twin of the Site-A (DetectionOrchestrator) seam. The
-            // SAME raw-bar helper, so a keyword-confirmed
-            // account/phone the learned term collapsed is re-floored to the
-            // preset-invariant conservative cutoff before the gate. Flooring at
-            // BOTH seams keeps Auto-Detect and Search symmetric — leaving either
-            // unfloored re-opens the leak on one path. The local `cutoff` stays the
-            // ACTIVE-preset gate; the floor's source is the separate conservative
-            // lookup. Pure code, no blob change. See ContextPosteriorFloor.
-            let scored = calibratedScorer.posterior(
-                raw: match.confidence,
-                priorMean: priorMean,
-                contextLogit: contextLogit
-            )
-            let finalConfidence = ContextPosteriorFloor.apply(
-                scored,
-                family: wire,
-                raw: match.confidence,
-                conservativeCutoff: ContextPosteriorFloor.conservativeCutoff(forWire: wire)
-            )
-            guard finalConfidence >= cutoff else { return nil }
-
-            // The survival decision above is on the POSTERIOR (finalConfidence),
-            // but the annotation records `.presetThresholdPass(raw:cutoff:)` keyed
-            // on the RAW confidence (the same signal shape ThresholdFilter.applying
-            // writes). For a scored family the posterior can carry a raw below the
-            // cutoff over it, so this recorded `raw` may be < `cutoff` by design —
-            // the audit trail's raw is pre-posterior, not the value that survived.
-            guard let rationale = match.rationale else { return match }
-            let annotated = rationale.with(
-                appliedThreshold: cutoff,
-                addingSignal: .presetThresholdPass(
-                    raw: match.confidence, cutoff: cutoff
-                )
-            )
-            return match.withRationale(annotated)
-        }
     }
 
     // MARK: - Spatial address assembly (both PII-scan legs)
@@ -422,74 +325,6 @@ public actor DocumentSearcher {
         return (gated.survivors + composedSurvivors(scored, pageText: pageText))
             .sorted { $0.range.location < $1.range.location }
     }
-
-    // MARK: - Test Seams (internal, observation/seeding only)
-
-    #if DEBUG
-    internal var _testOCRCacheKeys: Set<Int> { ocrPageCache.cachedKeys }
-    internal var _testOCRNormalizedConcatKeys: Set<Int> { ocrPageCache.normalizedKeys }
-    /// H3.1 (1.2 instrumentation plan §6) — read-only view of one page's
-    /// cached Vision lines so the search-GT harness can emit the exact OCR
-    /// text the OCR leg matched against. Observation-only, same contract as
-    /// `_testOCRCacheKeys` above; never touches the LRU access ordering.
-    internal func _testOCRCachedLines(forPageIndex pageIndex: Int) -> [OCREngine.TextLine]? {
-        ocrPageCache.cachedLines(forPageIndex: pageIndex)
-    }
-
-    /// Seeds the three OCR caches with `occupiedCount` placeholder entries,
-    /// inserted in ascending page-index order so the smallest index is the
-    /// least-recently-used. Page indices equal to `skippingPageIndex` are
-    /// skipped so a subsequent OCR pass on that page forces a miss + LRU
-    /// eviction — driving the production eviction code path under test.
-    internal func _testSeedOCRCacheForCoherence(
-        skippingPageIndex: Int,
-        occupiedCount: Int
-    ) {
-        ocrPageCache.seedForCoherence(
-            skippingPageIndex: skippingPageIndex, occupiedCount: occupiedCount)
-    }
-
-    /// Seeds the OCR cache with known lines for a specific page index,
-    /// allowing tests to exercise search paths (text-mode OCR, regex OCR
-    /// fallback) without invoking real Vision OCR on the simulator.
-    /// The normalized-concat cache entry is NOT pre-seeded here (the PII
-    /// path rebuilds it on demand; the text/regex paths do not read it).
-    internal func _testSeedOCRLines(_ lines: [OCREngine.TextLine], forPageIndex pageIndex: Int) {
-        ocrPageCache.seedLines(lines, forPageIndex: pageIndex)
-    }
-
-    /// Test seam: base address of the copy-on-write-shared surname
-    /// Bloom buffer behind this searcher's PIIDetector. Two searchers backed by
-    /// the process-shared static detector report the SAME address (shared COW
-    /// storage); per-instance detectors report different addresses. nil when the
-    /// name gazetteer is absent from the bundle. `nonisolated` — reads only the
-    /// immutable Sendable `piiDetector` let.
-    nonisolated var _testNameBloomBufferAddress: Int? { piiDetector._testNameBloomBufferAddress }
-
-    /// Observation-only seam over the Site-B composition (the same
-    /// `composedSurvivors` core production calls). The G8 Site-B parity harness
-    /// drives this with a chosen scorer — `ContextScorerWeights.identity` for the
-    /// w=0 identity control (composed-at-identity == raw), the installed bundle
-    /// for the AFTER — so the harness exercises the production path rather than a
-    /// re-implementation. `nonisolated static` (the core is pure / injected); it
-    /// changes nothing on the actor. Mirrors the `_testSeed*` seams' contract:
-    /// internal, DEBUG-only, no production caller.
-    nonisolated static func _testComposeSiteB(
-        _ matches: [PIIDetector.PIIMatch],
-        pageText: String,
-        thresholdVector: PresetThresholdVector?,
-        scorer: ContextScorerWeights
-    ) -> [PIIDetector.PIIMatch] {
-        composedSurvivors(
-            matches,
-            pageText: pageText,
-            thresholdVector: thresholdVector,
-            calibratedScorer: CalibratedScorer(),
-            contextScorer: scorer,
-            priors: PerCategoryPriors()
-        )
-    }
-    #endif
 
     /// Install the threshold vector to apply on future PII scans.
     /// Pass nil to disable gating entirely.
@@ -584,6 +419,13 @@ public actor DocumentSearcher {
         regexTimeoutSink
     }
 
+    /// One read of the per-page text-layer classification for the preview's
+    /// page walk (the preview is `nonisolated`; this is its one actor hop
+    /// for the routing, the shape `currentRegexTimeoutSink()` already has).
+    private func textLayerStatusSnapshot() -> [Int: TextLayerStatus] {
+        textLayerStatusByPage
+    }
+
     // MARK: - Public API
 
     /// Search the document, yielding results progressively.
@@ -655,6 +497,10 @@ public actor DocumentSearcher {
     /// - Caller supplies a `pageTextProvider` that returns the page's
     ///   text-layer string (or nil to skip a page). Live preview never
     ///   pays the OCR cost.
+    /// - A page whose installed text-layer classification is `.sparse` or
+    ///   `.none` is skipped, exactly as the full search skips its text layer
+    ///   (it routes such a page to OCR, which the preview never runs), so the
+    ///   preview's count never exceeds what the full text-layer search yields.
     /// - Per-page work is bounded by `perPageRegexTimeout` (regex path)
     ///   and `Task.isCancelled` checks (all paths).
     public nonisolated func previewMatches(
@@ -697,9 +543,11 @@ public actor DocumentSearcher {
                 )
             }
             let sink = await currentRegexTimeoutSink()
+            let textLayerStatus = await textLayerStatusSnapshot()
             return await previewRegex(
                 regex: regex, options: options, mode: mode, scope: scope,
                 pageRange: pageRange, currentPageIndex: currentPageIndex,
+                textLayerStatus: textLayerStatus,
                 pageTextProvider: pageTextProvider,
                 timeoutSink: sink
             )
@@ -712,9 +560,11 @@ public actor DocumentSearcher {
                     currentPageMatches: []
                 )
             }
+            let textLayerStatus = await textLayerStatusSnapshot()
             return await previewLiteral(
                 terms: [query], options: options, mode: mode, scope: scope,
                 pageRange: pageRange, currentPageIndex: currentPageIndex,
+                textLayerStatus: textLayerStatus,
                 pageTextProvider: pageTextProvider
             )
 
@@ -727,9 +577,11 @@ public actor DocumentSearcher {
                     currentPageMatches: []
                 )
             }
+            let textLayerStatus = await textLayerStatusSnapshot()
             return await previewLiteral(
                 terms: nonEmpty, options: options, mode: mode, scope: scope,
                 pageRange: pageRange, currentPageIndex: currentPageIndex,
+                textLayerStatus: textLayerStatus,
                 pageTextProvider: pageTextProvider
             )
         }
@@ -742,6 +594,7 @@ public actor DocumentSearcher {
         scope: SearchPreviewScope,
         pageRange: [Int],
         currentPageIndex: Int,
+        textLayerStatus: [Int: TextLayerStatus],
         pageTextProvider: @Sendable (Int) async -> String?,
         timeoutSink: (@Sendable (Int) -> Void)?
     ) async -> SearchPreviewResult {
@@ -751,58 +604,37 @@ public actor DocumentSearcher {
 
         for pageIndex in pageRange {
             if Task.isCancelled { break }
+            // The full search's text-layer gate: a `.sparse`/`.none` page is
+            // never counted from its text layer.
+            guard SearchCore.textLayerIsSearchable(textLayerStatus[pageIndex]) else { continue }
             guard let pageText = await pageTextProvider(pageIndex), !pageText.isEmpty else { continue }
 
-            var searchText: String
-            if options.normalizeUnicode {
-                searchText = TextNormalizer.normalize(pageText)
-            } else {
-                searchText = pageText
-            }
-            // Page-side smart punctuation (1:1, UTF-16
-            // length-preserving, so emitted NSRanges stay valid). The
-            // pattern itself is never transformed; see SearchOptions.
-            if options.normalizeSmartPunctuation {
-                searchText = TextNormalizer.normalizeSmartPunctuation(searchText)
-            }
-
-            let nsString = searchText as NSString
-            let fullRange = NSRange(location: 0, length: nsString.length)
+            let searchText = SearchCore.regexSearchText(pageText, options: options)
             let isVisiblePage = (pageIndex == currentPageIndex)
             let startTime = ContinuousClock.now
             let effectiveTimeout: Duration =
                 regexTimeoutOverride ?? Self.perPageRegexTimeout
 
-            // `.reportProgress` parity with `searchRegex`: the
-            // closure fires periodically during a long match attempt
-            // so the timeout / cancellation check actually samples.
-            regex.enumerateMatches(
-                in: searchText,
-                options: [.reportProgress],
-                range: fullRange
-            ) { match, _, stop in
-                if Task.isCancelled || totalCount >= Self.maxPreviewMatches {
-                    if totalCount >= Self.maxPreviewMatches { saturated = true }
-                    stop.pointee = true
-                    return
-                }
-                if ContinuousClock.now - startTime > effectiveTimeout {
+            // The shared enumeration (`.reportProgress` parity with
+            // `searchRegex`); the preview counts every surviving match and
+            // keeps the visible page's ranges up to the highlight cap.
+            let (count, stoppedAtCap) = SearchCore.enumerateRegexMatches(
+                in: searchText, regex: regex,
+                wholeWord: options.wholeWord, unconvertibleRangePasses: true,
+                cap: Self.maxPreviewMatches - totalCount,
+                timeout: effectiveTimeout, startTime: startTime,
+                onTimeout: {
                     // Preview-path timeout branch.
                     timeoutSink?(pageIndex)
-                    stop.pointee = true
-                    return
                 }
-                guard let match, match.range.location != NSNotFound else { return }
-
-                if options.wholeWord, let swiftRange = Range(match.range, in: searchText) {
-                    if !Self.isWholeWord(swiftRange, in: searchText) { return }
-                }
-
-                totalCount += 1
+            ) { matchRange in
                 if isVisiblePage && currentPageMatches.count < Self.maxCurrentPageHighlights {
-                    currentPageMatches.append(match.range)
+                    currentPageMatches.append(matchRange)
                 }
+                return true
             }
+            totalCount += count
+            if stoppedAtCap { saturated = true }
 
             if saturated || totalCount >= Self.maxPreviewMatches {
                 if totalCount >= Self.maxPreviewMatches { saturated = true }
@@ -826,6 +658,7 @@ public actor DocumentSearcher {
         scope: SearchPreviewScope,
         pageRange: [Int],
         currentPageIndex: Int,
+        textLayerStatus: [Int: TextLayerStatus],
         pageTextProvider: @Sendable (Int) async -> String?
     ) async -> SearchPreviewResult {
         var totalCount = 0
@@ -843,36 +676,22 @@ public actor DocumentSearcher {
             conjunction = false
         }
 
-        let normalizedTerms: [String] = options.normalizeUnicode
-            ? terms.map { TextNormalizer.normalizeForSearch($0, caseSensitive: options.caseSensitive) }
-            : (options.caseSensitive ? terms : terms.map { $0.lowercased() })
+        let normalizedTerms: [String] = terms.map { SearchCore.normalizedText($0, options: options) }
 
         for pageIndex in pageRange {
             if Task.isCancelled { break }
+            // The full search's text-layer gate: a `.sparse`/`.none` page is
+            // never counted from its text layer.
+            guard SearchCore.textLayerIsSearchable(textLayerStatus[pageIndex]) else { continue }
             guard let pageText = await pageTextProvider(pageIndex), !pageText.isEmpty else { continue }
 
-            let nfkcText: String
-            if options.normalizeUnicode {
-                nfkcText = TextNormalizer.normalizeForSearch(pageText, caseSensitive: options.caseSensitive)
-            } else if !options.caseSensitive {
-                nfkcText = pageText.lowercased()
-            } else {
-                nfkcText = pageText
-            }
-
-            // Same extension pipeline as findTextMatches so
-            // preview counts agree with the full search. Emitted ranges
-            // are mapped back to base coordinates before they reach the
-            // highlight-rect resolver (leak-class otherwise).
-            let ext = TextNormalizer.applySearchExtensions(
-                pageText: nfkcText, query: "", options: options
-            )
-            let searchText = ext.pageText
-            let baseChars: [Character]? = ext.offsetMap != nil ? Array(ext.baseText) : nil
-
+            // The same normalization and extension pipeline as
+            // `findTextMatches`, so preview counts agree with the full search;
+            // the preview does not detect CJK. Emitted ranges are mapped back
+            // to base coordinates before they reach the highlight-rect
+            // resolver (leak-class otherwise).
+            let page = SearchCore.preparePage(pageText, options: options)
             let isVisiblePage = (pageIndex == currentPageIndex)
-            let nsString = searchText as NSString
-            let nsLength = nsString.length
 
             var pageCount = 0
             var pageMatches: [NSRange] = []
@@ -880,66 +699,31 @@ public actor DocumentSearcher {
 
             for term in normalizedTerms where !term.isEmpty {
                 if Task.isCancelled { break }
-                if totalCount + pageCount >= Self.maxPreviewMatches { saturated = true; break }
-                let extTerm = TextNormalizer.applySearchExtensions(
-                    pageText: "", query: term, options: options
-                ).query
+                let remaining = Self.maxPreviewMatches - (totalCount + pageCount)
+                if remaining <= 0 { saturated = true; break }
+                let extTerm = SearchCore.preparedQuery(normalized: term, options: options)
                 if extTerm.isEmpty { everyTermMatched = false; continue }
 
-                var termMatched = false
-                var searchLocation = 0
-                while searchLocation < nsLength {
-                    if Task.isCancelled { break }
-                    let searchRange = NSRange(location: searchLocation, length: nsLength - searchLocation)
-                    let matchRange = nsString.range(of: extTerm, options: [.literal], range: searchRange)
-                    if matchRange.location == NSNotFound { break }
-
-                    // Map to base coordinates when a length-changing
-                    // extension is active (Character-offset convention,
-                    // same as findTextMatches).
-                    var emitRange = matchRange
-                    var baseBounds: (start: Int, endExclusive: Int)? = nil
-                    if let map = ext.offsetMap, let swiftRange = Range(matchRange, in: searchText) {
-                        let start = searchText.distance(from: searchText.startIndex, to: swiftRange.lowerBound)
-                        let len = searchText.distance(from: swiftRange.lowerBound, to: swiftRange.upperBound)
-                        guard let span = Self.baseSpan(start: start, length: len, offsetMap: map) else {
-                            searchLocation = matchRange.location + max(matchRange.length, 1)
-                            continue
-                        }
-                        emitRange = NSRange(location: span.lowerBound, length: span.count)
-                        baseBounds = (span.lowerBound, span.upperBound)
-                    }
-
-                    // The magic-wand `exactMatch` gates the same
-                    // live-preview word-boundary check as `wholeWord`.
-                    // Base-coordinate variant when an offset map is active.
-                    if options.wholeWord || options.exactMatch {
-                        let isBoundaried: Bool
-                        if let baseChars, let bounds = baseBounds {
-                            isBoundaried = Self.isWholeWordInBase(
-                                chars: baseChars, start: bounds.start, endExclusive: bounds.endExclusive
-                            )
-                        } else if let swiftRange = Range(matchRange, in: searchText) {
-                            isBoundaried = Self.isWholeWord(swiftRange, in: searchText)
-                        } else {
-                            isBoundaried = true
-                        }
-                        if !isBoundaried {
-                            searchLocation = matchRange.location + max(matchRange.length, 1)
-                            continue
-                        }
-                    }
-
+                // The magic-wand `exactMatch` gates the same live-preview
+                // word-boundary check as `wholeWord`.
+                let (spans, stoppedAtCap) = SearchCore.literalSpans(
+                    in: page, query: extTerm, comparison: [.literal],
+                    wholeWord: options.wholeWord || options.exactMatch,
+                    cap: remaining
+                )
+                for span in spans {
                     pageCount += 1
-                    termMatched = true
                     if isVisiblePage && currentPageMatches.count + pageMatches.count < Self.maxCurrentPageHighlights {
+                        // Base coordinates when a length-changing extension is
+                        // active (Character-offset convention, same as
+                        // `findTextMatches`); the searched range otherwise.
+                        let emitRange = span.base.map { NSRange(location: $0.lowerBound, length: $0.count) }
+                            ?? span.searchedRange
                         pageMatches.append(emitRange)
                     }
-
-                    if totalCount + pageCount >= Self.maxPreviewMatches { saturated = true; break }
-                    searchLocation = matchRange.location + max(matchRange.length, 1)
                 }
-                if !termMatched { everyTermMatched = false }
+                if spans.isEmpty { everyTermMatched = false }
+                if stoppedAtCap { saturated = true; break }
             }
             // A saturated page is committed as counted: past the cap the
             // count is a ceiling, not a page-exact total.
@@ -961,20 +745,12 @@ public actor DocumentSearcher {
 
     // MARK: - Text-layer routing
 
-    /// Whether the page's import-time classification permits
-    /// the text-layer fast path. `.rich` (or unknown — a page absent from the
-    /// status map, including the default `[:]`) stays on the text layer;
-    /// `.sparse`/`.none` fall through to OCR so a header-only layer over a
-    /// scanned body cannot suppress the body text. See `TextLayerStatus`.
+    /// Whether the page's import-time classification permits the
+    /// text-layer fast path — the core's predicate over this actor's status
+    /// map (`.rich` or unknown stays on the text layer; `.sparse`/`.none`
+    /// fall through to OCR). See `SearchCore.textLayerIsSearchable`.
     private func pageHasRichTextLayer(_ pageIndex: Int) -> Bool {
-        // Unwrap first: a page absent from the map (nil → unknown) takes the
-        // text-layer fast path. Switching the Optional directly would bind a bare
-        // `.none` to `Optional.none` rather than `TextLayerStatus.none`.
-        guard let status = textLayerStatusByPage[pageIndex] else { return true }
-        switch status {
-        case .rich: return true
-        case .sparse, .none: return false
-        }
+        SearchCore.textLayerIsSearchable(textLayerStatusByPage[pageIndex])
     }
 
     private func performSearch(
@@ -1080,66 +856,6 @@ public actor DocumentSearcher {
 
     // MARK: - Regex Search
 
-    /// Validate a regex pattern for safety before execution.
-    /// Returns the compiled regex or nil if the pattern is unsafe.
-    /// Thin wrapper over `validateRegexPatternWithError` so the
-    /// two entry points share one rule set and cannot drift.
-    public static func validateRegexPattern(_ pattern: String) -> NSRegularExpression? {
-        try? validateRegexPatternWithError(pattern)
-    }
-
-    /// Throwing variant that preserves WHY a
-    /// pattern was rejected, so the sheet can surface the engine's
-    /// `NSRegularExpression` NSError verbatim
-    /// (`SearchToolbarSection+Contracts.swift` already promises it).
-    ///
-    /// Sync entry point gates ad-hoc trigger, compose
-    /// sub-mode, custom-terms editor, and saved-regex compile via a
-    /// single check. `RegexQuantifierScan` refuses the nested-quantifier
-    /// shapes — an unbounded quantifier over a group that itself carries
-    /// one (`(x+)+`, `(.*)*`, `(a{2,})*`), and bounded chains whose
-    /// product of maxima exceeds `nestedBoundProductCap` — while a group
-    /// closed by a bounded quantifier (`(-\d{4})?`, `(,\d{3})*`,
-    /// `4111(\s?\d{4}){3}`) is never nesting. `RegexSafetyPrecheck`
-    /// additionally rejects unbounded group-quantifiers over alternation
-    /// (e.g. `(a|aa)*b`, `(ab|abc)*xyz`) that compile cleanly but
-    /// backtrack catastrophically. The async `RegexSentinelCheck.validate`
-    /// adds a sentinel-string runtime probe at compose-execution
-    /// and profile-import time on top of this.
-    public static func validateRegexPatternWithError(_ pattern: String) throws -> NSRegularExpression {
-        // Pattern length cap
-        guard pattern.count <= maxRegexPatternLength else {
-            throw RegexValidationError.patternTooLong(maxLength: maxRegexPatternLength)
-        }
-
-        if RegexSafetyPrecheck.isLikelyPathological(pattern) {
-            throw RegexValidationError.likelyPathological
-        }
-
-        // Nested quantifier rejection — the structural heuristic for
-        // catastrophic backtracking, bounded-quantifier aware; an inner
-        // unbounded run that a literal inside its group delimits is not
-        // nesting (the sentinel probe's polynomial class, not this one's).
-        if let violation = RegexQuantifierScan.violation(
-            in: pattern,
-            boundedCeiling: boundedQuantifierCeiling,
-            productCap: nestedBoundProductCap,
-            literalSeparatorDemotion: true
-        ) {
-            switch violation {
-            case .nestedUnbounded:
-                throw RegexValidationError.nestedQuantifiers
-            case .nestedBoundProduct:
-                throw RegexValidationError.nestedBoundProduct(cap: nestedBoundProductCap)
-            }
-        }
-
-        // Attempt compilation; an engine rejection propagates as the
-        // system NSError whose localizedDescription the sheet surfaces.
-        // Note: case sensitivity handled via text normalization, not regex flags
-        return try NSRegularExpression(pattern: pattern)
-    }
-
     private func searchRegex(
         doc: PDFDocument,
         pattern: String,
@@ -1206,90 +922,53 @@ public actor DocumentSearcher {
 
             pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
 
-            // PDFPage isn't Sendable; the `enumerateMatches` closure below
-            // captures the page reference and the compiler (Swift 6.2 / Xcode
-            // 26.3 on CI) flags it. enumerateMatches invokes the closure
-            // synchronously per match on the current thread, so the capture
-            // is treated as @unchecked Sendable via the wrapper.
+            // PDFPage isn't Sendable; the per-match closure below captures
+            // the page reference and the compiler (Swift 6.2 / Xcode 26.3 on
+            // CI) flags it. The enumeration invokes the closure synchronously
+            // per match on the current thread, so the capture is treated as
+            // @unchecked Sendable via the wrapper.
             let sendablePage = SendablePDFPage(page)
 
-            var searchText: String
-            if options.normalizeUnicode {
-                searchText = TextNormalizer.normalize(pageText)
-            } else {
-                searchText = pageText
-            }
-            // Page-side smart punctuation only (1:1, UTF-16
-            // length-preserving, so match NSRanges still index the page
-            // correctly). The pattern is never transformed, and the
-            // length-changing extensions are excluded from regex paths;
-            // see SearchOptions.
-            if options.normalizeSmartPunctuation {
-                searchText = TextNormalizer.normalizeSmartPunctuation(searchText)
-            }
-
+            let searchText = SearchCore.regexSearchText(pageText, options: options)
             let nsString = searchText as NSString
-            let fullRange = NSRange(location: 0, length: nsString.length)
 
-            // enumerateMatches with per-match time check — allows bailing
-            // mid-enumeration instead of waiting for all matches to complete.
-            // `.reportProgress` lets the engine invoke the closure
-            // between match-attempt iterations even when no match has been
-            // found, so the timeout / cancellation check below fires on
-            // long-running alternation walks instead of waiting for the
-            // next match. Catastrophic backtracking inside a single
-            // match attempt still blocks the synchronous C call;
-            // validation in `validateRegexPattern` remains the primary
-            // defense.
+            // The shared enumeration with the per-match time check — bails
+            // mid-enumeration instead of waiting for all matches to complete;
+            // the cap counts only the results that could be placed on the page.
             let startTime = ContinuousClock.now
             let effectiveTimeout: Duration =
                 regexTimeoutOverride ?? Self.perPageRegexTimeout
-            regex.enumerateMatches(
-                in: searchText,
-                options: [.reportProgress],
-                range: fullRange
-            ) { match, _, stop in
-                if Task.isCancelled || totalYielded >= Self.maxResults {
-                    stop.pointee = true
-                    return
-                }
-                if ContinuousClock.now - startTime > effectiveTimeout {
+            let (yielded, _) = SearchCore.enumerateRegexMatches(
+                in: searchText, regex: regex,
+                wholeWord: options.wholeWord, unconvertibleRangePasses: false,
+                cap: Self.maxResults - totalYielded,
+                timeout: effectiveTimeout, startTime: startTime,
+                onTimeout: {
                     // Search-path timeout branch.
                     timeoutSink?(pageIndex)
-                    stop.pointee = true
-                    return
                 }
-
-                guard let match, match.range.location != NSNotFound else { return }
-                let matchRange = match.range
-
-                // Whole-word check
-                if options.wholeWord {
-                    guard let swiftRange = Range(matchRange, in: searchText) else { return }
-                    if !Self.isWholeWord(swiftRange, in: searchText) {
-                        return
-                    }
+            ) { matchRange in
+                guard let normalizedRect = boundingRect(for: matchRange, page: sendablePage.page) else {
+                    return false
                 }
+                let matchedText = nsString.substring(with: matchRange)
+                let window = contextSnippet(
+                    text: searchText,
+                    matchNSRange: matchRange
+                )
 
-                if let normalizedRect = boundingRect(for: matchRange, page: sendablePage.page) {
-                    let matchedText = nsString.substring(with: matchRange)
-                    let window = contextSnippet(
-                        text: searchText,
-                        matchNSRange: matchRange
-                    )
-
-                    continuation.yield(SearchResult(
-                        pageIndex: pageIndex,
-                        normalizedRect: normalizedRect,
-                        matchedText: matchedText,
-                        contextSnippet: window.snippet,
-                        source: .textLayer,
-                        term: pattern,
-                        matchRangeInSnippet: window.matchRange
-                    ))
-                    totalYielded += 1
-                }
+                continuation.yield(SearchResult(
+                    pageIndex: pageIndex,
+                    normalizedRect: normalizedRect,
+                    matchedText: matchedText,
+                    contextSnippet: window.snippet,
+                    source: .textLayer,
+                    term: pattern,
+                    matchRangeInSnippet: window.matchRange
+                ))
+                return true
             }
+            totalYielded += yielded
 
             if totalYielded >= Self.maxResults { break }
         }
@@ -1636,27 +1315,6 @@ public actor DocumentSearcher {
     }
     #endif
 
-    /// Run PII detection on a page via OCR when no text layer is available.
-    /// Concatenates OCR lines into a single text block, runs PIIDetector,
-    /// then maps match ranges back to OCR line bounding boxes.
-    /// OCR render size for `page.thumbnail(of:for:.cropBox)`.
-    ///
-    /// Uses the page's DISPLAYED (effective, rotation-
-    /// swapped) dimensions. `thumbnail(of:for:.cropBox)` renders the rotation-
-    /// applied page and aspect-fits it into the requested size; an unrotated-dims
-    /// request on a /Rotate 90/270 page has the transposed aspect, so PDFKit
-    /// letterboxes the render and every Vision `normalizedRect` is shifted off
-    /// displayed space — the derived redaction region then misses the text. The
-    /// W↔H swap leaves the pixel budget (`maxOCRPixelDimension` /
-    /// `maxOCRPixelCount`) unchanged, so each call site's memory guard is
-    /// unaffected. Mirrors the effective-dims normalization in
-    /// `boundingRect(for:page:)`.
-    static func ocrThumbnailSize(pageBounds: CGRect, rotation: Int) -> CGSize {
-        let scale: CGFloat = 300.0 / 72.0  // 72 DPI → 300 DPI
-        let effective = effectiveBounds(pageBounds, rotation: rotation).size
-        return CGSize(width: effective.width * scale, height: effective.height * scale)
-    }
-
     private func scanPagePIIViaOCR(
         page: PDFPage,
         pageIndex: Int,
@@ -1936,15 +1594,15 @@ public actor DocumentSearcher {
                     if let baseLineChars, let map = ext.offsetMap {
                         let start = lineText.distance(from: lineText.startIndex, to: matchRange.lowerBound)
                         let len = lineText.distance(from: matchRange.lowerBound, to: matchRange.upperBound)
-                        if let span = Self.baseSpan(start: start, length: len, offsetMap: map) {
-                            isBoundaried = Self.isWholeWordInBase(
+                        if let span = SearchCore.baseSpan(start: start, length: len, offsetMap: map) {
+                            isBoundaried = SearchCore.isWholeWordInBase(
                                 chars: baseLineChars, start: span.lowerBound, endExclusive: span.upperBound
                             )
                         } else {
                             isBoundaried = false
                         }
                     } else {
-                        isBoundaried = Self.isWholeWord(matchRange, in: lineText)
+                        isBoundaried = SearchCore.isWholeWord(matchRange, in: lineText)
                     }
                     if !isBoundaried {
                         searchStart = matchRange.upperBound
@@ -2070,65 +1728,6 @@ public actor DocumentSearcher {
         return textLines
     }
 
-    // MARK: - Regex OCR Fallback Helpers
-
-    /// Map a character offset in a newline-joined OCR text to the bounding
-    /// rect of the containing OCR line. Used by the regex fallback to
-    /// associate a regex match position with a visual location.
-    ///
-    /// - Parameters:
-    ///   - offset: Character offset into `text` (the "\n"-joined concatenation
-    ///             of `lines[i].text` values, same join order as the caller).
-    ///   - text: The concatenated OCR text that was searched.
-    ///   - lines: The source OCR lines in the same order used when building `text`.
-    ///   - page: The page, used to compute padding in normalized coordinates.
-    /// - Returns: The normalized bounding rect of the containing line, padded
-    ///   for OCR imprecision, or `nil` if no line contains the offset.
-    private func ocrLineRect(
-        forCharOffset offset: Int,
-        inText text: String,
-        lines: [OCREngine.TextLine],
-        page: PDFPage
-    ) -> CGRect? {
-        // Walk lines in the same order they were joined with "\n".
-        // Each line occupies `line.text.count` characters followed by a
-        // "\n" separator (1 character), so the running total advances by
-        // `lineLength + 1` per line.
-        var cursor = 0
-        for line in lines {
-            let lineLength = line.text.count
-            let lineEnd = cursor + lineLength  // exclusive, before the "\n"
-            if offset >= cursor && offset <= lineEnd {
-                return Self.paddedNormalizedRect(line.normalizedRect, in: page)
-            }
-            cursor += lineLength + 1  // +1 for the "\n"
-        }
-        return nil
-    }
-
-    /// A Vision line rect (normalized 0–1, bottom-left origin) padded by
-    /// 2 pt in normalized coordinates for OCR imprecision and clamped to
-    /// the unit square — the one padding arithmetic for every OCR result
-    /// rect (the PII scan's union rect, the literal OCR search's line rect
-    /// and the regex fallback's line rect).
-    nonisolated static func paddedNormalizedRect(_ rect: CGRect, in page: PDFPage) -> CGRect {
-        let pageBounds = page.bounds(for: .cropBox)
-        let padX = 2.0 / pageBounds.width
-        let padY = 2.0 / pageBounds.height
-        return CGRect(
-            x: max(0, rect.minX - padX),
-            y: max(0, rect.minY - padY),
-            width: min(1, rect.width + padX * 2),
-            height: min(1, rect.height + padY * 2)
-        )
-    }
-
-    /// Average OCR confidence across a set of lines. Returns 0 for an empty
-    /// slice (caller should guard non-empty before using the result).
-    private func averageOCRConfidence(_ lines: [OCREngine.TextLine]) -> Float {
-        lines.map(\.confidence).reduce(0, +) / Float(max(lines.count, 1))
-    }
-
     /// Search a scanned (no-text-layer) page via OCR + regex.
     /// Called by `searchRegex` when `options.includeOCR` is true and the
     /// page's text layer is empty.
@@ -2184,28 +1783,13 @@ public actor DocumentSearcher {
         // enumerateMatches closure where actor re-entry is not permitted.
         let snapshotTimeoutSink = self.regexTimeoutSink
 
-        regex.enumerateMatches(
-            in: searchText,
-            options: [.reportProgress],
-            range: fullRange
-        ) { match, _, stop in
-            if Task.isCancelled {
-                stop.pointee = true
-                return
-            }
-            if ContinuousClock.now - startTime > effectiveTimeout {
-                snapshotTimeoutSink?(pageIndex)
-                stop.pointee = true
-                return
-            }
-            guard let match, match.range.location != NSNotFound else { return }
-            let matchRange = match.range
-
-            if options.wholeWord {
-                guard let swiftRange = Range(matchRange, in: searchText) else { return }
-                if !Self.isWholeWord(swiftRange, in: searchText) { return }
-            }
-
+        SearchCore.enumerateRegexMatches(
+            in: searchText, regex: regex,
+            wholeWord: options.wholeWord, unconvertibleRangePasses: false,
+            cap: nil,
+            timeout: effectiveTimeout, startTime: startTime,
+            onTimeout: { snapshotTimeoutSink?(pageIndex) }
+        ) { matchRange in
             // Map the match start character offset to the containing OCR
             // line's bounding rect. The NSRange location is a UTF-16 offset;
             // convert to a Character offset first for the line-walk cursor.
@@ -2226,7 +1810,7 @@ public actor DocumentSearcher {
                 inText: searchText,
                 lines: lines,
                 page: sendablePage.page
-            ) else { return }
+            ) else { return false }
 
             let matchedText = nsString.substring(with: matchRange)
             let window = contextSnippet(text: searchText, matchNSRange: matchRange)
@@ -2240,6 +1824,7 @@ public actor DocumentSearcher {
                 term: regex.pattern,
                 matchRangeInSnippet: window.matchRange
             ))
+            return true
         }
 
         return results
@@ -2256,65 +1841,28 @@ public actor DocumentSearcher {
         pageIndex: Int,
         term: String
     ) -> [SearchResult] {
-        // Detect CJK text per-page and disable whole-word matching.
-        // Per-page detection is necessary for multilingual documents (e.g.,
-        // Japanese-English contracts) where language varies across pages.
-        // NLLanguageRecognizer on 500 chars is sub-millisecond.
-        let recognizer = NLLanguageRecognizer()
-        recognizer.processString(String(pageText.prefix(500)))
-        let cjkLanguages: Set<NLLanguage> = [
-            .japanese, .korean, .simplifiedChinese, .traditionalChinese
-        ]
-        let isCJK = recognizer.dominantLanguage.map { cjkLanguages.contains($0) } ?? false
-        var effectiveOptions = options
-        // `exactMatch` rides the same CJK-disable shape as
-        // `wholeWord`. CJK runs lack the alphanumeric run-boundaries the
-        // predicate relies on, so the boundary check would always pass
-        // (or always fail) and add no signal.
-        if isCJK {
-            effectiveOptions.wholeWord = false
-            effectiveOptions.exactMatch = false
-        }
+        // Per-page CJK detection disables the boundary check (see
+        // `SearchCore.effectiveOptions`); the full tier detects, the preview
+        // does not.
+        let effectiveOptions = SearchCore.effectiveOptions(options, pageText: pageText, detectCJK: true)
 
-        let normalizedPageText: String
-        let normalizedQuery: String
-
-        if effectiveOptions.normalizeUnicode {
-            normalizedPageText = TextNormalizer.normalizeForSearch(pageText, caseSensitive: effectiveOptions.caseSensitive)
-            normalizedQuery = TextNormalizer.normalizeForSearch(query, caseSensitive: effectiveOptions.caseSensitive)
-        } else if !effectiveOptions.caseSensitive {
-            normalizedPageText = pageText.lowercased()
-            normalizedQuery = query.lowercased()
-        } else {
-            normalizedPageText = pageText
-            normalizedQuery = query
-        }
-
+        let normalizedQuery = SearchCore.normalizedText(query, options: effectiveOptions)
         guard !normalizedQuery.isEmpty else { return [] }
 
-        // Recall extensions on top of the NFKC path.
-        // Smart punctuation is 1:1 (length-preserving), so rect NSRanges
-        // stay in the normalized text's coordinates. Diacritic fold and
-        // separator strip are length-changing: matching runs on the
-        // transformed text and every match range routes through
-        // `ext.offsetMap` back to base coordinates BEFORE the rect is
-        // computed (Risk 1: a wrong rect is a misplaced redaction).
-        let ext = TextNormalizer.applySearchExtensions(
-            pageText: normalizedPageText,
-            query: normalizedQuery,
-            options: effectiveOptions
-        )
-        let searchPageText = ext.pageText
-        let searchQuery = ext.query
+        // Recall extensions on top of the NFKC path (the shared
+        // preparation). Smart punctuation is 1:1 (length-preserving), so rect
+        // NSRanges stay in the normalized text's coordinates. Diacritic fold
+        // and separator strip are length-changing: matching runs on the
+        // transformed text and every match range routes through the offset
+        // map back to base coordinates BEFORE the rect is computed (Risk 1: a
+        // wrong rect is a misplaced redaction).
+        let prepared = SearchCore.preparePage(pageText, options: effectiveOptions)
+        let searchPageText = prepared.searchText
+        let searchQuery = SearchCore.preparedQuery(normalized: normalizedQuery, options: effectiveOptions)
         // The strip path can empty a query made of separators only.
         guard !searchQuery.isEmpty else { return [] }
-        // Boundary checks must run against the PRE-strip text — the
-        // stripped text has no separators left, so word boundaries only
-        // exist in base coordinates. Materialized once per page for O(1)
-        // integer indexing.
-        let baseChars: [Character]? = ext.offsetMap != nil ? Array(ext.baseText) : nil
 
-        // Case-preserved analog of `ext.baseText`, used only to
+        // Case-preserved analog of the base text, used only to
         // re-slice the DISPLAYED span (see `displaySlice`). Mirrors the
         // base chain minus the case fold: page text → (ligature/NFKC
         // normalize) → (smart punctuation).
@@ -2330,66 +1878,23 @@ public actor DocumentSearcher {
         let displayBaseText = String(displayBaseChars)
 
         var results: [SearchResult] = []
-        var searchStart = searchPageText.startIndex
 
-        while searchStart < searchPageText.endIndex {
-            guard let matchRange = searchPageText.range(
-                of: searchQuery,
-                range: searchStart..<searchPageText.endIndex
-            ) else { break }
-
-            // Offsets measured on the searched (most-transformed) text.
-            let matchStartOffset = searchPageText.distance(
-                from: searchPageText.startIndex, to: matchRange.lowerBound
-            )
-            let matchLength = searchPageText.distance(
-                from: matchRange.lowerBound, to: matchRange.upperBound
-            )
-
-            // Map back to base (NFKC-normalized) coordinates when a
-            // length-changing extension is active.
-            let baseStartOffset: Int
-            let baseLength: Int
-            if let map = ext.offsetMap {
-                // The base span ends AFTER the last matched character's
-                // base position, so a match spanning removed separators
-                // covers them in the rect. A span the map cannot cover is
-                // structurally unreachable (the map covers every searched
-                // char); the match is refused rather than risk a bad rect.
-                guard let span = Self.baseSpan(
-                    start: matchStartOffset, length: matchLength, offsetMap: map
-                ) else {
-                    searchStart = matchRange.upperBound
-                    continue
-                }
-                baseStartOffset = span.lowerBound
-                baseLength = span.count
-            } else {
-                baseStartOffset = matchStartOffset
-                baseLength = matchLength
-            }
-
-            // Whole-word check: verify word boundaries around match.
-            // `exactMatch` is the magic-wand select-by-similar-text
-            // call-site flag; semantically equivalent to
-            // `wholeWord` on the text/multi-term/OCR paths. With an offset
-            // map active the predicate evaluates in base coordinates
-            // (separators are gone from the searched text, so boundaries
-            // are only meaningful there).
-            if effectiveOptions.wholeWord || effectiveOptions.exactMatch {
-                let isBoundaried: Bool
-                if let baseChars {
-                    isBoundaried = Self.isWholeWordInBase(
-                        chars: baseChars, start: baseStartOffset, endExclusive: baseStartOffset + baseLength
-                    )
-                } else {
-                    isBoundaried = Self.isWholeWord(matchRange, in: searchPageText)
-                }
-                if !isBoundaried {
-                    searchStart = matchRange.upperBound
-                    continue
-                }
-            }
+        // `exactMatch` is the magic-wand select-by-similar-text call-site
+        // flag; semantically equivalent to `wholeWord` on the
+        // text/multi-term/OCR paths.
+        let (spans, _) = SearchCore.literalSpans(
+            in: prepared, query: searchQuery, comparison: [],
+            wholeWord: effectiveOptions.wholeWord || effectiveOptions.exactMatch,
+            cap: nil
+        )
+        for span in spans {
+            // Offsets measured on the searched (most-transformed) text; the
+            // base span is the remapped one under an offset map, else the
+            // searched offsets themselves.
+            let matchStartOffset = span.searchedCharacters.lowerBound
+            let matchLength = span.searchedCharacters.count
+            let baseStartOffset = span.base?.lowerBound ?? matchStartOffset
+            let baseLength = span.base?.count ?? matchLength
 
             // Get bounding rect via PDFKit selection — base coordinates.
             let nsRange = NSRange(location: baseStartOffset, length: baseLength)
@@ -2399,12 +1904,12 @@ public actor DocumentSearcher {
                 // on the normalized text. The
                 // norm-drift trap is guarded inside `displaySlice`,
                 // which falls back to the normalized slice on drift.
-                let normalizedSlice = String(searchPageText[matchRange.lowerBound..<matchRange.upperBound])
+                let normalizedSlice = String(searchPageText[span.searchedIndices])
                 let matchedText = Self.displaySlice(
                     start: baseStartOffset, length: baseLength,
                     offsetMap: nil,
                     displayChars: displayBaseChars,
-                    baseCount: ext.baseText.count,
+                    baseCount: prepared.baseText.count,
                     fallback: normalizedSlice)
                 // The context window is built over the
                 // same case-preserved analog `displaySlice` re-sliced from,
@@ -2413,7 +1918,7 @@ public actor DocumentSearcher {
                 // the searched text at the searched offsets instead.
                 let window = displayWindow(
                     displayChars: displayBaseChars, displayText: displayBaseText,
-                    baseCount: ext.baseText.count,
+                    baseCount: prepared.baseText.count,
                     start: baseStartOffset, length: baseLength, offsetMap: nil,
                     searchedText: searchPageText, searchedStart: matchStartOffset, searchedLength: matchLength
                 )
@@ -2428,363 +1933,9 @@ public actor DocumentSearcher {
                     matchRangeInSnippet: window.matchRange
                 ))
             }
-
-            searchStart = matchRange.upperBound
         }
 
         return results
     }
 
-    /// Re-slice the DISPLAYED match span from the case-preserved
-    /// analog of the base text, so a match on "Hartwell" displays as
-    /// "Hartwell" rather than the case-folded "hartwell". Matching still
-    /// runs on the normalized text; this touches only the display slice.
-    /// `start`/`length` are Character offsets in the searched
-    /// (most-transformed) text; `offsetMap` routes them to base
-    /// coordinates when a length-changing extension is active (pass nil
-    /// when the offsets are already base coordinates). Returns `fallback`
-    /// (the normalized slice — today's behavior) whenever the
-    /// case-preserved analog drifted from the base Character count: the
-    /// norm-drift trap this guard
-    /// exists for.
-    static func displaySlice(
-        start: Int, length: Int, offsetMap: [Int]?,
-        displayChars: [Character], baseCount: Int, fallback: String
-    ) -> String {
-        guard displayChars.count == baseCount, length > 0 else { return fallback }
-        let baseStart: Int
-        let baseEndExclusive: Int
-        if let map = offsetMap {
-            guard start >= 0, start < map.count, start + length - 1 < map.count else {
-                return fallback
-            }
-            baseStart = map[start]
-            baseEndExclusive = map[start + length - 1] + 1
-        } else {
-            baseStart = start
-            baseEndExclusive = start + length
-        }
-        guard baseStart >= 0, baseStart < baseEndExclusive,
-              baseEndExclusive <= displayChars.count else {
-            return fallback
-        }
-        return String(displayChars[baseStart..<baseEndExclusive])
-    }
-
-    /// The base-coordinate span of a match measured on the searched
-    /// (most-transformed) text: `offsetMap` routes it to base coordinates
-    /// when a length-changing extension is active, ending AFTER the last
-    /// matched character's base position; nil when the map cannot cover
-    /// the span. The one remap for the preview, the OCR literal path and
-    /// `findTextMatches`, and the span `displaySlice` re-slices under the
-    /// same bound guards, so the context-window builder and the display
-    /// slice agree on when the fallback is taken.
-    static func baseSpan(start: Int, length: Int, offsetMap: [Int]?) -> Range<Int>? {
-        guard length > 0, start >= 0 else { return nil }
-        if let map = offsetMap {
-            guard start < map.count, start + length - 1 < map.count else { return nil }
-            return map[start] ..< (map[start + length - 1] + 1)
-        }
-        return start ..< start + length
-    }
-
-    /// Word-boundary predicate in base-text coordinates, used when a
-    /// length-changing normalization (offset map) is active. Mirrors
-    /// `isWholeWord`'s alphanumeric/underscore rule.
-    private static func isWholeWordInBase(
-        chars: [Character], start: Int, endExclusive: Int
-    ) -> Bool {
-        if start > 0 {
-            let c = chars[start - 1]
-            if c.isLetter || c.isNumber || c == "_" { return false }
-        }
-        if endExclusive < chars.count {
-            let c = chars[endExclusive]
-            if c.isLetter || c.isNumber || c == "_" { return false }
-        }
-        return true
-    }
-
-    // MARK: - Whole-Word Check
-
-    /// Check if the match range is surrounded by word boundaries. The one
-    /// String-index predicate for the preview and full tiers (`nonisolated`
-    /// so the preview path can call it without an actor hop); the
-    /// base-coordinate `isWholeWordInBase` covers the offset-map case.
-    private nonisolated static func isWholeWord(_ range: Range<String.Index>, in text: String) -> Bool {
-        if range.lowerBound > text.startIndex {
-            let charBefore = text[text.index(before: range.lowerBound)]
-            if charBefore.isLetter || charBefore.isNumber || charBefore == "_" {
-                return false
-            }
-        }
-        if range.upperBound < text.endIndex {
-            let charAfter = text[range.upperBound]
-            if charAfter.isLetter || charAfter.isNumber || charAfter == "_" {
-                return false
-            }
-        }
-        return true
-    }
-
-    // MARK: - Coordinate Conversion
-
-    /// Convert an NSRange in page text to a normalized bounding rect.
-    ///
-    /// Coordinate path:
-    /// PDFPage.selection(for:) → .bounds(for: page) → PDF points (bottom-left,
-    /// UN-ROTATED space). Transform to post-rotation visual
-    /// space before normalizing, so normalized coords align with the post-rotation
-    /// bitmap produced by renderPage()/getDrawingTransform().
-    ///
-    /// SECURITY NOTE: Wrong normalization = fill at wrong pixel position = data leak.
-    public nonisolated func boundingRect(for nsRange: NSRange, page: PDFPage) -> CGRect? {
-        guard let selection = page.selection(for: nsRange) else { return nil }
-        let absoluteBounds = selection.bounds(for: page)
-        guard !absoluteBounds.isEmpty else { return nil }
-
-        let pageBounds = page.bounds(for: .cropBox)
-        let rawW = pageBounds.width
-        let rawH = pageBounds.height
-        let rotation = page.rotation
-
-        // PDFSelection.bounds(for:) is in ABSOLUTE, UNROTATED (MediaBox/user)
-        // space and INCLUDES the cropBox origin (pinned by RotatedPageCoordinateTests
-        // .nonZeroCropBoxSelectionFrameProbe). Translate to cropBox-LOCAL BEFORE the
-        // rotation mirror — the rotation cases and the normalize below assume a
-        // zero-origin local rect (they use rawW/rawH as extents only). This mirrors
-        // TextLayerExtractor's `.offsetBy(dx:-cropBox.origin.x, dy:-cropBox.origin.y)`
-        // so both region producers agree on offset-CropBox pages. SECURITY: omitting
-        // this displaces the redaction fill by (origin / dimension).
-        let bounds = absoluteBounds.offsetBy(
-            dx: -pageBounds.origin.x, dy: -pageBounds.origin.y)
-
-        // Transform selection bounds from un-rotated PDF space to post-rotation
-        // visual space. PDF /Rotate is CW display rotation (ISO 32000 §8.3.2).
-        let visualBounds: CGRect
-        switch rotation {
-        case 90:
-            // CW 90°: (x,y) → (y, rawW - x - w)
-            visualBounds = CGRect(
-                x: bounds.minY, y: rawW - bounds.maxX,
-                width: bounds.height, height: bounds.width)
-        case 180:
-            // 180°: (x,y) → (rawW - x - w, rawH - y - h)
-            visualBounds = CGRect(
-                x: rawW - bounds.maxX, y: rawH - bounds.maxY,
-                width: bounds.width, height: bounds.height)
-        case 270:
-            // CCW 90°: (x,y) → (rawH - y - h, x)
-            visualBounds = CGRect(
-                x: rawH - bounds.maxY, y: bounds.minX,
-                width: bounds.height, height: bounds.width)
-        default:
-            visualBounds = bounds
-        }
-
-        // Post-rotation effective dimensions
-        let effectiveWidth: CGFloat = (rotation == 90 || rotation == 270) ? rawH : rawW
-        let effectiveHeight: CGFloat = (rotation == 90 || rotation == 270) ? rawW : rawH
-
-        guard effectiveWidth > 0, effectiveHeight > 0 else { return nil }
-
-        let normalized = CGRect(
-            x: visualBounds.minX / effectiveWidth,
-            y: visualBounds.minY / effectiveHeight,
-            width: visualBounds.width / effectiveWidth,
-            height: visualBounds.height / effectiveHeight
-        ).clampedToNormalized()
-
-        return normalized
-    }
-
-    // MARK: - Context Snippet
-
-    /// One context window per match: the snippet
-    /// text plus the match's position inside it, in Character offsets
-    /// (a leading `…` counts as one). Every `SearchResult` builder path
-    /// routes through `contextSnippet` so the row can highlight the
-    /// match without re-searching.
-    struct ContextWindow: Equatable, Sendable {
-        let snippet: String
-        let matchRange: Range<Int>
-    }
-
-    /// Characters of context kept on each side of the match before a
-    /// cut side is trimmed back to a word boundary.
-    static let contextRadius = 44
-
-    /// Build the context window around the match. `matchStart` and
-    /// `matchLength` are Character offsets (not UTF-16).
-    ///
-    /// Shape: `contextRadius` characters each side of the match; a side
-    /// that cut the text mid-word is trimmed back to the nearest word
-    /// boundary (a whitespace/punctuation run) so the window never
-    /// starts or ends inside a word — except that the trim never moves
-    /// into the match itself: when the partial word adjoins the match,
-    /// that side keeps the raw cut. `…` is prepended/appended only on a
-    /// side where text was cut. Newlines outside the match flatten to
-    /// spaces LAST, one Character each, so the returned offsets stay
-    /// valid; the match span itself is copied verbatim so the window
-    /// always contains `matchedText`.
-    func contextSnippet(text: String, matchStart: Int, matchLength: Int) -> ContextWindow {
-        let textCount = text.count
-        let clampedStart = min(max(0, matchStart), textCount)
-        let clampedLength = min(max(0, matchLength), textCount - clampedStart)
-        let matchEnd = clampedStart + clampedLength
-
-        let rawStart = max(0, clampedStart - Self.contextRadius)
-        let rawEnd = min(textCount, matchEnd + Self.contextRadius)
-        let leftCut = rawStart > 0
-        let rightCut = rawEnd < textCount
-
-        let matchStartIdx = text.index(text.startIndex, offsetBy: clampedStart)
-        let matchEndIdx = text.index(matchStartIdx, offsetBy: clampedLength)
-        var startIdx = text.index(matchStartIdx, offsetBy: rawStart - clampedStart)
-        var endIdx = text.index(matchEndIdx, offsetBy: rawEnd - matchEnd)
-
-        if leftCut {
-            startIdx = Self.trimmedWindowStart(
-                in: text, rawStart: startIdx, matchStart: matchStartIdx
-            )
-        }
-        if rightCut {
-            endIdx = Self.trimmedWindowEnd(
-                in: text, rawEnd: endIdx, matchEnd: matchEndIdx
-            )
-        }
-
-        let leading = leftCut ? "…" : ""
-        let trailing = rightCut ? "…" : ""
-        let matchOffset = leading.count + text.distance(from: startIdx, to: matchStartIdx)
-        // Flatten LAST and only OUTSIDE the match, Character for Character
-        // (a "\r\n" grapheme is one Character before and after), so
-        // `matchOffset` stays valid and the window contains the match
-        // verbatim — a match that spans a line break keeps its break.
-        func flattened(_ part: Substring) -> String {
-            String(part.map { ch -> Character in ch.isNewline ? " " : ch })
-        }
-        let snippet = leading
-            + flattened(text[startIdx..<matchStartIdx])
-            + String(text[matchStartIdx..<matchEndIdx])
-            + flattened(text[matchEndIdx..<endIdx])
-            + trailing
-        return ContextWindow(
-            snippet: snippet,
-            matchRange: matchOffset ..< matchOffset + clampedLength
-        )
-    }
-
-    /// NSRange-safe overload: converts UTF-16 range to Character offsets
-    /// before building the window. Use this when the range comes from
-    /// NSRegularExpression or PIIDetector (both use NSRange/UTF-16). An
-    /// unmappable range yields an empty window.
-    func contextSnippet(text: String, matchNSRange: NSRange) -> ContextWindow {
-        guard let range = Range(matchNSRange, in: text) else {
-            return ContextWindow(snippet: "", matchRange: 0..<0)
-        }
-        let charStart = text.distance(from: text.startIndex, to: range.lowerBound)
-        let charLength = text.distance(from: range.lowerBound, to: range.upperBound)
-        return contextSnippet(text: text, matchStart: charStart, matchLength: charLength)
-    }
-
-    /// The context window over the case-preserved display analog at the
-    /// base span `displaySlice` re-sliced from (so the window's match
-    /// slice IS the displayed text), or — when the analog drifted from the
-    /// base Character count, the `displaySlice` fallback — over the
-    /// searched text at the searched offsets, matching that fallback slice
-    /// instead. The one pairing for the OCR literal path and
-    /// `findTextMatches`.
-    private func displayWindow(
-        displayChars: [Character], displayText: String, baseCount: Int,
-        start: Int, length: Int, offsetMap: [Int]?,
-        searchedText: String, searchedStart: Int, searchedLength: Int
-    ) -> ContextWindow {
-        if displayChars.count == baseCount,
-           let span = Self.baseSpan(start: start, length: length, offsetMap: offsetMap),
-           span.upperBound <= displayChars.count {
-            return contextSnippet(text: displayText, matchStart: span.lowerBound, matchLength: span.count)
-        }
-        return contextSnippet(text: searchedText, matchStart: searchedStart, matchLength: searchedLength)
-    }
-
-    /// Word character for the window trim: letters and digits; every
-    /// other Character (whitespace, punctuation, symbols) is a boundary.
-    private static func isWordCharacter(_ ch: Character) -> Bool {
-        ch.isLetter || ch.isNumber
-    }
-
-    /// Left-side trim. Moves the window start forward past a partial
-    /// word and the separator run after it, stopping at the match: when
-    /// the partial word runs straight into the match there is no
-    /// boundary to trim to, and the raw cut stands.
-    private static func trimmedWindowStart(
-        in text: String, rawStart: String.Index, matchStart: String.Index
-    ) -> String.Index {
-        var cursor = rawStart
-        let before = text.index(before: rawStart)
-        if cursor < matchStart, isWordCharacter(text[before]), isWordCharacter(text[cursor]) {
-            while cursor < matchStart, isWordCharacter(text[cursor]) {
-                cursor = text.index(after: cursor)
-            }
-            if cursor == matchStart { return rawStart }
-        }
-        while cursor < matchStart, !isWordCharacter(text[cursor]) {
-            cursor = text.index(after: cursor)
-        }
-        return cursor
-    }
-
-    /// Right-side trim, the mirror of `trimmedWindowStart`: moves the
-    /// window end back over a partial word and the separator run before
-    /// it, never past the match end.
-    private static func trimmedWindowEnd(
-        in text: String, rawEnd: String.Index, matchEnd: String.Index
-    ) -> String.Index {
-        var cursor = rawEnd
-        if cursor > matchEnd,
-           isWordCharacter(text[text.index(before: cursor)]),
-           isWordCharacter(text[rawEnd]) {
-            while cursor > matchEnd, isWordCharacter(text[text.index(before: cursor)]) {
-                cursor = text.index(before: cursor)
-            }
-            if cursor == matchEnd { return rawEnd }
-        }
-        while cursor > matchEnd, !isWordCharacter(text[text.index(before: cursor)]) {
-            cursor = text.index(before: cursor)
-        }
-        return cursor
-    }
-}
-
-// MARK: - Typed validation errors
-
-/// Reasons `DocumentSearcher.validateRegexPatternWithError` rejects a
-/// pattern before compilation. Engine-compile failures are NOT wrapped —
-/// they propagate as the system `NSError` so its `localizedDescription`
-/// reaches the regex error callout verbatim.
-///
-/// Copy constraint: these strings are app-owned user-facing copy and
-/// use mechanism-description language ("has not been
-/// accepted" — names the response, promises no outcome). The strings never
-/// echo the submitted pattern text.
-public enum RegexValidationError: Error, LocalizedError {
-    case patternTooLong(maxLength: Int)
-    case likelyPathological
-    case nestedQuantifiers
-    /// A chain of bounded repetitions whose combined count exceeds `cap`.
-    case nestedBoundProduct(cap: Int)
-
-    public var errorDescription: String? {
-        switch self {
-        case .patternTooLong(let max):
-            return "Pattern exceeds the \(max)-character limit."
-        case .likelyPathological:
-            return "Pattern may cause performance issues and has not been accepted."
-        case .nestedQuantifiers:
-            return "Pattern contains nested quantifiers and has not been accepted."
-        case .nestedBoundProduct(let cap):
-            return "Pattern repeats a repeated group more than \(cap) times in total and has not been accepted."
-        }
-    }
 }
