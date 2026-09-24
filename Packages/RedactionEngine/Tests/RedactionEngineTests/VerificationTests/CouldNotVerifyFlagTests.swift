@@ -406,7 +406,10 @@ struct CouldNotVerifyFlagTests {
                 Marker(text: "Producer or timestamp fields were not rewritten", family: false, sites: 0, lines: 1),
                 Marker(text: "File identifier was not derived from the file contents", family: false, sites: 0, lines: 1),
                 Marker(text: "\\(prefix): \\(warnings.joined", family: false, sites: 0, lines: 1),
-                Marker(text: "return (.warn(msg), exclusionWarnPages", family: false, sites: 0, lines: 1),
+                // Layer 6's unmeasured-position class, passed through from
+                // `zeroBoundsWarning` (the classifying site); the graze class
+                // returns `grazeWarning`, a note.
+                Marker(text: "return (.warn(msg), unmeasuredPages, true)", family: false, sites: 0, lines: 1),
             ],
             "Layer2OCRCheck+Sweep.swift": [
                 Marker(text: "OCR coordinates could not be mapped to page space", family: true, sites: 1, lines: 1),
@@ -421,7 +424,7 @@ struct CouldNotVerifyFlagTests {
                 Marker(text: "Operator-semantic term search exceeded size limit", family: true, sites: 1, lines: 1),
                 Marker(text: "Operator scanner unavailable for page", family: true, sites: 1, lines: 1),
                 Marker(text: "Operator scanner could not traverse page", family: true, sites: 1, lines: 1),
-                Marker(text: "return (.warn(firstGrazeMessage)", family: false, sites: 0, lines: 1),
+                Marker(text: "A character touches the edge of a redacted area on", family: false, sites: 0, lines: 1),
                 Marker(text: "Character count excess on page", family: false, sites: 0, lines: 1),
             ],
             "SearchRecheck.swift": [
