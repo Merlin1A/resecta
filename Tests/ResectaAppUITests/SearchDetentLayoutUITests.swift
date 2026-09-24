@@ -496,9 +496,14 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
     /// the walk going; the counter survives the grabber re-expand.
     /// AX-text assertions only — the on-page ring is pixel-only
     /// (region overlays are not served through AX). Deterministic
-    /// launch: the multipage fixture with a seeded "Amount" query
-    /// (151 hits) at the medium detent (an arrival raise may lift it
-    /// to large — either is a valid start for the first tap).
+    /// launch: the multipage fixture with a seeded "Amount" query at
+    /// the medium detent (an arrival raise may lift it to large —
+    /// either is a valid start for the first tap). Count-agnostic on
+    /// purpose, like the per-item Apply leg: the fixture carries 28
+    /// "Amount" rows on each of its 23 pages (644), and the 151 this
+    /// leg once pinned was the partial count of a hook-triggered run
+    /// that the debounce re-trigger cancelled mid-flight (REV-09); the
+    /// premise is "results landed, the walk steps 1 → 2", never N.
     func testResultNavChevron_parksAtCompactAndClusterKeepsStepping() {
         app.launchArguments = [
             "--uitesting", "--loadTestDocument", "--multipageDoc",
@@ -511,9 +516,12 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             next.waitForExistence(timeout: 30),
             "Next-result chevron never appeared — the seeded query returned nothing or the sheet never presented."
         )
+        let footerCount = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@ AND label ENDSWITH %@", "0 of ", " selected")
+        ).firstMatch
         XCTAssertTrue(
-            app.staticTexts["0 of 151 selected"].waitForExistence(timeout: 15),
-            "Seeded search did not return the fixture's 151 \"Amount\" hits."
+            footerCount.waitForExistence(timeout: 20),
+            "The multipage fixture's 'Amount' query landed no results (no '0 of N selected' footer)."
         )
         XCTAssertTrue(next.isHittable, "Next-result chevron exists but is not hittable before the first step.")
         next.tap()
@@ -524,9 +532,12 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             strip.waitForExistence(timeout: 10),
             "The first chevron tap did not park the sheet at the compact float."
         )
+        let resultOne = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Result 1 of ")
+        ).firstMatch
         XCTAssertTrue(
-            app.staticTexts["Result 1 of 151"].waitForExistence(timeout: 10),
-            "Counter did not read 1/151 after the first step."
+            resultOne.waitForExistence(timeout: 10),
+            "Counter did not read 1/N after the first step."
         )
         let compactNext = app.buttons["resultNavNext"]
         XCTAssertTrue(
@@ -534,9 +545,12 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Next-result chevron is not hittable on the compact handle — the cluster is missing."
         )
         compactNext.tap()
+        let resultTwo = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Result 2 of ")
+        ).firstMatch
         XCTAssertTrue(
-            app.staticTexts["Result 2 of 151"].waitForExistence(timeout: 10),
-            "The compact handle's chevron did not step the walk (counter never read 2/151)."
+            resultTwo.waitForExistence(timeout: 10),
+            "The compact handle's chevron did not step the walk (counter never read 2/N)."
         )
         XCTAssertTrue(
             strip.exists,
@@ -545,8 +559,8 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
 
         expandCompactStripToMedium()
         XCTAssertTrue(
-            app.staticTexts["Result 2 of 151"].waitForExistence(timeout: 10),
-            "Walk position lost across the compact → medium expand — the counter no longer reads 2/151."
+            resultTwo.waitForExistence(timeout: 10),
+            "Walk position lost across the compact → medium expand — the counter no longer reads 2/N."
         )
         attachScreenshot(named: "uxc44-result-walk")
     }
