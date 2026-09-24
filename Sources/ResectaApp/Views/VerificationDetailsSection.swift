@@ -36,6 +36,14 @@ struct VerificationDetailsSection: View {
     @State private var expandedLayer: Int?
     @State private var showPageModes = false
 
+    /// The rows' icon column (`LayerResultRow.iconColumn`, the same
+    /// metric): the hairlines between rows and under the Page Modes
+    /// header inset past it and the icon's gap, so they start where the
+    /// row text starts.
+    @ScaledMetric(relativeTo: .title3) private var iconColumn: CGFloat = 30
+
+    private var hairlineInset: CGFloat { iconColumn + ResectaTokens.Spacing.sm }
+
     // MARK: - Details disclosure
     //
     // Phase 2 lock: collapsed by default; closed-state row carries the
@@ -79,21 +87,31 @@ struct VerificationDetailsSection: View {
             .accessibilityHint(isExpanded ? "Tap to collapse" : "Tap to expand")
 
             if isExpanded {
-                VStack(spacing: ResectaTokens.Spacing.md) {
-                    if report.perPageModes.hasMixedModes {
-                        pageModesSection
-                    }
-
+                // Groups, 24 pt apart; inside a group the header hugs its
+                // rows and the rows sit flat, a hairline between them.
+                VStack(alignment: .leading, spacing: ResectaTokens.Spacing.lg) {
+                    // Page Modes and the deselection row are one item.
+                    //
                     // Deselection visibility at share time: a PASS
                     // legitimately says "without issues" — the checks ran
                     // on what was redacted, not on what the user chose to
                     // leave. When the run started with known scan results
                     // deliberately un-checked, say so here, at the surface
                     // where the share decision is made.
-                    if VerificationResultsView.shouldShowDeselectionRow(
-                        snapshot: deselectionSnapshot),
-                       let snapshot = deselectionSnapshot {
-                        deselectionRow(snapshot: snapshot)
+                    let showsDeselection = VerificationResultsView.shouldShowDeselectionRow(
+                        snapshot: deselectionSnapshot)
+                    if report.perPageModes.hasMixedModes || showsDeselection {
+                        VStack(alignment: .leading, spacing: 0) {
+                            if report.perPageModes.hasMixedModes {
+                                pageModesSection
+                            }
+                            if report.perPageModes.hasMixedModes, showsDeselection {
+                                hairline
+                            }
+                            if showsDeselection, let snapshot = deselectionSnapshot {
+                                deselectionRow(snapshot: snapshot)
+                            }
+                        }
                     }
 
                     // The layers partitioned into actionable findings vs.
@@ -109,38 +127,40 @@ struct VerificationDetailsSection: View {
                     let partition = VerificationLayerPartition(layers: report.layers)
 
                     if partition.isWhollyClean {
-                        // Wholly clean doc — no headers, flat list.
-                        ForEach(partition.passed, id: \.self) { index in
-                            layerRow(layer: report.layers[index], index: index)
+                        // Wholly clean doc — one group, no header.
+                        VStack(alignment: .leading, spacing: 0) {
+                            layerRows(partition.passed)
                         }
                     } else {
                         if !partition.findings.isEmpty {
-                            sectionHeader("FINDINGS")
-                            ForEach(partition.findings, id: \.self) { index in
-                                layerRow(layer: report.layers[index], index: index)
-                            }
-                            if VerificationResultsView.shouldShowSkippedChecksFootnote(report: report) {
-                                skippedChecksFootnote
-                            }
-                            // Clean checks ride under FINDINGS so the user
-                            // sees the full surface that was inspected.
-                            ForEach(partition.passed, id: \.self) { index in
-                                layerRow(layer: report.layers[index], index: index)
+                            VStack(alignment: .leading, spacing: 0) {
+                                sectionHeader("FINDINGS")
+                                layerRows(partition.findings)
+                                // The full-width break between the
+                                // findings and the clean checks — the
+                                // group boundary.
+                                Divider()
+                                if VerificationResultsView.shouldShowSkippedChecksFootnote(report: report) {
+                                    skippedChecksFootnote
+                                }
+                                // Clean checks ride under FINDINGS so the user
+                                // sees the full surface that was inspected.
+                                layerRows(partition.passed)
                             }
                         } else {
                             // Notes-only — passed rows lead with no header,
                             // the NOTES group below.
-                            ForEach(partition.passed, id: \.self) { index in
-                                layerRow(layer: report.layers[index], index: index)
+                            VStack(alignment: .leading, spacing: 0) {
+                                layerRows(partition.passed)
                             }
                         }
                         if !partition.notes.isEmpty {
                             // INFO emitters include OCR/spatial
                             // observations, not just Layer-5 metadata —
                             // "NOTES" covers the whole isInfo set.
-                            sectionHeader("NOTES")
-                            ForEach(partition.notes, id: \.self) { index in
-                                layerRow(layer: report.layers[index], index: index)
+                            VStack(alignment: .leading, spacing: 0) {
+                                sectionHeader("NOTES")
+                                layerRows(partition.notes)
                             }
                         }
                     }
@@ -163,8 +183,9 @@ struct VerificationDetailsSection: View {
     private var skippedChecksFootnote: some View {
         Text(VerificationResultsView.skippedChecksFootnoteText)
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, ResectaTokens.Spacing.sm)
     }
 
     // MARK: - Deselection row
@@ -176,15 +197,20 @@ struct VerificationDetailsSection: View {
         let rowText = VerificationResultsView.deselectionRowText(
             deselected: snapshot.deselectedCount, total: snapshot.totalCount)
         HStack(spacing: ResectaTokens.Spacing.sm) {
+            // The glyph on a neutral tile, the rows' icon column wide — a
+            // fact about the run, not a status.
             Image(systemName: "checklist.unchecked")
                 .font(.system(size: 20))
-                .foregroundStyle(.secondary)
-                .frame(width: 28)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                .frame(width: iconColumn, height: iconColumn)
+                .background(
+                    Color.secondary.opacity(0.12),
+                    in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.small, style: .continuous))
                 .accessibilityHidden(true)
 
             Text(rowText)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if let onReviewDeselections {
@@ -192,6 +218,7 @@ struct VerificationDetailsSection: View {
                     .font(.caption.weight(.medium))
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .frame(minHeight: ResectaTokens.TouchTarget.minimum)
                     .accessibilityLabel(
                         "Review deselected items. Returns to the editor and opens the scan coverage panel.")
             }
@@ -205,10 +232,30 @@ struct VerificationDetailsSection: View {
     @ViewBuilder
     private func sectionHeader(_ label: String) -> some View {
         Text(label)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+            .textCase(.uppercase)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, ResectaTokens.Spacing.xs)
+            .padding(.bottom, ResectaTokens.Spacing.xs)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    /// The hairline between two rows (and between the Page Modes section
+    /// and the deselection row): inset past the icon column.
+    private var hairline: some View {
+        Divider().padding(.leading, hairlineInset)
+    }
+
+    /// The rows for a group's engine indices, flat, a hairline between
+    /// consecutive rows; the section owns the hairlines, the rows none.
+    @ViewBuilder
+    private func layerRows(_ indices: [Int]) -> some View {
+        ForEach(Array(indices.enumerated()), id: \.element) { position, index in
+            if position > 0 {
+                hairline
+            }
+            layerRow(layer: report.layers[index], index: index)
+        }
     }
 
     @ViewBuilder
@@ -225,7 +272,8 @@ struct VerificationDetailsSection: View {
             onPageTap: { pageIndex in
                 documentState.currentPageIndex = pageIndex
                 documentState.transition(to: .editing)
-            }
+            },
+            chrome: .plain
         )
     }
 
@@ -252,24 +300,23 @@ struct VerificationDetailsSection: View {
                     Image(systemName: "square.2.layers.3d")
                         .font(.system(size: 20))
                         .foregroundStyle(ResectaTokens.SemanticColor.searchableMode)
-                        .frame(width: 28)
+                        .frame(width: iconColumn)
 
                     VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
                         Text("Page Modes")
                             .font(.subheadline.weight(.medium))
                         Text(modeChipSummary)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     }
 
                     Spacer()
 
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(showPageModes ? 90 : 0))
+                    DisclosureChevron(isExpanded: showPageModes)
+                        .frame(width: 16)
                 }
                 .padding(ResectaTokens.Spacing.sm)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Page Modes, \(modeChipSummary)")
@@ -277,6 +324,7 @@ struct VerificationDetailsSection: View {
 
             // Expanded: color-coded page chips
             if showPageModes {
+                hairline
                 VStack(alignment: .leading, spacing: ResectaTokens.Spacing.sm) {
                     FlowLayout(spacing: ResectaTokens.Spacing.xs) {
                         ForEach(Array(report.perPageModes.enumerated()), id: \.offset) { index, mode in
@@ -329,7 +377,7 @@ struct VerificationDetailsSection: View {
                             PipelineMode.secureRasterization.glyph
                         }
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     }
 
                     // Why each rasterized page fell back, for
@@ -350,13 +398,13 @@ struct VerificationDetailsSection: View {
                                     pageNumber: entry.index + 1,
                                     reason: entry.reason))
                                     .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                             }
                         }
                     }
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.sm)
-                .padding(.bottom, ResectaTokens.Spacing.sm)
+                .padding(.vertical, ResectaTokens.Spacing.sm)
                 // Routed
                 // through the resolver so Reduce Motion swaps the slide
                 // for an opacity-only crossfade.
@@ -365,8 +413,7 @@ struct VerificationDetailsSection: View {
                     reduceMotion: reduceMotion))
             }
         }
-        .background(.regularMaterial, in: RoundedRectangle(
-            cornerRadius: ResectaTokens.CornerRadius.medium, style: .continuous))
+        // Flat inside the disclosure card — no nested material.
         .accessibilityIdentifier("pageModesSection")
     }
 
@@ -444,11 +491,15 @@ extension VerificationResultsView {
         // noun. "informational", not "metadata" — INFO rows include
         // OCR/spatial observations, and "informational" keeps the segment
         // distinct from the WARN arm's "· N note(s)".
+        // A no-break space after each segment's numeral keeps "3 informational
+        // notes" from wrapping between the count and its noun; the base
+        // "N of M checks passed" keeps ordinary spaces (VoiceOver reads
+        // both alike; the XCUI pin reads the base segment).
         let metaSuffix = counts.infoCount > 0
-            ? " · \(counts.infoCount) informational \(counts.infoCount == 1 ? "note" : "notes")" : ""
-        let skippedSuffix = counts.skippedCount > 0 ? " · \(counts.skippedCount) skipped" : ""
+            ? " · \(counts.infoCount)\u{00A0}informational \(counts.infoCount == 1 ? "note" : "notes")" : ""
+        let skippedSuffix = counts.skippedCount > 0 ? " · \(counts.skippedCount)\u{00A0}skipped" : ""
         let notesSuffix = counts.warnCount > 0
-            ? " · \(counts.warnCount) \(counts.warnCount == 1 ? "note" : "notes")" : ""
+            ? " · \(counts.warnCount)\u{00A0}\(counts.warnCount == 1 ? "note" : "notes")" : ""
         switch report.overallStatus {
         case .pass, .info, .skipped:
             return "\(counts.passedCount) of \(total) checks passed" + metaSuffix + skippedSuffix
@@ -466,10 +517,10 @@ extension VerificationResultsView {
             // ATTENTION aggregate carries no FAILs (fail forces the .fail arm
             // below) but may ride beside WARN notes — surface both segments.
             let reviewSuffix = " · " + (counts.attentionCount == 1
-                ? "1 needs review" : "\(counts.attentionCount) need review")
+                ? "1\u{00A0}needs review" : "\(counts.attentionCount)\u{00A0}need review")
             return "\(counts.passedCount) of \(total) checks passed" + reviewSuffix + notesSuffix + metaSuffix + skippedSuffix
         case .fail:
-            let issuesSuffix = " · \(counts.failCount) \(counts.failCount == 1 ? "issue" : "issues")"
+            let issuesSuffix = " · \(counts.failCount)\u{00A0}\(counts.failCount == 1 ? "issue" : "issues")"
             return "\(counts.passedCount) of \(total) checks passed" + issuesSuffix + metaSuffix + skippedSuffix
         }
     }
