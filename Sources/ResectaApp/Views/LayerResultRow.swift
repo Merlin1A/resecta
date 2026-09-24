@@ -38,6 +38,15 @@ struct LayerResultRow: View {
     /// (`iconColumn + Spacing.sm`), so the detail starts at the name's
     /// left edge.
     @ScaledMetric(relativeTo: .title3) private var iconColumn: CGFloat = 30
+    /// A custom glyph's optical size in a full row: 23 = 1.15 × 20 — the
+    /// sources render ≈ 15 % smaller than an SF symbol at the same point
+    /// size (the stopgap until they are retuned). SF fallbacks (the Search
+    /// Re-check) sit at `.title3`.
+    @ScaledMetric(relativeTo: .title3) private var glyphSize: CGFloat = 23
+    /// The shape badge's glyph, hung off the tile's corner.
+    @ScaledMetric(relativeTo: .caption) private var badgeSize: CGFloat = 11
+    // The tile's wash is per appearance (tileWashLight / tileWashDark).
+    @Environment(\.colorScheme) private var colorScheme
 
     let layer: LayerResult
     let layerIndex: Int
@@ -69,6 +78,22 @@ struct LayerResultRow: View {
     /// when flat, where the section's content column carries the inset.
     private var horizontalInset: CGFloat {
         chrome == .card ? ResectaTokens.Spacing.sm : 0
+    }
+
+    /// The ledger's status treatment — the tinted tile with its shape
+    /// badge — is for a finished run's rows. While the run is in progress
+    /// (`useIntermediateColors`) the rows keep the bare glyph.
+    private var showsStatusTreatment: Bool { !useIntermediateColors }
+
+    /// A non-pass full row sits its glyph on a tinted tile with the badge;
+    /// a pass row — a full one with something to expand, or a compact one —
+    /// carries neither (a clean pass is marked by the ledger's ✓ column).
+    private var showsTile: Bool { showsStatusTreatment && layer.status != .pass }
+
+    private var tileWash: Double {
+        colorScheme == .dark
+            ? ResectaTokens.Opacity.tileWashDark
+            : ResectaTokens.Opacity.tileWashLight
     }
 
     var body: some View {
@@ -116,12 +141,7 @@ struct LayerResultRow: View {
     private var header: some View {
         HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center,
                spacing: ResectaTokens.Spacing.sm) {
-            VerificationSymbol.icon(for: layer)
-                .foregroundStyle(useIntermediateColors
-                                 ? layer.status.intermediateColor
-                                 : layer.status.color)
-                .font(.title3)
-                .frame(width: iconColumn)
+            iconColumnView
 
             VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
                 // The check's name alone — the ledger lists every check
@@ -149,6 +169,76 @@ struct LayerResultRow: View {
         .padding(.vertical, ResectaTokens.Spacing.sm)
         .padding(.horizontal, horizontalInset)
     }
+
+    // MARK: - Icon column: the tile and the badge
+
+    /// On a non-pass row of a finished run, the tinted tile with the shape
+    /// badge; otherwise the bare glyph as before (the progress view's rows,
+    /// a full pass row).
+    @ViewBuilder
+    private var iconColumnView: some View {
+        if showsTile {
+            tile
+        } else {
+            statusGlyph
+                .foregroundStyle(useIntermediateColors
+                                 ? layer.status.intermediateColor
+                                 : layer.status.color)
+                .frame(width: iconColumn)
+        }
+    }
+
+    /// The glyph at its optical size: a custom asset at `glyphSize`, an SF
+    /// fallback at `.title3`.
+    private var statusGlyph: some View {
+        VerificationSymbol.icon(for: layer)
+            .font(VerificationSymbol.isCustom(layer) ? .system(size: glyphSize) : .title3)
+    }
+
+    /// The status tile: the glyph in the text tier on a wash of the status
+    /// hue, in a continuous-corner square the size of the icon column.
+    private var tile: some View {
+        statusGlyph
+            .foregroundStyle(layer.status.glyphOnWash)
+            .frame(width: iconColumn, height: iconColumn)
+            .background(
+                layer.status.color.opacity(tileWash),
+                in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.small, style: .continuous))
+            .overlay(alignment: .bottomTrailing) {
+                badge
+            }
+    }
+
+    /// The shape badge, hung 4 pt off the tile's bottom-trailing corner
+    /// (inside the corner it collides with the glyph), knocked out of its
+    /// surroundings by a ring in the card surface. Hidden from VoiceOver:
+    /// the row's label speaks the status phrase.
+    private var badge: some View {
+        Image(systemName: layer.status.badgeSymbolName)
+            .font(.system(size: badgeSize, weight: .bold))
+            .foregroundStyle(layer.status.glyphOnWash)
+            .background(badgeRing.padding(-1.5))
+            .offset(x: ResectaTokens.Spacing.xs, y: ResectaTokens.Spacing.xs)
+            .accessibilityHidden(true)
+    }
+
+    /// The knock-out ring, in the card surface.
+    private var badgeRing: some View {
+        Circle().fill(Self.cardSurface)
+    }
+
+    /// The disclosure's card surface as rendered — its material over the
+    /// results page, sampled from the captures (light #F5F5F5 · dark
+    /// #202020). A `Color`, because the `.background` shape style resolves
+    /// to the system background (black in dark), which would halo the badge
+    /// on the card.
+    static let cardSurface = Color(
+        uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .dark
+                ? UIColor(red: 0x20/255, green: 0x20/255, blue: 0x20/255, alpha: 1)
+                : UIColor(red: 0xF5/255, green: 0xF5/255, blue: 0xF5/255, alpha: 1)
+        }
+    )
 
     // MARK: - Expanded block
 
