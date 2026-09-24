@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # audit-lint.sh — pre-commit gate (mechanical checks M-1..M-6; see
-# CONTRIBUTING "Audit checklist"), plus the script-local checks AL-1..AL-4
+# CONTRIBUTING "Audit checklist"), plus the script-local checks AL-1..AL-5
 # (XcodeGen sync · resources: no-op warn · sample-statement and loan-packet
-# dual-copy byte identity) — numbering note at the AL-1 section below.
+# dual-copy byte identity · silent test guards on added lines) — numbering
+# note at the AL-1 section below.
 # Symlinked into .git/hooks/pre-commit by install-hooks.sh.
 #
 # Scope: staged Added/Modified files (`git diff --cached --diff-filter=AM`).
@@ -399,10 +400,39 @@ if [ "$packet_touched" -eq 1 ]; then
     fi
 fi
 
+# ── AL-5 silent test guard (added lines of test files) ──────────────────
+# A test that returns before its first assertion reports PASS with zero
+# assertions. `Scripts/lint-silent-guards.py` walks every test body in a
+# file (comments and strings blanked; closures, nested funcs and computed
+# properties skipped) and names each guard whose early return precedes the
+# first assertion-like token. This check keeps the offences whose guard
+# line this change ADDED, so a pre-existing guard elsewhere in the file is
+# not re-reported. The two accepted shapes: `try #require(...)` for a
+# resource the repository tracks; `TestGate.skip(...)` before the `return`
+# for an environmental gate. Same-line marker: `SilentGuard:ok <reason>`.
+AL5_SCANNER="$REPO_ROOT/Scripts/lint-silent-guards.py"
+if [ -f "$AL5_SCANNER" ] && command -v python3 >/dev/null 2>&1; then
+    for path in "${STAGED[@]}"; do
+        case "$path" in *Tests/*.swift) ;; *) continue ;; esac
+        [ -f "$path" ] || continue
+        added="$(diff_added_hunks "$path" | perl -ne 'if (/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/) { my ($s, $n) = ($1, defined $2 ? $2 : 1); print "$_\n" for ($s .. $s + $n - 1); }')"
+        [ -n "$added" ] || continue
+        while IFS= read -r off; do
+            [ -n "$off" ] || continue
+            line="${off#"$path":}"; line="${line%%:*}"
+            if printf '%s\n' "$added" | /usr/bin/grep -qx "$line"; then
+                violate "AL-5 silent test guard: $off"
+            fi
+        done < <(python3 "$AL5_SCANNER" --lint "$path" 2>/dev/null || true)
+    done
+else
+    warn "AL-5 skipped: $AL5_SCANNER or python3 not found"
+fi
+
 # ── Summary ─────────────────────────────────────────────────────────────
 if [ "$FAIL" -gt 0 ]; then
     printf '\naudit-lint: %d offence(s); commit blocked.\n' "$FAIL" >&2
-    printf 'Reference: CONTRIBUTING.md "Audit checklist" (M-1..M-6 mechanical) and this script'"'"'s AL-1..AL-4\n' >&2
+    printf 'Reference: CONTRIBUTING.md "Audit checklist" (M-1..M-6 mechanical) and this script'"'"'s AL-1..AL-5\n' >&2
     exit 1
 fi
 exit 0
