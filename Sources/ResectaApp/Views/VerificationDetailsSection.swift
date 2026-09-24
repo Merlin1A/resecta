@@ -96,64 +96,51 @@ struct VerificationDetailsSection: View {
                         deselectionRow(snapshot: snapshot)
                     }
 
-                    // Partition layers into actionable findings vs.
-                    // informational metadata vs. clean checks. `layerIndex`
-                    // stays engine-position-based (1-indexed) so the
-                    // accessibilityIdentifier "layerResult_\(layerIndex - 1)"
-                    // and spec cross-references remain stable across grouping.
-                    // .skipped rides under FINDINGS (a skipped check
-                    // is something the user should notice), not silently in the
+                    // The layers partitioned into actionable findings vs.
+                    // informational notes vs. clean checks — one enumeration
+                    // (`VerificationLayerPartition`), engine order inside each
+                    // group. `layerIndex` stays engine-position-based
+                    // (1-indexed) so the accessibilityIdentifier
+                    // "layerResult_\(layerIndex - 1)" and spec cross-references
+                    // remain stable across grouping; the rows are keyed by that
+                    // index. .skipped rides under FINDINGS (a skipped check is
+                    // something the user should notice), not silently in the
                     // passed group.
-                    let findings = Array(report.layers.enumerated()).filter {
-                        $0.element.status.isWarn
-                            || $0.element.status.isAttention
-                            || $0.element.status.isFail
-                            || $0.element.status.isSkipped
-                    }
-                    let metadata = Array(report.layers.enumerated()).filter {
-                        $0.element.status.isInfo
-                    }
-                    let passed = Array(report.layers.enumerated()).filter {
-                        !$0.element.status.isWarn
-                            && !$0.element.status.isAttention
-                            && !$0.element.status.isFail
-                            && !$0.element.status.isInfo
-                            && !$0.element.status.isSkipped
-                    }
+                    let partition = VerificationLayerPartition(layers: report.layers)
 
-                    if findings.isEmpty && metadata.isEmpty {
+                    if partition.isWhollyClean {
                         // Wholly clean doc — no headers, flat list.
-                        ForEach(passed, id: \.element.name) { index, layer in
-                            layerRow(layer: layer, index: index)
+                        ForEach(partition.passed, id: \.self) { index in
+                            layerRow(layer: report.layers[index], index: index)
                         }
                     } else {
-                        if !findings.isEmpty {
+                        if !partition.findings.isEmpty {
                             sectionHeader("FINDINGS")
-                            ForEach(findings, id: \.element.name) { index, layer in
-                                layerRow(layer: layer, index: index)
+                            ForEach(partition.findings, id: \.self) { index in
+                                layerRow(layer: report.layers[index], index: index)
                             }
                             if VerificationResultsView.shouldShowSkippedChecksFootnote(report: report) {
                                 skippedChecksFootnote
                             }
                             // Clean checks ride under FINDINGS so the user
                             // sees the full surface that was inspected.
-                            ForEach(passed, id: \.element.name) { index, layer in
-                                layerRow(layer: layer, index: index)
+                            ForEach(partition.passed, id: \.self) { index in
+                                layerRow(layer: report.layers[index], index: index)
                             }
                         } else {
-                            // Metadata-only — passed rows lead with no header,
-                            // METADATA group below.
-                            ForEach(passed, id: \.element.name) { index, layer in
-                                layerRow(layer: layer, index: index)
+                            // Notes-only — passed rows lead with no header,
+                            // the NOTES group below.
+                            ForEach(partition.passed, id: \.self) { index in
+                                layerRow(layer: report.layers[index], index: index)
                             }
                         }
-                        if !metadata.isEmpty {
+                        if !partition.notes.isEmpty {
                             // INFO emitters include OCR/spatial
                             // observations, not just Layer-5 metadata —
                             // "NOTES" covers the whole isInfo set.
                             sectionHeader("NOTES")
-                            ForEach(metadata, id: \.element.name) { index, layer in
-                                layerRow(layer: layer, index: index)
+                            ForEach(partition.notes, id: \.self) { index in
+                                layerRow(layer: report.layers[index], index: index)
                             }
                         }
                     }
@@ -447,24 +434,24 @@ extension VerificationResultsView {
     /// Static for exact-string test pinning (house pattern —
     /// `fallbackReasonRowText`). Pinned by `VerificationDisplayTests`.
     static func detailsSummaryText(for report: VerificationReport) -> String {
-        let total = report.layers.count
-        // "Passed" counts only .pass + .info (no actionable issue).
-        // `.skipped` is surfaced separately below — never rolled into the
-        // passed count. `.info` still rides here and also appears under the
-        // METADATA group, preserving the prior shape.
-        let passed = report.layers.filter { $0.status == .pass || $0.status.isInfo }.count
-        let infoCount = report.layers.filter(\.status.isInfo).count
-        let skippedCount = report.layers.filter(\.status.isSkipped).count
+        // The same partition the disclosure groups by — "passed" counts
+        // .pass + .info (no actionable issue); `.skipped` is surfaced
+        // separately below, never rolled into the passed count; `.info`
+        // also appears under the NOTES group, preserving the prior shape.
+        let counts = VerificationLayerPartition(layers: report.layers)
+        let total = counts.total
         // "· 1 metadata" read as a dangling adjective — name the
         // noun. "informational", not "metadata" — INFO rows include
         // OCR/spatial observations, and "informational" keeps the segment
         // distinct from the WARN arm's "· N note(s)".
-        let metaSuffix = infoCount > 0
-            ? " · \(infoCount) informational \(infoCount == 1 ? "note" : "notes")" : ""
-        let skippedSuffix = skippedCount > 0 ? " · \(skippedCount) skipped" : ""
+        let metaSuffix = counts.infoCount > 0
+            ? " · \(counts.infoCount) informational \(counts.infoCount == 1 ? "note" : "notes")" : ""
+        let skippedSuffix = counts.skippedCount > 0 ? " · \(counts.skippedCount) skipped" : ""
+        let notesSuffix = counts.warnCount > 0
+            ? " · \(counts.warnCount) \(counts.warnCount == 1 ? "note" : "notes")" : ""
         switch report.overallStatus {
         case .pass, .info, .skipped:
-            return "\(passed) of \(total) checks passed" + metaSuffix + skippedSuffix
+            return "\(counts.passedCount) of \(total) checks passed" + metaSuffix + skippedSuffix
         case .warn:
             // An overall WARN can now be skip-induced with zero
             // WARN layers — omit the notes segment in that case.
@@ -474,25 +461,16 @@ extension VerificationResultsView {
             // failure) without touching any verdict semantics; the
             // completed tally counts every layer that ran (WARN aggregate
             // carries no FAILs — fail forces the .fail arm below).
-            let warnCount = report.layers.filter(\.status.isWarn).count
-            let notesSuffix = warnCount > 0
-                ? " · \(warnCount) \(warnCount == 1 ? "note" : "notes")" : ""
-            let completed = total - skippedCount
-            return "\(completed) of \(total) checks completed" + notesSuffix + metaSuffix + skippedSuffix
+            return "\(counts.completedCount) of \(total) checks completed" + notesSuffix + metaSuffix + skippedSuffix
         case .attention:
             // ATTENTION aggregate carries no FAILs (fail forces the .fail arm
             // below) but may ride beside WARN notes — surface both segments.
-            let attentionCount = report.layers.filter(\.status.isAttention).count
-            let reviewSuffix = " · " + (attentionCount == 1
-                ? "1 needs review" : "\(attentionCount) need review")
-            let warnCount = report.layers.filter(\.status.isWarn).count
-            let notesSuffix = warnCount > 0
-                ? " · \(warnCount) \(warnCount == 1 ? "note" : "notes")" : ""
-            return "\(passed) of \(total) checks passed" + reviewSuffix + notesSuffix + metaSuffix + skippedSuffix
+            let reviewSuffix = " · " + (counts.attentionCount == 1
+                ? "1 needs review" : "\(counts.attentionCount) need review")
+            return "\(counts.passedCount) of \(total) checks passed" + reviewSuffix + notesSuffix + metaSuffix + skippedSuffix
         case .fail:
-            let failCount = report.layers.filter(\.status.isFail).count
-            let issuesSuffix = " · \(failCount) \(failCount == 1 ? "issue" : "issues")"
-            return "\(passed) of \(total) checks passed" + issuesSuffix + metaSuffix + skippedSuffix
+            let issuesSuffix = " · \(counts.failCount) \(counts.failCount == 1 ? "issue" : "issues")"
+            return "\(counts.passedCount) of \(total) checks passed" + issuesSuffix + metaSuffix + skippedSuffix
         }
     }
 
