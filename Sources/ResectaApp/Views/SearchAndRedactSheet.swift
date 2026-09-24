@@ -882,14 +882,15 @@ struct SearchAndRedactSheet: View {
         .padding(.vertical, ResectaTokens.Spacing.sm)
     }
 
-    /// Shared label chrome for this sheet's circular icon buttons — an
+    /// Shared label chrome for the sheet's circular icon buttons (the
+    /// toolbar section's `rescanButton` draws through it too) — an
     /// 18pt SF glyph in a drawn Ø44 circle whose wash is matched by eye
     /// to the retired `.bordered`-small background, floored to the
     /// `TouchTarget.minimum` LAYOUT square with the floor AFTER the
     /// chrome (hit area unchanged, visual back to circle scale; hit
     /// expansion beyond the layout frame is banned).
     /// Interaction states live on `CircularIconButtonStyle`.
-    private func circularIconLabel(_ systemName: String) -> some View {
+    static func circularIconLabel(_ systemName: String) -> some View {
         Image(systemName: systemName)
             .font(.system(size: CircularIconButtonStyle.glyphPointSize))
             .foregroundStyle(.tint)
@@ -919,7 +920,7 @@ struct SearchAndRedactSheet: View {
             // Drawn Ø44 circle + 18pt glyph in place of the
             // `.bordered` wash that rendered the touch-target floor as
             // a ~64pt slab; hit area unchanged.
-            circularIconLabel("bookmark")
+            Self.circularIconLabel("bookmark")
         }
         .buttonStyle(.circularIcon)
         .disabled(redactionState.pendingTriage != nil)
@@ -945,7 +946,7 @@ struct SearchAndRedactSheet: View {
             // SearchToolbarSection.rescanButton; identifier matches
             // that sibling since the two are mutually exclusive (only
             // one renders per `scanCategoryStripEnabled` state).
-            circularIconLabel("arrow.clockwise")
+            Self.circularIconLabel("arrow.clockwise")
         }
         .buttonStyle(.circularIcon)
         .disabled(searchState.isSearching)
@@ -1041,7 +1042,7 @@ struct SearchAndRedactSheet: View {
                     searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
                     navigateToCurrentResult(dropToCompact: true)
                 } label: {
-                    circularIconLabel("chevron.up")
+                    Self.circularIconLabel("chevron.up")
                 }
                 .accessibilityLabel("Previous result")
                 .accessibilityIdentifier("resultNavPrevious")
@@ -1051,7 +1052,7 @@ struct SearchAndRedactSheet: View {
                     searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
                     navigateToCurrentResult(dropToCompact: true)
                 } label: {
-                    circularIconLabel("chevron.down")
+                    Self.circularIconLabel("chevron.down")
                 }
                 .accessibilityLabel("Next result")
                 .accessibilityIdentifier("resultNavNext")
