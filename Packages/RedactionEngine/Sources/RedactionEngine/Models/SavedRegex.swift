@@ -6,13 +6,13 @@ import Foundation
 /// `Legal.xcstrings` at render time. The app-wide store is
 /// `SavedRegexStore` in the app target.
 public struct SavedRegex: Codable, Sendable, Identifiable, Equatable, Hashable {
-    public static let labelLengthCap = 80
+    static let labelLengthCap = 80
     public static let patternLengthCap = 200
 
     public let id: UUID
     public var label: String
     public var pattern: String
-    public var createdAt: Date
+    var createdAt: Date
     public var isBuiltIn: Bool
 
     public init(

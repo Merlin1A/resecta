@@ -20,48 +20,48 @@ import Foundation
 /// reads): the displayed size with its axes swapped at 90°/270°. On an
 /// unrotated page every map is the identity and only `displayedSize.width`
 /// is read (the assembled-line fit clamp).
-public struct PageFrame: Sendable, Equatable {
+struct PageFrame: Sendable, Equatable {
     /// The page's `/Rotate`, normalized to 0 · 90 · 180 · 270.
-    public let rotation: Int
-    public let displayedSize: CGSize
+    let rotation: Int
+    let displayedSize: CGSize
 
-    public init(rotation: Int, displayedSize: CGSize) {
+    init(rotation: Int, displayedSize: CGSize) {
         self.rotation = ((rotation % 360) + 360) % 360
         self.displayedSize = displayedSize
     }
 
     /// An unrotated page of the given width; the height is never read.
-    public static func unrotated(width: CGFloat) -> PageFrame {
+    static func unrotated(width: CGFloat) -> PageFrame {
         PageFrame(rotation: 0, displayedSize: CGSize(width: width, height: 0))
     }
 
-    public var isUnrotated: Bool { rotation == 0 }
+    var isUnrotated: Bool { rotation == 0 }
 
     /// The source (pre-rotation) crop size.
-    public var sourceSize: CGSize {
+    var sourceSize: CGSize {
         rotation == 90 || rotation == 270
             ? CGSize(width: displayedSize.height, height: displayedSize.width)
             : displayedSize
     }
 
     /// `T_rot`: a source-frame (cropBox-local) rect in the displayed frame.
-    public func displayedRect(_ source: CGRect) -> CGRect {
+    func displayedRect(_ source: CGRect) -> CGRect {
         TextLayerExtractor.rotateRectIntoOutputSpace(
             source, sourceCropSize: sourceSize, rotation: rotation)
     }
 
     /// `T_rot⁻¹`: a displayed-frame rect in the source frame.
-    public func sourceRect(_ displayed: CGRect) -> CGRect {
+    func sourceRect(_ displayed: CGRect) -> CGRect {
         TextLayerExtractor.unrotateRectIntoSourceSpace(
             displayed, sourceCropSize: sourceSize, rotation: rotation)
     }
 
-    public func displayedPoint(_ source: CGPoint) -> CGPoint {
+    func displayedPoint(_ source: CGPoint) -> CGPoint {
         TextLayerExtractor.rotatePointIntoOutputSpace(
             source, sourceCropSize: sourceSize, rotation: rotation)
     }
 
-    public func sourcePoint(_ displayed: CGPoint) -> CGPoint {
+    func sourcePoint(_ displayed: CGPoint) -> CGPoint {
         TextLayerExtractor.unrotatePointIntoSourceSpace(
             displayed, sourceCropSize: sourceSize, rotation: rotation)
     }
@@ -71,7 +71,7 @@ public struct PageFrame: Sendable, Equatable {
     /// is `p` rotated by this angle. A line drawn along +X in a graphics
     /// state translated to `displayedPoint(origin)` and rotated by this
     /// angle runs along its source line on the displayed page.
-    public var displayedAngle: CGFloat {
+    var displayedAngle: CGFloat {
         switch rotation {
         case 90: return -.pi / 2
         case 180: return .pi
