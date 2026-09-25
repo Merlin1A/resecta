@@ -417,13 +417,15 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
         row.tap()
 
-        // A row tap drops the sheet to the compact handle, which now
-        // carries the title AND the trailing ‹ k/N › cluster so the
-        // walk continues while the sheet is parked. The strip + title
-        // prove the drop landed; the cluster's presence + hittability
-        // at compact was pinned ABSENT under the earlier title-only
-        // contract; the no-selection-toggle proof is asserted at
-        // medium after a grabber re-expand, one detent later.
+        // A row tap drops the sheet to the compact handle, which
+        // carries the walk's match line AND the trailing ‹ k/N ›
+        // cluster so the walk continues while the sheet is parked (the
+        // interface title yields to the match line while a walk is
+        // live). The strip + the line prove the drop landed; the
+        // cluster's presence + hittability at compact was pinned
+        // ABSENT under the earlier title-only contract; the
+        // no-selection-toggle proof is asserted at medium after a
+        // grabber re-expand, one detent later.
         let strip = app.descendants(matching: .any)
             .matching(identifier: "compactFloatStrip").firstMatch
         XCTAssertTrue(
@@ -431,8 +433,9 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Row tap did not drop the sheet to the compact float."
         )
         XCTAssertTrue(
-            app.staticTexts["Search"].waitForExistence(timeout: 5),
-            "Compact handle is missing its interface title."
+            app.descendants(matching: .any).matching(identifier: "walkMatchLine").firstMatch
+                .waitForExistence(timeout: 5),
+            "Compact handle is missing the walk's match line."
         )
         let compactNext = app.buttons["Next result"]
         XCTAssertTrue(
@@ -675,20 +678,16 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         attachScreenshot(named: "uxc51-compact-apply-undo")
     }
 
-    /// Grabber drag from the medium detent back down to the compact
-    /// float — the inverse of `expandCompactStripToMedium`.
+    /// Step the sheet from the medium detent back down to the compact
+    /// float — the cooperative content-at-top down-drag inside the
+    /// results list (the idiom the down-drag chain legs pin).
     private func collapseSheetToCompactFloat() {
-        let window = app.windows.firstMatch
         let strip = app.descendants(matching: .any).matching(identifier: "compactFloatStrip").firstMatch
         for _ in 0..<3 {
-            let dismiss = app.buttons["searchDismissButton"].firstMatch
-            let fromY = dismiss.exists ? max(0.05, dismiss.frame.minY / window.frame.height - 0.03) : 0.45
-            let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: fromY))
-            let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.97))
-            start.press(forDuration: 0.1, thenDragTo: end)
+            dragInList(searchResultsList, from: 0.2, to: 0.7)
             if strip.waitForExistence(timeout: 3) { return }
         }
-        XCTFail("The grabber drag did not park the sheet back at the compact float.")
+        XCTFail("The in-list down-drag did not park the sheet back at the compact float.")
     }
 
     /// Poll a condition for up to `timeout` seconds — AX state such as
