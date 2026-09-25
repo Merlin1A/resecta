@@ -329,6 +329,20 @@ enum ResectaTokens {
             }
         )
 
+        /// Filled-capsule tier — the white-label action capsules (the
+        /// sheet footer's Select All, the parked strip's per-item Apply).
+        /// Light #0B646F (= the tint; white-on-fill 6.85) · Dark #117F8F
+        /// (white-on-fill 4.71 — the dark tint's 4.30 sat under AA for a
+        /// headline label; contrast runs, 2026-09-24). The global tint
+        /// (glyphs, the current-match ring) is untouched.
+        static let fill: Color = Color(
+            uiColor: UIColor { trait in
+                trait.userInterfaceStyle == .dark
+                    ? UIColor(red: 0x11/255, green: 0x7F/255, blue: 0x8F/255, alpha: 1)
+                    : UIColor(red: 0x0B/255, green: 0x64/255, blue: 0x6F/255, alpha: 1)
+            }
+        )
+
         /// Text tier — colored small text and small glyphs (affordances, chip
         /// counts, trust checks, disclosure icons). Light #0A5D66 · Dark
         /// #7BD7E2. Measured: 7.58/6.79/6.18 light (white/grouped/wash),

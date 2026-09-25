@@ -37,8 +37,8 @@ struct WalkSeamTests {
     func everyCallerNamesTheSeam() throws {
         let hub = try loadRepoFile("Sources/ResectaApp/Views/SearchAndRedactSheet.swift")
         let cluster = try slice(hub,
-                                from: "private func resultNavCluster(",
-                                to: "private var resultNavCounter: some View {")
+                                from: "func resultNavButton(",
+                                to: "func resultNavCounter(")
         #expect(cluster.components(separatedBy: "focusWalk(on: searchState.currentResult?.id, parking: true)").count - 1 == 2,
                 "both chevrons step then focus through the seam")
         #expect(hub.contains("onFocusWalk: focusWalk(on:parking:)"),

@@ -853,26 +853,13 @@ struct SearchResultsSection: View {
         }
     }
 
-    /// Derive the per-mode discriminator from the current
-    /// SearchState shape. Pure function — pinned by EmptyStateTests
-    /// so the discriminator stays in sync with the copy table.
+    /// The per-mode discriminator from the current SearchState shape —
+    /// the session's own read (`SearchState.emptyStateContext`, shared
+    /// with the parked strip's status line). Pure — pinned by
+    /// EmptyStateTests so the discriminator stays in sync with the
+    /// copy table.
     private func currentEmptyStateContext() -> WU20Strings.EmptyContext {
-        WU20Strings.context(
-            mode: searchState.searchModeType,
-            queryText: searchState.queryText,
-            multiTermTerms: searchState.searchTerms,
-            recentMultiTermSets: searchState.recentMultiTermSets,
-            multiTermConjunction: searchState.options.multiTermConjunction,
-            currentSearchPage: searchState.currentSearchPage,
-            totalPages: searchState.totalPages,
-            totalCount: searchState.totalCount,
-            // The completion copy describes the run that
-            // executed (kickoff snapshot), not the live chip state.
-            enabledPIICategoryCount: searchState.lastRunDetectorCount
-                ?? searchState.effectiveScanCategories.count,
-            hasCompletedRun: searchState.hasCompletedRunSinceClear,
-            scanStartFailed: searchState.scanStartFailed
-        )
+        searchState.emptyStateContext
     }
 
     /// Tappable recall chips for the multi-term empty state.

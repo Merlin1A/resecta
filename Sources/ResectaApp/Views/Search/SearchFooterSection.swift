@@ -138,7 +138,8 @@ struct SearchFooterSection: View {
                 .accessibilityIdentifier("footerSelectAllButton")
         } else {
             // Custom prominent chrome — subheadline white label on a 36pt
-            // drawn BrandTeal capsule (visual parity with the retired
+            // drawn BrandTeal capsule (`BrandTeal.fill`, the filled-capsule
+            // tier the parked strip's Apply shares; visual parity with the retired
             // `.borderedProminent` small control), with the 46pt
             // LAYOUT floor + contentShape AFTER the fill so the drawn
             // pill stays compact. The Deselect branch above is
@@ -150,7 +151,7 @@ struct SearchFooterSection: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14)
                     .frame(minHeight: 36)
-                    .background(ResectaTokens.BrandTeal.tint, in: Capsule())
+                    .background(ResectaTokens.BrandTeal.fill, in: Capsule())
                     .frame(minHeight: ResectaTokens.TouchTarget.minimum)
                     .contentShape(Rectangle())
             }

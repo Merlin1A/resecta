@@ -2,54 +2,74 @@ import SwiftUI
 
 // Compact float detent for the Search & Redact sheet.
 //
-// The compact detent hugs the glanceable handle — the
-// grabber capsule plus one row carrying the per-item Apply at the
-// leading edge, the centered interface title, and the result-nav
-// cluster (‹ › + k/N) at the trailing edge (`compactFloatStrip`) — so
-// the document stays the primary surface while the sheet is parked
-// and the result walk, with its one-tap mark, continues from the
-// handle. Height is a fixed hug clamped to the available height. The
-// prior max(110pt, 15%-of-screen) contract sized a control strip
-// (search bar + nav controls + first result row) that no longer
-// renders at compact; the title-only hug (60pt) pre-dates the
-// cluster's 46-pt layout floors, and a later hug (72pt) added the
-// per-item Apply.
+// The compact detent hugs the glanceable handle — the grabber capsule,
+// the walk's match line (kind · page · text) and one row of full-size
+// controls: the per-item Apply capsule and the ‹ › cluster with its
+// counter (`compactFloatStrip`, `+CompactStrip.swift`) — so the document
+// stays the primary surface while the sheet is parked and the result
+// walk, with its one-tap mark, continues from the handle. Height is a
+// fixed hug clamped to the available height, lifted at accessibility
+// type sizes for the taller line.
 //
-// The pure-function `compactHeight(maxDetentValue:)` helper isolates
-// the math from the SwiftUI runtime so tests can verify the hug +
-// clamp contract without constructing a `Context` value (the type
-// has no public initializer).
+// Two presentation regimes, measured on the iPhone 17 simulator (iOS 26):
+// up to a hug of 100 the system draws the parked sheet as a floating
+// capsule whose scale grows with the hug (0.877 at 80 → 0.957 at 100,
+// the grabber hidden from ≈94); from 101 it draws an attached sheet at
+// 0.96 with an 8-pt inset, the bottom safe area added under the content
+// and the grabber visible. The hug below sits in the attached regime,
+// where a 46-pt control frame shows at 44.2 pt — the effective floor
+// holds with the shared token. `CompactDetentAnchoredRowTests` pins the
+// regime and the hug arithmetic.
+//
+// History: 60 (the title-only handle) → 72 (the ‹ › cluster) → 80 (the
+// per-item Apply) → 108 (the match line + full-size controls; 120 at
+// accessibility sizes).
+//
+// The pure-function `compactHeight(maxDetentValue:accessibilitySize:)`
+// helper isolates the math from the SwiftUI runtime so tests can verify
+// the hug + clamp contract without constructing a `Context` value (the
+// type has no public initializer).
 
 struct CompactFloatDetent: CustomPresentationDetent {
     static func height(in context: Context) -> CGFloat? {
-        compactHeight(maxDetentValue: context.maxDetentValue)
+        // `Context` is `@dynamicMemberLookup` over `EnvironmentValues`,
+        // so the detent reads the type size the sheet is laid out at.
+        compactHeight(
+            maxDetentValue: context.maxDetentValue,
+            accessibilitySize: context.dynamicTypeSize.isAccessibilitySize
+        )
     }
 
-    /// Fixed title hug, never exceeding the available height.
-    static func compactHeight(maxDetentValue: CGFloat) -> CGFloat {
-        min(hugHeight, maxDetentValue)
+    /// Fixed hug for the type-size class, never exceeding the available height.
+    static func compactHeight(maxDetentValue: CGFloat, accessibilitySize: Bool = false) -> CGFloat {
+        min(accessibilitySize ? accessibilityHugHeight : hugHeight, maxDetentValue)
     }
-
-    /// Grabber inset (6+5+4 = 15pt) + the handle row's 46-pt layout
-    /// floor (the per-item Apply, the title and the
-    /// result-nav cluster all ride inside that one row) + breathing
-    /// room. The handle grows
-    /// slightly with the Apply on board — 72 → 80, tuned live on the
-    /// iPhone 17 and the 390-pt iPhone 17e sims: grabber, Apply, title,
-    /// chevrons and counter fully visible, no clip, canvas exposed
-    /// behind; the title font is unchanged. The page bar and the
-    /// parked-canvas inset read this symbolically. Was 60 under
-    /// the title-only handle and 72 under the cluster handle.
-    static let hugHeight: CGFloat = 80
 
     /// The ONE hug value the chrome outside the sheet reads — the
     /// page-bar / parked-canvas inset and the toast clearance, through
     /// `ParkedChromeLayout` — keyed to the type size so those consumers
-    /// move with the hug the detent reports. One value at every size
-    /// today; the accessibility branch lands with the strip's second line.
+    /// move with the hug the detent reports.
     static func hug(for size: DynamicTypeSize) -> CGFloat {
-        hugHeight
+        size.isAccessibilitySize ? accessibilityHugHeight : hugHeight
     }
+
+    /// Grabber inset + the match line + the 4-pt gap + the controls
+    /// row's 46-pt layout floor + breathing room (15 + 24 + 4 + 46 + 19).
+    /// Stays ≥ 101: the attached regime (see the file comment).
+    static let hugHeight: CGFloat = 108
+    /// The hug at accessibility type sizes: the match line grows to 36
+    /// (the line is capped at `.accessibility2`), the row keeps its
+    /// floor (15 + 36 + 4 + 46 + 19). Ceiling 120.
+    static let accessibilityHugHeight: CGFloat = 120
+    /// The grabber capsule's inset above the content (6 + 5 + 4).
+    static let grabberInset: CGFloat = 15
+    /// The match line's reserved height (`ResectaTokens.Spacing.lg`) —
+    /// reserved in every state so the layout never jumps.
+    static let matchLineHeight: CGFloat = 24
+    /// The match line's reserved height at accessibility type sizes.
+    static let accessibilityMatchLineHeight: CGFloat = 36
+    /// Breathing room under the controls row.
+    static let bottomInset: CGFloat = 19
 }
 
 extension PresentationDetent {

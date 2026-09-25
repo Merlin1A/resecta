@@ -22,6 +22,12 @@ struct CircularIconButtonStyle: ButtonStyle {
     static let diameter: CGFloat = 44
     /// SF glyph point size inside the circle (board value).
     static let glyphPointSize: CGFloat = 18
+    /// The parked strip's circle: the whole 46-pt layout frame (44.2 pt
+    /// on screen in the attached sheet regime) with a 20-pt glyph — the
+    /// full-size controls of the taller handle. The medium+ search bar
+    /// keeps `diameter` / `glyphPointSize` (pinned geometry).
+    static let parkedDiameter: CGFloat = ResectaTokens.TouchTarget.minimum
+    static let parkedGlyphPointSize: CGFloat = 20
     /// Circle wash — matched by eye to the retired `.bordered`
     /// small-control background on both appearances.
     static let wash = Color(.tertiarySystemFill)

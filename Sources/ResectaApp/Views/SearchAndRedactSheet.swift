@@ -829,14 +829,15 @@ struct SearchAndRedactSheet: View {
     /// chrome (hit area unchanged, visual back to circle scale; hit
     /// expansion beyond the layout frame is banned).
     /// Interaction states live on `CircularIconButtonStyle`.
-    static func circularIconLabel(_ systemName: String) -> some View {
+    static func circularIconLabel(
+        _ systemName: String,
+        diameter: CGFloat = CircularIconButtonStyle.diameter,
+        glyphPointSize: CGFloat = CircularIconButtonStyle.glyphPointSize
+    ) -> some View {
         Image(systemName: systemName)
-            .font(.system(size: CircularIconButtonStyle.glyphPointSize))
+            .font(.system(size: glyphPointSize))
             .foregroundStyle(.tint)
-            .frame(
-                width: CircularIconButtonStyle.diameter,
-                height: CircularIconButtonStyle.diameter
-            )
+            .frame(width: diameter, height: diameter)
             .background(CircularIconButtonStyle.wash, in: Circle())
             .frame(
                 width: ResectaTokens.TouchTarget.minimum,
@@ -959,49 +960,66 @@ struct SearchAndRedactSheet: View {
     /// untouched (`UIFixChromeUITests` measures it) and the counter
     /// always renders at this site.
     private var resultNavigationControls: some View {
-        resultNavCluster(hidesCounterAtLargeTypeSizes: false)
+        resultNavCluster(site: .searchBar)
     }
 
     /// The ONE result-nav cluster — the ‹ › pair plus the k/N counter
     /// — mounted at BOTH sites (the medium+ search bar's trailing edge
-    /// via `resultNavigationControls`, and the compact handle's
-    /// trailing edge in `compactFloatStrip`). The sites are never
-    /// co-mounted, so the ids / labels / ⌘G shortcuts stay unique in
-    /// the live tree. A chevron tap steps the current result AND parks
-    /// the sheet at the compact float (the row-tap idiom); ⌘G / ⇧⌘G
+    /// via `resultNavigationControls`, and the parked strip in
+    /// `+CompactStrip.swift`). The sites are never co-mounted, so the
+    /// ids / labels / ⌘G shortcuts stay unique in the live tree. A
+    /// chevron tap steps the current result AND parks the sheet at the
+    /// compact float through the one walk seam (`focusWalk`); ⌘G / ⇧⌘G
     /// ride these same Buttons, so the shortcut ≡ the chevron by
     /// construction (J/K keep the medium semantics —
-    /// `SearchResultsSection`). `hidesCounterAtLargeTypeSizes` applies
-    /// to the compact handle only: the counter hides from XXXL up
-    /// (measured — see `compactFloatStrip`).
-    func resultNavCluster(hidesCounterAtLargeTypeSizes: Bool) -> some View {
+    /// `SearchResultsSection`). The `site` decides the geometry only
+    /// (`ResultNavSite`): the search bar keeps its pinned Ø44-in-46,
+    /// spacing 6, caption counter; the parked strip draws full-size
+    /// controls and hides the counter from XXXL up (measured).
+    func resultNavCluster(site: ResultNavSite) -> some View {
         HStack(spacing: ResectaTokens.Spacing.xs) {
-            HStack(spacing: 6) {
-                Button {
-                    searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
-                    focusWalk(on: searchState.currentResult?.id, parking: true)
-                } label: {
-                    Self.circularIconLabel("chevron.up")
-                }
-                .accessibilityLabel("Previous result")
-                .accessibilityIdentifier("resultNavPrevious")
-                .keyboardShortcut("g", modifiers: [.command, .shift])
+            HStack(spacing: site.pairSpacing) {
+                resultNavButton(.previous, site: site)
+                resultNavButton(.next, site: site)
+            }
+            if !(site == .parked && dynamicTypeSize >= .xxxLarge) {
+                resultNavCounter(site: site)
+            }
+        }
+    }
 
-                Button {
-                    searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
-                    focusWalk(on: searchState.currentResult?.id, parking: true)
-                } label: {
-                    Self.circularIconLabel("chevron.down")
-                }
-                .accessibilityLabel("Next result")
-                .accessibilityIdentifier("resultNavNext")
-                .keyboardShortcut("g", modifiers: .command)
+    enum ResultNavDirection { case previous, next }
+
+    /// One chevron of the pair — the step, then the seam; the ids,
+    /// labels and shortcuts ride here for both sites and both
+    /// compositions.
+    @ViewBuilder
+    func resultNavButton(_ direction: ResultNavDirection, site: ResultNavSite) -> some View {
+        switch direction {
+        case .previous:
+            Button {
+                searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
+                focusWalk(on: searchState.currentResult?.id, parking: true)
+            } label: {
+                Self.circularIconLabel(
+                    "chevron.up", diameter: site.diameter, glyphPointSize: site.glyphPointSize)
             }
             .buttonStyle(.circularIcon)
-
-            if !(hidesCounterAtLargeTypeSizes && dynamicTypeSize >= .xxxLarge) {
-                resultNavCounter
+            .accessibilityLabel("Previous result")
+            .accessibilityIdentifier("resultNavPrevious")
+            .keyboardShortcut("g", modifiers: [.command, .shift])
+        case .next:
+            Button {
+                searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
+                focusWalk(on: searchState.currentResult?.id, parking: true)
+            } label: {
+                Self.circularIconLabel(
+                    "chevron.down", diameter: site.diameter, glyphPointSize: site.glyphPointSize)
             }
+            .buttonStyle(.circularIcon)
+            .accessibilityLabel("Next result")
+            .accessibilityIdentifier("resultNavNext")
+            .keyboardShortcut("g", modifiers: .command)
         }
     }
 
@@ -1010,26 +1028,27 @@ struct SearchAndRedactSheet: View {
     /// is shown. When a filter is active the counter shows the
     /// position within the visible filtered set; an en dash (–)
     /// signals that the current result is hidden by the filter.
-    /// Rendered by `resultNavCluster` at both sites — the strings
-    /// and a11y labels are unchanged from the prior implementation.
+    /// Rendered at both sites — the strings and a11y labels are
+    /// unchanged; only the font follows the site (caption at the
+    /// search bar, subheadline on the parked strip).
     @ViewBuilder
-    private var resultNavCounter: some View {
+    func resultNavCounter(site: ResultNavSite) -> some View {
         if let idx = searchState.currentResultIndex {
             if searchState.filteredCount == searchState.totalCount {
                 Text("\(idx + 1)/\(searchState.totalCount)")
-                    .font(.caption)
+                    .font(site.counterFont)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("Result \(idx + 1) of \(searchState.totalCount)")
             } else if let filteredPos = searchState.currentResultFilteredPosition {
                 Text("\(filteredPos)/\(searchState.filteredCount)")
-                    .font(.caption)
+                    .font(site.counterFont)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("Result \(filteredPos) of \(searchState.filteredCount), \(searchState.totalCount - searchState.filteredCount) filtered")
             } else {
                 Text("–/\(searchState.filteredCount)")
-                    .font(.caption)
+                    .font(site.counterFont)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("Current result hidden by filters, \(searchState.filteredCount) of \(searchState.totalCount) shown")

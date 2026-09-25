@@ -59,6 +59,8 @@ struct TouchTargetFloorTests {
             // The compact handle's per-item
             // Apply — its builder split out under the M-6 hub cap.
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift",
+            // The parked strip's row floor.
+            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactStrip.swift",
             "Sources/ResectaApp/Views/Search/SearchSheetHeaderSection.swift",
             "Sources/ResectaApp/Views/Search/SearchFooterSection.swift",
             "Sources/ResectaApp/Overlay/RedactionOverlayView.swift",
@@ -144,8 +146,8 @@ struct TouchTargetFloorTests {
         let source = try loadRepoFile(
             "Sources/ResectaApp/Views/Search/SearchFooterSection.swift"
         )
-        #expect(source.contains("ResectaTokens.BrandTeal.tint, in: Capsule()"),
-                "the prominent Select All must draw the ruled BrandTeal capsule")
+        #expect(source.contains("ResectaTokens.BrandTeal.fill, in: Capsule()"),
+                "the prominent Select All must draw the ruled BrandTeal capsule (the filled-capsule tier)")
         #expect(source.contains(".buttonStyle(.capsulePress)"),
                 "the prominent Select All must carry the custom pressed state")
         #expect(!source.contains(".buttonStyle(.borderedProminent)"),
