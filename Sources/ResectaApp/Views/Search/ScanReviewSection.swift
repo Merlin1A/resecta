@@ -33,13 +33,11 @@ struct ScanReviewSection: View {
     /// single `activeModal` slot (the same `ReverseRationalePopover`
     /// search rows open from their context menu).
     let onRequestWhy: (ReverseRationaleRequest) -> Void
-    /// Row-body tap navigates the canvas to the
-    /// finding's page — the search rows' shipped idiom (page write +
-    /// compact drop live on the hub, which owns the detent). Carries
-    /// the detection's `normalizedRect`
-    /// (0–1, bottom-left — the `DetectionResult` convention) so the hub
-    /// can frame it.
-    let onNavigateToFinding: (Int, CGRect) -> Void
+    /// Row-body tap focuses the review walk on the row's detection id
+    /// through the hub's one walk seam (`focusWalk(onReview:)`,
+    /// `+Walk.swift`: the cursor write, the page write, the centred
+    /// framing, the compact drop) — the search rows' shipped idiom.
+    let onNavigateToFinding: (UUID) -> Void
 
     @State private var viewMode: ReviewViewMode = .byPage
     // Cached kind counts + filtered list so the
@@ -207,7 +205,7 @@ struct ScanReviewSection: View {
         // button are Buttons, so they keep winning their own hit
         // regions; the rest of the row navigates.
         .contentShape(Rectangle())
-        .onTapGesture { onNavigateToFinding(page, detection.normalizedRect) }
+        .onTapGesture { onNavigateToFinding(detection.id) }
         // The family row's `.ignore` merge hides the trailing
         // detector-evaluation button
         // from VoiceOver (the retired triage row's `.combine` surfaced

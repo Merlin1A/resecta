@@ -156,6 +156,9 @@ struct SearchAndRedactSheet: View {
     /// Select All can target the VISIBLE (kind-filtered) findings —
     /// mirroring the search footer's filtered-only semantics.
     @State private var reviewFilterKind: DetectionResult.Kind? = nil
+    /// The review-origin walk's cursor (`ReviewWalk`); read and written
+    /// through `liveReviewWalk` / `stepWalk` (`+Walk.swift`).
+    @State var reviewWalk = ReviewWalk()
 
     // MARK: - Absorbed review (detection findings)
 
@@ -217,15 +220,9 @@ struct SearchAndRedactSheet: View {
                         onRequestWhy: { request in
                             activeModal = .rationale(request)
                         },
-                        // Review rows navigate the canvas through the
-                        // one walk seam's canvas half (`+Walk.swift`):
-                        // the page write, the centred readability
-                        // framing, the compact drop. The detection's
-                        // rect rides along until the review walk gives
-                        // the row an id.
-                        onNavigateToFinding: { page, normalizedRect in
-                            focusWalk(onPage: page, normalizedRect: normalizedRect, parking: true)
-                        }
+                        // A review row tap focuses the review walk on
+                        // its id through the one walk seam (`+Walk.swift`).
+                        onNavigateToFinding: focusWalk(onReview:)
                     )
                     .safeAreaInset(edge: .top, spacing: 0) {
                         sheetHeaderChrome
@@ -939,11 +936,12 @@ struct SearchAndRedactSheet: View {
 
     // MARK: - Result Navigation
 
-    /// The ‹ k/N › cluster renders at EITHER site only while the walk is
+    /// The ‹ k/N › cluster renders at EITHER site only while a walk is
     /// live — the ONE published predicate (`SearchState.isWalkLive`,
     /// which the editor's page-bar hide reads through
-    /// `RedactionState.walkLive`). The compact handle's per-item Apply
-    /// rides the same gate.
+    /// `RedactionState.walkLive`): search results on board, or the
+    /// staged detection review owning the Scan interface (the review
+    /// walk). The compact handle's per-item Apply / Select rides it.
     var showsResultNavCluster: Bool {
         searchState.isWalkLive(reviewPending: redactionState.pendingTriage != nil)
     }
@@ -998,8 +996,7 @@ struct SearchAndRedactSheet: View {
         switch direction {
         case .previous:
             Button {
-                searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
-                focusWalk(on: searchState.currentResult?.id, parking: true)
+                stepWalk(.previous)
             } label: {
                 Self.circularIconLabel(
                     "chevron.up", diameter: site.diameter, glyphPointSize: site.glyphPointSize)
@@ -1010,8 +1007,7 @@ struct SearchAndRedactSheet: View {
             .keyboardShortcut("g", modifiers: [.command, .shift])
         case .next:
             Button {
-                searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
-                focusWalk(on: searchState.currentResult?.id, parking: true)
+                stepWalk(.next)
             } label: {
                 Self.circularIconLabel(
                     "chevron.down", diameter: site.diameter, glyphPointSize: site.glyphPointSize)
@@ -1030,10 +1026,13 @@ struct SearchAndRedactSheet: View {
     /// signals that the current result is hidden by the filter.
     /// Rendered at both sites — the strings and a11y labels are
     /// unchanged; only the font follows the site (caption at the
-    /// search bar, subheadline on the parked strip).
+    /// search bar, subheadline on the parked strip). The review walk's
+    /// counter (`reviewWalkCounter`) takes the slot on the review origin.
     @ViewBuilder
     func resultNavCounter(site: ResultNavSite) -> some View {
-        if let idx = searchState.currentResultIndex {
+        if isReviewActive {
+            reviewWalkCounter(site: site)
+        } else if let idx = searchState.currentResultIndex {
             if searchState.filteredCount == searchState.totalCount {
                 Text("\(idx + 1)/\(searchState.totalCount)")
                     .font(site.counterFont)
