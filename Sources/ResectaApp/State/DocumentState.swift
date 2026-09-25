@@ -123,7 +123,19 @@ class DocumentState {
         /// rect scroll; `.readability` = the consumer normalizes the
         /// scale to `PDFDocumentView.readabilityTargetScale` first.
         let zoom: CanvasZoomIntent
+        /// Where the rect lands in the viewport: `.visible` = PDFKit's
+        /// minimal scroll (the rect merely comes into view); `.center`
+        /// = the result walk's framing, the rect centred in the visible
+        /// canvas at the readability scale (`.readability` only).
+        let anchor: CanvasScrollAnchor
         let token: UUID
+    }
+
+    /// The viewport anchor for a canvas scroll request. Every existing
+    /// writer keeps `.visible` by default; the walk passes `.center`.
+    enum CanvasScrollAnchor: Equatable {
+        case visible
+        case center
     }
 
     /// What a canvas scroll request
@@ -143,12 +155,14 @@ class DocumentState {
     func requestCanvasScroll(
         toPageIndex pageIndex: Int,
         normalizedRect: CGRect,
-        zoom: CanvasZoomIntent = .none
+        zoom: CanvasZoomIntent = .none,
+        anchor: CanvasScrollAnchor = .visible
     ) {
         pendingCanvasScrollTarget = CanvasScrollTarget(
             pageIndex: pageIndex,
             normalizedRect: normalizedRect,
             zoom: zoom,
+            anchor: anchor,
             token: UUID()
         )
     }

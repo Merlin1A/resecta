@@ -417,13 +417,15 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
         row.tap()
 
-        // A row tap drops the sheet to the compact handle, which now
-        // carries the title AND the trailing ‹ k/N › cluster so the
-        // walk continues while the sheet is parked. The strip + title
-        // prove the drop landed; the cluster's presence + hittability
-        // at compact was pinned ABSENT under the earlier title-only
-        // contract; the no-selection-toggle proof is asserted at
-        // medium after a grabber re-expand, one detent later.
+        // A row tap drops the sheet to the compact handle, which
+        // carries the walk's match line AND the trailing ‹ k/N ›
+        // cluster so the walk continues while the sheet is parked (the
+        // interface title yields to the match line while a walk is
+        // live). The strip + the line prove the drop landed; the
+        // cluster's presence + hittability at compact was pinned
+        // ABSENT under the earlier title-only contract; the
+        // no-selection-toggle proof is asserted at medium after a
+        // grabber re-expand, one detent later.
         let strip = app.descendants(matching: .any)
             .matching(identifier: "compactFloatStrip").firstMatch
         XCTAssertTrue(
@@ -431,8 +433,9 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Row tap did not drop the sheet to the compact float."
         )
         XCTAssertTrue(
-            app.staticTexts["Search"].waitForExistence(timeout: 5),
-            "Compact handle is missing its interface title."
+            app.descendants(matching: .any).matching(identifier: "walkMatchLine").firstMatch
+                .waitForExistence(timeout: 5),
+            "Compact handle is missing the walk's match line."
         )
         let compactNext = app.buttons["Next result"]
         XCTAssertTrue(
@@ -496,9 +499,14 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
     /// the walk going; the counter survives the grabber re-expand.
     /// AX-text assertions only — the on-page ring is pixel-only
     /// (region overlays are not served through AX). Deterministic
-    /// launch: the multipage fixture with a seeded "Amount" query
-    /// (151 hits) at the medium detent (an arrival raise may lift it
-    /// to large — either is a valid start for the first tap).
+    /// launch: the multipage fixture with a seeded "Amount" query at
+    /// the medium detent (an arrival raise may lift it to large —
+    /// either is a valid start for the first tap). Count-agnostic on
+    /// purpose, like the per-item Apply leg: the fixture carries 28
+    /// "Amount" rows on each of its 23 pages (644), and the 151 this
+    /// leg once pinned was the partial count of a hook-triggered run
+    /// that the debounce re-trigger cancelled mid-flight (REV-09); the
+    /// premise is "results landed, the walk steps 1 → 2", never N.
     func testResultNavChevron_parksAtCompactAndClusterKeepsStepping() {
         app.launchArguments = [
             "--uitesting", "--loadTestDocument", "--multipageDoc",
@@ -511,9 +519,12 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             next.waitForExistence(timeout: 30),
             "Next-result chevron never appeared — the seeded query returned nothing or the sheet never presented."
         )
+        let footerCount = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@ AND label ENDSWITH %@", "0 of ", " selected")
+        ).firstMatch
         XCTAssertTrue(
-            app.staticTexts["0 of 151 selected"].waitForExistence(timeout: 15),
-            "Seeded search did not return the fixture's 151 \"Amount\" hits."
+            footerCount.waitForExistence(timeout: 20),
+            "The multipage fixture's 'Amount' query landed no results (no '0 of N selected' footer)."
         )
         XCTAssertTrue(next.isHittable, "Next-result chevron exists but is not hittable before the first step.")
         next.tap()
@@ -524,9 +535,12 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             strip.waitForExistence(timeout: 10),
             "The first chevron tap did not park the sheet at the compact float."
         )
+        let resultOne = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Result 1 of ")
+        ).firstMatch
         XCTAssertTrue(
-            app.staticTexts["Result 1 of 151"].waitForExistence(timeout: 10),
-            "Counter did not read 1/151 after the first step."
+            resultOne.waitForExistence(timeout: 10),
+            "Counter did not read 1/N after the first step."
         )
         let compactNext = app.buttons["resultNavNext"]
         XCTAssertTrue(
@@ -534,9 +548,12 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             "Next-result chevron is not hittable on the compact handle — the cluster is missing."
         )
         compactNext.tap()
+        let resultTwo = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Result 2 of ")
+        ).firstMatch
         XCTAssertTrue(
-            app.staticTexts["Result 2 of 151"].waitForExistence(timeout: 10),
-            "The compact handle's chevron did not step the walk (counter never read 2/151)."
+            resultTwo.waitForExistence(timeout: 10),
+            "The compact handle's chevron did not step the walk (counter never read 2/N)."
         )
         XCTAssertTrue(
             strip.exists,
@@ -545,8 +562,8 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
 
         expandCompactStripToMedium()
         XCTAssertTrue(
-            app.staticTexts["Result 2 of 151"].waitForExistence(timeout: 10),
-            "Walk position lost across the compact → medium expand — the counter no longer reads 2/151."
+            resultTwo.waitForExistence(timeout: 10),
+            "Walk position lost across the compact → medium expand — the counter no longer reads 2/N."
         )
         attachScreenshot(named: "uxc44-result-walk")
     }
@@ -560,8 +577,10 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
     /// fixture and recipe: absent at medium, present and hittable
     /// once the walk parks the sheet; the tap disables it (applied)
     /// and the page bar's region count for the current page steps to
-    /// one; the editor toolbar's Undo removes the region and
-    /// re-enables the button. Run isolated on a quiet host.
+    /// one (read with the sheet expanded — the bar steps aside while
+    /// the walk is live at the compact float); the editor toolbar's
+    /// Undo removes the region and re-enables the button. Run isolated
+    /// on a quiet host.
     func testCompactHandle_applyMarksCurrentMatchAndUndoReEnables() {
         app.launchArguments = [
             "--uitesting", "--loadTestDocument", "--multipageDoc",
@@ -589,6 +608,10 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             apply.exists,
             "The per-item Apply is compact-only chrome — it must not render at the medium detent."
         )
+        XCTAssertFalse(
+            app.staticTexts["1 region"].exists,
+            "The current page already carries a region — the fixture premise (no regions on arrival) no longer holds."
+        )
 
         // The first step parks the sheet: the handle's Apply pops up
         // with the cluster, live for result 1.
@@ -612,18 +635,10 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
         XCTAssertTrue(apply.isHittable, "The per-item Apply exists but is not hittable on the compact handle.")
         XCTAssertTrue(apply.isEnabled, "The per-item Apply must be enabled for an un-applied current result.")
-        XCTAssertFalse(
-            app.staticTexts["1 region"].exists,
-            "The current page already carries a region — the fixture premise (no regions on arrival) no longer holds."
-        )
 
         // Tap: one region on the current page, the button reads applied,
         // the walk position is untouched (apply and stay put).
         apply.tap()
-        XCTAssertTrue(
-            app.staticTexts["1 region"].waitForExistence(timeout: 10),
-            "The page bar did not report the applied region — the per-item Apply created nothing on the current page."
-        )
         XCTAssertTrue(
             waitUntil(timeout: 5) { !apply.isEnabled },
             "The per-item Apply stayed enabled after applying the current result."
@@ -632,6 +647,18 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             resultOne.exists,
             "The apply moved the walk — apply-and-stay-put means the current result must not change."
         )
+        // The page bar steps aside while the walk is live at the compact
+        // float, so its region count is read with the sheet expanded to
+        // medium (the bar returns behind the sheet and stays in the
+        // served tree); the canvas overlay's own region elements are not
+        // served. The sheet is parked again for the toolbar Undo, which
+        // is hittable only beneath the compact float.
+        expandCompactStripToMedium()
+        XCTAssertTrue(
+            app.staticTexts["1 region"].waitForExistence(timeout: 10),
+            "The page bar did not report the applied region — the per-item Apply created nothing on the current page."
+        )
+        collapseSheetToCompactFloat()
 
         // The editor toolbar's Undo takes the region back and the
         // button re-enables — the undo-integration proof.
@@ -640,14 +667,27 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         XCTAssertTrue(undo.isHittable, "The editor toolbar's Undo is not hittable beneath the parked sheet.")
         undo.tap()
         XCTAssertTrue(
-            waitUntil(timeout: 10) { !app.staticTexts["1 region"].exists },
-            "Undo did not remove the applied region — the page bar still reports it."
-        )
-        XCTAssertTrue(
             waitUntil(timeout: 5) { apply.isEnabled },
             "The per-item Apply did not re-enable after Undo removed its region."
         )
+        expandCompactStripToMedium()
+        XCTAssertTrue(
+            waitUntil(timeout: 10) { !app.staticTexts["1 region"].exists },
+            "Undo did not remove the applied region — the page bar still reports it."
+        )
         attachScreenshot(named: "uxc51-compact-apply-undo")
+    }
+
+    /// Step the sheet from the medium detent back down to the compact
+    /// float — the cooperative content-at-top down-drag inside the
+    /// results list (the idiom the down-drag chain legs pin).
+    private func collapseSheetToCompactFloat() {
+        let strip = app.descendants(matching: .any).matching(identifier: "compactFloatStrip").firstMatch
+        for _ in 0..<3 {
+            dragInList(searchResultsList, from: 0.2, to: 0.7)
+            if strip.waitForExistence(timeout: 3) { return }
+        }
+        XCTFail("The in-list down-drag did not park the sheet back at the compact float.")
     }
 
     /// Poll a condition for up to `timeout` seconds — AX state such as

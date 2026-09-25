@@ -16,6 +16,7 @@ struct DocumentEditorView: View {
     @Environment(PipelineCoordinator.self) private var coordinator
     @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.undoManager) private var undoManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(ToastQueueManager.self) private var toastManager
@@ -385,7 +386,7 @@ struct DocumentEditorView: View {
                                 .padding(.horizontal, ResectaTokens.Spacing.md)
                                 .padding(.vertical, ResectaTokens.Spacing.xs)
                                 .background(.regularMaterial, in: Capsule())
-                                .padding(.bottom, ResectaTokens.Spacing.lg)
+                                .padding(.bottom, ResectaTokens.Spacing.lg + parkedChromeLayout.hintCapsuleLift)
                                 .accessibilityElement(children: .contain)
                                 .accessibilityLabel(
                                     DocumentEditorView.captionAccessibilityLabel(
@@ -1212,47 +1213,48 @@ struct DocumentEditorView: View {
         }
     }
 
-    /// Page navigation bar on iPhone only (editing
-    /// phase). While the search sheet floats at
-    /// the compact detent, extra bottom padding lifts the bar clear of
-    /// the compact strip — every control up through compact already
-    /// reaches the canvas via the existing background-interaction
-    /// grant, so only this geometry needs to change.
+    /// Page navigation bar on iPhone only (editing phase) — or the bare
+    /// parked-canvas inset when the bar steps aside (a live result walk
+    /// at the compact float) or never mounts (single-page documents).
+    /// ONE model decides the branch and the inset (`ParkedChromeLayout`);
+    /// each branch writes the toast clearance from the same value on
+    /// appearance, because the bar coming or going IS the event both
+    /// toast hosts wait on (the sheet writes it on its detent changes).
     @ViewBuilder
     private var pageNavigationBarInset: some View {
-        if horizontalSizeClass == .compact,
-           documentState.pageCount > 1,
-           documentState.phaseKind == .editing {
-            let inset = Self.pageBarCompactInset(
-                sheetPresented: redactionState.activeSearch != nil,
-                detent: searchSheetDetent
-            )
-            PageNavigationBar()
-                .padding(.bottom, inset)
-                .animation(
-                    ResectaTokens.Anim.resolved(
-                        ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion),
-                    value: inset
-                )
-        } else {
-            // The unified inset. With no
-            // page bar (single-page docs) the same safe-area slot still
-            // shrinks the canvas by the compact strip's hug while the
-            // sheet is parked, so zoomed content structurally cannot
-            // sit under the float — single-page docs re-centre up like
-            // multi-page docs already do.
-            let inset = Self.compactParkedCanvasInset(
-                sheetPresented: redactionState.activeSearch != nil,
-                detent: searchSheetDetent
-            )
-            Color.clear
-                .frame(height: inset)
-                .animation(
-                    ResectaTokens.Anim.resolved(
-                        ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion),
-                    value: inset
-                )
+        let layout = parkedChromeLayout
+        Group {
+            if layout.showsPageBar {
+                PageNavigationBar()
+                    .padding(.bottom, layout.canvasBottomInset)
+                    .onAppear { toastManager.bottomClearance = layout.toastClearance }
+            } else {
+                Color.clear
+                    .frame(height: layout.canvasBottomInset)
+                    .onAppear { toastManager.bottomClearance = layout.toastClearance }
+            }
         }
+        .animation(
+            ResectaTokens.Anim.resolved(
+                ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion),
+            value: layout.canvasBottomInset
+        )
+    }
+
+    /// The bottom-chrome model for this editor's current state: the
+    /// sheet slot, the detent binding, the published walk liveness, the
+    /// document's page count and phase, the size class, and the hug the
+    /// detent reports for the current type size.
+    private var parkedChromeLayout: ParkedChromeLayout {
+        ParkedChromeLayout(
+            sheetPresented: redactionState.activeSearch != nil,
+            detent: searchSheetDetent,
+            walkLive: redactionState.walkLive,
+            pageCount: documentState.pageCount,
+            sizeClass: horizontalSizeClass,
+            phase: documentState.phaseKind,
+            hugHeight: CompactFloatDetent.hug(for: dynamicTypeSize)
+        )
     }
 
     private var deleteButtonLabel: String {
@@ -1296,33 +1298,6 @@ struct DocumentEditorView: View {
     /// title alone carries the count.
     static func batchDeleteDialogTitle(regionCount: Int) -> String {
         regionCount == 1 ? "Delete 1 region?" : "Delete \(regionCount) regions?"
-    }
-
-    // MARK: - Pager compact-float inset
-
-    /// Bottom padding for the page nav bar while the search sheet floats
-    /// at the compact detent — clears the compact strip
-    /// (`CompactFloatDetent.hugHeight`) instead of sitting underneath
-    /// it. Zero whenever the sheet isn't presented or sits at a taller
-    /// detent.
-    static func pageBarCompactInset(
-        sheetPresented: Bool,
-        detent: PresentationDetent
-    ) -> CGFloat {
-        guard sheetPresented, detent == .compactFloat else { return 0 }
-        return CompactFloatDetent.hugHeight
-    }
-
-    /// Bottom inset for the canvas when
-    /// NO page bar mounts — the same geometry as `pageBarCompactInset`
-    /// (reads `CompactFloatDetent.hugHeight` symbolically, so a strip
-    /// height change propagates), zero unless the sheet is parked at
-    /// the compact float.
-    static func compactParkedCanvasInset(
-        sheetPresented: Bool,
-        detent: PresentationDetent
-    ) -> CGFloat {
-        pageBarCompactInset(sheetPresented: sheetPresented, detent: detent)
     }
 
     // MARK: - Drawing-mode caption helpers

@@ -73,8 +73,13 @@ struct SearchAndRedactSheet: View {
     /// Measured on-sim: the compact handle hides the result counter
     /// from the XXXL Dynamic Type size up and lays the row out as a
     /// plain HStack at accessibility sizes so the title never
-    /// collides with the trailing cluster.
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// collides with the trailing cluster. Read by the `+CompactApply`
+    /// extension too (the hug for the toast clearance).
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
+    /// The bottom-chrome model reads the size class beside the editor's
+    /// own read (`ParkedChromeLayout`); the toast clearance is derived
+    /// from it here on detent changes.
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @State var searchDebounceTask: Task<Void, Never>?
     // The prior `applyResultMessage`
     // state field drove an `.alert("Redaction Applied", ...)` that blocked
@@ -212,23 +217,14 @@ struct SearchAndRedactSheet: View {
                         onRequestWhy: { request in
                             activeModal = .rationale(request)
                         },
-                        // Review rows navigate the canvas with the
-                        // search rows' shipped idiom — page write plus
-                        // compact drop (the canvas stays interactive
-                        // behind the compact float). The detection's
-                        // rect rides along so the row tap frames the
-                        // detection like a search-row tap; the review
-                        // chevron walk is unchanged.
+                        // Review rows navigate the canvas through the
+                        // one walk seam's canvas half (`+Walk.swift`):
+                        // the page write, the centred readability
+                        // framing, the compact drop. The detection's
+                        // rect rides along until the review walk gives
+                        // the row an id.
                         onNavigateToFinding: { page, normalizedRect in
-                            documentState.currentPageIndex = page
-                            documentState.requestCanvasScroll(
-                                toPageIndex: page,
-                                normalizedRect: normalizedRect,
-                                zoom: .readability
-                            )
-                            if selectedDetent != .compactFloat {
-                                selectedDetent = .compactFloat
-                            }
+                            focusWalk(onPage: page, normalizedRect: normalizedRect, parking: true)
                         }
                     )
                     .safeAreaInset(edge: .top, spacing: 0) {
@@ -265,7 +261,7 @@ struct SearchAndRedactSheet: View {
                         onShowSavedSearches: {
                             activeModal = .savedSearches
                         },
-                        onNavigateToCurrentResult: navigateToCurrentResult(dropToCompact:)
+                        onFocusWalk: focusWalk(on:parking:)
                     )
                     .safeAreaInset(edge: .top, spacing: 0) {
                         // The Search interface's whole fixed chrome
@@ -506,7 +502,8 @@ struct SearchAndRedactSheet: View {
             #endif
         }
         .onDisappear {
-            toastManager.bottomClearance = 0 // Nothing to clear at this detent
+            // The app-level host clears the page bar alone from here.
+            toastManager.bottomClearance = toastBottomClearance(sheetPresented: false)
             // Cancel the in-flight debounce task on sheet
             // dismissal. Without this, a search debounce sleep that was
             // started just before `.onDisappear` fires would still resolve
@@ -643,8 +640,8 @@ struct SearchAndRedactSheet: View {
             if newDetent == .compactFloat {
                 isSearchFieldFocused = false
             }
-            // ContentView's toast host clears the parked float.
-            toastManager.bottomClearance = Self.toastBottomClearance(for: newDetent)
+            // Both toast hosts clear the parked float + the page bar.
+            toastManager.bottomClearance = toastBottomClearance(sheetPresented: true)
         }
         // Observed on-sim: the app's single toast host
         // lives on ContentView, which renders BEHIND this presented
@@ -656,9 +653,10 @@ struct SearchAndRedactSheet: View {
         // render in the presented layer. ContentView's copy stays —
         // it is covered while the sheet is up and takes over if the
         // toast outlives the sheet (e.g. a dismissal toast) — and at
-        // the compact float, where this host yields (the 80-pt float
+        // the compact float, where this host yields (the parked strip
         // has no room, and the uncovered ContentView copy lifts by
-        // `bottomClearance` to clear it).
+        // `bottomClearance` to clear it). Both hosts read the one
+        // clearance (`ParkedChromeLayout.toastClearance`).
         .overlay(alignment: .bottom) {
             if selectedDetent != .compactFloat {
             VStack(spacing: ResectaTokens.Spacing.sm) {
@@ -675,7 +673,7 @@ struct SearchAndRedactSheet: View {
                         .onTapGesture { toastManager.dismiss(item) }
                 }
             }
-            .padding(.bottom, ResectaTokens.Spacing.xl)
+            .padding(.bottom, ResectaTokens.Spacing.xl + toastManager.bottomClearance)
             .animation(
                 ResectaTokens.Anim.resolved(ResectaTokens.Anim.toastIn, reduceMotion: reduceMotion),
                 value: toastManager.toastVersion
@@ -688,68 +686,9 @@ struct SearchAndRedactSheet: View {
         .shieldedSheetContent(monitor: captureMonitor)
     }
 
-    // MARK: - compactFloat Strip
-
-    /// The compact detent's WHOLE composition: one row — per-item Apply
-    /// leading, centred interface title, result-nav cluster (‹ › + k/N)
-    /// trailing. Compact is a glanceable handle — title + cluster +
-    /// per-item Apply; every OTHER control lives at medium+; the canvas
-    /// owns interaction below the sheet. The cluster is the medium+
-    /// search bar's builder (`resultNavCluster`; never co-mounted, ids
-    /// unique); cluster and Apply render only with results and no
-    /// review pending (`showsResultNavCluster`). The counter hides from
-    /// XXXL up; at accessibility sizes the row is a plain HStack
-    /// (Apply · title · chevrons) so the headline never collides.
-    /// Identifier kept for the detent-layout pins; `children: .contain`
-    /// keeps the inner ids. The Apply's contract: `+CompactApply.swift`.
-    private var compactFloatStrip: some View {
-        VStack(spacing: 0) {
-            Group {
-                if dynamicTypeSize.isAccessibilitySize {
-                    HStack(spacing: ResectaTokens.Spacing.sm) {
-                        if showsResultNavCluster {
-                            applyCurrentResultButton
-                        }
-                        Spacer(minLength: 0)
-                        compactStripTitle
-                        Spacer(minLength: 0)
-                        if showsResultNavCluster {
-                            resultNavCluster(hidesCounterAtLargeTypeSizes: true)
-                                .padding(.trailing, ResectaTokens.Spacing.md)
-                        }
-                    }
-                } else {
-                    // Overlays: title centred full-width, Apply leading, cluster trailing.
-                    ZStack {
-                        compactStripTitle
-                            .frame(maxWidth: .infinity)
-                        if showsResultNavCluster {
-                            applyCurrentResultButton
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            resultNavCluster(hidesCounterAtLargeTypeSizes: true)
-                                .padding(.trailing, ResectaTokens.Spacing.md)
-                                .frame(maxWidth: .infinity, alignment: .trailing)
-                        }
-                    }
-                }
-            }
-            // The row is always the 46-pt layout height of its controls
-            // so the title sits on the same line whether or not the
-            // cluster and the Apply render (no jump between results /
-            // no results / review; measured on-sim).
-            .frame(minHeight: ResectaTokens.TouchTarget.minimum)
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("compactFloatStrip")
-    }
-
-    /// The compact handle's title — the centred headline, unchanged.
-    private var compactStripTitle: some View {
-        Text(searchState.searchModeType.interface.displayName)
-            .font(.headline)
-            .lineLimit(1)
-    }
+    // The compact detent's composition (`compactFloatStrip`, the title,
+    // the walk's match line) lives in `Search/SearchAndRedactSheet+CompactStrip.swift`
+    // (the M-6 hub cap).
 
     // MARK: - Search Bar
 
@@ -890,14 +829,15 @@ struct SearchAndRedactSheet: View {
     /// chrome (hit area unchanged, visual back to circle scale; hit
     /// expansion beyond the layout frame is banned).
     /// Interaction states live on `CircularIconButtonStyle`.
-    static func circularIconLabel(_ systemName: String) -> some View {
+    static func circularIconLabel(
+        _ systemName: String,
+        diameter: CGFloat = CircularIconButtonStyle.diameter,
+        glyphPointSize: CGFloat = CircularIconButtonStyle.glyphPointSize
+    ) -> some View {
         Image(systemName: systemName)
-            .font(.system(size: CircularIconButtonStyle.glyphPointSize))
+            .font(.system(size: glyphPointSize))
             .foregroundStyle(.tint)
-            .frame(
-                width: CircularIconButtonStyle.diameter,
-                height: CircularIconButtonStyle.diameter
-            )
+            .frame(width: diameter, height: diameter)
             .background(CircularIconButtonStyle.wash, in: Circle())
             .frame(
                 width: ResectaTokens.TouchTarget.minimum,
@@ -999,13 +939,13 @@ struct SearchAndRedactSheet: View {
 
     // MARK: - Result Navigation
 
-    /// The ‹ k/N › cluster renders at EITHER site only with search
-    /// results on board and no pipeline review pending — stale
-    /// sheet-scan results must not show a walk over a detections list,
-    /// which has no "current". The compact handle's per-item Apply
+    /// The ‹ k/N › cluster renders at EITHER site only while the walk is
+    /// live — the ONE published predicate (`SearchState.isWalkLive`,
+    /// which the editor's page-bar hide reads through
+    /// `RedactionState.walkLive`). The compact handle's per-item Apply
     /// rides the same gate.
-    private var showsResultNavCluster: Bool {
-        !searchState.results.isEmpty && !isReviewActive
+    var showsResultNavCluster: Bool {
+        searchState.isWalkLive(reviewPending: redactionState.pendingTriage != nil)
     }
 
     /// The medium+ search-bar site of the ‹ k/N › cluster. Geometry
@@ -1013,56 +953,73 @@ struct SearchAndRedactSheet: View {
     /// shortcuts; each chevron is the ruled Ø44 drawn circle inside the
     /// 46pt layout floor, pair spacing 2 → 6 (≈8pt visual gap between
     /// the drawn circles). A later change to the pair's BEHAVIOUR (a
-    /// tap parks the sheet at the compact float —
-    /// `navigateToCurrentResult(dropToCompact:)`) re-homed the
+    /// tap parks the sheet at the compact float — the walk seam
+    /// `focusWalk(on:parking:)`, `+Walk.swift`) re-homed the
     /// composition into the shared `resultNavCluster` builder so this
     /// site and the compact handle never drift; the geometry here is
     /// untouched (`UIFixChromeUITests` measures it) and the counter
     /// always renders at this site.
     private var resultNavigationControls: some View {
-        resultNavCluster(hidesCounterAtLargeTypeSizes: false)
+        resultNavCluster(site: .searchBar)
     }
 
     /// The ONE result-nav cluster — the ‹ › pair plus the k/N counter
     /// — mounted at BOTH sites (the medium+ search bar's trailing edge
-    /// via `resultNavigationControls`, and the compact handle's
-    /// trailing edge in `compactFloatStrip`). The sites are never
-    /// co-mounted, so the ids / labels / ⌘G shortcuts stay unique in
-    /// the live tree. A chevron tap steps the current result AND parks
-    /// the sheet at the compact float (the row-tap idiom); ⌘G / ⇧⌘G
+    /// via `resultNavigationControls`, and the parked strip in
+    /// `+CompactStrip.swift`). The sites are never co-mounted, so the
+    /// ids / labels / ⌘G shortcuts stay unique in the live tree. A
+    /// chevron tap steps the current result AND parks the sheet at the
+    /// compact float through the one walk seam (`focusWalk`); ⌘G / ⇧⌘G
     /// ride these same Buttons, so the shortcut ≡ the chevron by
     /// construction (J/K keep the medium semantics —
-    /// `SearchResultsSection`). `hidesCounterAtLargeTypeSizes` applies
-    /// to the compact handle only: the counter hides from XXXL up
-    /// (measured — see `compactFloatStrip`).
-    private func resultNavCluster(hidesCounterAtLargeTypeSizes: Bool) -> some View {
+    /// `SearchResultsSection`). The `site` decides the geometry only
+    /// (`ResultNavSite`): the search bar keeps its pinned Ø44-in-46,
+    /// spacing 6, caption counter; the parked strip draws full-size
+    /// controls and hides the counter from XXXL up (measured).
+    func resultNavCluster(site: ResultNavSite) -> some View {
         HStack(spacing: ResectaTokens.Spacing.xs) {
-            HStack(spacing: 6) {
-                Button {
-                    searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
-                    navigateToCurrentResult(dropToCompact: true)
-                } label: {
-                    Self.circularIconLabel("chevron.up")
-                }
-                .accessibilityLabel("Previous result")
-                .accessibilityIdentifier("resultNavPrevious")
-                .keyboardShortcut("g", modifiers: [.command, .shift])
+            HStack(spacing: site.pairSpacing) {
+                resultNavButton(.previous, site: site)
+                resultNavButton(.next, site: site)
+            }
+            if !(site == .parked && dynamicTypeSize >= .xxxLarge) {
+                resultNavCounter(site: site)
+            }
+        }
+    }
 
-                Button {
-                    searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
-                    navigateToCurrentResult(dropToCompact: true)
-                } label: {
-                    Self.circularIconLabel("chevron.down")
-                }
-                .accessibilityLabel("Next result")
-                .accessibilityIdentifier("resultNavNext")
-                .keyboardShortcut("g", modifiers: .command)
+    enum ResultNavDirection { case previous, next }
+
+    /// One chevron of the pair — the step, then the seam; the ids,
+    /// labels and shortcuts ride here for both sites and both
+    /// compositions.
+    @ViewBuilder
+    func resultNavButton(_ direction: ResultNavDirection, site: ResultNavSite) -> some View {
+        switch direction {
+        case .previous:
+            Button {
+                searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
+                focusWalk(on: searchState.currentResult?.id, parking: true)
+            } label: {
+                Self.circularIconLabel(
+                    "chevron.up", diameter: site.diameter, glyphPointSize: site.glyphPointSize)
             }
             .buttonStyle(.circularIcon)
-
-            if !(hidesCounterAtLargeTypeSizes && dynamicTypeSize >= .xxxLarge) {
-                resultNavCounter
+            .accessibilityLabel("Previous result")
+            .accessibilityIdentifier("resultNavPrevious")
+            .keyboardShortcut("g", modifiers: [.command, .shift])
+        case .next:
+            Button {
+                searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
+                focusWalk(on: searchState.currentResult?.id, parking: true)
+            } label: {
+                Self.circularIconLabel(
+                    "chevron.down", diameter: site.diameter, glyphPointSize: site.glyphPointSize)
             }
+            .buttonStyle(.circularIcon)
+            .accessibilityLabel("Next result")
+            .accessibilityIdentifier("resultNavNext")
+            .keyboardShortcut("g", modifiers: .command)
         }
     }
 
@@ -1071,68 +1028,30 @@ struct SearchAndRedactSheet: View {
     /// is shown. When a filter is active the counter shows the
     /// position within the visible filtered set; an en dash (–)
     /// signals that the current result is hidden by the filter.
-    /// Rendered by `resultNavCluster` at both sites — the strings
-    /// and a11y labels are unchanged from the prior implementation.
+    /// Rendered at both sites — the strings and a11y labels are
+    /// unchanged; only the font follows the site (caption at the
+    /// search bar, subheadline on the parked strip).
     @ViewBuilder
-    private var resultNavCounter: some View {
+    func resultNavCounter(site: ResultNavSite) -> some View {
         if let idx = searchState.currentResultIndex {
             if searchState.filteredCount == searchState.totalCount {
                 Text("\(idx + 1)/\(searchState.totalCount)")
-                    .font(.caption)
+                    .font(site.counterFont)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("Result \(idx + 1) of \(searchState.totalCount)")
             } else if let filteredPos = searchState.currentResultFilteredPosition {
                 Text("\(filteredPos)/\(searchState.filteredCount)")
-                    .font(.caption)
+                    .font(site.counterFont)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("Result \(filteredPos) of \(searchState.filteredCount), \(searchState.totalCount - searchState.filteredCount) filtered")
             } else {
                 Text("–/\(searchState.filteredCount)")
-                    .font(.caption)
+                    .font(site.counterFont)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("Current result hidden by filters, \(searchState.filteredCount) of \(searchState.totalCount) shown")
-            }
-        }
-    }
-
-    /// The ONE result-navigation seam (the former section-side
-    /// duplicate is deleted; its J/K keyboard buttons call back
-    /// through `onNavigateToCurrentResult`). Two detent targets behind
-    /// the one seam — the chevrons and ⌘G pass `dropToCompact: true`
-    /// (step AND park the sheet at the compact float, the row-tap
-    /// idiom, so the outlined match is in view and the walk continues
-    /// from the handle's cluster); J/K pass `false` and keep the prior
-    /// large → medium rule (keyboard users read the list while
-    /// stepping). The page write + rect scroll half is shared by both.
-    private func navigateToCurrentResult(dropToCompact: Bool) {
-        guard let result = searchState.currentResult else { return }
-        documentState.currentPageIndex = result.pageIndex
-        // Rect-level half — when the canvas is zoomed past fit, the
-        // page write alone can leave the match off-screen; the canvas
-        // consumes this with the engine's canonical rect conversion.
-        // The sheet-parking walk (chevrons, ⌘G/⇧⌘G) frames the item at
-        // the readability scale; J/K keeps today's page-only intent
-        // (semantics untouched).
-        documentState.requestCanvasScroll(
-            toPageIndex: result.pageIndex,
-            normalizedRect: result.normalizedRect,
-            zoom: dropToCompact ? .readability : .none
-        )
-        if dropToCompact {
-            // The chevron walk parks the sheet (the row-tap idiom in
-            // `SearchResultsSection`). The results-arrival detent
-            // raise is untouched — the first tap from large drops
-            // straight to compact.
-            if selectedDetent != .compactFloat {
-                selectedDetent = .compactFloat
-            }
-        } else {
-            // Only minimize from .large; preserve .medium so results list stays visible
-            if selectedDetent == .large {
-                selectedDetent = .medium
             }
         }
     }

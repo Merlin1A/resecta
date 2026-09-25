@@ -21,50 +21,86 @@ import SwiftUI
 // required (the wand / nudge precedent). No confirm dialog: the mark
 // is undoable and toasted (no second presentation at
 // compact). No keyboard shortcut — Return keeps its all-selected
-// semantics. iOS 26 renders the float at ≈0.86 scale, so the 46-pt
-// layout floor serves ≈40 pt effective.
+// semantics. The parked sheet is drawn at 0.96 (the attached regime,
+// `CompactFloatDetent`), so the 46-pt layout floor serves 44.2 pt
+// effective.
 
 extension SearchAndRedactSheet {
 
     // MARK: - Toast clearance at the compact float
 
-    /// How far ContentView's bottom toast host lifts while this
-    /// sheet is parked at the compact float — the hug, read symbolically
-    /// — so the "Marked 1 …" toast clears the strip instead of
-    /// sitting beneath it; zero at every other detent, where the sheet
-    /// covers that host and renders its own copy. Pure; the detent
-    /// tests pin it beside the hug.
-    static func toastBottomClearance(for detent: PresentationDetent) -> CGFloat {
-        detent == .compactFloat ? CompactFloatDetent.hugHeight : 0
+    /// How far the bottom toast hosts lift, from the one bottom-chrome
+    /// model (`ParkedChromeLayout`, the editor's own inputs read here):
+    /// the hug while this sheet is parked at the compact float — so the
+    /// "Marked 1 …" toast clears the strip instead of sitting beneath it
+    /// — plus the page bar's height while the bar is up and uncovered;
+    /// zero with the sheet up at a taller detent, where the sheet-local
+    /// host renders inside the sheet. `sheetPresented: false` is the
+    /// value the sheet leaves behind on disappearance (the bar alone).
+    func toastBottomClearance(sheetPresented: Bool) -> CGFloat {
+        ParkedChromeLayout(
+            sheetPresented: sheetPresented,
+            detent: selectedDetent,
+            walkLive: searchState.isWalkLive(reviewPending: redactionState.pendingTriage != nil),
+            pageCount: documentState.pageCount,
+            sizeClass: horizontalSizeClass,
+            phase: documentState.phaseKind,
+            hugHeight: CompactFloatDetent.hug(for: dynamicTypeSize)
+        ).toastClearance
     }
 
     // MARK: - Per-item Apply (compact handle)
 
-    /// Text "Apply", semibold tint, `.plain` (the `searchApplyButton`
-    /// idiom; default-styled buttons in the sheet's fixed chrome are
-    /// the arbitration poison), the disabled state
-    /// falling to `.tertiary`. The 46-pt LAYOUT floor and the
-    /// `contentShape` sit AFTER the chrome — the hit area is the drawn
-    /// frame, never an expansion. Identifier BEFORE `.disabled` so it
-    /// stays on the AX surface while disabled (the detent-layout leg
-    /// reads the disabled → enabled round-trip through it). Carries
-    /// its own leading inset so both strip branches mount it bare.
-    var applyCurrentResultButton: some View {
-        Button(action: applyCurrentResult) {
-            Text("Apply")
-                .frame(minHeight: ResectaTokens.TouchTarget.minimum)
-                .contentShape(Rectangle())
+    /// A filled capsule — `BrandTeal.fill`, white headline label,
+    /// `.capsulePress` — that reads applied once the current match is
+    /// marked: ✓ "Applied" (the applied-filter chip's word) on the
+    /// circle wash, `.secondary` label, disabled without the disabled
+    /// dim; while there is nothing to apply (no current match, hidden
+    /// by filters, regions locked) the capsule dims to the disabled
+    /// opacity. The 46-pt LAYOUT floor and the `contentShape` sit AFTER
+    /// the chrome — the hit area is the drawn frame, never an expansion.
+    /// Identifier BEFORE `.disabled` so it stays on the AX surface while
+    /// disabled (the detent-layout leg reads the disabled → enabled
+    /// round-trip through it); the a11y label stays "Apply" in both
+    /// states. The label's inset is `Spacing.md`; the strip adds the
+    /// leading inset.
+    func applyCurrentResultButton() -> some View {
+        Group {
+            if applyCurrentResultApplied {
+                Button(action: applyCurrentResult) {
+                    Label(AppliedFilter.applied.rawValue, systemImage: "checkmark")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, ResectaTokens.Spacing.md)
+                        .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                        .background(CircularIconButtonStyle.wash, in: Capsule())
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button(action: applyCurrentResult) {
+                    Text("Apply")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, ResectaTokens.Spacing.md)
+                        .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                        .background(ResectaTokens.BrandTeal.fill, in: Capsule())
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.capsulePress)
+            }
         }
-        .buttonStyle(.plain)
-        .fontWeight(.semibold)
-        .foregroundStyle(applyCurrentResultDisabled
-            ? AnyShapeStyle(.tertiary)
-            : AnyShapeStyle(.tint))
         .accessibilityLabel("Apply")
         .accessibilityHint("Marks the current match for redaction.")
         .accessibilityIdentifier("applyCurrentResultButton")
         .disabled(applyCurrentResultDisabled)
-        .padding(.leading, ResectaTokens.Spacing.md)
+    }
+
+    /// The applied read for the one result — `SearchState.isAppliedOrCovered`
+    /// (applied ∪ dedup-covered), the header Apply's graying predicate.
+    private var applyCurrentResultApplied: Bool {
+        guard let current = searchState.currentResult else { return false }
+        return searchState.isAppliedOrCovered(current.id)
     }
 
     /// Live only with a current match on board that the apply path
