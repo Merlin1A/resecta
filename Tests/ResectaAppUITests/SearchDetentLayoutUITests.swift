@@ -870,31 +870,41 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             strip.waitForExistence(timeout: 10),
             "Compact strip never appeared — the down-chain stalled above the compact float."
         )
-        // The full chrome yields to the strip at compact (title-only):
-        // the interface title is the strip's whole composition — the
-        // old summary line must be gone.
+        // The full chrome yields to the strip at compact: the review
+        // walk's ‹ › pair and its Select ride the handle (no current
+        // yet — nothing was tapped), the interface title yields to the
+        // walk, and the old summary line is gone.
         XCTAssertFalse(
             reviewList.exists,
             "Review list still present at the compact float — the strip did not replace the full chrome."
         )
         XCTAssertTrue(
-            app.staticTexts["Scan"].waitForExistence(timeout: 5),
-            "Compact handle is missing its interface title on the review origin."
+            app.buttons["resultNavNext"].waitForExistence(timeout: 5),
+            "Compact handle is missing the review walk's ▼ chevron on the review origin."
+        )
+        XCTAssertTrue(
+            app.buttons["applyCurrentResultButton"].exists,
+            "Compact handle is missing the review walk's Select on the review origin."
+        )
+        XCTAssertFalse(
+            app.staticTexts["Scan"].exists,
+            "The interface title must yield to the review walk on the parked strip."
         )
         XCTAssertFalse(
             app.staticTexts["0 of 6 selected"].exists,
-            "The retired compact summary line rendered — compact is title-only."
+            "The retired compact summary line rendered on the strip."
         )
         attachScreenshot(named: "sa2-compact-chain-strip")
     }
 
     // Review-row canvas-navigation parity — a row-BODY tap drops the
     // sheet to the compact float (the shipped search-row idiom keeps
-    // the canvas interactive behind it). Compact is title-only, so
-    // the no-selection proof moved one detent later: re-expand to
-    // medium and the footer must still read none-selected — a body
-    // tap must NAVIGATE, never toggle; the selection circle keeps
-    // its own hit region.
+    // the canvas interactive behind it) and makes the row the review
+    // walk's current (the strip's match line names it). The strip
+    // carries no footer, so the no-selection proof reads one detent
+    // later: re-expand to medium and the footer must still read
+    // none-selected — a body tap must NAVIGATE, never toggle; the
+    // selection circle keeps its own hit region.
     func testMediumDetent_seededReviewRowBodyTapDropsToCompact() {
         app.launchArguments = ["--uitesting", "--loadTestDocument", "--seedTriage"]
         app.launch()
@@ -931,13 +941,19 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             reviewList.exists,
             "Review list still present after the row-tap compact drop."
         )
+        let line = app.descendants(matching: .any)
+            .matching(identifier: "walkMatchLine").firstMatch
         XCTAssertTrue(
-            app.staticTexts["Scan"].waitForExistence(timeout: 5),
-            "Compact handle is missing its interface title after the row-body drop."
+            line.waitForExistence(timeout: 5),
+            "Compact handle is missing the walk's match line after the row-body drop."
+        )
+        XCTAssertTrue(
+            line.label.contains("123-45-6789"),
+            "The match line does not name the tapped row: \(line.label)"
         )
         XCTAssertFalse(
             app.staticTexts["0 of 6 selected"].exists,
-            "The retired compact summary line rendered — compact is title-only."
+            "The retired compact summary line rendered on the strip."
         )
         attachScreenshot(named: "sa2-review-rowtap-compact")
 

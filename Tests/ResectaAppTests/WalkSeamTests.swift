@@ -4,9 +4,10 @@ import Foundation
 
 // The ONE walk-navigation seam (`SearchAndRedactSheet+Walk.swift`):
 // source-slice pins, the estate idiom (`CompactDetentAnchoredRowTests`,
-// `TouchTargetFloorTests`). Every caller names the seam; no sheet file
-// outside it asks the canvas to scroll; the former inline copies are
-// gone.
+// `TouchTargetFloorTests`). Every caller names the seam — the chevrons
+// step whichever walk is live through it, the results section and the
+// review section call back into it by id; no sheet file outside it
+// asks the canvas to scroll; the former inline copies are gone.
 
 @Suite("Walk seam")
 struct WalkSeamTests {
@@ -16,6 +17,9 @@ struct WalkSeamTests {
         let walk = try loadRepoFile("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Walk.swift")
         #expect(walk.contains("func focusWalk(on id: UUID?, parking: Bool)"))
         #expect(walk.contains("func focusWalk(onPage page: Int, normalizedRect: CGRect, parking: Bool)"))
+        #expect(walk.contains("func focusWalk(onReview id: UUID)"), "the review walk's focus lives on the seam")
+        #expect(walk.contains("func stepWalk(_ direction: ResultNavDirection)"), "the chevrons' step lives on the seam")
+        #expect(walk.contains("var liveReviewWalk: ReviewWalk"), "the review cursor is re-anchored on the seam")
         #expect(walk.contains("requestCanvasScroll("))
         #expect(walk.contains("anchor: parking ? .center : .visible"))
         for path in [
@@ -24,6 +28,8 @@ struct WalkSeamTests {
             "Sources/ResectaApp/Views/Search/ScanReviewSection.swift",
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift",
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift",
+            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactStrip.swift",
+            "Sources/ResectaApp/State/ReviewWalk.swift",
         ] {
             let source = try loadRepoFile(path)
             #expect(!source.contains("requestCanvasScroll("),
@@ -33,18 +39,26 @@ struct WalkSeamTests {
         }
     }
 
-    @Test("Every caller names the seam: the chevrons, the results section wiring, the review row tap")
+    @Test("Every caller names the seam: the chevrons step whichever walk is live, the results section wiring, the review row tap by id")
     func everyCallerNamesTheSeam() throws {
         let hub = try loadRepoFile("Sources/ResectaApp/Views/SearchAndRedactSheet.swift")
         let cluster = try slice(hub,
                                 from: "func resultNavButton(",
                                 to: "func resultNavCounter(")
-        #expect(cluster.components(separatedBy: "focusWalk(on: searchState.currentResult?.id, parking: true)").count - 1 == 2,
-                "both chevrons step then focus through the seam")
+        #expect(cluster.contains("stepWalk(.previous)") && cluster.contains("stepWalk(.next)"),
+                "both chevrons step through the seam")
+        #expect(!cluster.contains("navigateToNext") && !cluster.contains("focusWalk("),
+                "the chevrons no longer step the search walk themselves")
+        let walk = try loadRepoFile("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Walk.swift")
+        #expect(walk.contains("focusWalk(on: searchState.currentResult?.id, parking: true)"),
+                "the search step focuses through the seam")
         #expect(hub.contains("onFocusWalk: focusWalk(on:parking:)"),
                 "the results section is wired to the seam")
-        #expect(hub.contains("focusWalk(onPage: page, normalizedRect: normalizedRect, parking: true)"),
-                "the review row tap routes through the seam's canvas half")
+        #expect(hub.contains("onNavigateToFinding: focusWalk(onReview:)"),
+                "the review row tap routes through the seam with the id")
+        let review = try loadRepoFile("Sources/ResectaApp/Views/Search/ScanReviewSection.swift")
+        #expect(review.contains("let onNavigateToFinding: (UUID) -> Void"))
+        #expect(review.contains("onNavigateToFinding(detection.id)"), "the review row tap carries the id only")
         let section = try loadRepoFile("Sources/ResectaApp/Views/Search/SearchResultsSection.swift")
         #expect(section.contains("let onFocusWalk: (UUID, Bool) -> Void"))
         #expect(section.contains("onFocusWalk(result.id, true)"), "the row tap parks through the seam")
