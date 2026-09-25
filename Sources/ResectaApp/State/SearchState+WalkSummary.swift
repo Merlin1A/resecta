@@ -6,10 +6,11 @@ import RedactionEngine
 //
 // `walkLive` is the ONE read of "a walk is on" — the editor's bottom-chrome
 // model hides the page bar on it, and the sheet's compact strip mounts its
-// ‹ › cluster and per-item Apply on the same predicate — so the two
-// surfaces cannot drift. Live = search results on board and no pipeline
-// review pending on the Scan interface (stale sheet-scan results must not
-// show a walk over a detections list, which has no "current").
+// ‹ › cluster and per-item Apply / Select on the same predicate — so the
+// two surfaces cannot drift. Live = search results on board, or the staged
+// detection review pending on the Scan interface (the review walk,
+// `ReviewWalk`: the review owns the Scan interface while it is pending,
+// so stale sheet-scan results never show a walk under it).
 //
 // The match line (`WalkLine`): kind · page · text for the current match —
 // Scan names the category, Search the term, and the matched text rides
@@ -17,15 +18,24 @@ import RedactionEngine
 // (case-insensitively); regex and multi-term keep it. A current hidden by
 // the active filters reads "Hidden by filters"; with no walk the slot
 // carries the list's own headline verbatim ("No matches", "Not run yet",
-// "Not scanned yet", …) and stays empty in the pre-search contexts and
-// while a review is pending. `WalkSummaryTests` pins the rules.
+// "Not scanned yet", …) and stays empty in the pre-search contexts. A
+// pending review owns the slot with its own line (`ReviewWalk.line`).
+// `WalkSummaryTests` pins the rules.
 
 extension SearchState {
-    /// Whether the result walk is live for this search session.
-    /// `reviewPending` is the store's `pendingTriage != nil`, passed in
-    /// because the review belongs to `RedactionState`.
+    /// Whether a walk is live for this search session: the review walk
+    /// while the staged review owns the Scan interface, else the search
+    /// walk over the results on board. `reviewPending` is the store's
+    /// `pendingTriage != nil`, passed in because the review belongs to
+    /// `RedactionState`.
     func isWalkLive(reviewPending: Bool) -> Bool {
-        !results.isEmpty && !(reviewPending && searchModeType.interface == .scan)
+        reviewOwnsInterface(reviewPending: reviewPending) || !results.isEmpty
+    }
+
+    /// The staged review is pending AND this session is on the Scan
+    /// interface — the review's surface (`SearchAndRedactSheet.isReviewActive`).
+    func reviewOwnsInterface(reviewPending: Bool) -> Bool {
+        reviewPending && searchModeType.interface == .scan
     }
 }
 
@@ -40,15 +50,21 @@ extension RedactionState {
 
 // MARK: - The match line
 
-/// What the strip's match line names for the walk's current result.
+/// What the strip's match line names for the walk's current result —
+/// a search result here, a staged detection through `ReviewWalk`.
 struct WalkSummary: Equatable {
     /// Scan: the PII category's display name; Search: the term.
     let kind: String
     /// "Page k of N" — the page readout that replaces the hidden page bar's.
     let pageLabel: String
     /// The matched text; nil when the line drops it (a literal text
-    /// search whose match equals the term).
+    /// search whose match equals the term) or the kind carries none.
     let text: String?
+
+    /// The page readout, 1-based over the document's page count.
+    static func pageLabel(pageIndex: Int, pageCount: Int) -> String {
+        "Page \(pageIndex + 1) of \(pageCount)"
+    }
 }
 
 /// The strip's second line, per state.
@@ -65,7 +81,7 @@ enum WalkLine: Equatable {
 extension SearchState {
 
     static func walkPageLabel(pageIndex: Int, pageCount: Int) -> String {
-        "Page \(pageIndex + 1) of \(pageCount)"
+        WalkSummary.pageLabel(pageIndex: pageIndex, pageCount: pageCount)
     }
 
     /// The line for one result.
@@ -83,10 +99,11 @@ extension SearchState {
 
     /// The line for the session's current state.
     func walkLine(pageCount: Int, reviewPending: Bool) -> WalkLine {
-        guard isWalkLive(reviewPending: reviewPending) else {
-            // A pending review owns the slot (its own line lands with
-            // the review walk); stale results under it show nothing.
-            if reviewPending || !results.isEmpty { return .empty }
+        // A pending review owns the slot with the review walk's own line
+        // (`ReviewWalk.line`); stale results under it show nothing.
+        if reviewOwnsInterface(reviewPending: reviewPending) { return .empty }
+        guard !results.isEmpty else {
+            if reviewPending { return .empty }
             return walkStatusHeadline.map { .status($0) } ?? .empty
         }
         guard let current = currentResult else { return .empty }
