@@ -353,6 +353,12 @@ class DocumentState {
     static let importBlockedDuringTriageMessage =
         "Cannot import while reviewing detections. Apply or dismiss them first."
 
+    /// Toast copy for a dropped file that is not a PDF (an image payload,
+    /// refused at the drop door). It is the unsupported-format message the
+    /// Files import shows, so both refusals read the same words.
+    static let importRefusedNotPDFMessage =
+        PipelineError.importError(.unsupportedFormat).localizedRecovery
+
     /// One-time acknowledgement shadows
     /// for the three share-risk confirm families. `failShareAcknowledged`
     /// and `skippedShareAcknowledged` generalize the shape

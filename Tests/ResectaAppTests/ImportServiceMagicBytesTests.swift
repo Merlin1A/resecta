@@ -137,4 +137,45 @@ struct ImportServiceMagicBytesTests {
 
         #expect(ImportService.detectPayloadKind(from: data) == .unknown)
     }
+
+    // MARK: - The drop door (PDF files only)
+
+    @Test("Image payloads are refused at the drop door")
+    func testImagePayloadsRefusedAtDoor() {
+        let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10])
+        let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        let heic = Data([
+            0x00, 0x00, 0x00, 0x18,
+            0x66, 0x74, 0x79, 0x70,
+            0x68, 0x65, 0x69, 0x63  // "heic"
+        ])
+        let webp = Data([
+            0x52, 0x49, 0x46, 0x46,
+            0x00, 0x00, 0x00, 0x00,
+            0x57, 0x45, 0x42, 0x50  // "WEBP"
+        ])
+
+        #expect(!ImportService.admitsDroppedPayload(jpeg), "a JPEG drop must be refused")
+        #expect(!ImportService.admitsDroppedPayload(png), "a PNG drop must be refused")
+        #expect(!ImportService.admitsDroppedPayload(heic), "a HEIC drop must be refused")
+        #expect(!ImportService.admitsDroppedPayload(webp), "a WEBP drop must be refused")
+    }
+
+    @Test("A %PDF payload is admitted at the drop door")
+    func testPDFPayloadAdmittedAtDoor() {
+        let data = Data([0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x37])
+
+        #expect(ImportService.admitsDroppedPayload(data))
+    }
+
+    @Test("An unknown payload is admitted at the drop door and reaches the PDF parser")
+    func testUnknownPayloadAdmittedAtDoor() {
+        // A PDF whose `%PDF` header is not at offset 0 sniffs as unknown;
+        // refusing unknown bytes would refuse it. The PDF parser reports
+        // anything it cannot open as an unsupported format.
+        let data = Data([0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01, 0x02, 0x03])
+
+        #expect(ImportService.admitsDroppedPayload(data))
+        #expect(ImportService.detectPayloadKind(from: data).suggestedType == "pdf")
+    }
 }

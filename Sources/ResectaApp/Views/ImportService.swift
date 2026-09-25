@@ -91,6 +91,17 @@ enum ImportService {
         return .unknown
     }
 
+    /// The drop door: whether a dropped payload may enter the import path.
+    /// Resecta opens PDF files only, so a payload whose leading bytes carry
+    /// an image signature is refused before dispatch. `%PDF` and unknown
+    /// payloads are admitted: an unknown payload reaches the PDF parser,
+    /// which reports anything it cannot open as an unsupported format
+    /// (refusing unknown bytes would also refuse a PDF whose `%PDF` header
+    /// is not at offset 0).
+    static func admitsDroppedPayload(_ data: Data) -> Bool {
+        true
+    }
+
     // MARK: - Sendable Bridge Type
 
     /// Results of off-MainActor PDF validation. All fields are Sendable.
