@@ -649,7 +649,7 @@ struct ShareRiskConfirmSheetTests {
     @Test("SlideToShareControl's hidden completion Button is sized by TouchTarget.minimum, not a 1×1 point")
     func hiddenCompletionButtonSizedByTouchTargetMinimum() throws {
         let source = try loadRepoFile(
-            "Sources/ResectaApp/Views/DocumentEditorView.swift")
+            "Sources/ResectaApp/Views/ShareRiskConfirm.swift")
         #expect(source.contains("ResectaTokens.TouchTarget.minimum"),
                 "SlideToShareControl's hidden completion Button must be sized by the shared touch-target token")
         #expect(!source.contains("frame(width: 1, height: 1)"),

@@ -145,14 +145,17 @@ struct DocumentEditorHomeCloseTests {
         #expect(!source.contains("isPresented: $showDoneConfirmation"),
                 "no direct $showDoneConfirmation presentation may remain")
 
-        guard let close = source.range(of: "private func performDoneCloseSession() {"),
-              let sec1 = source.range(of: "coordinator.downgradeTempProtectionOnSessionClose()",
-                                      range: close.upperBound..<source.endIndex)
+        // The teardown lives in the Home extension file (internal there:
+        // the hub's dialog and the extension's Home route both call it).
+        let home = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView+Home.swift")
+        guard let close = home.range(of: "func performDoneCloseSession() {"),
+              let sec1 = home.range(of: "coordinator.downgradeTempProtectionOnSessionClose()",
+                                    range: close.upperBound..<home.endIndex)
         else {
             Issue.record("Could not locate performDoneCloseSession")
             return
         }
-        let prologue = source[close.upperBound..<sec1.lowerBound]
+        let prologue = home[close.upperBound..<sec1.lowerBound]
         #expect(prologue.contains("homeCloseAwaitsSheetDismissal = false"))
         #expect(prologue.contains("homeCloseParkedReview = false"))
     }

@@ -3,6 +3,8 @@ import Foundation
 @testable import ResectaApp
 
 // Source-scanning contract pins for `DocumentEditorView.swift` surfaces
+// (and, since the detection banner moved into its own extension file,
+// `DocumentEditorView+DetectionBanner.swift`)
 // that render through a `private` type or a `@ViewBuilder` computed
 // property with no pure-function seam to unit-test directly — mirrors
 // `HonestySurfacesTests.loadRepoFile`'s technique.
@@ -23,7 +25,7 @@ struct DocumentEditorViewSourceContractsTests {
 
     @Test("DetectionSummaryBanner glyph has no unconditional .orange and gates on isWarning")
     func detectionSummaryBannerTintGatesOnIsWarning() throws {
-        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView+DetectionBanner.swift")
         guard let structRange = source.range(of: "private struct DetectionSummaryBanner"),
               let bodyEnd = source.range(of: "\n    }", range: structRange.upperBound..<source.endIndex)
         else {
