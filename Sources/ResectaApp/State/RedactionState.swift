@@ -1256,47 +1256,29 @@ class RedactionState {
             }
         }
 
-        var createdRegions: [Int: [RedactionRegion]] = [:]
-        var createdMetadata: [UUID: RegionMetadata] = [:]
-        var createdAudit: [UUID: MatchAuditSnapshot] = [:]
-        for (page, results) in pending {
-            let accepted = results.filter { triageSelections[$0.id] ?? false }
-            let newRegions = accepted.map { detection -> RedactionRegion in
-                let region = detection.toRegion()
-                // Preserve the ambiguity flag onto the region's metadata so
-                // the canvas and detail view can still surface it after review.
-                createdMetadata[region.id] = RegionMetadata(
-                    piiKind: detection.kind,
-                    confidence: detection.confidence,
-                    matchedText: detection.matchedText,
-                    recognitionLevel: detection.recognitionLevel,
-                    isAmbiguousSurname: ambiguousSurnameDetectionIDs.contains(detection.id)
-                )
-                createdAudit[region.id] = MatchAuditSnapshot(
-                    detection: detection,
-                    pageIndex: page,
-                    regionID: region.id,
-                    appliedAt: appliedAt
-                )
-                return region
-            }
-            if !newRegions.isEmpty {
-                createdRegions[page] = newRegions
-            }
+        // The accepted detections in review order; the pair for each is
+        // built by the one detection prepare step.
+        let accepted: [(page: Int, detection: DetectionResult)] = pending.flatMap { page, results in
+            results.filter { triageSelections[$0.id] ?? false }.map { (page: page, detection: $0) }
         }
+        let prepared = prepareApply(
+            detections: accepted,
+            ambiguousSurnameDetectionIDs: ambiguousSurnameDetectionIDs,
+            appliedAt: appliedAt
+        )
 
         // The review resolves whether or not anything was promoted. It
         // is deliberately NOT captured in the undo closure — undoing
         // the apply removes the regions but does not reopen the review.
         pendingTriage = nil
         triageSelections = [:]
-        let createdCount = createdRegions.values.reduce(0) { $0 + $1.count }
+        let createdCount = prepared.appliedCount
         if createdCount > 0 { triagePromotionOccurred = true }
 
         commitApply(
-            createdRegions: createdRegions,
-            createdMetadata: createdMetadata,
-            createdAudit: createdAudit,
+            createdRegions: prepared.createdRegions,
+            createdMetadata: prepared.createdMetadata,
+            createdAudit: prepared.createdAudit,
             actionName: "Apply Detections",
             priorsRestore: (priors: priorsSnapshot, surfaceForms: surfaceFormsSnapshot),
             recordsSearchApplyVersion: false,
@@ -1332,35 +1314,18 @@ class RedactionState {
             }
         }
 
-        var createdRegions: [Int: [RedactionRegion]] = [:]
-        var createdMetadata: [UUID: RegionMetadata] = [:]
-        var createdAudit: [UUID: MatchAuditSnapshot] = [:]
-        var appliedDetections: [DetectionResult] = []
-        var appliedIDs = Set<UUID>()
+        // The members still pending, in the group's order; the pair for
+        // each is built by the one detection prepare step.
+        let hits = group.detectionIDs.compactMap { lookup[$0] }
+        let appliedDetections = hits.map(\.detection)
+        let appliedIDs = Set(appliedDetections.map(\.id))
         let memberIDs = Set(group.detectionIDs)
         let appliedAt = Date()
-
-        for detectionID in group.detectionIDs {
-            guard let hit = lookup[detectionID] else { continue }
-            let region = hit.detection.toRegion()
-            createdRegions[hit.page, default: []].append(region)
-            createdMetadata[region.id] = RegionMetadata(
-                piiKind: hit.detection.kind,
-                confidence: hit.detection.confidence,
-                matchedText: hit.detection.matchedText,
-                recognitionLevel: hit.detection.recognitionLevel,
-                isAmbiguousSurname:
-                    ambiguousSurnameDetectionIDs.contains(hit.detection.id)
-            )
-            createdAudit[region.id] = MatchAuditSnapshot(
-                detection: hit.detection,
-                pageIndex: hit.page,
-                regionID: region.id,
-                appliedAt: appliedAt
-            )
-            appliedDetections.append(hit.detection)
-            appliedIDs.insert(hit.detection.id)
-        }
+        let prepared = prepareApply(
+            detections: hits,
+            ambiguousSurnameDetectionIDs: ambiguousSurnameDetectionIDs,
+            appliedAt: appliedAt
+        )
         let appliedCount = appliedDetections.count
 
         guard appliedCount > 0 else { return .zero }
@@ -1394,9 +1359,9 @@ class RedactionState {
         triagePromotionOccurred = true
 
         commitApply(
-            createdRegions: createdRegions,
-            createdMetadata: createdMetadata,
-            createdAudit: createdAudit,
+            createdRegions: prepared.createdRegions,
+            createdMetadata: prepared.createdMetadata,
+            createdAudit: prepared.createdAudit,
             actionName: "Redact Entity Group",
             priorsRestore: (priors: priorsSnapshot, surfaceForms: surfaceFormsSnapshot),
             recordsSearchApplyVersion: false,
@@ -1436,31 +1401,15 @@ class RedactionState {
             if !others.isEmpty { autoApplyResults[page] = others }
         }
 
-        let appliedAt = Date()
-        var createdRegions: [Int: [RedactionRegion]] = [:]
-        var createdMetadata: [UUID: RegionMetadata] = [:]
-        var createdAudit: [UUID: MatchAuditSnapshot] = [:]
-        for (page, pageResults) in autoApplyResults {
-            let newRegions = pageResults.map { detection -> RedactionRegion in
-                let region = detection.toRegion()
-                createdMetadata[region.id] = RegionMetadata(
-                    piiKind: detection.kind,
-                    confidence: detection.confidence,
-                    matchedText: detection.matchedText,
-                    recognitionLevel: detection.recognitionLevel,
-                    isAmbiguousSurname:
-                        ambiguousSurnameDetectionIDs.contains(detection.id)
-                )
-                createdAudit[region.id] = MatchAuditSnapshot(
-                    detection: detection,
-                    pageIndex: page,
-                    regionID: region.id,
-                    appliedAt: appliedAt
-                )
-                return region
-            }
-            createdRegions[page] = newRegions
-        }
+        // Every non-signature detection in map order; the pair for each
+        // is built by the one detection prepare step.
+        let prepared = prepareApply(
+            detections: autoApplyResults.flatMap { page, pageResults in
+                pageResults.map { (page: page, detection: $0) }
+            },
+            ambiguousSurnameDetectionIDs: ambiguousSurnameDetectionIDs,
+            appliedAt: Date()
+        )
 
         // Route signature candidates to the review. No selection
         // entries are written — an absent id reads deselected, the
@@ -1469,13 +1418,13 @@ class RedactionState {
             pendingTriage = signatureResults
         }
 
-        let appliedCount = createdRegions.values.reduce(0) { $0 + $1.count }
+        let appliedCount = prepared.appliedCount
         let signatureCount = signatureResults.values.reduce(0) { $0 + $1.count }
 
         commitApply(
-            createdRegions: createdRegions,
-            createdMetadata: createdMetadata,
-            createdAudit: createdAudit,
+            createdRegions: prepared.createdRegions,
+            createdMetadata: prepared.createdMetadata,
+            createdAudit: prepared.createdAudit,
             actionName: "Apply Detections",
             priorsRestore: nil,
             recordsSearchApplyVersion: false,
@@ -2059,6 +2008,57 @@ nonisolated func prepareApply(
         skippedOverlaps: skippedOverlaps,
         appliedResultIDs: appliedResultIDs,
         coveredResultIDs: coveredResultIDs
+    )
+}
+
+/// The detection origins' prepare step — the staged review, an entity
+/// group, a raw detection map — the ONE place a detection's region /
+/// `RegionMetadata` / `MatchAuditSnapshot` trio is built (the search
+/// origins' overload above builds the search trio). Every detection
+/// handed in becomes a region: the origins decide WHICH detections
+/// (accepted, member, non-signature) and in what order; no overlap test
+/// runs here, as none ever did on these origins. `createdRegions`
+/// groups the regions by page in the order given, so a page's regions
+/// commit in the order its detections were listed.
+///
+/// `nonisolated` like its sibling: a pure function over Sendable
+/// values, called synchronously on the MainActor by every detection
+/// origin (no suspension is added).
+nonisolated func prepareApply(
+    detections: [(page: Int, detection: DetectionResult)],
+    ambiguousSurnameDetectionIDs: Set<UUID>,
+    appliedAt: Date
+) -> PreparedApply {
+    var createdRegions: [Int: [RedactionRegion]] = [:]
+    var createdMetadata: [UUID: RegionMetadata] = [:]
+    var createdAudit: [UUID: MatchAuditSnapshot] = [:]
+    for (page, detection) in detections {
+        let region = detection.toRegion()
+        createdRegions[page, default: []].append(region)
+        // Preserve the ambiguity flag onto the region's metadata so
+        // the canvas and detail view can still surface it after review.
+        createdMetadata[region.id] = RegionMetadata(
+            piiKind: detection.kind,
+            confidence: detection.confidence,
+            matchedText: detection.matchedText,
+            recognitionLevel: detection.recognitionLevel,
+            isAmbiguousSurname: ambiguousSurnameDetectionIDs.contains(detection.id)
+        )
+        createdAudit[region.id] = MatchAuditSnapshot(
+            detection: detection,
+            pageIndex: page,
+            regionID: region.id,
+            appliedAt: appliedAt
+        )
+    }
+    return PreparedApply(
+        createdRegions: createdRegions,
+        createdMetadata: createdMetadata,
+        createdAudit: createdAudit,
+        appliedCount: createdRegions.values.reduce(0) { $0 + $1.count },
+        skippedOverlaps: 0,
+        appliedResultIDs: [],
+        coveredResultIDs: []
     )
 }
 
