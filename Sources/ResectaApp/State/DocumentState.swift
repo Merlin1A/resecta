@@ -339,7 +339,7 @@ class DocumentState {
         }
     }
 
-    /// Toast copy for drop/file/photo rejection while the pipeline is
+    /// Toast copy for drop/file rejection while the pipeline is
     /// active. Mechanism-description language — names what the app
     /// declined to do plus a recovery hint.
     static let importBlockedDuringPipelineMessage =
@@ -347,7 +347,7 @@ class DocumentState {
 
     /// Toast copy for a drag-drop import declined because a detection
     /// review is open for the current document (the drop path bypasses the
-    /// import-while-editing confirmation that the file/photo pickers stage).
+    /// import-while-editing confirmation that the file picker stages).
     /// Mechanism-description language — names
     /// what the app declined to do plus a recovery hint.
     static let importBlockedDuringTriageMessage =

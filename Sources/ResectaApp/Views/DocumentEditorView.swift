@@ -103,7 +103,6 @@ struct DocumentEditorView: View {
 
     /// Bindings to trigger import/settings from parent ContentView
     @Binding var showFilePicker: Bool
-    @Binding var showPhotoPicker: Bool
     @Binding var showSettings: Bool
 
     enum DrawingTool {
