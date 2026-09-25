@@ -4,12 +4,13 @@ import SwiftUI
 //
 // The compact detent hugs the glanceable handle — the grabber capsule,
 // the walk's match line (kind · page · text) and one row of full-size
-// controls: the per-item Apply capsule and the ‹ › cluster with its
-// counter (`compactFloatStrip`, `+CompactStrip.swift`) — so the document
-// stays the primary surface while the sheet is parked and the result
-// walk, with its one-tap mark, continues from the handle. Height is a
-// fixed hug clamped to the available height, lifted at accessibility
-// type sizes for the taller line.
+// controls: the per-item Apply capsule (Select on the review origin)
+// and the ‹ › cluster with its counter (`compactFloatStrip`,
+// `+CompactStrip.swift`) — so the document stays the primary surface
+// while the sheet is parked and the walk — the search results or the
+// staged detection review — continues from the handle with its one-tap
+// mark. Height is a fixed hug clamped to the available height, lifted
+// at accessibility type sizes for the taller line.
 //
 // Two presentation regimes, measured on the iPhone 17 simulator (iOS 26):
 // up to a hug of 100 the system draws the parked sheet as a floating
@@ -23,7 +24,9 @@ import SwiftUI
 //
 // History: 60 (the title-only handle) → 72 (the ‹ › cluster) → 80 (the
 // per-item Apply) → 108 (the match line + full-size controls; 120 at
-// accessibility sizes).
+// accessibility sizes) → 108 unchanged when the staged detection review
+// took the same handle (the review walk: the pair, the counter and the
+// line over its rows, Select in the Apply slot — `ReviewWalk`).
 //
 // The pure-function `compactHeight(maxDetentValue:accessibilitySize:)`
 // helper isolates the math from the SwiftUI runtime so tests can verify
