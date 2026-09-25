@@ -22,29 +22,29 @@ import OSLog
 
 /// The common-word curation list the name gazetteer consults beside the
 /// surname Bloom filter.
-public struct NameCommonWords: Sendable {
+struct NameCommonWords: Sendable {
 
-    public enum LoaderError: Error {
+    enum LoaderError: Error {
         case resourceMissing
         case decodingFailed(underlying: Error)
         case unsupportedVersion(actual: Int, supported: ClosedRange<Int>)
     }
 
     /// The loader-version fence: bump when the sidecar's shape changes.
-    public static let supportedVersions: ClosedRange<Int> = 1...1
+    static let supportedVersions: ClosedRange<Int> = 1...1
 
     private let members: Set<String>
 
     /// Number of distinct curated words.
-    public var count: Int { members.count }
+    var count: Int { members.count }
 
     /// The curated words, NFKC-lowercased — exposed for audit and tests.
-    public var entries: Set<String> { members }
+    var entries: Set<String> { members }
 
     // MARK: - Init
 
     /// Load from the module bundle.
-    public init() throws {
+    init() throws {
         try self.init(bundle: .module)
     }
 
@@ -80,14 +80,14 @@ public struct NameCommonWords: Sendable {
     }
 
     /// Direct init for tests — normalizes at construction time.
-    public init(words: [String]) {
+    init(words: [String]) {
         self.members = Set(words.map(Self.normalize))
     }
 
     // MARK: - Lookup
 
     /// Whether `token` (any casing, any Unicode form) is a curated common word.
-    public func contains(_ token: String) -> Bool {
+    func contains(_ token: String) -> Bool {
         members.contains(Self.normalize(token))
     }
 

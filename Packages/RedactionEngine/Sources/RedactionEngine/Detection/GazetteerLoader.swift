@@ -27,7 +27,7 @@ import OSLog
 //     primitive; it is not on Apple's NSPrivacyAccessedAPITypes required-
 //     reason list. No new privacy-manifest entry required.
 
-public enum GazetteerLoader {
+enum GazetteerLoader {
 
     /// Errors returned when the on-disk crypto material is malformed. Internal
     /// because all callers convert into `PipelineError.detectionError(.detectionCorpusInvalid)`

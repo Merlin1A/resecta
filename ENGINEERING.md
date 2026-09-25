@@ -307,6 +307,38 @@ assets. The contract between the two repos is enforced, not eyeballed:
   (`Scripts/verify-shipped-asset-hashes.sh`) additionally pins the two most
   drift-prone config blobs byte-exact before any release build.
 
+## 9. The engine's public surface is the document-runner API
+
+The engine is a separate Swift module, so `public` is exactly what the app
+(or any other client) can see. The surface I keep public on purpose is the
+document-runner surface — what a client needs to import a page, rasterize it,
+detect, search, rebuild, verify and export without the app's view code:
+
+- Import and rasterize: `PDFPageData` · `PageRasterizer.rasterize`
+- Detection: `DetectionOrchestrator.detectPage`
+- Search: `DocumentSearcher` (`search` · `previewMatches` · the result and
+  diagnostic sink setters · `boundingRect` · the regex validators ·
+  `maxResults` · `sharedLoadDiagnostics`) · `SearchMode` · `SearchOptions` ·
+  `SearchResult` · `SearchPreviewResult`
+- Rebuild: `PDFStreamReconstructor`
+- Verification: `VerificationEngine.runLayer` / `aggregateStatus` /
+  `layers(for:)` · `VerificationOrchestrator` · `VerificationReport` ·
+  `LayerResult` · `VerificationLayer` · `AppliedSearchQuery` ·
+  `AppliedSearchRecord` · `SearchRecheckRequest`
+- Export: `TempExportDirectory` · `TempFileHardening` · `ExportMetadata` ·
+  `MatchAuditExporter`
+
+These are public because a runner or the app consumes them, along with the
+types their signatures carry and whatever else the app names; everything else
+in the package is `internal` or on its way there, and the test suites reach it
+through `@testable import`, so narrowing the surface costs no coverage.
+
+The check: `EnginePublicSurfaceTests` names every symbol in the list through a
+plain `import RedactionEngine`, so making one of them `internal` stops the
+engine test target from compiling. Its limit: it pins presence, not absence —
+nothing in it stops a new declaration from being made `public`; that stays a
+review question.
+
 ## Where to start reading
 
 If you review one path end-to-end, make it this one:

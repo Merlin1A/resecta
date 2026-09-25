@@ -14,7 +14,7 @@ import OSLog
 //   { "version": 1, "temperature": 1.23 }
 // The implementation ignores other fields.
 
-public struct CalibratedScorer: Sendable {
+struct CalibratedScorer: Sendable {
 
     private static let logger = Logger(subsystem: "resecta.engine", category: "calibrated-scorer")
 
@@ -22,7 +22,7 @@ public struct CalibratedScorer: Sendable {
     /// may move to per-class vector temperature; schema leaves room.
     private let temperature: Double
 
-    public init() {
+    init() {
         self.temperature = Self.loadTemperature(from: .module)
     }
 
@@ -31,7 +31,7 @@ public struct CalibratedScorer: Sendable {
     /// toward what the user's history says about this category. `contextLogit`
     /// is the learned context log-odds; it defaults to 0,
     /// so every existing caller and the w=0 placeholder path are unchanged.
-    public func posterior(raw: Double, priorMean: Double, contextLogit: Double = 0) -> Double {
+    func posterior(raw: Double, priorMean: Double, contextLogit: Double = 0) -> Double {
         let combined = Logit.logit(raw) + Logit.logit(priorMean) + contextLogit
         return Logit.sigmoid(combined)
     }

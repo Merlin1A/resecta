@@ -7,8 +7,8 @@ import OSLog
 // error shape, and the supportedVersions semantics so future loader
 // version-policy evolution is a single-site edit.
 
-public enum LoaderVersionFence {
-    public static func assert(
+enum LoaderVersionFence {
+    static func assert(
         actual: Int,
         supported: ClosedRange<Int>,
         assetName: String,

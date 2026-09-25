@@ -12,16 +12,16 @@ import OSLog
 //   2. A6 negative-context expansion — header-anchored category suppression
 //      (e.g., dampen SSN/NPI in the body of SSA correspondence).
 
-public struct InstitutionGazetteer: Sendable {
+struct InstitutionGazetteer: Sendable {
 
-    public struct Entry: Sendable, Equatable, Codable {
-        public let name: String
-        public let aliases: [String]
-        public let category: String
-        public let jurisdictions: [String]
+    struct Entry: Sendable, Equatable, Codable {
+        let name: String
+        let aliases: [String]
+        let category: String
+        let jurisdictions: [String]
     }
 
-    public enum LoaderError: Error {
+    enum LoaderError: Error {
         case resourceMissing
         case decodingFailed(underlying: Error)
         case unsupportedVersion(actual: Int, supported: ClosedRange<Int>)
@@ -29,7 +29,7 @@ public struct InstitutionGazetteer: Sendable {
 
     private static let supportedVersions: ClosedRange<Int> = 1...1
 
-    public let entries: [Entry]
+    let entries: [Entry]
 
     /// Lowercased name / alias → Entry. All keys normalized via
     /// `TextNormalizer.normalize(_:)` to match the scanning path.
@@ -42,7 +42,7 @@ public struct InstitutionGazetteer: Sendable {
     // MARK: - Init
 
     /// Load the gazetteer from the module bundle.
-    public init() throws {
+    init() throws {
         try self.init(bundle: .module)
     }
 
@@ -86,7 +86,7 @@ public struct InstitutionGazetteer: Sendable {
     private static let minScanKeyLength = 3
 
     /// Direct-init path for tests and composition.
-    public init(entries: [Entry]) {
+    init(entries: [Entry]) {
         self.entries = entries
 
         var byKey: [String: Entry] = [:]
@@ -117,7 +117,7 @@ public struct InstitutionGazetteer: Sendable {
     /// Exact match on the normalized full name or any alias. Case-insensitive,
     /// NFKC-normalized, and whitespace-trimmed so "  IRS  " and "irs" both
     /// resolve to the same entry.
-    public func institution(named name: String) -> Entry? {
+    func institution(named name: String) -> Entry? {
         byLoweredKey[Self.normalize(name)]
     }
 
@@ -126,7 +126,7 @@ public struct InstitutionGazetteer: Sendable {
     /// Matching requires the key to sit on a word boundary on both sides so
     /// 3-letter acronyms like "IRS" hit "IRS Form" without also hitting
     /// "prIRSnyk" or similar letter runs in ordinary English.
-    public func findInstitution(in text: String) -> Entry? {
+    func findInstitution(in text: String) -> Entry? {
         let haystack = TextNormalizer.normalize(text).lowercased()
         guard !haystack.isEmpty else { return nil }
         for key in scanKeys where Self.wordBoundedContains(haystack, key: key) {
@@ -170,7 +170,7 @@ public struct InstitutionGazetteer: Sendable {
     /// stub issuer names suppress body-text SSN/name matches identically to bank
     /// statement headers). Other categories return `nil` until their mapping is
     /// authorized. Extend here (not at call sites) so the mapping stays auditable.
-    public static func anchoredDoctype(for entry: Entry) -> DoctypeClass? {
+    static func anchoredDoctype(for entry: Entry) -> DoctypeClass? {
         switch entry.category {
         case "federal_agency":
             return .foia

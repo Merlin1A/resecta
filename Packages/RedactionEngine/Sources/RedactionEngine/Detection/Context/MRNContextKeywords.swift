@@ -7,12 +7,12 @@ import Foundation
 /// Positive: medical-document labels that corroborate an MRN.
 /// Negative: receipts / ecommerce / tracking labels common in non-medical
 /// docs that carry alphanumeric patient-ID-shaped strings.
-public enum MRNContextKeywords {
+enum MRNContextKeywords {
 
     /// Window radius ±5 tokens (A1).
     /// Base 0.55 (no context), boosted 0.92 (positive context),
     /// floor 0.15 (negative context cannot suppress below this).
-    public static let profile = KeywordProfile(
+    static let profile = KeywordProfile(
         positiveKeywords: [
             "patient",
             "medical record",

@@ -20,9 +20,9 @@ import OSLog
 // inert; callers check for nil via the optional shared instance in
 // AddressSpatialAssembler.
 
-public struct AddressComponentsGazetteer: Sendable {
+struct AddressComponentsGazetteer: Sendable {
 
-    public enum LoaderError: Error {
+    enum LoaderError: Error {
         case resourceMissing
         case decodingFailed(underlying: Error)
         case unsupportedVersion(actual: Int, supported: ClosedRange<Int>)
@@ -32,12 +32,12 @@ public struct AddressComponentsGazetteer: Sendable {
 
     private let cities: Set<String>
     private let counties: Set<String>
-    public let streetTypes: Set<String>
+    let streetTypes: Set<String>
 
     // MARK: - Init
 
     /// Load from the module bundle.
-    public init() throws {
+    init() throws {
         try self.init(bundle: .module)
     }
 
@@ -77,11 +77,11 @@ public struct AddressComponentsGazetteer: Sendable {
 
     // MARK: - Lookup
 
-    public func containsCity(_ name: String) -> Bool {
+    func containsCity(_ name: String) -> Bool {
         cities.contains(Self.normalize(name))
     }
 
-    public func containsCounty(_ name: String) -> Bool {
+    func containsCounty(_ name: String) -> Bool {
         counties.contains(Self.normalize(name))
     }
 
@@ -90,7 +90,7 @@ public struct AddressComponentsGazetteer: Sendable {
     /// The street-types set is loaded from the pipeline artifact; it mirrors
     /// the full-word vocabulary enumerated in the Swift address regex so future
     /// pipeline-driven changes to the list flow here without Swift edits.
-    public func containsStreetType(_ token: String) -> Bool {
+    func containsStreetType(_ token: String) -> Bool {
         streetTypes.contains(Self.normalize(token))
     }
 

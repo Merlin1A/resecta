@@ -4,25 +4,25 @@ import Foundation
 // O(n) — no regex, bypasses the per-page 5 s timeout.
 
 /// A candidate SSN span extracted by the state machine.
-public struct SSNCandidate: Sendable {
+struct SSNCandidate: Sendable {
     /// Three-digit area number (digits only).
-    public let area: String
+    let area: String
     /// Two-digit group number (digits only).
-    public let group: String
+    let group: String
     /// Four-digit serial number (digits only).
-    public let serial: String
+    let serial: String
     /// Range in the original string (NSRange for compatibility with PIIMatch).
-    public let range: NSRange
+    let range: NSRange
     /// The full matched text including separators.
-    public let matchedText: String
+    let matchedText: String
 }
 
 /// Linear-time state machine that scans text for SSN-shaped sequences.
 /// Produces raw candidates — structural validation and context scoring
 /// are applied downstream by SSNStructuralValidator and ContextWindowScorer.
-public struct SSNStateMachine: Sendable {
+struct SSNStateMachine: Sendable {
 
-    public init() {}
+    init() {}
 
     // Characters recognized as SSN separators (hyphen-minus, space, typographic dashes).
     private static let separators: Set<Character> = [
@@ -45,7 +45,7 @@ public struct SSNStateMachine: Sendable {
 
     /// Scan text and return all SSN-shaped candidate spans.
     /// Boundary enforcement: candidates preceded or followed by a digit are rejected.
-    public func scan(_ text: String) -> [SSNCandidate] {
+    func scan(_ text: String) -> [SSNCandidate] {
         guard !text.isEmpty else { return [] }
 
         var candidates: [SSNCandidate] = []

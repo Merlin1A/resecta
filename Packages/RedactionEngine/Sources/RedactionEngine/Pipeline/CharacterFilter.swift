@@ -560,7 +560,7 @@ extension FilterResult {
     ///     lineage hash is taken in the SOURCE frame and the digest records
     ///     the rotation for Layer 9; nil or an unrotated frame is the
     ///     unchanged digest.
-    public func toDigest(
+    func toDigest(
         pageIndex: Int,
         redactionRects: [CGRect],
         safetyMargin: CGFloat,

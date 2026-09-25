@@ -119,7 +119,7 @@ public struct NameGazetteer: Sendable {
     }
 
     /// Init from explicit filter data (for testing with golden files).
-    public init(surnameFilter: BloomFilter, givenNameFilter: BloomFilter,
+    init(surnameFilter: BloomFilter, givenNameFilter: BloomFilter,
                 nicknameGazetteer: NicknameGazetteer? = nil,
                 commonWords: NameCommonWords? = nil) {
         self.surnameFilter = surnameFilter

@@ -17,10 +17,10 @@ public struct EntityClusterer: Sendable {
         /// NFKC-lowered surname, or nil if the detected name is a single token.
         public let surname: String
         /// First letter of the given name if present.
-        public let firstInitial: Character?
+        let firstInitial: Character?
         /// The full matched text as it appears in the page (for similarity
         /// metrics). Case-preserving.
-        public let fullText: String
+        let fullText: String
 
         public init(detectionID: UUID, surname: String, firstInitial: Character?, fullText: String) {
             self.detectionID = detectionID
@@ -34,16 +34,16 @@ public struct EntityClusterer: Sendable {
         public let clusters: [[UUID]]
         public let bareSurnameFlags: Set<UUID>
 
-        public init(clusters: [[UUID]], bareSurnameFlags: Set<UUID>) {
+        init(clusters: [[UUID]], bareSurnameFlags: Set<UUID>) {
             self.clusters = clusters
             self.bareSurnameFlags = bareSurnameFlags
         }
     }
 
     /// A5 threshold — intra-cluster minimum repair similarity.
-    public static let similarityThreshold: Double = 0.70
+    static let similarityThreshold: Double = 0.70
     /// A5 threshold — bare-surname cluster disambiguation threshold.
-    public static let ambiguousSurnameClusterSize: Int = 15
+    static let ambiguousSurnameClusterSize: Int = 15
 
     public func cluster(names: [ClusterInput]) -> ClusterReport {
         guard names.count > 1 else {

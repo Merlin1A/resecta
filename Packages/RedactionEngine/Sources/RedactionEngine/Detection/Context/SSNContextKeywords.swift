@@ -8,14 +8,14 @@ import Foundation
 /// Positive keywords: labels that confirm an SSN.
 /// Negative keywords: labels near numeric sequences that are NOT SSNs
 /// (case numbers, docket numbers, invoice numbers, etc.).
-public enum SSNContextKeywords {
+enum SSNContextKeywords {
 
     /// The keyword profile for SSN context scoring.
     /// Window radius: ±5 tokens (per A1).
     /// Base confidence: 0.75 (no context).
     /// Boosted confidence: 0.95 (positive context).
     /// Floor: 0.25 (negative context cannot suppress below this, per A1 risk mitigation).
-    public static let profile = KeywordProfile(
+    static let profile = KeywordProfile(
         positiveKeywords: [
             "ssn",
             "social security",
