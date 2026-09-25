@@ -18,13 +18,11 @@ import SwiftUI
 // (`compactFloatStrip`, `applyCurrentResultButton`, `resultNavPrevious`,
 // `resultNavNext`); the line adds `walkMatchLine`.
 //
-// TWO compositions ride here for the on-sim pick (the RW-D finalists):
-// B1 "Stacked" — the line over today's row (Apply leading, the cluster
-// trailing) — and B4 "Centred" — an info row (the line, the counter at
-// its trailing edge) over ▲ · a wide centred Apply · ▼. The DEBUG launch
-// argument `--compactStripVariant=b4` selects B4; the default is B1 so
-// the XCUI runs are deterministic. The loser and the switch are deleted
-// after the pick.
+// The composition is the "Stacked" one of the two finalists the on-sim
+// variant study put to the pick (2026-09-24): the line over the row —
+// Apply leading, the cluster trailing — so every existing id and tap
+// habit carries over. The alternate ("Centred": an info row over ▲ · a
+// wide centred Apply · ▼) was built, shot and not taken.
 
 /// Where the ‹ › cluster is mounted. The medium+ search bar keeps its
 /// pinned geometry (Ø44 circles in 46-pt frames, pair spacing 6, a
@@ -50,43 +48,15 @@ enum ResultNavSite {
     }
 }
 
-#if DEBUG
-/// THROWAWAY — the variant study's switch. Deleted after the pick.
-enum CompactStripVariant {
-    case b1
-    case b4
-}
-#endif
-
 extension SearchAndRedactSheet {
 
-    #if DEBUG
-    static let compactStripVariant: CompactStripVariant =
-        CommandLine.arguments.contains("--compactStripVariant=b4") ? .b4 : .b1
-    #endif
-
+    /// The match line over the row — Apply leading, the cluster (‹ › +
+    /// counter) trailing; the title centred in the row only while no
+    /// walk is live (it would collide with the full-size cluster from
+    /// xLarge). At accessibility sizes the row is a plain HStack.
+    /// Identifier kept for the detent-layout pins; `children: .contain`
+    /// keeps the inner ids.
     var compactFloatStrip: some View {
-        Group {
-            #if DEBUG
-            if Self.compactStripVariant == .b4 {
-                compactStripCentred
-            } else {
-                compactStripStacked
-            }
-            #else
-            compactStripStacked
-            #endif
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("compactFloatStrip")
-    }
-
-    /// B1 "Stacked": the match line over the row — Apply leading, the
-    /// cluster (‹ › + counter) trailing; the title centred in the row
-    /// only while no walk is live (it would collide with the full-size
-    /// cluster from xLarge). At accessibility sizes the row is a plain
-    /// HStack.
-    private var compactStripStacked: some View {
         VStack(spacing: ResectaTokens.Spacing.xs) {
             walkMatchLine
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -125,40 +95,8 @@ extension SearchAndRedactSheet {
             .frame(minHeight: ResectaTokens.TouchTarget.minimum)
             Spacer(minLength: 0)
         }
-    }
-
-    /// B4 "Centred": an info row — the match line, the counter at its
-    /// trailing edge — over ▲ leading · a wide centred Apply · ▼
-    /// trailing; the title alone while no walk is live.
-    private var compactStripCentred: some View {
-        VStack(spacing: ResectaTokens.Spacing.xs) {
-            HStack(spacing: ResectaTokens.Spacing.sm) {
-                walkMatchLine
-                if showsResultNavCluster, dynamicTypeSize < .xxxLarge {
-                    Spacer(minLength: ResectaTokens.Spacing.sm)
-                    resultNavCounter(site: .parked)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, ResectaTokens.Spacing.md)
-            Group {
-                if showsResultNavCluster {
-                    HStack(spacing: 0) {
-                        resultNavButton(.previous, site: .parked)
-                        Spacer(minLength: 0)
-                        applyCurrentResultButton(horizontalPadding: ResectaTokens.Spacing.xl)
-                        Spacer(minLength: 0)
-                        resultNavButton(.next, site: .parked)
-                    }
-                    .padding(.horizontal, ResectaTokens.Spacing.md)
-                } else {
-                    compactStripTitle
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .frame(minHeight: ResectaTokens.TouchTarget.minimum)
-            Spacer(minLength: 0)
-        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("compactFloatStrip")
     }
 
     /// The compact handle's title — the centred headline, unchanged.

@@ -62,19 +62,16 @@ extension SearchAndRedactSheet {
     /// Identifier BEFORE `.disabled` so it stays on the AX surface while
     /// disabled (the detent-layout leg reads the disabled → enabled
     /// round-trip through it); the a11y label stays "Apply" in both
-    /// states. `horizontalPadding` is the site's label inset —
-    /// `Spacing.md` leading-aligned, `Spacing.xl` for a wide centred
-    /// capsule.
-    func applyCurrentResultButton(
-        horizontalPadding: CGFloat = ResectaTokens.Spacing.md
-    ) -> some View {
+    /// states. The label's inset is `Spacing.md`; the strip adds the
+    /// leading inset.
+    func applyCurrentResultButton() -> some View {
         Group {
             if applyCurrentResultApplied {
                 Button(action: applyCurrentResult) {
                     Label(AppliedFilter.applied.rawValue, systemImage: "checkmark")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, horizontalPadding)
+                        .padding(.horizontal, ResectaTokens.Spacing.md)
                         .frame(minHeight: ResectaTokens.TouchTarget.minimum)
                         .background(CircularIconButtonStyle.wash, in: Capsule())
                         .contentShape(Rectangle())
@@ -85,7 +82,7 @@ extension SearchAndRedactSheet {
                     Text("Apply")
                         .font(.headline)
                         .foregroundStyle(.white)
-                        .padding(.horizontal, horizontalPadding)
+                        .padding(.horizontal, ResectaTokens.Spacing.md)
                         .frame(minHeight: ResectaTokens.TouchTarget.minimum)
                         .background(ResectaTokens.BrandTeal.fill, in: Capsule())
                         .contentShape(Rectangle())
