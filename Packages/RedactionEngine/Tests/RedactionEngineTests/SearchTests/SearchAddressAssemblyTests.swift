@@ -150,12 +150,16 @@ struct SearchAddressAssemblyTests {
         // (text leg, Balanced, all categories, whole document). The address
         // wiring must not move any non-address category. Name counts are
         // deliberately NOT pinned (NER availability varies across hosts).
+        // Phone 5 -> 4 and account 0 -> 1 since a81fb91: the bare word
+        // "number" stopped being a phone cue and "account number" joined the
+        // phone negatives, so the statement's labelled account number is
+        // typed account instead of phone.
         let phoneCount = results.filter { $0.piiCategory == .phone }.count
         let emailCount = results.filter { $0.piiCategory == .email }.count
         let accountCount = results.filter { $0.piiCategory == .account }.count
-        #expect(phoneCount == 5, "phone count moved")
+        #expect(phoneCount == 4, "phone count moved")
         #expect(emailCount == 1, "email count moved")
-        #expect(accountCount == 0, "account count moved")
+        #expect(accountCount == 1, "account count moved")
     }
 
     // MARK: - Synthetic block (text leg)
