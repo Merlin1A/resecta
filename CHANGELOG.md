@@ -34,6 +34,7 @@ The entries below follow the Keep-a-Changelog index format.
 - Import: the annotation notice also counts filled form fields; their values are drawn by the viewer but are not carried into the output.
 - Search: when a regular expression is refused and its shape is one a built-in detector covers, the reason names that detector.
 - Import: Resecta opens PDF files only. The Files picker lists PDFs, a non-PDF file dropped on iPad is declined with a message, and the unsupported-format message and the empty sidebar say PDF.
+- **Verification Details.** The details list on the results screen opens from a card that summarises the run. Checks that need review, failed, carry a warning or were skipped are grouped under a Findings header and informational notes under a Notes header; passing checks show a check mark, as a compact row when there is nothing more to show, and the other checks show a status tile with a shape badge, with rows that need review or failed tinted. Check titles drop the "Layer N:" prefix and a check's run time moves into its expanded detail. A check's detail text no longer repeats its summary line, and the spatial check's page list matches its page links.
 
 ### Fixed
 
