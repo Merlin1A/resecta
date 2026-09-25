@@ -49,7 +49,7 @@ struct RedactWorkspaceView: View {
             // File importer
             .fileImporter(
                 isPresented: $showFilePicker,
-                allowedContentTypes: [.pdf, .image],
+                allowedContentTypes: [.pdf],
                 allowsMultipleSelection: false
             ) { result in
                 handleFileImportResult(result)
@@ -77,6 +77,14 @@ struct RedactWorkspaceView: View {
             // Drag and drop (iPad)
             .dropDestination(for: Data.self) { items, _ in
                 guard let data = items.first else { return false }
+                // Resecta opens PDF files only: an image payload is refused
+                // at the door with the unsupported-format message the Files
+                // import shows. Returning true snaps the payload back, as
+                // the gate below does on a rejection.
+                guard ImportService.admitsDroppedPayload(data) else {
+                    enqueueImportRefusedNotPDFToast()
+                    return true
+                }
                 // Reject drops while the pipeline is
                 // active OR a detection review is open. The drag-drop path is
                 // the sole importer that bypasses the import-while-editing
@@ -359,6 +367,16 @@ struct RedactWorkspaceView: View {
     private func enqueueImportBlockedToast() {
         toastManager.enqueue(
             DocumentState.importBlockedDuringPipelineMessage,
+            severity: .warning
+        )
+    }
+
+    /// Surface the refusal when a dropped payload is not a PDF (an image,
+    /// refused at the drop door). The copy is the unsupported-format
+    /// message, held on `DocumentState.importRefusedNotPDFMessage`.
+    private func enqueueImportRefusedNotPDFToast() {
+        toastManager.enqueue(
+            DocumentState.importRefusedNotPDFMessage,
             severity: .warning
         )
     }

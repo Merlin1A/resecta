@@ -61,7 +61,7 @@ struct HomeView: View {
             }
             .fileImporter(
                 isPresented: $showFilePicker,
-                allowedContentTypes: [.pdf, .image],
+                allowedContentTypes: [.pdf],
                 allowsMultipleSelection: false
             ) { result in
                 handleFileImportResult(result)

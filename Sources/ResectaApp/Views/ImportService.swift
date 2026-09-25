@@ -99,7 +99,7 @@ enum ImportService {
     /// (refusing unknown bytes would also refuse a PDF whose `%PDF` header
     /// is not at offset 0).
     static func admitsDroppedPayload(_ data: Data) -> Bool {
-        true
+        detectPayloadKind(from: data) != .image
     }
 
     // MARK: - Sendable Bridge Type
