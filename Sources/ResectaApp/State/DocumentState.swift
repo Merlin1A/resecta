@@ -339,7 +339,7 @@ class DocumentState {
         }
     }
 
-    /// Toast copy for drop/file/photo rejection while the pipeline is
+    /// Toast copy for drop/file rejection while the pipeline is
     /// active. Mechanism-description language — names what the app
     /// declined to do plus a recovery hint.
     static let importBlockedDuringPipelineMessage =
@@ -347,11 +347,17 @@ class DocumentState {
 
     /// Toast copy for a drag-drop import declined because a detection
     /// review is open for the current document (the drop path bypasses the
-    /// import-while-editing confirmation that the file/photo pickers stage).
+    /// import-while-editing confirmation that the file picker stages).
     /// Mechanism-description language — names
     /// what the app declined to do plus a recovery hint.
     static let importBlockedDuringTriageMessage =
         "Cannot import while reviewing detections. Apply or dismiss them first."
+
+    /// Toast copy for a dropped file that is not a PDF (an image payload,
+    /// refused at the drop door). It is the unsupported-format message the
+    /// Files import shows, so both refusals read the same words.
+    static let importRefusedNotPDFMessage =
+        PipelineError.importError(.unsupportedFormat).localizedRecovery
 
     /// One-time acknowledgement shadows
     /// for the three share-risk confirm families. `failShareAcknowledged`

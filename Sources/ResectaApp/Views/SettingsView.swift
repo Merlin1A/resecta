@@ -410,7 +410,7 @@ struct SettingsView: View {
 
     /// Paranoid-mode toggle. Off by default. Copy uses
     /// mechanism-description language only: each item
-    /// describes what the app does, not an outcome promise. The three
+    /// describes what the app does, not an outcome promise. The two
     /// listed behaviors land as a bundle — there are no per-behavior
     /// sub-toggles by locked design.
     ///
@@ -418,7 +418,9 @@ struct SettingsView: View {
     /// report-copy behavior was removed from the paranoid copy — that mechanism
     /// was parked on the overflow menu and never shipped
     /// (VerificationResultsView.swift), so claiming the paranoid mode suppresses
-    /// it was a false claim (four overrides → three).
+    /// it was a false claim (four overrides → three). The Live Photo
+    /// auxiliary-metadata strip left the copy when import became PDF-only:
+    /// no image reaches the import branch that runs it (three → two).
     private var paranoidModeSection: some View {
         Section {
             Toggle(isOn: Binding(
@@ -427,14 +429,14 @@ struct SettingsView: View {
             )) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Paranoid Mode")
-                    Text("When on, the app forces secure-rasterization mode, runs verification automatically, and removes auxiliary metadata from imported Live Photos.")
+                    Text("When on, the app forces secure-rasterization mode and runs verification automatically.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
-            .accessibilityHint("When enabled, the app applies three behavior overrides described below")
+            .accessibilityHint("When enabled, the app applies two behavior overrides described below")
 
-            // Explicit list of the three enforced behaviors. Phrased in
+            // Explicit list of the two enforced behaviors. Phrased in
             // mechanism-description language. Each row hides its
             // separator for visual continuity with the toggle row.
             VStack(alignment: .leading, spacing: 4) {
@@ -445,9 +447,6 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 Text("\u{2022} Verification runs before every export; the toggle above is disabled.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Text("\u{2022} Auxiliary metadata is removed from imported Live Photo / Portrait depth images.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

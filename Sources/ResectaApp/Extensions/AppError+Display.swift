@@ -93,7 +93,7 @@ extension PipelineError {
             case .tooLarge(let bytes):
                 "This file is approximately \(bytes / (1024 * 1024)) MB. Try a smaller document or reduce the page count."
             case .unsupportedFormat:
-                "Resecta works with PDF and image files (JPEG, PNG, HEIC). Other formats are not supported."
+                "Resecta works with PDF files. Other formats are not supported."
             case .invalidPageDimensions(let p):
                 "Page \(p + 1) has dimensions outside the supported range. Each page must be between 1 and 5,000 points."
             case .activeContent:

@@ -150,17 +150,20 @@ final class SettingsParanoidModeTests {
         #expect(gate == false)
     }
 
-    // MARK: - Three-overrides copy guard
+    // MARK: - Overrides copy guard
 
-    /// Paranoid mode enforces THREE behaviors, not four. The
+    /// Paranoid mode lists TWO behaviors. The
     /// "verification-report copy step" was parked on the overflow menu and
     /// never shipped (VerificationResultsView), so the copy that claimed
     /// paranoid mode suppresses it was a false mechanism claim. This guard
     /// reads the SettingsView source (mirroring the LegalKeyExistenceTests
     /// `#filePath` loader posture) and pins the corrected copy so a future
-    /// string edit cannot re-introduce the phantom fourth override.
-    @Test("Paranoid-mode copy describes three overrides, not the parked copy step")
-    func testParanoidModeHasThreeOverrides() throws {
+    /// string edit cannot re-introduce the phantom fourth override. The
+    /// Live Photo auxiliary-metadata strip left the listed behaviors when
+    /// import became PDF-only (no image reaches the branch that runs it),
+    /// so the hint counts two.
+    @Test("Paranoid-mode copy describes two overrides, not the parked copy step or the Live Photo strip")
+    func testParanoidModeHasTwoOverrides() throws {
         let source = try loadSettingsViewSource()
         #expect(
             !source.contains("verification-report copy"),
@@ -169,8 +172,11 @@ final class SettingsParanoidModeTests {
             !source.contains("applies four behavior overrides"),
             "Paranoid-mode accessibility hint still says 'four' behavior overrides.")
         #expect(
-            source.contains("applies three behavior overrides"),
-            "Paranoid-mode accessibility hint should say 'three' behavior overrides.")
+            source.contains("applies two behavior overrides"),
+            "Paranoid-mode accessibility hint should say 'two' behavior overrides.")
+        #expect(
+            !source.contains("imported Live Photo"),
+            "Paranoid-mode copy still describes the Live Photo metadata strip.")
     }
 
     private func loadSettingsViewSource(file: StaticString = #filePath) throws -> String {

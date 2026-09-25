@@ -1,12 +1,11 @@
 import SwiftUI
-import PhotosUI
 import PDFKit
 
 // Redact workspace container — extracted from ContentView.
 // Owns the navigation container, import handlers, and import-related state.
 // Injects workspace-scoped state into the environment for downstream views.
 // NavigationSplitView on iPad, NavigationStack on iPhone.
-// Import sources: Files, Photos, drag-and-drop.
+// Import sources: Files, drag-and-drop.
 
 struct RedactWorkspaceView: View {
     let workspace: RedactWorkspace
@@ -20,13 +19,11 @@ struct RedactWorkspaceView: View {
 
     // Import state (moved from ContentView)
     @State private var showFilePicker = false
-    @State private var showPhotoPicker = false
-    @State private var selectedPhoto: PhotosPickerItem?
     @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
 
     /// Handle for the in-flight import dispatch. Each
-    /// dispatch site (drop, file picker, photo picker, pending-import
-    /// after confirmation) cancels the prior task before launching a
+    /// dispatch site (drop, file picker, pending-import after
+    /// confirmation) cancels the prior task before launching a
     /// new one. Without this, a rapid double-input (e.g., two drops in
     /// quick succession, or the file picker re-firing on a held button)
     /// would race two ImportService.importDocument calls against the
@@ -42,27 +39,16 @@ struct RedactWorkspaceView: View {
     // Import-while-editing confirmation
     @State private var showImportWhileEditingConfirmation = false
     @State private var pendingImportURL: URL?
-    @State private var pendingImportData: Data?
 
     var body: some View {
         navigationContainer
             // File importer
             .fileImporter(
                 isPresented: $showFilePicker,
-                allowedContentTypes: [.pdf, .image],
+                allowedContentTypes: [.pdf],
                 allowsMultipleSelection: false
             ) { result in
                 handleFileImportResult(result)
-            }
-            // Photos picker
-            .photosPicker(
-                isPresented: $showPhotoPicker,
-                selection: $selectedPhoto,
-                matching: .images,
-                photoLibrary: .shared()
-            )
-            .onChange(of: selectedPhoto) { _, newValue in
-                handlePhotoSelection(newValue)
             }
             // Fire the text-layer toast on import completion for EVERY
             // import path. The Home -> redact load (openRedactWithDocument) runs
@@ -77,10 +63,18 @@ struct RedactWorkspaceView: View {
             // Drag and drop (iPad)
             .dropDestination(for: Data.self) { items, _ in
                 guard let data = items.first else { return false }
+                // Resecta opens PDF files only: an image payload is refused
+                // at the door with the unsupported-format message the Files
+                // import shows. Returning true snaps the payload back, as
+                // the gate below does on a rejection.
+                guard ImportService.admitsDroppedPayload(data) else {
+                    enqueueImportRefusedNotPDFToast()
+                    return true
+                }
                 // Reject drops while the pipeline is
                 // active OR a detection review is open. The drag-drop path is
                 // the sole importer that bypasses the import-while-editing
-                // confirmation the file/photo pickers stage, so it consults the
+                // confirmation the file picker stages, so it consults the
                 // composed `canStartImport(with:)` gate directly — a stranded
                 // triage sheet over a replacement document could stamp the prior
                 // document's page-coordinate regions onto the new one. The drop
@@ -141,7 +135,6 @@ struct RedactWorkspaceView: View {
                 }
                 Button("Cancel", role: .cancel) {
                     pendingImportURL = nil
-                    pendingImportData = nil
                 }
             } message: {
                 // Names what actually clears — there is no save
@@ -172,7 +165,7 @@ struct RedactWorkspaceView: View {
                     ContentUnavailableView(
                         "No Document",
                         systemImage: "doc",
-                        description: Text("Open a PDF or image to see pages here.")
+                        description: Text("Open a PDF to see pages here.")
                     )
                 }
             } detail: {
@@ -193,7 +186,6 @@ struct RedactWorkspaceView: View {
     private var detailContent: some View {
         DocumentEditorView(
             showFilePicker: $showFilePicker,
-            showPhotoPicker: $showPhotoPicker,
             showSettings: $showSettings
         )
     }
@@ -235,59 +227,6 @@ struct RedactWorkspaceView: View {
         }
     }
 
-    private func handlePhotoSelection(_ item: PhotosPickerItem?) {
-        guard let item else { return }
-        // Photos picker cannot stage a new document
-        // while the pipeline holds in-flight state.
-        guard workspace.documentState.canStartImport else {
-            enqueueImportBlockedToast()
-            selectedPhoto = nil
-            return
-        }
-        // Cancel any prior in-flight import dispatch —
-        // see `activeImportDispatch` doc-comment.
-        activeImportDispatch?.cancel()
-        activeImportDispatch = Task {
-            // The prior `try? await item.loadTransferable(...)` swallowed both
-            // throws and nil (e.g., iCloud-not-downloaded photo, transferable
-            // decode error). The `if let` then fell through with no
-            // user-visible signal — indistinguishable from a UI bug. The
-            // preferred routing is the existing Tier 2 `FailedStateView`
-            // via `.importError(.corrupt)`, so the user lands on the same
-            // recovery surface as a corrupt-PDF import.
-            let loaded: Data?
-            do {
-                loaded = try await item.loadTransferable(type: Data.self)
-            } catch { // LegalPhrases:safe (Swift keyword)
-                loaded = nil
-            }
-            guard let data = loaded else {
-                workspace.documentState.transition(to: .importing)
-                workspace.documentState.transition(to: .failed(
-                    error: .importError(.corrupt),
-                    returnPhase: .empty
-                ))
-                return
-            }
-            // Confirm if a document is already open
-            if workspace.documentState.sourceDocument != nil {
-                pendingImportData = data
-                showImportWhileEditingConfirmation = true
-            } else {
-                // Paranoid mode enables the LivePhotoAuxStripper hook
-                // on the import path.
-                await ImportService.importDocument(
-                    data: data, suggestedType: "image",
-                    documentState: workspace.documentState,
-                    redactionState: workspace.redactionState,
-                    stripAuxData: settingsState.paranoidMode
-                )
-            }
-        }
-        // Reset selection so the same photo can be re-selected
-        selectedPhoto = nil
-    }
-
     /// Dialog-grammar normalization — sentence-case question title,
     /// bare-verb destructive button.
     static let importWhileEditingTitle = "Replace the open document?"
@@ -305,16 +244,6 @@ struct RedactWorkspaceView: View {
                 // on the import path.
                 await ImportService.importDocument(
                     from: url,
-                    documentState: workspace.documentState,
-                    redactionState: workspace.redactionState,
-                    stripAuxData: settingsState.paranoidMode
-                )
-            } else if let data = pendingImportData {
-                pendingImportData = nil
-                // Paranoid mode enables the LivePhotoAuxStripper hook
-                // on the import path.
-                await ImportService.importDocument(
-                    data: data, suggestedType: "image",
                     documentState: workspace.documentState,
                     redactionState: workspace.redactionState,
                     stripAuxData: settingsState.paranoidMode
@@ -351,14 +280,24 @@ struct RedactWorkspaceView: View {
         }
     }
 
-    /// Surface the rejection when a drop, file picker,
-    /// or photos picker invocation arrives while the pipeline owns
+    /// Surface the rejection when a drop or a file picker
+    /// invocation arrives while the pipeline owns
     /// in-flight state. Mechanism-description copy lives on
     /// `DocumentState.importBlockedDuringPipelineMessage` so unit tests
     /// can assert on the exact string without crossing the View boundary.
     private func enqueueImportBlockedToast() {
         toastManager.enqueue(
             DocumentState.importBlockedDuringPipelineMessage,
+            severity: .warning
+        )
+    }
+
+    /// Surface the refusal when a dropped payload is not a PDF (an image,
+    /// refused at the drop door). The copy is the unsupported-format
+    /// message, held on `DocumentState.importRefusedNotPDFMessage`.
+    private func enqueueImportRefusedNotPDFToast() {
+        toastManager.enqueue(
+            DocumentState.importRefusedNotPDFMessage,
             severity: .warning
         )
     }
