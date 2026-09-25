@@ -553,54 +553,67 @@ class RedactionState {
 
     /// Reset all state for a new document import. Called only after validation
     /// succeeds — old state is preserved until the new document is confirmed valid.
+    /// The teardown itself is `resetDocumentSession()` (shared with
+    /// `clearAll()`); the statements below are the ones only a replacement
+    /// document performs.
     func clearForNewDocument() {
-        regionVersion += 1
-        clearOutput()
-        // A replacement document must not inherit the prior
-        // document's apply-commit deselection facts: the counts describe
-        // search results on the PRIOR document, and `clearOutput()` above
-        // deliberately leaves this field alone (it survives pipeline
-        // retries), so the document boundary is where it is dropped.
-        pendingRunDeselection = nil
-        regions = [:]
-        detectionResults = [:]
-        ocrPixelCapSkippedPages = []
-        selectedRegionIDs = []
-        regionsModifiedSinceVerification = false
-        invalidateRegionCaches()
-        regionPageIndex.removeAll()
-        // New-document load. Reset the
-        // manual-draw nudge state explicitly so a new document never
-        // inherits the previous document's suppression.
-        manualDrawNudgeSuppressedForSession = false
-        pendingManualDrawNudge = nil
-        // Also drop any pending magic-wand request so a
-        // new-document / clearAll path doesn't inherit a stale term.
-        pendingMagicWandRequest = nil
-        // Data integrity: a replacement document must not inherit the
-        // prior document's pending detection review. `pendingTriage` /
-        // `triageSelections` carry detections whose page/coordinate data belong
-        // to the PRIOR document; left un-cleared, an Accept in a stranded triage
-        // sheet would stamp wrong-coordinate regions onto the new document.
-        pendingTriage = nil
-        triageSelections = [:]
-        // A replacement document must not inherit the prior document's
-        // detection-run record or promotion flag — the banner would
-        // describe a run that never happened on this document.
-        lastDetectionRun = nil
-        triagePromotionOccurred = false
-        // Cancel and drop any in-flight search so its sheet does not
-        // linger into the new document — mirrors the clearAll() pattern (the
-        // `activeSearch` didSet does not itself cancel the search task).
-        dismissActiveSearch()
+        resetDocumentSession()
         // A healthy second-document run must not show the prior run's
         // "auto-detect degraded" banner (`signalDegradedDetection` treats the
         // flag as an already-toasted gate and never resets it).
         autoDetectionDegraded = false
         autoDetectionDegradeFailures = []
-        // Drop any pending canvas-rationale request so a stale region
-        // UUID does not present a blank rationale sheet over the new document.
+    }
+
+    /// The teardown both document boundaries share — `clearForNewDocument()`
+    /// (a replacement document) and `clearAll()` (document close). Order:
+    /// `regionVersion` bumps first and `clearOutput()` runs before any
+    /// region wipe, so the published `outputURL` is nil before a UI
+    /// observer reacts to the regions going; the rest is a plain reset of
+    /// per-document state, each drop named by what it keeps from leaking
+    /// into the next document.
+    private func resetDocumentSession() {
+        regionVersion += 1
+        clearOutput()
+        // The apply-commit deselection facts describe search results on
+        // the PRIOR document; `clearOutput()` deliberately leaves them
+        // alone (they survive pipeline retries), so the document boundary
+        // is where they are dropped.
+        pendingRunDeselection = nil
+        // A full-document reset: no regions remain, so "regions modified
+        // since verification" is logically false.
+        regionsModifiedSinceVerification = false
+        regions = [:]
+        detectionResults = [:]
+        selectedRegionIDs = []
+        // Cancel and drop any in-flight search so its sheet does not
+        // linger into the next document (the `activeSearch` didSet does
+        // not itself cancel the search task).
+        dismissActiveSearch()
+        // `pendingTriage` / `triageSelections` carry detections whose
+        // page/coordinate data belong to the PRIOR document; left
+        // un-cleared, an Accept in a stranded review would stamp
+        // wrong-coordinate regions onto the next document.
+        pendingTriage = nil
+        triageSelections = [:]
+        // The detection-run record + promotion flag would describe a run
+        // that never happened on the next document.
+        lastDetectionRun = nil
+        triagePromotionOccurred = false
+        // A stale region UUID must not present a blank rationale sheet
+        // over the next document.
         pendingCanvasRationaleRequest = nil
+        ocrPixelCapSkippedPages = []
+        // The manual-draw nudge state and any pending magic-wand request
+        // never carry across documents. The `activeSearch` didSet above
+        // already resets the nudge flag; the explicit reset keeps the
+        // contract for a caller that clears state without crossing that
+        // boundary.
+        manualDrawNudgeSuppressedForSession = false
+        pendingManualDrawNudge = nil
+        pendingMagicWandRequest = nil
+        invalidateRegionCaches()
+        regionPageIndex.removeAll()
     }
 
     /// Clear pre-redaction text extraction buffer on success path.
@@ -1791,35 +1804,12 @@ class RedactionState {
     /// Must be called on .editing → .empty and .editing → .importing transitions.
     /// Extends clearOutput() to also clear regions, detections, triage state, and
     /// metadata — preventing PII (matchedText) from persisting in memory across documents.
+    /// The teardown itself is `resetDocumentSession()` (shared with
+    /// `clearForNewDocument()`); the statements below are the ones only a
+    /// document close performs.
     func clearAll() {
-        regionVersion += 1
-        // clearOutput() must be called FIRST so the published
-        // `outputURL` is nil before any UI observer reacts to the regions
-        // wipe. clearVerification() is decoupled from the
-        // verified-current flag; clearAll is a full-document reset, so
-        // we set the flag explicitly here — there are no regions left
-        // after this method, so "regions modified since verification"
-        // is logically false.
-        clearOutput()
-        // Document close must not leave the apply-commit
-        // deselection facts (see `clearForNewDocument()`) around for a
-        // next opened document to inherit.
-        pendingRunDeselection = nil
-        regionsModifiedSinceVerification = false
-        regions = [:]
-        detectionResults = [:]
-        selectedRegionIDs = []
+        resetDocumentSession()
         hoveredRegionID = nil
-        dismissActiveSearch()
-        pendingTriage = nil
-        triageSelections = [:]
-        // Document close drops the detection-run record + promotion flag —
-        // the banner must not describe a closed document's run.
-        lastDetectionRun = nil
-        triagePromotionOccurred = false
-        // Drop any pending canvas-rationale request on document close
-        // so a stale region UUID cannot present a blank rationale sheet.
-        pendingCanvasRationaleRequest = nil
         regionMetadata = [:]
         // Audit is per-document-session only; never leaks across docs.
         appliedMatchAudit = [:]
@@ -1833,22 +1823,8 @@ class RedactionState {
         priors = Self.loadPriors(defaults: priorsDefaults)
         surfaceForms = SurfaceFormDictionary()
         pageDiagnostics = [:]
-        ocrPixelCapSkippedPages = []
         ambiguousSurnameDetectionIDs = []
         crossPageEntityGroups = []
-        // Document close. The
-        // `activeSearch = nil` assignment above already triggers the
-        // didSet which resets the nudge flag; the explicit reset here
-        // is defensive so a hypothetical future caller that clears
-        // state without crossing the activeSearch boundary still
-        // satisfies the contract.
-        manualDrawNudgeSuppressedForSession = false
-        pendingManualDrawNudge = nil
-        // Also drop any pending magic-wand request so a
-        // new-document / clearAll path doesn't inherit a stale term.
-        pendingMagicWandRequest = nil
-        invalidateRegionCaches()
-        regionPageIndex.removeAll()
     }
 
     // MARK: - Undo Helper
