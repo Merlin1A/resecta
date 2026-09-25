@@ -8,15 +8,17 @@ import SwiftUI
 //
 // The strip is a taller handle (`CompactFloatDetent`, hug 108 / 120 at
 // accessibility sizes): the walk's match line — kind · page · text
-// (`SearchState.walkLine`) — over one row of full-size controls: the
-// per-item Apply capsule and the ‹ › pair with its counter. The page bar
-// steps aside beneath it while the walk is live, so the line's page
-// readout is the one page orientation on screen. The line's slot is
-// reserved in every state so the layout never jumps between results /
-// no results / a pending review; with no walk the row carries the
-// interface title alone. Every id the detent-layout pins read is kept
-// (`compactFloatStrip`, `applyCurrentResultButton`, `resultNavPrevious`,
-// `resultNavNext`); the line adds `walkMatchLine`.
+// (`SearchState.walkLine` for the search walk, `ReviewWalk.line` for
+// the staged detection review) — over one row of full-size controls:
+// the per-item Apply capsule (Select on the review origin) and the ‹ ›
+// pair with its counter. The page bar steps aside beneath it while
+// either walk is live, so the line's page readout is the one page
+// orientation on screen. The line's slot is reserved in every state so
+// the layout never jumps between results / no results / the review;
+// with no walk the row carries the interface title alone. Every id the
+// detent-layout pins read is kept (`compactFloatStrip`,
+// `applyCurrentResultButton`, `resultNavPrevious`, `resultNavNext`); the
+// line adds `walkMatchLine`.
 //
 // The composition is the "Stacked" one of the two finalists the on-sim
 // variant study put to the pick (2026-09-24): the line over the row —
@@ -108,20 +110,24 @@ extension SearchAndRedactSheet {
 
     // MARK: - The match line
 
-    /// The strip's second line (`SearchState.walkLine`): the current
-    /// match's kind · "Page k of N" · text, the text under
-    /// `.privacySensitive()` (the app-switcher snapshot; the list rows
-    /// and the toasts already expose it) and the first thing dropped
-    /// at large sizes; the page readout `monospacedDigit` with a numeric
-    /// transition and never truncated; the separator is the page bar's
-    /// dot. "Hidden by filters" for a current the active filters hide;
-    /// the list's own headline with no walk; nothing in the pre-search
-    /// contexts and under a pending review. One AX element, one id.
+    /// The strip's second line (`SearchState.walkLine`, or
+    /// `ReviewWalk.line` while the staged review owns the Scan
+    /// interface): the current match's kind · "Page k of N" · text, the
+    /// text under `.privacySensitive()` (the app-switcher snapshot; the
+    /// list rows and the toasts already expose it) and the first thing
+    /// dropped at large sizes; the page readout `monospacedDigit` with a
+    /// numeric transition and never truncated; the separator is the
+    /// page bar's dot. "Hidden by filters" for a current the active
+    /// filters hide; the list's own headline with no walk; nothing in
+    /// the pre-search contexts and before the review walk's first step.
+    /// One AX element, one id.
     @ViewBuilder
     var walkMatchLine: some View {
-        let line = searchState.walkLine(
-            pageCount: documentState.pageCount,
-            reviewPending: redactionState.pendingTriage != nil)
+        let line = isReviewActive
+            ? liveReviewWalk.line(pageCount: documentState.pageCount)
+            : searchState.walkLine(
+                pageCount: documentState.pageCount,
+                reviewPending: redactionState.pendingTriage != nil)
         Group {
             switch line {
             case .match(let summary):
@@ -172,5 +178,24 @@ extension SearchAndRedactSheet {
         Text("\u{B7}")
             .foregroundStyle(.quaternary)
             .padding(.horizontal, ResectaTokens.Spacing.xxs)
+    }
+
+    // MARK: - The review walk's counter
+
+    /// The k/N counter for the review walk — the search counter's plain
+    /// form (the walk covers every staged detection; no filter to
+    /// respect) with the same label; nothing before the first step.
+    /// Mounted by the hub's `resultNavCounter` while the review owns
+    /// the Scan interface.
+    @ViewBuilder
+    func reviewWalkCounter(site: ResultNavSite) -> some View {
+        let walk = liveReviewWalk
+        if let index = walk.currentIndex {
+            Text("\(index + 1)/\(walk.count)")
+                .font(site.counterFont)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Result \(index + 1) of \(walk.count)")
+        }
     }
 }

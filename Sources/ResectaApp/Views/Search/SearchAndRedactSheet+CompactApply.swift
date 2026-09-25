@@ -24,6 +24,16 @@ import SwiftUI
 // semantics. The parked sheet is drawn at 0.96 (the attached regime,
 // `CompactFloatDetent`), so the 46-pt layout floor serves 44.2 pt
 // effective.
+//
+// On the review origin — the staged detection review owning the Scan
+// interface — the same slot holds SELECT, the row checkbox's sibling:
+// one tap marks the review walk's current row selected (the
+// `triageSelections` entry the checkbox drives; "Selected" reads back
+// on the wash and stays tappable, the next tap deselects), and the
+// header's "Apply N" commits, as it always did. No region is created
+// from the strip on this origin, so nothing to undo and no toast; the
+// haptic is the checkbox's. The id is the same; the label switches
+// with the origin.
 
 extension SearchAndRedactSheet {
 
@@ -63,8 +73,20 @@ extension SearchAndRedactSheet {
     /// disabled (the detent-layout leg reads the disabled → enabled
     /// round-trip through it); the a11y label stays "Apply" in both
     /// states. The label's inset is `Spacing.md`; the strip adds the
-    /// leading inset.
+    /// leading inset. On the review origin the slot mounts
+    /// `reviewSelectButton` instead.
     func applyCurrentResultButton() -> some View {
+        Group {
+            if isReviewActive {
+                reviewSelectButton()
+            } else {
+                searchApplyButton()
+            }
+        }
+    }
+
+    /// The search origin's builder — the capsule / ✓ "Applied" pair.
+    private func searchApplyButton() -> some View {
         Group {
             if applyCurrentResultApplied {
                 Button(action: applyCurrentResult) {
@@ -95,6 +117,64 @@ extension SearchAndRedactSheet {
         .accessibilityIdentifier("applyCurrentResultButton")
         .disabled(applyCurrentResultDisabled)
     }
+
+    // MARK: - Per-item Select (the review origin)
+
+    /// The review origin's sibling of the Apply capsule: "Select" on the
+    /// same fill, or ✓ "Selected" on the wash — enabled either way (the
+    /// second tap deselects), the selected trait for VoiceOver and the
+    /// checkbox's haptic; dimmed with no current row (before the first
+    /// step). The same identifier, the origin's own label; identifier
+    /// BEFORE `.disabled` as on the search origin.
+    private func reviewSelectButton() -> some View {
+        let selected = reviewCurrentSelected
+        return Group {
+            if selected {
+                Button(action: toggleReviewCurrentSelection) {
+                    Label("Selected", systemImage: "checkmark")
+                        .font(.headline)
+                        .padding(.horizontal, ResectaTokens.Spacing.md)
+                        .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                        .background(CircularIconButtonStyle.wash, in: Capsule())
+                        .contentShape(Rectangle())
+                }
+            } else {
+                Button(action: toggleReviewCurrentSelection) {
+                    Text("Select")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, ResectaTokens.Spacing.md)
+                        .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                        .background(ResectaTokens.BrandTeal.fill, in: Capsule())
+                        .contentShape(Rectangle())
+                }
+            }
+        }
+        .buttonStyle(.capsulePress)
+        .sensoryFeedback(.selection, trigger: selected)
+        .accessibilityLabel("Select")
+        .accessibilityHint("Selects the current detection for redaction; tap again to deselect.")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("applyCurrentResultButton")
+        .disabled(liveReviewWalk.current == nil)
+    }
+
+    /// The review walk's current row is selected — the checkbox's read
+    /// (an absent id is not selected).
+    private var reviewCurrentSelected: Bool {
+        guard let id = liveReviewWalk.currentID else { return false }
+        return redactionState.triageSelections[id] ?? false
+    }
+
+    /// The checkbox's write for the current row, plus the conditional-
+    /// dismiss mark the checkbox makes (a toggle is user selection work).
+    private func toggleReviewCurrentSelection() {
+        guard let id = liveReviewWalk.currentID else { return }
+        ReviewWalk.toggleSelection(of: id, in: &redactionState.triageSelections)
+        searchState.userModifiedSelections = true
+    }
+
+    // MARK: - The search origin's reads
 
     /// The applied read for the one result — `SearchState.isAppliedOrCovered`
     /// (applied ∪ dedup-covered), the header Apply's graying predicate.
