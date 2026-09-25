@@ -13,7 +13,7 @@ import Foundation
 /// be adversarial. Users needing alternation-under-quantification can
 /// rewrite with bounded repetition (`{n,m}` with finite upper bound) or
 /// atomic groups.
-public enum RegexSafetyPrecheck {
+enum RegexSafetyPrecheck {
 
     /// Returns true if the pattern contains a group followed by an unbounded
     /// quantifier (`*`, `+`, `{n,}`) and that group either contains another
@@ -27,7 +27,7 @@ public enum RegexSafetyPrecheck {
     /// inside the group delimits (`(\.\d+)*`, `([a-z]+ )+`): with the
     /// iteration boundary fixed by the literal the shape is at worst
     /// polynomial — the runtime sentinel's class, not this precheck's.
-    public static func isLikelyPathological(_ pattern: String) -> Bool {
+    static func isLikelyPathological(_ pattern: String) -> Bool {
         let chars = Array(pattern)
         var nestedUnboundedCache: Bool? = nil
         func nestedUnboundedStands() -> Bool {
