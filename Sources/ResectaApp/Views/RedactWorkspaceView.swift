@@ -180,7 +180,7 @@ struct RedactWorkspaceView: View {
                     ContentUnavailableView(
                         "No Document",
                         systemImage: "doc",
-                        description: Text("Open a PDF or image to see pages here.")
+                        description: Text("Open a PDF to see pages here.")
                     )
                 }
             } detail: {
