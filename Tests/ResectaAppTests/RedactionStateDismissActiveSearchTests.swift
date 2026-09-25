@@ -64,7 +64,11 @@ struct RedactionStateDismissActiveSearchTests {
 
         let state = try loadRepoFile("Sources/ResectaApp/State/RedactionState.swift")
         let uses = state.components(separatedBy: "dismissActiveSearch()").count - 1
-        #expect(uses >= 3, "declaration + clearForNewDocument + clearAll (read \(uses))")
+        #expect(uses >= 2, "declaration + the one teardown both lifecycle resets call (read \(uses))")
+        // The call form (indented, on its own line) — the declaration and
+        // the doc comments that name the helper are not calls.
+        let resets = state.components(separatedBy: "\n        resetDocumentSession()\n").count - 1
+        #expect(resets == 2, "clearForNewDocument + clearAll each call the one teardown (read \(resets))")
         #expect(!state.contains("MainActor.assumeIsolated { search?.cancelSearchWithoutAwait() }\n        pendingTriage"),
                 "clearAll no longer inlines the teardown")
     }
