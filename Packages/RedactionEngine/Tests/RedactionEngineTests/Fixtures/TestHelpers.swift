@@ -120,7 +120,7 @@ extension TestFixtures {
     static let loanPacketScanSimSHA256 =
         "9af85bcef11b7e0cc14db1b43040f0cc121482598a8f5174296775268bf51874"
     static let loanPacketGroundTruthSHA256 =
-        "c1f56c7ce86fef50656d9472b1bbbf10ae7d1427fc07fb50e527bcc6ebd1e58d"
+        "dbbf59b3a769a36e61178a5ccdf2e38b421fb266052183924960eba871874383"
 
     /// Page count of the committed loan-packet fixture (identity pin).
     static let loanPacketPageCount = 12
