@@ -3,8 +3,7 @@
 # CONTRIBUTING "Audit checklist"), plus the script-local checks AL-1..AL-6
 # (XcodeGen sync · resources: no-op warn · sample-statement and loan-packet
 # dual-copy byte identity · silent test guards on added lines · planning
-# shorthand on added lines, report-only) — numbering note at the AL-1
-# section below.
+# shorthand on added lines) — numbering note at the AL-1 section below.
 # Symlinked into .git/hooks/pre-commit by install-hooks.sh.
 #
 # Scope: staged Added/Modified files (`git diff --cached --diff-filter=AM`).
@@ -168,9 +167,11 @@ scan_added() {
 M1_RE='\b(guarantee[ds]?|ensure[ds]?|impossible|find(?:s|ing)?|catch(?:es|ing)?|perfectly|flawlessly)\b|100%'
 # AL-6's pattern (used by the self-test below and the AL-6 section at the end):
 # the register-identifier shape of the private planning notes — a short
-# upper-case prefix, an optional hyphen, digits. Case-sensitive on purpose:
-# `p3-1` is arithmetic, `P3-1` is a citation.
-AL6_RE='\b(D12|C12|F12|M12|Q12|RB12|SR12|SR|AL|PB|UXC|DC|R111|S4|P3)-?[0-9]+\b'
+# upper-case prefix, a hyphen, digits. Case-sensitive on purpose: `p3-1` is
+# arithmetic, `P3-1` is a citation. The hyphen is required: without it a
+# prefix running straight into digits (a licence number such as `S4482911`)
+# would read as a citation.
+AL6_RE='\b(D12|C12|F12|M12|Q12|RB12|SR12|SR|AL|PB|UXC|DC|R111|S4|P3)-[0-9]+\b'
 
 # --self-test: the keyword rule against five synthetic Swift lines. The
 # two comment lines (3 and 5) must be the only hits; anything else means
@@ -191,9 +192,10 @@ if [ -n "$SELF_TEST" ]; then
         echo "audit-lint --self-test: M-1 keyword rule DRIFTED — expected hits on lines 3 and 5, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
         exit 1
     fi
-    # AL-6 against five synthetic lines: a comment citing a register id (1)
+    # AL-6 against six synthetic lines: a comment citing a register id (1)
     # and a string citing one (4) are the only hits; an arithmetic `p3-1`
-    # (2), a marked line (3) and a lower-case token (5) pass.
+    # (2), a marked line (3), a lower-case token (5) and a licence-number
+    # literal with no hyphen (6) pass.
     expected=$'1\n4'
     actual=$(printf '%s\n' \
         '        // D12-155 fence: the OCR body stays one' \
@@ -201,10 +203,11 @@ if [ -n "$SELF_TEST" ]; then
         '        // Shorthand:ok C12-118 cited on purpose' \
         '        let note = "see C12-118 for the split"' \
         '        // the al-6 rule is case-sensitive' \
+        '        let id = "DL S4482911"' \
         | PATTERN="$AL6_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL" \
         | cut -d: -f1)
     if [ "$actual" = "$expected" ]; then
-        echo "audit-lint --self-test: AL-6 shorthand rule OK (hits on lines 1 and 4 of 5; the comment and the string)"
+        echo "audit-lint --self-test: AL-6 shorthand rule OK (hits on lines 1 and 4 of 6; the comment and the string)"
         exit 0
     fi
     echo "audit-lint --self-test: AL-6 shorthand rule DRIFTED — expected hits on lines 1 and 4, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
@@ -456,21 +459,20 @@ else
     warn "AL-5 skipped: $AL5_SCANNER or python3 not found"
 fi
 
-# ── AL-6 planning shorthand on added lines (report-only) ────────────────
+# ── AL-6 planning shorthand on added lines ──────────────────────────────
 # Shipped source, tests and string tables describe mechanisms; they never
 # cite the private planning registers that scheduled the work, and a
 # reader of the repository has no way to resolve such a citation. This
 # check reports, on each added line of a .swift or .xcstrings file, a token
-# in the register-identifier shape (AL6_RE, defined with M-1 above). It is
-# a warning, never an offence, until the last of the staged source splits
-# has merged; the switch to `violate` is a one-line change here. Same-line
-# marker: `Shorthand:ok <reason>`. The mechanical twin of the datapipeline's
-# hygiene gate (scripts/hygiene_gate.py there scans the whole tree; this
-# one scans the lines a change adds).
+# in the register-identifier shape (AL6_RE, defined with M-1 above) as an
+# offence: the pre-commit hook blocks the commit and the pull-request gate
+# fails. Same-line marker: `Shorthand:ok <reason>`. The mechanical twin
+# of the datapipeline's hygiene gate (scripts/hygiene_gate.py there scans
+# the whole tree; this one scans the lines a change adds).
 for path in "${STAGED[@]}"; do
     case "$path" in *.swift|*.xcstrings) ;; *) continue ;; esac
     while IFS= read -r off; do
-        [ -n "$off" ] && warn "AL-6 planning shorthand (report-only): $path:$off"
+        [ -n "$off" ] && violate "AL-6 planning shorthand: $path:$off"
     done < <(CASE_SENSITIVE=1 scan_added "$path" "$AL6_RE" "Shorthand:ok")
 done
 
