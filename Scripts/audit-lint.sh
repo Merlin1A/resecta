@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # audit-lint.sh — pre-commit gate (mechanical checks M-1..M-6; see
-# CONTRIBUTING "Audit checklist"), plus the script-local checks AL-1..AL-5
+# CONTRIBUTING "Audit checklist"), plus the script-local checks AL-1..AL-6
 # (XcodeGen sync · resources: no-op warn · sample-statement and loan-packet
-# dual-copy byte identity · silent test guards on added lines) — numbering
-# note at the AL-1 section below.
+# dual-copy byte identity · silent test guards on added lines · planning
+# shorthand on added lines, report-only) — numbering note at the AL-1
+# section below.
 # Symlinked into .git/hooks/pre-commit by install-hooks.sh.
 #
 # Scope: staged Added/Modified files (`git diff --cached --diff-filter=AM`).
@@ -20,12 +21,14 @@
 #
 # Usage: Scripts/audit-lint.sh                 (staged mode; the pre-commit hook)
 #        Scripts/audit-lint.sh --range A..B    (range mode; the pull-request gate)
-#        Scripts/audit-lint.sh --self-test     (the M-1 keyword rule against five
-#                                               synthetic lines; exit 1 on drift)
+#        Scripts/audit-lint.sh --self-test     (the M-1 keyword rule and the AL-6
+#                                               shorthand rule against synthetic
+#                                               lines; exit 1 on drift)
 #
 # Override markers (substring on the same line):
 #   LegalPhrases:safe          → exempts a forbidden-phrase hit (M-1)
 #   Networking:exempt SafariView → exempts a banned-symbol hit (M-3)
+#   Shorthand:ok <reason>      → exempts a planning-shorthand hit (AL-6)
 #
 # M-1 in a .swift file skips a match that is Swift syntax rather than prose:
 # `catch` / `do` at statement position (or a `catch` clause after code on the
@@ -91,7 +94,7 @@ violate() { printf '%s\n' "$1" >&2; FAIL=$((FAIL + 1)); }
 
 # The line scanner (perl; env-configured). Reads a unified diff and walks
 # its added (+) lines, or with PLAIN=1 reads plain lines (the self-test).
-# PATTERN = the case-insensitive regex; OVERRIDE = the same-line marker
+# PATTERN = the regex, case-insensitive unless CASE_SENSITIVE=1; OVERRIDE = the same-line marker
 # that exempts a line (empty disables); KEYWORD_EXEMPT=1 = the M-1 Swift
 # rule: a match is skipped when it sits in the code part of the line
 # (before any `//`) and is `catch` / `do` at statement position (only
@@ -103,7 +106,7 @@ violate() { printf '%s\n' "$1" >&2; FAIL=$((FAIL + 1)); }
 # "<line>: <body>" per offending line.
 SCAN_PERL='
     my $line  = 0;
-    my $re    = qr/$ENV{PATTERN}/i;
+    my $re    = $ENV{CASE_SENSITIVE} ? qr/$ENV{PATTERN}/ : qr/$ENV{PATTERN}/i;
     my $ovr   = $ENV{OVERRIDE} // "";
     my $plain = $ENV{PLAIN} // "";
     my $kw    = $ENV{KEYWORD_EXEMPT} // "";
@@ -149,11 +152,12 @@ SCAN_PERL='
 
 # Walk added (+) lines from $1's staged diff. Match perl regex $2,
 # skip lines containing override marker $3 (empty disables override);
-# $4 = 1 applies the Swift keyword rule (M-1 on .swift files).
+# $4 = 1 applies the Swift keyword rule (M-1 on .swift files). The regex
+# is case-insensitive unless the caller sets CASE_SENSITIVE=1 (AL-6).
 scan_added() {
     local path="$1" pattern="$2" override="$3" keyword="${4:-}"
     diff_added_hunks "$path" \
-        | PATTERN="$pattern" OVERRIDE="$override" KEYWORD_EXEMPT="$keyword" perl -e "$SCAN_PERL"
+        | PATTERN="$pattern" OVERRIDE="$override" KEYWORD_EXEMPT="$keyword" CASE_SENSITIVE="${CASE_SENSITIVE:-}" perl -e "$SCAN_PERL"
 }
 
 # ── M-1 forbidden phrases (.swift / .xcstrings / .md) ───────────────────
@@ -162,6 +166,11 @@ scan_added() {
 # without a marker; the same words in a comment, a string or a doc line
 # are still reported and still take `LegalPhrases:safe`.
 M1_RE='\b(guarantee[ds]?|ensure[ds]?|impossible|find(?:s|ing)?|catch(?:es|ing)?|perfectly|flawlessly)\b|100%'
+# AL-6's pattern (used by the self-test below and the AL-6 section at the end):
+# the register-identifier shape of the private planning notes — a short
+# upper-case prefix, an optional hyphen, digits. Case-sensitive on purpose:
+# `p3-1` is arithmetic, `P3-1` is a citation.
+AL6_RE='\b(D12|C12|F12|M12|Q12|RB12|SR12|SR|AL|PB|UXC|DC|R111|S4|P3)-?[0-9]+\b'
 
 # --self-test: the keyword rule against five synthetic Swift lines. The
 # two comment lines (3 and 5) must be the only hits; anything else means
@@ -178,9 +187,27 @@ if [ -n "$SELF_TEST" ]; then
         | cut -d: -f1)
     if [ "$actual" = "$expected" ]; then
         echo "audit-lint --self-test: M-1 keyword rule OK (hits on lines 3 and 5 of 5; the two comment lines)"
+    else
+        echo "audit-lint --self-test: M-1 keyword rule DRIFTED — expected hits on lines 3 and 5, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+        exit 1
+    fi
+    # AL-6 against five synthetic lines: a comment citing a register id (1)
+    # and a string citing one (4) are the only hits; an arithmetic `p3-1`
+    # (2), a marked line (3) and a lower-case token (5) pass.
+    expected=$'1\n4'
+    actual=$(printf '%s\n' \
+        '        // D12-155 fence: the OCR body stays one' \
+        '        let y = p3-1' \
+        '        // Shorthand:ok C12-118 cited on purpose' \
+        '        let note = "see C12-118 for the split"' \
+        '        // the al-6 rule is case-sensitive' \
+        | PATTERN="$AL6_RE" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL" \
+        | cut -d: -f1)
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: AL-6 shorthand rule OK (hits on lines 1 and 4 of 5; the comment and the string)"
         exit 0
     fi
-    echo "audit-lint --self-test: M-1 keyword rule DRIFTED — expected hits on lines 3 and 5, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+    echo "audit-lint --self-test: AL-6 shorthand rule DRIFTED — expected hits on lines 1 and 4, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
     exit 1
 fi
 
@@ -429,10 +456,28 @@ else
     warn "AL-5 skipped: $AL5_SCANNER or python3 not found"
 fi
 
+# ── AL-6 planning shorthand on added lines (report-only) ────────────────
+# Shipped source, tests and string tables describe mechanisms; they never
+# cite the private planning registers that scheduled the work, and a
+# reader of the repository has no way to resolve such a citation. This
+# check reports, on each added line of a .swift or .xcstrings file, a token
+# in the register-identifier shape (AL6_RE, defined with M-1 above). It is
+# a warning, never an offence, until the last of the staged source splits
+# has merged; the switch to `violate` is a one-line change here. Same-line
+# marker: `Shorthand:ok <reason>`. The mechanical twin of the datapipeline's
+# hygiene gate (scripts/hygiene_gate.py there scans the whole tree; this
+# one scans the lines a change adds).
+for path in "${STAGED[@]}"; do
+    case "$path" in *.swift|*.xcstrings) ;; *) continue ;; esac
+    while IFS= read -r off; do
+        [ -n "$off" ] && warn "AL-6 planning shorthand (report-only): $path:$off"
+    done < <(CASE_SENSITIVE=1 scan_added "$path" "$AL6_RE" "Shorthand:ok")
+done
+
 # ── Summary ─────────────────────────────────────────────────────────────
 if [ "$FAIL" -gt 0 ]; then
     printf '\naudit-lint: %d offence(s); commit blocked.\n' "$FAIL" >&2
-    printf 'Reference: CONTRIBUTING.md "Audit checklist" (M-1..M-6 mechanical) and this script'"'"'s AL-1..AL-5\n' >&2
+    printf 'Reference: CONTRIBUTING.md "Audit checklist" (M-1..M-6 mechanical) and this script'"'"'s AL-1..AL-6\n' >&2
     exit 1
 fi
 exit 0
