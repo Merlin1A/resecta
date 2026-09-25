@@ -14,9 +14,9 @@ import OSLog
 // `ZIPStateTable` falls back to its hardcoded enum (pattern mirrors
 // `DocumentTypeClassifier.loadData(from:)` graceful-degradation path).
 
-public struct ZIPStateTableLoader: Sendable {
+struct ZIPStateTableLoader: Sendable {
 
-    public enum LoaderError: Error {
+    enum LoaderError: Error {
         case resourceMissing
         case decodingFailed(underlying: Error)
         case unsupportedVersion(actual: Int, supported: ClosedRange<Int>)
@@ -31,7 +31,7 @@ public struct ZIPStateTableLoader: Sendable {
     // MARK: - Init
 
     /// Load from the module bundle without any per-profile user overrides.
-    public init() throws {
+    init() throws {
         try self.init(bundle: .module, userOverrides: [:])
     }
 
@@ -71,7 +71,7 @@ public struct ZIPStateTableLoader: Sendable {
 
     /// Map a 3-digit ZIP prefix to a 2-letter state code. Returns `nil` for
     /// unknown prefixes — callers treat `nil` as "no cross-check".
-    public func state(forZIPPrefix prefix: String) -> String? {
+    func state(forZIPPrefix prefix: String) -> String? {
         guard prefix.count == 3 else { return nil }
         return scfTable[prefix]
     }

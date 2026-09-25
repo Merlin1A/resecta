@@ -5,21 +5,21 @@ import Foundation
 // Phase 3 categories will add their own KeywordProfile instances.
 
 /// Configuration for a category-specific context scoring pass.
-public struct KeywordProfile: Sendable {
+struct KeywordProfile: Sendable {
     /// Keywords whose presence near a match INCREASE confidence.
-    public let positiveKeywords: Set<String>
+    let positiveKeywords: Set<String>
     /// Keywords whose presence near a match DECREASE confidence.
-    public let negativeKeywords: Set<String>
+    let negativeKeywords: Set<String>
     /// Number of whitespace-separated tokens on each side of the match to examine.
-    public let windowRadius: Int
+    let windowRadius: Int
     /// Confidence when no context keywords are found.
-    public let baseConfidence: Double
+    let baseConfidence: Double
     /// Confidence when positive context keywords are found.
-    public let boostedConfidence: Double
+    let boostedConfidence: Double
     /// Minimum confidence — negative context cannot suppress below this (A1 risk mitigation).
-    public let floor: Double
+    let floor: Double
 
-    public init(
+    init(
         positiveKeywords: Set<String>,
         negativeKeywords: Set<String>,
         windowRadius: Int = 5,
@@ -39,9 +39,9 @@ public struct KeywordProfile: Sendable {
 /// Scores PII match confidence based on surrounding text context.
 /// Uses a ±N token window around the match, checking for positive and
 /// negative keywords. Generic over category via KeywordProfile.
-public struct ContextWindowScorer: Sendable {
+struct ContextWindowScorer: Sendable {
 
-    public init() {}
+    init() {}
 
     // Pre-compiled date patterns for collision dampening.
     // Candidate inside a date span gets score floor 0.05.
@@ -80,7 +80,7 @@ public struct ContextWindowScorer: Sendable {
     ///     institution-anchor suppression. When nil, the
     ///     3-arg `suppressionScore` path is used (no header anchor).
     /// - Returns: Adjusted confidence score in `[profile.floor, profile.boostedConfidence]`.
-    public func score(
+    func score(
         text: String,
         matchRange: NSRange,
         profile: KeywordProfile,
@@ -163,7 +163,7 @@ public struct ContextWindowScorer: Sendable {
     /// `negativeContextSuppressed` signal — that signal is emitted separately
     /// by `gazetteerSignal(...)` which calls `suppressionDetail` (keyword-only
     /// API). Header-anchor suppression is intentionally not surfaced here.
-    public func signal(
+    func signal(
         text: String,
         matchRange: NSRange,
         profile: KeywordProfile,
@@ -201,7 +201,7 @@ public struct ContextWindowScorer: Sendable {
     /// if let scalar = scorer.signal(...) { signals.append(scalar) }
     /// if let detail = scorer.signalDetail(...) { signals.append(detail) }
     /// ```
-    public func signalDetail(
+    func signalDetail(
         text: String,
         matchRange: NSRange,
         profile: KeywordProfile
@@ -248,7 +248,7 @@ public struct ContextWindowScorer: Sendable {
     /// the keyword scan runs only once per call site.
     ///
     /// Header-anchor path is deliberately NOT included here (deferred).
-    public func gazetteerSignal(
+    func gazetteerSignal(
         text: String,
         matchRange: NSRange,
         category: PIICategory,

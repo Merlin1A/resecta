@@ -5,12 +5,12 @@ import Foundation
 
 /// Validates SSN candidates against SSA structural rules.
 /// All rejection rules are independent — a candidate must pass ALL checks.
-public struct SSNStructuralValidator: Sendable {
+struct SSNStructuralValidator: Sendable {
 
-    public init() {}
+    init() {}
 
     /// Returns true if the candidate passes all structural validation checks.
-    public func isValid(_ candidate: SSNCandidate) -> Bool {
+    func isValid(_ candidate: SSNCandidate) -> Bool {
         let area = candidate.area
         let group = candidate.group
         let serial = candidate.serial
