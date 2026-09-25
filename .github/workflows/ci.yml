@@ -127,14 +127,14 @@ jobs:
 
       # Growth ratchet: a source file over 800 lines at the base of the change
       # may not be larger at its head (Scripts/growth-ratchet.sh; a split along
-      # a real seam shrinks the file and passes). Report-only while
-      # RATCHET_ENFORCE is '0': every tracked file is listed in the step
-      # summary and a grown file is a warning annotation; flipping the value to
-      # '1' makes growth fail the gate. Runs the base branch's copy of the
-      # script when the base has one, this change's copy on its first landing.
-      - name: Growth ratchet (report-only)
+      # a real seam shrinks the file and passes). Enforcing: with
+      # RATCHET_ENFORCE at '1' a grown file is an error annotation and fails
+      # the gate; every tracked file is listed in the step summary. Runs the
+      # base branch's copy of the script when the base has one, this change's
+      # copy on its first landing.
+      - name: Growth ratchet
         env:
-          RATCHET_ENFORCE: '0'
+          RATCHET_ENFORCE: '1'
           PR_BASE: ${{ github.event.pull_request.base.sha }}
           PUSH_BEFORE: ${{ github.event.before }}
         run: |
@@ -186,7 +186,7 @@ jobs:
             echo "| claims-lint | ${CLAIMS_SECS:-—} |"
             echo "| doc-metrics (check) | ${DOCMETRICS_SECS:-—} |"
             echo "| audit-lint (range) | ${AUDIT_SECS:-—} |"
-            echo "| growth-ratchet (report-only) | ${RATCHET_SECS:-—} |"
+            echo "| growth-ratchet | ${RATCHET_SECS:-—} |"
             echo
             echo "lint scripts from: ${LINT_SCRIPTS_FROM:-—}"
           } >> "$GITHUB_STEP_SUMMARY"
