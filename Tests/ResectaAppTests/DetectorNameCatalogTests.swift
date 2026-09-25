@@ -14,6 +14,7 @@ struct DetectorNameCatalogTests {
         #expect(DetectorNameCatalog.humanName(forRuleID: "cc.luhn") == "Card number check (Luhn)")
         #expect(DetectorNameCatalog.humanName(forRuleID: "email.regex") == "Email format")
         #expect(DetectorNameCatalog.humanName(forRuleID: "name.nltagger") == "Name recognition")
+        #expect(DetectorNameCatalog.humanName(forRuleID: "name.label-anchor") == "Name recognition (labeled)")
         #expect(DetectorNameCatalog.humanName(forRuleID: "user.alwaysFlag") == "Your always-flag term")
         #expect(DetectorNameCatalog.humanName(forRuleID: "pii.other") == "Other detector")
     }
