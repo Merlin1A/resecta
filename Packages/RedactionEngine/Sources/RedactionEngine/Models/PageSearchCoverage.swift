@@ -5,8 +5,8 @@ import Foundation
 /// `DocumentSearcher.setPageCoverageSink(_:)` — the search-side seam for the
 /// verification search re-check. Reporting-only: installing the sink never
 /// changes which results a search yields.
-public struct PageSearchCoverage: Sendable, Equatable {
-    public enum Route: Sendable, Equatable {
+struct PageSearchCoverage: Sendable, Equatable {
+    enum Route: Sendable, Equatable {
         /// The page's text layer was searched.
         case textLayer
         /// The page was rendered and read by OCR (cached or fresh).
@@ -19,10 +19,10 @@ public struct PageSearchCoverage: Sendable, Equatable {
         case unopenable
     }
 
-    public let pageIndex: Int
-    public let route: Route
+    let pageIndex: Int
+    let route: Route
 
-    public init(pageIndex: Int, route: Route) {
+    init(pageIndex: Int, route: Route) {
         self.pageIndex = pageIndex
         self.route = route
     }
