@@ -574,8 +574,10 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
     /// fixture and recipe: absent at medium, present and hittable
     /// once the walk parks the sheet; the tap disables it (applied)
     /// and the page bar's region count for the current page steps to
-    /// one; the editor toolbar's Undo removes the region and
-    /// re-enables the button. Run isolated on a quiet host.
+    /// one (read with the sheet expanded — the bar steps aside while
+    /// the walk is live at the compact float); the editor toolbar's
+    /// Undo removes the region and re-enables the button. Run isolated
+    /// on a quiet host.
     func testCompactHandle_applyMarksCurrentMatchAndUndoReEnables() {
         app.launchArguments = [
             "--uitesting", "--loadTestDocument", "--multipageDoc",
@@ -603,6 +605,10 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             apply.exists,
             "The per-item Apply is compact-only chrome — it must not render at the medium detent."
         )
+        XCTAssertFalse(
+            app.staticTexts["1 region"].exists,
+            "The current page already carries a region — the fixture premise (no regions on arrival) no longer holds."
+        )
 
         // The first step parks the sheet: the handle's Apply pops up
         // with the cluster, live for result 1.
@@ -626,18 +632,10 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         )
         XCTAssertTrue(apply.isHittable, "The per-item Apply exists but is not hittable on the compact handle.")
         XCTAssertTrue(apply.isEnabled, "The per-item Apply must be enabled for an un-applied current result.")
-        XCTAssertFalse(
-            app.staticTexts["1 region"].exists,
-            "The current page already carries a region — the fixture premise (no regions on arrival) no longer holds."
-        )
 
         // Tap: one region on the current page, the button reads applied,
         // the walk position is untouched (apply and stay put).
         apply.tap()
-        XCTAssertTrue(
-            app.staticTexts["1 region"].waitForExistence(timeout: 10),
-            "The page bar did not report the applied region — the per-item Apply created nothing on the current page."
-        )
         XCTAssertTrue(
             waitUntil(timeout: 5) { !apply.isEnabled },
             "The per-item Apply stayed enabled after applying the current result."
@@ -646,6 +644,18 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             resultOne.exists,
             "The apply moved the walk — apply-and-stay-put means the current result must not change."
         )
+        // The page bar steps aside while the walk is live at the compact
+        // float, so its region count is read with the sheet expanded to
+        // medium (the bar returns behind the sheet and stays in the
+        // served tree); the canvas overlay's own region elements are not
+        // served. The sheet is parked again for the toolbar Undo, which
+        // is hittable only beneath the compact float.
+        expandCompactStripToMedium()
+        XCTAssertTrue(
+            app.staticTexts["1 region"].waitForExistence(timeout: 10),
+            "The page bar did not report the applied region — the per-item Apply created nothing on the current page."
+        )
+        collapseSheetToCompactFloat()
 
         // The editor toolbar's Undo takes the region back and the
         // button re-enables — the undo-integration proof.
@@ -654,14 +664,31 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         XCTAssertTrue(undo.isHittable, "The editor toolbar's Undo is not hittable beneath the parked sheet.")
         undo.tap()
         XCTAssertTrue(
-            waitUntil(timeout: 10) { !app.staticTexts["1 region"].exists },
-            "Undo did not remove the applied region — the page bar still reports it."
-        )
-        XCTAssertTrue(
             waitUntil(timeout: 5) { apply.isEnabled },
             "The per-item Apply did not re-enable after Undo removed its region."
         )
+        expandCompactStripToMedium()
+        XCTAssertTrue(
+            waitUntil(timeout: 10) { !app.staticTexts["1 region"].exists },
+            "Undo did not remove the applied region — the page bar still reports it."
+        )
         attachScreenshot(named: "uxc51-compact-apply-undo")
+    }
+
+    /// Grabber drag from the medium detent back down to the compact
+    /// float — the inverse of `expandCompactStripToMedium`.
+    private func collapseSheetToCompactFloat() {
+        let window = app.windows.firstMatch
+        let strip = app.descendants(matching: .any).matching(identifier: "compactFloatStrip").firstMatch
+        for _ in 0..<3 {
+            let dismiss = app.buttons["searchDismissButton"].firstMatch
+            let fromY = dismiss.exists ? max(0.05, dismiss.frame.minY / window.frame.height - 0.03) : 0.45
+            let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: fromY))
+            let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.97))
+            start.press(forDuration: 0.1, thenDragTo: end)
+            if strip.waitForExistence(timeout: 3) { return }
+        }
+        XCTFail("The grabber drag did not park the sheet back at the compact float.")
     }
 
     /// Poll a condition for up to `timeout` seconds — AX state such as
