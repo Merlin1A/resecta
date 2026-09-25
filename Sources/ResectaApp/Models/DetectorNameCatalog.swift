@@ -46,6 +46,7 @@ enum DetectorNameCatalog {
         "dea.letter-check":     "DEA number check",
         // Names.
         "name.nltagger":        "Name recognition",
+        "name.label-anchor":    "Name recognition (labeled)",
         // Visual detectors.
         "barcode.vision":       "Barcode detection",
         "signature.heuristic":  "Signature detection",
