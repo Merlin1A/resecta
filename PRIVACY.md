@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Effective date:** 2026-09-22
+**Effective date:** 2026-09-26
 
 Resecta is an on-device document-redaction app for iOS. This Privacy Policy
 describes how Resecta handles information. It is written to satisfy Apple's
@@ -75,14 +75,18 @@ When you export a redacted PDF, Resecta builds a fresh file. The exported PDF
 omits the document's author, title, subject, keywords, and creator fields. For
 accuracy rather than overstatement: the system PDF writer automatically adds a
 producer tag, creation and modification timestamps, and a file identifier when
-it builds the file. Resecta then replaces the producer tag and both timestamps
-in the finished file with fixed values ("Resecta" and a constant date) that
-identify neither the operating system version, the build, nor the moment the
-file was written; Resecta rewrites the file identifier to a value derived from
-the file's own contents, so it carries nothing about the device, the build or
-the moment of export, and two exports of identical content carry the same
-identifier. The export therefore carries much less metadata than a typical
-PDF, but it is not metadata-free.
+it builds the file. Resecta then replaces the producer tag in the finished file
+with a fixed value ("Resecta") that identifies neither the operating system
+version nor the build that wrote the file. The rest depends on the version. In
+version 1.1.0, the timestamps record when the file was written and the file
+identifier is a per-export value the writer assigns, so if a timestamp matters
+for your situation, account for it before you share. From version 1.2.0,
+Resecta also replaces both timestamps with a constant date, so they do not
+record the moment the file was written, and rewrites the file identifier to a
+value derived from the file's own contents, so it carries nothing about the
+device, the build or the moment of export, and two exports of identical content
+carry the same identifier. The export therefore carries much less metadata than
+a typical PDF, but it is not metadata-free.
 
 A separate note applies to photos. An image you import can carry its own
 embedded metadata, such as EXIF or GPS location data. Resecta redraws imported
