@@ -24,6 +24,15 @@ ACTUAL_SCORER="$(shasum -a 256 "$RES/Classifier/context-scorer.json" | cut -d' '
 [ "$ACTUAL_SCORER" = "$EXPECT_SCORER" ] || {
   echo "FAIL context-scorer.json sha256 $ACTUAL_SCORER != $EXPECT_SCORER" >&2; exit 1; }
 
+# manifest_public_key.pem — the key the signed manifest verifies against.
+# Pinned by git blob hash; a rotation moves this constant, the fingerprint in
+# ManifestPublicKeyPinTests and the one published in the DataPipeline's
+# KEY-MANAGEMENT.md together.
+EXPECT_PUBKEY="5e7ae488f00778781c50c8a1a16ec56351c99fab"
+ACTUAL_PUBKEY="$(git hash-object "$RES/Gazetteers/manifest_public_key.pem")"
+[ "$ACTUAL_PUBKEY" = "$EXPECT_PUBKEY" ] || {
+  echo "FAIL manifest_public_key.pem blob $ACTUAL_PUBKEY != $EXPECT_PUBKEY" >&2; exit 1; }
+
 # gazetteer-manifest.json — the signed manifest's assets[] must describe the
 # tree it ships with: every listed file present with the recorded size and
 # SHA-256, and every installed asset listed (the manifest triple excepted).
