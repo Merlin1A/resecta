@@ -3,10 +3,9 @@ import Foundation
 /// Lightweight pre-compile heuristic for catastrophic-backtracking shapes.
 ///
 /// Runs before `RegexSentinelCheck.validate` detaches tasks — rejects obvious
-/// ReDoS shapes synchronously so adversarial patterns can't orphan the
-/// sentinel's `enumerateMatches` task for seconds (the regex engine spins
-/// inside a synchronous C call that neither `cancelAll()` nor the 200 ms
-/// wall-clock timer can interrupt).
+/// ReDoS shapes synchronously, before any match runs: the sentinel's probe
+/// stops at its deadline (`.reportProgress`), but the budget is spent either
+/// way, and the ad-hoc search path runs only this synchronous gate.
 ///
 /// Scope: conservative. False positives (rejecting safe patterns) are
 /// preferred to false negatives on the regex-import path where profiles can
@@ -20,7 +19,13 @@ enum RegexSafetyPrecheck {
     /// unbounded quantifier (nested case) or a top-level alternation `|`
     /// (overlapping-alternation proxy) — unless that alternation is a
     /// prefix-free set of literal strings, which repeats deterministically
-    /// (`isPrefixFreeLiteralAlternation`).
+    /// (`isPrefixFreeLiteralAlternation`). The alternation case also applies
+    /// under `{n,m}` with m above `DocumentSearcher.boundedQuantifierCeiling`
+    /// (`(a|aa){0,1000}`), and, under any bounded quantifier, to a literal
+    /// alternation that is NOT prefix-free (`(a|a){1,25}`) once the branch
+    /// count raised to the quantifier's maximum exceeds
+    /// `DocumentSearcher.nestedBoundProductCap`: every repetition may take
+    /// either branch.
     ///
     /// The nested case defers to `RegexQuantifierScan`'s reading of the
     /// same shape, which ignores an inner run that a literal character
@@ -73,20 +78,34 @@ enum RegexSafetyPrecheck {
                 let closed = stack.count > 1 ? stack.removeLast() : GroupState()
                 let nextIdx = i + 1
                 let unbounded: Bool
+                // The bounded quantifier's maximum (`?` → 1, `{n}` → n,
+                // `{n,m}` → m); nil when unbounded or unquantified.
+                var boundedMax: Int? = nil
                 if nextIdx < chars.count {
                     switch chars[nextIdx] {
                     case "*", "+":
                         unbounded = true
+                    case "?":
+                        unbounded = false
+                        boundedMax = 1
                     case "{":
                         unbounded = braceIsUnbounded(chars, startingAt: nextIdx)
+                        boundedMax = unbounded ? nil : braceMaximum(chars, startingAt: nextIdx)
                     default:
                         unbounded = false
                     }
                 } else {
                     unbounded = false
                 }
-                if unbounded, closed.hasAlternation,
+                let aboveCeiling = (boundedMax ?? 0) > DocumentSearcher.boundedQuantifierCeiling
+                if unbounded || aboveCeiling, closed.hasAlternation,
                    !isPrefixFreeLiteralAlternation(chars, from: closed.start, to: i) {
+                    return true
+                }
+                if let m = boundedMax, closed.hasAlternation,
+                   let alternatives = literalAlternatives(chars, from: closed.start, to: i),
+                   !isPrefixFree(alternatives),
+                   exceedsProductCap(branches: alternatives.count, repetitions: m) {
                     return true
                 }
                 if unbounded, closed.hasInnerQuantifier, nestedUnboundedStands() {
@@ -125,12 +144,23 @@ enum RegexSafetyPrecheck {
     private static func isPrefixFreeLiteralAlternation(
         _ chars: [Character], from: Int, to: Int
     ) -> Bool {
-        guard from >= 0, to > from + 1 else { return false }
+        guard let alternatives = literalAlternatives(chars, from: from, to: to) else { return false }
+        return isPrefixFree(alternatives)
+    }
+
+    /// The alternatives of the group `chars[from...to]` when it is a plain
+    /// or non-capturing group whose body is an alternation of pure literal
+    /// strings (escaped punctuation allowed; no classes, quantifiers,
+    /// anchors, wildcards or nested groups); nil otherwise.
+    private static func literalAlternatives(
+        _ chars: [Character], from: Int, to: Int
+    ) -> [[Character]]? {
+        guard from >= 0, to > from + 1 else { return nil }
         var i = from + 1
         if i < to, chars[i] == "?" {
             // Only the non-capturing form; lookarounds and atomic groups
             // stay on the conservative side.
-            guard i + 1 < to, chars[i + 1] == ":" else { return false }
+            guard i + 1 < to, chars[i + 1] == ":" else { return nil }
             i += 2
         }
         var alternatives: [[Character]] = [[]]
@@ -138,24 +168,30 @@ enum RegexSafetyPrecheck {
             let c = chars[i]
             switch c {
             case "\\":
-                guard i + 1 < to else { return false }
+                guard i + 1 < to else { return nil }
                 let e = chars[i + 1]
                 // Only escaped punctuation is a literal; `\d`, `\w`, `\b`,
                 // `\1`, `\p{…}` and the control escapes are not.
-                if e.isLetter || e.isNumber { return false }
+                if e.isLetter || e.isNumber { return nil }
                 alternatives[alternatives.count - 1].append(e)
                 i += 2
             case "|":
                 alternatives.append([])
                 i += 1
             case "(", ")", "[", "]", "*", "+", "?", "{", "}", ".", "^", "$":
-                return false
+                return nil
             default:
                 alternatives[alternatives.count - 1].append(c)
                 i += 1
             }
         }
-        guard alternatives.count >= 2, alternatives.allSatisfy({ !$0.isEmpty }) else { return false }
+        guard alternatives.count >= 2, alternatives.allSatisfy({ !$0.isEmpty }) else { return nil }
+        return alternatives
+    }
+
+    /// Pairwise distinct and no alternative a prefix of another: at most one
+    /// alternative can match at any input position.
+    private static func isPrefixFree(_ alternatives: [[Character]]) -> Bool {
         for a in alternatives.indices {
             for b in alternatives.indices where a != b {
                 let x = alternatives[a], y = alternatives[b]
@@ -163,6 +199,19 @@ enum RegexSafetyPrecheck {
             }
         }
         return true
+    }
+
+    /// True when `branches` raised to `repetitions` exceeds the nested-bound
+    /// product cap — the ways a bounded repetition of an ambiguous
+    /// alternation can split its input.
+    private static func exceedsProductCap(branches: Int, repetitions: Int) -> Bool {
+        guard branches > 1 else { return false }
+        var ways = 1
+        for _ in 0..<repetitions {
+            ways *= branches
+            if ways > DocumentSearcher.nestedBoundProductCap { return true }
+        }
+        return false
     }
 
     private static func skipCharClass(_ chars: [Character], from: Int) -> Int {
@@ -193,5 +242,19 @@ enum RegexSafetyPrecheck {
         let afterComma = content[content.index(after: commaIdx)...]
             .trimmingCharacters(in: .whitespaces)
         return afterComma.isEmpty
+    }
+
+    /// The maximum of a bounded `{n}` / `{n,m}` at `startingAt`; nil when
+    /// the brace is not a readable interval.
+    private static func braceMaximum(_ chars: [Character], startingAt: Int) -> Int? {
+        guard startingAt < chars.count, chars[startingAt] == "{" else { return nil }
+        var j = startingAt + 1
+        while j < chars.count, chars[j] != "}" { j += 1 }
+        guard j < chars.count else { return nil }
+        let content = String(chars[(startingAt + 1)..<j])
+        let parts = content.split(separator: ",", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        guard let last = parts.last, let upper = Int(last) else { return nil }
+        return upper
     }
 }

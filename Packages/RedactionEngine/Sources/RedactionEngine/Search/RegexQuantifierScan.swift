@@ -9,7 +9,7 @@ import Foundation
 ///   - **bounded** — `?`, `{n}`, `{n,m}` with m ≤ `boundedCeiling`
 ///   - **unbounded** — `*`, `+`, `{n,}`, and `{n,m}` with m > `boundedCeiling`
 ///
-/// and applies three rules:
+/// and applies these rules:
 ///
 ///   1. A group closed by a **bounded** quantifier never counts as nesting
 ///      — `(-\d{4})?`, `(\.\d{2})?`, `4111(\s?\d{4}){3}` are the optional
@@ -22,12 +22,25 @@ import Foundation
 ///      maxima must not exceed `productCap` — `(a{0,40}){0,40}` explores up
 ///      to 1,600 repetitions although every bound is small. Quantifiers
 ///      stacked on one atom (`a{0,40}{0,40}`) form the same chain.
+///   4. The wrap-around: a group closed by an unbounded quantifier whose
+///      unbounded runs were all demoted (below) still counts as nesting
+///      when it holds two or more of them, or when its first and last
+///      atoms can match a common character — `(\d+\.\d+)+`,
+///      `(\w+ \w+)+`: iteration k's trailing run and iteration k+1's
+///      leading run meet with no literal between them.
+///   5. A range quantifier above `boundedCeiling` (`{1,40}`) over a group
+///      that holds a variable bounded quantifier (`{1,25}`, `?`) counts as
+///      nesting — `(a{1,25}){1,40}` stays under the product cap but
+///      splits its input in exponentially many ways.
+///   6. Three unbounded runs in a row whose neighbouring atoms can match a
+///      common character (`\w*\w*\w*`) count as nesting: the ways to split
+///      one input run grow with its length cubed.
 ///
 /// With `literalSeparatorDemotion` on, rule 2 ignores an inner unbounded
 /// run that is delimited inside its group by a literal character the run
 /// cannot match (`\.` beside `\d+`, a space after `[a-z]+`): the literal
-/// fixes every iteration boundary, so the shape is at worst polynomial —
-/// the class the runtime sentinel probe backstops, not this scan's.
+/// fixes the run's boundaries inside one iteration. The boundary between
+/// two iterations is rule 4's.
 ///
 /// The scan is a structural heuristic: it reads the pattern text, never
 /// the engine's compiled form, and errs on the side of refusing.
@@ -376,7 +389,41 @@ enum RegexQuantifierScan {
         var hasUnbounded = false
         /// The largest product of bounded maxima along any chain inside.
         var maxBoundedChain = 1
+        /// Unbounded runs a literal separator demoted (rule 4).
+        var demotedRuns = 0
+        /// A bounded quantifier whose count varies (`{n,m}`, `?`) sits inside (rule 5).
+        var hasVariableBounded = false
+        /// The group's first and last atoms; `.other` stands for a nested
+        /// group or an alternation (rule 4).
+        var firstAtom: Atom? = nil
+        var lastAtom: Atom? = nil
+        var hasAlternation = false
+        /// Unbounded runs in a row whose neighbours can overlap (rule 6),
+        /// and the last such run's atom.
+        var adjacentRuns = 0
+        var adjacentAtom: Atom? = nil
+
+        mutating func noteElement(_ atom: Atom) {
+            if firstAtom == nil { firstAtom = atom }
+            lastAtom = atom
+        }
+
+        /// The group's first and last atoms as its parent sees them.
+        var edges: (first: Atom, last: Atom) {
+            hasAlternation ? (.other, .other) : (firstAtom ?? .other, lastAtom ?? .other)
+        }
     }
+
+    /// True when some character could match both atoms; checked over a
+    /// probe set (ASCII printable, whitespace and a few non-ASCII letters,
+    /// digits and symbols). Atoms this scan cannot read overlap everything.
+    fileprivate static func mayOverlap(_ a: Atom, _ b: Atom) -> Bool {
+        probeCharacters.contains { a.canMatch($0) && b.canMatch($0) }
+    }
+
+    private static let probeCharacters: [Character] =
+        (0x20...0x7E).compactMap { Unicode.Scalar($0).map(Character.init) }
+        + ["\t", "\n", "\r", "\u{A0}", "é", "ö", "π", "中", "٣", "€", "—"]
 
     fileprivate static func evaluate(
         _ tokens: [Token], boundedCeiling: Int, productCap: Int, literalSeparatorDemotion: Bool
@@ -394,28 +441,51 @@ enum RegexQuantifierScan {
                 lastQuantifier = nil
             case .close:
                 let group = stack.count > 1 ? stack.removeLast() : GroupState()
+                let edges = group.edges
+                var top = stack[stack.count - 1]
+                if top.firstAtom == nil { top.firstAtom = edges.first }
+                top.lastAtom = edges.last
+                top.adjacentRuns = 0
+                top.adjacentAtom = nil
                 if i + 1 < tokens.count, case .quantifier(let q) = tokens[i + 1] {
                     i += 1
                     let chain: Int? = q.max.map { $0.multipliedReportingOverflow(by: group.maxBoundedChain).overflow ? Int.max : $0 * group.maxBoundedChain }
                     if let chain, chain > productCap { return .nestedBoundProduct }
                     let unbounded = q.countsAsUnbounded(ceiling: boundedCeiling)
                     if unbounded, group.hasUnbounded { return .nestedUnbounded }
-                    stack[stack.count - 1].hasUnbounded =
-                        stack[stack.count - 1].hasUnbounded || unbounded || group.hasUnbounded
+                    // Rule 4: demoted runs meeting across the iteration boundary.
+                    if unbounded, group.demotedRuns > 0,
+                       group.demotedRuns >= 2 || mayOverlap(edges.first, edges.last) {
+                        return .nestedUnbounded
+                    }
+                    // Rule 5: a range above the ceiling over a variable bounded run.
+                    if unbounded, q.form == .range, group.hasVariableBounded { return .nestedUnbounded }
+                    top.hasUnbounded = top.hasUnbounded || unbounded || group.hasUnbounded
+                    top.hasVariableBounded = top.hasVariableBounded || group.hasVariableBounded
+                        || (!unbounded && (q.form == .range || q.form == .question))
                     if let chain {
-                        stack[stack.count - 1].maxBoundedChain = max(stack[stack.count - 1].maxBoundedChain, chain)
+                        top.maxBoundedChain = max(top.maxBoundedChain, chain)
                     }
                     lastQuantifier = (chain, unbounded)
                 } else {
-                    stack[stack.count - 1].hasUnbounded =
-                        stack[stack.count - 1].hasUnbounded || group.hasUnbounded
-                    stack[stack.count - 1].maxBoundedChain =
-                        max(stack[stack.count - 1].maxBoundedChain, group.maxBoundedChain)
+                    top.hasUnbounded = top.hasUnbounded || group.hasUnbounded
+                    top.maxBoundedChain = max(top.maxBoundedChain, group.maxBoundedChain)
+                    top.hasVariableBounded = top.hasVariableBounded || group.hasVariableBounded
+                    top.demotedRuns += group.demotedRuns
                     lastQuantifier = nil
                 }
-            case .alternation, .anchor:
+                stack[stack.count - 1] = top
+            case .alternation:
+                stack[stack.count - 1].hasAlternation = true
+                stack[stack.count - 1].adjacentRuns = 0
+                stack[stack.count - 1].adjacentAtom = nil
+                lastQuantifier = nil
+            case .anchor:
+                stack[stack.count - 1].adjacentRuns = 0
+                stack[stack.count - 1].adjacentAtom = nil
                 lastQuantifier = nil
             case .atom(let atom):
+                stack[stack.count - 1].noteElement(atom)
                 if i + 1 < tokens.count, case .quantifier(let q) = tokens[i + 1] {
                     let atomIndex = i
                     i += 1
@@ -423,13 +493,31 @@ enum RegexQuantifierScan {
                     if unbounded {
                         let separated = literalSeparatorDemotion
                             && isSeparated(tokens, atomIndex: atomIndex, quantifierIndex: i, atom: atom)
-                        if !separated { stack[stack.count - 1].hasUnbounded = true }
+                        if separated {
+                            stack[stack.count - 1].demotedRuns += 1
+                        } else {
+                            stack[stack.count - 1].hasUnbounded = true
+                        }
+                        // Rule 6: a third unbounded run in a row over overlapping atoms.
+                        let top = stack[stack.count - 1]
+                        let runs = top.adjacentAtom.map { mayOverlap($0, atom) } == true ? top.adjacentRuns + 1 : 1
+                        if runs >= 3 { return .nestedUnbounded }
+                        stack[stack.count - 1].adjacentRuns = runs
+                        stack[stack.count - 1].adjacentAtom = atom
+                    } else {
+                        stack[stack.count - 1].adjacentRuns = 0
+                        stack[stack.count - 1].adjacentAtom = nil
+                        if q.form == .range || q.form == .question {
+                            stack[stack.count - 1].hasVariableBounded = true
+                        }
                     }
                     if let m = q.max {
                         stack[stack.count - 1].maxBoundedChain = max(stack[stack.count - 1].maxBoundedChain, m)
                     }
                     lastQuantifier = (q.max, unbounded)
                 } else {
+                    stack[stack.count - 1].adjacentRuns = 0
+                    stack[stack.count - 1].adjacentAtom = nil
                     lastQuantifier = nil
                 }
             case .quantifier(let q):
