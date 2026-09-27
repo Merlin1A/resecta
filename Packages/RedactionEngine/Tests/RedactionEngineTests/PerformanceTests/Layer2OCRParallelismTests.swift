@@ -76,7 +76,7 @@ struct Layer2OCRParallelismTests {
             normalizedRect: CGRect(x: 0, y: 0, width: 1, height: 1),
             source: .manual)
         let result = await VerificationEngine().runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -115,7 +115,7 @@ struct Layer2OCRParallelismTests {
 
         func run() async -> VerificationStatus {
             await engine.runLayer(
-                1, outputDocument: wrapped, sourcePageCount: 4, regions: regions,
+                .ocrCheck, outputDocument: wrapped, sourcePageCount: 4, regions: regions,
                 sensitiveTerms: [], pipelineMode: .secureRasterization,
                 filterDigests: [], perPageModes: Array(repeating: .secureRasterization, count: 4)
             ).status
@@ -174,7 +174,7 @@ struct Layer2OCRParallelismTests {
         let modes = Array(repeating: PipelineMode.secureRasterization, count: n)
         func runLayer2() async -> VerificationStatus {
             await engine.runLayer(
-                1, outputDocument: wrapped, sourcePageCount: n, regions: regions,
+                .ocrCheck, outputDocument: wrapped, sourcePageCount: n, regions: regions,
                 sensitiveTerms: [], pipelineMode: .secureRasterization,
                 filterDigests: [], perPageModes: modes).status
         }

@@ -19,7 +19,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -34,7 +34,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -49,7 +49,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -64,7 +64,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -82,7 +82,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -106,7 +106,7 @@ struct AdversarialVerificationTests {
         }
 
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -128,7 +128,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -148,7 +148,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -170,7 +170,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -188,7 +188,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -208,7 +208,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -225,7 +225,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            0, outputDocument: SendablePDFDocument(doc),
+            .textExtraction, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]

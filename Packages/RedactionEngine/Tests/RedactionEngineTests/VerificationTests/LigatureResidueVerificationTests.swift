@@ -54,7 +54,7 @@ struct LigatureResidueVerificationTests {
         let (doc, url) = try TestFixtures.writeTempPDF(data, prefix: prefix)
         defer { try? FileManager.default.removeItem(at: url) }
         return await VerificationEngine().runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            VerificationEngine().layers(for: mode)[2], outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: [SensitiveTerm(text: term)],
             pipelineMode: mode, filterDigests: [nil], perPageModes: [mode])

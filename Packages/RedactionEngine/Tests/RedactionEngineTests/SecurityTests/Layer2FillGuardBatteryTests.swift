@@ -71,7 +71,7 @@ struct Layer2FillGuardBatteryTests {
         let doc = try #require(PDFDocument(data: pdf))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1,
+            engine.layers(for: mode)[1],
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: doc.pageCount,
             regions: regions,

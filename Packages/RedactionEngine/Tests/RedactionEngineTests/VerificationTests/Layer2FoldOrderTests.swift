@@ -10,9 +10,10 @@ import Foundation
 // WARNs (unmappable coordinates, then unchecked pages) return ahead of every
 // informational note, so a page whose check did not run is never folded
 // into a note the aggregate reads as a pass. Within the note tier the order
-// stays specificity (fill artifact > generic outside text). The generic
-// outside-text informational is the record surface for the page's own
-// un-redacted content only (mapping matrix + record string pinned below).
+// stays specificity (fill artifact > generic outside text). Pages carrying
+// only their own un-redacted content outside every region are a PASS with
+// a detail sentence on both modes — the check read them and reports
+// nothing (mapping matrix + the detail string pinned below).
 
 @Suite("Layer 2 fold arm order")
 struct Layer2FoldOrderTests {
@@ -23,11 +24,11 @@ struct Layer2FoldOrderTests {
         mode: PipelineMode = .searchableRedaction,
         hasRegions: Bool = true,
         terms: [Int: [String]] = [:]
-    ) -> (status: VerificationStatus, pages: [Int]?, terms: [String]?, couldNotVerify: Bool) {
+    ) -> (status: VerificationStatus, pages: [Int]?, terms: [String]?, couldNotVerify: Bool, copy: LayerCopy?) {
         let result = VerificationEngine.foldLayer2PageOutcomes(
             outcomes, pipelineMode: mode, documentHasRegions: hasRegions,
             reviewTermsByPage: terms)
-        return (result.0, result.1, result.2, result.3)
+        return (result.0, result.1, result.2, result.3, result.4)
     }
 
     private func message(_ status: VerificationStatus) -> String {
@@ -113,34 +114,40 @@ struct Layer2FoldOrderTests {
 
         outcomes.removeAll { $0.bucket == .fillArtifactInRegion }
         r = fold(outcomes, terms: terms)
-        #expect(r.status.isInfo, "generic outside-text note is next — got \(r.status)")
-        #expect(message(r.status).contains("expected for Searchable Redaction mode"))
-        #expect(r.pages == [6])
+        #expect(r.status == .pass, "outside-text-only pages fold to PASS with a detail — got \(r.status)")
+        #expect(r.copy?.detail == VerificationEngine.layer2OutsideTextDetail)
+        #expect(r.pages == nil)
 
         outcomes.removeAll { $0.bucket == .textOutsideRegionsOnly }
         r = fold(outcomes, terms: terms)
         #expect(r.status == .pass, "clean pages alone fold to PASS — got \(r.status)")
+        #expect(r.copy == nil, "a clean fold carries no detail")
         #expect(r.pages == nil)
         #expect(r.terms == nil)
     }
 
-    /// The generic record string is byte-exact: pages carrying only the
-    /// page's own un-redacted content (no term match) on a secure-raster
-    /// document with regions fold to the record informational — full-string
-    /// equality so any wording or page-list drift reads red here.
-    @Test("outside-text-only pages fold to the secure-raster record informational, byte-exact")
-    func textOutsideOnly_recordInformationalByteExact() {
-        let r = fold([
-            (1, .textOutsideRegionsOnly),
-            (2, .textOutsideRegionsOnly),
-            (3, .textOutsideRegionsOnly),
-        ], mode: .secureRasterization, hasRegions: true)
-        #expect(r.status.isInfo, "got \(r.status)")
-        #expect(message(r.status) ==
-            "Unredacted page content remains readable on 3 pages: 1, 2, 3 — expected for this mode.",
-            "the record string must render byte-exact — got \(message(r.status))")
-        #expect(r.pages == [0, 1, 2])
-        #expect(r.terms == nil)
+    /// Pages carrying only the page's own un-redacted content (no term
+    /// match) fold to PASS with one detail sentence on BOTH document modes:
+    /// the check read every page and reports nothing. The detail string is
+    /// byte-exact so any wording drift reads red here; the short line stays
+    /// the generic PASS line; no page chips (there is nothing to visit).
+    @Test("outside-text-only pages fold to PASS with the detail sentence, byte-exact, on both modes")
+    func textOutsideOnly_passWithDetailByteExact() {
+        for mode in [PipelineMode.secureRasterization, .searchableRedaction] {
+            let r = fold([
+                (1, .textOutsideRegionsOnly),
+                (2, .textOutsideRegionsOnly),
+                (3, .textOutsideRegionsOnly),
+            ], mode: mode, hasRegions: true)
+            #expect(r.status == .pass, "\(mode): got \(r.status)")
+            #expect(r.copy?.short == "No issues found.", "\(mode): the short line is the generic PASS line")
+            #expect(r.copy?.detail ==
+                "OCR read every page; content outside every redacted region is the page's own and is not reported.",
+                "\(mode): the detail must render byte-exact — got \(r.copy?.detail ?? "nil")")
+            #expect(r.pages == nil)
+            #expect(r.terms == nil)
+            #expect(!r.couldNotVerify)
+        }
     }
 
     /// The term-outside arm: ATTENTION on BOTH page modes with a byte-exact,
@@ -266,18 +273,31 @@ struct Layer2FoldOrderTests {
         #expect(bucket(.textInRegion, .searchableRedaction) == .textInRegionSearchable)
     }
 
-    /// Secure-raster mode's outside-text arm: INFO when the document had
-    /// regions, PASS when it had none (the raster's own content).
-    @Test("secure-raster outside-text arm keys on documentHasRegions")
+    /// Secure-raster mode's outside-text arm: PASS with the detail when the
+    /// document had regions, a bare PASS when it had none (the raster's own
+    /// content; nothing was checked against).
+    @Test("secure-raster outside-text arm keys on documentHasRegions for its detail")
     func secureRasterOutsideText() {
-        let noted = fold([(1, .textOutsideRegionsOnly)],
-                         mode: .secureRasterization, hasRegions: true)
-        #expect(noted.status.isInfo, "got \(noted.status)")
-        #expect(message(noted.status).contains("Unredacted page content remains readable"))
+        let detailed = fold([(1, .textOutsideRegionsOnly)],
+                            mode: .secureRasterization, hasRegions: true)
+        #expect(detailed.status == .pass, "got \(detailed.status)")
+        #expect(detailed.copy?.detail == VerificationEngine.layer2OutsideTextDetail)
 
         let clean = fold([(1, .textOutsideRegionsOnly)],
                          mode: .secureRasterization, hasRegions: false)
         #expect(clean.status == .pass, "got \(clean.status)")
+        #expect(clean.copy == nil)
         #expect(clean.pages == nil)
+    }
+
+    /// The fill-artifact note keeps its INFO tier beside the folded arm: it
+    /// says something (Vision read tokens out of the fill itself).
+    @Test("the fill-artifact note stays INFO and outranks the folded outside-text PASS")
+    func fillNoteStaysInfo() {
+        let r = fold([(1, .fillArtifactInRegion), (2, .textOutsideRegionsOnly)])
+        #expect(r.status.isInfo, "got \(r.status)")
+        #expect(message(r.status).contains("no readable text recovered"))
+        #expect(r.pages == [0])
+        #expect(r.copy == nil)
     }
 }

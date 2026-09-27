@@ -52,14 +52,13 @@ extension TestFixtures {
 
     static func textRequest(
         _ query: String, options: SearchOptions = SearchOptions(),
-        found: Int = 1, applied: Int = 1, pages: Set<Int> = [0],
-        pageBound: Bool = false
+        found: Int = 1, applied: Int = 1, pages: Set<Int> = [0]
     ) -> SearchRecheckRequest {
         SearchRecheckRequest(
             record: AppliedSearchRecord(
                 query: AppliedSearchQuery(kind: .text(query), options: options),
                 foundCount: found),
-            appliedCount: applied, appliedPages: pages, pageBound: pageBound)
+            appliedCount: applied, appliedPages: pages)
     }
 
     static func regexRequest(

@@ -86,7 +86,8 @@ struct AppliedSearchDerivationTests {
         #expect(request.record == rec)
         #expect(request.appliedCount == 3)
         #expect(request.appliedPages == [0, 2])
-        #expect(request.pageBound == false, "the page bound stays opt-in")
+        #expect(request.origin == .applied)
+        #expect(request.deselected.isEmpty)
         // Overlap-skipped results never wrote an audit entry: the record's
         // found count (5) exceeds the applied count (3) by construction.
         #expect(request.record.foundCount == 5)
@@ -127,8 +128,8 @@ struct AppliedSearchDerivationTests {
         #expect(requests[0].appliedPages == [0, 1])
         #expect(requests[0].record == later,
                 "the latest apply's found count and coverage facts describe the query")
-        #expect(requests[0].pageBoundIsSound == false,
-                "the later run skipped a page for OCR, so the bound is unsound")
+        #expect(requests[0].record.ocrSkippedPages == [3],
+                "the later run's coverage facts ride the request")
     }
 
     @Test("A multi-term query is one request carrying the whole term set")

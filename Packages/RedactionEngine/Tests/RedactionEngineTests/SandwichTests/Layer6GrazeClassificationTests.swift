@@ -126,7 +126,7 @@ struct Layer6GrazeClassificationTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            5, outputDocument: SendablePDFDocument(doc),
+            .spatialVerification, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: [.searchableRedaction])

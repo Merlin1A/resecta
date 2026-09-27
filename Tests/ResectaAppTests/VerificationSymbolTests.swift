@@ -15,9 +15,8 @@ struct VerificationSymbolTests {
 
     @Test("every engine layer name routes to its numbered custom asset")
     func engineNamesAllRoute() {
-        let engine = VerificationEngine()
-        for index in 0..<10 {
-            let name = engine.layerName(at: index)
+        for (index, layer) in VerificationLayer.allCases.prefix(10).enumerated() {
+            let name = layer.name
             let expected = String(format: "resecta.verify.layer%02d", index + 1)
             #expect(VerificationSymbol.assetName(forLayerNamed: name) == expected)
         }
@@ -33,14 +32,24 @@ struct VerificationSymbolTests {
         #expect(VerificationSymbol.assetName(forLayerNamed: "Unknown Layer") == nil)
         #expect(VerificationSymbol.assetName(forLayerNamed: "") == nil)
         // Symbol strings must never be accepted as identity keys.
-        #expect(VerificationSymbol.assetName(forLayerNamed: "01.rectangle.fill") == nil)
+        #expect(VerificationSymbol.assetName(forLayerNamed: "01.square.fill") == nil)
         #expect(VerificationSymbol.assetName(forLayerNamed: "doc.text.magnifyingglass") == nil)
     }
 
     @Test("the search re-check has no custom asset yet: identity-keyed lookup falls back to its SF symbol")
     func searchRecheckFallsBackToSFSymbol() {
-        #expect(VerificationEngine().layerName(at: 10) == VerificationLayer.searchRecheck.name)
+        #expect(VerificationLayer.allCases[10] == .searchRecheck)
         #expect(VerificationSymbol.assetName(forLayerNamed: VerificationLayer.searchRecheck.name) == nil)
+        // The detection sweep (the twelfth engine layer) rides its SF fallback the same way.
+        #expect(VerificationLayer.allCases[11] == .detectionSweep)
+        #expect(VerificationSymbol.assetName(forLayerNamed: VerificationLayer.detectionSweep.name) == nil)
+        let sweep = LayerResult(
+            name: VerificationLayer.detectionSweep.name,
+            symbolName: VerificationLayer.detectionSweep.symbolName,
+            status: .pass, shortDescription: "", detailDescription: "",
+            pageReferences: nil, durationSeconds: 0, layer: .detectionSweep)
+        #expect(VerificationSymbol.assetName(for: sweep) == nil)
+        #expect(sweep.symbolName == "rectangle.and.text.magnifyingglass")
         let recheck = LayerResult(
             name: VerificationLayer.searchRecheck.name,
             symbolName: VerificationLayer.searchRecheck.symbolName,

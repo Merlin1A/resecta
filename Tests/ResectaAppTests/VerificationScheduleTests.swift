@@ -8,7 +8,8 @@ import PDFKit
 // from `VerificationEngine.layers(for:)` grouped by `VerificationLayer.phase`
 // (never index arithmetic); the published progress appends results in
 // completion order while the REPORT is assembled in canonical order; the
-// Search Re-check runs last and, with nothing applied, reports INFO.
+// Search Re-check and the Detection Sweep run last and, with nothing
+// applied, each reports INFO.
 
 @Suite("Verification schedule by phase")
 @MainActor
@@ -24,15 +25,15 @@ struct VerificationScheduleTests {
         let post = layers.filter { $0.phase == .postSequential }
         #expect(parallel.count + catalog.count + sandwich.count + post.count == layers.count)
         #expect(catalog == [.structureCheck, .metadataCheck])
-        #expect(post == [.searchRecheck])
-        #expect(layers.last == .searchRecheck)
+        #expect(post == [.searchRecheck, .detectionSweep])
+        #expect(layers.last == .detectionSweep)
         switch mode {
         case .secureRasterization:
-            #expect(layers.count == 6)
+            #expect(layers.count == 7)
             #expect(parallel == [.textExtraction, .ocrCheck, .binaryStringSearch])
             #expect(sandwich.isEmpty)
         case .searchableRedaction:
-            #expect(layers.count == 11)
+            #expect(layers.count == 12)
             #expect(parallel == [.textExtraction, .ocrCheck, .binaryStringSearch, .operatorReExtraction])
             #expect(sandwich == [.spatialVerification, .characterCount, .fontVerification, .characterLineage])
         }
@@ -65,33 +66,39 @@ struct VerificationScheduleTests {
 
     private enum ScheduleTestError: Error { case notVerified }
 
-    @Test("Raster verify-only reports six layers in canonical order, the re-check last as INFO")
+    @Test("Raster verify-only reports seven layers in canonical order, the re-check then the sweep last as INFO")
     func rasterReportIsCanonical() async throws {
         let report = try await verifyOnlyReport(mode: .secureRasterization)
         let expected = VerificationEngine().layers(for: .secureRasterization)
-        #expect(report.layers.count == 6)
+        #expect(report.layers.count == 7)
         #expect(report.layers.map(\.name) == expected.map(\.name))
         #expect(report.layers.map(\.layer) == expected.map { Optional($0) })
         let last = try #require(report.layers.last)
-        #expect(last.layer == .searchRecheck)
-        #expect(last.name == "Search Re-check")
+        #expect(last.layer == .detectionSweep)
+        #expect(last.name == "Detection Sweep")
         #expect(last.status == .info(""))
-        #expect(last.shortDescription == SearchRecheck.infoMessage)
+        #expect(last.shortDescription == DetectionSweep.infoMessage)
+        let recheck = report.layers[5]
+        #expect(recheck.layer == .searchRecheck)
+        #expect(recheck.status == .info(""))
+        #expect(recheck.shortDescription == SearchRecheck.infoMessage)
         #expect(!report.layers.contains { $0.status.isSkipped },
                 "an idle re-check is a note, never a skipped layer")
     }
 
-    @Test("Searchable verify-only reports eleven layers in canonical order; the parallel-batch layer keeps its ordinal")
+    @Test("Searchable verify-only reports twelve layers in canonical order; the parallel-batch layer keeps its ordinal")
     func searchableReportIsCanonical() async throws {
         let report = try await verifyOnlyReport(mode: .searchableRedaction)
         let expected = VerificationEngine().layers(for: .searchableRedaction)
-        #expect(report.layers.count == 11)
+        #expect(report.layers.count == 12)
         #expect(report.layers.map(\.name) == expected.map(\.name))
         // Operator Re-Extraction completes in the parallel base batch but
         // the report places it at its canonical ordinal (index 9).
         #expect(report.layers[9].layer == .operatorReExtraction)
         #expect(report.layers[10].layer == .searchRecheck)
         #expect(report.layers[10].status == .info(""))
+        #expect(report.layers[11].layer == .detectionSweep)
+        #expect(report.layers[11].status == .info(""))
     }
 
     @Test("The idle re-check row reads as an informational note, never a warn or attention row")

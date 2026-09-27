@@ -12,15 +12,17 @@ struct VerificationEngineTests {
 
     // MARK: - Layer Count (never hardcoded)
 
-    @Test("Secure Rasterization has 6 layers, Searchable has 11")
+    @Test("Secure Rasterization has 7 layers, Searchable has 12")
     func layerCounts() {
         let engine = VerificationEngine()
-        #expect(engine.layerCount(for: .secureRasterization) == 6)
-        #expect(engine.layerCount(for: .searchableRedaction) == 11)
-        // The eleventh Searchable layer (index 10) is the search re-check.
-        #expect(engine.layerName(at: 10) == "Search Re-check")
+        #expect(engine.layerCount(for: .secureRasterization) == 7)
+        #expect(engine.layerCount(for: .searchableRedaction) == 12)
+        // The two post-sequential checks close both orders.
+        #expect(engine.layers(for: .searchableRedaction).suffix(2) == [.searchRecheck, .detectionSweep])
         #expect(engine.layerName(at: 10, mode: .searchableRedaction) == "Search Re-check")
+        #expect(engine.layerName(at: 11, mode: .searchableRedaction) == "Detection Sweep")
         #expect(engine.layerName(at: 5, mode: .secureRasterization) == "Search Re-check")
+        #expect(engine.layerName(at: 6, mode: .secureRasterization) == "Detection Sweep")
     }
 
     // MARK: - Layer Names and Symbols
@@ -30,7 +32,7 @@ struct VerificationEngineTests {
         let engine = VerificationEngine()
         let layers = engine.layers(for: .searchableRedaction)
         for i in 0..<engine.layerCount(for: .searchableRedaction) {
-            #expect(!engine.layerName(at: i).isEmpty)
+            #expect(!layers[i].name.isEmpty)
             #expect(!layers[i].symbolName.isEmpty)
         }
     }
@@ -44,7 +46,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            0, outputDocument: SendablePDFDocument(doc),
+            .textExtraction, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -65,7 +67,7 @@ struct VerificationEngineTests {
 
         // Use a term that won't be in a clean PDF
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: ["NONEXISTENT_TERM_12345"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
@@ -81,7 +83,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: ["ab", "xy"].map { SensitiveTerm(text: $0) },  // All < 3 chars — should warn
             pipelineMode: .secureRasterization,
@@ -98,7 +100,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: [],  // No terms — expected for manual-only redaction
             pipelineMode: .secureRasterization,
@@ -122,7 +124,7 @@ struct VerificationEngineTests {
         // "zzq" is 3 chars — should now be searched (not skipped).
         // It won't be found in a clean PDF, so result is still .pass.
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: ["zzq"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
@@ -146,7 +148,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: ["acme"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -170,7 +172,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: ["acme"].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [nil], perPageModes: [.searchableRedaction])
@@ -191,7 +193,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: ["Andre\u{0301}"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -210,7 +212,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: ["\u{674E}\u{660E}"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -228,7 +230,7 @@ struct VerificationEngineTests {
         // layer could not search is a could-not-verify WARN — the all-short
         // shape — never an informational note.
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: ["zzqx", "ab"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -248,7 +250,7 @@ struct VerificationEngineTests {
         // One 400k-character term expands past the byte-based 1 MB automaton
         // bound → degraded no-op → the existing WARN, verbatim.
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: [String(repeating: "a", count: 400_000)].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
@@ -272,7 +274,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: ["CLASSIFIED"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -291,7 +293,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: ["CLASSIFIED"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -308,7 +310,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: ["CLASSIFIED"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -346,7 +348,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -374,7 +376,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -395,7 +397,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -415,7 +417,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -437,7 +439,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -459,7 +461,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -484,17 +486,16 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
-        #expect(result.status.isInfo,
-                "Expected keys only must stay INFO; got \(result.status)")
-        if case .info(let msg) = result.status {
-            #expect(msg == "Auto-injected metadata present: /Producer",
-                    "Pure-INFO copy keeps auto-injected wording; got \(msg)")
-        }
+        #expect(result.status == .pass,
+                "Expected keys only fold to PASS with a detail; got \(result.status)")
+        #expect(result.detailDescription == VerificationEngine.layer5FixedFieldsDetail,
+                "the detail names the mechanism; got \(result.detailDescription)")
+        #expect(result.shortDescription == "No issues found.")
     }
 
     @Test("Layer 5 WARNs when the producer field was not rewritten to the fixed value")
@@ -510,7 +511,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -533,7 +534,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -561,7 +562,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -581,17 +582,15 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
-        #expect(result.status.isInfo,
-                "Real output must attest the fixed producer as INFO; got \(result.status)")
-        if case .info(let msg) = result.status {
-            #expect(msg == "Auto-injected metadata present: /Producer, /CreationDate, /ModDate",
-                    "INFO composition unchanged for the fixed-value case; got \(msg)")
-        }
+        #expect(result.status == .pass,
+                "Real output attests the fixed producer as PASS with a detail; got \(result.status)")
+        #expect(result.detailDescription == VerificationEngine.layer5FixedFieldsDetail,
+                "the fixed-value case carries the detail; got \(result.detailDescription)")
     }
 
     @Test("Layer 5 WARNs when a timestamp field was not rewritten to the fixed value")
@@ -615,7 +614,7 @@ struct VerificationEngineTests {
 
             let engine = VerificationEngine()
             let result = await engine.runLayer(
-                4, outputDocument: SendablePDFDocument(doc),
+                .metadataCheck, outputDocument: SendablePDFDocument(doc),
                 sourcePageCount: 1, regions: [:], sensitiveTerms: [],
                 pipelineMode: .secureRasterization,
                 filterDigests: [], perPageModes: [.secureRasterization]
@@ -641,7 +640,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -671,17 +670,16 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
-        #expect(result.status.isInfo,
-                "All three fixed values must stay INFO; got \(result.status)")
-        if case .info(let msg) = result.status {
-            #expect(msg == "Auto-injected metadata present: /Producer, /CreationDate, /ModDate",
-                    "INFO composition for the fixed-value case; got \(msg)")
-        }
+        #expect(result.status == .pass,
+                "All three fixed values fold to PASS with a detail; got \(result.status)")
+        #expect(result.detailDescription == VerificationEngine.layer5FixedFieldsDetail,
+                "the fixed-value case carries the detail; got \(result.detailDescription)")
+        #expect(result.hasDetail)
     }
 
     // MARK: - Layer 6: spatial-exclusion check on region-less searchable pages
@@ -698,7 +696,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            5, outputDocument: SendablePDFDocument(doc),
+            .spatialVerification, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: [.searchableRedaction]
@@ -719,7 +717,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -742,7 +740,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -789,7 +787,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -805,9 +803,9 @@ struct VerificationEngineTests {
           arguments: [PipelineMode.secureRasterization, PipelineMode.searchableRedaction])
     func allLayerNamesNonEmpty(mode: PipelineMode) {
         let engine = VerificationEngine()
-        let count = engine.layerCount(for: mode)
-        for i in 0..<count {
-            #expect(!engine.layerName(at: i).isEmpty,
+        let layers = engine.layers(for: mode)
+        for (i, layer) in layers.enumerated() {
+            #expect(!layer.name.isEmpty,
                     "Layer \(i) name should be non-empty for \(mode)")
         }
     }
@@ -847,7 +845,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            6, outputDocument: SendablePDFDocument(doc),
+            .characterCount, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 2, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [nil, nil],
@@ -864,7 +862,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            8, outputDocument: SendablePDFDocument(doc),
+            .characterLineage, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 2, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [nil, nil],
@@ -884,7 +882,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            6, outputDocument: SendablePDFDocument(doc),
+            .characterCount, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 2, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [nil, nil],
@@ -948,7 +946,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            5, outputDocument: SendablePDFDocument(doc),
+            .spatialVerification, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [nil],
@@ -970,7 +968,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            5, outputDocument: SendablePDFDocument(doc),
+            .spatialVerification, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [nil],
@@ -993,7 +991,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            5, outputDocument: SendablePDFDocument(doc),
+            .spatialVerification, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [nil],
@@ -1018,7 +1016,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            0, outputDocument: SendablePDFDocument(doc),
+            .textExtraction, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 2, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [nil, nil],
@@ -1043,7 +1041,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            layerIndex, outputDocument: SendablePDFDocument(doc),
+            engine.layers(for: .searchableRedaction)[layerIndex], outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 2, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [nil, nil],
@@ -1067,7 +1065,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            0, outputDocument: SendablePDFDocument(doc),
+            .textExtraction, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -1087,7 +1085,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -1129,7 +1127,7 @@ struct VerificationEngineTests {
         let region = manualRegion(CGRect(x: 0.05, y: 0.05, width: 0.9, height: 0.9))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -1448,24 +1446,24 @@ struct VerificationEngineTests {
         let region = manualRegion(CGRect(x: 0.6, y: 0.05, width: 0.3, height: 0.2)) // bottom-right
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
-        // Readable non-redacted content is expected output for this mode, so the
-        // observation is an informational note (never a WARN — that tier is kept
-        // for could-not-verify conditions) but never silent PASS either: regions
-        // were present, so the note records what remained readable. The leak this
-        // arm's old WARN chased is carried by the specific arms: a redacted term
-        // surviving out-of-region raises ATTENTION (pins below), in-region
-        // survivors FAIL. PASS is preserved only when no regions are present
+        // Readable non-redacted content outside every region is the page's
+        // own: the check read it and reports nothing, so the arm is a PASS
+        // whose detail says what was read (never a WARN — that tier is kept
+        // for could-not-verify conditions — and never a note the summary
+        // has to count). The leak this arm's old WARN chased is carried by
+        // the specific arms: a redacted term surviving out-of-region raises
+        // ATTENTION (pins below), in-region survivors FAIL. Without regions
+        // the PASS carries no detail
         // (layer2ScopedOCR_textOutsideRegions_noRegions_passes).
-        #expect(result.status.isInfo,
-                "SR out-of-region text with regions present is an INFO note; got \(result.status)")
-        if case .info(let msg) = result.status {
-            #expect(msg.contains("expected for this mode"),
-                    "INFO copy must state the content is expected; got \(msg)")
-        }
+        #expect(result.status == .pass,
+                "SR out-of-region text with regions present is a PASS with a detail; got \(result.status)")
+        #expect(result.detailDescription == VerificationEngine.layer2OutsideTextDetail,
+                "the detail names the mechanism; got \(result.detailDescription)")
+        #expect(result.hasDetail)
     }
 
     @Test("Layer 2: SR out-of-region text with NO regions → PASS (no over-block)")
@@ -1478,7 +1476,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -1500,7 +1498,7 @@ struct VerificationEngineTests {
         let region = manualRegion(CGRect(x: 0.6, y: 0.05, width: 0.3, height: 0.2))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: [.searchableRedaction])
@@ -1526,7 +1524,7 @@ struct VerificationEngineTests {
         let region = manualRegion(CGRect(x: 0.02, y: 0.42, width: 0.95, height: 0.2))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -1551,7 +1549,7 @@ struct VerificationEngineTests {
         let topBand = manualRegion(CGRect(x: 0, y: 0.55, width: 1.0, height: 0.43))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [topBand]], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -1580,7 +1578,7 @@ struct VerificationEngineTests {
         let topBand = manualRegion(CGRect(x: 0, y: 0.55, width: 1.0, height: 0.43))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [topBand]], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -1603,7 +1601,7 @@ struct VerificationEngineTests {
         let region = manualRegion(CGRect(x: 0.02, y: 0.42, width: 0.95, height: 0.2))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: [.searchableRedaction])
@@ -1630,7 +1628,7 @@ struct VerificationEngineTests {
         let region = manualRegion(CGRect(x: 0.02, y: 0.42, width: 0.95, height: 0.2))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: [.searchableRedaction])
@@ -1656,7 +1654,7 @@ struct VerificationEngineTests {
         let region = manualRegion(CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -1679,7 +1677,7 @@ struct VerificationEngineTests {
         let region = manualRegion(CGRect(x: 0.02, y: 0.42, width: 0.95, height: 0.2))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 2, regions: [1: [region]], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [],
@@ -1706,7 +1704,7 @@ struct VerificationEngineTests {
         let region = manualRegion(CGRect(x: 0.02, y: 0.42, width: 0.95, height: 0.2))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 2, regions: [1: [region]], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [],
@@ -1737,7 +1735,7 @@ struct VerificationEngineTests {
         let region = manualRegion(CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 2, regions: [0: [region], 1: [region]],
             sensitiveTerms: [], pipelineMode: .secureRasterization,
             filterDigests: [],
@@ -1775,7 +1773,7 @@ struct VerificationEngineTests {
         let region = manualRegion(CGRect(x: 0.6, y: 0.05, width: 0.3, height: 0.2))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -1804,7 +1802,7 @@ struct VerificationEngineTests {
         let region = manualRegion(CGRect(x: 0.6, y: 0.05, width: 0.3, height: 0.2))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: [.searchableRedaction])
@@ -1832,7 +1830,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            0, outputDocument: SendablePDFDocument(doc),
+            .textExtraction, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 3, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [],
@@ -1860,7 +1858,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            0, outputDocument: SendablePDFDocument(doc),
+            .textExtraction, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 3, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [],
@@ -1886,7 +1884,7 @@ struct VerificationEngineTests {
         let topBand = manualRegion(CGRect(x: 0, y: 0.55, width: 1.0, height: 0.43))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [0: [topBand]], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -1906,7 +1904,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 3, regions: [:], sensitiveTerms: ["acme"].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
             filterDigests: [nil, nil, nil],
@@ -1938,7 +1936,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: ["DELIAHARTWELL"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
@@ -1964,7 +1962,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: ["DELIAHARTWELL"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
@@ -2002,7 +2000,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            0, outputDocument: SendablePDFDocument(doc),
+            .textExtraction, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 2, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization, .secureRasterization])
@@ -2023,7 +2021,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 2, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization, .secureRasterization])
@@ -2044,7 +2042,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            5, outputDocument: SendablePDFDocument(doc),
+            .spatialVerification, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 2, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [nil, nil],
@@ -2064,7 +2062,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            7, outputDocument: SendablePDFDocument(doc),
+            .fontVerification, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 2, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [nil, nil],
@@ -2100,7 +2098,7 @@ struct VerificationEngineTests {
         let task = Task { () -> LayerResult in
             withUnsafeCurrentTask { $0?.cancel() }
             return await engine.runLayer(
-                8, outputDocument: sendableDoc,
+                .characterLineage, outputDocument: sendableDoc,
                 sourcePageCount: 1, regions: [:], sensitiveTerms: [],
                 pipelineMode: .searchableRedaction,
                 filterDigests: [digest],
@@ -2151,7 +2149,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1, outputDocument: SendablePDFDocument(doc),
+            .ocrCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
@@ -2186,7 +2184,7 @@ struct VerificationEngineTests {
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]

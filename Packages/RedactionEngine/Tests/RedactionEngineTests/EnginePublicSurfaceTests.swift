@@ -32,6 +32,7 @@ struct EnginePublicSurfaceTests {
             AppliedSearchQuery.self,
             AppliedSearchRecord.self,
             SearchRecheckRequest.self,
+            ScanRunConfiguration.self,
             VerificationReport.self,
             LayerResult.self,
             VerificationLayer.self,
@@ -40,7 +41,7 @@ struct EnginePublicSurfaceTests {
             SearchResult.self,
             SearchPreviewResult.self,
         ]
-        #expect(types.count == 21)
+        #expect(types.count == 22)
         #expect(DocumentSearcher.maxResults > 0)
         #expect(DocumentSearcher.validateRegexPattern("[a-z]+") != nil)
     }
@@ -86,14 +87,20 @@ struct EnginePublicSurfaceTests {
         _ = engine.layers(for: .searchableRedaction)
         _ = engine.aggregateStatus(layers)
         _ = await engine.runLayer(
-            0, outputDocument: document, sourcePageCount: 1, regions: [:],
+            .textExtraction, outputDocument: document, sourcePageCount: 1, regions: [:],
             sensitiveTerms: [], pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: []
         )
         _ = await engine.runLayer(
-            .textExtraction, outputDocument: document, sourcePageCount: 1, regions: [:],
+            .detectionSweep, outputDocument: document, sourcePageCount: 1, regions: [:],
             sensitiveTerms: [], pipelineMode: .searchableRedaction,
-            filterDigests: [], perPageModes: []
+            filterDigests: [], perPageModes: [],
+            appliedSearches: [SearchRecheckRequest(
+                record: AppliedSearchRecord(
+                    query: AppliedSearchQuery(kind: .piiScan(categories: [.ssn]), options: SearchOptions()),
+                    foundCount: 0,
+                    scanConfiguration: ScanRunConfiguration(thresholdVector: nil, alwaysFlag: [], neverFlag: [])),
+                appliedCount: 0, appliedPages: [], origin: .sweep, deselected: [])]
         )
     }
 }

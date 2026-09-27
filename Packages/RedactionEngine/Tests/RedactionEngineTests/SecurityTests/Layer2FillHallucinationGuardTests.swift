@@ -140,7 +140,7 @@ struct Layer2FillHallucinationGuardTests {
         let outDoc = try #require(PDFDocument(data: pdf))
         let engine = VerificationEngine()
         let layer2 = await engine.runLayer(
-            1,
+            .ocrCheck,
             outputDocument: SendablePDFDocument(outDoc),
             sourcePageCount: outDoc.pageCount,
             regions: regions,
@@ -173,7 +173,7 @@ struct Layer2FillHallucinationGuardTests {
         let regions = try Self.committedRegions()
         let engine = VerificationEngine()
         let layer2 = await engine.runLayer(
-            1,
+            .ocrCheck,
             outputDocument: SendablePDFDocument(outDoc),
             sourcePageCount: outDoc.pageCount,
             regions: regions,
@@ -216,7 +216,7 @@ struct Layer2FillHallucinationGuardTests {
         let regions = try Self.committedRegions()
         let engine = VerificationEngine()
         let proven = await engine.runLayer(
-            1,
+            .ocrCheck,
             outputDocument: SendablePDFDocument(outDoc),
             sourcePageCount: outDoc.pageCount,
             regions: regions,
@@ -239,7 +239,7 @@ struct Layer2FillHallucinationGuardTests {
             paintBars: false)   // region declared, ink NOT painted over
         let inkDoc = try #require(PDFDocument(data: pdf))
         let nonProven = await engine.runLayer(
-            1,
+            .ocrCheck,
             outputDocument: SendablePDFDocument(inkDoc),
             sourcePageCount: inkDoc.pageCount,
             regions: inkRegions,

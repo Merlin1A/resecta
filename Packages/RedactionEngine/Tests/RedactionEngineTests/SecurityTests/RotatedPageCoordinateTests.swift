@@ -386,7 +386,7 @@ struct RotatedPageCoordinateTests {
         let digests = try await TestPipeline.searchableDigests(data, regions: [0: [region]])
         for idx in 5...9 {
             let lr = await engine.runLayer(
-                idx, outputDocument: SendablePDFDocument(outDoc),
+                engine.layers(for: .searchableRedaction)[idx], outputDocument: SendablePDFDocument(outDoc),
                 sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [],
                 pipelineMode: .searchableRedaction,
                 filterDigests: digests, perPageModes: [.searchableRedaction]
@@ -418,7 +418,7 @@ struct RotatedPageCoordinateTests {
         defer { try? FileManager.default.removeItem(at: tamperURL) }
         let tamperDoc = try #require(PDFDocument(url: tamperURL))
         let l6 = await engine.runLayer(
-            5, outputDocument: SendablePDFDocument(tamperDoc),
+            .spatialVerification, outputDocument: SendablePDFDocument(tamperDoc),
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [nil], perPageModes: [.searchableRedaction]
