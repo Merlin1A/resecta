@@ -4,15 +4,15 @@ import Foundation
 
 // Cross-page Layer-2 fold precedence.
 // A redacted term still readable OUTSIDE every region folds to ATTENTION on
-// both page modes, above the WARN tier (the report aggregate ranks attention
-// above warn) and with the matched term texts threaded for the results row.
-// The warnable out-of-region arm (unmappable coordinates) returns ahead of
-// the Part-A fill-artifact note, so a multi-signal document folds to the
-// warning. Within the note tier the order stays specificity (fill artifact >
-// generic outside text); the unchecked arm keeps its long-standing position
-// below the expected-state notes. The generic outside-text informational is
-// the record surface for the page's own un-redacted content only (mapping
-// matrix + record string pinned below).
+// both page modes, above the whole WARN tier — the Searchable in-region WARN
+// included (the report aggregate ranks attention above warn) — and with the
+// matched term texts threaded for the results row. The could-not-verify
+// WARNs (unmappable coordinates, then unchecked pages) return ahead of every
+// informational note, so a page whose check did not run is never folded
+// into a note the aggregate reads as a pass. Within the note tier the order
+// stays specificity (fill artifact > generic outside text). The generic
+// outside-text informational is the record surface for the page's own
+// un-redacted content only (mapping matrix + record string pinned below).
 
 @Suite("Layer 2 fold arm order")
 struct Layer2FoldOrderTests {
@@ -70,15 +70,9 @@ struct Layer2FoldOrderTests {
 
         outcomes.removeAll { $0.bucket == .textInRegionSecureRaster }
         r = fold(outcomes, terms: terms)
-        #expect(r.status.isWarn, "in-region text on a Searchable page WARNs next — got \(r.status)")
-        #expect(message(r.status).contains("OCR detected text within a redacted region"))
-        #expect(r.pages == [2])
-
         // A redacted term readable outside every region: ATTENTION, above the
-        // WARN tier (the aggregate ranks attention above warn), with the term
-        // texts threaded and the message content-free.
-        outcomes.removeAll { $0.bucket == .textInRegionSearchable }
-        r = fold(outcomes, terms: terms)
+        // whole WARN tier (the aggregate ranks attention above warn), with the
+        // term texts threaded and the message content-free.
         #expect(r.status.isAttention, "term-outside ATTENTION returns ahead of the WARN tier — got \(r.status)")
         #expect(message(r.status).contains("still readable"))
         #expect(!message(r.status).contains("CONFIDENTIAL"), "the message never echoes a term")
@@ -86,19 +80,32 @@ struct Layer2FoldOrderTests {
         #expect(r.terms == ["CONFIDENTIAL"])
         #expect(!r.couldNotVerify, "a leak result never carries the could-not-verify flag")
 
-        // The warnable out-of-region arm returns ahead of the fill-artifact
-        // note: a multi-signal document folds to the warning.
         outcomes.removeAll { $0.bucket == .sensitiveTermOutsideRegions }
         r = fold(outcomes, terms: terms)
-        #expect(r.status.isWarn, "unmappable WARN returns ahead of the fill note — got \(r.status)")
+        #expect(r.status.isWarn, "in-region text on a Searchable page WARNs next — got \(r.status)")
+        #expect(message(r.status).contains("OCR detected text within a redacted region"))
+        #expect(r.pages == [2])
+        #expect(!r.couldNotVerify)
+
+        // The could-not-verify WARNs return ahead of every note.
+        outcomes.removeAll { $0.bucket == .textInRegionSearchable }
+        r = fold(outcomes, terms: terms)
+        #expect(r.status.isWarn, "unmappable WARN returns ahead of the notes — got \(r.status)")
         #expect(message(r.status).contains("could not be mapped to page space"))
         #expect(r.couldNotVerify, "unmappable coordinates: the check did not fully run")
         #expect(r.pages == [4])
         #expect(r.terms == nil)
 
-        // Note tier, most specific first: fill artifact ahead of generic
-        // outside text; both ahead of the unchecked arm (long-standing).
         outcomes.removeAll { $0.bucket == .unmappable }
+        r = fold(outcomes, terms: terms)
+        #expect(r.status.isWarn, "unchecked pages WARN ahead of the notes — got \(r.status)")
+        #expect(message(r.status).contains("OCR could not be run"))
+        #expect(r.couldNotVerify, "unchecked pages: the check did not fully run")
+        #expect(r.pages == [7])
+
+        // Note tier, most specific first: fill artifact ahead of generic
+        // outside text.
+        outcomes.removeAll { $0.bucket == .unchecked }
         r = fold(outcomes, terms: terms)
         #expect(r.status.isInfo, "fill note wins the note tier — got \(r.status)")
         #expect(message(r.status).contains("no readable text recovered"))
@@ -111,13 +118,6 @@ struct Layer2FoldOrderTests {
         #expect(r.pages == [6])
 
         outcomes.removeAll { $0.bucket == .textOutsideRegionsOnly }
-        r = fold(outcomes, terms: terms)
-        #expect(r.status.isWarn, "unchecked pages WARN once no note arm fires — got \(r.status)")
-        #expect(message(r.status).contains("OCR could not be run"))
-        #expect(r.couldNotVerify, "unchecked pages: the check did not fully run")
-        #expect(r.pages == [7])
-
-        outcomes.removeAll { $0.bucket == .unchecked }
         r = fold(outcomes, terms: terms)
         #expect(r.status == .pass, "clean pages alone fold to PASS — got \(r.status)")
         #expect(r.pages == nil)
@@ -198,19 +198,35 @@ struct Layer2FoldOrderTests {
         #expect(r.pages == [1])
     }
 
-    /// The fill-note-vs-unchecked pairing mirrors the long-standing
-    /// outside-text-vs-unchecked steady state, pinned here side by side.
-    @Test("note arms keep their position above the unchecked arm")
-    func noteArms_aboveUnchecked() {
+    /// A page whose OCR could not run is never folded into a note: beside a
+    /// fill note or an outside-text note (either mode) the layer WARNs with
+    /// the could-not-verify flag and references the unchecked page.
+    @Test("the unchecked arm outranks the note arms, with the could-not-verify flag")
+    func unchecked_aboveNotes() {
         let fill = fold([(1, .fillArtifactInRegion), (2, .unchecked)])
-        #expect(fill.status.isInfo, "got \(fill.status)")
-        #expect(message(fill.status).contains("no readable text recovered"))
-        #expect(fill.pages == [0])
+        #expect(fill.status.isWarn && fill.couldNotVerify, "fill note + unchecked — got \(fill.status)")
+        #expect(message(fill.status).contains("OCR could not be run"))
+        #expect(fill.pages == [1])
 
-        let outside = fold([(1, .textOutsideRegionsOnly), (2, .unchecked)])
-        #expect(outside.status.isInfo, "got \(outside.status)")
-        #expect(message(outside.status).contains("expected for Searchable Redaction mode"))
-        #expect(outside.pages == [0])
+        for mode in [PipelineMode.searchableRedaction, .secureRasterization] {
+            let outside = fold([(1, .textOutsideRegionsOnly), (2, .unchecked)], mode: mode)
+            #expect(outside.status.isWarn && outside.couldNotVerify,
+                    "\(mode): outside-text note + unchecked — got \(outside.status)")
+            #expect(message(outside.status).contains("OCR could not be run"))
+            #expect(outside.pages == [1])
+        }
+    }
+
+    /// A Searchable page's in-region WARN on one page never hides a redacted
+    /// term readable outside every region on another: ATTENTION with the term.
+    @Test("term-outside ATTENTION outranks the Searchable in-region WARN")
+    func attention_aboveSearchableInRegionWarn() {
+        let r = fold([(1, .textInRegionSearchable), (2, .sensitiveTermOutsideRegions)],
+                     terms: [2: ["SYNTH-TERM"]])
+        #expect(r.status.isAttention, "got \(r.status)")
+        #expect(r.terms == ["SYNTH-TERM"])
+        #expect(r.pages == [1])
+        #expect(!r.couldNotVerify)
     }
 
     /// The verdict is independent of outcome order (the task group completes

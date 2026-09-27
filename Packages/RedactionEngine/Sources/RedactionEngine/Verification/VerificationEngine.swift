@@ -705,8 +705,8 @@ public struct VerificationEngine: Sendable {
         if let warn = deferredWarn { return (.warn(warn.message), warn.pages, nil, false) }
         if droppedTermCount > 0 {
             // Partial-coverage honesty: some (not all) terms were too short
-            // to search. Informational — the searched terms were clean.
-            return (.info(shortTermTail(droppedTermCount)), nil, nil, false)
+            // to search — terms it could not search: a could-not-verify WARN.
+            return (.warn(shortTermTail(droppedTermCount)), nil, nil, true)
         }
         return (.pass, nil, nil, false)
     }
@@ -1139,15 +1139,13 @@ public struct VerificationEngine: Sendable {
         // Per-page WARNs from the exclusion pass, in two classes: a
         // positional edge graze (the check ran; a note) and characters whose
         // position could not be measured (the check did not fully run).
-        // They fold below FAIL and above the unreadable-page WARN; the class
-        // of the first WARN page in page order is the one reported, its
-        // sentence composed ONCE over that class's pages, which are exactly
-        // the page references.
+        // They fold below FAIL and above the unreadable-page WARN; an
+        // unmeasured page outranks every graze (its message names the first
+        // such page; the grazed pages join the references), else the graze
+        // sentence is composed ONCE over the grazed pages.
         var grazePages: [Int] = []
         var unmeasuredPages: [Int] = []
         var firstUnmeasuredMessage: String?
-        // nil until the first WARN page: true = graze, false = unmeasured.
-        var firstWarnIsGraze: Bool?
         // Eligible pages PDFKit cannot open surface as a WARN when the
         // layer would otherwise PASS — see runLayer1TextExtraction.
         var unreadablePages: [Int] = []
@@ -1234,7 +1232,6 @@ public struct VerificationEngine: Sendable {
                     unmeasuredPages.append(i)
                     if firstUnmeasuredMessage == nil { firstUnmeasuredMessage = msg }
                 }
-                if firstWarnIsGraze == nil { firstWarnIsGraze = outcome.grazed }
             }
         }
         // A text layer on a page written as image-only outranks every other
@@ -1249,16 +1246,15 @@ public struct VerificationEngine: Sendable {
         }
         // The exclusion pass's WARN outranks the unreadable-page WARN
         // (mirror of FAIL's masking above; the combined case is rare and the
-        // exclusion message is the more actionable of the two). A graze is
-        // a positional note (the check ran); an unmeasured position means
-        // the check did not fully run.
-        if let firstWarnIsGraze {
-            if firstWarnIsGraze {
-                return (SandwichVerification.grazeWarning(pages: grazePages), grazePages, false)
-            }
-            if let msg = firstUnmeasuredMessage {
-                return (.warn(msg), unmeasuredPages, true)
-            }
+        // exclusion message is the more actionable of the two). An
+        // unmeasured position (the check did not fully run) outranks a graze
+        // (a positional note; the check ran); the grazed pages ride along
+        // as references.
+        if let msg = firstUnmeasuredMessage {
+            return (.warn(msg), (unmeasuredPages + grazePages).sorted(), true)
+        }
+        if !grazePages.isEmpty {
+            return (SandwichVerification.grazeWarning(pages: grazePages), grazePages, false)
         }
         if !unreadablePages.isEmpty {
             return (unreadablePagesWarn(unreadablePages), unreadablePages, true)

@@ -502,14 +502,14 @@ public struct SandwichVerification: Sendable {
                 }
             }
         }
-        if grazed {
-            // A positional note: the character's content is outside the
-            // region; the check ran.
-            return (Self.grazeWarning(pages: [pageIndex]), false, true)
-        }
         if zeroBoundsUnits > 0 {
             // Characters the check could not place — it did not fully run.
             return (Self.zeroBoundsWarning(count: zeroBoundsUnits, pageIndex: pageIndex), true, false)
+        }
+        if grazed {
+            // A positional note (the content is outside the region; the check
+            // ran), below the unplaced characters on the same page.
+            return (Self.grazeWarning(pages: [pageIndex]), false, true)
         }
         return (.pass, false, false)
     }
@@ -1107,7 +1107,7 @@ public struct SandwichVerification: Sendable {
             }
         }
         if droppedTermCount > 0 {
-            return (.info(shortTermTail(droppedTermCount)), nil, nil, false)
+            return (.warn(shortTermTail(droppedTermCount)), nil, nil, true)
         }
         return (.pass, nil, nil, false)
     }

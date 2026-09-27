@@ -224,17 +224,17 @@ struct VerificationEngineTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let engine = VerificationEngine()
-        // "zzqx" is searched (and clean); "ab" is too short. The drop must
-        // be visible, not silent — INFO so the searched-terms-clean verdict
-        // is preserved.
+        // "zzqx" is searched (and clean); "ab" is too short. A term the
+        // layer could not search is a could-not-verify WARN — the all-short
+        // shape — never an informational note.
         let result = await engine.runLayer(
             2, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: ["zzqx", "ab"].map { SensitiveTerm(text: $0) },
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
-        #expect(result.status.isInfo,
-                "partial short-term drop must surface as INFO; got \(result.status)")
-        if case .info(let msg) = result.status {
+        #expect(result.status.isWarn && result.couldNotVerify,
+                "partial short-term drop must surface as a could-not-verify WARN; got \(result.status)")
+        if case .warn(let msg) = result.status {
             #expect(msg.contains("1 term too short to check"), "got: \(msg)")
         }
     }
@@ -1204,8 +1204,8 @@ struct VerificationEngineTests {
         #expect(verdict == .textOutsideRegionsOnly)
     }
 
-    @Test("classifyPageOCR: in-region text outranks a sibling out-of-region term")
-    func classifyPageOCR_inRegionBeatsTermOutside() {
+    @Test("classifyPageOCR: in-region text and a sibling out-of-region term both reach the fold")
+    func classifyPageOCR_inRegionBesideTermOutside() {
         let region = manualRegion(CGRect(x: 0.2, y: 0.2, width: 0.4, height: 0.3))
         let inRegion = VerificationEngine.OCRHit(
             box: CGRect(x: 0.3, y: 0.3, width: 0.2, height: 0.1),
@@ -1213,10 +1213,16 @@ struct VerificationEngineTests {
         let termOutside = VerificationEngine.OCRHit(
             box: CGRect(x: 0.05, y: 0.85, width: 0.3, height: 0.08),
             wordBoxes: [], text: "ACME-SECRET", confidence: 0.9)
-        // Priority: readable text INSIDE a region is the stronger signal.
-        #expect(VerificationEngine.classifyPageOCR(
+        let verdict = VerificationEngine.classifyPageOCR(
             hits: [inRegion, termOutside], pageRegions: [region],
-            sensitiveTerms: ["acme-secret"]) == .textInRegion)
+            sensitiveTerms: ["acme-secret"])
+        // On a rasterized page the in-region text is a leak (FAIL) and
+        // outranks the term; on a Searchable page the in-region WARN is the
+        // weaker signal and the term outside every region folds to ATTENTION.
+        #expect(VerificationEngine.pageBucket(for: verdict, effectiveMode: .secureRasterization)
+                == .textInRegionSecureRaster, "got \(verdict)")
+        #expect(VerificationEngine.pageBucket(for: verdict, effectiveMode: .searchableRedaction)
+                == .sensitiveTermOutsideRegions, "got \(verdict)")
     }
 
     @Test("classifyPageOCR: no hits → none")

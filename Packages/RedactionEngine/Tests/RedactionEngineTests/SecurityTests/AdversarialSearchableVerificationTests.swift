@@ -538,15 +538,16 @@ struct AdversarialSearchableVerificationTests {
         )
         defer { try? FileManager.default.removeItem(at: url) }
 
-        // "zzqx" is searched (and clean); "ab" is too short — the drop must
-        // surface as INFO, mirroring Layer 3.
-        let result = await sandwichVerifier.verifyTextOperatorSemantics(
+        // "zzqx" is searched (and clean); "ab" is too short — the drop is a
+        // could-not-verify WARN, mirroring Layer 3.
+        let outcome = await sandwichVerifier.verifyTextOperatorSemantics(
             outputDocument: SendablePDFDocument(doc),
             sensitiveTerms: ["zzqx", "ab"].map { SensitiveTerm(text: $0) }
-        ).status
-        #expect(result.isInfo,
-                "partial short-term drop must surface as INFO; got \(result)")
-        if case .info(let msg) = result {
+        )
+        let result = outcome.status
+        #expect(result.isWarn && outcome.couldNotVerify,
+                "partial short-term drop must surface as a could-not-verify WARN; got \(result)")
+        if case .warn(let msg) = result {
             #expect(msg.contains("1 term too short to check"), "got: \(msg)")
         }
     }
