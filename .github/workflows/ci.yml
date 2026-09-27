@@ -72,8 +72,10 @@ jobs:
           echo "BFT_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
 
       # The copies sit one directory under the checkout because two of the
-      # scripts locate the tree relative to their own path. On a push to
-      # main the base is the parent commit, i.e. the merged tree's scripts.
+      # scripts locate the tree relative to their own path. audit-lint.sh
+      # runs the silent-guard scanner that sits beside it, so the scanner is
+      # copied too. On a push to main the base is the parent commit, i.e. the
+      # merged tree's scripts.
       - name: Lint scripts from the base branch
         env:
           BASE_REF: ${{ github.base_ref }}
@@ -86,9 +88,9 @@ jobs:
           fi
           dir="${GITHUB_WORKSPACE}/.base-scripts"
           mkdir -p "$dir"
-          for s in claims-lint doc-metrics audit-lint verify-shipped-asset-hashes; do
-            git show "${base}:Scripts/${s}.sh" > "${dir}/${s}.sh"
-            chmod +x "${dir}/${s}.sh"
+          for s in claims-lint.sh doc-metrics.sh audit-lint.sh verify-shipped-asset-hashes.sh lint-silent-guards.py; do
+            git show "${base}:Scripts/${s}" > "${dir}/${s}"
+            chmod +x "${dir}/${s}"
           done
           echo "lint scripts from ${base} = $(git rev-parse "$base")"
           echo "BASE_SCRIPTS=${dir}" >> "$GITHUB_ENV"

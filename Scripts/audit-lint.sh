@@ -173,6 +173,24 @@ M1_RE='\b(guarantee[ds]?|ensure[ds]?|impossible|find(?:s|ing)?|catch(?:es|ing)?|
 # would read as a citation.
 AL6_RE='\b(D12|C12|F12|M12|Q12|RB12|SR12|SR|AL|PB|UXC|DC|R111|S4|P3)-[0-9]+\b'
 
+# AL-5's scanner call (used by the self-test below and the AL-5 section at
+# the end). Prints the scanner's offence lines for one file and returns 0,
+# or returns 1 when the scanner is missing or failed: a crash (a traceback,
+# a usage error) exits non-zero with no `path:line:` offence line, and is
+# never read as "no offences".
+al5_scan() {
+    local scanner="$1" path="$2" out rc
+    { [ -f "$scanner" ] && command -v python3 >/dev/null 2>&1; } || return 1
+    out="$(python3 "$scanner" --lint "$path" 2>/dev/null)"
+    rc=$?
+    case "$rc" in
+        0) return 0 ;;
+        1) printf '%s\n' "$out" | awk -v p="$path:" 'index($0, p) == 1 { f = 1 } END { exit !f }' || return 1
+           printf '%s\n' "$out" ;;
+        *) return 1 ;;
+    esac
+}
+
 # --self-test: the keyword rule against five synthetic Swift lines. The
 # two comment lines (3 and 5) must be the only hits; anything else means
 # the rule drifted. Exit 0/1, no git access.
@@ -208,9 +226,27 @@ if [ -n "$SELF_TEST" ]; then
         | cut -d: -f1)
     if [ "$actual" = "$expected" ]; then
         echo "audit-lint --self-test: AL-6 shorthand rule OK (hits on lines 1 and 4 of 6; the comment and the string)"
+    else
+        echo "audit-lint --self-test: AL-6 shorthand rule DRIFTED — expected hits on lines 1 and 4, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+        exit 1
+    fi
+    # AL-5's scanner call fails closed: a missing scanner and a crashing
+    # one both return 1; a scanner that reports an offence returns 0 with
+    # the offence line.
+    st="$(mktemp -d)"
+    printf 'import Testing\n' > "$st/T.swift"
+    printf 'raise RuntimeError("scanner crash")\n' > "$st/crash.py"
+    printf 'import sys\nprint(sys.argv[2] + ":3: silent guard")\nsys.exit(1)\n' > "$st/report.py"
+    al5_ok=1
+    al5_scan "$st/missing.py" "$st/T.swift" >/dev/null && al5_ok=0
+    al5_scan "$st/crash.py" "$st/T.swift" >/dev/null && al5_ok=0
+    [ "$(al5_scan "$st/report.py" "$st/T.swift")" = "$st/T.swift:3: silent guard" ] || al5_ok=0
+    rm -rf "$st"
+    if [ "$al5_ok" = 1 ]; then
+        echo "audit-lint --self-test: AL-5 scanner call OK (missing and crashing scanners fail closed; an offence is reported)"
         exit 0
     fi
-    echo "audit-lint --self-test: AL-6 shorthand rule DRIFTED — expected hits on lines 1 and 4, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+    echo "audit-lint --self-test: AL-5 scanner call DRIFTED — a missing or crashing scanner was read as clean, or an offence was lost" >&2
     exit 1
 fi
 
@@ -440,24 +476,29 @@ fi
 # not re-reported. The two accepted shapes: `try #require(...)` for a
 # resource the repository tracks; `TestGate.skip(...)` before the `return`
 # for an environmental gate. Same-line marker: `SilentGuard:ok <reason>`.
-AL5_SCANNER="$REPO_ROOT/Scripts/lint-silent-guards.py"
-if [ -f "$AL5_SCANNER" ] && command -v python3 >/dev/null 2>&1; then
-    for path in "${STAGED[@]}"; do
-        case "$path" in *Tests/*.swift) ;; *) continue ;; esac
-        [ -f "$path" ] || continue
-        added="$(diff_added_hunks "$path" | perl -ne 'if (/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/) { my ($s, $n) = ($1, defined $2 ? $2 : 1); print "$_\n" for ($s .. $s + $n - 1); }')"
-        [ -n "$added" ] || continue
-        while IFS= read -r off; do
-            [ -n "$off" ] || continue
-            line="${off#"$path":}"; line="${line%%:*}"
-            if printf '%s\n' "$added" | /usr/bin/grep -qx "$line"; then
-                violate "AL-5 silent test guard: $off"
-            fi
-        done < <(python3 "$AL5_SCANNER" --lint "$path" 2>/dev/null || true)
-    done
-else
-    warn "AL-5 skipped: $AL5_SCANNER or python3 not found"
-fi
+# The scanner beside this script comes first — in CI that is the base
+# branch's copy, so a change cannot edit the scanner it is gated by — then
+# the checkout's own. A missing or failing scanner is an offence, never a
+# skip.
+AL5_SCANNER="$(cd "$(dirname "$0")" && pwd)/lint-silent-guards.py"
+[ -f "$AL5_SCANNER" ] || AL5_SCANNER="$REPO_ROOT/Scripts/lint-silent-guards.py"
+for path in "${STAGED[@]}"; do
+    case "$path" in *Tests/*.swift) ;; *) continue ;; esac
+    [ -f "$path" ] || continue
+    added="$(diff_added_hunks "$path" | perl -ne 'if (/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/) { my ($s, $n) = ($1, defined $2 ? $2 : 1); print "$_\n" for ($s .. $s + $n - 1); }')"
+    [ -n "$added" ] || continue
+    if ! offences="$(al5_scan "$AL5_SCANNER" "$path")"; then
+        violate "AL-5 silent-guard scanner missing or failed on $path ($AL5_SCANNER)"
+        continue
+    fi
+    while IFS= read -r off; do
+        [ -n "$off" ] || continue
+        line="${off#"$path":}"; line="${line%%:*}"
+        if printf '%s\n' "$added" | /usr/bin/grep -qx "$line"; then
+            violate "AL-5 silent test guard: $off"
+        fi
+    done <<< "$offences"
+done
 
 # ── AL-6 planning shorthand on added lines ──────────────────────────────
 # Shipped source, tests and string tables describe mechanisms; they never

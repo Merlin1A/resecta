@@ -2,71 +2,13 @@ import Testing
 import PDFKit
 @testable import RedactionEngine
 
-// `validateRegexPattern` rejects catastrophic shapes that
-// compile cleanly under the earlier nested-quantifier heuristic, plus
-// a cancellation-propagation check that exercises the `.reportProgress`
-// path through the full-scan branch.
+// The cancellation-propagation and timeout checks that exercise the
+// `.reportProgress` path through the full-scan branch. They assert wall-clock
+// bounds, so the suite is report-only in the batched runner; the gate's pure
+// verdicts live in `RegexGateFunctionalTests` (gating).
 
 @Suite("Regex search hardening", .tags(.search))
 struct RegexSearchHardeningTests {
-
-    // MARK: - Validation rejects catastrophic shapes
-
-    @Test("validateRegexPattern rejects `(a+)+b`")
-    func rejectsNestedPlus() {
-        #expect(DocumentSearcher.validateRegexPattern("(a+)+b") == nil)
-    }
-
-    @Test("validateRegexPattern rejects `(ab|abc)*xyz`")
-    func rejectsAlternationStar() {
-        #expect(DocumentSearcher.validateRegexPattern("(ab|abc)*xyz") == nil)
-    }
-
-    @Test("validateRegexPattern rejects `(a|aa)*b`")
-    func rejectsOverlappingAlternationStar() {
-        #expect(DocumentSearcher.validateRegexPattern("(a|aa)*b") == nil)
-    }
-
-    @Test("validateRegexPattern rejects `(a|ab)+b` (overlapping alternation under +)")
-    func rejectsOverlappingAlternationPlus() {
-        #expect(DocumentSearcher.validateRegexPattern("(a|ab)+b") == nil)
-    }
-
-    @Test("validateRegexPattern rejects `(a+|b+)+` (alternation of quantifiers)")
-    func rejectsAlternatedQuantifiers() {
-        #expect(DocumentSearcher.validateRegexPattern("(a+|b+)+") == nil)
-    }
-
-    @Test("validateRegexPattern rejects `(a|ab){2,}` (overlapping alternation under an open brace)")
-    func rejectsOpenBraceOverAlternation() {
-        // `(a|b){2,}` — two distinct single letters — repeats
-        // deterministically and is accepted since the precheck's
-        // literal-alternation demotion.
-        #expect(DocumentSearcher.validateRegexPattern("(a|ab){2,}") == nil)
-        #expect(DocumentSearcher.validateRegexPattern("(a|b){2,}") != nil)
-    }
-
-    // MARK: - Validation still accepts safe shapes
-
-    @Test(#"validateRegexPattern accepts `\d{3}-\d{2}-\d{4}` (SSN shape)"#)
-    func acceptsSSNShape() {
-        #expect(DocumentSearcher.validateRegexPattern(#"\d{3}-\d{2}-\d{4}"#) != nil)
-    }
-
-    @Test("validateRegexPattern accepts bounded `(a|b){1,10}`")
-    func acceptsBoundedAlternation() {
-        #expect(DocumentSearcher.validateRegexPattern("(a|b){1,10}") != nil)
-    }
-
-    @Test("validateRegexPattern accepts all built-in saved regex patterns")
-    func acceptsBuiltInRegexes() {
-        for regex in SavedRegex.allBuiltIns {
-            #expect(
-                DocumentSearcher.validateRegexPattern(regex.pattern) != nil,
-                "built-in failed validation: \(regex.label) — \(regex.pattern)"
-            )
-        }
-    }
 
     // MARK: - Cancellation propagation via `.reportProgress`
 

@@ -23,12 +23,11 @@ import CryptoKit
 //     separately (they sit on the conservative-precheck boundary by
 //     design).
 //
-// Execution watchdog: an accepted-but-catastrophic pattern spins inside a
-// synchronous ICU call that nothing can interrupt (the RegexSentinelCheck
-// contract), so timed executions run on a detached task with a deadline
-// waiter — on timeout the row records unbounded and the spinning task is
-// ORPHANED (same trade the product sentinel makes; bounded by process
-// lifetime, and the adversarial corpus is 32 rows).
+// Execution watchdog: the timed execution enumerates with `.reportProgress`
+// and stops at the budget, but it still runs on a detached task with a
+// deadline waiter — should an accepted pattern outrun the budget anyway, the
+// row records unbounded and the task is left to finish (bounded by process
+// lifetime; the adversarial corpus is 38 rows).
 //
 // MEASUREMENT HARNESS: env-gated (RESECTA_REGEX_OUT, with the
 // TEST_RUNNER_-prefixed form xcodebuild forwards), never in the batched gate.
