@@ -76,10 +76,11 @@ public enum PixelOperations {
 /// Compute post-rotation visual dimensions.
 /// bounds(for:) returns raw/un-rotated dimensions (R-1 confirmed, Experiment D).
 ///
-/// PDFKit normalizes the page's
-/// `/Rotate` entry to one of {0, 90, 180, 270} per ISO 32000 §8.3.2 —
-/// non-multiple-of-90 values are clamped on parse, so this switch
-/// covers every rotation the engine can observe via `PDFPage.rotation`.
+/// `PDFPage.rotation` is always one of {0, 90, 180, 270}: PDFKit rounds a
+/// `/Rotate` that is not a right angle to the nearest quarter turn, while
+/// CoreGraphics (`CGPDFPage.rotationAngle`) keeps the raw value. The
+/// pre-flight (`validatePageGeometry`) refuses a page on which the two
+/// disagree, so every rendered page is in the frame this switch covers.
 public func effectiveBounds(_ rawBounds: CGRect, rotation: Int) -> CGRect {
     switch rotation {
     case 90, 270:
@@ -723,22 +724,34 @@ public func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
 }
 
 /// The geometry half of the pre-flight: every side of the cropBox between
-/// 10 and 5,000 pt, and no non-default `/UserUnit` on the page dictionary.
-/// Independent of DPI and of available memory. A page that fails here is
-/// reported as `.unsupportedPageGeometry`, never as a memory failure.
+/// 10 and 5,000 pt, no non-default `/UserUnit` on the page dictionary, and a
+/// `/Rotate` that is a right angle read the same way by PDFKit and by
+/// CoreGraphics. Independent of DPI and of available memory. A page that
+/// fails here is reported as `.unsupportedPageGeometry`, never as a memory
+/// failure.
 public func validatePageGeometry(_ page: PDFPage) -> Bool {
     let box = page.bounds(for: .cropBox)
     guard box.width >= 10, box.height >= 10,
           box.width <= 5000, box.height <= 5000 else { return false }
 
-    // Check for /UserUnit (Experiment N)
-    if let pageRef = page.pageRef,
-       let dict = pageRef.dictionary {
-        var userUnit: CGPDFReal = 0
-        if CGPDFDictionaryGetNumber(dict, "UserUnit", &userUnit),
-           userUnit != 1.0 {
-            return false
+    if let pageRef = page.pageRef {
+        // Check for /UserUnit (Experiment N)
+        if let dict = pageRef.dictionary {
+            var userUnit: CGPDFReal = 0
+            if CGPDFDictionaryGetNumber(dict, "UserUnit", &userUnit),
+               userUnit != 1.0 {
+                return false
+            }
         }
+        // A /Rotate that is not a right angle (invalid per ISO 32000
+        // §7.7.3.3, still opened) is rounded by PDFKit — the frame of the
+        // editor, text extraction, search and every region — while
+        // CoreGraphics keeps the raw value, so a render would place every
+        // fill on the wrong pixels. Refuse unless both read the same
+        // right angle (an inherited /Rotate resolves in both).
+        let raw = ((Int(pageRef.rotationAngle) % 360) + 360) % 360
+        let displayed = ((page.rotation % 360) + 360) % 360
+        guard raw % 90 == 0, raw == displayed else { return false }
     }
     return true
 }

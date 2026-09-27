@@ -165,6 +165,36 @@ struct PageRotationGateTests {
 
     // MARK: - The render frame
 
+    /// On a right-angle page the render keeps CoreGraphics' own transform to
+    /// the bit, fractional cropBox origins included (the rendered pixels of
+    /// every admitted page are unchanged); on a non-right-angle page the
+    /// transform carries PDFKit's quarter turn.
+    @Test("The render transform keeps the system transform on right-angle pages",
+          arguments: ["0", "90", "180", "270", "-90", "450", "45", "135"])
+    func renderTransformKeepsSystemTransform(_ rotate: String) throws {
+        for mediaBox in ["0 0 612 792", "0.1 0.3 612.4 792.7", "36.285714 -158 2037.747253 2089.272727"] {
+            let data = Self.rotatedPDF(rotate: rotate)
+            let text = String(decoding: data, as: UTF8.self)
+                .replacingOccurrences(of: "/MediaBox [0 0 612 792]", with: "/MediaBox [\(mediaBox)]")
+            let doc = try #require(PDFDocument(data: Data(text.utf8)))
+            let page = try #require(doc.page(at: 0))
+            let cgPage = try #require(page.pageRef)
+            let size = effectiveBounds(page.bounds(for: .cropBox), rotation: page.rotation).size
+            let target = CGRect(origin: .zero, size: size)
+            let transform = PageRasterizer.drawingTransform(
+                for: cgPage, box: .cropBox, rotation: page.rotation, targetRect: target)
+            let system = cgPage.getDrawingTransform(.cropBox, rect: target, rotate: 0, preserveAspectRatio: true)
+            if Int(cgPage.rotationAngle) % 90 == 0 {
+                #expect(transform == system, "/Rotate \(rotate) box \(mediaBox): \(transform) vs \(system)")
+            } else {
+                // PDFKit's quarter turn: zero on the diagonal for 90/270.
+                let quarter = page.rotation == 90 || page.rotation == 270
+                #expect((transform.a == 0) == quarter && (transform.b == 0) == !quarter,
+                        "/Rotate \(rotate) (displayed \(page.rotation)): \(transform)")
+            }
+        }
+    }
+
     /// A direct render (the detection path renders without the pre-flight)
     /// follows PDFKit's rounded rotation: the page renders exactly like the
     /// same page carrying that right angle.

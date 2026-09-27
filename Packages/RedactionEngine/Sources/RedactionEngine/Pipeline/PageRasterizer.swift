@@ -611,13 +611,12 @@ public final class PageRasterizer: @unchecked Sendable {
         ctx.setShouldSubpixelQuantizeFonts(false)
         ctx.setAllowsFontSubpixelPositioning(false)
 
-        // 6. getDrawingTransform handles cropBox origin, /Rotate, clipping.
+        // 6. The drawing transform in PDFKit's rotation frame (cropBox
+        // origin + rotation; see `drawingTransform`).
         let targetRect = CGRect(x: 0, y: 0, width: effectiveSize.width, height: effectiveSize.height)
-        let transform = cgPage.getDrawingTransform(
-            box == .cropBox ? .cropBox : .mediaBox,
-            rect: targetRect,
-            rotate: 0,
-            preserveAspectRatio: true
+        let transform = Self.drawingTransform(
+            for: cgPage, box: box == .cropBox ? .cropBox : .mediaBox,
+            rotation: rotation, targetRect: targetRect
         )
 
         // 7. DPI scale first, then drawing transform
@@ -689,10 +688,10 @@ public final class PageRasterizer: @unchecked Sendable {
         ctx.setShouldSubpixelQuantizeFonts(false)
         ctx.setAllowsFontSubpixelPositioning(false)
 
-        // getDrawingTransform handles cropBox origin, /Rotate, clipping.
+        // The drawing transform in PDFKit's rotation frame (see `drawingTransform`).
         let targetRect = CGRect(x: 0, y: 0, width: effectiveSize.width, height: effectiveSize.height)
-        let transform = cgPage.getDrawingTransform(
-            .cropBox, rect: targetRect, rotate: 0, preserveAspectRatio: true
+        let transform = Self.drawingTransform(
+            for: cgPage, box: .cropBox, rotation: rotation, targetRect: targetRect
         )
 
         // DPI scale first, then drawing transform
@@ -716,5 +715,52 @@ public final class PageRasterizer: @unchecked Sendable {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
         }
         return image
+    }
+}
+
+extension PageRasterizer {
+    /// The transform that draws `cgPage`'s `box` into `targetRect` in the
+    /// rotation frame PDFKit reports (`rotation`, the `PDFPage.rotation`
+    /// every region is built in). CoreGraphics' `getDrawingTransform`
+    /// applies the page's raw `/Rotate`, which PDFKit rounds when it is not
+    /// a right angle; its transform is used only when its matrix is the
+    /// quarter turn PDFKit reports — every page the pre-flight admits,
+    /// unchanged to the bit. Otherwise the transform is built here: the
+    /// cropBox centred on the target, rotated clockwise by `rotation`,
+    /// scaled down to fit.
+    static func drawingTransform(
+        for cgPage: CGPDFPage, box: CGPDFBox, rotation: Int, targetRect: CGRect
+    ) -> CGAffineTransform {
+        let system = cgPage.getDrawingTransform(
+            box, rect: targetRect, rotate: 0, preserveAspectRatio: true)
+        let turn = ((rotation % 360) + 360) % 360
+        let (a, b, c, d): (CGFloat, CGFloat, CGFloat, CGFloat)
+        switch turn {
+        case 90: (a, b, c, d) = (0, -1, 1, 0)
+        case 180: (a, b, c, d) = (-1, 0, 0, -1)
+        case 270: (a, b, c, d) = (0, 1, -1, 0)
+        default: (a, b, c, d) = (1, 0, 0, 1)
+        }
+        // Same quarter turn: every component is zero where the rotation
+        // matrix is zero (a -0.0 included) and carries its sign elsewhere;
+        // the positive scale does not change either.
+        let pairs: [(CGFloat, CGFloat)] = [(system.a, a), (system.b, b), (system.c, c), (system.d, d)]
+        if pairs.allSatisfy(Self.sameSignOrZero) { return system }
+
+        let rect = cgPage.getBoxRect(box)
+        let quarter = turn == 90 || turn == 270
+        let turnedWidth: CGFloat = quarter ? rect.height : rect.width
+        let turnedHeight: CGFloat = quarter ? rect.width : rect.height
+        let scale: CGFloat = min(targetRect.width / turnedWidth, targetRect.height / turnedHeight, 1)
+        let toCentre = CGAffineTransform(translationX: -rect.midX, y: -rect.midY)
+        let turned = CGAffineTransform(a: a * scale, b: b * scale, c: c * scale, d: d * scale, tx: 0, ty: 0)
+        let toTarget = CGAffineTransform(translationX: targetRect.midX, y: targetRect.midY)
+        return toCentre.concatenating(turned).concatenating(toTarget)
+    }
+
+    private static func sameSignOrZero(_ pair: (CGFloat, CGFloat)) -> Bool {
+        let (value, sign) = pair
+        if sign == 0 { return value == 0 }
+        return value != 0 && value.sign == sign.sign
     }
 }
