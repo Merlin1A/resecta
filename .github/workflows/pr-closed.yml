@@ -1,0 +1,35 @@
+# Stops the runs still going for a pull request once it is merged or
+# closed. Each job below joins the concurrency group of one pull-request
+# workflow (ci.yml, sim-suite.yml) with cancel-in-progress, which cancels
+# that workflow's run for the same pull request; the job itself does
+# nothing. Without this a closed pull request's simulator suite keeps a
+# macOS runner for up to twenty minutes while the next pull request's gate
+# waits for one. The group names here must match the two workflows'
+# `concurrency.group` lines. Linux runners, no token permissions, no
+# checkout. Code scanning's runs are not reached from here.
+name: pr-closed
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  stop-ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    concurrency:
+      group: ci-refs/pull/${{ github.event.pull_request.number }}/merge
+      cancel-in-progress: true
+    steps:
+      - run: echo "the pull request is closed; its ci run, if one was going, is cancelled"
+
+  stop-sim-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    concurrency:
+      group: sim-suite-${{ github.event.pull_request.number }}-both
+      cancel-in-progress: true
+    steps:
+      - run: echo "the pull request is closed; its sim-suite run, if one was going, is cancelled"
