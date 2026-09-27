@@ -1,5 +1,5 @@
 # The full engine host suite: `swift test` in Packages/RedactionEngine on a
-# hosted macos-26 runner. Runs on demand and on release tags; it is not part
+# hosted macos-26 runner. Runs on demand; it is not part
 # of the pull-request gate (the suite exceeds ninety minutes on a 3-vCPU
 # runner, and every parallel run to date has stalled short of a verdict;
 # the serial input runs the suites one at a time under a one-hour cap to
@@ -22,8 +22,6 @@ on:
         description: Run the suites one at a time (swift test --no-parallel) under a one-hour cap
         type: boolean
         default: false
-  push:
-    tags: ['v*']
 
 permissions:
   contents: read
