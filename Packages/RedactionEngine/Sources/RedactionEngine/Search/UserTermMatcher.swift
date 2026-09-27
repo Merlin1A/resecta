@@ -28,13 +28,12 @@ struct CompiledUserTerm: Sendable {
     let normalizedLiteral: String?
 }
 
-/// Per-page result of `alwaysFlagHits`. Carries the match list plus any
-/// user-authored patterns whose enumeration bailed on the per-page
-/// wall-clock budget so the call site can route a non-error per-term-
-/// per-page skip signal (a custom-terms timeout toast). Order in
-/// `timedOutPatterns` matches enumeration order; the outer loop's budget
-/// check breaks before any subsequent terms run, so at most one entry
-/// per page is expected in practice.
+/// Per-page result of `alwaysFlagHits`. Carries the match list plus the
+/// user-authored patterns the page's wall-clock budget did not let it
+/// check in full — a regex term that ran out its share, or a term the page
+/// had no time left for — so the call site can route a non-error per-term-
+/// per-page skip signal (a custom-terms timeout toast). Both lists follow
+/// the custom terms' order.
 struct AlwaysFlagPageResult {
     let hits: [(range: NSRange, pattern: String)]
     let timedOutPatterns: [String]
@@ -159,14 +158,17 @@ public struct UserTermMatcher: Sendable {
     /// the plain case-insensitive search (the two are equivalent there),
     /// as does a page whose per-character normalization cannot be mapped.
     ///
-    /// Returns `AlwaysFlagPageResult.timedOutPatterns` populated with the
-    /// user-authored patterns whose `enumerateMatches` bailed on the per-
-    /// page budget. `[.reportProgress]` lets the engine fire the
-    /// closure between match attempts on long alternation walks, so the
-    /// `Task.isCancelled` + `ContinuousClock` checks below sample inside
-    /// a single `enumerateMatches` invocation. Catastrophic backtracking
-    /// inside one match attempt still blocks the synchronous C call;
-    /// `DocumentSearcher.validateRegexPattern` remains the primary defense.
+    /// Literal terms run first (linear in the page); then each regex term
+    /// gets its own share of what is left of the per-page budget — the page
+    /// budget stays the cap — so one slow regex cannot use up the time of
+    /// the terms after it. Returns `AlwaysFlagPageResult.timedOutPatterns`
+    /// populated with the regex terms whose `enumerateMatches` bailed on
+    /// their share and any term the page had no time left for.
+    /// `[.reportProgress]` lets the engine fire the closure periodically,
+    /// inside a single long match attempt too, so the `Task.isCancelled` +
+    /// `ContinuousClock` checks below stop a backtracking match at its
+    /// share; `DocumentSearcher.validateRegexPattern` remains the primary
+    /// defense.
     ///
     /// `timeoutOverride` mirrors `DocumentSearcher.regexTimeoutOverride`
     /// as a per-call test seam — production code passes nil (or omits the
@@ -181,20 +183,32 @@ public struct UserTermMatcher: Sendable {
             return AlwaysFlagPageResult(hits: [], timedOutPatterns: [])
         }
 
-        var hits: [(range: NSRange, pattern: String)] = []
-        var timedOutPatterns: [String] = []
         let ns = pageText as NSString
         let fullRange = NSRange(location: 0, length: ns.length)
         let startTime = ContinuousClock.now
         let timeout = timeoutOverride ?? DocumentSearcher.perPageRegexTimeout
         // Built once per page, on the first literal term that needs it.
         var normalizedPage: NormalizedSearchText? = nil
+        // Per term, in the custom terms' order, whatever order they run in.
+        var hitsByTerm = [[(range: NSRange, pattern: String)]](repeating: [], count: alwaysFlag.count)
+        var timedOutByTerm = [Bool](repeating: false, count: alwaysFlag.count)
+        let runOrder = alwaysFlag.indices.filter { alwaysFlag[$0].regex == nil }
+            + alwaysFlag.indices.filter { alwaysFlag[$0].regex != nil }
+        var regexTermsLeft = alwaysFlag.filter { $0.regex != nil }.count
 
-        for term in alwaysFlag {
-            if ContinuousClock.now - startTime > timeout { break }
+        for index in runOrder {
+            let term = alwaysFlag[index]
             if Task.isCancelled { break }
-
+            let remaining = timeout - (ContinuousClock.now - startTime)
             if let regex = term.regex {
+                // This term's share of what is left of the page budget.
+                let share = remaining / max(regexTermsLeft, 1)
+                regexTermsLeft -= 1
+                guard remaining > .zero else {
+                    timedOutByTerm[index] = true
+                    continue
+                }
+                let termStart = ContinuousClock.now
                 var thisTermTimedOut = false
                 regex.enumerateMatches(
                     in: pageText,
@@ -205,21 +219,21 @@ public struct UserTermMatcher: Sendable {
                         stop.pointee = true
                         return
                     }
-                    if ContinuousClock.now - startTime > timeout {
+                    if ContinuousClock.now - termStart > share {
                         thisTermTimedOut = true
                         stop.pointee = true
                         return
                     }
                     guard let match, match.range.location != NSNotFound else { return }
-                    hits.append((range: match.range, pattern: term.pattern))
+                    hitsByTerm[index].append((range: match.range, pattern: term.pattern))
                 }
-                if thisTermTimedOut {
-                    timedOutPatterns.append(term.pattern)
-                }
+                timedOutByTerm[index] = thisTermTimedOut
+            } else if remaining <= .zero {
+                timedOutByTerm[index] = true
             } else if let literal = term.normalizedLiteral,
                       let mapped = normalizedPage ?? Self.normalizedSearchText(pageText) {
                 normalizedPage = mapped
-                hits.append(contentsOf: Self.literalHits(literal, in: mapped, pattern: term.pattern))
+                hitsByTerm[index].append(contentsOf: Self.literalHits(literal, in: mapped, pattern: term.pattern))
             } else {
                 var searchRange = fullRange
                 while searchRange.length > 0 {
@@ -229,7 +243,7 @@ public struct UserTermMatcher: Sendable {
                         range: searchRange
                     )
                     if found.location == NSNotFound { break }
-                    hits.append((range: found, pattern: term.pattern))
+                    hitsByTerm[index].append((range: found, pattern: term.pattern))
                     let advanceTo = found.location + max(1, found.length)
                     if advanceTo >= fullRange.length { break }
                     searchRange = NSRange(
@@ -239,6 +253,8 @@ public struct UserTermMatcher: Sendable {
                 }
             }
         }
+        let hits = hitsByTerm.flatMap { $0 }
+        let timedOutPatterns = alwaysFlag.indices.filter { timedOutByTerm[$0] }.map { alwaysFlag[$0].pattern }
         return AlwaysFlagPageResult(hits: hits, timedOutPatterns: timedOutPatterns)
     }
 

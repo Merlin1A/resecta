@@ -382,8 +382,8 @@ extension SearchAndRedactSheet {
         // Install the custom-terms always-flag timeout
         // sink. `DocumentSearcher` calls this once per (page, user-
         // authored pattern) when `UserTermMatcher.alwaysFlagHits`
-        // reports a regex term whose enumeration bailed on the
-        // per-page timeout. Per-term-per-page semantics: the term
+        // reports a term the page's time budget did not let it check
+        // in full. Per-term-per-page semantics: the term
         // stays active on subsequent pages within the same scan,
         // so each affected (page, pattern) emits its own toast.
         // Truncated to 24 user-facing chars so a long pasted pattern
@@ -395,7 +395,7 @@ extension SearchAndRedactSheet {
                     ? "\(String(pattern.prefix(24)))…"
                     : pattern
                 let message =
-                    "Custom term '\(truncated)' took too long on page \(page + 1) — skipped."
+                    "Custom term '\(truncated)' was not fully checked on page \(page + 1) — time limit reached."
                 toastManager?.enqueue(message, severity: .warning)
             }
         })
