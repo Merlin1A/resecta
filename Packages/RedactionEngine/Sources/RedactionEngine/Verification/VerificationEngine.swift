@@ -554,9 +554,9 @@ public struct VerificationEngine: Sendable {
         }
 
         // Get raw PDF bytes.
-        // Memory-mapped access via
-        // `Data(contentsOf:options:.mappedIfSafe)`; loadPDFData uses the
-        // default-options overload, which is `.mappedIfSafe`.
+        // Raw PDF bytes: loadPDFData reads the whole output into memory;
+        // `Data(contentsOf:)` with default options requests no mapping
+        // (`.mappedIfSafe` is an opt-in reading option).
         guard let (data, cgDoc) = loadPDFData(doc) else {
             return (.warn("Could not read output PDF for binary search"), nil, nil, true)
         }
@@ -801,19 +801,19 @@ public struct VerificationEngine: Sendable {
     private func runLayer4Structural(_ doc: PDFDocument) throws -> (VerificationStatus, [Int]?, Bool) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
-        guard let (pdfData, cgDoc) = loadPDFData(doc),
-              let catalog = cgDoc.catalog else {
+        let loaded = loadPDFData(doc)
+        // /Encrypt is a trailer key, never the catalog's: an encrypted output FAILs, locked or not.
+        if let cgDoc = loaded?.1, cgDoc.isEncrypted { return (.fail("Encrypt found in document"), nil, false) }
+        guard let (pdfData, cgDoc) = loaded, let catalog = cgDoc.catalog else {
             return (.warn("Could not inspect document structure"), nil, true)
         }
 
-        // FAIL-triggering keys
-        // Keys that indicate active content or encryption in the
-        // document catalog. /AA triggers automatic actions (can execute JS on
-        // open/close/print). /Encrypt should never appear in redacted output.
+        // FAIL-triggering keys: active content in the document catalog. /AA
+        // triggers automatic actions (can execute JS on open/close/print);
         // /RichMedia and /Flash can embed content containing PII.
         let failKeys = ["JavaScript", "JS", "OpenAction", "Launch",
                         "EmbeddedFiles", "SubmitForm", "ResetForm", "AcroForm",
-                        "AA", "Encrypt", "RichMedia", "Flash"]
+                        "AA", "RichMedia", "Flash"]
         for key in failKeys {
             var obj: CGPDFObjectRef?
             if CGPDFDictionaryGetObject(catalog, key, &obj) {
@@ -866,7 +866,7 @@ public struct VerificationEngine: Sendable {
         }
 
         // Check for multiple %%EOF markers (incremental updates).
-        // pdfData already loaded by loadPDFData (memory-mapped).
+        // pdfData already read into memory by loadPDFData.
         let eofMarker = "%%EOF".data(using: .ascii)!
         var eofCount = 0
         var searchRange = pdfData.startIndex..<pdfData.endIndex
@@ -900,7 +900,7 @@ public struct VerificationEngine: Sendable {
         // the document's /Metadata stream, independent of /Info; the prior
         // early `return .pass` on a nil /Info dictionary skipped the XMP scan
         // entirely, so a document carrying XMP but no /Info passed silently.
-        // pdfData already loaded by loadPDFData (memory-mapped).
+        // pdfData already read into memory by loadPDFData.
         let hasXMP = pdfData.range(of: "<?xpacket".data(using: .ascii)!) != nil
             || pdfData.range(of: "<x:xmpmeta>".data(using: .ascii)!) != nil
             || pdfData.range(of: "<rdf:RDF".data(using: .ascii)!) != nil
@@ -1061,8 +1061,8 @@ public struct VerificationEngine: Sendable {
     // MARK: - PDF Data Loading Helper
 
     /// Load raw PDF bytes and a CGPDFDocument from a PDFDocument.
-    /// Prefers URL-based loading; the default-options `Data(contentsOf:)`
-    /// is `.mappedIfSafe`.
+    /// Prefers URL-based loading; reads the file with default options (no
+    /// mapping requested).
     /// Falls back to dataRepresentation() for non-file documents.
     private func loadPDFData(_ doc: PDFDocument) -> (Data, CGPDFDocument)? {
         if let url = doc.documentURL,
