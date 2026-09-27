@@ -52,13 +52,14 @@ public final class TempExportDirectory: @unchecked Sendable {
     }
 
     /// Idempotently create the subdirectory and set `isExcludedFromBackup`.
-    /// Safe to call repeatedly. Throws on `createDirectory` failure; the
-    /// `isExcludedFromBackup` flag is best-effort (logged via `try?`) — if
-    /// it cannot be set, the temp write still proceeds rather than blocking
-    /// the pipeline.
+    /// Safe to call repeatedly. A directory deleted behind the session (a
+    /// sweep, the system) is created and flagged again. Throws on
+    /// `createDirectory` failure; the `isExcludedFromBackup` flag is
+    /// best-effort (logged via `try?`) — if it cannot be set, the temp write
+    /// still proceeds rather than blocking the pipeline.
     @discardableResult
     public func prepare() throws -> URL {
-        if didPrepare { return url }
+        if didPrepare, FileManager.default.fileExists(atPath: url.path) { return url }
         try FileManager.default.createDirectory(
             at: url, withIntermediateDirectories: true, attributes: nil
         )

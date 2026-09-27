@@ -30,8 +30,14 @@ final class AppCoordinator {
         self.settingsState = settingsState
     }
 
-    /// The open workspace's temporary session directories.
-    var liveTempDirectories: Set<URL> { [] }
+    /// The open workspace's temporary session directory — the orphan sweep
+    /// leaves it in place whatever its age. Empty at home.
+    var liveTempDirectories: Set<URL> {
+        switch activeWorkspace {
+        case .home: []
+        case .redact(let ws): [ws.coordinator.tempExportDirectory.url]
+        }
+    }
 
     func openRedact() {
         tearDownCurrentWorkspace()

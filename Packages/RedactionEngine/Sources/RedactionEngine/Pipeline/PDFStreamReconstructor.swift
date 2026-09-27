@@ -491,15 +491,22 @@ public actor PDFStreamReconstructor {
 ///                             same 1-hour TTL and cleanup contract
 ///                             uniformly so app-kill during a share-sheet
 ///                             dismiss does not leak orphans.
+///
+/// `liveSessionURLs` names the session directories still in use — the open
+/// document's `redacted_session_<UUID>/`, handed in by the app's workspace
+/// coordinator. They are skipped whatever their age: a document left open
+/// past the TTL keeps its session and its output.
 public func cleanOrphanedTempFiles(excluding liveSessionURLs: Set<URL> = []) {
     let tmp = FileManager.default.temporaryDirectory
     guard let contents = try? FileManager.default.contentsOfDirectory(
         at: tmp, includingPropertiesForKeys: [.creationDateKey]
     ) else { return }
     let staleThreshold = Date().addingTimeInterval(-3600) // 1 hour
+    let livePaths = Set(liveSessionURLs.map { $0.resolvingSymlinksInPath().standardizedFileURL.path })
     for url in contents where url.lastPathComponent.hasPrefix("recon_")
                             || url.lastPathComponent.hasPrefix("redacted_")
                             || url.lastPathComponent.hasPrefix("resecta_") {
+        if livePaths.contains(url.resolvingSymlinksInPath().standardizedFileURL.path) { continue }
         // `redacted_session_<UUID>` directories are caught by the
         // `redacted_` prefix match above; removeItem handles both files
         // and directories recursively. The `resecta_` arm covers
