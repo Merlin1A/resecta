@@ -10,7 +10,7 @@ import OSLog
 // CalibratedScorer (Phase 3) is the actual consumer. Missing JSON degrades
 // gracefully to built-in defaults.
 
-public struct PresetThresholdVector: Sendable, Equatable {
+public struct PresetThresholdVector: Sendable, Hashable {
     /// Threshold by schema category name ("ssn", "npi", "dea", "dob",
     /// "address", "account", "mrn", "name"). Intentionally keyed by the
     /// wire format — lets Phase 1 ship before `PIICategory` gains

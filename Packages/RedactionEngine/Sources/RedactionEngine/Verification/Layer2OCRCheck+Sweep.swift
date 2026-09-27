@@ -274,16 +274,18 @@ extension VerificationEngine {
 
     /// Returns (status, affectedPages, reviewTermTexts): the winning fold
     /// bucket's page list, 0-based for the UI's tappable page chips (the
-    /// message text keeps its 1-based numbering), and the display-only term
+    /// message text keeps its 1-based numbering), the display-only term
     /// texts behind an `.attention` verdict (nil for every other status —
-    /// Layer 3's shape). A clean PASS carries nil for both.
+    /// Layer 3's shape), the could-not-verify flag, and the layer's own copy
+    /// for a PASS that read something and reports nothing (the outside-text
+    /// detail). A clean PASS carries nil for all three.
     func runLayer2OCR(
         _ doc: PDFDocument,
         pipelineMode: PipelineMode,
         regions: [Int: [RedactionRegion]],
         sensitiveTerms: [SensitiveTerm],
         perPageModes: [PipelineMode]
-    ) async throws -> (VerificationStatus, [Int]?, [String]?, Bool) {
+    ) async throws -> (VerificationStatus, [Int]?, [String]?, Bool, LayerCopy?) {
         // Entry-level cooperative cancellation, plus a
         // per-page check inside the OCR loop. A 50-page OCR pass that does
         // not check until layer return would exceed the 50 ms p95
@@ -292,8 +294,8 @@ extension VerificationEngine {
 
         // Does ANY page carry a redaction region? The out-of-region fold below
         // uses this to tell a rasterized document that HAD regions (surviving
-        // out-of-region content is noted as INFO) from one with none (the
-        // raster's own content → PASS).
+        // out-of-region content is a PASS with the detail) from one with none
+        // (the raster's own content → a bare PASS).
         let documentHasRegions = regions.values.contains { !$0.isEmpty }
 
         // The per-page OCR pass (extract → downsample → Vision →
@@ -443,11 +445,17 @@ extension VerificationEngine {
             reviewTermsByPage: reviewTermsByPage)
     }
 
+    /// The outside-text PASS detail: pages carrying only their own content
+    /// outside every region were read and are not reported (both modes).
+    static let layer2OutsideTextDetail =
+        "OCR read every page; content outside every redacted region is the page's own and is not reported."
+
     /// Cross-page fold: collapses the per-page Layer-2 buckets into the layer's
-    /// single (status, pageReferences, reviewTermTexts, couldNotVerify)
+    /// single (status, pageReferences, reviewTermTexts, couldNotVerify, copy)
     /// verdict — the fourth element is true for the two WARN arms that say
     /// the check did not fully run (unmappable coordinates, unchecked
-    /// pages) and false for every note. `static` and
+    /// pages) and false for every note; the fifth is the layer's own copy
+    /// for the outside-text PASS and nil for every other arm. `static` and
     /// OCR-free so arm precedence has a direct unit test
     /// (`Layer2FoldOrderTests`); `runLayer2OCR` feeds it the real buckets.
     /// `reviewTermsByPage` (1-based) carries the term texts behind each
@@ -458,7 +466,7 @@ extension VerificationEngine {
         pipelineMode: PipelineMode,
         documentHasRegions: Bool,
         reviewTermsByPage: [Int: [String]] = [:]
-    ) -> (VerificationStatus, [Int]?, [String]?, Bool) {
+    ) -> (VerificationStatus, [Int]?, [String]?, Bool, LayerCopy?) {
         // Fold the per-page buckets into the per-bucket page lists, SORTED
         // ascending so the message text is byte-identical regardless of OCR
         // completion order (the sequential loop appended in page order; the
@@ -483,7 +491,7 @@ extension VerificationEngine {
         // rasterized page) > ATTENTION (a redacted term readable outside
         // every region) > WARN (text in region on a Searchable page) > WARN
         // (unmappable) > WARN (unchecked) > INFO (Part A fill artifact in
-        // region) > INFO (text only outside regions) > PASS. The layer
+        // region) > PASS with the outside-text detail > PASS. The layer
         // reports its single most specific outcome. ATTENTION sits above the
         // whole WARN tier because the report aggregate ranks attention above
         // warn (`aggregateStatus`): a document carrying both a term-outside
@@ -491,15 +499,15 @@ extension VerificationEngine {
         // page masks every lower arm. The two could-not-verify WARNs
         // (unmappable, unchecked) stay ahead of every note — a note beside a
         // page whose check did not run would read as a pass in the
-        // aggregate and drop the could-not-verify flag. Within the note tier
-        // the order stays specificity (fill artifact > generic outside text).
+        // aggregate and drop the could-not-verify flag. The fill note stays
+        // ahead of the outside-text PASS (it says something).
         if !pagesWithSensitiveTermInRegion.isEmpty {
             let list = pagesWithSensitiveTermInRegion.map(String.init).joined(separator: ", ")
             // An OCR hit inside a redacted region means readable text inside the
             // black box — a leak in EITHER mode. Region scoping already
             // excludes Searchable Redaction's expected surviving text.
             return (.fail("Sensitive text detected within a redacted region on \(pagePhrase(pagesWithSensitiveTermInRegion, list: list))"),
-                    pagesWithSensitiveTermInRegion.map { $0 - 1 }, nil, false)
+                    pagesWithSensitiveTermInRegion.map { $0 - 1 }, nil, false, nil)
         }
         // On a rasterized page the region is a destroyed-pixel box that
         // holds NO readable text by construction, so ANY in-region OCR hit is a
@@ -512,7 +520,7 @@ extension VerificationEngine {
         if !pagesWithTextInRegionSecureRaster.isEmpty {
             let list = pagesWithTextInRegionSecureRaster.map(String.init).joined(separator: ", ")
             return (.fail("Readable text detected within a redacted region on \(pagePhrase(pagesWithTextInRegionSecureRaster, list: list))"),
-                    pagesWithTextInRegionSecureRaster.map { $0 - 1 }, nil, false)
+                    pagesWithTextInRegionSecureRaster.map { $0 - 1 }, nil, false, nil)
         }
         // A term the user redacted is still readable outside every region —
         // read by OCR off the rendered page, so it is reported on BOTH page
@@ -534,12 +542,12 @@ extension VerificationEngine {
             }
             return (.attention("Text matching your redactions is still readable on \(pagePhrase(pagesWithSensitiveTermOutsideRegions, list: list)) — read by OCR outside every redacted region"),
                     pagesWithSensitiveTermOutsideRegions.map { $0 - 1 },
-                    reviewTerms.isEmpty ? nil : reviewTerms, false)
+                    reviewTerms.isEmpty ? nil : reviewTerms, false, nil)
         }
         if !pagesWithTextInRegionSearchable.isEmpty {
             let list = pagesWithTextInRegionSearchable.map(String.init).joined(separator: ", ")
             return (.warn("OCR detected text within a redacted region on \(pagePhrase(pagesWithTextInRegionSearchable, list: list))"),
-                    pagesWithTextInRegionSearchable.map { $0 - 1 }, nil, false)
+                    pagesWithTextInRegionSearchable.map { $0 - 1 }, nil, false, nil)
         }
         // Unmappable-coordinate pages (multi-image or padded thumbnail)
         // that carry OCR text near a region — surfaced as a WARN because the
@@ -547,14 +555,14 @@ extension VerificationEngine {
         if !pagesWithUnmappableImages.isEmpty {
             let list = pagesWithUnmappableImages.map(String.init).joined(separator: ", ")
             return (.warn("OCR coordinates could not be mapped to page space on \(pagePhrase(pagesWithUnmappableImages, list: list)) — text could not be confirmed inside or outside a redacted region"),
-                    pagesWithUnmappableImages.map { $0 - 1 }, nil, true)
+                    pagesWithUnmappableImages.map { $0 - 1 }, nil, true, nil)
         }
         // A page whose OCR could not run: the check did not fully run, so
         // the could-not-verify WARN returns ahead of every note — a note
         // beside it would read as a pass in the aggregate.
         if !uncheckedPages.isEmpty {
             return (.warn("OCR could not be run on \(pageCountPhrase(uncheckedPages.count))"),
-                    uncheckedPages.map { $0 - 1 }, nil, true)
+                    uncheckedPages.map { $0 - 1 }, nil, true, nil)
         }
         if !pagesWithFillArtifactInRegion.isEmpty {
             let list = pagesWithFillArtifactInRegion.map(String.init).joined(separator: ", ")
@@ -567,38 +575,34 @@ extension VerificationEngine {
             // the same off a Searchable page's painted bar as off a
             // secure-raster one. Returns below the warnable out-of-region arms
             // — on a multi-signal document the warning sets the layer status —
-            // and above the generic outside-text note (note-tier specificity).
+            // and above the outside-text PASS (it says something).
             return (.info("OCR detected likely fill artifacts within a redacted region on \(pagePhrase(pagesWithFillArtifactInRegion, list: list)) — no readable text recovered"),
-                    pagesWithFillArtifactInRegion.map { $0 - 1 }, nil, false)
+                    pagesWithFillArtifactInRegion.map { $0 - 1 }, nil, false, nil)
         }
         if !pagesWithTextOutsideRegionsOnly.isEmpty {
-            let list = pagesWithTextOutsideRegionsOnly.map(String.init).joined(separator: ", ")
+            // Out-of-region OCR text is the page's own un-redacted content:
+            // on a Searchable page by construction, on a rasterized page
+            // because nearly every real document keeps readable content
+            // outside its regions. The displaced-fill leak this arm once
+            // chased as a WARN is carried by the in-region arms above (a
+            // displaced fill leaves the region's own text readable in-region
+            // → FAIL); a redacted term surviving out-of-region is the
+            // ATTENTION arm above. So the check read these pages and
+            // reports nothing: a PASS whose detail says what was read — on
+            // both document modes — never a note the summary has to count.
+            // A rasterized document with NO regions had nothing to violate →
+            // the raster's own content → a bare PASS.
             switch pipelineMode {
             case .searchableRedaction:
-                // Selectable/raster text outside regions is expected on a Searchable page.
-                return (.info("OCR detected text on \(pagePhrase(pagesWithTextOutsideRegionsOnly, list: list)) — expected for Searchable Redaction mode."),
-                        pagesWithTextOutsideRegionsOnly.map { $0 - 1 }, nil, false)
+                return (.pass, nil, nil, false,
+                        LayerCopy(short: "No issues found.", detail: Self.layer2OutsideTextDetail))
             case .secureRasterization:
-                // Out-of-region OCR text on a Secure-Rasterized page is expected
-                // output — nearly every real document keeps readable non-redacted
-                // content, so as a WARN this arm fired on virtually every run and
-                // pinned the masthead off green, drowning the conditional warns
-                // (unmappable, unchecked, could-not-read) that DO carry signal.
-                // The displaced-fill leak this WARN was originally aimed at is
-                // carried by the in-region arms above (a displaced fill leaves
-                // the region's own text readable in-region → FAIL); a redacted
-                // term surviving out-of-region is the ATTENTION arm above.
-                // This note covers the page's own un-redacted content only.
-                // Expected-under-this-mode observations are informational;
-                // every could-not-verify condition keeps its warning tier.
-                // Pages with NO regions have nothing to violate → the raster's
-                // own content → PASS.
                 if documentHasRegions {
-                    return (.info("Unredacted page content remains readable on \(pagePhrase(pagesWithTextOutsideRegionsOnly, list: list)) — expected for this mode."),
-                            pagesWithTextOutsideRegionsOnly.map { $0 - 1 }, nil, false)
+                    return (.pass, nil, nil, false,
+                            LayerCopy(short: "No issues found.", detail: Self.layer2OutsideTextDetail))
                 }
             }
         }
-        return (.pass, nil, nil, false)
+        return (.pass, nil, nil, false, nil)
     }
 }

@@ -567,8 +567,9 @@ struct VerificationEngineTests {
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
-        #expect(result.status.isInfo,
+        #expect(result.status == .pass,
                 "Trailing spaces inside the literal must not WARN; got \(result.status)")
+        #expect(result.detailDescription == VerificationEngine.layer5FixedFieldsDetail)
     }
 
     @Test("Layer 5 attests the fixed producer and dates on real reconstructed output")
@@ -1502,10 +1503,11 @@ struct VerificationEngineTests {
             sourcePageCount: 1, regions: [0: [region]], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: [.searchableRedaction])
-        // The Searchable .info continuity stays untouched: selectable text
-        // outside regions is expected on a Searchable page.
-        #expect(result.status.isInfo,
-                "Searchable out-of-region text stays INFO; got \(result.status)")
+        // Selectable text outside regions is the Searchable page's own: a
+        // PASS whose detail says it was read, never a note.
+        #expect(result.status == .pass,
+                "Searchable out-of-region text is a PASS with a detail; got \(result.status)")
+        #expect(result.detailDescription == VerificationEngine.layer2OutsideTextDetail)
     }
 
     @Test("Layer 2: sensitive term inside a region → FAIL, page number only")
@@ -1582,12 +1584,14 @@ struct VerificationEngineTests {
             sourcePageCount: 1, regions: [0: [topBand]], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])
-        // Identity mapping: bottom text (low y) ∉ top band → out-of-region → the
-        // INFO note (regions present). A reintroduced y-flip would map it high →
-        // in-region → FAIL, so identity vs flip stays distinguishable
-        // (INFO ≠ FAIL).
-        #expect(result.status.isInfo,
-                "bottom text vs top region must not intersect under identity mapping (out-of-region INFO); got \(result.status)")
+        // Identity mapping: bottom text (low y) ∉ top band → out-of-region →
+        // the PASS with the outside-text detail (regions present). A
+        // reintroduced y-flip would map it high → in-region → FAIL, so
+        // identity vs flip stays distinguishable (PASS ≠ FAIL).
+        #expect(result.status == .pass,
+                "bottom text vs top region must not intersect under identity mapping (out-of-region PASS); got \(result.status)")
+        #expect(result.detailDescription == VerificationEngine.layer2OutsideTextDetail,
+                "the outside-text detail marks the arm; got \(result.detailDescription)")
     }
 
     @Test("Layer 2: Searchable readable text inside a region → WARN (unchanged string)")

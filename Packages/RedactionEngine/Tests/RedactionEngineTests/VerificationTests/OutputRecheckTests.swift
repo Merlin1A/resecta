@@ -115,14 +115,23 @@ struct OutputRecheckTests {
         #expect(subset.counts[2] == nil)
     }
 
-    @Test("A page the sub-document cannot open is unopenable for every request, never clear")
-    func unopenablePageIsNotClear() async throws {
+    @Test("Every page is observed; a page the sub-document cannot open carries no count, never a clear")
+    func everyPageObservedAndUnopenableCarriesNoCount() async throws {
         let doc = try #require(PDFDocument(data: TestFixtures.brokenSecondPagePDF(term: "Delia")))
         let observations = try await OutputRecheck().observe(
             outputDocument: SendablePDFDocument(doc),
             requests: [TestFixtures.textRequest("Delia"), scanRequest([.ssn], ssnCutoff: nil, origin: .sweep)])
-        #expect(observations.count == 3)
-        #expect(observations[1].route == .unopenable)
-        #expect(observations[1].counts.isEmpty)
+        #expect(observations.count == 3, "one observation per page the document reports")
+        #expect(observations.map(\.pageIndex) == [0, 1, 2])
+        for observation in observations {
+            if observation.route == .unopenable {
+                #expect(observation.counts.isEmpty, "an unopenable page counts nothing for any request")
+            } else {
+                #expect(Set(observation.counts.keys) == [0, 1], "a readable page counts every request")
+            }
+        }
+        // The two real term pages are read (the page walk survives the broken kid).
+        let readWithTerm = observations.filter { ($0.counts[0]?.remaining ?? 0) > 0 }.count
+        #expect(readWithTerm == 2)
     }
 }

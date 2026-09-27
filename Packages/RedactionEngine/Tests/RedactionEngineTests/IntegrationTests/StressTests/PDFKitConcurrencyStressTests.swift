@@ -261,7 +261,7 @@ struct PDFKitConcurrencyStressTests {
                         // what this gate validates — open inside the raced span.
                         guard let doc = PDFDocument(url: url) else { return (layer, nil) }
                         let r = await verifier.runLayer(
-                            layer, outputDocument: SendablePDFDocument(doc),
+                            verifier.layers(for: .searchableRedaction)[layer], outputDocument: SendablePDFDocument(doc),
                             sourcePageCount: 10,
                             regions: params.regions, sensitiveTerms: params.terms,
                             pipelineMode: .searchableRedaction,
@@ -527,7 +527,7 @@ struct PDFKitConcurrencyStressTests {
         var out: [Int: VerificationStatus] = [:]
         for layer in layers {
             let r = await verifier.runLayer(
-                layer, outputDocument: doc, sourcePageCount: doc.document.pageCount,
+                verifier.layers(for: .searchableRedaction)[layer], outputDocument: doc, sourcePageCount: doc.document.pageCount,
                 regions: params.regions, sensitiveTerms: params.terms,
                 pipelineMode: .searchableRedaction,
                 filterDigests: params.digests, perPageModes: params.modes)

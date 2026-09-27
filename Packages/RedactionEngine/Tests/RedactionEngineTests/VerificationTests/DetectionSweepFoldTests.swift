@@ -164,7 +164,8 @@ struct DetectionSweepFoldTests {
         #expect(line?.remainingCount == 3)
         #expect(line?.perTerm?.map(\.term) == ["Email", "Phone", "SSN"], "per category, by name")
         #expect(line?.perTerm?.map(\.remaining) == [1, 1, 1])
-        #expect(outcome.copyOverride == nil, "INFO uses the generic composition")
+        #expect(outcome.copyOverride?.short == message(outcome.status), "INFO carries the layer's own copy: the short line is the status")
+        #expect(outcome.copyOverride?.detail == "\(DetectionSweep.detailLeadSweep) Text was read from the output's text layer. 3 possible items remain on 2 pages: 2, 5.")
     }
 
     @Test("INFO: an applied scan beside the sweep splits in-scope and out-of-scope; both sub-lines")

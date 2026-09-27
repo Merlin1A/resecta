@@ -392,7 +392,7 @@ struct RotatedPageCoordinateTests {
                 filterDigests: digests, perPageModes: [.searchableRedaction]
             )
             #expect(!lr.status.isFail,
-                    "\(label): \(engine.layerName(at: idx)) must not FAIL on a correct rotated redaction")
+                    "\(label): \(engine.layers(for: .searchableRedaction)[idx].name) must not FAIL on a correct rotated redaction")
         }
 
         // (ii-b) READING ORDER — the rebuilt layer reads as the surviving

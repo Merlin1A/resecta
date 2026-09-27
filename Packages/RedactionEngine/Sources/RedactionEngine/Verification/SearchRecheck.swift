@@ -3,15 +3,14 @@ import PDFKit
 
 // The Search Re-check layer (`VerificationLayer.searchRecheck`).
 //
-// Re-runs every applied search on the redacted output through
+// Re-runs every applied typed search on the redacted output through
 // `DocumentSearcher` itself — the text layer on pages that carry one, the
 // searcher's own OCR path on image-only pages — and reports per query how
 // many matches were found, how many the user applied, and how many remain
-// in the text the app can read. Pages run in a bounded task group of width
-// `VerificationEngine.ocrParallelism` (Layer 2's shape): each page becomes a
-// one-page sub-document with ONE searcher, so the page's OCR is rendered
-// once and cached across every request. Completion order never reaches a
-// message — page lists are sorted before the fold.
+// in the text the app can read. The page loop is `OutputRecheck`, shared
+// with the Detection Sweep: one searcher per page, the page's OCR rendered
+// once and cached across every request, the observations sorted before
+// the fold.
 //
 // Honesty: a page the searcher could not read (OCR did not run, oversize,
 // unopenable, regex timeout, the per-page result cap, a pattern the regex
@@ -29,17 +28,10 @@ struct SearchRecheck: Sendable {
     /// Lead sentence of the layer's own detail copy.
     static let detailLead = "Search Re-check re-ran each applied search on the output through the search engine."
 
-    /// Copy the layer supplies for PASS / ATTENTION / WARN, replacing the
-    /// engine's generic composition (the Layer-7 precedent).
-    struct Copy: Sendable, Equatable {
-        let short: String
-        let detail: String
-    }
-
     /// What `runLayer` folds into the `LayerResult`.
     struct Outcome: Sendable {
         let status: VerificationStatus
-        let copyOverride: Copy?
+        let copyOverride: LayerCopy?
         /// ATTENTION: pages with remaining matches. WARN: pages that could
         /// not be checked. Nil otherwise. 0-based.
         let pageReferences: [Int]?
@@ -50,193 +42,39 @@ struct SearchRecheck: Sendable {
         let queryLines: [SearchRecheckQueryLine]?
     }
 
-    /// One page's observation, folded after the group completes.
-    struct PageObservation: Sendable, Equatable {
-        struct Count: Sendable, Equatable {
-            var remaining: Int
-            var hitCap: Bool
-            var perTerm: [String: Int]
-            /// The searcher refused the request's pattern before reading the
-            /// page; `remaining` is not a measurement.
-            var rejected: Bool = false
-        }
-        let pageIndex: Int
-        /// The worst route the searcher reported for the page; nil when no
-        /// request read it (every request's page bound excluded it, or the
-        /// search finished without visiting the page).
-        var route: PageSearchCoverage.Route?
-        var regexTimedOut: Bool
-        /// Keyed by request index.
-        var counts: [Int: Count]
-    }
+    /// One page's observation — the shared runner's record.
+    typealias PageObservation = RecheckObservation
 
     // MARK: - Run
 
+    /// Fold the typed requests among `requests`. `observations` are the
+    /// shared runner's, keyed by index into the FULL request list; nil runs
+    /// the page loop here for the typed requests alone (the public
+    /// `runLayer` contract).
     func run(
         outputDocument: SendablePDFDocument,
         requests: [SearchRecheckRequest],
-        perPageModes: [PipelineMode]
+        observations: [RecheckObservation]? = nil
     ) async throws -> Outcome {
         try Task.checkCancellation()
-        guard !requests.isEmpty else {
+        let typed = requests.enumerated().filter { !$0.element.record.query.isScan }
+        let typedRequests = typed.map(\.element)
+        guard !typedRequests.isEmpty else {
             return Outcome(
                 status: .info(Self.infoMessage), copyOverride: nil,
                 pageReferences: nil, reviewTermTexts: nil, queryLines: nil)
         }
-
-        let doc = outputDocument.document
-        let pageCount = doc.pageCount
-        // Per request: the pages it runs on (nil = every page).
-        let boundPages: [Set<Int>?] = requests.map { $0.effectivePageBound ? $0.appliedPages : nil }
-
-        var observations: [PageObservation] = []
-        observations.reserveCapacity(pageCount)
-
-        var pageIndex = 0
-        while pageIndex < pageCount {
-            try Task.checkCancellation()
-            let chunkEnd = min(pageIndex + VerificationEngine.ocrParallelism, pageCount)
-
-            // Phase 1 — sequential extraction on this task: PDFKit reads on the
-            // shared document stay single-threaded (Layer 2's contract). Each
-            // page's bytes become that page's own document inside the group.
-            var work: [PageWork] = []
-            for i in pageIndex..<chunkEnd {
-                try Task.checkCancellation()
-                let applicable = requests.indices.filter { boundPages[$0]?.contains(i) ?? true }
-                guard !applicable.isEmpty else { continue }
-                work.append(PageWork(
-                    index: i,
-                    data: doc.page(at: i)?.dataRepresentation,
-                    requestIndices: applicable))
-            }
-
-            // Phase 2 — one searcher per page, bounded by the chunk width.
-            let chunk = try await withThrowingTaskGroup(of: PageObservation.self) { group in
-                for item in work {
-                    group.addTask {
-                        try Task.checkCancellation()
-                        return await Self.observePage(item, requests: requests)
-                    }
-                }
-                var out: [PageObservation] = []
-                for try await observation in group {
-                    out.append(observation)
-                }
-                return out
-            }
-            observations.append(contentsOf: chunk)
-            pageIndex = chunkEnd
+        let pageCount = outputDocument.document.pageCount
+        let observed: [RecheckObservation]
+        if let observations {
+            let indices = typed.map(\.offset)
+            observed = observations.map { $0.restricted(to: indices) }
+        } else {
+            observed = try await OutputRecheck().observe(
+                outputDocument: outputDocument, requests: typedRequests)
         }
-
         try Task.checkCancellation()
-        return Self.fold(
-            requests: requests,
-            observations: observations.sorted { $0.pageIndex < $1.pageIndex },
-            pageCount: pageCount)
-    }
-
-    private struct PageWork: Sendable {
-        let index: Int
-        let data: Data?
-        let requestIndices: [Int]
-    }
-
-    /// Route + timeout collector for one page's searcher. The sinks fire
-    /// from the actor; the box is locked so the values are read after the
-    /// stream finishes.
-    private final class CoverageBox: @unchecked Sendable {
-        private let lock = NSLock()
-        private var worst: PageSearchCoverage.Route?
-        private var timedOut = false
-
-        private static func rank(_ route: PageSearchCoverage.Route?) -> Int {
-            switch route {
-            case nil: -1
-            case .textLayer?: 0
-            case .ocr?: 1
-            case .ocrSkippedOversize?: 2
-            case .ocrUnavailable?: 3
-            case .unopenable?: 4
-            }
-        }
-
-        func record(_ route: PageSearchCoverage.Route) {
-            lock.lock(); defer { lock.unlock() }
-            if Self.rank(route) > Self.rank(worst) { worst = route }
-        }
-
-        func recordTimeout() {
-            lock.lock(); defer { lock.unlock() }
-            timedOut = true
-        }
-
-        var snapshot: (route: PageSearchCoverage.Route?, timedOut: Bool) {
-            lock.lock(); defer { lock.unlock() }
-            return (worst, timedOut)
-        }
-    }
-
-    /// Set once by the searcher's rejection sink for one request.
-    private final class RejectionFlag: @unchecked Sendable {
-        private let lock = NSLock()
-        private var fired = false
-        func set() { lock.lock(); fired = true; lock.unlock() }
-        var value: Bool { lock.lock(); defer { lock.unlock() }; return fired }
-    }
-
-    /// Run every applicable request on one page through its own searcher.
-    private static func observePage(
-        _ work: PageWork, requests: [SearchRecheckRequest]
-    ) async -> PageObservation {
-        var observation = PageObservation(
-            pageIndex: work.index, route: nil, regexTimedOut: false, counts: [:])
-        guard let data = work.data,
-              let pageDocument = PDFDocument(data: data),
-              pageDocument.pageCount >= 1 else {
-            observation.route = .unopenable
-            return observation
-        }
-
-        let searcher = DocumentSearcher()
-        let box = CoverageBox()
-        await searcher.setPageCoverageSink { coverage in box.record(coverage.route) }
-        await searcher.setRegexTimeoutSink { _ in box.recordTimeout() }
-        let wrapped = SendablePDFDocument(pageDocument)
-
-        for requestIndex in work.requestIndices {
-            if Task.isCancelled { break }
-            let query = requests[requestIndex].record.query
-            // The output may have no text layer at all; the searcher's own
-            // OCR path is the route there, so OCR is forced on a copy of the
-            // user's options. Every other option is the user's.
-            var options = query.options
-            options.includeOCR = true
-            let mode = AppliedSearchQuery(kind: query.kind, options: options).searchMode
-
-            var remaining = 0
-            var perTerm: [String: Int] = [:]
-            // A pattern the safety gate refuses finishes the stream empty;
-            // the sink is what tells that apart from a page with no match.
-            let rejection = RejectionFlag()
-            await searcher.setRegexRejectionSink { _ in rejection.set() }
-            let stream = searcher.search(wrapped, mode: mode, progress: { _, _ in })
-            for await result in stream {
-                if Task.isCancelled { break }
-                remaining += 1
-                perTerm[result.term, default: 0] += 1
-            }
-            observation.counts[requestIndex] = PageObservation.Count(
-                remaining: remaining,
-                hitCap: remaining >= DocumentSearcher.maxResults,
-                perTerm: perTerm,
-                rejected: rejection.value)
-        }
-
-        let coverage = box.snapshot
-        observation.route = coverage.route
-        observation.regexTimedOut = coverage.timedOut
-        return observation
+        return Self.fold(requests: typedRequests, observations: observed, pageCount: pageCount)
     }
 
     // MARK: - Fold (pure)
@@ -375,7 +213,7 @@ struct SearchRecheck: Sendable {
                 .map { $0.element.record.query.displayText }
             return Outcome(
                 status: .attention(message),
-                copyOverride: Copy(short: message, detail: detail),
+                copyOverride: LayerCopy(short: message, detail: detail),
                 pageReferences: remainingPages,
                 reviewTermTexts: reviewTerms,
                 queryLines: queryLines)
@@ -386,7 +224,7 @@ struct SearchRecheck: Sendable {
             let detail = joined([Self.detailLead, routeSentence, uncheckedClause + "."])
             return Outcome(
                 status: .warn(message),
-                copyOverride: Copy(short: message, detail: detail),
+                copyOverride: LayerCopy(short: message, detail: detail),
                 pageReferences: uncheckedPages,
                 reviewTermTexts: nil,
                 queryLines: queryLines)
@@ -396,7 +234,7 @@ struct SearchRecheck: Sendable {
         let detail = joined([Self.detailLead, routeSentence])
         return Outcome(
             status: .pass,
-            copyOverride: Copy(short: short, detail: detail),
+            copyOverride: LayerCopy(short: short, detail: detail),
             pageReferences: nil,
             reviewTermTexts: nil,
             queryLines: queryLines)
