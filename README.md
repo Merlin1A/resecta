@@ -10,7 +10,7 @@ On-device iOS 26 PDF redaction. Free, open-source, zero data collection — all 
 
 **License:** [Apache License 2.0](./LICENSE)
 
-**Latest release:** 1.1.0 — `main` may be ahead of it: the 6-layer and 11-layer verification counts below describe the next release (1.2.0), not the 1.1.0 build. See the [CHANGELOG](./CHANGELOG.md).
+**Latest release:** 1.1.0 — `main` may be ahead of it: the 7-layer and 12-layer verification counts below describe the next release (1.2.0), not the 1.1.0 build. See the [CHANGELOG](./CHANGELOG.md).
 
 Every pull request builds the app and both test bundles, runs the audit and claims lints on the change (from the base branch's copies of the scripts), checks the documented counts and the shipped-asset hashes, and fails if a source file already over 800 lines grows; the app suite also runs on a hosted simulator as a non-blocking check. Both batched suites are scheduled on a hosted simulator every Monday and run on demand and on release tags (GitHub pauses a scheduled workflow after sixty days without a commit; any commit resumes it). The engine suite's macOS host run is on demand only and has not yet reached a verdict on the hosted runner.
 
@@ -35,8 +35,8 @@ The core workflow is:
 
 ## Two modes
 
-- **Secure Rasterization** — produces image-only output and is the simplest approach for high-sensitivity documents. Verification runs as a 6-layer check.
-- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to remove glyph-positioning side channels identified in academic research. If any unmarked text on a page shows no ink — white on white, invisible, or under a box drawn into the page — that page is exported as an image only. Text covered by a picture in the page can still enter the text layer. Verification runs as an 11-layer check (the five additional checks cover the preserved-text layer; both modes end with a re-run of your applied searches on the output).
+- **Secure Rasterization** — produces image-only output and is the simplest approach for high-sensitivity documents. Verification runs as a 7-layer check.
+- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to remove glyph-positioning side channels identified in academic research. If any unmarked text on a page shows no ink — white on white, invisible, or under a box drawn into the page — that page is exported as an image only. Text covered by a picture in the page can still enter the text layer. Verification runs as a 12-layer check (the five additional checks cover the preserved-text layer; both modes end with a re-run of your applied searches and a detection sweep on the output).
 
 Both modes share the same pixel-destruction core. Mode choice is per-document.
 
@@ -50,8 +50,8 @@ flowchart LR
   B --> C[Mark: scan, search, or draw regions]
   C --> D[Apply: rasterize / flatten / strip metadata]
   D --> E{Export mode}
-  E -->|Secure Rasterization| F[Verify - 6-layer pass]
-  E -->|Searchable| G[Verify - 11-layer pass]
+  E -->|Secure Rasterization| F[Verify - 7-layer pass]
+  E -->|Searchable| G[Verify - 12-layer pass]
   F --> H[Export]
   G --> H[Export]
 ```
@@ -119,7 +119,7 @@ Each load-bearing claim in this README is paired with a mechanical check in this
 | Claim | Check |
 | --- | --- |
 | Marked regions are destroyed, not covered | Per-region pixel readback after every fill — one wrong pixel fails the export (`Pipeline/PageRasterizer.swift`); the classic annotation-over-text attacks are constructed and destroyed in `SecurityTests/FakeRedactionTests.swift` |
-| The exported file is re-checked independently | The 6/11-layer verification pass re-opens the output and scans text, OCR, raw bytes across seven encodings, structure, and metadata, and re-runs each applied search on the output (`Verification/VerificationEngine.swift`) |
+| The exported file is re-checked independently | The 7/12-layer verification pass re-opens the output and scans text, OCR, raw bytes across seven encodings, structure, and metadata, re-runs each applied search on the output, and runs the app's detectors on the output to report what remains (`Verification/VerificationEngine.swift`) |
 | Placement survives rotated pages | A rotation × crop-box-origin test matrix positions its regions with a transform written independently of the production code (`SecurityTests/RotatedPageCoordinateTests.swift`) |
 | No network requests of its own | A source grep for networking symbols returns no code references (the sole hit is a comment); the pre-commit hook rejects those symbols in any staged diff (`Scripts/audit-lint.sh`) |
 | The app's own copy doesn't overclaim | A banned-vocabulary lint walks every localized string and the shipping docs (`Tests/ResectaAppTests/LegalPhraseLintTests.swift`, `Scripts/claims-lint.sh`) |
@@ -174,11 +174,11 @@ A stranger can clone, build, and start contributing with these steps:
 
 ## Testing
 
-The test tree is larger than the source tree: roughly 66,000 lines of Swift source to roughly 99,000 lines of test code, about 1.5×. Counted from the current tree:
+The test tree is larger than the source tree: roughly 67,000 lines of Swift source to roughly 102,000 lines of test code, about 1.5×. Counted from the current tree:
 
 - **Engine package** (`Packages/RedactionEngine/Tests`) — 1,973 Swift Testing `@Test` functions across 267 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
-- **App target** (`Tests/ResectaAppTests`) — 1,661 `@Test` functions across 235 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
-- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 49 XCUITest methods that drive the built app on a simulator: the first-launch legal gate, detection review, search-to-redaction flows, the search re-check on the results screen, and the editor's handling of links inside a document.
+- **App target** (`Tests/ResectaAppTests`) — 1,682 `@Test` functions across 238 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
+- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 50 XCUITest methods that drive the built app on a simulator: the first-launch legal gate, detection review, search-to-redaction flows, the search re-check on the results screen, and the editor's handling of links inside a document.
 
 Together the suites carry about 9,300 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
 
