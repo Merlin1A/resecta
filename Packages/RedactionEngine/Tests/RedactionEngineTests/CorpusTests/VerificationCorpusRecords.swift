@@ -79,6 +79,66 @@ extension VerificationCorpusRunnerTests {
         let file_id_matches_digest: Bool?
     }
 
+    /// The Detection Sweep row of a cell's report and the requests behind
+    /// it, for the sweep-residual measurement (`sweep.json`).
+    struct SweepJSON: Encodable {
+        struct Line: Encodable {
+            let label: String
+            let origin: String
+            let found: Int
+            let applied: Int
+            let remaining: Int
+            let unchecked: Bool
+            let per_category: [String: Int]
+        }
+        let status: String
+        let message: String
+        let short: String
+        let detail: String
+        let pages: [Int]?
+        let could_not_verify: Bool
+        let lines: [Line]
+        /// Row durations: the two post rows sum to the shared output pass.
+        let ocr_check_seconds: Double?
+        let search_recheck_seconds: Double
+        let detection_sweep_seconds: Double
+        let report_seconds: Double
+    }
+
+    static func sweepRecord(
+        _ report: VerificationReport, appliedSearches: [SearchRecheckRequest]
+    ) -> SweepJSON {
+        let sweep = report.layers.first { $0.layer == .detectionSweep }
+        let recheck = report.layers.first { $0.layer == .searchRecheck }
+        let ocr = report.layers.first { $0.layer == .ocrCheck }
+        let message: String
+        switch sweep?.status {
+        case .warn(let m)?, .info(let m)?, .attention(let m)?, .fail(let m)?: message = m
+        default: message = ""
+        }
+        let scanRequests = appliedSearches.filter { $0.record.query.isScan }
+        let lines = (sweep?.queryLines ?? []).enumerated().map { index, line in
+            SweepJSON.Line(
+                label: line.label,
+                origin: index < scanRequests.count && scanRequests[index].origin == .sweep ? "sweep" : "applied",
+                found: line.foundCount, applied: line.appliedCount,
+                remaining: line.remainingCount, unchecked: line.unchecked,
+                per_category: Dictionary(uniqueKeysWithValues: (line.perTerm ?? []).map { ($0.term, $0.remaining) }))
+        }
+        return SweepJSON(
+            status: sweep.map { statusCaseName($0.status) } ?? "absent",
+            message: message,
+            short: sweep?.shortDescription ?? "",
+            detail: sweep?.detailDescription ?? "",
+            pages: sweep?.pageReferences,
+            could_not_verify: sweep?.couldNotVerify ?? false,
+            lines: lines,
+            ocr_check_seconds: ocr.map { r6($0.durationSeconds) },
+            search_recheck_seconds: r6(recheck?.durationSeconds ?? 0),
+            detection_sweep_seconds: r6(sweep?.durationSeconds ?? 0),
+            report_seconds: r6(report.durationSeconds))
+    }
+
     struct RunnerSummary: Encodable {
         let schema_version: Int
         let generated_by: String

@@ -24,10 +24,19 @@ import CryptoKit
 // between this runner and the app.
 //
 // n per cell: the redaction runs once; VERIFICATION runs n=3 sweeps against
-// the same output. Layers other than index 1 (OCR Check, Vision-dependent)
-// must report identically across sweeps — asserted on the duration-free
-// layer tuple. Layer 1's per-sweep statuses are all recorded for downstream
-// min/median/max treatment.
+// the same output (n=1 in the full-apply mode). Layers other than the two
+// Vision-dependent ones (OCR Check; the Detection Sweep on rasterized
+// output) must report identically across sweeps — asserted on the
+// duration-free layer tuple. The per-sweep statuses are all recorded for
+// downstream min/median/max treatment.
+//
+// Every cell carries the run's sweep request (every detector at the
+// balanced preset), so the Detection Sweep row reads every output. The
+// FULL-APPLY mode (RESECTA_VERIFY_FULL_APPLY=1) instead seeds every
+// manifest document from its own source scan at the balanced preset,
+// redacts every hit, and verifies with the applied scan beside the sweep —
+// the sweep's residual on fully-applied output, per cell and per category
+// (`sweep.json`), both modes.
 //
 // Region sets (plan §4): `all-must-fire` (every GT `must_fire` box, rect),
 // `seeded-subset` (k boxes, seeded PRNG), `polygon` (the all-must-fire boxes
@@ -58,6 +67,12 @@ struct VerificationCorpusRunnerTests {
         if let p = env["TEST_RUNNER_RESECTA_DOCS_ROOT"], !p.isEmpty { return p }
         return nil
     }
+    /// The full-apply measurement mode (see the header).
+    static func fullApply() -> Bool {
+        let env = ProcessInfo.processInfo.environment
+        return env["RESECTA_VERIFY_FULL_APPLY"] == "1"
+            || env["TEST_RUNNER_RESECTA_VERIFY_FULL_APPLY"] == "1"
+    }
     /// Optional comma-separated doc-id filter (smoke runs / partial re-runs).
     static func onlyDocs() -> Set<String>? {
         let env = ProcessInfo.processInfo.environment
@@ -83,6 +98,8 @@ struct VerificationCorpusRunnerTests {
         let verifyOnly: Bool
         /// Terms override for non-GT sets (factories). Nil = derive from seeds.
         let termsOverride: [SensitiveTerm]?
+        /// The full-apply set: the source scan's results, all applied.
+        var appliedScan: [SearchResult]? = nil
     }
 
     /// Run one (doc × mode × region set) cell end-to-end and write its
@@ -170,11 +187,25 @@ struct VerificationCorpusRunnerTests {
         let redactionSeconds = Double(redactionElapsed.components.seconds)
             + Double(redactionElapsed.components.attoseconds) / 1e18
 
-        // --- Verification: n = 3 sweeps against the same output ---
+        // --- The scan requests: the run's sweep, plus the applied scan on
+        // the full-apply set ---
+        var appliedSearches: [SearchRecheckRequest] = []
+        if let scan = input.appliedScan {
+            appliedSearches.append(Self.appliedScanRequest(
+                results: scan,
+                appliedCount: regionsByPage.values.reduce(0) { $0 + $1.count },
+                appliedPages: Set(regionsByPage.filter { !$0.value.isEmpty }.keys)))
+        }
+        appliedSearches.append(Self.sweepRequest())
+
+        // --- Verification: n = 3 sweeps against the same output (1 on the
+        // full-apply set) ---
+        let sweepCount = Self.fullApply() ? 1 : 3
         var overallPerSweep: [String] = []
         var layerStatusPerSweep: [[String]] = []
         var identityPerSweep: [[String]] = []
-        for sweep in 1...3 {
+        var firstReport: VerificationReport?
+        for sweep in 1...sweepCount {
             let report = try await runVerificationSweep(
                 outputURL: outputURL,
                 sourcePageCount: doc.pageCount,
@@ -183,7 +214,8 @@ struct VerificationCorpusRunnerTests {
                 effectiveMode: mode,
                 filterDigests: outcome.filterDigests,
                 perPageModes: outcome.perPageModes,
-                perPageFallbackReasons: outcome.perPageFallbackReasons)
+                perPageFallbackReasons: outcome.perPageFallbackReasons,
+                appliedSearches: appliedSearches)
             try report.jsonData().write(
                 to: URL(fileURLWithPath: "\(cellDir)/report-run-\(sweep).json"),
                 options: .atomic)
@@ -191,16 +223,22 @@ struct VerificationCorpusRunnerTests {
                 try report.jsonData().write(
                     to: URL(fileURLWithPath: "\(cellDir)/report.json"),
                     options: .atomic)
+                firstReport = report
             }
             overallPerSweep.append(statusCaseName(report.overallStatus))
             layerStatusPerSweep.append(report.layers.map { statusCaseName($0.status) })
-            identityPerSweep.append(report.layers.enumerated().map {
-                // Layer index 1 (OCR Check) is Vision-dependent; excluded
-                // from the determinism identity. A short single-layer report
-                // (page-count gate) participates whole.
-                $0.offset == 1 && report.layers.count > 1
-                    ? "OCR-EXCLUDED" : layerIdentity($0.element)
+            identityPerSweep.append(report.layers.map {
+                // The OCR Check and the Detection Sweep read the rendered
+                // pages through Vision; excluded from the determinism
+                // identity by identity. A short single-layer report (the
+                // page-count gate) participates whole.
+                ($0.layer == .ocrCheck || $0.layer == .detectionSweep) && report.layers.count > 1
+                    ? "OCR-EXCLUDED" : layerIdentity($0)
             })
+        }
+        if let firstReport {
+            try writeJSON(Self.sweepRecord(firstReport, appliedSearches: appliedSearches),
+                          to: "\(cellDir)/sweep.json")
         }
         let deterministic = identityPerSweep.dropFirst().allSatisfy {
             $0 == identityPerSweep[0]
@@ -240,7 +278,7 @@ struct VerificationCorpusRunnerTests {
                 mode: mode.rawValue,
                 region_set: input.regionSet.name,
                 verify_only: input.verifyOnly,
-                n_verification_sweeps: 3,
+                n_verification_sweeps: sweepCount,
                 output_sha256: outputSHA,
                 redaction_seconds: r6(redactionSeconds),
                 per_page_modes: outcome.perPageModes.map(\.rawValue),
@@ -361,6 +399,57 @@ struct VerificationCorpusRunnerTests {
                     print("[H2.2] done \(cellName)")
                 }
             }
+        }
+
+        // --- FULL-APPLY (the measurement mode): every manifest PDF seeded
+        // from its own source scan, every hit applied, both modes; nothing
+        // else runs ---
+        if Self.fullApply() {
+            let manifest = try Self.loadManifest()
+            for row in manifest where row.path.hasSuffix(".pdf") {
+                guard let url = Self.resolve(row, root: root),
+                      let data = try? Data(contentsOf: url) else {
+                    cellsSkipped[row.id] = row.source == "external"
+                        ? "RESECTA_DOCS_ROOT unset or file missing" : "bundle resource missing"
+                    continue
+                }
+                let hex = Self.sha256Hex(data)
+                if hex != row.sha256 {
+                    shaMismatches.append(row.id)
+                    #expect(hex == row.sha256, "\(row.id): loaded bytes drift from the manifest pin")
+                }
+                if let only, !only.contains(row.id) { continue }
+                guard let doc = PDFDocument(data: data) else {
+                    cellsSkipped[row.id] = "PDFDocument(data:) failed"
+                    continue
+                }
+                let results = await Self.scanSource(doc)
+                let seeds = Self.scanSeeds(from: results)
+                guard !seeds.isEmpty else {
+                    cellsSkipped[row.id] = "the source scan read nothing at the balanced preset"
+                    continue
+                }
+                let input = CellInput(
+                    docId: row.id, data: data, docSHA: hex,
+                    regionSet: Self.fixedSet("full-apply", seeds: seeds),
+                    regionSource: "scan",
+                    expectedVisible: [],
+                    notes: "full apply: every source-scan hit at the balanced preset is redacted; the Detection Sweep's residual is the measurement",
+                    verifyOnly: false, termsOverride: nil, appliedScan: results)
+                try await execute(input, modes: [.secureRasterization, .searchableRedaction])
+            }
+            try Self.writeJSON(
+                RunnerSummary(
+                    schema_version: 1,
+                    generated_by: "VerificationCorpusRunnerTests.emitVerificationCorpus (full-apply)",
+                    platform_note: "full-apply",
+                    cells_run: cellsRun,
+                    cells_skipped: cellsSkipped,
+                    sha_mismatches: shaMismatches),
+                to: "\(out)/runner-summary.json")
+            print("[H2.2] full-apply done: \(cellsRun.count) cells -> \(out); skipped: \(cellsSkipped.count)")
+            #expect(shaMismatches.isEmpty)
+            return
         }
 
         // --- A. Manifest rows with drawable GT: three region sets × both modes ---
