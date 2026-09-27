@@ -118,13 +118,13 @@ struct CustomTermsTemplatePickerTests {
 
     @Test("Heuristic-passing, sentinel-failing regex excluded from valid set")
     func testSentinelFailingRegexRejected() async {
-        // Sequential unbounded stars with an end anchor: no groups, so
-        // the RegexSafetyPrecheck and the nested-quantifier heuristic
-        // both pass — but against the sentinel payload's 2048-char `a`
-        // run the backtracking blows the 200 ms probe budget, so
-        // `RegexSentinelCheck.validate` rejects it. Previously this
-        // pattern imported cleanly and stalled the next scan instead.
-        let adversarial = UserTerm(pattern: "a*a*a*a*a*a*a*a*a*a*$", isRegex: true)
+        // Two sequential unbounded stars with an end anchor: no groups
+        // and fewer than three adjacent runs, so the RegexSafetyPrecheck
+        // and the quantifier scan both pass — but against the sentinel
+        // payload's 2048-char `a` run the backtracking blows the 200 ms
+        // probe budget, so `RegexSentinelCheck.validate` rejects it.
+        // (Three or more adjacent runs are now refused by the scan.)
+        let adversarial = UserTerm(pattern: "a*a*$", isRegex: true)
         // Guard the fixture premise: the static heuristic must accept it,
         // otherwise this test is no longer exercising the sentinel layer.
         #expect(UserTermsStore.isValidUserTerm(adversarial),
@@ -136,7 +136,7 @@ struct CustomTermsTemplatePickerTests {
             [adversarial, safe, literal]
         )
         #expect(partition.valid.map(\.pattern) == [#"^\d{3}$"#, "Smith"])
-        #expect(partition.invalid.map(\.pattern) == ["a*a*a*a*a*a*a*a*a*a*$"])
+        #expect(partition.invalid.map(\.pattern) == ["a*a*$"])
 
         // Preview==commit contract: the count shown ("Add N entries") is
         // derived from the same valid-after-dedup set `performImport`
