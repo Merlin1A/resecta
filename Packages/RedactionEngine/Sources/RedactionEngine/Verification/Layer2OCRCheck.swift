@@ -94,9 +94,14 @@ extension VerificationEngine {
     /// Layer 3 and the Search Re-check give the same condition; the user's
     /// remedy is a text search. `textOutsideRegionsOnly` is the page's own
     /// un-redacted content and stays informational.
+    /// `textInRegionAndSensitiveTermOutsideRegions` carries both signals of
+    /// one page: the page's mode picks the stronger one (a rasterized page's
+    /// in-region text FAILs; on a Searchable page the term's ATTENTION
+    /// outranks the in-region WARN).
     enum PageOCRFinding: Sendable, Equatable {
         case sensitiveTermInRegion
         case textInRegion
+        case textInRegionAndSensitiveTermOutsideRegions
         case fillArtifactInRegion
         case sensitiveTermOutsideRegions
         case textOutsideRegionsOnly
@@ -228,7 +233,9 @@ extension VerificationEngine {
             }
         }
 
-        if sawTextInRegion { return .textInRegion }
+        if sawTextInRegion {
+            return sawSensitiveTermOutsideRegions ? .textInRegionAndSensitiveTermOutsideRegions : .textInRegion
+        }
         if sawFillArtifactInRegion { return .fillArtifactInRegion }
         if sawSensitiveTermOutsideRegions { return .sensitiveTermOutsideRegions }
         if sawTextOutsideRegions { return .textOutsideRegionsOnly }

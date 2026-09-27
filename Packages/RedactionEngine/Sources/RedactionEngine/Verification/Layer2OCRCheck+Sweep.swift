@@ -178,6 +178,13 @@ extension VerificationEngine {
             // Searchable and only this page fell back.
             return effectiveMode == .secureRasterization
                 ? .textInRegionSecureRaster : .textInRegionSearchable
+        case .textInRegionAndSensitiveTermOutsideRegions:
+            // Both signals on one page: a rasterized page's in-region text
+            // is the leak (FAIL); on a Searchable page the redacted term
+            // readable outside every region (ATTENTION) outranks the
+            // in-region WARN.
+            return effectiveMode == .secureRasterization
+                ? .textInRegionSecureRaster : .sensitiveTermOutsideRegions
         case .fillArtifactInRegion:
             // Vision hallucinated tokens out of the solid fill itself — no
             // readable ink (full-RGB fill-consistent on the in-region portion).
@@ -244,13 +251,12 @@ extension VerificationEngine {
             // SAME hits, regions and terms the classifier saw, so the names
             // the results row shows are exactly the matches behind the
             // verdict.
-            let reviewTermTexts = classification == .sensitiveTermOutsideRegions
+            let bucket = Self.pageBucket(for: classification, effectiveMode: work.effectiveMode)
+            let reviewTermTexts = bucket == .sensitiveTermOutsideRegions
                 ? Self.outsideRegionTermTexts(
                     hits: enriched, pageRegions: work.pageRegions, sensitiveTerms: sensitiveTerms)
                 : []
-            return PageOCRResult(
-                work.page, Self.pageBucket(for: classification, effectiveMode: work.effectiveMode),
-                reviewTermTexts: reviewTermTexts)
+            return PageOCRResult(work.page, bucket, reviewTermTexts: reviewTermTexts)
         } else if !work.pageRegions.isEmpty,
                   hits.contains(where: { !($0.text ?? "").isEmpty }) {
             // Unmappable coordinates with a redaction region present: text might
@@ -473,21 +479,20 @@ extension VerificationEngine {
         let uncheckedPages = pages(in: .unchecked)
 
         // Page numbers only, never document content, in any message.
-        // Priority fold: FAIL (term in region) > FAIL/WARN (text in region, by
-        // the page's own mode) > ATTENTION (a redacted term readable outside
-        // every region) > WARN (unmappable) > INFO (Part A fill artifact in
-        // region) > INFO (text only outside regions) > unchecked WARN > PASS.
-        // The layer reports its single most specific outcome. ATTENTION sits
-        // above the WARN tier because the report aggregate ranks attention
-        // above warn (`aggregateStatus`): a document carrying both a
-        // term-outside page and an unmappable page reports the attention,
-        // exactly as a FAIL page masks every lower arm. The warnable
-        // unmappable arm stays ahead of the proven-artifact note — on a
-        // multi-signal document a page in a warnable bucket sets the
-        // masthead, not the note. Within the note tier the order stays
-        // specificity (fill artifact > generic outside text); the unchecked
-        // arm keeps its long-standing position below the expected-state
-        // notes.
+        // Priority fold: FAIL (term in region) > FAIL (text in region on a
+        // rasterized page) > ATTENTION (a redacted term readable outside
+        // every region) > WARN (text in region on a Searchable page) > WARN
+        // (unmappable) > WARN (unchecked) > INFO (Part A fill artifact in
+        // region) > INFO (text only outside regions) > PASS. The layer
+        // reports its single most specific outcome. ATTENTION sits above the
+        // whole WARN tier because the report aggregate ranks attention above
+        // warn (`aggregateStatus`): a document carrying both a term-outside
+        // page and any warning page reports the attention, exactly as a FAIL
+        // page masks every lower arm. The two could-not-verify WARNs
+        // (unmappable, unchecked) stay ahead of every note — a note beside a
+        // page whose check did not run would read as a pass in the
+        // aggregate and drop the could-not-verify flag. Within the note tier
+        // the order stays specificity (fill artifact > generic outside text).
         if !pagesWithSensitiveTermInRegion.isEmpty {
             let list = pagesWithSensitiveTermInRegion.map(String.init).joined(separator: ", ")
             // An OCR hit inside a redacted region means readable text inside the
@@ -508,11 +513,6 @@ extension VerificationEngine {
             let list = pagesWithTextInRegionSecureRaster.map(String.init).joined(separator: ", ")
             return (.fail("Readable text detected within a redacted region on \(pagePhrase(pagesWithTextInRegionSecureRaster, list: list))"),
                     pagesWithTextInRegionSecureRaster.map { $0 - 1 }, nil, false)
-        }
-        if !pagesWithTextInRegionSearchable.isEmpty {
-            let list = pagesWithTextInRegionSearchable.map(String.init).joined(separator: ", ")
-            return (.warn("OCR detected text within a redacted region on \(pagePhrase(pagesWithTextInRegionSearchable, list: list))"),
-                    pagesWithTextInRegionSearchable.map { $0 - 1 }, nil, false)
         }
         // A term the user redacted is still readable outside every region —
         // read by OCR off the rendered page, so it is reported on BOTH page
@@ -536,6 +536,11 @@ extension VerificationEngine {
                     pagesWithSensitiveTermOutsideRegions.map { $0 - 1 },
                     reviewTerms.isEmpty ? nil : reviewTerms, false)
         }
+        if !pagesWithTextInRegionSearchable.isEmpty {
+            let list = pagesWithTextInRegionSearchable.map(String.init).joined(separator: ", ")
+            return (.warn("OCR detected text within a redacted region on \(pagePhrase(pagesWithTextInRegionSearchable, list: list))"),
+                    pagesWithTextInRegionSearchable.map { $0 - 1 }, nil, false)
+        }
         // Unmappable-coordinate pages (multi-image or padded thumbnail)
         // that carry OCR text near a region — surfaced as a WARN because the
         // identity check that would FAIL/PASS them is unsound.
@@ -543,6 +548,13 @@ extension VerificationEngine {
             let list = pagesWithUnmappableImages.map(String.init).joined(separator: ", ")
             return (.warn("OCR coordinates could not be mapped to page space on \(pagePhrase(pagesWithUnmappableImages, list: list)) — text could not be confirmed inside or outside a redacted region"),
                     pagesWithUnmappableImages.map { $0 - 1 }, nil, true)
+        }
+        // A page whose OCR could not run: the check did not fully run, so
+        // the could-not-verify WARN returns ahead of every note — a note
+        // beside it would read as a pass in the aggregate.
+        if !uncheckedPages.isEmpty {
+            return (.warn("OCR could not be run on \(pageCountPhrase(uncheckedPages.count))"),
+                    uncheckedPages.map { $0 - 1 }, nil, true)
         }
         if !pagesWithFillArtifactInRegion.isEmpty {
             let list = pagesWithFillArtifactInRegion.map(String.init).joined(separator: ", ")
@@ -586,10 +598,6 @@ extension VerificationEngine {
                             pagesWithTextOutsideRegionsOnly.map { $0 - 1 }, nil, false)
                 }
             }
-        }
-        if !uncheckedPages.isEmpty {
-            return (.warn("OCR could not be run on \(pageCountPhrase(uncheckedPages.count))"),
-                    uncheckedPages.map { $0 - 1 }, nil, true)
         }
         return (.pass, nil, nil, false)
     }
