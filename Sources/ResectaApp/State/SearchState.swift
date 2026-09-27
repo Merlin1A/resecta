@@ -131,6 +131,11 @@ final class SearchState: Identifiable {
 
     /// Active search mode selector.
     var searchModeType: SearchModeType = .text
+    /// What the last Scan kickoff ran with (the preset thresholds and the
+    /// user terms); nil for a typed run or before any run. Set by
+    /// `SearchAndRedactSheet+Trigger.prepareSearchRun()`, read by
+    /// `appliedSearchRecord()` so the record reproduces the run.
+    var lastRunScanConfiguration: ScanRunConfiguration?
 
     /// One-shot arm for the toolbar Scan button's one-tap contract:
     /// the button sets this before presenting the sheet, and the
@@ -1188,6 +1193,7 @@ final class SearchState: Identifiable {
     /// filter write, flushed before the session tears down.
     private func clearSessionState() {
         queryText = ""
+        lastRunScanConfiguration = nil
         isSearching = false
         searchTerms = []
         recentMultiTermSets = []

@@ -125,10 +125,6 @@ struct PipelineRunner {
             let pages = coordinator.buildPDFPageData(
                 effectiveMode: effectiveMode, runSettings: runSettings)
             let sensitiveTerms = coordinator.collectSensitiveTerms()
-            // The applied searches, read at the same point and from the
-            // same present-region set: the Search Re-check re-runs
-            // exactly the queries whose regions this run redacts.
-            let appliedSearches = coordinator.collectAppliedSearches()
 
             // Capture the run's deselection facts at run entry,
             // before any pipeline work. The value is recorded onto
@@ -153,6 +149,15 @@ struct PipelineRunner {
             let ocrSkippedPages = redactionState.lastDetectionRun?.ocrSkippedPages ?? []
             let degradeFailures: [String]? = redactionState.autoDetectionDegraded
                 ? redactionState.autoDetectionDegradeFailures : nil
+            // The output re-check requests, read at the same point and from
+            // the same present-region set: the applied searches (typed and
+            // Scan — the Search Re-check and the Detection Sweep re-run
+            // exactly the queries whose regions this run redacts) and the
+            // run's sweep request, at the settings as they stand at entry.
+            // The deselected items ride both so the sweep subtracts them.
+            let deselectedItems = deselectionSnapshot?.items ?? []
+            let appliedSearches = coordinator.collectAppliedSearches(deselected: deselectedItems)
+                + [coordinator.collectSweepRequest(deselected: deselectedItems)]
 
             // Sub-threshold guard — no pages with effective redactions
             guard !pages.allSatisfy({ $0.regions.isEmpty }) else {
@@ -261,12 +266,19 @@ struct PipelineRunner {
         let retained = coordinator.redactionState.lastRunInputs
         let sensitiveTerms = retained?.sensitiveTerms
             ?? coordinator.collectSensitiveTerms()
-        // Same retention contract for the Search Re-check requests:
+        // Same retention contract for the output re-check requests:
         // the retained set when the run recorded one, else the same
-        // derivation from the live audit (nothing is persisted; no
-        // relaunch-restore path exists to consume a serialized copy).
-        let appliedSearches = retained?.appliedSearches
-            ?? coordinator.collectAppliedSearches()
+        // derivation from the live audit plus a sweep at the current
+        // settings (nothing is persisted; no relaunch-restore path exists
+        // to consume a serialized copy).
+        let appliedSearches: [SearchRecheckRequest]
+        if let retainedRequests = retained?.appliedSearches {
+            appliedSearches = retainedRequests
+        } else {
+            let deselectedItems = coordinator.redactionState.runEntryDeselectionSnapshot()?.items ?? []
+            appliedSearches = coordinator.collectAppliedSearches(deselected: deselectedItems)
+                + [coordinator.collectSweepRequest(deselected: deselectedItems)]
+        }
         let pageCount = coordinator.documentState.pageCount
         // Per-page rasterize artifacts are not available on this
         // path; sandwich layers detect missing entries and skip.

@@ -2,9 +2,10 @@ import Foundation
 import RedactionEngine
 
 // The applied-search record the apply seam stamps on every search-origin
-// match-audit entry, moved out of the class body as a pure move: the
-// session fields it reads (`searchModeType`, the query text and terms,
-// `options`, `results` and the coverage facts) stay where they are.
+// match-audit entry — a typed search or a Scan — moved out of the class
+// body: the session fields it reads (`searchModeType`, the query text and
+// terms, `options`, `results`, the kickoff configuration and the coverage
+// facts) stay where they are.
 
 extension SearchState {
 
@@ -12,12 +13,15 @@ extension SearchState {
     /// `MatchAuditSnapshot` (`prepareApply(searchRecord:)`): the query
     /// as the user ran it — kind + query text(s) + the full `options`,
     /// the same fields `SearchAndRedactSheet.buildSearchMode()` reads —
-    /// plus this run's result count and coverage facts. Nil for the
-    /// Scan interface (`.piiScan` is a detector run, not a typed search)
-    /// and for an empty query / term set (nothing was searched). Read
+    /// plus this run's result count and coverage facts. A Scan records the
+    /// categories it ran (the effective set — an empty selection is every
+    /// category) and the configuration the kickoff compiled, so the
+    /// Detection Sweep re-runs the scan as the user ran it. Nil for an
+    /// empty query / term set and for a Scan session that never ran. Read
     /// on MainActor at apply time, before the detached prepare step.
     func appliedSearchRecord() -> AppliedSearchRecord? {
         let kind: AppliedSearchQuery.Kind
+        var scanConfiguration: ScanRunConfiguration?
         switch searchModeType {
         case .text:
             guard !queryText.isEmpty else { return nil }
@@ -29,7 +33,9 @@ extension SearchState {
             guard !searchTerms.isEmpty else { return nil }
             kind = .multiTerm(searchTerms)
         case .piiScan:
-            return nil
+            guard let configuration = lastRunScanConfiguration else { return nil }
+            kind = .piiScan(categories: effectiveScanCategories)
+            scanConfiguration = configuration
         }
         return AppliedSearchRecord(
             query: AppliedSearchQuery(kind: kind, options: options),
@@ -37,6 +43,7 @@ extension SearchState {
             foundHitCap: resultsAtCap,
             ocrSkippedPages: ocrSkippedPages,
             regexTimeoutPages: regexTimeoutPages,
-            unscannedPageCount: capUnscannedPageCount)
+            unscannedPageCount: capUnscannedPageCount,
+            scanConfiguration: scanConfiguration)
     }
 }

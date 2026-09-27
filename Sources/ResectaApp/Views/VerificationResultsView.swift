@@ -126,7 +126,7 @@ struct VerificationResultsView: View {
                     status: report.overallStatus,
                     hasMixedModes: report.perPageModes.hasMixedModes,
                     hasDeselection: Self.shouldShowDeselectionRow(
-                        snapshot: deselectionSnapshot)
+                        snapshot: deselectionSnapshot, report: report)
                 ) {
                     detailsExpanded = true
                 }

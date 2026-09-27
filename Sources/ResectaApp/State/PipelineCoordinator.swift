@@ -34,6 +34,8 @@ final class PipelineCoordinator: @unchecked Sendable {
     let documentState: DocumentState
     let redactionState: RedactionState
     let settingsState: SettingsState
+    /// The user's custom terms; read at run entry for the sweep request.
+    let userTermsStore: UserTermsStore
 
     /// Toast manager for pipeline completion notifications. Set from the view layer.
     var toastManager: ToastQueueManager?
@@ -162,10 +164,11 @@ final class PipelineCoordinator: @unchecked Sendable {
     }
 
     init(documentState: DocumentState, redactionState: RedactionState,
-         settingsState: SettingsState) {
+         settingsState: SettingsState, userTermsStore: UserTermsStore = UserTermsStore()) {
         self.documentState = documentState
         self.redactionState = redactionState
         self.settingsState = settingsState
+        self.userTermsStore = userTermsStore
 
         // Memory mitigation — on memory warning, both lower dpiCap and
         // collapse rasterization parallelism to 1 until workspace teardown.
@@ -1153,15 +1156,16 @@ final class PipelineCoordinator: @unchecked Sendable {
 
     // MARK: - Applied-Search Collection
 
-    /// Collect the Search Re-check requests for this run — one per
-    /// distinct query the user applied from the Search interface whose
-    /// regions are still present. Read at run entry beside
-    /// `collectSensitiveTerms()`; the verify-only path re-feeds the
-    /// retained copy or calls this again.
-    func collectAppliedSearches() -> [SearchRecheckRequest] {
+    /// Collect the applied re-check requests for this run — one per
+    /// distinct query (a typed search or a Scan) the user applied whose
+    /// regions are still present; `deselected` rides the Scan requests.
+    /// Read at run entry beside `collectSensitiveTerms()`; the verify-only
+    /// path re-feeds the retained copy or calls this again.
+    func collectAppliedSearches(deselected: [SearchResult] = []) -> [SearchRecheckRequest] {
         Self.appliedSearches(
             fromRegions: redactionState.regions,
-            audit: redactionState.appliedMatchAudit
+            audit: redactionState.appliedMatchAudit,
+            deselected: deselected
         )
     }
 

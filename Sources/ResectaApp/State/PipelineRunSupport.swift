@@ -142,8 +142,9 @@ extension PipelineCoordinator {
     /// - The typed QUERY, from the applied-search record the apply seam
     ///   stamped on the region's audit entry — explicit provenance, one rule
     ///   per kind: a text query as the user typed it; a multi-term row's own
-    ///   term; a regex NOTHING beyond its matched text (the pattern is not
-    ///   document content and would not appear in the output as written).
+    ///   term; a regex or a Scan NOTHING beyond its matched text (the
+    ///   pattern is not document content, and a Scan's identity is its
+    ///   category set).
     ///   A region with no record — a detector row, a user-term row, a
     ///   nudge-accepted row — contributes no query: the label in its
     ///   `source` ("Name", "Custom") is not document content and would
@@ -183,7 +184,7 @@ extension PipelineCoordinator {
                         if let term = snapshot.term, !term.isEmpty {
                             insert(term, requiresTokenBoundary: false)
                         }
-                    case .regex:
+                    case .regex, .piiScan:
                         break
                     }
                 }
@@ -217,10 +218,11 @@ extension PipelineCoordinator {
     /// drop the region and its metadata but leave the audit entry, so an
     /// orphaned audit entry means "deleted" — and deletion is the user's
     /// intent. A query whose regions were all deleted is not re-checked.
-    /// Out by construction: scan-origin records, `.piiScan` sessions and
-    /// nudge-accepted regions (no stamped record), manual regions (no
-    /// audit entry). Overlap-skipped results never wrote an audit entry,
-    /// so they count in the record's `foundCount` but not in `appliedCount`.
+    /// A Scan session's record joins like a typed search's (the Detection
+    /// Sweep re-runs it). Out by construction: detection-origin entries and
+    /// nudge-accepted regions (no stamped record), manual regions (no audit
+    /// entry). Overlap-skipped results never wrote an audit entry, so they
+    /// count in the record's `foundCount` but not in `appliedCount`.
     ///
     /// Per query: `appliedCount` = present regions citing it; `appliedPages`
     /// = the pages carrying them (the region dictionary's key is the page
@@ -228,10 +230,13 @@ extension PipelineCoordinator {
     /// — is the LATEST apply's by `appliedAt`, since a later run of the same
     /// query reports the newer result count. Requests come back in
     /// first-seen order over pages ascending, then region order within the
-    /// page, so two derivations over the same state are equal.
+    /// page, so two derivations over the same state are equal. Every request
+    /// is `.applied`; `deselected` — the run's un-checked scan results —
+    /// rides the Scan requests only (a typed search has nothing to subtract).
     nonisolated static func appliedSearches(
         fromRegions regions: [Int: [RedactionRegion]],
-        audit: [UUID: MatchAuditSnapshot]
+        audit: [UUID: MatchAuditSnapshot],
+        deselected: [SearchResult] = []
     ) -> [SearchRecheckRequest] {
         struct Group {
             var record: AppliedSearchRecord
@@ -270,8 +275,48 @@ extension PipelineCoordinator {
             return SearchRecheckRequest(
                 record: group.record,
                 appliedCount: group.appliedCount,
-                appliedPages: group.appliedPages)
+                appliedPages: group.appliedPages,
+                origin: .applied,
+                deselected: { if case .piiScan = query.kind { deselected } else { [] } }())
         }
+    }
+
+    // MARK: - The sweep request
+
+    /// The run's sweep request: every detector category at the run-entry
+    /// preset thresholds and user terms, nothing found and nothing applied
+    /// (it is not an apply), the run's deselected items so the Detection
+    /// Sweep subtracts them. Pure over its inputs — the coordinator
+    /// snapshots the settings at run entry (`collectSweepRequest`).
+    nonisolated static func sweepRequest(
+        thresholdVector: PresetThresholdVector?,
+        userTerms: UserTermsBlob,
+        deselected: [SearchResult]
+    ) -> SearchRecheckRequest {
+        SearchRecheckRequest(
+            record: AppliedSearchRecord(
+                query: AppliedSearchQuery(
+                    kind: .piiScan(categories: Set(PIICategory.allCases)),
+                    options: SearchOptions()),
+                foundCount: 0,
+                scanConfiguration: ScanRunConfiguration(
+                    thresholdVector: thresholdVector,
+                    alwaysFlag: userTerms.alwaysFlag,
+                    neverFlag: userTerms.neverFlag)),
+            appliedCount: 0,
+            appliedPages: [],
+            origin: .sweep,
+            deselected: deselected)
+    }
+
+    /// The sweep request for a run starting now: the current preset vector
+    /// and user terms, read on MainActor at run entry (never inside detached
+    /// work), with the run's deselected items.
+    func collectSweepRequest(deselected: [SearchResult]) -> SearchRecheckRequest {
+        Self.sweepRequest(
+            thresholdVector: settingsState.activeThresholdVector,
+            userTerms: userTermsStore.blob,
+            deselected: deselected)
     }
 
     // MARK: - OCR skip fast path
