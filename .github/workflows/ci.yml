@@ -1,13 +1,13 @@
 # Pull-request gate. Builds the app and both test bundles, runs the two
 # lints over the lines the change adds, checks the documented counts
-# against the tree, checks the shipped-asset hashes and lists the growth of
-# every source file over 800 lines (the ratchet; report-only for now). The
-# scripts run from the base branch's copies, so a change cannot edit the
-# lint it is gated by; the change's own copies run once more, report-only. About
-# five minutes on a hosted macos-26 runner. The batched simulator suites
-# (sim-suite.yml) run weekly, on demand and on release tags, and the
-# engine host suite (engine-suite.yml) on demand and on release tags,
-# not here.
+# against the tree, checks the shipped-asset hashes and fails when a source
+# file already over 800 lines grows (the growth ratchet). The scripts run
+# from the base branch's copies, so a change cannot edit the lint it is
+# gated by; the change's own copies run once more, report-only. About five
+# minutes on a hosted macos-26 runner. The batched simulator suites
+# (sim-suite.yml) run weekly, on demand and on release tags, and the app
+# suite on every pull request as a non-blocking check; the engine host
+# suite (engine-suite.yml) runs on demand only. Neither runs here.
 name: ci
 
 on:

@@ -75,9 +75,10 @@ targets:
         optional: true
     settings:
       base:
-        # NSPhotoLibraryUsageDescription is deliberately absent:
-        # photo import uses SwiftUI PhotosPicker, an out-of-process picker
-        # that grants the app no library access. Re-add only if App Review
+        # NSPhotoLibraryUsageDescription is deliberately absent: the app
+        # requests no photo-library access; documents arrive through the Files
+        # picker and drag-and-drop. A SwiftUI PhotosPicker, if one returns, runs
+        # out of process and needs no usage string. Re-add only if App Review
         # requires it.
         PRODUCT_BUNDLE_IDENTIFIER: com.resecta.app
         PRODUCT_NAME: ResectaApp
@@ -126,11 +127,10 @@ targets:
       # UITestFixtures is routed via sources:
       # above, and neither sources: nor optional: gates on build
       # configuration — optional: only tolerates absence at xcodegen time.
-      # On machines where the gitignored fixtures exist when
-      # ./regenerate.sh runs, they would otherwise ship in Release
-      # archives. Resources copy flat into the bundle root, so strip by
-      # basename. Clean checkouts have no UITestFixtures/ and are
-      # unaffected.
+      # The fixtures are committed (see .gitignore), so every checkout has
+      # them when ./regenerate.sh runs and they would otherwise ship in
+      # Release archives: this strip is load-bearing. Resources copy flat
+      # into the bundle root, so strip by basename.
       - name: Strip UI-test fixtures from non-Debug bundles
         shell: /bin/bash
         basedOnDependencyAnalysis: false
