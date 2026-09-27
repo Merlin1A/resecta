@@ -121,7 +121,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         /// Empty ⇒ the re-check reports INFO. Derived at run entry by
         /// `collectAppliedSearches()` (present regions joined to the match
         /// audit); the verify-only path re-feeds the retained
-        /// `lastRunAppliedSearches` or re-derives the same way.
+        /// `lastRunInputs` or re-derives the same way.
         let appliedSearches: [SearchRecheckRequest]
     }
 
@@ -525,7 +525,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 redactionState.clearOutput()
             }
             redactionState.outputURL = outputURL
-        case .redactionFinished(let outputURL, let runContext, let deselection):
+        case .redactionFinished(let outputURL, let inputs):
             // `outputURL` was already registered. The explicit
             // re-assignment here is intentional: if a redactionState
             // mutation occurred between the eager register and
@@ -533,19 +533,11 @@ final class PipelineCoordinator: @unchecked Sendable {
             // published value. Idempotent.
             redactionState.outputURL = outputURL
             redactionState.clearTextExtractionBuffer()
-            // Retain the run's verification inputs beside the output so
-            // a verify-only re-run checks the terms the artifact was built
-            // with and reports the true per-page modes, instead of
-            // re-synthesizing both (see RedactionState.lastRunPerPageModes).
-            redactionState.recordLastRunInputs(
-                perPageModes: runContext.perPageModes,
-                perPageFallbackReasons: runContext.perPageFallbackReasons,
-                sensitiveTerms: runContext.sensitiveTerms,
-                appliedSearches: runContext.appliedSearches)
-            // Record the run-entry deselection snapshot beside the run
-            // inputs (nil clears a previous run's record). Cleared with
-            // the output in `clearOutput()`.
-            redactionState.recordLastRunDeselection(deselection)
+            // Retain the run's verification inputs beside the output as
+            // one value, so a verify-only re-run checks what the artifact
+            // was built with and the results screen describes this run
+            // (see RedactionState.LastRunInputs).
+            redactionState.recordLastRunInputs(inputs)
         case .verificationSkipped:
             documentState.transition(to: .verified(report: .skipped))
             redactionState.markVerificationCurrent()

@@ -368,7 +368,7 @@ final class SearchState: Identifiable {
             return nil
         }
         return RedactionState.DeselectionSnapshot(
-            deselectedCount: deselectedCount, totalCount: totalCount)
+            items: results.filter { !$0.isSelected }, totalCount: totalCount)
     }
 
     /// Accumulate per-page overlap-suppressed counts. Invoked from

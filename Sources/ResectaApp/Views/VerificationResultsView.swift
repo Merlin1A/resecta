@@ -39,7 +39,7 @@ struct VerificationResultsView: View {
     /// `RedactionState`; this view stays decoupled like `onExport`.
     var onRunVerification: () -> Void
     /// Deselection facts captured at run entry
-    /// (`RedactionState.lastRunDeselection`), threaded in like
+    /// (`RedactionState.LastRunInputs.deselection`), threaded in like
     /// `previewAvailable` since this view does not inject RedactionState.
     /// Nil (also the default, so fixture call sites stay source-compatible)
     /// or zero deselections renders no row.
@@ -231,9 +231,9 @@ struct VerificationResultsView: View {
         return "Verification was skipped. \(skippedSubtitle(reason: report.skipReason))"
     }
 
-    /// Reason-specific subtitle for skipped reports. The status-level
-    /// `VerificationStatus.subtitle` cannot see the report, so the
-    /// derivation lives here where the report is available.
+    /// Reason-specific subtitle for skipped reports. The status type
+    /// cannot see the report, so the derivation lives here where the
+    /// report is available.
     static func skippedSubtitle(reason: VerificationReport.SkipReason) -> String {
         switch reason {
         case .autoVerifyOff:
@@ -328,13 +328,13 @@ struct VerificationResultsView: View {
 
     // MARK: - Run facts strip
     //
-    // 0-3 conditional caption-weight lines disclosing what
-    // this run's detection did or did not cover. Mounted directly
-    // beneath the masthead, above the action stack, on every verdict —
-    // a routine PASS with nothing to disclose renders no strip (no
-    // empty container). Every line is a pinned static builder
-    // so the rendered text is unit-testable without a
-    // SwiftUI host.
+    // 0-2 conditional caption-weight lines stating what this run's
+    // detection did not cover. Mounted directly beneath the masthead,
+    // above the action stack, on every verdict — a routine PASS with
+    // nothing to state renders no strip (no empty container). Every line
+    // is a pinned static builder so the rendered text is unit-testable
+    // without a SwiftUI host. Whether the detectors ran on the output is
+    // no longer stated here in prose: the verification ledger measures it.
 
     /// Pure facts input for the strip. `derive` is the single production
     /// source (called from `DocumentEditorView`); the plain-value
@@ -343,31 +343,18 @@ struct VerificationResultsView: View {
         /// 0-indexed pages whose raster exceeded the OCR pixel
         /// caps during the run behind this output.
         var ocrSkippedPages: Set<Int> = []
-        /// No detection ran this session, yet a region was
-        /// applied for this output (Search or manual marking produced
-        /// it).
-        var detectionNeverRan: Bool = false
-        /// The degrade-failure list snapshotted when the run
-        /// behind this output was recorded; nil when that run was not
-        /// degraded.
+        /// The degrade-failure list at the run behind this output's
+        /// entry; nil when that run was not degraded.
         var degradeFailures: [String]? = nil
 
-        /// Pure derivation from the two facts `DocumentEditorView`
-        /// already computes. `lastDetectionRun` is the session's most
-        /// recent detection/scan record, not necessarily the run behind
-        /// `report` — the common scan-then-apply-then-Redact-then-Verify
-        /// path keeps the two in step, since leaving `.verified` is
-        /// required before another scan can start; a later scan not
-        /// followed by another Redact would leave this strip describing
-        /// the newer scan rather than the on-screen report.
-        static func derive(
-            lastDetectionRun: RedactionState.DetectionRunRecord?,
-            hasAppliedRegions: Bool
-        ) -> RunFacts {
+        /// Pure derivation from the run's own retained inputs — the two
+        /// facts are read at run entry and recorded with the output, so
+        /// a later scan not followed by another Redact cannot move what
+        /// this strip says about the on-screen report.
+        static func derive(inputs: RedactionState.LastRunInputs?) -> RunFacts {
             RunFacts(
-                ocrSkippedPages: lastDetectionRun?.ocrSkippedPages ?? [],
-                detectionNeverRan: lastDetectionRun == nil && hasAppliedRegions,
-                degradeFailures: lastDetectionRun?.degradeFailures
+                ocrSkippedPages: inputs?.ocrSkippedPages ?? [],
+                degradeFailures: inputs?.degradeFailures
             )
         }
     }
@@ -386,9 +373,6 @@ struct VerificationResultsView: View {
             return "Pages \(list) were too large to scan for text, so image content there was not examined by detection. Review those pages manually before sharing."
         }
 
-        static let detectionNeverRanLine =
-            "Automated detection did not run on this document. Every region here came from Search or manual marking \u{2014} review each page for anything those did not cover before sharing."
-
         /// Reuses `DetectionDegradeCopy.banner` verbatim; no new
         /// degrade string.
         static func degradeLine(failedGazetteers: [String]) -> String {
@@ -396,17 +380,11 @@ struct VerificationResultsView: View {
         }
 
         /// Ordered lines for the given facts: the OCR-skip line, then
-        /// the detection-never-ran line, then the degrade line. The first
-        /// two are mutually exclusive by construction
-        /// (both key off `lastDetectionRun`'s nilness), so at most two
-        /// lines render for this fact set today.
+        /// the degrade line.
         static func lines(for facts: RunFacts) -> [String] {
             var result: [String] = []
             if !facts.ocrSkippedPages.isEmpty {
                 result.append(ocrSkipLine(pages: Array(facts.ocrSkippedPages)))
-            }
-            if facts.detectionNeverRan {
-                result.append(detectionNeverRanLine)
             }
             if let degradeFailures = facts.degradeFailures {
                 result.append(degradeLine(failedGazetteers: degradeFailures))

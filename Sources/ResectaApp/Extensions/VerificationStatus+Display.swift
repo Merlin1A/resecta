@@ -98,22 +98,6 @@ extension VerificationStatus {
         }
     }
 
-    var subtitle: String {
-        switch self {
-        case .pass:    "All verification layers completed without issues."
-        case .warn:    "Verification completed. Review notes below before sharing."
-        case .info:    "Document metadata found. No action required."
-        // Report-aware sites (the results masthead) name the exact text via
-        // the report's review terms; this status-level line stays generic.
-        case .attention: "Unredacted text remains — review the items below."
-        case .fail:    "Review the findings below. You can adjust regions and run redaction again, or share after reviewing."
-        // Cause-neutral fallback — VerificationStatus cannot see the report's
-        // skipReason. Report-aware sites (the results masthead) derive
-        // reason-specific copy from the report instead.
-        case .skipped: "Verification did not run for this output. Run it before sharing."
-        }
-    }
-
     // MARK: - Accessibility
 
     var accessibilityLabel: String {

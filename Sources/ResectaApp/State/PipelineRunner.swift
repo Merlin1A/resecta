@@ -35,12 +35,9 @@ enum PipelineRunEvent {
     /// registration is cleared first — see `PipelineCoordinator.apply`).
     case outputRegistered(URL)
     /// `processDocument` returned: the URL is re-published, the extraction
-    /// buffer cleared and the run's verification inputs retained beside
-    /// the output with the run-entry deselection snapshot.
-    case redactionFinished(
-        outputURL: URL,
-        runContext: PipelineCoordinator.PipelineRunContext,
-        deselection: RedactionState.DeselectionSnapshot?)
+    /// buffer cleared and the run's verification inputs — one value —
+    /// retained beside the output.
+    case redactionFinished(outputURL: URL, inputs: RedactionState.LastRunInputs)
     /// Auto-verify is off for this run: the skipped report is published.
     case verificationSkipped
     /// A verification report to publish.
@@ -136,8 +133,8 @@ struct PipelineRunner {
             // Capture the run's deselection facts at run entry,
             // before any pipeline work. The value is recorded onto
             // RedactionState only after `processDocument` returns
-            // (beside `recordLastRunInputs`), but reading it HERE pins
-            // the counts the user saw when they pressed Redact — a
+            // (inside the run inputs), but reading it HERE pins the
+            // items the user saw when they pressed Redact — a
             // programmatic or user re-selection during `.redacting` /
             // `.verifying` cannot drift what the results screen reports.
             // `runEntryDeselectionSnapshot()` prefers the
@@ -147,8 +144,15 @@ struct PipelineRunner {
             // to the live search session's snapshot — nil only when
             // neither source has one (no apply this document session
             // and no live PII-scan session at run entry).
-            let deselectionSnapshot =
-                coordinator.redactionState.runEntryDeselectionSnapshot()
+            let redactionState = coordinator.redactionState
+            let deselectionSnapshot = redactionState.runEntryDeselectionSnapshot()
+            // The two run facts the results strip states, read at the
+            // same point for the same reason: the session's detection
+            // record and degrade flags describe the session, and a scan
+            // after this run must not move what the strip says about it.
+            let ocrSkippedPages = redactionState.lastDetectionRun?.ocrSkippedPages ?? []
+            let degradeFailures: [String]? = redactionState.autoDetectionDegraded
+                ? redactionState.autoDetectionDegradeFailures : nil
 
             // Sub-threshold guard — no pages with effective redactions
             guard !pages.allSatisfy({ $0.regions.isEmpty }) else {
@@ -198,8 +202,15 @@ struct PipelineRunner {
             try? TempFileHardening.applyProtection(outputURL, level: .complete)
 
             sink(.redactionFinished(
-                outputURL: outputURL, runContext: runContext,
-                deselection: deselectionSnapshot))
+                outputURL: outputURL,
+                inputs: RedactionState.LastRunInputs(
+                    perPageModes: runContext.perPageModes,
+                    perPageFallbackReasons: runContext.perPageFallbackReasons,
+                    sensitiveTerms: runContext.sensitiveTerms,
+                    appliedSearches: runContext.appliedSearches,
+                    deselection: deselectionSnapshot,
+                    ocrSkippedPages: ocrSkippedPages,
+                    degradeFailures: degradeFailures)))
 
             // --- Verification ---
             // Paranoid-mode override #2: paranoid
@@ -240,7 +251,6 @@ struct PipelineRunner {
     private func runVerifyOnly(
         outputURL: URL, effectiveMode: PipelineMode
     ) async throws -> PipelineRunOutcome {
-        let redactionState = coordinator.redactionState
         // Prefer the retained inputs of the run that produced the
         // output (recorded beside `outputURL` when `processDocument`
         // returned): the terms snapshot keeps the re-verify checking
@@ -248,13 +258,14 @@ struct PipelineRunner {
         // since, and the retained mode array preserves a mixed run's
         // per-page fallback record in the report. Fall back to
         // re-synthesis when absent (resumed old session).
-        let sensitiveTerms = redactionState.lastRunSensitiveTerms
+        let retained = coordinator.redactionState.lastRunInputs
+        let sensitiveTerms = retained?.sensitiveTerms
             ?? coordinator.collectSensitiveTerms()
         // Same retention contract for the Search Re-check requests:
         // the retained set when the run recorded one, else the same
         // derivation from the live audit (nothing is persisted; no
         // relaunch-restore path exists to consume a serialized copy).
-        let appliedSearches = redactionState.lastRunAppliedSearches
+        let appliedSearches = retained?.appliedSearches
             ?? coordinator.collectAppliedSearches()
         let pageCount = coordinator.documentState.pageCount
         // Per-page rasterize artifacts are not available on this
@@ -263,15 +274,14 @@ struct PipelineRunner {
         // cannot be rebuilt from the output PDF, by design.
         let filterDigests: [PageFilterDigest?] = Array(
             repeating: nil, count: pageCount)
-        let perPageModes: [PipelineMode] = redactionState
-            .lastRunPerPageModes
+        let perPageModes: [PipelineMode] = retained?.perPageModes
             ?? Array(repeating: effectiveMode, count: pageCount)
         // Same retention contract as the mode array — the
         // retained reasons preserve a mixed run's fallback record on
         // re-verify; the all-nil synthesis matches the digest
         // fallback (per-page rasterize artifacts are unavailable).
         let perPageFallbackReasons: [TextLayerDetector.FallbackReason?] =
-            redactionState.lastRunPerPageFallbackReasons
+            retained?.perPageFallbackReasons
             ?? Array(repeating: nil, count: pageCount)
 
         let runContext = PipelineCoordinator.PipelineRunContext(
