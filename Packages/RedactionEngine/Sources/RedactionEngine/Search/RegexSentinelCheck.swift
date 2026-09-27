@@ -37,13 +37,11 @@ public enum RegexSentinelCheck {
 
             // The sentinel races this detached `enumerateMatches` task against
             // the budget sleep below and resumes the continuation once,
-            // whichever arrives first. The LOSING task is not cancelled:
-            // `enumerateMatches` is a non-cancellable C call, so a
-            // catastrophic pattern keeps running until the regex engine
-            // returns (the stop block only runs between matches) — bounded
-            // only by the 200-character pattern cap and the 10 KiB payload.
-            // Repeated adversarial submissions can accumulate such orphaned
-            // tasks.
+            // whichever arrives first. `.reportProgress` calls the block
+            // periodically while a single match attempt backtracks, so the
+            // probe stops at the deadline instead of running until the regex
+            // engine returns; the losing task ends within a progress
+            // interval of the budget.
             Task.detached {
                 guard let regex = try? NSRegularExpression(pattern: capturedPattern) else {
                     if resolver.setIfUnset() { cont.resume(returning: false) }
@@ -53,6 +51,7 @@ public enum RegexSentinelCheck {
                 let deadline = ContinuousClock.now + RegexSentinelCheck.validationBudget
                 regex.enumerateMatches(
                     in: payload,
+                    options: [.reportProgress],
                     range: NSRange(location: 0, length: (payload as NSString).length)
                 ) { _, _, stop in
                     if ContinuousClock.now >= deadline {
