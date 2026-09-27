@@ -231,6 +231,68 @@ struct CouldNotVerifyFlagTests {
         expectFlag(r, false, "L6 graze")
     }
 
+    /// A sliver region over the left fifth of `page`'s first character: the
+    /// glyph box crosses the region's edge while its centre stays outside
+    /// (the edge-graze shape).
+    private func grazeRegion(on page: PDFPage) throws -> RedactionRegion {
+        let sel = try #require(page.selection(for: NSRange(location: 0, length: 1)))
+        let bounds = sel.bounds(for: page)
+        try #require(bounds.width > 0 && bounds.height > 0)
+        let pageBounds = page.bounds(for: .cropBox)
+        let sliver = CGRect(x: bounds.minX - 10, y: bounds.minY,
+                            width: 10 + bounds.width * 0.2, height: bounds.height)
+        return RedactionRegion(
+            id: UUID(),
+            normalizedRect: CGRect(x: sliver.minX / pageBounds.width, y: sliver.minY / pageBounds.height,
+                                   width: sliver.width / pageBounds.width, height: sliver.height / pageBounds.height),
+            source: .manual)
+    }
+
+    /// One page: a measurable line, then two glyphs drawn under a text
+    /// matrix of zero height (extracted, with no measurable position).
+    private static func grazeAndZeroBoundsPDF() -> Data {
+        let stream = "BT /F1 24 Tf 72 700 Td (SECRET CONTENT) Tj ET "
+            + "BT /F1 12 Tf 1 0 0 0 100 600 Tm (AB) Tj ET"
+        return buildRawPDF(objects: [
+            PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            PDFObject(id: 3, content: """
+                << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] \
+                /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+                """),
+            PDFObject(id: 4, content: "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"),
+            PDFObject(id: 5, content: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
+        ], rootId: 1)
+    }
+
+    @Test("Layer 6: a graze beside unmeasured characters on one page → the unmeasured WARN, true")
+    func layer6GrazeAndZeroBoundsSamePage() async throws {
+        let (doc, url) = try TestFixtures.writeTempPDF(Self.grazeAndZeroBoundsPDF(), prefix: "cnv_l6gz_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let region = try grazeRegion(on: try #require(doc.page(at: 0)))
+        let r = await run(5, doc, mode: .searchableRedaction, regions: [0: [region]])
+        #expect(message(r).contains("had no measurable position"), "got \(r.status)")
+        expectFlag(r, true, "L6 graze + zero-bounds, one page")
+        #expect(r.pageReferences == [0])
+    }
+
+    @Test("Layer 6: a grazed page before a page of unmeasured characters → the unmeasured WARN, true, both pages referenced")
+    func layer6GrazeThenZeroBoundsPage() async throws {
+        let merged = PDFDocument()
+        let grazed = try #require(PDFDocument(data: TestFixtures.textLayerPDF(text: "SECRET CONTENT")))
+        let unmeasured = try #require(PDFDocument(data: TestFixtures.zeroBoundsGlyphPDF(text: "AB")))
+        merged.insert(try #require(grazed.page(at: 0)), at: 0)
+        merged.insert(try #require(unmeasured.page(at: 0)), at: 1)
+        let data = try #require(merged.dataRepresentation())
+        let (doc, url) = try TestFixtures.writeTempPDF(data, prefix: "cnv_l6g2_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let region = try grazeRegion(on: try #require(doc.page(at: 0)))
+        let r = await run(5, doc, mode: .searchableRedaction, regions: [0: [region]])
+        #expect(message(r).contains("had no measurable position"), "got \(r.status)")
+        expectFlag(r, true, "L6 graze page + zero-bounds page")
+        #expect(r.pageReferences == [0, 1])
+    }
+
     @Test("Layer 6: an unreadable searchable page → true; a short per-page mode array → true")
     func layer6UnreadableAndCoverage() async throws {
         let (doc, url) = try unopenableSecondPageDoc()
