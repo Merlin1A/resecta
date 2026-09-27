@@ -85,6 +85,13 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
             app.staticTexts["Checks Passed"].waitForExistence(timeout: 90),
             "Verification did not reach 'Checks Passed'."
         )
+        // A search-only run carries no line about automated detection on
+        // the run-facts strip: the verification ledger states what the
+        // detectors observed on the output instead of a disclaimer.
+        let detectionLine = app.staticTexts.matching(
+            NSPredicate(format: #"label CONTAINS "Automated detection did not run""#)
+        ).firstMatch
+        XCTAssertFalse(detectionLine.exists, "The detection-disclosure line must not render.")
         attachScreenshot(named: "search-recheck-01-checks-passed")
 
         // Expand Verification Details (label = "Verification Details, <summary>").
