@@ -30,3 +30,28 @@ struct LaunchHygienePolicyTests {
         #expect(LaunchHygienePolicy.shouldSweepOrphans(on: .background) == false)
     }
 }
+
+// The foreground sweep leaves the open document's session directory alone:
+// `AppCoordinator` hands the open workspace's temporary directory to the
+// sweep, and hands none once the workspace closes.
+
+@Suite("Launch hygiene: the open session")
+@MainActor
+struct LiveSessionTempDirectoryTests {
+
+    @Test("An open redact workspace hands its session directory; home hands none")
+    func coordinatorHandsLiveSessionDirectory() {
+        let coordinator = AppCoordinator(settingsState: SettingsState())
+        #expect(coordinator.liveTempDirectories.isEmpty)
+
+        coordinator.openRedact()
+        guard case .redact(let workspace) = coordinator.activeWorkspace else {
+            Issue.record("openRedact() did not produce a redact workspace")
+            return
+        }
+        #expect(coordinator.liveTempDirectories == [workspace.coordinator.tempExportDirectory.url])
+
+        coordinator.returnHome()
+        #expect(coordinator.liveTempDirectories.isEmpty)
+    }
+}

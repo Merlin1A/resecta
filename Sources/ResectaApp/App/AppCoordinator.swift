@@ -30,6 +30,9 @@ final class AppCoordinator {
         self.settingsState = settingsState
     }
 
+    /// The open workspace's temporary session directories.
+    var liveTempDirectories: Set<URL> { [] }
+
     func openRedact() {
         tearDownCurrentWorkspace()
         activeWorkspace = .redact(RedactWorkspace(settingsState: settingsState))

@@ -491,7 +491,7 @@ public actor PDFStreamReconstructor {
 ///                             same 1-hour TTL and cleanup contract
 ///                             uniformly so app-kill during a share-sheet
 ///                             dismiss does not leak orphans.
-public func cleanOrphanedTempFiles() {
+public func cleanOrphanedTempFiles(excluding liveSessionURLs: Set<URL> = []) {
     let tmp = FileManager.default.temporaryDirectory
     guard let contents = try? FileManager.default.contentsOfDirectory(
         at: tmp, includingPropertiesForKeys: [.creationDateKey]
