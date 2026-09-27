@@ -5,8 +5,9 @@ import Testing
 
 // Signed gazetteer manifest verification tests.
 //
-// Signing scheme: Ed25519, rotation per major release,
-//   degrade-with-banner on failure.
+// Signing scheme: Ed25519; the key is rotated on the maintainer's documented
+//   schedule and on any suspicion of compromise (the DataPipeline's
+//   KEY-MANAGEMENT.md); degrade-with-banner on failure.
 //
 // Wire-format contract:
 //   - DataPipeline `manifest_signing.py` signs the canonical-form JSON

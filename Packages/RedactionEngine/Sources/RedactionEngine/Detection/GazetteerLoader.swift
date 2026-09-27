@@ -17,8 +17,10 @@ import OSLog
 //   - Signature does not verify against the bundled public key and
 //     manifest bytes.
 //
-// Signing scheme: Ed25519, rotation per major release,
-//   degrade-with-banner on failure via the load-diagnostics surface.
+// Signing scheme: Ed25519; the key is rotated on the maintainer's documented
+//   schedule and on any suspicion of compromise (the DataPipeline's
+//   KEY-MANAGEMENT.md); degrade-with-banner on failure via the
+//   load-diagnostics surface.
 //
 // Cryptography:
 //   - Algorithm: Curve25519.Signing (Ed25519). First CryptoKit use in the
