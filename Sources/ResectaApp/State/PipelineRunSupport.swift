@@ -133,21 +133,22 @@ extension PipelineCoordinator {
         }
     }
 
-    /// Pure core of `collectSensitiveTerms`: given the applied regions
-    /// and their metadata, return the verifier's sensitive-term set. Split out as
-    /// a `nonisolated static` seam so it is unit-testable without a live
-    /// coordinator.
+    /// Pure core of `collectSensitiveTerms`: given the applied regions,
+    /// their metadata and the match audit, return the verifier's
+    /// sensitive-term set. Split out as a `nonisolated static` seam so it is
+    /// unit-testable without a live coordinator.
     ///
     /// Two contributions per region:
-    /// - The region's search TERM, only when the region came from a typed
-    ///   query (text / regex / multi-term row) — there the term IS the
-    ///   sensitive text the user searched for. Detector and user-term rows
-    ///   carry a placeholder there instead (a category label like "Name",
-    ///   or "Custom"), which is not document content and would substring-hit
-    ///   unrelated body text ("Name" inside "/FontName", "Custom" inside
-    ///   "Customer"). Typed rows are the ones with no attached rationale and
-    ///   no stamped PII category — both are nil for text/regex/multi-term
-    ///   results by the `SearchResult` contract.
+    /// - The typed QUERY, from the applied-search record the apply seam
+    ///   stamped on the region's audit entry — explicit provenance, one rule
+    ///   per kind: a text query as the user typed it; a multi-term row's own
+    ///   term; a regex NOTHING beyond its matched text (the pattern is not
+    ///   document content and would not appear in the output as written).
+    ///   A region with no record — a detector row, a user-term row, a
+    ///   nudge-accepted row — contributes no query: the label in its
+    ///   `source` ("Name", "Custom") is not document content and would
+    ///   substring-hit unrelated body text ("Name" inside "/FontName",
+    ///   "Custom" inside "Customer").
     /// - The region's MATCHED TEXT — the actual document content — for every
     ///   region that has one. A bare single-word name token (a lone surname /
     ///   given name from per-word NL tagging) is included WITH token-boundary
@@ -159,7 +160,8 @@ extension PipelineCoordinator {
     ///   matching so embedded/partial leaks stay catchable.
     nonisolated static func sensitiveTerms(
         fromAppliedRegions regions: [Int: [RedactionRegion]],
-        metadata: [UUID: RegionMetadata]
+        metadata: [UUID: RegionMetadata],
+        audit: [UUID: MatchAuditSnapshot]
     ) -> [SensitiveTerm] {
         // Dedup by text; a text contributed with AND without the boundary
         // requirement keeps plain substring matching (the least restrictive
@@ -172,10 +174,18 @@ extension PipelineCoordinator {
         for pageRegions in regions.values {
             for region in pageRegions {
                 let meta = metadata[region.id]
-                if case .searchMatch(let term, let rationale) = region.source,
-                   rationale == nil,
-                   meta.map({ if case .searchMatch = $0.piiKind { true } else { false } }) ?? true {
-                    insert(term, requiresTokenBoundary: false)
+                if let snapshot = audit[region.id],
+                   let kind = snapshot.searchRecord?.query.kind {
+                    switch kind {
+                    case .text(let query):
+                        insert(query, requiresTokenBoundary: false)
+                    case .multiTerm:
+                        if let term = snapshot.term, !term.isEmpty {
+                            insert(term, requiresTokenBoundary: false)
+                        }
+                    case .regex:
+                        break
+                    }
                 }
                 guard let meta,
                       let text = meta.matchedText, !text.isEmpty else { continue }

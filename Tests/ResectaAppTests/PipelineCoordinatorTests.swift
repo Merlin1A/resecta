@@ -478,11 +478,6 @@ struct CollectSensitiveTermsScopingTests {
             account.id:    .mock(piiKind: .pii(.account), matchedText: "4100773265"),
             search.id:     .mock(piiKind: .searchMatch(term: "Wrenfield"), matchedText: "Wrenfield"),
         ]
-        coord.redactionState.appliedMatchAudit = [
-            search.id: searchAudit(
-                for: search, matched: "Wrenfield", term: "Wrenfield",
-                record: record(.text("wren"))),
-        ]
         // A detection the user DESELECTED in triage: it lingers in
         // detectionResults but has no applied region → must not be a term.
         coord.redactionState.detectionResults = [
@@ -493,9 +488,29 @@ struct CollectSensitiveTermsScopingTests {
         #expect(terms["Delia Hartwell"] == false)  // multi-word name: plain substring
         #expect(terms["4100773265"] == false)      // non-name single token: plain
         #expect(terms["Wrenfield"] == false)       // the matched text of the typed row
-        #expect(terms["wren"] == false)            // the query as typed, from the record
         #expect(terms["Hartwell"] == true)         // single-word name: boundary-matched
         #expect(terms["999-00-1234"] == nil)       // deselected detection not hunted
+    }
+
+    @Test("collectSensitiveTerms reads the record the apply seam stamped: the query as typed joins the matched text")
+    func collectorReadsTheAppliedRecord() async {
+        let coord = makeCoordinator()
+        let search = SearchState()
+        search.searchModeType = .text
+        search.queryText = "wren"
+        search.results = [
+            SearchResult(
+                pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.05),
+                matchedText: "Wrenfield", contextSnippet: "…Wrenfield…", source: .textLayer,
+                term: "wren", isSelected: true),
+        ]
+        coord.redactionState.activeSearch = search
+        let outcome = await coord.redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
+        #expect(outcome?.applied == 1)
+
+        let terms = termTable(coord.collectSensitiveTerms())
+        #expect(terms["wren"] == false, "the query as typed, from the stamped record")
+        #expect(terms["Wrenfield"] == false, "the matched text")
     }
 
     @Test("Pure seam keeps a single-word name token with the boundary requirement")

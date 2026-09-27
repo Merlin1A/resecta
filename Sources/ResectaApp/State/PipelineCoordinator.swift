@@ -1146,7 +1146,8 @@ final class PipelineCoordinator: @unchecked Sendable {
     func collectSensitiveTerms() -> [SensitiveTerm] {
         Self.sensitiveTerms(
             fromAppliedRegions: redactionState.regions,
-            metadata: redactionState.regionMetadata
+            metadata: redactionState.regionMetadata,
+            audit: redactionState.appliedMatchAudit
         )
     }
 
