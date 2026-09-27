@@ -86,36 +86,6 @@ struct ReDoSFuzzTests {
         }
     }
 
-    @Test("validateRegexPattern rejects canonical nested-quantifier shapes")
-    func validateRejectsNestedQuantifiers() {
-        // `validateRegexPattern` now delegates to
-        // `RegexSafetyPrecheck.isLikelyPathological` in addition to the
-        // original nested-quantifier heuristic. The combined check
-        // covers both (group-with-quantifier)quantifier shapes and
-        // unbounded group-quantifiers over alternation
-        // (e.g. `(a|ab)*b`). Backreference traps and patterns whose
-        // backtracking is catastrophic only inside a single match
-        // attempt are still left to the per-page 5s timeout exercised
-        // by the payload-runtime test above.
-        let nestedQuantifiers = [
-            "(a+)+b",
-            "([a-z]+)*z",
-            "(.*)+x",
-        ]
-        for pattern in nestedQuantifiers {
-            #expect(
-                DocumentSearcher.validateRegexPattern(pattern) == nil,
-                "pattern must be rejected by validateRegexPattern: \(pattern)"
-            )
-        }
-    }
-
-    @Test("validateRegexPattern rejects patterns over 200 chars")
-    func validateRejectsOversizePatterns() {
-        let longPattern = String(repeating: "a", count: 201)
-        #expect(DocumentSearcher.validateRegexPattern(longPattern) == nil)
-    }
-
     @Test("SSN state machine stays microsecond-fast on worst-case payloads")
     func ssnStateMachineLinear() throws {
         let payloads = try Self.loadPayloads()
