@@ -10,7 +10,8 @@ import XCTest
 /// dismiss the sheet → overflow → Redact (default Secure Rasterization,
 /// Verify Before Export on by default) → "Checks Passed" → expand
 /// Verification Details → the sixth row (`layerResult_5`) is the Search
-/// Re-check and reads "Check passed." The row's accessibility label is
+/// Re-check and reads "Check passed."; the seventh (`layerResult_6`) is the
+/// Detection Sweep. The row's accessibility label is
 /// the ordinal + name + status phrase + the layer's own line, so the
 /// black-box assertion needs no `@testable` import.
 ///
@@ -107,8 +108,8 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
             NSPredicate(format: #"label BEGINSWITH "Verification Details""#)
         ).firstMatch
         XCTAssertTrue(details.waitForExistence(timeout: 10), "Verification Details toggle not found.")
-        XCTAssertTrue(details.label.contains("6 of 6 checks passed"),
-                      "Secure Rasterization runs a 6-layer check: \(details.label)")
+        XCTAssertTrue(details.label.contains("7 of 7 checks passed"),
+                      "Secure Rasterization runs a 7-layer check: \(details.label)")
         details.tap()
 
         // The sixth row (zero-indexed identifier) is the Search Re-check in
@@ -129,6 +130,69 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         XCTAssertTrue(label.contains("Check passed."),
                       "The Search Re-check did not read as passed: \(label)")
         attachScreenshot(named: "search-recheck-02-details-row")
+    }
+
+    // MARK: - Detection Sweep row
+
+    /// The seeded review (the Scan interface over the bundled one-page
+    /// fixture): Select All → Apply → Redact. The run carries no typed
+    /// search, so the Search Re-check reads as an informational note and the
+    /// seventh row — the Detection Sweep — reports what the detectors
+    /// observed on the output. The run-facts strip carries no line about
+    /// detection having or not having run: the row measures it.
+    func testDetectionSweep_seededScanApplied_rowPresentAndNoDetectionLine() {
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--seedTriage"]
+        app.launch()
+
+        let dismiss = app.buttons["searchDismissButton"]
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 30),
+                      "Seeded review sheet never presented — check the --seedTriage launch hook.")
+        let selectAll = app.buttons["footerSelectAllButton"]
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 10), "Select All button not found.")
+        selectAll.tap()
+        let apply = app.buttons["searchApplyButton"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 10), "Apply button not found.")
+        apply.tap()
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 10), "Dismiss button not found after Apply.")
+        dismiss.tap()
+
+        let overflow = app.buttons["OverflowBarButtonItem"]
+        XCTAssertTrue(overflow.waitForExistence(timeout: 10), "Toolbar overflow button never appeared.")
+        overflow.tap()
+        let redact = app.buttons["Redact"]
+        XCTAssertTrue(redact.waitForExistence(timeout: 10), "Redact menu item never appeared.")
+        redact.tap()
+
+        XCTAssertTrue(app.staticTexts["Checks Passed"].waitForExistence(timeout: 90),
+                      "Verification did not reach 'Checks Passed'.")
+        // No line about automated detection on the strip — the ledger row
+        // states what the detectors observed instead.
+        let detectionLine = app.staticTexts.matching(
+            NSPredicate(format: #"label CONTAINS "Automated detection did not run""#)
+        ).firstMatch
+        XCTAssertFalse(detectionLine.exists, "The detection-disclosure line must not render.")
+        attachScreenshot(named: "detection-sweep-01-checks-passed")
+
+        let results = app.scrollViews["verificationResults"]
+        XCTAssertTrue(results.waitForExistence(timeout: 10), "Results scroll view not found.")
+        results.swipeUp()
+        let details = app.buttons.matching(
+            NSPredicate(format: #"label BEGINSWITH "Verification Details""#)
+        ).firstMatch
+        XCTAssertTrue(details.waitForExistence(timeout: 10), "Verification Details toggle not found.")
+        XCTAssertTrue(details.label.contains("7 of 7 checks passed"),
+                      "Secure Rasterization runs a 7-layer check: \(details.label)")
+        details.tap()
+
+        let row = app.descendants(matching: .any).matching(identifier: "layerResult_6").firstMatch
+        var scrolls = 0
+        while !row.exists && scrolls < 4 {
+            results.swipeUp()
+            scrolls += 1
+        }
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "The seventh verification row never appeared.")
+        XCTAssertTrue(row.label.contains("Detection Sweep"), "Row 7 is not the Detection Sweep: \(row.label)")
+        attachScreenshot(named: "detection-sweep-02-details-row")
     }
 
     // MARK: - Evidence

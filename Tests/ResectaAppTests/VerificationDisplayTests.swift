@@ -735,4 +735,110 @@ struct SearchRecheckQueryLineDisplayTests {
             contentsOf: repoRoot.appendingPathComponent(relativePath),
             encoding: .utf8)
     }
+    // MARK: - The Detection Sweep row's lines
+
+    private func scanLine(
+        label: String, found: Int, applied: Int, remaining: Int,
+        perCategory: [(String, Int)] = []
+    ) -> SearchRecheckQueryLine {
+        SearchRecheckQueryLine(
+            label: label, foundCount: found, foundHitCap: false,
+            appliedCount: applied, remainingCount: remaining, route: .ocr,
+            optionBadges: [],
+            perTerm: perCategory.isEmpty ? nil : perCategory.map {
+                SearchRecheckQueryLine.PerTerm(term: $0.0, found: nil, applied: nil, remaining: $0.1)
+            },
+            unchecked: false)
+    }
+
+    @Test("The engine labels a scan line \"Scan (N detectors)\" — the prefix the app's composition keys on")
+    func scanLabelPrefix() {
+        let two = AppliedSearchQuery(kind: .piiScan(categories: [.ssn, .name]), options: SearchOptions())
+        #expect(two.displayLabel == "Scan (2 detectors)")
+        let one = AppliedSearchQuery(kind: .piiScan(categories: [.ssn]), options: SearchOptions())
+        #expect(one.displayLabel == "Scan (1 detector)")
+        #expect(LayerResultRow.isScanLine(scanLine(label: two.displayLabel, found: 3, applied: 3, remaining: 0)))
+        #expect(!LayerResultRow.isScanLine(scanLine(label: "\u{201C}Scan (2 detectors)\u{201D}", found: 1, applied: 1, remaining: 0)),
+                "a typed query that happens to read like a scan label is quoted, so the prefix does not match")
+    }
+
+    @Test("An applied scan's line reads found · applied · remain, with per-category sub-lines unquoted")
+    func appliedScanLine() {
+        let line = scanLine(
+            label: "Scan (17 detectors)", found: 23, applied: 20, remaining: 3,
+            perCategory: [("Name", 1), ("SSN", 2)])
+        #expect(LayerResultRow.queryLineText(line) == "Scan (17 detectors) · found 23 · applied 20 · 3 remain")
+        #expect(LayerResultRow.perTermLineTexts(line) == ["Name · 1 remain", "SSN · 2 remain"])
+    }
+
+    @Test("The sweep's line (nothing found, nothing applied) reads what the detectors observed, never \"found 0 · applied 0\"")
+    func sweepLine() {
+        let several = scanLine(
+            label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 4,
+            perCategory: [("Name", 1), ("SSN", 3)])
+        #expect(LayerResultRow.isSweepLine(several))
+        #expect(LayerResultRow.queryLineText(several) == "Scan (17 detectors) · 4 possible items")
+        #expect(LayerResultRow.perTermLineTexts(several) == ["Name · 1 possible item", "SSN · 3 possible items"])
+        let one = scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 1)
+        #expect(LayerResultRow.queryLineText(one) == "Scan (17 detectors) · 1 possible item")
+        let clean = scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 0)
+        #expect(LayerResultRow.queryLineText(clean) == "Scan (17 detectors) · nothing further")
+        #expect(LayerResultRow.perTermLineTexts(clean).isEmpty)
+        // An applied scan that read nothing further is not the sweep shape.
+        let appliedClean = scanLine(label: "Scan (2 detectors)", found: 5, applied: 5, remaining: 0)
+        #expect(!LayerResultRow.isSweepLine(appliedClean))
+        #expect(LayerResultRow.queryLineText(appliedClean) == "Scan (2 detectors) · found 5 · applied 5 · 0 remain")
+    }
+
+    @Test("A Detection Sweep row exposes its lines in order — the applied scan's, then the sweep's")
+    func sweepRowLines() {
+        let layer = LayerResult(
+            name: VerificationLayer.detectionSweep.name,
+            symbolName: VerificationLayer.detectionSweep.symbolName,
+            status: .pass, shortDescription: "", detailDescription: "",
+            pageReferences: nil, durationSeconds: 0,
+            reviewTermTexts: nil, layer: .detectionSweep,
+            queryLines: [
+                scanLine(label: "Scan (2 detectors)", found: 23, applied: 20, remaining: 3, perCategory: [("SSN", 3)]),
+                scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 0),
+            ])
+        #expect(LayerResultRow.queryLineTexts(layer: layer) == [
+            "Scan (2 detectors) · found 23 · applied 20 · 3 remain",
+            "SSN · 3 remain",
+            "Scan (17 detectors) · nothing further",
+        ])
+    }
+
+    @Test("The sweep line vocabulary stays mechanism-only")
+    func sweepLineVocabulary() {
+        let samples = [
+            LayerResultRow.queryLineText(scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 4)),
+            LayerResultRow.queryLineText(scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 0)),
+        ] + LayerResultRow.perTermLineTexts(
+            scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 2, perCategory: [("SSN", 2)]))
+        for sample in samples {
+            for banned in LegalPhrases.bannedTerms {
+                #expect(!sample.lowercased().contains(banned.lowercased()), "'\(banned)' in: \(sample)")
+            }
+            #expect(!sample.contains("%"))
+        }
+    }
+
+    // MARK: - The schedule's summary line
+
+    @Test("A clean run reads N of N checks passed with no suffix — seven in Secure Rasterization, twelve in Searchable")
+    func cleanRunSummaryPerMode() {
+        func report(_ mode: PipelineMode) -> VerificationReport {
+            let layers = VerificationEngine().layers(for: mode).map { layer in
+                LayerResult(
+                    name: layer.name, symbolName: layer.symbolName, status: .pass,
+                    shortDescription: "", detailDescription: "", pageReferences: nil,
+                    durationSeconds: 0, layer: layer)
+            }
+            return VerificationReport(layers: layers, overallStatus: .pass, durationSeconds: 0)
+        }
+        #expect(VerificationResultsView.detailsSummaryText(for: report(.secureRasterization)) == "7 of 7 checks passed")
+        #expect(VerificationResultsView.detailsSummaryText(for: report(.searchableRedaction)) == "12 of 12 checks passed")
+    }
+
 }

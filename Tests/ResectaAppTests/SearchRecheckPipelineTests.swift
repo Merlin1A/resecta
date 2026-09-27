@@ -131,6 +131,13 @@ struct SearchRecheckPipelineTests {
         return report
     }
 
+    /// The Search Re-check row by identity: the two post-sequential checks
+    /// close the schedule (the re-check, then the Detection Sweep), so the
+    /// re-check is no longer the last row.
+    private func recheckRow(_ report: VerificationReport) throws -> LayerResult {
+        try #require(report.layers.first { $0.layer == .searchRecheck })
+    }
+
     private var expectedRequest: SearchRecheckRequest {
         SearchRecheckRequest(
             record: AppliedSearchRecord(
@@ -155,9 +162,9 @@ struct SearchRecheckPipelineTests {
         let report = try await runVerifyOnly(h)
 
         #expect(report.layers.count == 12)
-        #expect(report.layers.last?.layer == .detectionSweep, "the sweep closes the schedule")
-        let last = try #require(report.layers.first { $0.layer == .searchRecheck })
-        #expect(last.layer == .searchRecheck)
+        #expect(report.layers.last?.layer == .detectionSweep)
+        #expect(report.layers.dropLast().last?.layer == .searchRecheck)
+        let last = try recheckRow(report)
         #expect(last.name == "Search Re-check")
         #expect(last.status == .pass)
         #expect(last.shortDescription
@@ -183,7 +190,7 @@ struct SearchRecheckPipelineTests {
         #expect(!report.overallStatus.isFail && !report.overallStatus.isAttention)
     }
 
-    @Test("Secure Raster schedule: seven layers, the re-check then the sweep last with the same counts (text-layer fixture; Layer 1 reports the fixture's text, not this test's subject)")
+    @Test("Secure Raster schedule: seven layers, the re-check then the sweep last, with the same counts (text-layer fixture; Layer 1 reports the fixture's text, not this test's subject)")
     func passRaster() async throws {
         let h = try await makeHarness(
             outputPageTexts: ["Account holder page one", "Balance for page two"],
@@ -194,9 +201,8 @@ struct SearchRecheckPipelineTests {
         let report = try await runVerifyOnly(h)
 
         #expect(report.layers.count == 7)
-        #expect(report.layers.last?.layer == .detectionSweep, "the sweep closes the schedule")
-        let last = try #require(report.layers.first { $0.layer == .searchRecheck })
-        #expect(last.layer == .searchRecheck)
+        #expect(report.layers.last?.layer == .detectionSweep)
+        let last = try recheckRow(report)
         #expect(last.status == .pass)
         #expect(last.queryLines?.count == 1)
         #expect(last.queryLines?.first?.foundCount == 2)
@@ -218,7 +224,7 @@ struct SearchRecheckPipelineTests {
 
         let report = try await runVerifyOnly(h)
 
-        let last = try #require(report.layers.first { $0.layer == .searchRecheck })
+        let last = try recheckRow(report)
         #expect(last.layer == .searchRecheck)
         #expect(last.status.isAttention)
         if case .attention(let message) = last.status {
@@ -269,7 +275,7 @@ struct SearchRecheckPipelineTests {
 
         let report = try await runVerifyOnly(h)
 
-        let last = try #require(report.layers.first { $0.layer == .searchRecheck })
+        let last = try recheckRow(report)
         #expect(last.layer == .searchRecheck)
         #expect(last.status.isInfo)
         #expect(last.shortDescription == SearchRecheck.infoMessage)
@@ -307,7 +313,7 @@ struct SearchRecheckPipelineTests {
 
         let report = try await runVerifyOnly(h)
 
-        let last = try #require(report.layers.first { $0.layer == .searchRecheck })
+        let last = try recheckRow(report)
         #expect(last.status == .pass, "the `?? collectAppliedSearches()` fallback fed the layer")
         #expect(last.queryLines?.first?.appliedCount == 2)
         #expect(last.queryLines?.first?.foundCount == 2)

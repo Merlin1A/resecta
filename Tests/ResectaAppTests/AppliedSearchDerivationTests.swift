@@ -61,9 +61,19 @@ struct AppliedSearchDerivationTests {
 
     private func derive(
         _ regions: [Int: [RedactionRegion]],
-        _ audit: [UUID: MatchAuditSnapshot]
+        _ audit: [UUID: MatchAuditSnapshot],
+        deselected: [SearchResult] = []
     ) -> [SearchRecheckRequest] {
-        PipelineCoordinator.appliedSearches(fromRegions: regions, audit: audit)
+        PipelineCoordinator.appliedSearches(fromRegions: regions, audit: audit, deselected: deselected)
+    }
+
+    private func scanResult(_ index: Int) -> SearchResult {
+        SearchResult(
+            pageIndex: 0,
+            normalizedRect: CGRect(x: 0.1 * CGFloat(index), y: 0.3, width: 0.1, height: 0.03),
+            matchedText: "match-\(index)", contextSnippet: "…match-\(index)…",
+            source: .textLayer, term: "SSN", isSelected: false,
+            piiCategory: .ssn, piiConfidence: 0.9)
     }
 
     // MARK: - Pins
@@ -158,13 +168,44 @@ struct AppliedSearchDerivationTests {
         #expect(requests[0].appliedPages == [0, 1])
     }
 
-    @Test("Exclusions: scan-origin records, nil-record search snapshots, and manual regions never join")
+    @Test("A Scan session's record joins like a typed search: origin .applied, the run's deselected items on it")
+    func scanRecordsJoin() {
+        var regions: [Int: [RedactionRegion]] = [:]
+        var audit: [UUID: MatchAuditSnapshot] = [:]
+        let configuration = ScanRunConfiguration(thresholdVector: nil, alwaysFlag: [UserTerm(pattern: "ACME", isRegex: false)])
+        let scan = AppliedSearchRecord(
+            query: AppliedSearchQuery(kind: .piiScan(categories: [.ssn, .name]), options: SearchOptions()),
+            foundCount: 5, scanConfiguration: configuration)
+        let typed = record(query(.text("secret")), foundCount: 1)
+        searchRegion(page: 0, record: scan, term: "SSN", into: &regions, audit: &audit)
+        searchRegion(page: 2, record: scan, term: "Name", into: &regions, audit: &audit)
+        searchRegion(page: 1, record: typed, into: &regions, audit: &audit)
+        let deselected = [scanResult(0), scanResult(1)]
+
+        let requests = derive(regions, audit, deselected: deselected)
+
+        #expect(requests.count == 2)
+        let scanRequest = requests[0]
+        #expect(scanRequest.record == scan)
+        #expect(scanRequest.record.scanConfiguration == configuration)
+        #expect(scanRequest.appliedCount == 2)
+        #expect(scanRequest.appliedPages == [0, 2])
+        #expect(scanRequest.origin == .applied)
+        #expect(scanRequest.deselected == deselected, "the run's deselected items ride the scan request")
+        let typedRequest = requests[1]
+        #expect(typedRequest.record == typed)
+        #expect(typedRequest.origin == .applied)
+        #expect(typedRequest.deselected.isEmpty, "a typed search has nothing to subtract")
+    }
+
+    @Test("Exclusions: nil-record search snapshots, detection-origin entries and manual regions never join")
     func exclusions() {
         var regions: [Int: [RedactionRegion]] = [:]
         var audit: [UUID: MatchAuditSnapshot] = [:]
-        // `.piiScan` session / nudge: search origin, no record.
+        // A nudge-accepted row: search origin, no record.
         searchRegion(page: 0, record: nil, term: "PII Scan", into: &regions, audit: &audit)
-        // Scan origin: the builder stamps nil by construction.
+        // Detection origin (the staged review): the builder stamps nil by
+        // construction.
         let detection = DetectionResult.mock(kind: .pii(.ssn), matchedText: "123-45-6789")
         let scanRegion = RedactionRegion(
             id: UUID(), normalizedRect: detection.normalizedRect,
@@ -172,12 +213,13 @@ struct AppliedSearchDerivationTests {
         regions[0, default: []].append(scanRegion)
         let scanSnapshot = MatchAuditSnapshot(
             detection: detection, pageIndex: 0, regionID: scanRegion.id, appliedAt: Self.baseDate)
-        #expect(scanSnapshot.searchRecord == nil, "the scan builder never carries a record")
+        #expect(scanSnapshot.searchRecord == nil, "the detection builder never carries a record")
         audit[scanRegion.id] = scanSnapshot
         // Manual: no audit entry at all.
         regions[1, default: []].append(RedactionRegion.mock())
 
-        #expect(derive(regions, audit).isEmpty)
+        #expect(derive(regions, audit, deselected: [scanResult(0)]).isEmpty,
+                "deselected items alone never synthesize a request here — that is the sweep's")
     }
 
     @Test("Distinct options are distinct queries; requests come back in first-seen page order")
