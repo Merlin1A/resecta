@@ -315,12 +315,12 @@ final class PipelineCoordinator: @unchecked Sendable {
         // The initial layer count is taken from the verifier so the
         // progress UI shows the correct total from frame 0.
         let verifier = VerificationEngine()
-        let totalLayers = verifier.layerCount(for: effectiveMode)
+        let scheduledLayers = verifier.layers(for: effectiveMode)
         documentState.transition(to: .verifying(
             progress: .init(
                 currentLayer: 1,
-                totalLayers: totalLayers,
-                layerName: verifier.layerName(at: 0, mode: effectiveMode),
+                totalLayers: scheduledLayers.count,
+                layerName: scheduledLayers.first?.name ?? "",
                 completedLayers: []
             )
         ))
