@@ -12,7 +12,7 @@ On-device iOS 26 PDF redaction. Free, open-source, zero data collection — all 
 
 **Latest release:** 1.1.0 — `main` may be ahead of it: the 6-layer and 11-layer verification counts below describe the next release (1.2.0), not the 1.1.0 build. See the [CHANGELOG](./CHANGELOG.md).
 
-Every pull request builds the app and both test bundles, runs the audit and claims lints on the diff (from the base branch's copies of the scripts), checks the documented counts against the tree, and checks the shipped-asset hashes; the batched engine and app suites run on a hosted simulator every Monday, on demand and on release tags (GitHub pauses a scheduled workflow after sixty days without a commit; any commit resumes it), and the engine host suite on demand and on release tags.
+Every pull request builds the app and both test bundles, runs the audit and claims lints on the change (from the base branch's copies of the scripts), checks the documented counts and the shipped-asset hashes, and fails if a source file already over 800 lines grows; the app suite also runs on a hosted simulator as a non-blocking check. Both batched suites are scheduled on a hosted simulator every Monday and run on demand and on release tags (GitHub pauses a scheduled workflow after sixty days without a commit; any commit resumes it). The engine suite's macOS host run is on demand only and has not yet reached a verdict on the hosted runner.
 
 ---
 
@@ -29,14 +29,14 @@ The core workflow is:
 1. **Import** a PDF from Files, or open the bundled sample document.
 2. **View** pages and navigate the document.
 3. **Mark** regions for redaction by drawing rectangles, or by selecting and applying results from Scan (on-device text detection) or Search (text, pattern, and multi-term matching).
-4. **Apply** redaction. Each affected page is rasterized — vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer in marked regions. Source document metadata (author, editing history, etc.) is stripped; the rebuilt file carries a producer tag that Resecta replaces with a fixed value ("Resecta", identifying neither the operating system version nor the build), plus the writer's creation/modification timestamps, rewritten to a fixed date, so the export is not metadata-free — see [`PRIVACY.md`](./PRIVACY.md).
+4. **Apply** redaction. Every page is rasterized, marked or not — vector text and images are converted into flat bitmap data, marked regions are overwritten in those pixels, and the rebuilt file is designed to leave the original text layer out. Source document metadata (author, editing history, etc.) is stripped; the rebuilt file carries a producer tag that Resecta replaces with a fixed value ("Resecta", identifying neither the operating system version nor the build), plus the writer's creation/modification timestamps, rewritten to a fixed date, so the export is not metadata-free — see [`PRIVACY.md`](./PRIVACY.md).
 5. **Verify.** A multi-layer verification engine scans the output for residual content using text extraction, OCR, binary string search across multiple encodings, structural analysis, and metadata checks.
 6. **Export** via the system share sheet.
 
 ## Two modes
 
 - **Secure Rasterization** — produces image-only output and is the simplest approach for high-sensitivity documents. Verification runs as a 6-layer check.
-- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to remove glyph-positioning side channels identified in academic research. Non-redacted text includes text the page does not visibly show (for example, text beneath boxes or stamps in the source). Verification runs as an 11-layer check (the five additional checks cover the preserved-text layer; both modes end with a re-run of your applied searches on the output).
+- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to remove glyph-positioning side channels identified in academic research. If any unmarked text on a page shows no ink — white on white, invisible, or under a box drawn into the page — that page is exported as an image only. Text covered by a picture in the page can still enter the text layer. Verification runs as an 11-layer check (the five additional checks cover the preserved-text layer; both modes end with a re-run of your applied searches on the output).
 
 Both modes share the same pixel-destruction core. Mode choice is per-document.
 
@@ -101,7 +101,7 @@ Resecta is designed to address specific risks that arise when sharing redacted d
 
 **In scope:**
 
-- **Residual text after redaction.** Both modes are designed to rasterize affected pages and remove the original text layer from marked regions. The multi-layer verification pass scans the output for any text or character data that remains.
+- **Residual text after redaction.** Both modes are designed to rasterize every page and leave the original text layer out of the rebuilt file; Searchable Redaction adds a rebuilt layer holding only unmarked text. The multi-layer verification pass scans the output for any text or character data that remains.
 - **Document metadata leakage.** Author, editing history, tagged structure, and other source metadata fields are stripped from exported documents. The rebuilt file does carry a producer tag — replaced with a fixed value ("Resecta") that identifies neither the operating system version nor the build — and the writer's creation/modification timestamps, rewritten to a fixed date; it is not metadata-free. See [`PRIVACY.md`](./PRIVACY.md).
 - **Font-positioning side channels (Searchable Redaction).** The preserved text layer uses a fresh monospace font with uniform spacing, designed to remove the glyph-positioning side channels identified in academic research on sandwich PDFs.
 
@@ -176,8 +176,8 @@ A stranger can clone, build, and start contributing with these steps:
 
 The test tree is larger than the source tree: roughly 66,000 lines of Swift source to roughly 99,000 lines of test code, about 1.5×. Counted from the current tree:
 
-- **Engine package** (`Packages/RedactionEngine/Tests`) — 1,941 Swift Testing `@Test` functions across 262 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
-- **App target** (`Tests/ResectaAppTests`) — 1,660 `@Test` functions across 234 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
+- **Engine package** (`Packages/RedactionEngine/Tests`) — 1,950 Swift Testing `@Test` functions across 264 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
+- **App target** (`Tests/ResectaAppTests`) — 1,661 `@Test` functions across 235 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
 - **UI / end-to-end** (`Tests/ResectaAppUITests`) — 49 XCUITest methods that drive the built app on a simulator: the first-launch legal gate, detection review, search-to-redaction flows, the search re-check on the results screen, and the editor's handling of links inside a document.
 
 Together the suites carry about 9,000 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).

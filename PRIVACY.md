@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Effective date:** 2026-09-26
+**Effective date:** 2026-09-27
 
 Resecta is an on-device document-redaction app for iOS. This Privacy Policy
 describes how Resecta handles information. It is written to satisfy Apple's
@@ -20,7 +20,7 @@ particular, none of the following is collected by the developer or transmitted
 off your device:
 
 - the documents and images you open;
-- the text, faces, barcodes, or other items the app detects in them;
+- the text and other items the app detects in them;
 - your Custom Terms (the always-flag and never-flag lists you create);
 - your saved searches and saved-regex library;
 - your settings and preferences; and
@@ -52,11 +52,15 @@ hold text you typed — are kept as files in the app's private container with
 the iOS "complete" file-protection class applied and a system flag that
 excludes them from device backups, so they are not copied into iCloud or
 computer backups.
-Your remaining preferences — detection preferences, per-category detection
+Your remaining preferences — your settings (export resolution, fill colour,
+default redaction mode, detection sensitivity, appearance, and the automatic
+verification, snap-to-text and Paranoid Mode switches), per-category detection
 priors the app maintains and uses when ranking its suggestions, an export
-counter, and your acceptance of the in-app agreement — are stored in the
-system `UserDefaults` store, which participates in your device backups the
-way ordinary app preference data does.
+counter, the last search filter you used (its source, confidence and sort
+order), and your acceptance of the in-app agreement — are stored in the system
+`UserDefaults` store, which participates in your device backups the way
+ordinary app preference data does. None of them holds document content or text
+you typed.
 
 This data is not transmitted anywhere by the app and is removed when you
 delete the app; Custom Terms and the saved libraries also have their own
@@ -86,7 +90,12 @@ record the moment the file was written, and rewrites the file identifier to a
 value derived from the file's own contents, so it carries nothing about the
 device, the build or the moment of export, and two exports of identical content
 carry the same identifier. The export therefore carries much less metadata than
-a typical PDF, but it is not metadata-free.
+a typical PDF, but it is not metadata-free. The file name of a shared copy
+records when you exported it.
+
+Resecta 1.2.0 opens PDF files only; this note applies to releases that import
+images. Images inside a PDF you open reach the exported file only as redrawn
+page pixels.
 
 A separate note applies to photos. An image you import can carry its own
 embedded metadata, such as EXIF or GPS location data. Resecta redraws imported
@@ -98,8 +107,8 @@ metadata is not carried into the file Resecta produces.
 Resecta detects candidate sensitive information entirely on your device.
 Detection combines pattern matching with structural validators (for example, a
 checksum test on card numbers), the system Natural Language tagger (`NLTagger`)
-for names, and the system Vision framework for optical character recognition,
-faces, and barcodes or QR codes. Resecta ships no Core ML model and does not use
+for names, and the system Vision framework for optical character recognition of
+pages without a text layer. Resecta ships no Core ML model and does not use
 Apple Intelligence or the Foundation Models system; detection surfaces
 candidates on your device for you to review and redact. Automated detection can
 miss sensitive content; you are responsible for reviewing each page and

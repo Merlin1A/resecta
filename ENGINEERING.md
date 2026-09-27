@@ -14,8 +14,8 @@ tree you are looking at (grep counts over source), not from a dashboard.
 
 ## 1. Redaction is destructive, and the app reads back its own output
 
-The core design decision: Resecta does not edit the source PDF. Affected pages
-are rendered to bitmaps, redaction fills are painted into those bitmaps, and
+The core design decision: Resecta does not edit the source PDF. Every page,
+marked or not, is rendered to a bitmap, redaction fills are painted into those bitmaps, and
 the export is a fresh PDF built from the redacted rasters. The source
 document's object graph — its text runs, annotations, form fields, embedded
 fonts — is parsed for rendering and text extraction, but it is never handed to
@@ -36,8 +36,8 @@ is read back and every row of every region is compared byte-for-byte against
 the expected fill pattern (`verifyFill` in `Pipeline/PixelOperations.swift`,
 called from `Pipeline/PageRasterizer.swift`). This is not sampling and there
 is no threshold: one wrong pixel fails the page, and a failed page fails the
-whole export with an error rather than shipping. Freeform (polygon) regions
-get the same treatment with one extra property: the readback mask is built by
+whole export with an error rather than shipping. Polygon regions (a path the
+editor does not offer in this release) get the same treatment with one extra property: the readback mask is built by
 a scanline rasteriser written independently of the Core Graphics fill path
 that painted the region, so the check does not share code — or bugs — with the
 thing it is checking.
@@ -292,7 +292,9 @@ assets. The contract between the two repos is enforced, not eyeballed:
   asset's own diagnostic and raises the banner while the asset's fail-open
   fallback stands. Every loader that decodes a versioned table fences its wire
   version, so a table from a future or stale schema is refused by name rather
-  than read. The degraded-detection banner names exactly the withheld set.
+  than read. The degraded-detection banner tells an OS-name-model-only degrade
+  from a corpus-load failure; the withheld loaders are recorded in the load
+  diagnostics.
 - One asset additionally carries a load-time content check: the context-scorer
   weights file is SHA-256-hashed at load against a compiled-in constant, with
   an identity-scorer fallback on mismatch. That fallback — and the equivalent

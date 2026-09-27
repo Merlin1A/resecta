@@ -18,7 +18,7 @@ The entries below follow the Keep-a-Changelog index format.
 - **Stepping through matches.** The parked Search/Scan strip is taller and names the current match (kind, page, text); each match is centred on the page as you step; the page bar steps aside while you step through matches and returns when the sheet expands; the detection review gets the same Previous/Next stepping with a one-tap Select.
 - Diagnostics export: the coverage snapshot share writes inside the per-session directory with complete protection at write time and is withheld while the screen is captured, matching the audit export.
 - Verification: the OCR check now reports a redacted term that is still readable outside every redacted region as Attention Needed on both output modes, naming the text on the results screen; on rasterized pages it was an informational note.
-- Verification: the text-layer checks report pages without per-page mode data as not checked instead of passing them; a polygon that covers no pixel is reported as a failed fill; the polygon and freeform tools apply the rectangle tool's 10-point minimum size.
+- Verification: the text-layer checks report pages without per-page mode data as not checked instead of passing them.
 - Verification: a page written as image-only that still carries a text layer now fails the spatial check instead of being skipped; characters whose position could not be measured are reported as not checked; the text-extraction check reads each page's own output mode.
 - Verification: the metadata check confirms the producer field carries the fixed value and warns when it does not.
 - Export: the creation and modification timestamps the system PDF writer adds are rewritten to a fixed value, like the producer tag; the metadata check confirms all three.
@@ -33,8 +33,17 @@ The entries below follow the Keep-a-Changelog index format.
 - Trust strip reads "On-device" again, matching the home screen's tagline.
 - Import: the annotation notice also counts filled form fields; their values are drawn by the viewer but are not carried into the output.
 - Search: when a regular expression is refused and its shape is one a built-in detector covers, the reason names that detector.
-- Import: Resecta opens PDF files only. The Files picker lists PDFs, a non-PDF file dropped on iPad is declined with a message, and the unsupported-format message and the empty sidebar say PDF.
 - **Verification Details.** The details list on the results screen opens from a card that summarises the run. Checks that need review, failed, carry a warning or were skipped are grouped under a Findings header and informational notes under a Notes header; passing checks show a check mark, as a compact row when there is nothing more to show, and the other checks show a status tile with a shape badge, with rows that need review or failed tinted. Check titles drop the "Layer N:" prefix and a check's run time moves into its expanded detail. A check's detail text no longer repeats its summary line, and the spatial check's page list matches its page links.
+- Scan: names are also recognised after a role or field label's colon, beside a caption's "v.", after a sign-off or a salutation; words such as Plaintiff or DL no longer surface as names alone.
+- Scan: context keywords match whole words only; phone cues are phrases such as "phone number", not the bare word "number", so a labelled account number with no phone cue is not read as a phone.
+- Scan: a card number no longer starts inside a letter-led token.
+- Scanned pages: characters next to a clearly read digit are no longer read as letters.
+- Search: pages with many matches no longer drop results, and a cancelled search's results stay out of the next.
+- Search: bounded repetition such as `(-\d{4})?` is accepted; a refused pattern shows its reason and a plain-text option, and the re-check lists it as not checked; always-flag terms match ligature and full-width forms.
+
+### Removed
+
+- Image input: this release opens PDF files only; 1.0.0 and 1.1.0 also opened JPEG, PNG and HEIC images from Files or a drop. The Files picker lists PDFs, a dropped image is declined with the unsupported-format message, and that message now names PDF.
 
 ### Fixed
 
@@ -46,6 +55,12 @@ The entries below follow the Keep-a-Changelog index format.
 - Links inside an imported document are not followed when tapped in the editor, and data detectors are turned off for the document the editor shows.
 - Import: a document that carries JavaScript or a launch action in its catalog's name tree, in its open action, in a page's additional actions, or in an annotation's action is refused at import, as a document with those entries at the top of the catalog already was. The refusal names active content instead of a damaged file.
 - Export: the file identifier the system PDF writer adds is rewritten to a value derived from the file's own contents, so it carries nothing about the device, the build or the moment of export; the metadata check confirms it. Two exports of identical content carry the same identifier.
+- Searchable Redaction: a page whose unmarked text shows no ink (white on white, invisible, or under a box drawn into the page) is exported as an image only; the results screen names the reason.
+- Detection assets: each bundled table is checked against the size and SHA-256 digest the signed manifest lists for it at first load; a mismatch withholds that loader and raises the degraded-detection banner.
+
+### Internal
+
+- Polygon regions, which the editor does not offer in this release: a polygon that covers no pixel is reported as a failed fill, and the polygon commit path applies the rectangle tool's 10-point minimum size.
 
 ## [1.1.0] — 2026-08-28
 
@@ -113,7 +128,7 @@ Initial public release.
 - **Custom Terms.** Single-entry CRUD for user-defined detection terms. Bulk operations (paste-many, CSV import / export, share-profile) are V1.1+ scope.
 - **Audit export schema (surface disabled in V1.0).** The v4 match-audit wire schema ships in code, with the user-facing export surface disabled for this release; enabling it is scoped to a future release (see release notes for the column list and version-bump policy).
 - **Doctype temperature and preset thresholds** calibrated against an iPhone 17 / A19 softmax dump.
-- **Core workflow** — Import → View → Mark → Apply → Verify → Export — covering PDF input from Files or the bundled sample document, with export via the system share sheet.
+- **Core workflow** — Import → View → Mark → Apply → Verify → Export — covering PDF input from Files or the bundled sample document, with export via the system share sheet. The Files picker and drag-and-drop also accepted image files such as JPEG, PNG and HEIC, each redrawn from its pixels as a one-page PDF.
 
 ### Removed
 
@@ -125,7 +140,7 @@ Initial public release.
 - **No network requests of its own.** The codebase contains no `URLSession` or `NWConnection` usage. Verifiable at the source level via `grep`.
 - **No accounts, no analytics, no telemetry, no server-side components.**
 - **Document metadata stripped on export** — author, editing history, tagged structure, and other source metadata fields are removed from exported documents. The rebuilt file carries a producer tag replaced with a fixed value ("Resecta", identifying neither the operating system version nor the build), and fresh creation/modification timestamps from the system PDF writer (not metadata-free — see `PRIVACY.md`).
-- **Pixel-destruction core shared by both modes.** Each affected page is rasterized; vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer from marked regions.
+- **Pixel-destruction core shared by both modes.** Every page is rasterized, marked or not; vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer from marked regions.
 - **Searchable Redaction text-layer design.** The reconstructed text layer uses a fresh monospace font with uniform spacing, designed to remove the glyph-positioning side channels identified in academic research on sandwich PDFs.
 
 [Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.1.0...HEAD

@@ -254,10 +254,12 @@ struct ResectaApp: App {
             // regardless of `disclaimerAccepted` — a crash during a session
             // before EULA acceptance (or a EULA-version bump) previously left
             // orphans unswept until the user accepted. Detached `.utility`
-            // task so it does not block MainActor at launch.
+            // task so it does not block MainActor at launch. The open
+            // document's session directory is handed in and left in place.
             .task {
+                let live = appCoordinator.liveTempDirectories
                 Task.detached(priority: .utility) {
-                    cleanOrphanedTempFiles()
+                    cleanOrphanedTempFiles(excluding: live)
                 }
             }
             // Drive `obscureContent` (and the orphan sweep, below) from
@@ -282,9 +284,12 @@ struct ResectaApp: App {
                 // foreground/background cycles would otherwise never sweep
                 // again. The sweep is idempotent and TTL-bounded, so each
                 // extra run costs one directory listing.
+                // The open document's session directory is excluded: a
+                // session left open past the one-hour TTL keeps its files.
                 if LaunchHygienePolicy.shouldSweepOrphans(on: newPhase) {
+                    let live = appCoordinator.liveTempDirectories
                     Task.detached(priority: .utility) {
-                        cleanOrphanedTempFiles()
+                        cleanOrphanedTempFiles(excluding: live)
                     }
                 }
             }

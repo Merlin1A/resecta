@@ -387,6 +387,35 @@ struct ReconstructionTests {
         #expect(count == 1, "Expected 1 %%EOF, found \(count)")
     }
 
+    // MARK: - cleanOrphanedTempFiles Leaves the Open Session in Place
+
+    @Test("cleanOrphanedTempFiles leaves an excluded session directory in place, whatever its age")
+    func sweepLeavesLiveSessionDirectory() throws {
+        let tmp = FileManager.default.temporaryDirectory
+        let live = tmp.appendingPathComponent(
+            "\(TempExportDirectory.sessionDirectoryPrefix)\(UUID().uuidString)", isDirectory: true)
+        let orphan = tmp.appendingPathComponent(
+            "\(TempExportDirectory.sessionDirectoryPrefix)\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: live)
+            try? FileManager.default.removeItem(at: orphan)
+        }
+        for dir in [live, orphan] {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try Data("payload".utf8).write(to: dir.appendingPathComponent("redacted_output.pdf"))
+            // Two hours old: past the sweep's one-hour threshold.
+            try FileManager.default.setAttributes(
+                [.creationDate: Date().addingTimeInterval(-7200)], ofItemAtPath: dir.path)
+        }
+
+        cleanOrphanedTempFiles(excluding: [live])
+
+        #expect(FileManager.default.fileExists(atPath: live.appendingPathComponent("redacted_output.pdf").path),
+                "the open session's directory and its output must survive the sweep")
+        #expect(!FileManager.default.fileExists(atPath: orphan.path),
+                "a stale session directory nobody holds is still swept")
+    }
+
     // MARK: - cleanOrphanedTempFiles Preserves Recent Files
 
     @Test("cleanOrphanedTempFiles ignores recent files (< 1 hour old)")

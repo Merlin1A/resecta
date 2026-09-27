@@ -32,6 +32,23 @@ struct BackupExclusionTests {
                 "isExcludedFromBackup must be true on the session directory URL")
     }
 
+    @Test("prepare() re-creates and re-flags a session directory deleted behind it")
+    func prepareRecreatesAfterExternalDeletion() throws {
+        let dir = TempExportDirectory()
+        defer { dir.tearDown() }
+        try dir.prepare()
+        // Something outside the session (a sweep, the system) removes it.
+        try FileManager.default.removeItem(at: dir.url)
+
+        let child = try dir.childURL(named: "redacted_\(UUID().uuidString).pdf")
+        try Data("payload".utf8).write(to: child)
+
+        #expect(FileManager.default.fileExists(atPath: child.path),
+                "a child URL must be writable after the directory was deleted")
+        let values = try dir.url.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        #expect(values.isExcludedFromBackup == true, "the re-created directory is flagged again")
+    }
+
     // --- Test 2 ------------------------------------------------------------
     @Test("Session subdirectory is removed on tearDown()")
     func testSessionSubdirRemovedOnSessionEnd() throws {
