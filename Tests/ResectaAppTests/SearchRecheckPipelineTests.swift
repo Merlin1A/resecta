@@ -115,11 +115,10 @@ struct SearchRecheckPipelineTests {
     /// `processDocument` returns — the retained set the verify-only path
     /// prefers.
     private func recordRunInputs(_ h: Harness, mode: PipelineMode) {
-        h.redactionState.recordLastRunInputs(
+        h.redactionState.recordLastRunInputs(.fixture(
             perPageModes: Array(repeating: mode, count: h.documentState.pageCount),
-            perPageFallbackReasons: Array(repeating: nil, count: h.documentState.pageCount),
             sensitiveTerms: h.coordinator.collectSensitiveTerms(),
-            appliedSearches: h.coordinator.collectAppliedSearches())
+            appliedSearches: h.coordinator.collectAppliedSearches()))
     }
 
     private func runVerifyOnly(_ h: Harness) async throws -> VerificationReport {
@@ -151,7 +150,7 @@ struct SearchRecheckPipelineTests {
         defer { h.removeOutput() }
         #expect(h.coordinator.collectAppliedSearches() == [expectedRequest])
         recordRunInputs(h, mode: .searchableRedaction)
-        #expect(h.redactionState.lastRunAppliedSearches == [expectedRequest])
+        #expect(h.redactionState.lastRunInputs?.appliedSearches == [expectedRequest])
 
         let report = try await runVerifyOnly(h)
 
@@ -266,7 +265,7 @@ struct SearchRecheckPipelineTests {
         defer { h.removeOutput() }
         #expect(h.coordinator.collectAppliedSearches().isEmpty)
         recordRunInputs(h, mode: .secureRasterization)
-        #expect(h.redactionState.lastRunAppliedSearches == [])
+        #expect(h.redactionState.lastRunInputs?.appliedSearches == [])
 
         let report = try await runVerifyOnly(h)
 
@@ -301,7 +300,7 @@ struct SearchRecheckPipelineTests {
             mode: .searchableRedaction)
         defer { h.removeOutput() }
         // No `recordLastRunInputs`: the resumed-session posture.
-        #expect(h.redactionState.lastRunAppliedSearches == nil)
+        #expect(h.redactionState.lastRunInputs?.appliedSearches == nil)
         let derived = h.coordinator.collectAppliedSearches()
         #expect(derived == [expectedRequest])
         #expect(h.coordinator.collectAppliedSearches() == derived, "the derivation is stable")
@@ -316,10 +315,10 @@ struct SearchRecheckPipelineTests {
         // Recording retains exactly the derived set; clearing the output
         // drops it with the other run inputs.
         recordRunInputs(h, mode: .searchableRedaction)
-        #expect(h.redactionState.lastRunAppliedSearches == derived)
+        #expect(h.redactionState.lastRunInputs?.appliedSearches == derived)
         h.redactionState.clearOutput()
-        #expect(h.redactionState.lastRunAppliedSearches == nil)
-        #expect(h.redactionState.lastRunSensitiveTerms == nil)
+        #expect(h.redactionState.lastRunInputs?.appliedSearches == nil)
+        #expect(h.redactionState.lastRunInputs?.sensitiveTerms == nil)
     }
 
     // MARK: - Cancellation
@@ -331,7 +330,7 @@ struct SearchRecheckPipelineTests {
             mode: .searchableRedaction)
         defer { h.removeOutput() }
         recordRunInputs(h, mode: .searchableRedaction)
-        let retained = h.redactionState.lastRunAppliedSearches
+        let retained = h.redactionState.lastRunInputs?.appliedSearches
 
         var rng = SeededLCG(seed: 0x5EA7_C4EC)
         var violations = 0
@@ -361,7 +360,7 @@ struct SearchRecheckPipelineTests {
         #expect(recheckSkippedUnderPass == 0, "a skipped re-check can never hide under PASS")
         // Cancellation leaves the retained inputs alone (the output survives
         // a cancel-from-verifying).
-        #expect(h.redactionState.lastRunAppliedSearches == retained)
+        #expect(h.redactionState.lastRunInputs?.appliedSearches == retained)
     }
 
     /// Numerical-Recipes LCG; fixed seed → reproducible jitter.

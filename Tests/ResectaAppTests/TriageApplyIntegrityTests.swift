@@ -112,24 +112,6 @@ struct TriageApplyIntegrityTests {
         #expect(!state.triagePromotionOccurred)
     }
 
-    @Test("Detection-map apply splits signature candidates out of the applied count")
-    func applyDetectionResultsCountsExcludeSignatures() async {
-        let state = RedactionState()
-        let name = makeDetection(page: 0, kind: .name, matchedText: "Jordan Avery")
-        let ssn = makeDetection(page: 1, kind: .ssn, matchedText: "123-45-6789")
-        let sig = makeDetection(page: 1, kind: .signatureCandidate, matchedText: "")
-
-        let outcome = await state.applyFindings(
-            .detectionResults([0: [name], 1: [ssn, sig]]), undoManager: nil)
-
-        // The toast's count is regions created — the signature candidate
-        // routed to the review instead (never applied directly).
-        #expect(outcome?.applied == 2)
-        #expect(outcome?.signatureCandidates == 1)
-        #expect(state.regions.values.flatMap { $0 }.count == 2)
-        #expect(state.pendingTriage?.values.flatMap { $0 }.count == 1)
-    }
-
     @Test("PII Scan mode apply returns the honest count that feeds the shared toast copy")
     func piiScanApplyReturnsCount() async {
         let state = RedactionState()

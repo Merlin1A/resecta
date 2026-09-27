@@ -121,19 +121,6 @@ struct VerificationDisplayTests {
         #expect(!status.title.isEmpty)
     }
 
-    @Test("subtitle is non-empty for all cases",
-          arguments: [
-            VerificationStatus.pass,
-            VerificationStatus.warn("w"),
-            VerificationStatus.info("i"),
-            VerificationStatus.attention("a"),
-            VerificationStatus.fail("f"),
-            VerificationStatus.skipped,
-          ])
-    func subtitleNonEmpty(status: VerificationStatus) {
-        #expect(!status.subtitle.isEmpty)
-    }
-
     // "Passed" is reserved for .pass — a WARN masthead that says
     // "Passed" frames reduced assurance as a pass (the trust strip on the
     // same screen already refuses the completeness claim on WARN).
@@ -146,17 +133,16 @@ struct VerificationDisplayTests {
                 "\"Passed\" is reserved for the .pass verdict")
     }
 
-    // The FAIL subtitle names the remediation path, not just the
-    // review instruction — and the masthead's own .fail arm speaks the
-    // same sentence, so the two surfaces cannot drift apart.
-    @Test("FAIL subtitle names the remediation path on both surfaces")
+    // The FAIL masthead names the remediation path, not just the review
+    // instruction. The masthead derives every subtitle from the report;
+    // the status type carries no subtitle of its own (no production
+    // reader ever did — the one derivation is the masthead's).
+    @Test("FAIL masthead names the remediation path")
     func failSubtitleNamesRemediation() {
-        let subtitle = VerificationStatus.fail("f").subtitle
-        #expect(subtitle
-                == "Review the findings below. You can adjust regions and run redaction again, or share after reviewing.")
         let report = VerificationReport(
             layers: [], overallStatus: .fail("f"), durationSeconds: 0)
-        #expect(VerificationResultsView.mastheadSubtitle(report: report) == subtitle)
+        #expect(VerificationResultsView.mastheadSubtitle(report: report)
+                == "Review the findings below. You can adjust regions and run redaction again, or share after reviewing.")
         #expect(VerificationStatus.fail("f").title == "Issues Found",
                 "The FAIL title is pinned — the preview verdict capsule quotes it")
     }
@@ -236,7 +222,7 @@ struct VerificationDisplayTests {
           ])
     func noOutcomePromiseLanguage(status: VerificationStatus) {
         let bannedWords = ["guaranteed", "ensures", "impossible", "guarantee", "ensure"]
-        let allText = [status.title, status.subtitle, status.accessibilityLabel]
+        let allText = [status.title, status.accessibilityLabel]
             .joined(separator: " ").lowercased()
 
         for word in bannedWords {
@@ -247,11 +233,9 @@ struct VerificationDisplayTests {
 
     // MARK: - Attention masthead (residual tier)
 
-    @Test("ATTENTION title and subtitle are pinned")
-    func attentionTitleSubtitlePinned() {
+    @Test("ATTENTION title is pinned")
+    func attentionTitlePinned() {
         #expect(VerificationStatus.attention("a").title == "Attention Needed")
-        #expect(VerificationStatus.attention("a").subtitle
-                == "Unredacted text remains — review the items below.")
     }
 
     @Test("ATTENTION masthead subtitle names the report's review terms")

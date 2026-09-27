@@ -263,30 +263,6 @@ struct ApplySeamDetectionOriginTests {
         }
     }
 
-    @Test("Detection-map apply writes both records; routed signature candidates get neither")
-    func detectionMapApplyWritesBothRecords() async {
-        let state = RedactionState()
-        let ssn = makeDetection(page: 0)
-        let signature = makeDetection(
-            page: 1, kind: .pii(.signatureCandidate), matchedText: nil)
-
-        let outcome = await state.applyFindings(
-            .detectionResults([0: [ssn], 1: [signature]]), undoManager: nil)
-
-        #expect(outcome?.applied == 1)
-        #expect(outcome?.signatureCandidates == 1)
-        guard let region = state.regions[0]?.first else {
-            Issue.record("no region created")
-            return
-        }
-        #expect(state.regionMetadata[region.id] != nil)
-        #expect(state.appliedMatchAudit[region.id]?.origin == .scan)
-        // The routed candidate created no region, so no records exist for
-        // it — audit describes applied regions only.
-        #expect(state.appliedMatchAudit.count == 1)
-        #expect(state.regionMetadata.count == 1)
-    }
-
     @Test("A face detection's audit record tolerates absent text and pairs its PII fields")
     func faceDetectionAuditHasNilText() async {
         let state = RedactionState()
@@ -568,14 +544,6 @@ struct ApplySeamReGuardTests {
         #expect(groupState.regions.isEmpty)
         #expect(groupState.pendingTriage?.values.flatMap { $0 }.count == 2,
                 "a refused group apply prunes nothing")
-
-        // Detection-map origin.
-        let mapState = RedactionState()
-        let mapOutcome = await mapState.applyFindings(
-            .detectionResults([0: [makeDetection()]]), undoManager: nil, documentState: doc)
-        #expect(mapOutcome == nil)
-        #expect(mapState.regions.isEmpty)
-        #expect(mapState.pendingTriage == nil)
     }
 
     @Test("A permissive documentState admits the apply (the guard reads live phase)")

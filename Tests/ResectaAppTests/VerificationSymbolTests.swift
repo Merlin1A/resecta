@@ -3,71 +3,68 @@ import UIKit
 import RedactionEngine
 @testable import ResectaApp
 
-// Symbol-router pins. The router is keyed on layer identity
-// (never the stored symbolName), so these pin (a) router ↔ engine name
-// agreement, (b) the fallback path for unmapped identities, and (c) all
-// 12 custom symbol assets resolving from the APP bundle (C-A pattern,
-// same Bundle(for:) resolution as BundleContentsTests).
+// Symbol-router pins. The router is keyed on the layer's identity
+// (`VerificationLayer`), never on a name or the stored symbol string, so
+// these pin (a) every custom asset lands on its numbered layer in
+// canonical order, (b) the fallback path for identities without an asset
+// and for the identity-less Page Count gate row, and (c) all 12 custom
+// symbol assets resolving from the APP bundle (same Bundle(for:)
+// resolution as BundleContentsTests).
 @Suite("Verification symbol router")
 struct VerificationSymbolTests {
 
     private var appBundle: Bundle { Bundle(for: AppCoordinator.self) }
 
-    @Test("every engine layer name routes to its numbered custom asset")
-    func engineNamesAllRoute() {
-        for (index, layer) in VerificationLayer.allCases.prefix(10).enumerated() {
-            let name = layer.name
+    private func result(for layer: VerificationLayer?, symbolName: String = "x") -> LayerResult {
+        LayerResult(
+            name: layer?.name ?? "Page Count", symbolName: symbolName,
+            status: .pass, shortDescription: "", detailDescription: "",
+            pageReferences: nil, durationSeconds: 0, layer: layer)
+    }
+
+    @Test("the first ten layers of the canonical schedule route to their numbered custom assets")
+    func canonicalLayersRoute() {
+        let schedule = VerificationEngine().layers(for: .searchableRedaction)
+        #expect(schedule.count >= 10)
+        for (index, layer) in schedule.prefix(10).enumerated() {
             let expected = String(format: "resecta.verify.layer%02d", index + 1)
-            #expect(VerificationSymbol.assetName(forLayerNamed: name) == expected)
+            #expect(VerificationSymbol.layerAssets[layer] == expected, "\(layer)")
+            #expect(VerificationSymbol.assetName(for: result(for: layer)) == expected)
+            #expect(VerificationSymbol.isCustom(result(for: layer)))
         }
     }
 
-    @Test("router covers exactly the ten engine layers")
+    @Test("router covers exactly the ten layers with a glyph")
     func routerCoversExactlyTen() {
         #expect(VerificationSymbol.layerAssets.count == 10)
+        #expect(!VerificationSymbol.layerAssets.keys.contains(.searchRecheck))
     }
 
-    @Test("unmapped identities route to nil (stored-symbol fallback)")
-    func unknownNameFallsBack() {
-        #expect(VerificationSymbol.assetName(forLayerNamed: "Unknown Layer") == nil)
-        #expect(VerificationSymbol.assetName(forLayerNamed: "") == nil)
-        // Symbol strings must never be accepted as identity keys.
-        #expect(VerificationSymbol.assetName(forLayerNamed: "01.square.fill") == nil)
-        #expect(VerificationSymbol.assetName(forLayerNamed: "doc.text.magnifyingglass") == nil)
+    @Test("the post-sequential checks ship on their SF symbols until their glyphs land")
+    func postSequentialFallsBackToSFSymbol() {
+        let schedule = VerificationEngine().layers(for: .searchableRedaction)
+        for layer in schedule.dropFirst(10) {
+            let stored = result(for: layer, symbolName: layer.symbolName)
+            #expect(VerificationSymbol.assetName(for: stored) == nil, "\(layer)")
+            #expect(!VerificationSymbol.isCustom(stored))
+        }
+        #expect(VerificationLayer.searchRecheck.symbolName == "text.page.badge.magnifyingglass")
     }
 
-    @Test("the search re-check has no custom asset yet: identity-keyed lookup falls back to its SF symbol")
-    func searchRecheckFallsBackToSFSymbol() {
-        #expect(VerificationLayer.allCases[10] == .searchRecheck)
-        #expect(VerificationSymbol.assetName(forLayerNamed: VerificationLayer.searchRecheck.name) == nil)
-        // The detection sweep (the twelfth engine layer) rides its SF fallback the same way.
-        #expect(VerificationLayer.allCases[11] == .detectionSweep)
-        #expect(VerificationSymbol.assetName(forLayerNamed: VerificationLayer.detectionSweep.name) == nil)
-        let sweep = LayerResult(
-            name: VerificationLayer.detectionSweep.name,
-            symbolName: VerificationLayer.detectionSweep.symbolName,
-            status: .pass, shortDescription: "", detailDescription: "",
-            pageReferences: nil, durationSeconds: 0, layer: .detectionSweep)
-        #expect(VerificationSymbol.assetName(for: sweep) == nil)
-        #expect(sweep.symbolName == "rectangle.and.text.magnifyingglass")
-        let recheck = LayerResult(
-            name: VerificationLayer.searchRecheck.name,
-            symbolName: VerificationLayer.searchRecheck.symbolName,
-            status: .pass, shortDescription: "", detailDescription: "",
-            pageReferences: nil, durationSeconds: 0, layer: .searchRecheck)
-        #expect(VerificationSymbol.assetName(for: recheck) == nil)
-        #expect(recheck.symbolName == "text.page.badge.magnifyingglass")
-        // Identity outranks the stored name; a result without identity keys on its name.
+    @Test("identity outranks the stored name; a result without identity (the Page Count gate row) keeps its SF symbol")
+    func identityKeyedLookup() {
+        // A stamped identity routes regardless of the stored name.
         let stamped = LayerResult(
             name: "Legacy Name", symbolName: "x", status: .pass, shortDescription: "",
             detailDescription: "", pageReferences: nil, durationSeconds: 0, layer: .ocrCheck)
         #expect(VerificationSymbol.assetName(for: stamped) == "resecta.verify.layer02")
-        let legacy = LayerResult(
-            name: "OCR Check", symbolName: "x", status: .pass, shortDescription: "",
-            detailDescription: "", pageReferences: nil, durationSeconds: 0)
-        #expect(VerificationSymbol.assetName(for: legacy) == "resecta.verify.layer02")
-        // The router still maps exactly the ten custom assets (pin unchanged).
-        #expect(VerificationSymbol.layerAssets.count == 10)
+        // No identity, no asset — even when the name matches a layer's.
+        let gateRow = LayerResult(
+            name: "OCR Check", symbolName: "doc.text.magnifyingglass", status: .pass,
+            shortDescription: "", detailDescription: "", pageReferences: nil, durationSeconds: 0)
+        #expect(gateRow.layer == nil)
+        #expect(VerificationSymbol.assetName(for: gateRow) == nil)
+        #expect(!VerificationSymbol.isCustom(gateRow))
     }
 
     @Test("mode glyphs route to the two custom mode assets")

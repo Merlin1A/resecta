@@ -10,8 +10,8 @@ import RedactionEngine
 // redacted; the counts of what they chose to leave lived solely in the
 // search sheet's coverage panel. These tests pin the run-entry snapshot
 // (`SearchState.deselectionSnapshotForRun()` →
-// `RedactionState.lastRunDeselection`), the results-screen row gates and
-// copy, and the Review affordance's routing preamble.
+// `RedactionState.LastRunInputs.deselection`), the results-screen row gates
+// and copy, and the Review affordance's routing preamble.
 
 @Suite("Deselection snapshot derivation", .tags(.search))
 @MainActor
@@ -69,30 +69,34 @@ struct DeselectionSnapshotDerivationTests {
 @MainActor
 struct DeselectionRecordLifecycleTests {
 
-    @Test("recordLastRunDeselection stores; clearOutput clears with the run inputs")
+    @Test("The run's deselection rides the run inputs; clearOutput clears it with them")
     func recordAndClear() {
         let redaction = RedactionState()
-        #expect(redaction.lastRunDeselection == nil)
+        #expect(redaction.lastRunInputs?.deselection == nil)
+        let snapshot = makeScanSession(total: 5, deselected: 2).deselectionSnapshotForRun()
+        #expect(snapshot?.deselectedCount == 2, "precondition")
 
-        redaction.recordLastRunDeselection(
-            .init(deselectedCount: 2, totalCount: 5))
-        #expect(redaction.lastRunDeselection
-            == .init(deselectedCount: 2, totalCount: 5))
+        redaction.recordLastRunInputs(.fixture(deselection: snapshot))
+        #expect(redaction.lastRunInputs?.deselection == snapshot)
+        #expect(redaction.lastRunInputs?.deselection?.deselectedCount == 2)
+        #expect(redaction.lastRunInputs?.deselection?.totalCount == 5)
 
         // The record describes the output that clearOutput discards.
         redaction.clearOutput()
-        #expect(redaction.lastRunDeselection == nil)
+        #expect(redaction.lastRunInputs?.deselection == nil)
     }
 
-    @Test("Recording nil clears a previous run's record")
+    @Test("A run recorded with no snapshot clears a previous run's record")
     func nilRecordOverwrites() {
         let redaction = RedactionState()
-        redaction.recordLastRunDeselection(
-            .init(deselectedCount: 1, totalCount: 3))
+        redaction.recordLastRunInputs(.fixture(
+            deselection: makeScanSession(total: 3, deselected: 1).deselectionSnapshotForRun()))
+        #expect(redaction.lastRunInputs?.deselection != nil, "precondition")
         // Next run starts with no live scan session: its nil record must
         // not leave the previous run's counts on screen.
-        redaction.recordLastRunDeselection(nil)
-        #expect(redaction.lastRunDeselection == nil)
+        redaction.recordLastRunInputs(.fixture(deselection: nil))
+        #expect(redaction.lastRunInputs != nil)
+        #expect(redaction.lastRunInputs?.deselection == nil)
     }
 }
 
@@ -107,8 +111,8 @@ struct DeselectionApplyCommitCaptureTests {
 
         _ = await redaction.applyFindings(.selectedSearchResults, undoManager: nil)
 
-        #expect(redaction.pendingRunDeselection
-            == .init(deselectedCount: 2, totalCount: 5))
+        #expect(redaction.pendingRunDeselection?.deselectedCount == 2)
+        #expect(redaction.pendingRunDeselection?.totalCount == 5)
     }
 
     @Test("A nil-activeSearch run entry still reads the apply-commit snapshot")
@@ -120,9 +124,9 @@ struct DeselectionApplyCommitCaptureTests {
         // Mirrors DocumentEditorView nil-ing `activeSearch` on sheet dismiss.
         redaction.activeSearch = nil
 
-        #expect(redaction.runEntryDeselectionSnapshot()
-            == .init(deselectedCount: 1, totalCount: 4),
-            "pipeline entry must still see the apply-commit snapshot with no live session")
+        let atEntry = redaction.runEntryDeselectionSnapshot()
+        #expect(atEntry?.deselectedCount == 1 && atEntry?.totalCount == 4,
+                "pipeline entry must still see the apply-commit snapshot with no live session")
     }
 
     @Test("Run entry prefers the pending snapshot over a live session's snapshot")
@@ -135,9 +139,9 @@ struct DeselectionApplyCommitCaptureTests {
         // the sheet and ran a fresh scan) without applying anything from it.
         redaction.activeSearch = makeScanSession(total: 3, deselected: 1)
 
-        #expect(redaction.runEntryDeselectionSnapshot()
-            == .init(deselectedCount: 2, totalCount: 5),
-            "the apply-commit snapshot wins over an unrelated live session")
+        let atEntry = redaction.runEntryDeselectionSnapshot()
+        #expect(atEntry?.deselectedCount == 2 && atEntry?.totalCount == 5,
+                "the apply-commit snapshot wins over an unrelated live session")
     }
 
     @Test("Run entry falls back to the live session when nothing is pending")
@@ -146,8 +150,8 @@ struct DeselectionApplyCommitCaptureTests {
         redaction.activeSearch = makeScanSession(total: 3, deselected: 1)
 
         #expect(redaction.pendingRunDeselection == nil)
-        #expect(redaction.runEntryDeselectionSnapshot()
-            == .init(deselectedCount: 1, totalCount: 3))
+        let atEntry = redaction.runEntryDeselectionSnapshot()
+        #expect(atEntry?.deselectedCount == 1 && atEntry?.totalCount == 3)
     }
 
     @Test("Last apply wins — a later apply overwrites the pending snapshot")
@@ -155,15 +159,15 @@ struct DeselectionApplyCommitCaptureTests {
         let redaction = RedactionState()
         redaction.activeSearch = makeScanSession(total: 5, deselected: 2)
         _ = await redaction.applyFindings(.selectedSearchResults, undoManager: nil)
-        #expect(redaction.pendingRunDeselection
-            == .init(deselectedCount: 2, totalCount: 5))
+        #expect(redaction.pendingRunDeselection?.deselectedCount == 2)
+        #expect(redaction.pendingRunDeselection?.totalCount == 5)
 
         redaction.activeSearch = makeScanSession(total: 6, deselected: 3)
         _ = await redaction.applyFindings(.selectedSearchResults, undoManager: nil)
 
-        #expect(redaction.pendingRunDeselection
-            == .init(deselectedCount: 3, totalCount: 6),
-            "the second apply's snapshot replaces the first — no accumulation")
+        #expect(redaction.pendingRunDeselection?.deselectedCount == 3)
+        #expect(redaction.pendingRunDeselection?.totalCount == 6,
+                "the second apply's snapshot replaces the first — no accumulation")
     }
 
     @Test("clearOutput() alone does not clear the pending snapshot — it survives a pipeline cancel/retry")
@@ -174,11 +178,11 @@ struct DeselectionApplyCommitCaptureTests {
 
         redaction.clearOutput()
 
-        #expect(redaction.pendingRunDeselection
-            == .init(deselectedCount: 2, totalCount: 5),
-            "a cancelled/failed run must not lose the apply-commit snapshot before a retry")
-        #expect(redaction.lastRunDeselection == nil,
-                "lastRunDeselection still clears — it describes the discarded run")
+        #expect(redaction.pendingRunDeselection?.deselectedCount == 2)
+        #expect(redaction.pendingRunDeselection?.totalCount == 5,
+                "a cancelled/failed run must not lose the apply-commit snapshot before a retry")
+        #expect(redaction.lastRunInputs == nil,
+                "the run inputs still clear — they describe the discarded run")
     }
 
     @Test("The pending snapshot does not leak past clearForNewDocument()")
@@ -217,10 +221,9 @@ struct DeselectionRowTests {
         // Plain `==` comparisons on named locals: `#expect(!call(.init(…)))`
         // trips a swift-testing macro-capture quirk (the call's value is
         // recorded as "<not evaluated>" and the expectation mis-reports).
-        let zeroDeselected = RedactionState.DeselectionSnapshot(
-            deselectedCount: 0, totalCount: 4)
-        let twoDeselected = RedactionState.DeselectionSnapshot(
-            deselectedCount: 2, totalCount: 5)
+        let zeroDeselected = makeScanSession(total: 4, deselected: 0).deselectionSnapshotForRun()
+        let twoDeselected = makeScanSession(total: 5, deselected: 2).deselectionSnapshotForRun()
+        #expect(zeroDeselected?.deselectedCount == 0 && twoDeselected?.deselectedCount == 2)
         #expect(VerificationResultsView.shouldShowDeselectionRow(
             snapshot: nil) == false)
         #expect(VerificationResultsView.shouldShowDeselectionRow(
