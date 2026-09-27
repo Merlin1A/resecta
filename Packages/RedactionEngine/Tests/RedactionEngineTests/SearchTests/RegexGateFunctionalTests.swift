@@ -78,8 +78,9 @@ struct RegexGateFunctionalTests {
         // unbounded group-quantifiers over alternation
         // (e.g. `(a|ab)*b`). Backreference traps and patterns whose
         // backtracking is catastrophic only inside a single match
-        // attempt are still left to the per-page 5s timeout exercised
-        // by `ReDoSFuzzTests`' payload-runtime test.
+        // attempt are left to the per-page 5 s timeout: the search path
+        // enumerates with `.reportProgress`, whose block runs during one
+        // long match attempt, so the budget stops it (`ReDoSFuzzTests`).
         let nestedQuantifiers = [
             "(a+)+b",
             "([a-z]+)*z",

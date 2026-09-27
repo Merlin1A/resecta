@@ -256,6 +256,54 @@
       "notes": "Length 1024.",
       "pattern_class": "catastrophic_anchored",
       "target_regex_shape": "^(a+)+$"
+    },
+    {
+      "attacker_input": "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima alpha bravo charlie delta echo foxtro",
+      "expected_behavior": "superlinear",
+      "id": "structured_wraparound_00",
+      "notes": "Word-space-word prose with no closing '!'; length 256.",
+      "pattern_class": "structured_wraparound",
+      "target_regex_shape": "(\\w+ \\w+)+!"
+    },
+    {
+      "attacker_input": "100.101.102.103.104.105.106.107.108.109.110.111.112.113.114.115.116.117.118.119.120.121.122.123.124.125.126.127.128.129.130.131.132.133.134.135.136.137.138.139.140.141.142.143.144.145.146.147.148.149.150.151.152.153.154.155.156.157.158.159.160.161.162.163.",
+      "expected_behavior": "superlinear",
+      "id": "structured_wraparound_01",
+      "notes": "Dotted digit groups with no closing 'x'; length 256.",
+      "pattern_class": "structured_wraparound",
+      "target_regex_shape": "(\\d+\\.\\d+)+x"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "bounded_alternation_00",
+      "notes": "Ambiguous alternation under an over-ceiling range; length 256.",
+      "pattern_class": "bounded_alternation",
+      "target_regex_shape": "(a|aa){0,1000}c"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "bounded_alternation_01",
+      "notes": "Duplicate alternation under a bounded range; length 256.",
+      "pattern_class": "bounded_alternation",
+      "target_regex_shape": "(a|a){1,25}c"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "bounded_composition_00",
+      "notes": "Variable bounded run under an over-ceiling range; length 256.",
+      "pattern_class": "bounded_composition",
+      "target_regex_shape": "(a{1,25}){1,40}c"
+    },
+    {
+      "attacker_input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_behavior": "superlinear",
+      "id": "adjacent_runs_00",
+      "notes": "Three adjacent runs over one character set; length 256.",
+      "pattern_class": "adjacent_runs",
+      "target_regex_shape": "\\w*\\w*\\w*!"
     }
   ],
   "seed": 20260416,
