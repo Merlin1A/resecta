@@ -227,7 +227,7 @@ concurrent entry points. The working rules, checkable by grep:
   queue for thumbnail-cache disk writes) and **zero** `.main.async` calls —
   main-thread work is expressed through actor isolation, not queue hops.
 - Isolation opt-outs are rare and deliberate: 24 `nonisolated(unsafe)`
-  declarations across ~65,000 lines of app + engine source, and the working
+  declarations across ~66,000 lines of app + engine source, and the working
   convention is a written rationale at the declaration site saying why the
   access is safe.
 - Long pixel operations (fills, readbacks) run in 256-row bands with a
@@ -326,7 +326,7 @@ detect, search, rebuild, verify and export without the app's view code:
 - Verification: `VerificationEngine.runLayer` / `aggregateStatus` /
   `layers(for:)` · `VerificationOrchestrator` · `VerificationReport` ·
   `LayerResult` · `VerificationLayer` · `AppliedSearchQuery` ·
-  `AppliedSearchRecord` · `SearchRecheckRequest`
+  `AppliedSearchRecord` · `ScanRunConfiguration` · `SearchRecheckRequest`
 - Export: `TempExportDirectory` · `TempFileHardening` · `ExportMetadata` ·
   `MatchAuditExporter`
 
