@@ -12,6 +12,13 @@ import PDFKit
 // loop is `OutputRecheck`, shared with the Search Re-check so the two rows
 // read one OCR pass per page.
 //
+// The category gate (ruled on the sweep-residual measurement over the
+// corpus): the structured families only — names and addresses are not
+// swept, by either origin.
+// On fully-applied output the detectors re-read names at a rate no user
+// could act on (three quarters of the residual), while the structured
+// families sit at a median of zero. The row's detail says so.
+//
 // Tier: PASS when nothing further remains (a detail sentence when the
 // remaining items are exactly the ones left unredacted), INFO with page
 // chips when something further remains, WARN could-not-verify for pages
@@ -31,6 +38,20 @@ struct DetectionSweep: Sendable {
     static let detailLeadApplied = "Detection Sweep re-ran your scan on the output through the detectors."
     static let detailLeadAppliedAndSweep = "Detection Sweep re-ran your scan on the output through the detectors and ran every detector for items outside its categories."
     static let detailLeadSweep = "Detection Sweep ran every detector on the output."
+
+    /// The categories the sweep and the scan re-run read on the output: the
+    /// structured families. Names and addresses are not swept.
+    static let gatedCategories: Set<PIICategory> =
+        Set(PIICategory.allCases).subtracting([.name, .address])
+
+    /// Whether a remaining item counts: an always-flag hit (no category)
+    /// does; a detector hit counts by its category's gate.
+    static func isSwept(_ category: PIICategory?) -> Bool {
+        category.map { gatedCategories.contains($0) } ?? true
+    }
+
+    /// The detail sentence that says what the gate leaves out.
+    static let gateSentence = "Names and addresses are not swept."
 
     /// A deselected item subtracts one remaining item on the same page and
     /// category whose rect overlaps it by at least this intersection over
@@ -133,8 +154,12 @@ struct DetectionSweep: Sendable {
                     pageRefused = true
                     continue
                 }
-                rawRemainingByRequest[requestIndex] += count.remaining
-                itemsByRequest[requestIndex].append(contentsOf: count.items)
+                // The gate: only swept categories count (the runner already
+                // reads only those; a caller-built observation is filtered
+                // the same way).
+                let swept = count.items.filter { isSwept($0.category) }
+                rawRemainingByRequest[requestIndex] += count.items.isEmpty ? count.remaining : swept.count
+                itemsByRequest[requestIndex].append(contentsOf: swept)
                 if count.hitCap { pageHitCap = true }
                 if pageWasRead {
                     if observation.route == .textLayer {
@@ -213,6 +238,9 @@ struct DetectionSweep: Sendable {
         let uncheckedPages = uncheckedClauses.keys.sorted()
 
         // Copy pieces.
+        func joined(_ parts: [String]) -> String {
+            parts.filter { !$0.isEmpty }.joined(separator: " ")
+        }
         let lead = hasApplied ? "Re-ran your scan on the output" : "Ran the detectors on the output"
         let leadSentence: String
         switch (hasApplied, hasSweep) {
@@ -220,7 +248,7 @@ struct DetectionSweep: Sendable {
         case (true, false): leadSentence = detailLeadApplied
         default: leadSentence = detailLeadSweep
         }
-        let routeSentence = SearchRecheck.routeSentence(textPages: textPages, ocrPages: ocrPages)
+        let routeSentence = joined([SearchRecheck.routeSentence(textPages: textPages, ocrPages: ocrPages), gateSentence])
         let furtherPageList = furtherPages.map { String($0 + 1) }.joined(separator: ", ")
         let onPages = "on \(pagePhrase(furtherPages, list: furtherPageList))"
         func remainWord(_ n: Int) -> String { n == 1 ? "remains" : "remain" }
@@ -235,10 +263,6 @@ struct DetectionSweep: Sendable {
         let uncheckedClause = k == 0
             ? ""
             : "\(k) \(k == 1 ? "page" : "pages") could not be checked: \(uncheckedList)"
-        func joined(_ parts: [String]) -> String {
-            parts.filter { !$0.isEmpty }.joined(separator: " ")
-        }
-
         // The "further" body: what remains beyond the items left unredacted.
         let hasFurther = further > 0 || possible > 0
         let furtherBody: String

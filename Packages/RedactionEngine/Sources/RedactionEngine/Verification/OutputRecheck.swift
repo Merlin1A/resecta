@@ -197,7 +197,13 @@ struct OutputRecheck: Sendable {
             // user's options. Every other option is the user's.
             var options = query.options
             options.includeOCR = true
-            let mode = AppliedSearchQuery(kind: query.kind, options: options).searchMode
+            // A scan re-runs through the category gate: the structured
+            // families only (`DetectionSweep.gatedCategories`).
+            var kind = query.kind
+            if case .piiScan(let categories) = kind {
+                kind = .piiScan(categories: categories.intersection(DetectionSweep.gatedCategories))
+            }
+            let mode = AppliedSearchQuery(kind: kind, options: options).searchMode
             // A Scan re-runs with the thresholds and user terms it ran with
             // (nil for a typed search — the searcher's own default). The
             // setters are actor calls that land before the stream starts.

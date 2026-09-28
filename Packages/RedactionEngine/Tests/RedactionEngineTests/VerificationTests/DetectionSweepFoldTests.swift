@@ -124,7 +124,7 @@ struct DetectionSweepFoldTests {
             requests: [applied([.ssn])], observations: [page(0, [0: []]), page(1, [0: []])], pageCount: 2)
         #expect(outcome.status == .pass)
         #expect(outcome.copyOverride?.short == "Re-ran your scan on the output — the detectors reported nothing further.")
-        #expect(outcome.copyOverride?.detail == "\(DetectionSweep.detailLeadApplied) Text was read from the output's text layer.")
+        #expect(outcome.copyOverride?.detail == "\(DetectionSweep.detailLeadApplied) Text was read from the output's text layer. \(DetectionSweep.gateSentence)")
         #expect(outcome.pageReferences == nil)
         #expect(outcome.reviewTermTexts == nil)
         let line = try? #require(outcome.queryLines?.first)
@@ -142,7 +142,7 @@ struct DetectionSweepFoldTests {
             requests: [sweep], observations: [page(0, route: .ocr, [0: []])], pageCount: 1)
         #expect(outcome.status == .pass)
         #expect(outcome.copyOverride?.short == "Ran the detectors on the output — nothing further reported.")
-        #expect(outcome.copyOverride?.detail == "\(DetectionSweep.detailLeadSweep) Text was read by OCR from the rendered pages.")
+        #expect(outcome.copyOverride?.detail == "\(DetectionSweep.detailLeadSweep) Text was read by OCR from the rendered pages. \(DetectionSweep.gateSentence)")
         #expect(outcome.queryLines?.first?.label == "Scan (\(PIICategory.allCases.count) detectors)")
         #expect(outcome.queryLines?.first?.route == .ocr)
     }
@@ -165,17 +165,17 @@ struct DetectionSweepFoldTests {
         #expect(line?.perTerm?.map(\.term) == ["Email", "Phone", "SSN"], "per category, by name")
         #expect(line?.perTerm?.map(\.remaining) == [1, 1, 1])
         #expect(outcome.copyOverride?.short == message(outcome.status), "INFO carries the layer's own copy: the short line is the status")
-        #expect(outcome.copyOverride?.detail == "\(DetectionSweep.detailLeadSweep) Text was read from the output's text layer. 3 possible items remain on 2 pages: 2, 5.")
+        #expect(outcome.copyOverride?.detail == "\(DetectionSweep.detailLeadSweep) Text was read from the output's text layer. \(DetectionSweep.gateSentence) 3 possible items remain on 2 pages: 2, 5.")
     }
 
     @Test("INFO: an applied scan beside the sweep splits in-scope and out-of-scope; both sub-lines")
     func infoSplitInAndOutOfScope() {
         let left = rect(0.5, 0.5)
         let outcome = DetectionSweep.fold(
-            requests: [applied([.ssn, .name], deselected: [result(0, .ssn, left)]), sweep],
+            requests: [applied([.ssn, .dateOfBirth], deselected: [result(0, .ssn, left)]), sweep],
             observations: [
-                page(0, [0: [item(0, .ssn, left), item(0, .name, rect(0.1, 0.1))],
-                         1: [item(0, .ssn, left), item(0, .name, rect(0.1, 0.1)), item(0, .email, rect(0.1, 0.8))]]),
+                page(0, [0: [item(0, .ssn, left), item(0, .dateOfBirth, rect(0.1, 0.1))],
+                         1: [item(0, .ssn, left), item(0, .dateOfBirth, rect(0.1, 0.1)), item(0, .email, rect(0.1, 0.8))]]),
                 page(2, [0: [], 1: [item(2, .phone, rect(0.1, 0.1))]]),
             ], pageCount: 3)
         #expect(outcome.status.isInfo, "got \(outcome.status)")
@@ -185,7 +185,7 @@ struct DetectionSweepFoldTests {
         #expect(outcome.pageReferences == [0, 2])
         #expect(outcome.queryLines?.count == 2)
         #expect(outcome.queryLines?[0].remainingCount == 2)
-        #expect(outcome.queryLines?[0].perTerm?.map(\.term) == ["Name", "SSN"])
+        #expect(outcome.queryLines?[0].perTerm?.map(\.term) == ["Date of Birth", "SSN"])
         #expect(outcome.queryLines?[1].remainingCount == 2, "the sweep line counts the out-of-scope items")
         #expect(outcome.queryLines?[1].perTerm?.map(\.term) == ["Email", "Phone"])
         for line in outcome.queryLines ?? [] {
@@ -239,6 +239,33 @@ struct DetectionSweepFoldTests {
         #expect(outcome.pageReferences == nil)
     }
 
+    // MARK: - The category gate
+
+    @Test("The gate: the structured families only; names and addresses never count, by either origin; the detail says so")
+    func categoryGate() {
+        #expect(DetectionSweep.gatedCategories == Set(PIICategory.allCases).subtracting([.name, .address]))
+        #expect(!DetectionSweep.gatedCategories.contains(.name))
+        #expect(!DetectionSweep.gatedCategories.contains(.address))
+        #expect(DetectionSweep.isSwept(nil), "an always-flag hit counts")
+        #expect(DetectionSweep.isSwept(.ssn) && !DetectionSweep.isSwept(.name) && !DetectionSweep.isSwept(.address))
+        let outcome = DetectionSweep.fold(
+            requests: [applied([.ssn, .name, .address]), sweep],
+            observations: [page(0, [0: [item(0, .name, rect(0.1, 0.1)), item(0, .address, rect(0.1, 0.2))],
+                                    1: [item(0, .name, rect(0.1, 0.1)), item(0, .address, rect(0.1, 0.2)), item(0, nil, rect(0.1, 0.3), text: "ACME")]])],
+            pageCount: 1)
+        // The names and the address vanish; the always-flag hit belongs to
+        // the applied scan (in scope), and an in-scope item of the SWEEP
+        // request is the re-run's to count, not the sweep's — nothing further.
+        #expect(outcome.status == .pass, "got \(outcome.status)")
+        #expect(outcome.queryLines?[0].remainingCount == 0, "the applied scan's names and address do not count")
+        #expect(outcome.queryLines?[1].remainingCount == 0, "the sweep's out-of-scope count carries no name or address")
+        #expect(outcome.copyOverride?.detail.contains(DetectionSweep.gateSentence) == true)
+        let clean = DetectionSweep.fold(
+            requests: [applied([.name])], observations: [page(0, [0: [item(0, .name, rect(0.1, 0.1))]])], pageCount: 1)
+        #expect(clean.status == .pass, "a name-only scan re-run reads nothing it counts; got \(clean.status)")
+        #expect(clean.copyOverride?.detail.hasSuffix(DetectionSweep.gateSentence) == true)
+    }
+
     // MARK: - Invariants
 
     @Test("Never ATTENTION and never a term text in a status message, over random observations")
@@ -277,7 +304,8 @@ struct DetectionSweepFoldTests {
             #expect(!outcome.status.isAttention)
             #expect(!outcome.status.isFail)
             #expect(outcome.reviewTermTexts == nil)
-            let text = message(outcome.status) + (outcome.copyOverride?.short ?? "") + (outcome.copyOverride?.detail ?? "")
+            let text = (message(outcome.status) + (outcome.copyOverride?.short ?? "") + (outcome.copyOverride?.detail ?? ""))
+                .replacingOccurrences(of: DetectionSweep.gateSentence, with: "")
             #expect(!text.contains("SECRET-"), "status copy never carries matched text")
             for category in categories {
                 #expect(!text.contains(category.rawValue), "status copy never names a category")

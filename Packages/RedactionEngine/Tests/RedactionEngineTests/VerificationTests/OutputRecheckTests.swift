@@ -97,6 +97,18 @@ struct OutputRecheckTests {
         #expect(page.counts[0]?.items.first?.category == nil, "an always-flag hit has no detector category")
     }
 
+    @Test("The category gate: a scan re-run reads the structured families only; a name on the page is never an item")
+    func categoryGateInTheRunner() async throws {
+        let doc = try output(["Patient John Smith SSN 123-45-6789 on file"])
+        let observations = try await OutputRecheck().observe(
+            outputDocument: doc, requests: [scanRequest([.ssn, .name], ssnCutoff: nil), scanRequest([.name], ssnCutoff: nil, origin: .sweep)])
+        let page = try #require(observations.first)
+        let both = try #require(page.counts[0])
+        #expect(both.items.allSatisfy { $0.category != .name }, "names are not swept")
+        #expect(both.items.contains { $0.category == .ssn }, "the SSN is")
+        #expect(page.counts[1]?.remaining == 0, "a names-only sweep request reads nothing")
+    }
+
     @Test("Observations keyed by the whole request list re-key to a subset in the subset's order")
     func restrictionRekeys() {
         let full = RecheckObservation(
