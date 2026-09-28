@@ -40,8 +40,9 @@ struct EnginePublicSurfaceTests {
             SearchOptions.self,
             SearchResult.self,
             SearchPreviewResult.self,
+            TextSpan.self,
         ]
-        #expect(types.count == 22)
+        #expect(types.count == 23)
         #expect(DocumentSearcher.maxResults > 0)
         #expect(DocumentSearcher.validateRegexPattern("[a-z]+") != nil)
     }
@@ -72,6 +73,8 @@ struct EnginePublicSurfaceTests {
             totalPageCount: 1, pageTextProvider: { _ in nil }
         )
         _ = searcher.boundingRect(for: NSRange(location: 0, length: 1), page: pdfPage)
+        _ = TextSpan.words(fullyInside: .zero, on: pdfPage)
+        _ = TextSpan.words(fullyInside: .zero, polygon: [], on: pdfPage)
         await searcher.setThresholdVector(nil)
         await searcher.setUserTerms(nil)
         await searcher.setOverlapSink(nil)
@@ -90,6 +93,11 @@ struct EnginePublicSurfaceTests {
             .textExtraction, outputDocument: document, sourcePageCount: 1, regions: [:],
             sensitiveTerms: [], pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: []
+        )
+        _ = await engine.runLayer(
+            .binaryStringSearch, outputDocument: document, sourcePageCount: 1, regions: [:],
+            sensitiveTerms: [], pipelineMode: .searchableRedaction,
+            filterDigests: [], perPageModes: [], manualRegionsWithoutText: 1
         )
         _ = await engine.runLayer(
             .detectionSweep, outputDocument: document, sourcePageCount: 1, regions: [:],

@@ -231,7 +231,7 @@ concurrent entry points. The working rules, checkable by grep:
 - The app target contains **one** `DispatchQueue` reference (a labeled serial
   queue for thumbnail-cache disk writes) and **zero** `.main.async` calls —
   main-thread work is expressed through actor isolation, not queue hops.
-- Isolation opt-outs are rare and deliberate: 24 `nonisolated(unsafe)`
+- Isolation opt-outs are rare and deliberate: 25 `nonisolated(unsafe)`
   declarations across ~66,000 lines of app + engine source, and the working
   convention is a written rationale at the declaration site saying why the
   access is safe.
@@ -326,7 +326,9 @@ detect, search, rebuild, verify and export without the app's view code:
 - Search: `DocumentSearcher` (`search` · `previewMatches` · the result and
   diagnostic sink setters · `boundingRect` · the regex validators ·
   `maxResults` · `sharedLoadDiagnostics`) · `SearchMode` · `SearchOptions` ·
-  `SearchResult` · `SearchPreviewResult`
+  `SearchResult` · `SearchPreviewResult` · `TextSpan` (`words(fullyInside:on:)` — the
+  words of a page's text layer inside a region, in the displayed frame; the
+  verification run captures a manual region's words through it)
 - Rebuild: `PDFStreamReconstructor`
 - Verification: `VerificationEngine.runLayer` / `aggregateStatus` /
   `layers(for:)` · `VerificationOrchestrator` · `VerificationReport` ·

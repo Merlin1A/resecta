@@ -89,4 +89,17 @@ struct Layer2TermBoundaryTests {
         #expect(legacy == .sensitiveTermOutsideRegions,
                 "bare-string terms keep the pre-model substring behavior — got \(legacy)")
     }
+
+    @Test("A manual-captured token (boundary-required): an OCR word embedding it stays quiet; the standalone word signals")
+    func manualCapturedToken_boundaryGate() {
+        let captured = [SensitiveTerm(text: "Smith", requiresTokenBoundary: true)]
+        let embedded = VerificationEngine.classifyPageOCR(
+            hits: [Self.hit("Smithsonian Institution", box: Self.outsideBox)],
+            pageRegions: [Self.pageRegion], sensitiveTerms: captured)
+        #expect(embedded == .textOutsideRegionsOnly, "got \(embedded)")
+        let standalone = VerificationEngine.classifyPageOCR(
+            hits: [Self.hit("Dr Smith attended", box: Self.outsideBox)],
+            pageRegions: [Self.pageRegion], sensitiveTerms: captured)
+        #expect(standalone != .textOutsideRegionsOnly, "got \(standalone)")
+    }
 }

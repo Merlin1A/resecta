@@ -15,14 +15,14 @@ struct VerificationEngineTests {
     @Test("Secure Rasterization has 7 layers, Searchable has 12")
     func layerCounts() {
         let engine = VerificationEngine()
-        #expect(engine.layerCount(for: .secureRasterization) == 7)
-        #expect(engine.layerCount(for: .searchableRedaction) == 12)
+        #expect(engine.layers(for: .secureRasterization).count == 7)
+        #expect(engine.layers(for: .searchableRedaction).count == 12)
         // The two post-sequential checks close both orders.
         #expect(engine.layers(for: .searchableRedaction).suffix(2) == [.searchRecheck, .detectionSweep])
-        #expect(engine.layerName(at: 10, mode: .searchableRedaction) == "Search Re-check")
-        #expect(engine.layerName(at: 11, mode: .searchableRedaction) == "Detection Sweep")
-        #expect(engine.layerName(at: 5, mode: .secureRasterization) == "Search Re-check")
-        #expect(engine.layerName(at: 6, mode: .secureRasterization) == "Detection Sweep")
+        #expect(engine.layers(for: .searchableRedaction)[10].name == "Search Re-check")
+        #expect(engine.layers(for: .searchableRedaction)[11].name == "Detection Sweep")
+        #expect(engine.layers(for: .secureRasterization)[5].name == "Search Re-check")
+        #expect(engine.layers(for: .secureRasterization)[6].name == "Detection Sweep")
     }
 
     // MARK: - Layer Names and Symbols
@@ -31,7 +31,7 @@ struct VerificationEngineTests {
     func layerNamesAndSymbols() {
         let engine = VerificationEngine()
         let layers = engine.layers(for: .searchableRedaction)
-        for i in 0..<engine.layerCount(for: .searchableRedaction) {
+        for i in 0..<engine.layers(for: .searchableRedaction).count {
             #expect(!layers[i].name.isEmpty)
             #expect(!layers[i].symbolName.isEmpty)
         }
@@ -816,7 +816,7 @@ struct VerificationEngineTests {
     func allLayerSymbolsNonEmpty(mode: PipelineMode) {
         let engine = VerificationEngine()
         let layers = engine.layers(for: mode)
-        #expect(layers.count == engine.layerCount(for: mode))
+        #expect(layers.count == engine.layers(for: mode).count)
         for (i, layer) in layers.enumerated() {
             #expect(!layer.symbolName.isEmpty,
                     "Layer \(i) symbol should be non-empty for \(mode)")

@@ -269,6 +269,7 @@ extension RedactionState.LastRunInputs {
         perPageModes: [PipelineMode] = [.secureRasterization],
         perPageFallbackReasons: [TextLayerDetector.FallbackReason?]? = nil,
         sensitiveTerms: [SensitiveTerm] = [],
+        manualRegionsWithoutText: Int = 0,
         appliedSearches: [SearchRecheckRequest] = [],
         deselection: RedactionState.DeselectionSnapshot? = nil,
         ocrSkippedPages: Set<Int> = [],
@@ -278,7 +279,8 @@ extension RedactionState.LastRunInputs {
             perPageModes: perPageModes,
             perPageFallbackReasons: perPageFallbackReasons
                 ?? Array(repeating: nil, count: perPageModes.count),
-            sensitiveTerms: sensitiveTerms,
+            sensitiveTerms: SensitiveTermSet(
+                terms: sensitiveTerms, manualRegionsWithoutText: manualRegionsWithoutText),
             appliedSearches: appliedSearches,
             deselection: deselection,
             ocrSkippedPages: ocrSkippedPages,

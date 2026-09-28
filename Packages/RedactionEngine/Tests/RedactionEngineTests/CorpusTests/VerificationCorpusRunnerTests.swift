@@ -163,7 +163,14 @@ struct VerificationCorpusRunnerTests {
             return "no effective regions after the floor"
         }
 
-        let terms = input.termsOverride ?? sensitiveTerms(for: input.regionSet.seeds)
+        // The manual regions (the value-less seeds) add their captured words
+        // on rich pages and are counted on every other page — the app's
+        // run-entry rule, mirrored in `manualRegionTerms`.
+        let manual = manualRegionTerms(
+            seeds: input.regionSet.seeds, doc: doc, polygon: input.regionSet.polygon,
+            textLayerStatus: status)
+        let terms = mergeTerms(
+            input.termsOverride ?? sensitiveTerms(for: input.regionSet.seeds), manual.terms)
 
         // --- Redaction (or verify-only passthrough) ---
         let clock = ContinuousClock()
@@ -215,7 +222,8 @@ struct VerificationCorpusRunnerTests {
                 filterDigests: outcome.filterDigests,
                 perPageModes: outcome.perPageModes,
                 perPageFallbackReasons: outcome.perPageFallbackReasons,
-                appliedSearches: appliedSearches)
+                appliedSearches: appliedSearches,
+                manualRegionsWithoutText: manual.regionsWithoutText)
             try report.jsonData().write(
                 to: URL(fileURLWithPath: "\(cellDir)/report-run-\(sweep).json"),
                 options: .atomic)
