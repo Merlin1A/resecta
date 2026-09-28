@@ -259,3 +259,29 @@ func withUndoGroup(_ mgr: UndoManager, _ body: () -> Void) {
     body()
     mgr.endUndoGrouping()
 }
+
+// MARK: - Last-run inputs fixture
+
+extension RedactionState.LastRunInputs {
+    /// The run inputs with every field defaulted to the empty run; the
+    /// fallback reasons default to one nil per page.
+    static func fixture(
+        perPageModes: [PipelineMode] = [.secureRasterization],
+        perPageFallbackReasons: [TextLayerDetector.FallbackReason?]? = nil,
+        sensitiveTerms: [SensitiveTerm] = [],
+        appliedSearches: [SearchRecheckRequest] = [],
+        deselection: RedactionState.DeselectionSnapshot? = nil,
+        ocrSkippedPages: Set<Int> = [],
+        degradeFailures: [String]? = nil
+    ) -> RedactionState.LastRunInputs {
+        RedactionState.LastRunInputs(
+            perPageModes: perPageModes,
+            perPageFallbackReasons: perPageFallbackReasons
+                ?? Array(repeating: nil, count: perPageModes.count),
+            sensitiveTerms: sensitiveTerms,
+            appliedSearches: appliedSearches,
+            deselection: deselection,
+            ocrSkippedPages: ocrSkippedPages,
+            degradeFailures: degradeFailures)
+    }
+}

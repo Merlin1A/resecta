@@ -430,11 +430,31 @@ struct CollectSensitiveTermsScopingTests {
     }
 
     /// Rationale carried by detector / user-term search rows (typed rows
-    /// carry none) — the term-insert discriminator.
+    /// carry none).
     private func detectorRationale(_ ruleID: String = "pii.name") -> MatchRationale {
         MatchRationale(
             ruleID: ruleID, signals: [],
             preThresholdScore: 0.9, finalScore: 0.9, appliedThreshold: 0.5)
+    }
+
+    /// The audit entry the apply seam stamps on a search-origin region:
+    /// the row's term and matched text, plus the session's applied-search
+    /// record — the ONE source of "what the user typed".
+    private func searchAudit(
+        for region: RedactionRegion, matched: String, term: String,
+        record: AppliedSearchRecord?
+    ) -> MatchAuditSnapshot {
+        MatchAuditSnapshot(
+            origin: .search, resultID: UUID(), regionID: region.id,
+            pageIndex: 0, matchedText: matched, source: .textLayer,
+            piiCategory: nil, piiConfidence: nil, rationale: nil,
+            term: term, appliedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            searchRecord: record)
+    }
+
+    private func record(_ kind: AppliedSearchQuery.Kind) -> AppliedSearchRecord {
+        AppliedSearchRecord(
+            query: AppliedSearchQuery(kind: kind, options: SearchOptions()), foundCount: 1)
     }
 
     /// text → requiresTokenBoundary, for assertion convenience.
@@ -467,9 +487,30 @@ struct CollectSensitiveTermsScopingTests {
         let terms = termTable(coord.collectSensitiveTerms())
         #expect(terms["Delia Hartwell"] == false)  // multi-word name: plain substring
         #expect(terms["4100773265"] == false)      // non-name single token: plain
-        #expect(terms["Wrenfield"] == false)       // typed search term kept
+        #expect(terms["Wrenfield"] == false)       // the matched text of the typed row
         #expect(terms["Hartwell"] == true)         // single-word name: boundary-matched
         #expect(terms["999-00-1234"] == nil)       // deselected detection not hunted
+    }
+
+    @Test("collectSensitiveTerms reads the record the apply seam stamped: the query as typed joins the matched text")
+    func collectorReadsTheAppliedRecord() async {
+        let coord = makeCoordinator()
+        let search = SearchState()
+        search.searchModeType = .text
+        search.queryText = "wren"
+        search.results = [
+            SearchResult(
+                pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.05),
+                matchedText: "Wrenfield", contextSnippet: "…Wrenfield…", source: .textLayer,
+                term: "wren", isSelected: true),
+        ]
+        coord.redactionState.activeSearch = search
+        let outcome = await coord.redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
+        #expect(outcome?.applied == 1)
+
+        let terms = termTable(coord.collectSensitiveTerms())
+        #expect(terms["wren"] == false, "the query as typed, from the stamped record")
+        #expect(terms["Wrenfield"] == false, "the matched text")
     }
 
     @Test("Pure seam keeps a single-word name token with the boundary requirement")
@@ -477,20 +518,79 @@ struct CollectSensitiveTermsScopingTests {
         let name = seededRegion(.detectedPII(kind: .name))
         let terms = PipelineCoordinator.sensitiveTerms(
             fromAppliedRegions: [0: [name]],
-            metadata: [name.id: .mock(piiKind: .pii(.name), matchedText: "Solo")])
+            metadata: [name.id: .mock(piiKind: .pii(.name), matchedText: "Solo")],
+            audit: [:])
         #expect(terms == [SensitiveTerm(text: "Solo", requiresTokenBoundary: true)])
+    }
+
+    // MARK: - The typed term comes from the record, per kind
+
+    @Test("A text record contributes the query as typed, beside the matched text")
+    func textRecordContributesQuery() {
+        let region = seededRegion(.searchMatch(term: "wren"))
+        let terms = termTable(PipelineCoordinator.sensitiveTerms(
+            fromAppliedRegions: [0: [region]],
+            metadata: [region.id: .mock(piiKind: .searchMatch(term: "wren"), matchedText: "Wrenfield")],
+            audit: [region.id: searchAudit(
+                for: region, matched: "Wrenfield", term: "wren", record: record(.text("wren")))]))
+        #expect(terms["wren"] == false, "the query as typed, plain substring")
+        #expect(terms["Wrenfield"] == false, "the matched text")
+        #expect(terms.count == 2)
+    }
+
+    @Test("A multi-term record contributes the row's own term")
+    func multiTermRecordContributesRowTerm() {
+        let region = seededRegion(.searchMatch(term: "beta"))
+        let terms = termTable(PipelineCoordinator.sensitiveTerms(
+            fromAppliedRegions: [0: [region]],
+            metadata: [region.id: .mock(piiKind: .searchMatch(term: "beta"), matchedText: "Beta-9")],
+            audit: [region.id: searchAudit(
+                for: region, matched: "Beta-9", term: "beta",
+                record: record(.multiTerm(["alpha", "beta", "gamma"])))]))
+        #expect(terms["beta"] == false, "the row's term, not the whole list")
+        #expect(terms["alpha"] == nil)
+        #expect(terms["gamma"] == nil)
+        #expect(terms["Beta-9"] == false)
+    }
+
+    @Test("A regex record contributes nothing beyond the matched text — the pattern is not document content")
+    func regexRecordContributesNoPattern() {
+        let pattern = #"\d{3}-\d{2}"#
+        let region = seededRegion(.searchMatch(term: pattern))
+        let terms = termTable(PipelineCoordinator.sensitiveTerms(
+            fromAppliedRegions: [0: [region]],
+            metadata: [region.id: .mock(piiKind: .searchMatch(term: pattern), matchedText: "123-45")],
+            audit: [region.id: searchAudit(
+                for: region, matched: "123-45", term: pattern, record: record(.regex(pattern)))]))
+        #expect(terms[pattern] == nil, "the pattern string must not become a literal term")
+        #expect(terms["123-45"] == false)
+        #expect(terms.count == 1)
+    }
+
+    @Test("A search-origin region with no record contributes only its matched text — nothing is inferred from absent fields")
+    func noRecordNoInference() {
+        // A nudge-accepted row: search origin, no stamped record. The label
+        // in `source` is not a typed query and stays out.
+        let region = seededRegion(.searchMatch(term: "Name", rationale: nil))
+        let terms = termTable(PipelineCoordinator.sensitiveTerms(
+            fromAppliedRegions: [0: [region]],
+            metadata: [region.id: .mock(piiKind: .searchMatch(term: "Name"), matchedText: "Delia Hartwell")],
+            audit: [:]))
+        #expect(terms["Name"] == nil)
+        #expect(terms["Delia Hartwell"] == false)
     }
 
     @Test("piiScan region: category label stays out; matched text carries the terms")
     func piiScanLabelExcluded() {
-        // After the stamp, a piiScan-applied region's metadata carries
-        // .pii(category) while its Source keeps the label as `term` — the
-        // label ("Name") must not become a sensitive term.
+        // A piiScan-applied region's metadata carries .pii(category) while
+        // its Source keeps the label as `term` — the label ("Name") must not
+        // become a sensitive term. No record names it as a typed query.
         let region = seededRegion(
             .searchMatch(term: "Name", rationale: detectorRationale()))
         let terms = termTable(PipelineCoordinator.sensitiveTerms(
             fromAppliedRegions: [0: [region]],
-            metadata: [region.id: .mock(piiKind: .pii(.name), matchedText: "DELIA")]))
+            metadata: [region.id: .mock(piiKind: .pii(.name), matchedText: "DELIA")],
+            audit: [:]))
         #expect(terms["Name"] == nil, "category label must not enter the term set")
         #expect(terms["DELIA"] == true, "single-token name matched text carries the boundary flag")
     }
@@ -505,16 +605,17 @@ struct CollectSensitiveTermsScopingTests {
         let terms = termTable(PipelineCoordinator.sensitiveTerms(
             fromAppliedRegions: [0: [region]],
             metadata: [region.id: .mock(
-                piiKind: .searchMatch(term: "Custom"), matchedText: "ACME-4471")]))
+                piiKind: .searchMatch(term: "Custom"), matchedText: "ACME-4471")],
+            audit: [:]))
         #expect(terms["Custom"] == nil, "placeholder term must not enter the term set")
         #expect(terms["ACME-4471"] == false)
     }
 
     @Test("Typed query text also matched as a single-token name keeps substring matching")
     func dedupKeepsLeastRestrictiveDiscipline() {
-        // The user explicitly searched for "Delia" (typed row) AND a piiScan
-        // name region matched the same text: the typed contribution wins —
-        // plain substring matching.
+        // The user explicitly searched for "Delia" (a text record) AND a
+        // piiScan name region matched the same text: the typed contribution
+        // wins — plain substring matching.
         let typed = seededRegion(.searchMatch(term: "Delia"))
         let scanned = seededRegion(
             .searchMatch(term: "Name", rationale: detectorRationale()))
@@ -523,7 +624,9 @@ struct CollectSensitiveTermsScopingTests {
             metadata: [
                 typed.id: .mock(piiKind: .searchMatch(term: "Delia"), matchedText: "Delia"),
                 scanned.id: .mock(piiKind: .pii(.name), matchedText: "Delia"),
-            ]))
+            ],
+            audit: [typed.id: searchAudit(
+                for: typed, matched: "Delia", term: "Delia", record: record(.text("Delia")))]))
         #expect(terms["Delia"] == false)
     }
 

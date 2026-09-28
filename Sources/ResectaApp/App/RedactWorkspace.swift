@@ -11,7 +11,7 @@ final class RedactWorkspace {
     let redactionState: RedactionState
     let coordinator: PipelineCoordinator
 
-    init(settingsState: SettingsState) {
+    init(settingsState: SettingsState, userTermsStore: UserTermsStore) {
         let doc = DocumentState()
         let red = RedactionState()
         // Hydrate the persisted triage priors at
@@ -23,7 +23,8 @@ final class RedactWorkspace {
         self.documentState = doc
         self.redactionState = red
         self.coordinator = PipelineCoordinator(
-            documentState: doc, redactionState: red, settingsState: settingsState
+            documentState: doc, redactionState: red, settingsState: settingsState,
+            userTermsStore: userTermsStore
         )
     }
 

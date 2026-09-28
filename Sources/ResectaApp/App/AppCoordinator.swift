@@ -25,9 +25,11 @@ final class AppCoordinator {
     var activeWorkspace: ActiveWorkspace = .home
 
     private let settingsState: SettingsState
+    private let userTermsStore: UserTermsStore
 
-    init(settingsState: SettingsState) {
+    init(settingsState: SettingsState, userTermsStore: UserTermsStore) {
         self.settingsState = settingsState
+        self.userTermsStore = userTermsStore
     }
 
     /// The open workspace's temporary session directory — the orphan sweep
@@ -41,14 +43,14 @@ final class AppCoordinator {
 
     func openRedact() {
         tearDownCurrentWorkspace()
-        activeWorkspace = .redact(RedactWorkspace(settingsState: settingsState))
+        activeWorkspace = .redact(RedactWorkspace(settingsState: settingsState, userTermsStore: userTermsStore))
     }
 
     /// Creates a RedactWorkspace, transitions to it, and begins importing the document.
     /// Workspace transition is synchronous; import runs asynchronously after.
     func openRedactWithDocument(url: URL) async {
         tearDownCurrentWorkspace()
-        let workspace = RedactWorkspace(settingsState: settingsState)
+        let workspace = RedactWorkspace(settingsState: settingsState, userTermsStore: userTermsStore)
         activeWorkspace = .redact(workspace)
         // Paranoid mode enables the LivePhotoAuxStripper hook on the import path.
         await ImportService.importDocument(

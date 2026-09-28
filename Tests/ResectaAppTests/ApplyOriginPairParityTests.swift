@@ -4,9 +4,9 @@ import CoreGraphics
 import RedactionEngine
 @testable import ResectaApp
 
-// Characterisation pin for the three detection origins of
-// `RedactionState.applyFindings` — the staged review, an entity group,
-// a raw detection map. Every region they create carries a
+// Characterisation pin for the two detection origins of
+// `RedactionState.applyFindings` — the staged review and an entity
+// group. Every region they create carries a
 // `RegionMetadata` + `MatchAuditSnapshot` pair; this suite pins each
 // pair's field values against the construction the origins used before
 // the pair was built in one place — `RegionMetadata(piiKind:confidence:
@@ -88,21 +88,6 @@ struct ApplyOriginPairParityTests {
         id: id(19), category: .name, canonicalText: "jane doe",
         pages: [0, 2], detectionIDs: [id(11), id(12), id(14)])
     private static let groupAmbiguous: Set<UUID> = [id(12)]
-
-    /// The raw detection map: three applied, one signature candidate
-    /// routed to the review.
-    private static let map: [Int: [DetectionResult]] = [
-        0: [
-            detection(21, page: 0, kind: .pii(.ssn), text: "123-45-6789", confidence: 0.92),
-            detection(22, page: 0, kind: .pii(.signatureCandidate), text: nil, confidence: 0.4),
-        ],
-        3: [
-            detection(23, page: 3, kind: .face, text: nil, confidence: 0.88),
-            detection(24, page: 3, kind: .pii(.phone), text: "555-0199",
-                      confidence: 0.71, level: .fast),
-        ],
-    ]
-    private static let mapAmbiguous: Set<UUID> = [id(23)]
 
     // MARK: - The pin
 
@@ -213,21 +198,6 @@ struct ApplyOriginPairParityTests {
         let pairs = pairs(in: state, from: Self.groupPending)
         pin(pairs, ambiguous: Self.groupAmbiguous, expectedIDs: [11, 12])
         Self.dump("entityGroup", pairs: pairs, outcome: outcome, remaining: state.pendingTriage)
-    }
-
-    @Test("Detection map: every applied detection's pair matches the per-detection construction")
-    func detectionMapPairs() async {
-        let state = RedactionState()
-        state.ambiguousSurnameDetectionIDs = Self.mapAmbiguous
-
-        let outcome = await state.applyFindings(.detectionResults(Self.map), undoManager: nil)
-
-        #expect(outcome?.applied == 3)
-        #expect(outcome?.signatureCandidates == 1)
-        #expect(state.pendingTriage?.values.flatMap { $0 }.map(\.id) == [Self.id(22)])
-        let pairs = pairs(in: state, from: Self.map)
-        pin(pairs, ambiguous: Self.mapAmbiguous, expectedIDs: [21, 23, 24])
-        Self.dump("detectionMap", pairs: pairs, outcome: outcome, remaining: state.pendingTriage)
     }
 
     // MARK: - The dump (opt-in; sorted keys; no dates; ordinal region ids)

@@ -64,7 +64,8 @@ shared types.
   search, verification, and audit subsystems.
 - **Verification** — Runs multi-layer output verification on redacted
   PDFs, executing byte-oriented pattern matching, OCR confidence checks,
-  and reconstruction layer checks to validate pixel destruction.
+  reconstruction layer checks, and a re-run of the applied searches and
+  the detectors on the output.
 
 ## Privacy contract
 

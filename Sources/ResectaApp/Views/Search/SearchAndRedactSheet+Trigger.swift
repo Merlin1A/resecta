@@ -279,6 +279,14 @@ extension SearchAndRedactSheet {
         if isPIIScan {
             searchState.lastRunDetectorCount = enabledCategories.count
         }
+        // The configuration this Scan runs with, kept on the session so the
+        // applied record reproduces the run (the blob, not the compiled
+        // index — the record is a value). Nil for a typed run.
+        searchState.lastRunScanConfiguration = isPIIScan
+            ? ScanRunConfiguration(
+                thresholdVector: thresholdVector,
+                alwaysFlag: userTerms.alwaysFlag, neverFlag: userTerms.neverFlag)
+            : nil
 
         // Degrade surface for the LIVE scan path. The
         // legacy detection pipeline surfaced its loader diagnostics via

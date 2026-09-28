@@ -498,6 +498,11 @@ struct LayerResultRow: View {
     /// query / pattern, or the multi-term form); the route is not
     /// repeated here — the layer's detail sentence carries it once.
     static func queryLineText(_ line: SearchRecheckQueryLine) -> String {
+        // The run's sweep: nothing was found or applied because nothing was
+        // an apply — the line says what the detectors observed instead.
+        if isSweepLine(line) {
+            return "\(line.label) · \(possibleItems(line.remainingCount))"
+        }
         let found = line.foundHitCap ? "1,000+" : String(line.foundCount)
         // A query the search engine refused to re-run (the regex safety
         // gate) has no remaining count: the line says so instead of
@@ -516,12 +521,45 @@ struct LayerResultRow: View {
     /// "found {n} · applied {m}" ahead of the remaining count when the
     /// record carries per-term counts. Empty for single-query lines.
     static func perTermLineTexts(_ line: SearchRecheckQueryLine) -> [String] {
-        (line.perTerm ?? []).map { term in
+        // A scan line's sub-lines are per detector category, named as the
+        // engine names them — not quoted like a typed term.
+        if isScanLine(line) {
+            let sweep = isSweepLine(line)
+            return (line.perTerm ?? []).map { category in
+                sweep
+                    ? "\(category.term) · \(possibleItems(category.remaining))"
+                    : "\(category.term) · \(category.remaining) remain"
+            }
+        }
+        return (line.perTerm ?? []).map { term in
             var text = "\u{201C}\(term.term)\u{201D}"
             if let found = term.found { text += " · found \(found)" }
             if let applied = term.applied { text += " · applied \(applied)" }
             text += " · \(term.remaining) remain"
             return text
+        }
+    }
+
+    /// A Detection Sweep line: the engine labels a scan query "Scan (N
+    /// detectors)"; a typed query's label is quoted, so the bare prefix
+    /// identifies the scan lines.
+    static func isScanLine(_ line: SearchRecheckQueryLine) -> Bool {
+        line.label.hasPrefix("Scan (")
+    }
+
+    /// The run's synthesized sweep among the scan lines: it found nothing
+    /// and applied nothing because it was never an apply (an applied scan
+    /// always found at least what it applied).
+    static func isSweepLine(_ line: SearchRecheckQueryLine) -> Bool {
+        isScanLine(line) && line.foundCount == 0 && !line.foundHitCap && line.appliedCount == 0
+    }
+
+    /// "N possible item(s)", or "nothing further" at zero.
+    private static func possibleItems(_ count: Int) -> String {
+        switch count {
+        case 0: "nothing further"
+        case 1: "1 possible item"
+        default: "\(count) possible items"
         }
     }
 

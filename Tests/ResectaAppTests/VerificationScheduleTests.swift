@@ -66,7 +66,7 @@ struct VerificationScheduleTests {
 
     private enum ScheduleTestError: Error { case notVerified }
 
-    @Test("Raster verify-only reports seven layers in canonical order, the re-check then the sweep last as INFO")
+    @Test("Raster verify-only reports seven layers in canonical order, the re-check then the sweep last — the re-check idle, the sweep run on the output")
     func rasterReportIsCanonical() async throws {
         let report = try await verifyOnlyReport(mode: .secureRasterization)
         let expected = VerificationEngine().layers(for: .secureRasterization)
@@ -76,8 +76,11 @@ struct VerificationScheduleTests {
         let last = try #require(report.layers.last)
         #expect(last.layer == .detectionSweep)
         #expect(last.name == "Detection Sweep")
-        #expect(last.status == .info(""))
-        #expect(last.shortDescription == DetectionSweep.infoMessage)
+        // Every run carries the sweep request — the verify-only fallback
+        // synthesizes one at the current settings — so the row is never
+        // the idle note: on this fixture the detectors read nothing further.
+        #expect(last.status == .pass)
+        #expect(last.shortDescription == "Ran the detectors on the output — nothing further reported.")
         let recheck = report.layers[5]
         #expect(recheck.layer == .searchRecheck)
         #expect(recheck.status == .info(""))
@@ -98,7 +101,7 @@ struct VerificationScheduleTests {
         #expect(report.layers[10].layer == .searchRecheck)
         #expect(report.layers[10].status == .info(""))
         #expect(report.layers[11].layer == .detectionSweep)
-        #expect(report.layers[11].status == .info(""))
+        #expect(report.layers[11].status == .pass, "the sweep ran on the output — never the idle note")
     }
 
     @Test("The idle re-check row reads as an informational note, never a warn or attention row")

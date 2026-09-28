@@ -82,12 +82,14 @@ struct LayerResultRowStyleTests {
     // The icon column sets a custom asset at its optical size (23 pt, the
     // stopgap until the sources are retuned) and an SF fallback at
     // `.title3`; the predicate is the router's own lookup.
-    @Test("isCustom is true exactly for a layer with a custom asset (identity first, then the stored name)")
+    @Test("isCustom is true exactly for an identity with a custom asset — never for a name alone")
     func isCustomIsTrueExactlyForTheAssetLayers() {
+        // No identity (the Page Count gate row's shape): the stored SF
+        // symbol, whatever the name says.
         let ocr = LayerResult(
             name: "OCR Check", symbolName: "x", status: .pass, shortDescription: "",
             detailDescription: "", pageReferences: nil, durationSeconds: 0)
-        #expect(VerificationSymbol.isCustom(ocr))
+        #expect(!VerificationSymbol.isCustom(ocr))
         let stamped = LayerResult(
             name: "Legacy Name", symbolName: "x", status: .pass, shortDescription: "",
             detailDescription: "", pageReferences: nil, durationSeconds: 0, layer: .ocrCheck)

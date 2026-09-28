@@ -34,6 +34,8 @@ final class PipelineCoordinator: @unchecked Sendable {
     let documentState: DocumentState
     let redactionState: RedactionState
     let settingsState: SettingsState
+    /// The user's custom terms; read at run entry for the sweep request.
+    let userTermsStore: UserTermsStore
 
     /// Toast manager for pipeline completion notifications. Set from the view layer.
     var toastManager: ToastQueueManager?
@@ -121,7 +123,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         /// Empty ⇒ the re-check reports INFO. Derived at run entry by
         /// `collectAppliedSearches()` (present regions joined to the match
         /// audit); the verify-only path re-feeds the retained
-        /// `lastRunAppliedSearches` or re-derives the same way.
+        /// `lastRunInputs` or re-derives the same way.
         let appliedSearches: [SearchRecheckRequest]
     }
 
@@ -162,10 +164,11 @@ final class PipelineCoordinator: @unchecked Sendable {
     }
 
     init(documentState: DocumentState, redactionState: RedactionState,
-         settingsState: SettingsState) {
+         settingsState: SettingsState, userTermsStore: UserTermsStore = UserTermsStore()) {
         self.documentState = documentState
         self.redactionState = redactionState
         self.settingsState = settingsState
+        self.userTermsStore = userTermsStore
 
         // Memory mitigation — on memory warning, both lower dpiCap and
         // collapse rasterization parallelism to 1 until workspace teardown.
@@ -315,12 +318,12 @@ final class PipelineCoordinator: @unchecked Sendable {
         // The initial layer count is taken from the verifier so the
         // progress UI shows the correct total from frame 0.
         let verifier = VerificationEngine()
-        let totalLayers = verifier.layerCount(for: effectiveMode)
+        let scheduledLayers = verifier.layers(for: effectiveMode)
         documentState.transition(to: .verifying(
             progress: .init(
                 currentLayer: 1,
-                totalLayers: totalLayers,
-                layerName: verifier.layerName(at: 0, mode: effectiveMode),
+                totalLayers: scheduledLayers.count,
+                layerName: scheduledLayers.first?.name ?? "",
                 completedLayers: []
             )
         ))
@@ -525,7 +528,7 @@ final class PipelineCoordinator: @unchecked Sendable {
                 redactionState.clearOutput()
             }
             redactionState.outputURL = outputURL
-        case .redactionFinished(let outputURL, let runContext, let deselection):
+        case .redactionFinished(let outputURL, let inputs):
             // `outputURL` was already registered. The explicit
             // re-assignment here is intentional: if a redactionState
             // mutation occurred between the eager register and
@@ -533,19 +536,11 @@ final class PipelineCoordinator: @unchecked Sendable {
             // published value. Idempotent.
             redactionState.outputURL = outputURL
             redactionState.clearTextExtractionBuffer()
-            // Retain the run's verification inputs beside the output so
-            // a verify-only re-run checks the terms the artifact was built
-            // with and reports the true per-page modes, instead of
-            // re-synthesizing both (see RedactionState.lastRunPerPageModes).
-            redactionState.recordLastRunInputs(
-                perPageModes: runContext.perPageModes,
-                perPageFallbackReasons: runContext.perPageFallbackReasons,
-                sensitiveTerms: runContext.sensitiveTerms,
-                appliedSearches: runContext.appliedSearches)
-            // Record the run-entry deselection snapshot beside the run
-            // inputs (nil clears a previous run's record). Cleared with
-            // the output in `clearOutput()`.
-            redactionState.recordLastRunDeselection(deselection)
+            // Retain the run's verification inputs beside the output as
+            // one value, so a verify-only re-run checks what the artifact
+            // was built with and the results screen describes this run
+            // (see RedactionState.LastRunInputs).
+            redactionState.recordLastRunInputs(inputs)
         case .verificationSkipped:
             documentState.transition(to: .verified(report: .skipped))
             redactionState.markVerificationCurrent()
@@ -1154,21 +1149,23 @@ final class PipelineCoordinator: @unchecked Sendable {
     func collectSensitiveTerms() -> [SensitiveTerm] {
         Self.sensitiveTerms(
             fromAppliedRegions: redactionState.regions,
-            metadata: redactionState.regionMetadata
+            metadata: redactionState.regionMetadata,
+            audit: redactionState.appliedMatchAudit
         )
     }
 
     // MARK: - Applied-Search Collection
 
-    /// Collect the Search Re-check requests for this run — one per
-    /// distinct query the user applied from the Search interface whose
-    /// regions are still present. Read at run entry beside
-    /// `collectSensitiveTerms()`; the verify-only path re-feeds the
-    /// retained copy or calls this again.
-    func collectAppliedSearches() -> [SearchRecheckRequest] {
+    /// Collect the applied re-check requests for this run — one per
+    /// distinct query (a typed search or a Scan) the user applied whose
+    /// regions are still present; `deselected` rides the Scan requests.
+    /// Read at run entry beside `collectSensitiveTerms()`; the verify-only
+    /// path re-feeds the retained copy or calls this again.
+    func collectAppliedSearches(deselected: [SearchResult] = []) -> [SearchRecheckRequest] {
         Self.appliedSearches(
             fromRegions: redactionState.regions,
-            audit: redactionState.appliedMatchAudit
+            audit: redactionState.appliedMatchAudit,
+            deselected: deselected
         )
     }
 

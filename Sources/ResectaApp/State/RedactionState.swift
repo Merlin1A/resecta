@@ -43,71 +43,62 @@ class RedactionState {
 
     var outputURL: URL?
 
-    /// Inputs of the redaction run that produced `outputURL`, retained so a
-    /// verify-only re-run checks the same terms and reports the
-    /// same per-page modes as the run that built the output. Without the
-    /// snapshot, `runVerifyOnly` re-synthesized both: a uniform mode array
-    /// erased a mixed run's per-page fallback record, and re-collected terms
-    /// could differ from the artifact's if regions changed since the run.
-    /// Written by the coordinator when `processDocument` returns; cleared
-    /// with the output (`clearOutput()`, which `clearForNewDocument()` also
-    /// routes through). Nil means no completed run this session — e.g. a
-    /// resumed old session — and the verify-only path falls back to
-    /// re-synthesis. Per-page filter digests are NOT retained: they cannot
-    /// be rebuilt from the output PDF, by design.
-    private(set) var lastRunPerPageModes: [PipelineMode]?
-    /// Sibling of `lastRunPerPageModes` — the run's per-page fallback
-    /// reasons, retained so a verify-only re-run reports why each page
-    /// rasterized, not just that it did.
-    private(set) var lastRunPerPageFallbackReasons: [TextLayerDetector.FallbackReason?]?
-    private(set) var lastRunSensitiveTerms: [SensitiveTerm]?
-    /// Sibling of `lastRunSensitiveTerms` — the Search Re-check requests
-    /// the run was verified with (one per distinct applied query), so a
-    /// verify-only re-run re-checks the searches the artifact was built
-    /// with even if regions changed since. Nil means no completed run this
-    /// session; the verify-only path then re-derives the set from the live
-    /// match audit (`PipelineCoordinator.collectAppliedSearches()`).
-    /// In-memory only — nothing is persisted.
-    private(set) var lastRunAppliedSearches: [SearchRecheckRequest]?
+    /// Everything verification consumed for the redaction run that
+    /// produced `outputURL`, as ONE value — the run's inputs plus the two
+    /// facts the results strip states about the run. Retained so a
+    /// verify-only re-run checks the same terms and re-check requests and
+    /// reports the same per-page modes as the run that built the output,
+    /// and so the results screen describes THIS run rather than the
+    /// session's most recent scan. Written by the coordinator when
+    /// `processDocument` returns; cleared with the output (`clearOutput()`,
+    /// which both document boundaries route through). Nil means no
+    /// completed run this session — e.g. a resumed old session — and the
+    /// verify-only path falls back to re-synthesis. Per-page filter
+    /// digests are NOT retained: they cannot be rebuilt from the output
+    /// PDF, by design. In-memory only — nothing here is persisted.
+    struct LastRunInputs: Equatable, Sendable {
+        let perPageModes: [PipelineMode]
+        /// Sibling of `perPageModes` — why each page rasterized, not just
+        /// that it did.
+        let perPageFallbackReasons: [TextLayerDetector.FallbackReason?]
+        let sensitiveTerms: [SensitiveTerm]
+        /// The output re-check requests the run was verified with, one per
+        /// distinct applied query; the verify-only path re-feeds them so
+        /// the artifact is re-checked against the searches it was built
+        /// with even if regions changed since.
+        let appliedSearches: [SearchRecheckRequest]
+        /// The run-entry deselection snapshot
+        /// (`runEntryDeselectionSnapshot()`); nil when neither source had
+        /// one — the results screen then renders no deselection row.
+        let deselection: DeselectionSnapshot?
+        /// 0-indexed pages whose raster exceeded the OCR pixel caps in the
+        /// session's detection, as read at run entry.
+        let ocrSkippedPages: Set<Int>
+        /// The degrade-failure list at run entry; nil when detection was
+        /// not degraded.
+        let degradeFailures: [String]?
+    }
+    private(set) var lastRunInputs: LastRunInputs?
 
     /// Record the inputs of a completed redaction run alongside `outputURL`.
     /// Called by `PipelineCoordinator` at the same point the output URL is
     /// re-asserted after `processDocument` returns.
-    func recordLastRunInputs(perPageModes: [PipelineMode],
-                             perPageFallbackReasons: [TextLayerDetector.FallbackReason?],
-                             sensitiveTerms: [SensitiveTerm],
-                             appliedSearches: [SearchRecheckRequest]) {
-        lastRunPerPageModes = perPageModes
-        lastRunPerPageFallbackReasons = perPageFallbackReasons
-        lastRunSensitiveTerms = sensitiveTerms
-        lastRunAppliedSearches = appliedSearches
+    func recordLastRunInputs(_ inputs: LastRunInputs) {
+        lastRunInputs = inputs
     }
 
-    /// Deselection facts recorded for the run that produced `outputURL`:
-    /// how many scan results the user left un-checked, out of how many
-    /// total. Captured by `runFullPipeline` at run entry via
-    /// `runEntryDeselectionSnapshot()` — the apply-commit
-    /// snapshot (`pendingRunDeselection`) when one is pending, else the
-    /// live search session's snapshot, same derivation the scan coverage
-    /// panel renders (`SearchState.deselectionSnapshotForRun()`) — so
-    /// re-selection while the pipeline is in flight does not drift the
-    /// recorded counts either way. Recorded here beside
-    /// `lastRunPerPageModes` when `processDocument` returns. Read by
-    /// `DocumentEditorView` to thread the counts into the
-    /// verification-results details disclosure. Nil when neither source
-    /// had a snapshot at run entry — the results screen renders no
-    /// deselection row in that case. Cleared with the output in
-    /// `clearOutput()`.
-    struct DeselectionSnapshot: Equatable {
-        let deselectedCount: Int
+    /// Deselection facts for a run: the scan results the user left
+    /// un-checked — as values (page · category · rect · text), so the
+    /// output re-run can subtract them — and the session's total. Built by
+    /// `SearchState.deselectionSnapshotForRun()` (the same derivation the
+    /// scan coverage panel renders); captured at the apply commit
+    /// (`pendingRunDeselection`) and read at run entry
+    /// (`runEntryDeselectionSnapshot()`). `deselectedCount` is the item
+    /// count. In-memory only.
+    struct DeselectionSnapshot: Equatable, Sendable {
+        let items: [SearchResult]
         let totalCount: Int
-    }
-    private(set) var lastRunDeselection: DeselectionSnapshot?
-
-    /// Record (or clear, with nil) the run-entry deselection snapshot.
-    /// Sibling of `recordLastRunInputs` — same call site, same lifetime.
-    func recordLastRunDeselection(_ snapshot: DeselectionSnapshot?) {
-        lastRunDeselection = snapshot
+        var deselectedCount: Int { items.count }
     }
 
     /// The deselection facts of the search session the user
@@ -125,7 +116,7 @@ class RedactionState {
     /// (including cancel/fail, both of which route through
     /// `clearOutput()`) so a retry that didn't re-apply still reports
     /// the same counts — `clearOutput()` deliberately does NOT clear
-    /// this field, only `lastRunDeselection` (which describes a
+    /// this field, only `lastRunInputs` (which describes a
     /// completed/attempted run's recorded inputs, not the pending
     /// apply fact). It must not leak across documents, so both
     /// document-boundary resets (`clearForNewDocument()`,
@@ -674,11 +665,7 @@ class RedactionState {
         textExtractionBuffer = nil
         // The retained run inputs describe the output that was just
         // discarded — a later run must not verify against them.
-        lastRunPerPageModes = nil
-        lastRunPerPageFallbackReasons = nil
-        lastRunSensitiveTerms = nil
-        lastRunAppliedSearches = nil
-        lastRunDeselection = nil
+        lastRunInputs = nil
     }
 
     // MARK: - Region Mutations with Undo
@@ -906,11 +893,6 @@ class RedactionState {
         /// the review. Selection state is not consulted — accepting the
         /// group IS the selection gesture.
         case entityGroup(CrossPageEntityGroup)
-        /// A raw detection map applied directly, with signature
-        /// candidates split out to the review (never applied directly).
-        /// No production caller — the absorbed shape of the former
-        /// direct-apply entry, retained until a pipeline path needs it.
-        case detectionResults([Int: [DetectionResult]])
         /// One result of `activeSearch.results`, addressed by id — the
         /// compact handle's per-item Apply. Selection state is not
         /// consulted: the tap IS the accept for that one result.
@@ -1010,8 +992,6 @@ class RedactionState {
             return outcome
         case .entityGroup(let group):
             return applyEntityGroupOrigin(group, undoManager: undoManager)
-        case .detectionResults(let results):
-            return applyDetectionMapOrigin(results, undoManager: undoManager)
         case .searchResult(let id):
             return applySearchResultOrigin(id: id, undoManager: undoManager)
         }
@@ -1231,7 +1211,7 @@ class RedactionState {
         return outcome
     }
 
-    // MARK: - Detection origins (staged review, entity group, raw map)
+    // MARK: - Detection origins (staged review, entity group)
 
     /// Staged-detections origin: promotes explicit-true selections and
     /// records accept AND reject decisions into `priors` +
@@ -1384,69 +1364,6 @@ class RedactionState {
         return ApplyOutcome(
             applied: appliedCount, skippedOverlaps: 0,
             appliedResultIDs: [], signatureCandidates: 0)
-    }
-
-    /// Detection-map origin — the absorbed shape of the former
-    /// direct-apply entry (no production caller). `.signatureCandidate`
-    /// detections are never applied directly: the signature heuristic
-    /// is review-only by design (confidence is heuristic; the user must
-    /// accept in the review before a region is created — locked
-    /// decision). They split out to `pendingTriage` and arrive
-    /// DESELECTED like every review arrival (absent id = not accepted).
-    /// Every region this origin creates now carries the same metadata +
-    /// audit records as the other origins.
-    private func applyDetectionMapOrigin(
-        _ results: [Int: [DetectionResult]],
-        undoManager: UndoManager?
-    ) -> ApplyOutcome? {
-        var autoApplyResults: [Int: [DetectionResult]] = [:]
-        var signatureResults: [Int: [DetectionResult]] = [:]
-        for (page, pageResults) in results {
-            let signatures = pageResults.filter {
-                if case .pii(.signatureCandidate) = $0.kind { return true }
-                return false
-            }
-            let others = pageResults.filter {
-                if case .pii(.signatureCandidate) = $0.kind { return false }
-                return true
-            }
-            if !signatures.isEmpty { signatureResults[page] = signatures }
-            if !others.isEmpty { autoApplyResults[page] = others }
-        }
-
-        // Every non-signature detection in map order; the pair for each
-        // is built by the one detection prepare step.
-        let prepared = prepareApply(
-            detections: autoApplyResults.flatMap { page, pageResults in
-                pageResults.map { (page: page, detection: $0) }
-            },
-            ambiguousSurnameDetectionIDs: ambiguousSurnameDetectionIDs,
-            appliedAt: Date()
-        )
-
-        // Route signature candidates to the review. No selection
-        // entries are written — an absent id reads deselected, the
-        // arrival default for every review.
-        if !signatureResults.isEmpty {
-            pendingTriage = signatureResults
-        }
-
-        let appliedCount = prepared.appliedCount
-        let signatureCount = signatureResults.values.reduce(0) { $0 + $1.count }
-
-        commitApply(
-            createdRegions: prepared.createdRegions,
-            createdMetadata: prepared.createdMetadata,
-            createdAudit: prepared.createdAudit,
-            actionName: "Apply Detections",
-            priorsRestore: nil,
-            recordsSearchApplyVersion: false,
-            undoManager: undoManager
-        )
-
-        return ApplyOutcome(
-            applied: appliedCount, skippedOverlaps: 0,
-            appliedResultIDs: [], signatureCandidates: signatureCount)
     }
 
     /// Dismiss triage without applying any results.
