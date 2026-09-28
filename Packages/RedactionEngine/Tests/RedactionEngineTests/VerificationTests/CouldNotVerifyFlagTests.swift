@@ -441,20 +441,16 @@ struct CouldNotVerifyFlagTests {
 
     // MARK: - Source census
 
-    /// Every `.warn(` construction in the four verification files is
-    /// classified here — the could-not-verify family (22 sites) and the
+    /// Every `.warn(` construction in the six verification files is
+    /// classified here — the could-not-verify family (23 sites) and the
     /// routine-note WARNs — so a new site cannot land silently: an
     /// unclassified construction, a moved message or a changed count fails.
-    @Test("source census: the could-not-verify family is exactly 22 sites and every WARN construction is classified")
+    @Test("source census: the could-not-verify family is exactly 23 sites and every WARN construction is classified")
     func warnSiteCensus() throws {
         struct Marker { let text: String; let family: Bool; let sites: Int; let lines: Int }
         let markers: [String: [Marker]] = [
             "VerificationEngine.swift": [
                 Marker(text: "Could not verify /AcroForm absence", family: true, sites: 1, lines: 1),
-                Marker(text: "All sensitive terms shorter than 3 characters", family: true, sites: 1, lines: 1),
-                Marker(text: "return (.warn(shortTermTail(droppedTermCount)), nil, nil, true)", family: true, sites: 1, lines: 1),
-                Marker(text: "Sensitive term search exceeded size limit", family: true, sites: 1, lines: 1),
-                Marker(text: "Could not read output PDF for binary search", family: true, sites: 1, lines: 1),
                 Marker(text: "Could not inspect document structure", family: true, sites: 1, lines: 1),
                 Marker(text: "Could not inspect metadata", family: true, sites: 1, lines: 1),
                 Marker(text: "Per-page mode data covered", family: true, sites: 1, lines: 1),
@@ -463,7 +459,6 @@ struct CouldNotVerifyFlagTests {
                 Marker(text: "return .warn(msg)", family: false, sites: 0, lines: 1),
                 Marker(text: "Verification produced warnings", family: false, sites: 0, lines: 1),
                 Marker(text: "Some verification checks were skipped", family: false, sites: 0, lines: 1),
-                Marker(text: "return (.warn(warn.message), warn.pages, nil", family: false, sites: 0, lines: 1),
                 Marker(text: "Structural findings:", family: false, sites: 0, lines: 1),  // LegalPhrases:safe (the engine message)
                 Marker(text: "Auto-injected metadata present: XMP metadata", family: false, sites: 0, lines: 1),
                 Marker(text: "Producer or timestamp fields were not rewritten", family: false, sites: 0, lines: 1),
@@ -473,6 +468,13 @@ struct CouldNotVerifyFlagTests {
                 // `zeroBoundsWarning` (the classifying site); the graze class
                 // returns `grazeWarning`, a note.
                 Marker(text: "return (.warn(msg), (unmeasuredPages + grazePages).sorted(), true)", family: false, sites: 0, lines: 1),
+            ],
+            "VerificationEngine+Layer3.swift": [
+                Marker(text: "All sensitive terms shorter than 3 characters", family: true, sites: 1, lines: 1),
+                Marker(text: "return (.warn(shortTermTail(droppedTermCount)), nil, nil, true)", family: true, sites: 1, lines: 1),
+                Marker(text: "Sensitive term search exceeded size limit", family: true, sites: 1, lines: 1),
+                Marker(text: "Could not read output PDF for binary search", family: true, sites: 1, lines: 1),
+                Marker(text: "return (.warn(warn.message), warn.pages, nil", family: false, sites: 0, lines: 1),
             ],
             "Layer2OCRCheck+Sweep.swift": [
                 Marker(text: "OCR coordinates could not be mapped to page space", family: true, sites: 1, lines: 1),
@@ -494,9 +496,18 @@ struct CouldNotVerifyFlagTests {
             "SearchRecheck.swift": [
                 Marker(text: "status: .warn(message)", family: true, sites: 1, lines: 1),
             ],
+            // The sweep's one WARN family: pages it could not read (the
+            // re-check's clause vocabulary).
+            "DetectionSweep.swift": [
+                Marker(text: "status: .warn(message)", family: true, sites: 1, lines: 1),
+            ],
         ]
         // Pinned `.warn(` construction counts (pattern matches excluded).
-        let constructionCounts = ["VerificationEngine.swift": 22, "Layer2OCRCheck+Sweep.swift": 3, "SandwichVerification.swift": 10, "SearchRecheck.swift": 1]
+        let constructionCounts = [
+            "VerificationEngine.swift": 17, "VerificationEngine+Layer3.swift": 5,
+            "Layer2OCRCheck+Sweep.swift": 3, "SandwichVerification.swift": 10,
+            "SearchRecheck.swift": 1, "DetectionSweep.swift": 1,
+        ]
 
         let sources = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -517,6 +528,6 @@ struct CouldNotVerifyFlagTests {
                 familySites += m.sites
             }
         }
-        #expect(familySites == 22, "the could-not-verify family is \(familySites) sites; the contract says 22")
+        #expect(familySites == 23, "the could-not-verify family is \(familySites) sites; the contract says 23")
     }
 }

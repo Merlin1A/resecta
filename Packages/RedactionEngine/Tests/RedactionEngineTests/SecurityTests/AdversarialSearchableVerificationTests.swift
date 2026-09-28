@@ -41,7 +41,7 @@ struct AdversarialSearchableVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            7,
+            .fontVerification,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
@@ -72,7 +72,7 @@ struct AdversarialSearchableVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            7,
+            .fontVerification,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
@@ -290,7 +290,7 @@ struct AdversarialSearchableVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            2,
+            .binaryStringSearch,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
@@ -312,7 +312,7 @@ struct AdversarialSearchableVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            2,
+            .binaryStringSearch,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
@@ -349,7 +349,7 @@ struct AdversarialSearchableVerificationTests {
         }
 
         let resultA = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(docA),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(docA),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: [termA].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
@@ -357,7 +357,7 @@ struct AdversarialSearchableVerificationTests {
             perPageModes: [.searchableRedaction]
         )
         let resultB = await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(docB),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(docB),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: [termB].map { SensitiveTerm(text: $0) },
             pipelineMode: .searchableRedaction,
@@ -459,7 +459,7 @@ struct AdversarialSearchableVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            9,
+            .operatorReExtraction,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
@@ -486,7 +486,7 @@ struct AdversarialSearchableVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            9,
+            .operatorReExtraction,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: [term].map { SensitiveTerm(text: $0) },
@@ -512,7 +512,7 @@ struct AdversarialSearchableVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            9,
+            .operatorReExtraction,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: ["acme"].map { SensitiveTerm(text: $0) },
@@ -642,7 +642,7 @@ struct AdversarialSearchableVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            9,
+            .operatorReExtraction,
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:],
             sensitiveTerms: [term].map { SensitiveTerm(text: $0) },

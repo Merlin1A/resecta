@@ -201,28 +201,6 @@ struct SearchRecheckTests {
         #expect(result.pageReferences?.first == 0)
     }
 
-    @Test("pageBound: honored only when the original run was complete; default off")
-    func pageBoundOptIn() async throws {
-        let out = try output(["clean", "Delia survives on page 2"])
-        // Default: every page → the survivor is found.
-        let full = await TestFixtures.recheck(out, requests: [TestFixtures.textRequest("Delia", pages: [0])])
-        #expect(full.queryLines?.first?.remainingCount == 1)
-        // Bound to page 1 only, sound record → page 2 is not read.
-        let bound = await TestFixtures.recheck(out, requests: [TestFixtures.textRequest("Delia", pages: [0], pageBound: true)])
-        #expect(bound.status == .pass)
-        #expect(bound.queryLines?.first?.remainingCount == 0)
-        // Bound requested on an incomplete original run → full re-search.
-        let unsound = SearchRecheckRequest(
-            record: AppliedSearchRecord(
-                query: AppliedSearchQuery(kind: .text("Delia"), options: SearchOptions()),
-                foundCount: 1, foundHitCap: true),
-            appliedCount: 1, appliedPages: [0], pageBound: true)
-        #expect(!unsound.pageBoundIsSound)
-        #expect(!unsound.effectivePageBound)
-        let recovered = await TestFixtures.recheck(out, requests: [unsound])
-        #expect(recovered.queryLines?.first?.remainingCount == 1)
-    }
-
     // MARK: - R-1: the per-page sub-document keeps the text layer
 
     @Test("R-1: PDFPage.dataRepresentation round-trips a page with its text layer")

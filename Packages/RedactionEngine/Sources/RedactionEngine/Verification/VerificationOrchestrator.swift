@@ -18,6 +18,14 @@ public enum VerificationRunEvent: Sendable {
     case layerFinished(layer: VerificationLayer, ordinal: Int, result: LayerResult)
 }
 
+/// The post-sequential checks' shared pass over the output (`OutputRecheck`):
+/// the observations keyed by index into the run's full request list, and
+/// the pass's wall-clock, attributed to the first post row's duration.
+struct PostSequentialBatch: Sendable {
+    let observations: [RecheckObservation]
+    let seconds: Double
+}
+
 /// The verification schedule: the page-count integrity gate, the mode's
 /// layer list grouped by execution phase, the parallel base batch on one
 /// document instance per layer, the sequential phases in order, the
@@ -87,8 +95,10 @@ public struct VerificationOrchestrator: Sendable {
     /// The sandwich checks run sequentially — the inter-layer
     /// character-count baseline depends on Spatial Verification's extraction
     /// work and must remain ordered. The post-sequential checks (the Search
-    /// Re-check) run last: page-parallel inside the layer at Layer 2's
-    /// width, never overlapped with Layer 2's own Vision pass.
+    /// Re-check, then the Detection Sweep) run last over ONE shared pass of
+    /// the output (`OutputRecheck`: page-parallel at Layer 2's width, never
+    /// overlapped with Layer 2's own Vision pass), each folding its own
+    /// requests from that pass; the two results publish in canonical order.
     ///
     /// The report lists every layer in canonical order: the results UI
     /// labels rows by ordinal position. A cancellation checkpoint precedes
@@ -171,8 +181,8 @@ public struct VerificationOrchestrator: Sendable {
             }
         }
 
-        // --- Sequential phases: catalog readers → sandwich checks → post checks ---
-        for phaseLayers in [catalogLayers, sandwichLayers, postLayers] {
+        // --- Sequential phases: catalog readers → sandwich checks ---
+        for phaseLayers in [catalogLayers, sandwichLayers] {
             for layer in phaseLayers {
                 try Task.checkCancellation()
                 events(.layerStarted(
@@ -187,8 +197,38 @@ public struct VerificationOrchestrator: Sendable {
                     sensitiveTerms: sensitiveTerms,
                     pipelineMode: pipelineMode,
                     filterDigests: filterDigests,
+                    perPageModes: perPageModes
+                )
+                resultsByLayer[layer] = result
+                completedLayers.append(result)
+                events(.layerFinished(layer: layer, ordinal: ordinal(layer), result: result))
+            }
+        }
+
+        // --- Post-sequential batch: one pass over the output, one fold per layer ---
+        if !postLayers.isEmpty {
+            try Task.checkCancellation()
+            let batch = await Self.observeOutput(outputDocument, requests: appliedSearches)
+            for (position, layer) in postLayers.enumerated() {
+                try Task.checkCancellation()
+                events(.layerStarted(
+                    layer: layer, ordinal: ordinal(layer),
+                    totalLayers: globalLayerCount, completedLayers: completedLayers))
+
+                let result = await verifier.runLayer(
+                    layer,
+                    outputDocument: outputDocument,
+                    sourcePageCount: sourcePageCount,
+                    regions: regions,
+                    sensitiveTerms: sensitiveTerms,
+                    pipelineMode: pipelineMode,
+                    filterDigests: filterDigests,
                     perPageModes: perPageModes,
-                    appliedSearches: appliedSearches
+                    appliedSearches: appliedSearches,
+                    // The pass's wall-clock rides the first row's duration so
+                    // the post rows sum to the batch.
+                    batch: batch.map { PostSequentialBatch(
+                        observations: $0.observations, seconds: position == 0 ? $0.seconds : 0) }
                 )
                 resultsByLayer[layer] = result
                 completedLayers.append(result)
@@ -208,6 +248,22 @@ public struct VerificationOrchestrator: Sendable {
             perPageModes: perPageModes,
             perPageFallbackReasons: perPageFallbackReasons
         )
+    }
+
+    /// The one output pass the post-sequential checks share: every request
+    /// on every page through the shared runner. Nil when nothing was
+    /// requested (each layer then reports its idle INFO without a pass) or
+    /// when the pass was cancelled (each layer's own pass then folds the
+    /// cancellation into its `.skipped` row, as before).
+    static func observeOutput(
+        _ outputDocument: SendablePDFDocument, requests: [SearchRecheckRequest]
+    ) async -> PostSequentialBatch? {
+        guard !requests.isEmpty else { return nil }
+        let start = CFAbsoluteTimeGetCurrent()
+        guard let observations = try? await OutputRecheck().observe(
+            outputDocument: outputDocument, requests: requests) else { return nil }
+        return PostSequentialBatch(
+            observations: observations, seconds: CFAbsoluteTimeGetCurrent() - start)
     }
 
     /// Run the parallel base-layer batch and return the `(layer, result)`

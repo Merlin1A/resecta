@@ -125,7 +125,7 @@ enum SearchableMergeProbe {
         var out: [Int: LayerResult] = [:]
         for idx in 0..<count {
             out[idx] = await engine.runLayer(
-                idx,
+                engine.layers(for: .searchableRedaction)[idx],
                 outputDocument: outputDocument,
                 sourcePageCount: sourcePageCount,
                 regions: regions,

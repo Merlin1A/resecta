@@ -62,16 +62,16 @@ struct Layer2FillGuardBatteryTests {
 
     /// Run the REAL Layer-2 path (index 1) over a built page and return the layer
     /// status — the battery's end-to-end observable.
-    static func layer2Status(
+    static func layer2Result(
         pdf: Data,
         regions: [Int: [RedactionRegion]],
         sensitiveTerms: [SensitiveTerm] = [],
         mode: PipelineMode = .secureRasterization
-    ) async throws -> VerificationStatus {
+    ) async throws -> LayerResult {
         let doc = try #require(PDFDocument(data: pdf))
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            1,
+            engine.layers(for: mode)[1],
             outputDocument: SendablePDFDocument(doc),
             sourcePageCount: doc.pageCount,
             regions: regions,
@@ -79,7 +79,16 @@ struct Layer2FillGuardBatteryTests {
             pipelineMode: mode,
             filterDigests: Array(repeating: nil, count: doc.pageCount),
             perPageModes: Array(repeating: mode, count: doc.pageCount))
-        return result.status
+        return result
+    }
+
+    static func layer2Status(
+        pdf: Data,
+        regions: [Int: [RedactionRegion]],
+        sensitiveTerms: [SensitiveTerm] = [],
+        mode: PipelineMode = .secureRasterization
+    ) async throws -> VerificationStatus {
+        try await layer2Result(pdf: pdf, regions: regions, sensitiveTerms: sensitiveTerms, mode: mode).status
     }
 
     /// In-region OCR word boxes of a built one-page PDF, run through the
@@ -293,8 +302,12 @@ struct Layer2FillGuardBatteryTests {
     /// (readable non-redacted content is expected output for this mode, so the
     /// generic arm is informational; a tail matching a redacted term takes the
     /// term-specific WARN, and any readable box landing ≥0.5 in-region FAILs).
-    /// Asserts surfaced-not-silent, NOT `isFail`.
-    @Test("F-EDGE-STRADDLE (leak): ink past a painted bar surfaces (INFO floor), never a clean PASS (pin iOS 26.4)")
+    /// Asserts surfaced-not-silent, NOT `isFail`. Since the outside-text
+    /// arm folded into PASS with a detail sentence, the surface for a tail
+    /// that matches no term is that detail (the check read the page and
+    /// reports the content outside every region as the page's own); a bare
+    /// PASS with no detail would be silence.
+    @Test("F-EDGE-STRADDLE (leak): ink past a painted bar surfaces (the PASS detail at minimum), never a bare PASS (pin iOS 26.4)")
     func edgeStraddleLeak_onDevice() async throws {
         let region = CGRect(x: 0.10, y: 0.60, width: 0.42, height: 0.07)
         // Text spans the region's right edge: the in-region half is painted over
@@ -305,11 +318,14 @@ struct Layer2FillGuardBatteryTests {
             paintBars: true,
             textRect: CGRect(x: 0.44, y: 0.60, width: 0.30, height: 0.07))
 
-        let status = try await Self.layer2Status(pdf: pdf, regions: regions)
-        Self.report("F-EDGE-STRADDLE-LEAK", "status=\(status)")
-        #expect(status.isInfo || status.isWarn || status.isFail,
-                "a readable straddle tail must surface (INFO note at minimum) — got \(status)")
-        #expect(status != .pass, "never a clean PASS while readable ink is on the page")
+        let result = try await Self.layer2Result(pdf: pdf, regions: regions)
+        let status = result.status
+        Self.report("F-EDGE-STRADDLE-LEAK", "status=\(status) detail=\(result.hasDetail)")
+        let surfacedAsPassDetail = status == .pass
+            && result.detailDescription == VerificationEngine.layer2OutsideTextDetail
+        #expect(surfacedAsPassDetail || status.isInfo || status.isWarn || status.isFail,
+                "a readable straddle tail must surface (the outside-text PASS detail at minimum) — got \(status)")
+        #expect(!(status == .pass && !result.hasDetail), "never a bare PASS while readable ink is on the page")
     }
 
     // MARK: - F-EDGE-STRADDLE, hallucination variant == F-PARTA-REPLAY (on-device)

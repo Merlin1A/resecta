@@ -258,6 +258,9 @@ public enum SearchSource: Sendable, Equatable {
     case ocr(confidence: Float)
 }
 
+// A re-check request hashes the results the user left unselected.
+extension SearchSource: Hashable {}
+
 /// A single search hit — page, bounds, matched text, context.
 public struct SearchResult: Sendable, Identifiable, Equatable {
     public let id: UUID
@@ -323,6 +326,8 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
         self.matchRangeInSnippet = matchRangeInSnippet
     }
 }
+
+extension SearchResult: Hashable {}
 
 // MARK: - MatchRationale
 //

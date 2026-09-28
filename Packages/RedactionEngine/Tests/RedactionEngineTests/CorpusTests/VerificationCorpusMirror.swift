@@ -273,15 +273,84 @@ extension VerificationCorpusRunnerTests {
             perPageFallbackReasons: reasons)
     }
 
+    // MARK: - The scan requests (the Detection Sweep's input)
+
+    /// The balanced preset the app scans with by default; nil when the
+    /// engine bundle carries no table (the searcher then gates nothing).
+    static let balancedThresholdVector: PresetThresholdVector? =
+        PresetThresholdBundle.loadFromEngineBundle().presets[.balanced]
+
+    static var balancedConfiguration: ScanRunConfiguration {
+        ScanRunConfiguration(thresholdVector: balancedThresholdVector)
+    }
+
+    static var allCategoriesScan: AppliedSearchQuery {
+        AppliedSearchQuery(kind: .piiScan(categories: Set(PIICategory.allCases)), options: SearchOptions())
+    }
+
+    /// The run's sweep request as the app synthesizes it at entry: every
+    /// detector at the balanced preset, no user terms, nothing applied.
+    static func sweepRequest() -> SearchRecheckRequest {
+        SearchRecheckRequest(
+            record: AppliedSearchRecord(
+                query: allCategoriesScan, foundCount: 0,
+                scanConfiguration: balancedConfiguration),
+            appliedCount: 0, appliedPages: [], origin: .sweep)
+    }
+
+    /// An applied scan as the app records it: the source run's results at
+    /// the balanced preset, every hit applied (nothing deselected).
+    static func appliedScanRequest(
+        results: [SearchResult], appliedCount: Int, appliedPages: Set<Int>
+    ) -> SearchRecheckRequest {
+        SearchRecheckRequest(
+            record: AppliedSearchRecord(
+                query: allCategoriesScan, foundCount: results.count,
+                foundHitCap: results.count >= DocumentSearcher.maxResults,
+                scanConfiguration: balancedConfiguration),
+            appliedCount: appliedCount, appliedPages: appliedPages,
+            origin: .applied, deselected: [])
+    }
+
+    /// The source scan the full-apply set seeds from: every detector at the
+    /// balanced preset through `DocumentSearcher` (the text layer where the
+    /// page carries one, the searcher's OCR path otherwise).
+    static func scanSource(_ doc: PDFDocument) async -> [SearchResult] {
+        let searcher = DocumentSearcher()
+        await searcher.setThresholdVector(balancedThresholdVector)
+        var options = SearchOptions()
+        options.includeOCR = true
+        let stream = searcher.search(
+            SendablePDFDocument(doc),
+            mode: .piiScan(categories: Set(PIICategory.allCases), options: options),
+            progress: { _, _ in })
+        var results: [SearchResult] = []
+        for await result in stream { results.append(result) }
+        return results
+    }
+
+    /// Scan hits as region seeds: one per hit, the category by name (the
+    /// mirror's boundary rule keys on "name"), the value the matched text.
+    static func scanSeeds(from results: [SearchResult]) -> [RegionSeed] {
+        results.enumerated().map { index, hit in
+            RegionSeed(
+                gtId: "scan_\(index)", value: hit.matchedText,
+                category: hit.piiCategory?.rawValue.lowercased() ?? "custom",
+                page: hit.pageIndex, rect: hit.normalizedRect)
+        }
+    }
+
     // MARK: - runVerification (the product's orchestrator)
 
     /// The verification pass as the product runs it: `VerificationOrchestrator`
     /// (the page-count gate first, the phase partition by
     /// `VerificationLayer.phase`, the parallel base batch with ONE
     /// PDFDocument instance per parallel layer and the sequential-shared
-    /// fallback, the sequential phases, the canonical assembly,
-    /// `aggregateStatus`). The harness applies no searches, so the Search
-    /// Re-check reports INFO on every cell.
+    /// fallback, the sequential phases, the post-sequential batch on one
+    /// output pass, the canonical assembly, `aggregateStatus`). The harness
+    /// applies no typed search, so the Search Re-check reports INFO on every
+    /// cell; every cell carries the run's sweep request (and the full-apply
+    /// set its applied scan), so the Detection Sweep reads every output.
     static func runVerificationSweep(
         outputURL: URL,
         sourcePageCount: Int,
@@ -290,7 +359,8 @@ extension VerificationCorpusRunnerTests {
         effectiveMode: PipelineMode,
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode],
-        perPageFallbackReasons: [TextLayerDetector.FallbackReason?]
+        perPageFallbackReasons: [TextLayerDetector.FallbackReason?],
+        appliedSearches: [SearchRecheckRequest] = [sweepRequest()]
     ) async throws -> VerificationReport {
         guard let sharedDoc = PDFDocument(url: outputURL) else {
             throw PipelineError.verificationError(.engineCrash(layerIndex: 0))
@@ -305,7 +375,7 @@ extension VerificationCorpusRunnerTests {
             filterDigests: filterDigests,
             perPageModes: perPageModes,
             perPageFallbackReasons: perPageFallbackReasons,
-            appliedSearches: [],
+            appliedSearches: appliedSearches,
             provisionLayerDocuments: { layers in
                 // One independent PDFDocument per parallel layer (the app's
                 // loadParallelLayerDocuments contract); nil ⇒ the batch runs

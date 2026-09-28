@@ -7,8 +7,9 @@ import PDFKit
 // The verification schedule as the product and the corpus harness run it:
 // the event order the app's progress UI relies on (one `.layerStarted`
 // for the parallel batch, its results published in canonical order, then
-// each sequential layer started → finished), the report's canonical layer
-// order, and the page-count gate short-circuit.
+// each sequential layer started → finished; the two post-sequential checks
+// share one output pass and publish in canonical order), the report's
+// canonical layer order, and the page-count gate short-circuit.
 
 @Suite("VerificationOrchestrator — the schedule and its events")
 struct VerificationOrchestratorTests {
@@ -77,12 +78,13 @@ struct VerificationOrchestratorTests {
         #expect(report.layers.map(\.name) == layers.map(\.name),
                 "the report lists every layer in canonical order")
         #expect(events.map(shape) == [
-            "S1/6 textExtraction after:0",
+            "S1/7 textExtraction after:0",
             "F1 textExtraction", "F2 ocrCheck", "F3 binaryStringSearch",
-            "S4/6 structureCheck after:3", "F4 structureCheck",
-            "S5/6 metadataCheck after:4", "F5 metadataCheck",
-            "S6/6 searchRecheck after:5", "F6 searchRecheck",
-        ])
+            "S4/7 structureCheck after:3", "F4 structureCheck",
+            "S5/7 metadataCheck after:4", "F5 metadataCheck",
+            "S6/7 searchRecheck after:5", "F6 searchRecheck",
+            "S7/7 detectionSweep after:6", "F7 detectionSweep",
+        ], "the post batch publishes the re-check then the sweep, each started and finished in canonical order")
         // The results a `.layerStarted` carries are exactly the ones published before it.
         for case .layerStarted(_, let ordinal, _, let completed) in events {
             #expect(completed.map(\.name) == Array(report.layers.prefix(ordinal - 1)).map(\.name))
@@ -133,6 +135,6 @@ struct VerificationOrchestratorTests {
         )
         let layers = VerificationEngine().layers(for: .secureRasterization)
         #expect(report.layers.map(\.name) == layers.map(\.name))
-        #expect(events.count == 10)
+        #expect(events.count == 12)
     }
 }

@@ -43,7 +43,7 @@ struct Layer10NormalizationParityTests {
             TestFixtures.compatFormResiduePDF(burned: nil), prefix: "l3_compat_")
         defer { try? FileManager.default.removeItem(at: url) }
         let result = await VerificationEngine().runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [term],
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: [.searchableRedaction])

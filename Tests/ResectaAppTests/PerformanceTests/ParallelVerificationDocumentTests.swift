@@ -188,7 +188,7 @@ struct ParallelVerificationDocumentTests {
         var out: [Int: VerificationStatus] = [:]
         for layer in layers {
             let result = await verifier.runLayer(
-                layer,
+                verifier.layers(for: .secureRasterization)[layer],
                 outputDocument: shared,
                 sourcePageCount: sourcePageCount,
                 regions: [:],

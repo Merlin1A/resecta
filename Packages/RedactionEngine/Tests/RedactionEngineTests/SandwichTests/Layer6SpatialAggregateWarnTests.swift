@@ -56,7 +56,7 @@ struct Layer6SpatialAggregateWarnTests {
     private func runLayer6(_ doc: PDFDocument, regions: [Int: [RedactionRegion]]) async -> LayerResult {
         let engine = VerificationEngine()
         return await engine.runLayer(
-            5, outputDocument: SendablePDFDocument(doc),
+            .spatialVerification, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: doc.pageCount, regions: regions, sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [], perPageModes: Array(repeating: .searchableRedaction, count: doc.pageCount))

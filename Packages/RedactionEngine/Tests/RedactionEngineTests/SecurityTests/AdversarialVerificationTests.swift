@@ -19,7 +19,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -34,7 +34,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -49,7 +49,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -64,7 +64,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -82,7 +82,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -106,7 +106,7 @@ struct AdversarialVerificationTests {
         }
 
         let result = await engine.runLayer(
-            3, outputDocument: SendablePDFDocument(doc),
+            .structureCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -128,7 +128,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -142,21 +142,22 @@ struct AdversarialVerificationTests {
         #expect(isAcceptable, "Clean reconstructed PDF should not FAIL Layer 5")
     }
 
-    @Test("Layer 5 reports Apple auto-injected /Producer as info")
-    func layer5InfoOnProducer() async throws {
+    @Test("Layer 5 reports Apple auto-injected /Producer as a PASS with the fixed-fields detail")
+    func layer5PassWithDetailOnProducer() async throws {
         let (doc, url) = try await makeCleanReconstructedPDF()
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
-        // Apple CGPDFContext always injects /Producer; post-split it lives
-        // in `infoFindings` so a doc with only auto-injected keys reports
-        // .info (does not bump the masthead off green).
-        #expect(result.status == .info(""))
+        // Apple CGPDFContext always injects /Producer and the writer rewrites
+        // it to the fixed value; a doc with only the auto-injected keys is a
+        // PASS whose detail says so (never a note the summary has to count).
+        #expect(result.status == .pass)
+        #expect(result.detailDescription == VerificationEngine.layer5FixedFieldsDetail)
     }
 
     // M3: Layer 5 FAIL on key *presence* — independent of decoded value.
@@ -170,7 +171,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -188,7 +189,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -208,7 +209,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            4, outputDocument: SendablePDFDocument(doc),
+            .metadataCheck, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
@@ -225,7 +226,7 @@ struct AdversarialVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let result = await engine.runLayer(
-            0, outputDocument: SendablePDFDocument(doc),
+            .textExtraction, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: [],
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]

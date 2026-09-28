@@ -104,6 +104,15 @@ public enum VerificationStatus: Sendable, Equatable {
     public var isSkipped: Bool { if case .skipped = self { true } else { false } }
 }
 
+/// Copy a layer supplies for its own PASS / ATTENTION / WARN row, replacing
+/// the engine's generic composition (the Layer-7 precedent): the short
+/// line and the detail line. Internal — the app reads the composed
+/// `LayerResult`.
+struct LayerCopy: Sendable, Equatable {
+    let short: String
+    let detail: String
+}
+
 /// Result of a single verification layer.
 /// Produced by Verification/ components, consumed by VerificationReport
 /// and the verification results UI.

@@ -170,7 +170,7 @@ struct Layer3BoundaryAndMaskingTests {
         _ doc: PDFDocument, terms: [SensitiveTerm]
     ) async -> LayerResult {
         await engine.runLayer(
-            2, outputDocument: SendablePDFDocument(doc),
+            .binaryStringSearch, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 1, regions: [:], sensitiveTerms: terms,
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization])

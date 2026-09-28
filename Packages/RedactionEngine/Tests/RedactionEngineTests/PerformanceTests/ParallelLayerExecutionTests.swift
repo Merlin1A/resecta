@@ -83,7 +83,7 @@ struct ParallelLayerExecutionTests {
                 group.addTask {
                     let start = Date()
                     let result = await verifier.runLayer(
-                        layerIndex,
+                        verifier.layers(for: pipelineMode)[layerIndex],
                         outputDocument: doc,
                         sourcePageCount: sourcePageCount,
                         regions: regions,
@@ -127,7 +127,7 @@ struct ParallelLayerExecutionTests {
         for layerIndex in layers {
             let start = Date()
             let result = await verifier.runLayer(
-                layerIndex,
+                verifier.layers(for: pipelineMode)[layerIndex],
                 outputDocument: doc,
                 sourcePageCount: sourcePageCount,
                 regions: regions,
@@ -406,7 +406,7 @@ struct ParallelLayerExecutionTests {
         // dispatch rather than one-off startup overhead.
         for i in 0..<5 {
             _ = await verifier.runLayer(
-                i,
+                verifier.layers(for: .secureRasterization)[i],
                 outputDocument: wrappedDoc,
                 sourcePageCount: pageCount,
                 regions: [:],
@@ -430,7 +430,7 @@ struct ParallelLayerExecutionTests {
             let sequentialStart = Date()
             for i in 0..<5 {
                 _ = await verifier.runLayer(
-                    i,
+                    verifier.layers(for: .secureRasterization)[i],
                     outputDocument: wrappedDoc,
                     sourcePageCount: pageCount,
                     regions: [:],
@@ -530,7 +530,7 @@ struct ParallelLayerExecutionTests {
         var sequentialResults: [LayerResult] = []
         for i in 0..<5 {
             let result = await verifier.runLayer(
-                i,
+                verifier.layers(for: .secureRasterization)[i],
                 outputDocument: wrappedDoc,
                 sourcePageCount: pageCount,
                 regions: [:],

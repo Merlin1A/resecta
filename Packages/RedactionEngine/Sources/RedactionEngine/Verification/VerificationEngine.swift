@@ -10,8 +10,8 @@ import AppKit  // macOS tooling destination: thumbnail returns NSImage
 
 // Verification engine. Each check is a `VerificationLayer` case; the
 // per-mode order and count come from `layers(for:)` (Secure Rasterization
-// runs six checks, Searchable Redaction eleven; the search re-check is last
-// in both), never from an index table.
+// runs seven checks, Searchable Redaction twelve; the two post-sequential
+// checks are last in both), never from an index table.
 
 /// Stateless verification engine. Runs individual layers on output PDFs.
 public struct VerificationEngine: Sendable {
@@ -70,7 +70,7 @@ public struct VerificationEngine: Sendable {
     /// no-op. `VerificationEngine` is a value type, so set this on the verifier
     /// value BEFORE passing it into `collectParallelBaseLayerResults`; the
     /// per-task copies the fan-out makes each carry the closure.
-    public var onRunLayerDispatch: (@Sendable (Int, ObjectIdentifier) -> Void)?
+    var onRunLayerDispatch: (@Sendable (Int, ObjectIdentifier) -> Void)?
 
     /// Canonical per-mode layer order: every `VerificationLayer` that applies
     /// to `mode`, in declaration order (`searchRecheck` last in both modes).
@@ -90,53 +90,12 @@ public struct VerificationEngine: Sendable {
         return ordered.indices.contains(index) ? ordered[index].name : "Unknown Layer"
     }
 
-    /// Index-only adapter over the Searchable order (`VerificationLayer
-    /// .allCases`): indices 0–9 are identical in both modes; index 10 is the
-    /// Search Re-check. Kept for index-keyed callers; new code reads
-    /// `layerName(at:mode:)` or the layer's own `name`. The symbol lives on
-    /// the layer (`VerificationLayer.symbolName`) and on each result
-    /// (`LayerResult.symbolName`); no index-keyed symbol adapter remains.
-    public func layerName(at index: Int) -> String {
-        let all = VerificationLayer.allCases
-        return all.indices.contains(index) ? all[index].name : "Unknown Layer"
-    }
-
-    /// Run a single verification layer by its index in `pipelineMode`'s
-    /// order (`layers(for:)`). Adapter over `runLayer(_ layer:…)` for the
-    /// index-keyed callers; the range check is the same fail-fast
-    /// precondition (a silent `.pass` on an out-of-range index would let
-    /// caller bugs masquerade as verification success).
-    @concurrent
-    public func runLayer(
-        _ layerIndex: Int,
-        outputDocument: SendablePDFDocument,
-        sourcePageCount: Int,
-        regions: [Int: [RedactionRegion]],
-        sensitiveTerms: [SensitiveTerm],
-        pipelineMode: PipelineMode,
-        filterDigests: [PageFilterDigest?],
-        perPageModes: [PipelineMode]
-    ) async -> LayerResult {
-        let ordered = layers(for: pipelineMode)
-        precondition(
-            layerIndex >= 0 && layerIndex < ordered.count,
-            "runLayer called with out-of-range layerIndex \(layerIndex) for mode \(pipelineMode)"
-        )
-        return await runLayer(
-            ordered[layerIndex],
-            outputDocument: outputDocument,
-            sourcePageCount: sourcePageCount,
-            regions: regions,
-            sensitiveTerms: sensitiveTerms,
-            pipelineMode: pipelineMode,
-            filterDigests: filterDigests,
-            perPageModes: perPageModes
-        )
-    }
-
-    /// Run a single verification layer. `appliedSearches` feeds the Search
-    /// Re-check only (every other layer ignores it); empty ⇒ that layer
-    /// reports INFO.
+    /// Run a single verification layer. `appliedSearches` feeds the two
+    /// post-sequential checks only (every other layer ignores it): the typed
+    /// requests the Search Re-check, the scan requests the Detection Sweep;
+    /// empty ⇒ that layer reports INFO. Called on its own, each of those two
+    /// runs its own pass over the output; the orchestrator runs ONE pass for
+    /// both and hands it in through the internal overload.
     @concurrent
     public func runLayer(
         _ layer: VerificationLayer,
@@ -148,6 +107,29 @@ public struct VerificationEngine: Sendable {
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode],
         appliedSearches: [SearchRecheckRequest] = []
+    ) async -> LayerResult {
+        await runLayer(
+            layer, outputDocument: outputDocument, sourcePageCount: sourcePageCount,
+            regions: regions, sensitiveTerms: sensitiveTerms, pipelineMode: pipelineMode,
+            filterDigests: filterDigests, perPageModes: perPageModes,
+            appliedSearches: appliedSearches, batch: nil)
+    }
+
+    /// The layer template behind `runLayer`: `batch` is the orchestrator's
+    /// shared output pass for the post-sequential checks (nil ⇒ the layer
+    /// runs its own); its wall-clock is added to the row's duration.
+    @concurrent
+    func runLayer(
+        _ layer: VerificationLayer,
+        outputDocument: SendablePDFDocument,
+        sourcePageCount: Int,
+        regions: [Int: [RedactionRegion]],
+        sensitiveTerms: [SensitiveTerm],
+        pipelineMode: PipelineMode,
+        filterDigests: [PageFilterDigest?],
+        perPageModes: [PipelineMode],
+        appliedSearches: [SearchRecheckRequest],
+        batch: PostSequentialBatch?
     ) async -> LayerResult {
         // A layer that does not apply to the mode is a caller bug; a silent
         // .pass would masquerade as verification success. Fail fast instead.
@@ -173,10 +155,11 @@ public struct VerificationEngine: Sendable {
         // and 10, and the Search Re-check) — threaded into
         // LayerResult.reviewTermTexts; nil elsewhere.
         var layerReviewTerms: [String]? = nil
-        // A layer that supplies its own PASS/ATTENTION/WARN copy (the
-        // Search Re-check; the Layer-7 promotion below is the precedent).
-        var copyOverride: SearchRecheck.Copy? = nil
-        // Display-only per-query lines (Search Re-check only).
+        // A layer that supplies its own copy (the two post-sequential
+        // checks; Layers 2 and 5 for a PASS that read something and reports
+        // nothing; the Layer-7 promotion below is the precedent).
+        var copyOverride: LayerCopy? = nil
+        // Display-only per-query lines (the two post-sequential checks only).
         var layerQueryLines: [SearchRecheckQueryLine]? = nil
         // The layer's own classification of a WARN that says the check did
         // not fully run (see `LayerResult.couldNotVerify`); each dispatcher
@@ -206,7 +189,7 @@ public struct VerificationEngine: Sendable {
                 // substring-match inside an unrelated word read off a raster.
                 // The third element carries the display-only term texts
                 // behind an `.attention` verdict (Layer 3's shape).
-                let (s1, pages1, terms1, cnv1) = try await runLayer2OCR(
+                let (s1, pages1, terms1, cnv1, copy1) = try await runLayer2OCR(
                     doc, pipelineMode: pipelineMode,
                     regions: regions, sensitiveTerms: sensitiveTerms,
                     perPageModes: perPageModes)
@@ -214,6 +197,7 @@ public struct VerificationEngine: Sendable {
                 layerPageReferences = pages1
                 layerReviewTerms = terms1
                 couldNotVerify = cnv1
+                copyOverride = copy1
             case .binaryStringSearch:
                 let (s2, pages2, terms2, cnv2) = try runLayer3BinarySearch(doc, sensitiveTerms: sensitiveTerms)
                 status = s2
@@ -226,9 +210,10 @@ public struct VerificationEngine: Sendable {
                 layerPageReferences = pages
                 couldNotVerify = cnv3
             case .metadataCheck:
-                let (s4, cnv4) = try runLayer5Metadata(doc)
+                let (s4, cnv4, copy4) = try runLayer5Metadata(doc)
                 status = s4
                 couldNotVerify = cnv4
+                copyOverride = copy4
             // Layers 6–10: Sandwich-specific.
             // Only run for Searchable Redaction pages.
             case .spatialVerification:
@@ -272,14 +257,14 @@ public struct VerificationEngine: Sendable {
                 layerReviewTerms = l10.reviewTermTexts
                 couldNotVerify = l10.couldNotVerify
             case .searchRecheck:
-                // Search Re-check — re-runs every applied search on the
-                // output through the search engine itself (text layer or the
-                // searcher's own OCR path per page). Supplies its own
+                // Search Re-check — re-runs every applied typed search on
+                // the output through the search engine itself (text layer
+                // or the searcher's own OCR path per page). Supplies its own
                 // PASS/ATTENTION/WARN copy; INFO when nothing was applied.
                 let outcome = try await SearchRecheck().run(
                     outputDocument: outputDocument,
                     requests: appliedSearches,
-                    perPageModes: perPageModes
+                    observations: batch?.observations
                 )
                 status = outcome.status
                 layerPageReferences = outcome.pageReferences
@@ -290,6 +275,25 @@ public struct VerificationEngine: Sendable {
                 // one (pages it could not open or read, OCR it could not
                 // run, pages over its caps): a WARN here always says the
                 // re-check did not fully run.
+                couldNotVerify = outcome.status.isWarn
+            case .detectionSweep:
+                // Detection Sweep — re-runs the applied scan on the output
+                // through the detectors, minus the items left unselected,
+                // and every detector for anything further. Supplies its own
+                // PASS/INFO/WARN copy; never ATTENTION; INFO when no scan
+                // was applied and no sweep requested.
+                let outcome = try await DetectionSweep().run(
+                    outputDocument: outputDocument,
+                    requests: appliedSearches,
+                    observations: batch?.observations
+                )
+                status = outcome.status
+                layerPageReferences = outcome.pageReferences
+                layerReviewTerms = outcome.reviewTermTexts
+                copyOverride = outcome.copyOverride
+                layerQueryLines = outcome.queryLines
+                // The sweep's only WARN family is the same unchecked-pages
+                // one: a WARN here always says the sweep did not fully run.
                 couldNotVerify = outcome.status.isWarn
             }
         } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
@@ -319,7 +323,7 @@ public struct VerificationEngine: Sendable {
             )
         }
 
-        let duration = CFAbsoluteTimeGetCurrent() - start
+        let duration = CFAbsoluteTimeGetCurrent() - start + (batch?.seconds ?? 0)
         let name = layer.name
         let symbol = layer.symbolName
 
@@ -358,9 +362,9 @@ public struct VerificationEngine: Sendable {
         }
 
         // A layer-supplied copy replaces the generic composition for the
-        // status it was composed for (PASS / ATTENTION / WARN); INFO, FAIL and
-        // skipped always use the generic lines.
-        if let copyOverride, status == .pass || status.isAttention || status.isWarn {
+        // status it was composed for (PASS / INFO / ATTENTION / WARN); FAIL
+        // and skipped always use the generic lines.
+        if let copyOverride, status == .pass || status.isInfo || status.isAttention || status.isWarn {
             shortDesc = copyOverride.short
             detailDesc = copyOverride.detail
         }
@@ -505,295 +509,6 @@ public struct VerificationEngine: Sendable {
         return (.pass, nil, false)
     }
 
-    // MARK: - Layer 3: Binary String Search
-
-    /// Returns (status, affectedPages, reviewTermTexts). The
-    /// decoded-page hits and the EXIF WARN carry their 0-based page lists
-    /// for the UI's tappable page chips; the structural raw-byte pass is
-    /// document-level (nil). The third element carries the display-only term
-    /// texts behind an `.attention` verdict (nil for every other status).
-    private func runLayer3BinarySearch(
-        _ doc: PDFDocument, sensitiveTerms: [SensitiveTerm]
-    ) throws -> (VerificationStatus, [Int]?, [String]?, Bool) {
-        // Entry-level cooperative cancellation.
-        try Task.checkCancellation()
-        // No terms provided — expected for manual-only redaction.
-        // INFO, not PASS — the string search did not run, and "No issues
-        // found" would overstate what this layer observed. INFO lands in the
-        // notes group without bumping the masthead (Layer-7 boundary-count
-        // precedent).
-        guard !sensitiveTerms.isEmpty else {
-            return (.info("No sensitive terms were provided — string search did not run."), nil, nil, false)
-        }
-        // Filter terms too short to search (shared
-        // `AhoCorasick.isSearchableTerm`): ≥3 scalars (supports 3-letter PII
-        // abbreviations like SSN, DOB, PHI) or a 2-character CJK name.
-        let validTerms = sensitiveTerms.filter { AhoCorasick.isSearchableTerm($0.text) }
-        guard !validTerms.isEmpty else {
-            return (.warn("All sensitive terms shorter than 3 characters"), nil, nil, true)
-        }
-        // Surfaced on the otherwise-clean path below so a partial drop is
-        // never silent (the all-short WARN above covers the total drop).
-        let droppedTermCount = sensitiveTerms.count - validTerms.count
-
-        // Build the Aho-Corasick automaton with all encoding variants, keeping
-        // each pattern's token-boundary discipline for the match
-        // post-filters below.
-        // DEFERRED: automaton caching is deferred to
-        // V1.1. AhoCorasick is a Sendable value built fresh per
-        // verification call; caching needs an actor/class wrapper for ~25 ms
-        // saved once per export — low benefit, no security relevance.
-        let termAutomaton = SensitiveTermAutomaton(validTerms: validTerms)
-        guard termAutomaton.hasPatterns else { return (.pass, nil, nil, false) }
-        let automaton = termAutomaton.automaton
-
-        // If the automaton degraded due to pattern size limits,
-        // report the limitation rather than silently passing.
-        if automaton.isDegraded {
-            return (.warn("Sensitive term search exceeded size limit — results may be incomplete"), nil, nil, true)
-        }
-
-        // Get raw PDF bytes.
-        // Raw PDF bytes: loadPDFData reads the whole output into memory;
-        // `Data(contentsOf:)` with default options requests no mapping
-        // (`.mappedIfSafe` is an opt-in reading option).
-        guard let (data, cgDoc) = loadPDFData(doc) else {
-            return (.warn("Could not read output PDF for binary search"), nil, nil, true)
-        }
-
-        // First WARN encountered, returned only if no FAIL is found below: a
-        // non-boundary structural fragment (Part A) or an EXIF hit (Part B) must
-        // not mask a boundary-token or decoded-text FAIL. Carries the 0-based page
-        // list when the WARN is page-scoped (EXIF); nil when document-level.
-        var deferredWarn: (message: String, pages: [Int]?)?
-        // Structural complete-token FAIL, held (not returned) so the
-        // decoded pass below always runs — a structural hit must not mask a
-        // decoded-text hit; both findings combine into one result at the end.
-        var structuralFailMessage: String?
-
-        // Structural pass: raw-byte scan with stream ranges excluded.
-        // Compressed streams (FlateDecode) contain random byte sequences that
-        // produce false positive matches. Structural/metadata bytes outside
-        // streams are the meaningful search surface. Other layers (1, 2, 6, 8)
-        // independently verify text content. See ISO 32000-2 §7.3.8.
-        // DEFERRED: stream decompression (decompress-then-search)
-        // is deferred to V1.1 — Resecta's own CGPDFContext
-        // output embeds no compressed PII-bearing streams, and the
-        // page.string re-scan below compensates for PDFKit-decoded text.
-        // Boundary-required terms drop matches embedded in an
-        // alphanumeric run before any classification.
-        let allMatches = termAutomaton.tokenFilteredMatches(in: data)
-        if !allMatches.isEmpty {
-            let streamRanges = findStreamRanges(data)
-            let structuralMatches = allMatches.filter { match in
-                !streamRanges.contains { $0.contains(match.position) }
-            }
-            if !structuralMatches.isEmpty {
-                // Token-boundary rule ("verify matches are complete PDF
-                // tokens"): a match bounded by PDF delimiters on BOTH sides is a
-                // complete token → FAIL; a match embedded mid-token on either
-                // side (the term inside "classifieddata", or trailing a name
-                // token as in "/FontName ") is a possible fragment collision →
-                // WARN. A match at buffer start / ending at EOF has no adjacent
-                // byte on that side and counts as bounded there.
-                let boundaryMatches = structuralMatches.filter { match in
-                    if match.position > 0,
-                       !Self.pdfDelimiters.contains(data[data.startIndex + match.position - 1]) {
-                        return false
-                    }
-                    let end = match.position + match.length
-                    guard end < data.count else { return true }  // EOF = boundary
-                    return Self.pdfDelimiters.contains(data[data.startIndex + end])
-                }
-                if !boundaryMatches.isEmpty {
-                    // Physical-occurrence count: unique (position, length), so
-                    // one occurrence never multi-counts across case/encoding
-                    // pattern variants.
-                    structuralFailMessage =
-                        "Sensitive string found in output PDF structural data (\(AhoCorasick.uniqueOccurrenceCount(boundaryMatches)) match(es))"
-                } else {
-                    deferredWarn = deferredWarn
-                        ?? (message: "Possible sensitive term fragment in output PDF structural data (\(AhoCorasick.uniqueOccurrenceCount(structuralMatches)) match(es))",
-                            pages: nil)
-                }
-            }
-        }
-
-        // M1 tightening: always re-scan PDFKit's decoded
-        // page.string, even when the structural raw-byte pass produced no
-        // matches. PDFKit decodes operator-level encodings transparently
-        // (UTF-16 surrogate halves, octal escapes inside literal strings,
-        // Name-object substitution); sensitive terms that live only inside
-        // an excluded stream range or behind a decoding transformation
-        // surface here.
-        // Accumulate across ALL pages (not first-hit-return) so a multi-page
-        // leak is reported in one run; the 0-based page list feeds the chips.
-        var decodedHitPages: [Int] = []
-        var decodedMatchCount = 0
-        var decodedTermTexts: [String] = []
-        var decodedTermsSeen = Set<String>()
-        for i in 0..<doc.pageCount {
-            guard let page = doc.page(at: i),
-                  let pageText = page.string,
-                  !pageText.isEmpty else { continue }
-            // The decoded text is scanned as extracted and, when the search
-            // path's normalizer changes it (a ligature or another
-            // compatibility form in the text layer), in that normalized form
-            // as well, so a residue the search can locate is never invisible
-            // here. A page counts once; its instance count is the larger of
-            // the two scans, so one occurrence never double-counts.
-            let decodedMatches = termAutomaton.tokenFilteredMatches(in: Data(pageText.utf8))
-            let normalizedText = TextNormalizer.normalize(pageText)
-            let normalizedMatches = normalizedText == pageText
-                ? []
-                : termAutomaton.tokenFilteredMatches(in: Data(normalizedText.utf8))
-            if !decodedMatches.isEmpty || !normalizedMatches.isEmpty {
-                decodedHitPages.append(i)
-                decodedMatchCount += max(
-                    AhoCorasick.uniqueOccurrenceCount(decodedMatches),
-                    AhoCorasick.uniqueOccurrenceCount(normalizedMatches))
-                for text in termAutomaton.matchedTermTexts(decodedMatches + normalizedMatches)
-                where decodedTermsSeen.insert(text).inserted {
-                    decodedTermTexts.append(text)
-                }
-            }
-        }
-        var decodedResidualMessage: String?
-        if !decodedHitPages.isEmpty {
-            let list = decodedHitPages.map { String($0 + 1) }.joined(separator: ", ")
-            decodedResidualMessage =
-                "Text matching your redactions is still readable on \(pagePhrase(decodedHitPages, list: list)) "
-                + "(\(decodedMatchCount) instance\(decodedMatchCount == 1 ? "" : "s"))"
-        }
-        // Combine the held structural and decoded verdicts into ONE result so
-        // neither verdict masks the other; the page list carries the decoded
-        // pass's page-scoped part (the structural pass is document-level).
-        // Tiering: a structural hit is a defect in the output itself → FAIL
-        // (the decoded text rides along in the combined message). A decoded
-        // hit alone is residual text OUTSIDE every region — the user's remedy
-        // is a text search — → ATTENTION, with the term texts threaded for
-        // display (the message itself stays content-free).
-        if let structuralFailMessage {
-            let message = [structuralFailMessage, decodedResidualMessage]
-                .compactMap { $0 }
-                .joined(separator: "; ")
-            return (.fail(message), decodedHitPages.isEmpty ? nil : decodedHitPages, nil, false)
-        }
-        if let decodedResidualMessage {
-            return (.attention(decodedResidualMessage), decodedHitPages, decodedTermTexts, false)
-        }
-
-        // EXIF scan ("scan JPEG APP1/EXIF markers", WARN-only):
-        // EXIF IFD bytes live inside the image stream and surface in neither
-        // page.string nor the structural pass. Scan each JPEG XObject's raw
-        // bytes for an APP1/EXIF segment carrying a sensitive term. WARN only;
-        // skipped if a structural fragment WARN was already recorded.
-        if deferredWarn == nil {
-            for pageIdx in 1...max(1, cgDoc.numberOfPages) {
-                try Task.checkCancellation()
-                guard let cgPage = cgDoc.page(at: pageIdx) else { continue }
-                if Self.extractRawJPEGStreams(from: cgPage).contains(where: {
-                    Self.jpegEXIFContainsTerm($0, automaton: automaton)
-                }) {
-                    deferredWarn = (message: "Sensitive term found in embedded JPEG EXIF metadata on page \(pageIdx)",
-                                    pages: [pageIdx - 1])
-                    break
-                }
-            }
-        }
-
-        if let warn = deferredWarn { return (.warn(warn.message), warn.pages, nil, false) }
-        if droppedTermCount > 0 {
-            // Partial-coverage honesty: some (not all) terms were too short
-            // to search — terms it could not search: a could-not-verify WARN.
-            return (.warn(shortTermTail(droppedTermCount)), nil, nil, true)
-        }
-        return (.pass, nil, nil, false)
-    }
-
-    /// Byte ranges of PDF stream data (between `stream` and `endstream` markers).
-    /// ISO 32000-2 §7.3.8: the `stream` keyword is followed by CR LF or LF
-    /// (bare CR is not permitted), data bytes, then EOL + `endstream`.
-    /// Returns ranges covering the data bytes (exclusive of markers).
-    ///
-    /// The strict pass REQUIRES that keyword EOL. Without it, any structural
-    /// byte-run containing the letters "stream" (e.g. a /Downstream name)
-    /// opened a phantom range reaching to the next `endstream` or EOF, and
-    /// structural term matches inside that span were excluded from Layer 3's
-    /// FAIL/WARN pass. The permissive scan (EOL optional — the pre-gate
-    /// behavior) is retained ONLY as a fallback when the strict pass yields
-    /// no ranges at all, so a malformed writer's streams are still excluded
-    /// rather than raw-byte-scanned (malformed-file tolerance; compressed
-    /// stream bytes as false-positive fodder is the worse failure there).
-    private func findStreamRanges(_ data: Data) -> [Range<Int>] {
-        let strict = scanStreamRanges(data, requireKeywordEOL: true)
-        if !strict.isEmpty { return strict }
-        return scanStreamRanges(data, requireKeywordEOL: false)
-    }
-
-    private func scanStreamRanges(_ data: Data, requireKeywordEOL: Bool) -> [Range<Int>] {
-        // ASCII bytes for marker detection
-        let streamMarker: [UInt8] = [0x73, 0x74, 0x72, 0x65, 0x61, 0x6D]       // "stream"
-        let endstreamMarker: [UInt8] = [0x65, 0x6E, 0x64, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6D] // "endstream"
-
-        var ranges: [Range<Int>] = []
-        data.withUnsafeBytes { rawBuffer in
-            guard let base = rawBuffer.bindMemory(to: UInt8.self).baseAddress else { return }
-            let count = rawBuffer.count
-            var i = 0
-
-            while i < count - streamMarker.count {
-                // Look for "stream" not preceded by "end" (avoid matching "endstream" as "stream")
-                guard memcmp(base + i, streamMarker, streamMarker.count) == 0 else {
-                    i += 1
-                    continue
-                }
-                // Verify not "endstream"
-                if i >= 3 && memcmp(base + i - 3, endstreamMarker, endstreamMarker.count) == 0 {
-                    i += streamMarker.count
-                    continue
-                }
-
-                // Skip past "stream" + EOL (CR+LF or just LF)
-                var dataStart = i + streamMarker.count
-                if requireKeywordEOL {
-                    // Strict: the keyword must be followed by CR LF or LF
-                    // (§7.3.8) or this is not a stream keyword at all — an
-                    // embedded byte-run like "Downstream" opens no range.
-                    if dataStart + 1 < count, base[dataStart] == 0x0D, base[dataStart + 1] == 0x0A {
-                        dataStart += 2
-                    } else if dataStart < count, base[dataStart] == 0x0A {
-                        dataStart += 1
-                    } else {
-                        i += 1
-                        continue
-                    }
-                } else {
-                    if dataStart < count && base[dataStart] == 0x0D { dataStart += 1 } // CR
-                    if dataStart < count && base[dataStart] == 0x0A { dataStart += 1 } // LF
-                }
-
-                // Find "endstream"
-                var j = dataStart
-                while j < count - endstreamMarker.count {
-                    if memcmp(base + j, endstreamMarker, endstreamMarker.count) == 0 {
-                        break
-                    }
-                    j += 1
-                }
-                if j < count - endstreamMarker.count {
-                    ranges.append(dataStart..<j)
-                    i = j + endstreamMarker.count
-                } else {
-                    // Malformed: no endstream found, treat rest as stream data
-                    ranges.append(dataStart..<count)
-                    break
-                }
-            }
-        }
-        return ranges
-    }
-
     // MARK: - Layer 4: Structural Verification
 
     /// Returns (status, affectedPages) where affectedPages is non-nil
@@ -889,11 +604,16 @@ public struct VerificationEngine: Sendable {
 
     // MARK: - Layer 5: Metadata Verification
 
-    private func runLayer5Metadata(_ doc: PDFDocument) throws -> (VerificationStatus, Bool) {
+    /// The fixed-fields PASS detail: the writer's own values, nothing of the
+    /// file's, are what the /Info dictionary carries.
+    static let layer5FixedFieldsDetail =
+        "Producer and timestamps carry the writer's fixed values; no file-specific metadata is present."
+
+    private func runLayer5Metadata(_ doc: PDFDocument) throws -> (VerificationStatus, Bool, LayerCopy?) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         guard let (pdfData, cgDoc) = loadPDFData(doc) else {
-            return (.warn("Could not inspect metadata"), true)
+            return (.warn("Could not inspect metadata"), true, nil)
         }
 
         // Scan for XMP metadata BEFORE the /Info guard. XMP lives in
@@ -910,7 +630,7 @@ public struct VerificationEngine: Sendable {
         guard let infoDict = cgDoc.info else {
             return (hasXMP
                 ? .warn("Auto-injected metadata present: XMP metadata")
-                : .pass, false)
+                : .pass, false, nil)
         }
 
         // Standard metadata keys to check. FAIL on key presence regardless of
@@ -928,13 +648,14 @@ public struct VerificationEngine: Sendable {
         for key in sensitiveKeys {
             var obj: CGPDFObjectRef?
             if CGPDFDictionaryGetObject(infoDict, key, &obj) {
-                return (.fail("Metadata key /\(key) present"), false)
+                return (.fail("Metadata key /\(key) present"), false, nil)
             }
         }
 
-        // /Producer, /CreationDate, /ModDate are Apple auto-injected —
-        // informational only; they ride in `infoFindings` so a clean
-        // doc with only these doesn't bump the masthead off green.
+        // /Producer, /CreationDate, /ModDate are Apple auto-injected and
+        // rewritten to the writer's fixed values (attested below); they
+        // ride in `infoFindings` so a clean doc with only these is a PASS
+        // whose detail says so.
         var infoFindings: [String] = []
         var warnings: [String] = []
         let expectedKeys = ["Producer", "CreationDate", "ModDate"]
@@ -975,7 +696,7 @@ public struct VerificationEngine: Sendable {
         }, nil)
         if !nonStandardKeys.isEmpty {
             // Do not include key values — just names
-            return (.fail("Non-standard /Info key(s): \(nonStandardKeys.joined(separator: ", "))"), false)
+            return (.fail("Non-standard /Info key(s): \(nonStandardKeys.joined(separator: ", "))"), false, nil)
         }
 
         // Writer-field attestation. The writer rewrites the auto-injected
@@ -1002,7 +723,7 @@ public struct VerificationEngine: Sendable {
             var value = (CGPDFStringCopyTextString(ref) as String?) ?? ""
             while value.hasSuffix(" ") { value.removeLast() }
             if value != fixedValue {
-                return (.warn("Producer or timestamp fields were not rewritten to the fixed values"), false)
+                return (.warn("Producer or timestamp fields were not rewritten to the fixed values"), false, nil)
             }
         }
 
@@ -1014,7 +735,7 @@ public struct VerificationEngine: Sendable {
         // a value. An absent pair stays on the paths below.
         if let idArray = cgDoc.fileIdentifier,
            !Self.fileIdentifierMatchesContents(idArray, pdfData: pdfData) {
-            return (.warn("File identifier was not derived from the file contents"), false)
+            return (.warn("File identifier was not derived from the file contents"), false, nil)
         }
 
         // XMP metadata — scanned above the /Info guard; fold the
@@ -1032,12 +753,14 @@ public struct VerificationEngine: Sendable {
             // XMP is the sole entry.
             let onlyXMP = warnings.allSatisfy { $0 == "XMP metadata" }
             let prefix = onlyXMP ? "Auto-injected metadata present" : "Metadata present"
-            return (.warn("\(prefix): \(warnings.joined(separator: ", "))"), false)
+            return (.warn("\(prefix): \(warnings.joined(separator: ", "))"), false, nil)
         }
         if !infoFindings.isEmpty {
-            return (.info("Auto-injected metadata present: \(infoFindings.joined(separator: ", "))"), false)
+            // The three keys are always present by construction and were
+            // attested above: a PASS that says what it read, never a note.
+            return (.pass, false, LayerCopy(short: "No issues found.", detail: Self.layer5FixedFieldsDetail))
         }
-        return (.pass, false)
+        return (.pass, false, nil)
     }
 
     /// True when the two strings of a trailer `/ID` array both equal the
@@ -1064,7 +787,7 @@ public struct VerificationEngine: Sendable {
     /// Prefers URL-based loading; reads the file with default options (no
     /// mapping requested).
     /// Falls back to dataRepresentation() for non-file documents.
-    private func loadPDFData(_ doc: PDFDocument) -> (Data, CGPDFDocument)? {
+    func loadPDFData(_ doc: PDFDocument) -> (Data, CGPDFDocument)? {
         if let url = doc.documentURL,
            let data = try? Data(contentsOf: url),
            let cgDoc = CGPDFDocument(url as CFURL) {

@@ -8,8 +8,10 @@ import CoreGraphics
 // the layer template's detail line: a check that has nothing to add to
 // its short line emits an EMPTY detail (pass / warn / info / attention /
 // fail, and the Layer 7 boundary promotion, whose short line carries the
-// count); the skipped arm keeps its sentence (it adds the why). The app
-// never string-sniffs engine copy.
+// count); the skipped arm keeps its sentence (it adds the why); a PASS
+// whose check read something and reports nothing (Layer 5's fixed writer
+// fields, Layer 2's outside-region text) carries one detail sentence
+// behind the generic short line. The app never string-sniffs engine copy.
 
 @Suite("LayerResult.hasDetail and the template's detail line")
 struct LayerResultHasDetailTests {
@@ -24,7 +26,7 @@ struct LayerResultHasDetailTests {
         let n = doc.pageCount
         let engine = VerificationEngine()
         return await engine.runLayer(
-            index, outputDocument: SendablePDFDocument(doc),
+            engine.layers(for: mode)[index], outputDocument: SendablePDFDocument(doc),
             sourcePageCount: n, regions: [:],
             sensitiveTerms: terms.map { SensitiveTerm(text: $0) },
             pipelineMode: mode,
@@ -110,6 +112,22 @@ struct LayerResultHasDetailTests {
         #expect(r.status.isFail, "got \(r.status)")
         #expect(r.detailDescription == "", "got: \(r.detailDescription)")
         #expect(r.hasDetail == false)
+    }
+
+    @Test("PASS with detail: Layer 5's fixed writer fields keep the generic short line and add one sentence")
+    func layer5FixedFieldsPassCarriesDetail() async throws {
+        let (doc, url) = try TestFixtures.writeTempPDF(
+            TestFixtures.withMetadataRaw(
+                infoDictBody: "/Producer (\(PDFStreamReconstructor.fixedProducerValue))"),
+            prefix: "hd_pass_detail_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let r = await run(4, doc, mode: .secureRasterization)
+        #expect(r.status == .pass, "got \(r.status)")
+        #expect(r.shortDescription == "No issues found.")
+        #expect(r.detailDescription == VerificationEngine.layer5FixedFieldsDetail,
+                "got: \(r.detailDescription)")
+        #expect(r.hasDetail == true)
+        #expect(r.pageReferences == nil)
     }
 
     @Test("SKIPPED keeps its generic sentence — it adds the why")

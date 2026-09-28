@@ -5,22 +5,25 @@ import PDFKit
 
 // Layer identity: `VerificationLayer` + `VerificationEngine.layers(for:)`
 // replace index arithmetic. These pins hold the per-mode order and counts,
-// the phase partition, the index adapters' parity with the identity entry,
-// and the mode-aware names.
+// the phase partition, the two post-sequential checks last, and the
+// mode-aware names. The index adapters are gone: every caller names the
+// layer.
 
 @Suite("Verification layer identity")
 struct VerificationLayerIdentityTests {
 
     private let engine = VerificationEngine()
 
-    @Test("Secure Rasterization runs 6 layers, Searchable 11; the search re-check is last in both")
-    func countsAndLastLayer() {
+    @Test("Secure Rasterization runs 7 layers, Searchable 12; the search re-check then the detection sweep are last in both")
+    func countsAndLastLayers() {
         let raster = engine.layers(for: .secureRasterization)
         let searchable = engine.layers(for: .searchableRedaction)
-        #expect(raster.count == 6)
-        #expect(searchable.count == 11)
-        #expect(raster.last == .searchRecheck)
-        #expect(searchable.last == .searchRecheck)
+        #expect(raster.count == 7)
+        #expect(searchable.count == 12)
+        #expect(raster.suffix(2) == [.searchRecheck, .detectionSweep])
+        #expect(searchable.suffix(2) == [.searchRecheck, .detectionSweep])
+        #expect(raster.last == .detectionSweep)
+        #expect(searchable.last == .detectionSweep)
         #expect(engine.layerCount(for: .secureRasterization) == raster.count)
         #expect(engine.layerCount(for: .searchableRedaction) == searchable.count)
         // The Searchable order IS the declaration order.
@@ -38,6 +41,10 @@ struct VerificationLayerIdentityTests {
         #expect(Set(VerificationLayer.allCases.map(\.name)).count == VerificationLayer.allCases.count)
         #expect(VerificationLayer.searchRecheck.name == "Search Re-check")
         #expect(VerificationLayer.searchRecheck.symbolName == "text.page.badge.magnifyingglass")
+        #expect(VerificationLayer.detectionSweep.name == "Detection Sweep")
+        #expect(VerificationLayer.detectionSweep.symbolName == "rectangle.and.text.magnifyingglass")
+        // Layer 3's fallback is a real SF Symbol name (the app masks nothing).
+        #expect(VerificationLayer.binaryStringSearch.symbolName == "01.square.fill")
     }
 
     @Test("The phase partition covers every layer exactly once")
@@ -54,53 +61,45 @@ struct VerificationLayerIdentityTests {
                 == [.structureCheck, .metadataCheck])
         #expect(VerificationLayer.allCases.filter { $0.phase == .sandwichSequential }
                 == [.spatialVerification, .characterCount, .fontVerification, .characterLineage])
-        #expect(VerificationLayer.allCases.filter { $0.phase == .postSequential } == [.searchRecheck])
+        #expect(VerificationLayer.allCases.filter { $0.phase == .postSequential }
+                == [.searchRecheck, .detectionSweep])
         // Raster mode carries no sandwich layer and no operator re-extraction.
         let raster = engine.layers(for: .secureRasterization)
         #expect(!raster.contains { $0.phase == .sandwichSequential })
         #expect(!raster.contains(.operatorReExtraction))
+        #expect(raster.contains(.detectionSweep))
     }
 
     @Test("Mode-aware names: index 5 is the re-check in raster and Spatial Verification in searchable")
     func modeAwareNames() {
         #expect(engine.layerName(at: 5, mode: .secureRasterization) == "Search Re-check")
+        #expect(engine.layerName(at: 6, mode: .secureRasterization) == "Detection Sweep")
         #expect(engine.layerName(at: 5, mode: .searchableRedaction) == "Spatial Verification")
         #expect(engine.layerName(at: 10, mode: .searchableRedaction) == "Search Re-check")
+        #expect(engine.layerName(at: 11, mode: .searchableRedaction) == "Detection Sweep")
         #expect(engine.layers(for: .secureRasterization)[5].symbolName == "text.page.badge.magnifyingglass")
-        // Out of range keeps the historical fallbacks.
-        #expect(engine.layerName(at: 6, mode: .secureRasterization) == "Unknown Layer")
-        // The index-only adapters read the Searchable order.
-        #expect(engine.layerName(at: 10) == "Search Re-check")
-        #expect(engine.layerName(at: 5) == "Spatial Verification")
-        #expect(engine.layerName(at: 11) == "Unknown Layer")
+        // Out of range keeps the historical fallback.
+        #expect(engine.layerName(at: 7, mode: .secureRasterization) == "Unknown Layer")
         for (index, layer) in VerificationLayer.allCases.enumerated() {
-            #expect(engine.layerName(at: index) == layer.name)
+            #expect(engine.layers(for: .searchableRedaction)[index].name == layer.name)
             #expect(engine.layers(for: .searchableRedaction)[index].symbolName == layer.symbolName)
         }
     }
 
-    @Test("Index adapter parity: runLayer(i) ≡ runLayer(layers(for:)[i]) for every index in both modes",
+    @Test("Every layer runs by identity and stamps it on its result, in both modes",
           arguments: [PipelineMode.secureRasterization, PipelineMode.searchableRedaction])
-    func indexAdapterParity(mode: PipelineMode) async throws {
+    func identityRunStampsTheLayer(mode: PipelineMode) async throws {
         let (doc, url) = try TestFixtures.writeTempPDF(TestFixtures.blankPage(), prefix: "identity_")
         defer { try? FileManager.default.removeItem(at: url) }
         let wrapped = SendablePDFDocument(doc)
-        let ordered = engine.layers(for: mode)
-        for (index, layer) in ordered.enumerated() {
-            let byIndex = await engine.runLayer(
-                index, outputDocument: wrapped, sourcePageCount: 1, regions: [:],
-                sensitiveTerms: [], pipelineMode: mode, filterDigests: [nil],
-                perPageModes: [mode])
-            let byIdentity = await engine.runLayer(
+        for layer in engine.layers(for: mode) {
+            let result = await engine.runLayer(
                 layer, outputDocument: wrapped, sourcePageCount: 1, regions: [:],
                 sensitiveTerms: [], pipelineMode: mode, filterDigests: [nil],
                 perPageModes: [mode])
-            #expect(byIndex.status == byIdentity.status, "\(mode) index \(index) / \(layer)")
-            #expect(byIndex.name == layer.name)
-            #expect(byIdentity.name == layer.name)
-            #expect(byIndex.layer == layer, "the adapter must stamp the identity")
-            #expect(byIdentity.layer == layer)
-            #expect(byIndex.symbolName == layer.symbolName)
+            #expect(result.name == layer.name, "\(mode) / \(layer)")
+            #expect(result.layer == layer)
+            #expect(result.symbolName == layer.symbolName)
         }
     }
 
@@ -115,14 +114,16 @@ struct VerificationLayerIdentityTests {
         let box = Box()
         var spy = VerificationEngine()
         spy.onRunLayerDispatch = { ordinal, _ in box.record(ordinal) }
-        _ = await spy.runLayer(
-            .searchRecheck, outputDocument: SendablePDFDocument(doc), sourcePageCount: 1,
-            regions: [:], sensitiveTerms: [], pipelineMode: .secureRasterization,
-            filterDigests: [nil], perPageModes: [.secureRasterization])
-        _ = await spy.runLayer(
-            .searchRecheck, outputDocument: SendablePDFDocument(doc), sourcePageCount: 1,
-            regions: [:], sensitiveTerms: [], pipelineMode: .searchableRedaction,
-            filterDigests: [nil], perPageModes: [.searchableRedaction])
-        #expect(box.seen == [5, 10])
+        for layer in [VerificationLayer.searchRecheck, .detectionSweep] {
+            _ = await spy.runLayer(
+                layer, outputDocument: SendablePDFDocument(doc), sourcePageCount: 1,
+                regions: [:], sensitiveTerms: [], pipelineMode: .secureRasterization,
+                filterDigests: [nil], perPageModes: [.secureRasterization])
+            _ = await spy.runLayer(
+                layer, outputDocument: SendablePDFDocument(doc), sourcePageCount: 1,
+                regions: [:], sensitiveTerms: [], pipelineMode: .searchableRedaction,
+                filterDigests: [nil], perPageModes: [.searchableRedaction])
+        }
+        #expect(box.seen == [5, 10, 6, 11])
     }
 }
