@@ -108,8 +108,10 @@ struct ReviewWalkTests {
         #expect(summary() == nil)
         walk.next()
         #expect(summary() == WalkSummary(kind: "SSN", pageLabel: "Page 2 of 5", text: "123-45-6789"))
+        #expect(summary()?.accessibilityValue == "SSN, Page 2 of 5, 123-45-6789")
         walk.next()
         #expect(summary() == WalkSummary(kind: "Detected Face", pageLabel: "Page 4 of 5", text: nil))
+        #expect(summary()?.accessibilityValue == "Detected Face, Page 4 of 5")
         // The same label the search summary uses.
         #expect(WalkSummary.pageLabel(pageIndex: 1, pageCount: 5) == SearchState.walkPageLabel(pageIndex: 1, pageCount: 5))
     }

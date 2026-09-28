@@ -5,9 +5,10 @@ import RedactionEngine
 // The review-origin walk's cursor — pure state over the staged
 // detections (`RedactionState.pendingTriage`), so the pipeline review
 // steps its rows from the parked strip the way the search walk steps
-// its results: the same ‹ › pair, the same counter, the same match
-// line, and in the Apply slot a one-tap Select (the row checkbox's
-// sibling; the header's "Apply N" commits, as it always did). The sheet
+// its results: the same ‹ › pair, the same counter, the same VoiceOver
+// value on Select as on Apply, and in the Apply slot a one-tap Select
+// (the row checkbox's sibling; the header's "Apply N" commits, as it
+// always did). The sheet
 // holds one as `@State`; the walk seam (`+Walk.swift`) re-anchors it
 // against the live staged set on every read and steps it, and the
 // canvas half of the seam frames the current row.
@@ -110,21 +111,13 @@ struct ReviewWalk: Equatable {
     }
 }
 
-// MARK: - The match line
-
-extension ReviewWalk {
-    /// The strip's line for the current row — `.empty` with no current
-    /// (before the first step, or after the set emptied under it).
-    func line(pageCount: Int) -> WalkLine {
-        guard let item = current else { return .empty }
-        return .match(WalkSummary(item: item, pageCount: pageCount))
-    }
-}
+// MARK: - The current row's summary
 
 extension WalkSummary {
-    /// The review origin's line: the kind = the category name the Scan
-    /// search line uses (`PIICategory.rawValue`) when the kind has one,
-    /// else the kind's full name (a face, a barcode, a possible
+    /// The review origin's summary (the strip's Select reads it as its
+    /// accessibility value): the kind = the category name the Scan
+    /// search summary uses (`PIICategory.rawValue`) when the kind has
+    /// one, else the kind's full name (a face, a barcode, a possible
     /// signature); the page readout over the document; the matched
     /// text, absent for the kinds that carry none.
     init(item: ReviewWalk.Item, pageCount: Int) {

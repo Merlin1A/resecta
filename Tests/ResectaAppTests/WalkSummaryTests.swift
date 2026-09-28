@@ -63,6 +63,18 @@ struct WalkSummaryTests {
         #expect(SearchState.walkPageLabel(pageIndex: 22, pageCount: 23) == "Page 23 of 23")
     }
 
+    @Test("The accessibility value reads kind, page, text — commas, no dots")
+    func accessibilityValueThreeParts() {
+        let s = state(mode: .piiScan, results: [result(page: 1, matched: "Hartwell", term: "name", category: .name)])
+        #expect(s.walkSummary(for: s.results[0], pageCount: 3).accessibilityValue == "Name, Page 2 of 3, Hartwell")
+    }
+
+    @Test("The accessibility value has two parts when the summary carries no text")
+    func accessibilityValueTwoParts() {
+        let same = state(mode: .text, results: [result(page: 0, matched: "DELIA", term: "Delia")])
+        #expect(same.walkSummary(for: same.results[0], pageCount: 3).accessibilityValue == "Delia, Page 1 of 3")
+    }
+
     @Test("The walk is live with results on board, or with the staged review owning the Scan interface (the review walk)")
     func walkLiveness() {
         let search = state(mode: .text, results: [result(matched: "x", term: "x")])

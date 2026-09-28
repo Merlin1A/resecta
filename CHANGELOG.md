@@ -17,7 +17,7 @@ The entries below follow the Keep-a-Changelog index format.
 ### Changed
 
 - Verification results: the two informational notes that every run carried — page content outside the redacted regions, and the writer's fixed metadata fields — now read as passing checks with a detail line; the results screen no longer carries the "Automated detection did not run" line — the Detection Sweep row reports what the detectors observed on the output.
-- **Stepping through matches.** The parked Search/Scan strip is taller and names the current match (kind, page, text); each match is centred on the page as you step; the page bar steps aside while you step through matches and returns when the sheet expands; the detection review gets the same Previous/Next stepping with a one-tap Select.
+- **Stepping through matches.** The parked Search/Scan strip steps through matches with Previous/Next and a one-tap Apply; each match is centred on the page as you step; the page bar steps aside while you step through matches and returns when the sheet expands; the detection review gets the same Previous/Next stepping with a one-tap Select.
 - Diagnostics export: the coverage snapshot share writes inside the per-session directory with complete protection at write time and is withheld while the screen is captured, matching the audit export.
 - Verification: the OCR check now reports a redacted term that is still readable outside every redacted region as Attention Needed on both output modes, naming the text on the results screen; on rasterized pages it was an informational note.
 - Verification: the text-layer checks report pages without per-page mode data as not checked instead of passing them.
