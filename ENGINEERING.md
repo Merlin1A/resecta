@@ -63,9 +63,10 @@ markers — the signature of an incremental update appended after redaction);
 metadata checks; a search re-check that re-runs each search you applied
 through the search engine itself against the output — OCR of the rendered
 pages in this mode — and reports what it observed per search; and a detection
-sweep that runs the app's detectors on the output through the search engine
-and reports what remains, minus what you chose to leave unredacted — read by
-OCR on rasterized pages. Searchable Redaction adds five more over the
+sweep that runs the app's structured detectors on the output through the
+search engine — names and addresses are not swept — and reports what remains
+in those categories, minus what you chose to leave unredacted; read by OCR on
+rasterized pages. Searchable Redaction adds five more over the
 preserved text layer (twelve in total):
 spatial exclusion (no character geometry inside a redacted region),
 character count cross-checks, font verification, character lineage, and an
@@ -90,9 +91,9 @@ Details a reviewer should know exist:
   to the results UI as
   explicit "could not verify" states rather than folded into a pass.
 - The verdict tiers are calibrated against alarm fatigue: conditions that are
-  expected under the chosen mode are informational notes, while every
-  could-not-verify condition keeps its severity. A warning tier that fires on
-  every normal document carries no information.
+  expected under the chosen mode read as passing checks with a detail line,
+  while every could-not-verify condition keeps its severity. A warning tier
+  that fires on every normal document carries no information.
 - Verification is advisory by design. A failed or skipped verdict does not
   hard-block export — it routes the share action through an explicit
   confirmation instead. I chose that over hard-blocking because the check has
@@ -232,7 +233,7 @@ concurrent entry points. The working rules, checkable by grep:
   queue for thumbnail-cache disk writes) and **zero** `.main.async` calls —
   main-thread work is expressed through actor isolation, not queue hops.
 - Isolation opt-outs are rare and deliberate: 25 `nonisolated(unsafe)`
-  declarations across ~66,000 lines of app + engine source, and the working
+  declarations across ~68,000 lines of app + engine source, and the working
   convention is a written rationale at the declaration site saying why the
   access is safe.
 - Long pixel operations (fills, readbacks) run in 256-row bands with a
@@ -314,6 +315,10 @@ assets. The contract between the two repos is enforced, not eyeballed:
   (`Scripts/verify-shipped-asset-hashes.sh`) additionally pins the two most
   drift-prone config blobs byte-exact before any release build.
 
+The trust boundary this section implements — what the signature proves and
+what it does not — is stated for readers in [`THREAT-MODEL.md`](./THREAT-MODEL.md)
+§4, and the key's custody in the pipeline's `KEY-MANAGEMENT.md`.
+
 ## 9. The engine's public surface is the document-runner API
 
 The engine is a separate Swift module, so `public` is exactly what the app
@@ -326,9 +331,10 @@ detect, search, rebuild, verify and export without the app's view code:
 - Search: `DocumentSearcher` (`search` · `previewMatches` · the result and
   diagnostic sink setters · `boundingRect` · the regex validators ·
   `maxResults` · `sharedLoadDiagnostics`) · `SearchMode` · `SearchOptions` ·
-  `SearchResult` · `SearchPreviewResult` · `TextSpan` (`words(fullyInside:on:)` — the
-  words of a page's text layer inside a region, in the displayed frame; the
-  verification run captures a manual region's words through it)
+  `SearchResult` · `SearchPreviewResult` · `TextSpan`
+  (`words(fullyInside:polygon:on:)` — the words of a page's text layer fully
+  inside a region, in the displayed frame; the verification run captures a
+  manual region's words through it on pages with a usable text layer)
 - Rebuild: `PDFStreamReconstructor`
 - Verification: `VerificationEngine.runLayer` / `aggregateStatus` /
   `layers(for:)` · `VerificationOrchestrator` · `VerificationReport` ·
@@ -355,7 +361,11 @@ If you review one path end-to-end, make it this one:
 `Pipeline/PDFStreamReconstructor.swift` (rebuild) →
 `Verification/VerificationEngine.swift` (the layered pass over the output) →
 `SecurityTests/FakeRedactionTests.swift` (the named attack, pinned). The test
-tree is larger than the source tree — about 66,000 lines of source to about
+tree is larger than the source tree — about 68,000 lines of source to about
 102,000 lines of tests; counts and structure are in the README's Testing
 section — and the suites above are the reason I trust my own output enough to
 ship it.
+
+`THREAT-MODEL.md` states what the app protects, against whom, where its trust
+boundaries lie, the accepted risks, and a dated posture table with a check per
+line.

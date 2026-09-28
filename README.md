@@ -97,7 +97,7 @@ Users are responsible for verifying that redaction output meets their specific r
 
 ## Threat model
 
-Resecta is designed to address specific risks that arise when sharing redacted documents. The list below names what is in scope and what is not.
+Resecta is designed to address specific risks that arise when sharing redacted documents. The list below names what is in scope and what is not; the full model — assets, adversaries, trust boundaries, accepted risks and a dated security-posture table — is [`THREAT-MODEL.md`](./THREAT-MODEL.md).
 
 **In scope:**
 
@@ -119,7 +119,7 @@ Each load-bearing claim in this README is paired with a mechanical check in this
 | Claim | Check |
 | --- | --- |
 | Marked regions are destroyed, not covered | Per-region pixel readback after every fill — one wrong pixel fails the export (`Pipeline/PageRasterizer.swift`); the classic annotation-over-text attacks are constructed and destroyed in `SecurityTests/FakeRedactionTests.swift` |
-| The exported file is re-checked independently | The 7/12-layer verification pass re-opens the output and scans text, OCR, raw bytes across seven encodings, structure, and metadata, re-runs each applied search on the output, and runs the app's detectors on the output to report what remains (`Verification/VerificationEngine.swift`) |
+| The exported file is re-checked independently | The 7/12-layer verification pass re-opens the output and scans text, OCR, raw bytes across seven encodings, structure, and metadata, re-runs each applied search on the output, and runs the app's structured detectors on the output to report what remains — names and addresses are not swept (`Verification/VerificationEngine.swift`) |
 | Placement survives rotated pages | A rotation × crop-box-origin test matrix positions its regions with a transform written independently of the production code (`SecurityTests/RotatedPageCoordinateTests.swift`) |
 | No network requests of its own | A source grep for networking symbols returns no code references (the sole hit is a comment); the pre-commit hook rejects those symbols in any staged diff (`Scripts/audit-lint.sh`) |
 | The app's own copy doesn't overclaim | A banned-vocabulary lint walks every localized string and the shipping docs (`Tests/ResectaAppTests/LegalPhraseLintTests.swift`, `Scripts/claims-lint.sh`) |
@@ -174,7 +174,7 @@ A stranger can clone, build, and start contributing with these steps:
 
 ## Testing
 
-The test tree is larger than the source tree: roughly 67,000 lines of Swift source to roughly 102,000 lines of test code, about 1.5×. Counted from the current tree:
+The test tree is larger than the source tree: roughly 68,000 lines of Swift source to roughly 102,000 lines of test code, about 1.5×. Counted from the current tree:
 
 - **Engine package** (`Packages/RedactionEngine/Tests`) — 1,990 Swift Testing `@Test` functions across 269 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
 - **App target** (`Tests/ResectaAppTests`) — 1,707 `@Test` functions across 243 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.

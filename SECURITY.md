@@ -2,6 +2,8 @@
 
 Resecta is an on-device iOS redaction app. Because redaction is a security-sensitive operation, we take reports of vulnerabilities seriously and welcome good-faith security research.
 
+The threat model this policy is written against — what the app protects, whom it protects it from, where its trust boundaries lie, and what it does not claim to handle — is published in [`THREAT-MODEL.md`](./THREAT-MODEL.md), together with a dated table of the project's security posture and how to check each line.
+
 ## Supported versions
 
 | Version | Supported |
@@ -21,6 +23,10 @@ Please report suspected vulnerabilities through either of the following channels
 
 Please **do not** file public GitHub issues for security reports until the issue has been addressed and coordinated disclosure has been agreed upon.
 
+Plain email is the default channel and is monitored regularly. If a report needs more confidentiality than email offers, use a private GitHub Security Advisory: it keeps the report restricted to you and the maintainer without a separate encryption key or an out-of-band verification step. No PGP key is published for this address.
+
+The machine-readable pointer to this policy is `https://resecta.app/.well-known/security.txt`.
+
 ### What to include
 
 A useful report generally contains:
@@ -36,6 +42,17 @@ A useful report generally contains:
 - **Triage update:** within 30 days of acknowledgement.
 - **Disclosure coordination:** we will work with you on a disclosure timeline. We request a **90-day embargo** from the date of first report before public disclosure, and will aim in good faith to have a fix ready within that window — Resecta is maintained on a best-effort basis, so this is an intention, not a guarantee. If additional time is needed, we will communicate early. <!-- LegalPhrases:safe -->
 
+### How reports are classed
+
+Triage orders reports by what the issue would let an adversary do, in this order, from most to least serious:
+
+1. Content recoverable from a file the app presented as redacted, by whoever receives that file.
+2. Original document content, or text you typed into the app, left on the device beyond the editing session where it can be read from a backup or a locked device.
+3. A crafted document that makes the app export something under-redacted while reporting a pass, or that crashes or exhausts it.
+4. A public claim about the app that is false.
+
+The timelines above apply to every class; the order sets what is worked on first.
+
 ## Scope
 
 **In scope:**
@@ -43,6 +60,8 @@ A useful report generally contains:
 - The Resecta iOS application (all code in this repository).
 - Bundled first-party Swift packages (e.g., `Packages/RedactionEngine/`).
 - Any vulnerability that could undermine the redaction, verification, metadata, or on-device-only properties the app is designed to provide.
+
+The detection-data pipeline ([`resecta-datapipeline`](https://github.com/Merlin1A/resecta-datapipeline)) and the sample-document generator ([`resecta-sample-doc`](https://github.com/Merlin1A/resecta-sample-doc)) carry their own security policies; a report about the data the app bundles is welcome in either place.
 
 **Out of scope:**
 
@@ -92,5 +111,9 @@ When a reported issue is resolved, we will:
 - Publish a changelog entry referencing the fix (CVE assignment where appropriate).
 - Credit the reporter, unless anonymity was requested.
 - Coordinate public disclosure after the fix is available to users.
+
+## Advisory history
+
+No security advisories have been published for Resecta as of this document's last update. Fixes that came out of the project's own security reviews are recorded in [`CHANGELOG.md`](./CHANGELOG.md), under a release's `Security` heading where it has one.
 
 Thank you for helping keep Resecta and its users safe.
