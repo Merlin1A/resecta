@@ -115,6 +115,7 @@ public struct VerificationOrchestrator: Sendable {
         perPageModes: [PipelineMode],
         perPageFallbackReasons: [TextLayerDetector.FallbackReason?],
         appliedSearches: [SearchRecheckRequest],
+        manualRegionsWithoutText: Int = 0,
         provisionLayerDocuments: ([VerificationLayer]) async -> [VerificationLayer: SendablePDFDocument]?,
         events: (VerificationRunEvent) -> Void
     ) async throws -> VerificationReport {
@@ -168,7 +169,8 @@ public struct VerificationOrchestrator: Sendable {
                 sensitiveTerms: sensitiveTerms,
                 pipelineMode: pipelineMode,
                 filterDigests: filterDigests,
-                perPageModes: perPageModes
+                perPageModes: perPageModes,
+                manualRegionsWithoutText: manualRegionsWithoutText
             )
 
             // Canonical order within the batch so the announcements and the
@@ -197,7 +199,8 @@ public struct VerificationOrchestrator: Sendable {
                     sensitiveTerms: sensitiveTerms,
                     pipelineMode: pipelineMode,
                     filterDigests: filterDigests,
-                    perPageModes: perPageModes
+                    perPageModes: perPageModes,
+                    manualRegionsWithoutText: manualRegionsWithoutText
                 )
                 resultsByLayer[layer] = result
                 completedLayers.append(result)
@@ -225,6 +228,7 @@ public struct VerificationOrchestrator: Sendable {
                     filterDigests: filterDigests,
                     perPageModes: perPageModes,
                     appliedSearches: appliedSearches,
+                    manualRegionsWithoutText: manualRegionsWithoutText,
                     // The pass's wall-clock rides the first row's duration so
                     // the post rows sum to the batch.
                     batch: batch.map { PostSequentialBatch(
@@ -284,7 +288,8 @@ public struct VerificationOrchestrator: Sendable {
         sensitiveTerms: [SensitiveTerm],
         pipelineMode: PipelineMode,
         filterDigests: [PageFilterDigest?],
-        perPageModes: [PipelineMode]
+        perPageModes: [PipelineMode],
+        manualRegionsWithoutText: Int = 0
     ) async throws -> [(VerificationLayer, LayerResult)] {
         guard let perLayerDocuments else {
             // Debug-only diagnostic; no Phase change, no PipelineError, no
@@ -304,7 +309,8 @@ public struct VerificationOrchestrator: Sendable {
                     sensitiveTerms: sensitiveTerms,
                     pipelineMode: pipelineMode,
                     filterDigests: filterDigests,
-                    perPageModes: perPageModes
+                    perPageModes: perPageModes,
+                    manualRegionsWithoutText: manualRegionsWithoutText
                 )
                 collected.append((layer, result))
             }
@@ -324,7 +330,8 @@ public struct VerificationOrchestrator: Sendable {
                         sensitiveTerms: sensitiveTerms,
                         pipelineMode: pipelineMode,
                         filterDigests: filterDigests,
-                        perPageModes: perPageModes
+                        perPageModes: perPageModes,
+                        manualRegionsWithoutText: manualRegionsWithoutText
                     )
                     return (layer, result)
                 }

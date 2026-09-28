@@ -79,23 +79,14 @@ public struct VerificationEngine: Sendable {
         VerificationLayer.allCases.filter { $0.appliesTo(mode) }
     }
 
-    /// Total layer count for a given pipeline mode (never hardcoded).
-    public func layerCount(for mode: PipelineMode) -> Int {
-        layers(for: mode).count
-    }
-
-    /// Human-readable name for the layer at `index` in `mode`'s order.
-    public func layerName(at index: Int, mode: PipelineMode) -> String {
-        let ordered = layers(for: mode)
-        return ordered.indices.contains(index) ? ordered[index].name : "Unknown Layer"
-    }
-
     /// Run a single verification layer. `appliedSearches` feeds the two
     /// post-sequential checks only (every other layer ignores it): the typed
     /// requests the Search Re-check, the scan requests the Detection Sweep;
     /// empty ⇒ that layer reports INFO. Called on its own, each of those two
     /// runs its own pass over the output; the orchestrator runs ONE pass for
     /// both and hands it in through the internal overload.
+    /// `manualRegionsWithoutText` (manual regions on pages with no text
+    /// layer to read) is Layer 3's alone: its clean line names them.
     @concurrent
     public func runLayer(
         _ layer: VerificationLayer,
@@ -106,13 +97,15 @@ public struct VerificationEngine: Sendable {
         pipelineMode: PipelineMode,
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode],
-        appliedSearches: [SearchRecheckRequest] = []
+        appliedSearches: [SearchRecheckRequest] = [],
+        manualRegionsWithoutText: Int = 0
     ) async -> LayerResult {
         await runLayer(
             layer, outputDocument: outputDocument, sourcePageCount: sourcePageCount,
             regions: regions, sensitiveTerms: sensitiveTerms, pipelineMode: pipelineMode,
             filterDigests: filterDigests, perPageModes: perPageModes,
-            appliedSearches: appliedSearches, batch: nil)
+            appliedSearches: appliedSearches, manualRegionsWithoutText: manualRegionsWithoutText,
+            batch: nil)
     }
 
     /// The layer template behind `runLayer`: `batch` is the orchestrator's
@@ -129,6 +122,7 @@ public struct VerificationEngine: Sendable {
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode],
         appliedSearches: [SearchRecheckRequest],
+        manualRegionsWithoutText: Int,
         batch: PostSequentialBatch?
     ) async -> LayerResult {
         // A layer that does not apply to the mode is a caller bug; a silent
@@ -204,6 +198,8 @@ public struct VerificationEngine: Sendable {
                 layerPageReferences = pages2
                 layerReviewTerms = terms2
                 couldNotVerify = cnv2
+                // Manual regions on pages with no text layer: the clean line gains one sentence.
+                copyOverride = Self.manualRegionsWithoutTextCopy(status, count: manualRegionsWithoutText)
             case .structureCheck:
                 let (s, pages, cnv3) = try runLayer4Structural(doc)
                 status = s

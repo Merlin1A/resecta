@@ -11,6 +11,33 @@ extension VerificationEngine {
 
     // MARK: - Layer 3: Binary String Search
 
+    /// The one detail sentence Layer 3 adds behind its PASS or INFO line
+    /// when manual regions sat on pages with no text layer to read: their
+    /// text identity could not be captured, so the string search had
+    /// nothing of theirs to look for. Mechanism wording; no count of what
+    /// might be under them.
+    static func manualRegionsWithoutTextDetail(_ count: Int) -> String {
+        count == 1
+            ? "1 manual region on an image-only page carries no text to search for."
+            : "\(count) manual regions on image-only pages carry no text to search for."
+    }
+
+    /// Layer 3's copy for a run with such regions: the clean line (PASS's
+    /// generic short line, INFO's note) gains the detail sentence; every
+    /// other status keeps its own copy, and a count of zero adds nothing.
+    static func manualRegionsWithoutTextCopy(
+        _ status: VerificationStatus, count: Int
+    ) -> LayerCopy? {
+        guard count > 0 else { return nil }
+        let short: String
+        switch status {
+        case .pass: short = "No issues found."
+        case .info(let note): short = note
+        default: return nil
+        }
+        return LayerCopy(short: short, detail: manualRegionsWithoutTextDetail(count))
+    }
+
     /// Returns (status, affectedPages, reviewTermTexts). The
     /// decoded-page hits and the EXIF WARN carry their 0-based page lists
     /// for the UI's tappable page chips; the structural raw-byte pass is

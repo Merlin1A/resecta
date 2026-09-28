@@ -155,6 +155,66 @@ extension VerificationCorpusRunnerTests {
         }.sorted { $0.text < $1.text }
     }
 
+    // MARK: - The manual-region rule mirror
+
+    /// Mirror of the app's
+    /// `PipelineCoordinator.sensitiveTermSet(applied:manualRegions:in:textLayerStatus:)`
+    /// for the harness's manual regions — the seeds WITHOUT a value (a GT
+    /// seed with a value stands for a detected region and keeps the
+    /// matched-text rule above). On a page whose text layer is rich the
+    /// words fully inside the region (the engine's word-span primitive) join
+    /// the set: a multi-word run as one substring term plus each token of
+    /// three or more scalars bounded; a single word as one bounded token.
+    /// On any other page the region is counted, not captured. A whole-page
+    /// region (area ≥ 0.95) is skipped; a below-floor or out-of-range seed
+    /// never became a region and is ignored.
+    static func manualRegionTerms(
+        seeds: [RegionSeed], doc: PDFDocument, polygon: Bool,
+        textLayerStatus: [Int: TextLayerStatus]
+    ) -> (terms: [SensitiveTerm], regionsWithoutText: Int) {
+        var boundaryByText: [String: Bool] = [:]
+        func insert(_ text: String, bounded: Bool) {
+            boundaryByText[text] = (boundaryByText[text] ?? true) && bounded
+        }
+        var withoutText = 0
+        for seed in seeds where seed.value.isEmpty {
+            guard seed.page >= 0, seed.page < doc.pageCount,
+                  let region = region(from: seed, polygon: polygon) else { continue }
+            let rect = region.normalizedRect
+            if rect.width * rect.height >= 0.95 { continue }
+            guard textLayerStatus[seed.page] == .rich, let page = doc.page(at: seed.page) else {
+                withoutText += 1
+                continue
+            }
+            let words = TextLayerSpans.words(fullyInside: rect, polygon: region.vertices, on: page)
+                .map(\.text)
+            if words.count == 1 {
+                insert(words[0], bounded: true)
+            } else if words.count > 1 {
+                insert(words.joined(separator: " "), bounded: false)
+                for word in words where word.unicodeScalars.count >= 3 {
+                    insert(word, bounded: true)
+                }
+            }
+        }
+        let terms = boundaryByText.map {
+            SensitiveTerm(text: $0.key, requiresTokenBoundary: $0.value)
+        }.sorted { $0.text < $1.text }
+        return (terms, withoutText)
+    }
+
+    /// The app's dedup across contributors: one entry per text, plain
+    /// substring matching when any contributor asked for it; sorted by text.
+    static func mergeTerms(_ a: [SensitiveTerm], _ b: [SensitiveTerm]) -> [SensitiveTerm] {
+        var boundaryByText: [String: Bool] = [:]
+        for term in a + b {
+            boundaryByText[term.text] = (boundaryByText[term.text] ?? true) && term.requiresTokenBoundary
+        }
+        return boundaryByText.map {
+            SensitiveTerm(text: $0.key, requiresTokenBoundary: $0.value)
+        }.sorted { $0.text < $1.text }
+    }
+
     // MARK: - buildPDFPageData mirror
 
     /// Mirror of `PipelineCoordinator.buildPDFPageData` for a harness-loaded
@@ -363,7 +423,8 @@ extension VerificationCorpusRunnerTests {
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode],
         perPageFallbackReasons: [TextLayerDetector.FallbackReason?],
-        appliedSearches: [SearchRecheckRequest] = [sweepRequest()]
+        appliedSearches: [SearchRecheckRequest] = [sweepRequest()],
+        manualRegionsWithoutText: Int = 0
     ) async throws -> VerificationReport {
         guard let sharedDoc = PDFDocument(url: outputURL) else {
             throw PipelineError.verificationError(.engineCrash(layerIndex: 0))
@@ -379,6 +440,7 @@ extension VerificationCorpusRunnerTests {
             perPageModes: perPageModes,
             perPageFallbackReasons: perPageFallbackReasons,
             appliedSearches: appliedSearches,
+            manualRegionsWithoutText: manualRegionsWithoutText,
             provisionLayerDocuments: { layers in
                 // One independent PDFDocument per parallel layer (the app's
                 // loadParallelLayerDocuments contract); nil ⇒ the batch runs
