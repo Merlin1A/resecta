@@ -4,11 +4,11 @@ import CoreGraphics
 import RedactionEngine
 @testable import ResectaApp
 
-// The parked strip's match line (`SearchState.walkLine` /
-// `walkSummary`) and the one published walk-liveness predicate, pinned
-// without a SwiftUI host.
+// The walk summary the parked strip's Apply / Select carries as its
+// accessibility value (`SearchState.walkSummary`) and the one published
+// walk-liveness predicate, pinned without a SwiftUI host.
 
-@Suite("Walk summary line")
+@Suite("Walk summary")
 @MainActor
 struct WalkSummaryTests {
 
@@ -38,7 +38,6 @@ struct WalkSummaryTests {
         let s = state(mode: .piiScan, results: [result(page: 1, matched: "Hartwell", term: "name", category: .name)])
         let summary = s.walkSummary(for: s.results[0], pageCount: 3)
         #expect(summary == WalkSummary(kind: "Name", pageLabel: "Page 2 of 3", text: "Hartwell"))
-        #expect(s.walkLine(pageCount: 3, reviewPending: false) == .match(summary))
     }
 
     @Test("Text search: the term · page, and the text only when it differs from the term (case-insensitive)")
@@ -62,47 +61,6 @@ struct WalkSummaryTests {
     func pageLabel() {
         #expect(SearchState.walkPageLabel(pageIndex: 0, pageCount: 1) == "Page 1 of 1")
         #expect(SearchState.walkPageLabel(pageIndex: 22, pageCount: 23) == "Page 23 of 23")
-    }
-
-    @Test("A current the active filters hide reads 'Hidden by filters'")
-    func hiddenByFilters() {
-        let s = state(mode: .text, results: [result(matched: "x", term: "x")])
-        s.sourceFilter = .ocrOnly   // the one text-layer result drops out of the filtered set
-        #expect(s.currentResultFilteredPosition == nil)
-        #expect(s.walkLine(pageCount: 1, reviewPending: false) == .hiddenByFilters)
-        #expect(WalkLine.hiddenByFiltersText == "Hidden by filters")
-    }
-
-    @Test("Results on board but no current yet: the slot is empty")
-    func noCurrentIsEmpty() {
-        let s = state(mode: .text, results: [result(matched: "x", term: "x")], current: nil)
-        #expect(s.walkLine(pageCount: 1, reviewPending: false) == .empty)
-    }
-
-    @Test("No results: the list's own headline, verbatim; empty in the pre-search contexts")
-    func statusHeadlines() {
-        let noMatch = state(mode: .text, results: [], current: nil)
-        noMatch.queryText = "zzz"; noMatch.hasCompletedRunSinceClear = true
-        #expect(noMatch.walkLine(pageCount: 1, reviewPending: false) == .status("No matches"))
-        let notRun = state(mode: .regex, results: [], current: nil)
-        notRun.queryText = "a+"
-        #expect(notRun.walkLine(pageCount: 1, reviewPending: false) == .status("Not run yet"))
-        let preScan = state(mode: .piiScan, results: [], current: nil)
-        #expect(preScan.walkLine(pageCount: 1, reviewPending: false) == .status("Not scanned yet"))
-        let preSearch = state(mode: .text, results: [], current: nil)
-        #expect(preSearch.walkLine(pageCount: 1, reviewPending: false) == .empty)
-        let preRegex = state(mode: .regex, results: [], current: nil)
-        #expect(preRegex.walkLine(pageCount: 1, reviewPending: false) == .empty)
-        let preMulti = state(mode: .multiTerm, results: [], current: nil)
-        #expect(preMulti.walkLine(pageCount: 1, reviewPending: false) == .empty)
-    }
-
-    @Test("A pending review owns the slot: empty, with or without stale results")
-    func reviewPendingIsEmpty() {
-        let scan = state(mode: .piiScan, results: [], current: nil)
-        #expect(scan.walkLine(pageCount: 1, reviewPending: true) == .empty)
-        let stale = state(mode: .piiScan, results: [result(matched: "x", term: "x", category: .ssn)])
-        #expect(stale.walkLine(pageCount: 1, reviewPending: true) == .empty)
     }
 
     @Test("The walk is live with results on board, or with the staged review owning the Scan interface (the review walk)")

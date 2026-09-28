@@ -2,8 +2,9 @@ import XCTest
 
 /// UI test for the review-origin walk on the parked Scan sheet: the
 /// staged detection review steps its rows from the compact strip's
-/// ‹ › pair, the match line names the current row, the strip's Select
-/// toggles the row's selection (the footer count moves), and the page
+/// ‹ › pair, the strip's Select names the current row as its
+/// accessibility value and toggles the row's selection (the footer
+/// count moves), and the page
 /// bar steps aside beneath the parked strip while the walk is live —
 /// on the 23-page fixture with the DEBUG-seeded review (six staged
 /// detections on page 1, none selected on arrival).
@@ -49,32 +50,33 @@ nonisolated final class ReviewWalkUITests: XCTestCase {
             pageBar.waitForNonExistence(timeout: 10),
             "The page bar must step aside while the review walk is live at the compact float."
         )
-        let line = app.descendants(matching: .any).matching(identifier: "walkMatchLine").firstMatch
-        XCTAssertTrue(line.waitForExistence(timeout: 5), "The match line is missing from the parked review strip.")
+        // The strip draws no line for the current row; VoiceOver reads
+        // it as the Select button's value — kind, page, text.
+        let select = app.buttons["applyCurrentResultButton"]
+        XCTAssertTrue(select.waitForExistence(timeout: 5), "The strip's Select is missing on the parked review strip.")
+        func selectValue() -> String { select.value as? String ?? "" }
         XCTAssertTrue(
-            line.label.contains("SSN") && line.label.contains("123-45-6789"),
-            "The match line does not name the tapped row: \(line.label)"
+            selectValue().contains("SSN") && selectValue().contains("123-45-6789"),
+            "The strip's Select does not name the tapped row in its accessibility value: \(selectValue())"
         )
         XCTAssertTrue(counter("Result 1 of 6").waitForExistence(timeout: 5), "The counter did not read 1 of 6 for the tapped row.")
         attachScreenshot(named: "rw-review-parked-row1")
 
-        // ▼ twice: Email, then Phone — the line and the counter follow.
+        // ▼ twice: Email, then Phone — the value and the counter follow.
         let next = app.buttons["resultNavNext"]
         XCTAssertTrue(next.waitForExistence(timeout: 5), "The parked review strip is missing its ▼ chevron.")
         next.tap()
         XCTAssertTrue(counter("Result 2 of 6").waitForExistence(timeout: 5), "▼ did not step the review walk to row 2.")
         XCTAssertTrue(
-            line.label.contains("Email") && line.label.contains("j.doe@example.com"),
-            "The match line does not name row 2: \(line.label)"
+            selectValue().contains("Email") && selectValue().contains("j.doe@example.com"),
+            "The strip's Select does not name row 2 in its accessibility value: \(selectValue())"
         )
         next.tap()
         XCTAssertTrue(counter("Result 3 of 6").waitForExistence(timeout: 5), "▼ did not step the review walk to row 3.")
-        XCTAssertTrue(line.label.contains("Phone"), "The match line does not name row 3: \(line.label)")
+        XCTAssertTrue(selectValue().contains("Phone"), "The strip's Select does not name row 3 in its accessibility value: \(selectValue())")
 
         // Select the current row from the strip: the button reads
         // selected and the walk stays put.
-        let select = app.buttons["applyCurrentResultButton"]
-        XCTAssertTrue(select.waitForExistence(timeout: 5), "The strip's Select is missing on the review origin.")
         XCTAssertEqual(select.label, "Select", "The strip's per-item button must read Select on the review origin.")
         XCTAssertTrue(select.isEnabled, "Select must be enabled with a current row.")
         XCTAssertFalse(select.isSelected, "A row arriving unselected must not read selected.")
