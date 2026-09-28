@@ -192,6 +192,10 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         }
         XCTAssertTrue(row.waitForExistence(timeout: 10), "The seventh verification row never appeared.")
         XCTAssertTrue(row.label.contains("Detection Sweep"), "Row 7 is not the Detection Sweep: \(row.label)")
+        // The collapsed row and its spoken label carry the gate the sweep
+        // applies, not only the expanded detail.
+        XCTAssertTrue(row.label.contains("Names and addresses are not swept."),
+                      "The Detection Sweep row must state its gate when collapsed: \(row.label)")
         attachScreenshot(named: "detection-sweep-02-details-row")
     }
 

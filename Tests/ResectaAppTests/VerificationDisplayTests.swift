@@ -842,3 +842,28 @@ struct SearchRecheckQueryLineDisplayTests {
     }
 
 }
+
+@Suite("Detection Sweep row caption", .tags(.display))
+@MainActor
+struct DetectionSweepRowCaptionTests {
+
+    private func row(_ layer: VerificationLayer, status: VerificationStatus = .pass) -> LayerResult {
+        LayerResult(name: layer.name, symbolName: layer.symbolName, status: status,
+                    shortDescription: "short line", detailDescription: "detail line",
+                    pageReferences: nil, durationSeconds: 0, layer: layer)
+    }
+
+    @Test("The sweep row's spoken label states the gate; every other row's label does not")
+    func spokenLabelCarriesTheGate() {
+        let gate = "Names and addresses are not swept."
+        for status in [VerificationStatus.pass, .info("i")] {
+            let spoken = LayerResultRow.accessibilityLabel(layerIndex: 7, layer: row(.detectionSweep, status: status))
+            #expect(spoken.contains(gate), "\(status): \(spoken)")
+            #expect(spoken.contains("short line"), "the layer's own line stays: \(spoken)")
+        }
+        for layer in [VerificationLayer.searchRecheck, .textExtraction] {
+            let spoken = LayerResultRow.accessibilityLabel(layerIndex: 6, layer: row(layer))
+            #expect(!spoken.contains(gate), "\(layer): \(spoken)")
+        }
+    }
+}
