@@ -4,7 +4,7 @@ import CoreGraphics
 import PDFKit
 @testable import RedactionEngine
 
-// `TextLayerSpans.words(fullyInside:polygon:on:)` — the word-span primitive:
+// `TextSpan.words(fullyInside:polygon:on:)` — the word-span primitive:
 // the words of a page's text layer whose boxes lie fully inside a
 // normalized region rect (the displayed frame, bottom-left origin), in
 // reading order, with a 0.5-pt tolerance on the region's edges; a polygon
@@ -50,7 +50,7 @@ struct TextLayerSpansTests {
 
     /// Every word on the page keyed by text (the unit rect admits all).
     private func wordRects(_ page: PDFPage) -> [String: CGRect] {
-        Dictionary(TextLayerSpans.words(fullyInside: Self.unit, on: page).map { ($0.text, $0.normalizedRect) },
+        Dictionary(TextSpan.words(fullyInside: Self.unit, on: page).map { ($0.text, $0.normalizedRect) },
                    uniquingKeysWith: { a, _ in a })
     }
 
@@ -64,7 +64,7 @@ struct TextLayerSpansTests {
     @Test("The unit rect returns every word in reading order")
     func unitRectReturnsEveryWordInReadingOrder() throws {
         let page = try page(Self.wordsPDF())
-        let spans = TextLayerSpans.words(fullyInside: Self.unit, on: page)
+        let spans = TextSpan.words(fullyInside: Self.unit, on: page)
         #expect(spans.map(\.text) == ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT"])
         for span in spans {
             #expect(span.normalizedRect.width > 0 && span.normalizedRect.height > 0)
@@ -78,7 +78,7 @@ struct TextLayerSpansTests {
         let rects = wordRects(page)
         let alpha = try #require(rects["ALPHA"]); let bravo = try #require(rects["BRAVO"])
         let region = inset(alpha.union(bravo), points: -1, on: page)
-        let spans = TextLayerSpans.words(fullyInside: region, on: page)
+        let spans = TextSpan.words(fullyInside: region, on: page)
         #expect(spans.map(\.text) == ["ALPHA", "BRAVO"])
         #expect(spans.map(\.normalizedRect) == [alpha, bravo])
     }
@@ -92,16 +92,16 @@ struct TextLayerSpansTests {
         var region = alpha.union(bravo)
         region.size.width = bravo.midX - region.minX
         region = inset(region, points: -1, on: page)
-        #expect(TextLayerSpans.words(fullyInside: region, on: page).map(\.text) == ["ALPHA"])
+        #expect(TextSpan.words(fullyInside: region, on: page).map(\.text) == ["ALPHA"])
     }
 
     @Test("The 0.5-pt edge tolerance admits a word whose box touches the region edge; 1 pt does not")
     func edgeTolerance() throws {
         let page = try page(Self.wordsPDF())
         let alpha = try #require(wordRects(page)["ALPHA"])
-        #expect(TextLayerSpans.words(fullyInside: alpha, on: page).map(\.text) == ["ALPHA"])
-        #expect(TextLayerSpans.words(fullyInside: inset(alpha, points: 0.4, on: page), on: page).map(\.text) == ["ALPHA"])
-        #expect(TextLayerSpans.words(fullyInside: inset(alpha, points: 1.0, on: page), on: page).isEmpty)
+        #expect(TextSpan.words(fullyInside: alpha, on: page).map(\.text) == ["ALPHA"])
+        #expect(TextSpan.words(fullyInside: inset(alpha, points: 0.4, on: page), on: page).map(\.text) == ["ALPHA"])
+        #expect(TextSpan.words(fullyInside: inset(alpha, points: 1.0, on: page), on: page).isEmpty)
     }
 
     @Test("An L-shaped polygon excludes the word in its notch")
@@ -123,10 +123,10 @@ struct TextLayerSpansTests {
             CGPoint(x: notchX, y: bounds.maxY),
             CGPoint(x: bounds.minX, y: bounds.maxY),
         ]
-        let spans = TextLayerSpans.words(fullyInside: bounds, polygon: lShape, on: page)
+        let spans = TextSpan.words(fullyInside: bounds, polygon: lShape, on: page)
         #expect(spans.map(\.text) == ["ALPHA", "BRAVO", "DELTA", "ECHO"])
         // Without the polygon the bounding rect admits the notch's word too.
-        #expect(TextLayerSpans.words(fullyInside: bounds, on: page).map(\.text) == ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO"])
+        #expect(TextSpan.words(fullyInside: bounds, on: page).map(\.text) == ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO"])
     }
 
     @Test("A rotated page: the region drawn in the displayed frame returns the word under it",
@@ -138,7 +138,7 @@ struct TextLayerSpansTests {
         let anchorRange = (text as NSString).range(of: "ANCHOR")
         // The search path's inverse mapping is the frame of record.
         let anchorRect = try #require(DocumentSearcher().boundingRect(for: anchorRange, page: page))
-        let spans = TextLayerSpans.words(fullyInside: inset(anchorRect, points: -1, on: page), on: page)
+        let spans = TextSpan.words(fullyInside: inset(anchorRect, points: -1, on: page), on: page)
         #expect(spans.map(\.text) == ["ANCHOR"])
     }
 
@@ -148,7 +148,7 @@ struct TextLayerSpansTests {
         let page = try page(TestFixtures.rotatedTextPDF(rotation: rotation))
         let text = try #require(page.string) as NSString
         let searcher = DocumentSearcher()
-        let spans = TextLayerSpans.words(fullyInside: Self.unit, on: page)
+        let spans = TextSpan.words(fullyInside: Self.unit, on: page)
         #expect(spans.map(\.text) == ["ANCHOR", "MARKER"])
         for span in spans {
             let expected = try #require(searcher.boundingRect(for: text.range(of: span.text), page: page))
@@ -162,14 +162,14 @@ struct TextLayerSpansTests {
     @Test("An image-only page has no words")
     func imageOnlyPageHasNoWords() throws {
         let page = try page(TestFixtures.imageOnlyPDF())
-        #expect(TextLayerSpans.words(fullyInside: Self.unit, on: page).isEmpty)
+        #expect(TextSpan.words(fullyInside: Self.unit, on: page).isEmpty)
     }
 
     @Test("An empty or degenerate region admits nothing")
     func degenerateRegionAdmitsNothing() throws {
         let page = try page(Self.wordsPDF())
-        #expect(TextLayerSpans.words(fullyInside: .zero, on: page).isEmpty)
-        #expect(TextLayerSpans.words(fullyInside: CGRect(x: 0.95, y: 0.95, width: 0.05, height: 0.05), on: page).isEmpty)
+        #expect(TextSpan.words(fullyInside: .zero, on: page).isEmpty)
+        #expect(TextSpan.words(fullyInside: CGRect(x: 0.95, y: 0.95, width: 0.05, height: 0.05), on: page).isEmpty)
     }
 
     @Test("TextSpan is a plain value")

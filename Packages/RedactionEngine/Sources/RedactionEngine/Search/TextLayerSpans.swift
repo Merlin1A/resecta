@@ -2,9 +2,10 @@ import CoreGraphics
 import Foundation
 import PDFKit
 
-// The word-span primitive: the words of a page's text layer whose boxes lie
-// fully inside a region, in reading order, with their boxes in the frame
-// every region and search result uses. The verification run captures the
+// The word-span primitive (`TextSpan.words(fullyInside:polygon:on:)`): the
+// words of a page's text layer whose boxes lie fully inside a region, in
+// reading order, with their boxes in the frame every region and search
+// result uses. The verification run captures the
 // words under each manual region through it; a text selection that snaps
 // to words on the canvas wraps it. Pure: it reads the page once and keeps
 // nothing. Text-layer words only — no OCR.
@@ -23,7 +24,7 @@ public struct TextSpan: Sendable, Equatable {
     }
 }
 
-public enum TextLayerSpans {
+extension TextSpan {
 
     /// The tolerance on the region's edges, in PDF points: a word whose box
     /// touches the region's edge from inside by less than this is inside.

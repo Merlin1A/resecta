@@ -326,9 +326,9 @@ detect, search, rebuild, verify and export without the app's view code:
 - Search: `DocumentSearcher` (`search` · `previewMatches` · the result and
   diagnostic sink setters · `boundingRect` · the regex validators ·
   `maxResults` · `sharedLoadDiagnostics`) · `SearchMode` · `SearchOptions` ·
-  `SearchResult` · `SearchPreviewResult` · `TextLayerSpans.words` · `TextSpan`
-  (the words of a page's text layer inside a region, in the displayed frame —
-  the verification run captures a manual region's words through it)
+  `SearchResult` · `SearchPreviewResult` · `TextSpan` (`words(fullyInside:on:)` — the
+  words of a page's text layer inside a region, in the displayed frame; the
+  verification run captures a manual region's words through it)
 - Rebuild: `PDFStreamReconstructor`
 - Verification: `VerificationEngine.runLayer` / `aggregateStatus` /
   `layers(for:)` · `VerificationOrchestrator` · `VerificationReport` ·

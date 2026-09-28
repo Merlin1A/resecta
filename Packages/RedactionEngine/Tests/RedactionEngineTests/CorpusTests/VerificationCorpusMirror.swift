@@ -186,7 +186,7 @@ extension VerificationCorpusRunnerTests {
                 withoutText += 1
                 continue
             }
-            let words = TextLayerSpans.words(fullyInside: rect, polygon: region.vertices, on: page)
+            let words = TextSpan.words(fullyInside: rect, polygon: region.vertices, on: page)
                 .map(\.text)
             if words.count == 1 {
                 insert(words[0], bounded: true)
