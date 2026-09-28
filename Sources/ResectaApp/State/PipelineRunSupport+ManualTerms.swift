@@ -106,6 +106,11 @@ extension PipelineCoordinator {
         }
         let regions = redactionState.regions
         let status = documentState.textLayerStatus
+        // nonisolated(unsafe): PDFDocument is not Sendable. Safe because the
+        // detached closure only reads it (page lookups and per-word
+        // selections), the run awaits the value before it touches the
+        // document again, and the source is replaced only by an import,
+        // which the pending run refuses (`DocumentState.canStartImport`).
         nonisolated(unsafe) let source = document
         return await Task.detached {
             Self.sensitiveTermSet(

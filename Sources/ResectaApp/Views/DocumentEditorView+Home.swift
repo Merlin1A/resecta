@@ -30,6 +30,13 @@ extension DocumentEditorView {
     /// confirmed-with-regions path share one implementation. The
     /// editing-phase Home entry (`handleHomeTap()`) shares this exact path.
     func performDoneCloseSession() {
+        // A run pending in the run-entry window — the phase still
+        // `.editing`, `activePipelineTask` set while the manual-term
+        // capture works — is cancelled FIRST, the order
+        // `RedactWorkspace.tearDown()` keeps: the run surrenders at its
+        // next cancellation check instead of redacting a torn-down
+        // session. A no-op when nothing is pending.
+        documentState.cancelActivePipeline(redactionState: redactionState)
         // A sheet parked for the close dialog goes down with the
         // session — nothing is re-presented after the teardown.
         homeCloseAwaitsSheetDismissal = false

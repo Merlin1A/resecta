@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import PDFKit
+import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
@@ -89,15 +90,187 @@ struct RunEntryPendingRunGateTests {
         }
     }
 
-    @Test("Source pin: the full run captures the term set before it snapshots the pages")
-    func captureRunsBeforeThePagesSnapshot() throws {
+    @Test("Source pin: the capture is awaited first; the snapshot that follows, and the run up to `.redacting`, do not suspend")
+    func captureFirstThenNoSuspension() throws {
         let source = try loadRepoFile("Sources/ResectaApp/State/PipelineRunner.swift")
-        let entry = try #require(source.range(of: "private func runFull("))
-        let run = source[entry.upperBound...]
-        let capture = try #require(run.range(of: "collectSensitiveTermSet"))
-        let pages = try #require(run.range(of: "buildPDFPageData("))
-        #expect(capture.lowerBound < pages.lowerBound,
+        let start = try #require(source.range(of: "static func captureRunEntry("))
+        let body = source[start.upperBound...]
+        let end = try #require(body.range(of: "return RunEntry("))
+        let function = body[..<end.lowerBound]
+        let firstCapture = try #require(function.range(of: "await capture()"))
+        let pages = try #require(function.range(of: "buildPDFPageData("))
+        #expect(firstCapture.lowerBound < pages.lowerBound,
                 "the awaited capture must precede the synchronous region snapshot")
+        #expect(!function[pages.upperBound...].contains("await "),
+                "no suspension point after the region snapshot")
+
+        let runStart = try #require(source.range(of: "private func runFull("))
+        let run = source[runStart.upperBound...]
+        let entryCall = try #require(run.range(of: "captureRunEntry("))
+        let redacting = try #require(run.range(of: ".redacting("))
+        #expect(!run[entryCall.upperBound..<redacting.lowerBound].contains("await "),
+                "the full run reaches `.redacting` without another suspension")
+    }
+}
+
+@Suite("Run entry — one region state", .tags(.coordination))
+@MainActor
+struct RunEntryCaptureTests {
+
+    private func makeEditingCoordinator() -> PipelineCoordinator {
+        let coord = makeCoordinator()
+        coord.documentState.sourceDocument = makeTestPDFDocument()
+        coord.documentState.phase = .editing
+        coord.redactionState.addRegion(.mock(), page: 0, undoManager: nil)
+        return coord
+    }
+
+    private func drawRegion(_ coord: PipelineCoordinator, y: CGFloat) {
+        coord.redactionState.addRegion(
+            .mock(rect: CGRect(x: 0.5, y: y, width: 0.2, height: 0.05)),
+            page: 0, undoManager: nil)
+    }
+
+    @Test("A region drawn while the capture is pending is in the burned pages, and the capture re-runs once")
+    func regionDrawnDuringCaptureIsBurned() async throws {
+        let coord = makeEditingCoordinator()
+        var captureRuns = 0
+        let entry = try await PipelineRunner.captureRunEntry(
+            coordinator: coord, effectiveMode: .secureRasterization,
+            runSettings: .snapshot(from: coord.settingsState)
+        ) {
+            captureRuns += 1
+            if captureRuns == 1 { drawRegion(coord, y: 0.5) }
+            return .empty
+        }
+        #expect(captureRuns == 2)
+        #expect(entry.captureRuns == 2)
+        #expect(entry.pages.count == 1)
+        #expect(entry.pages[0].regions.count == 2,
+                "the region drawn during the capture is in the burned pages")
+        #expect(entry.burnedRegionVersion == coord.redactionState.regionVersion)
+    }
+
+    @Test("The re-run is bounded: a region drawn during the second capture is still burned; no third capture")
+    func reRunIsBounded() async throws {
+        let coord = makeEditingCoordinator()
+        var captureRuns = 0
+        let entry = try await PipelineRunner.captureRunEntry(
+            coordinator: coord, effectiveMode: .secureRasterization,
+            runSettings: .snapshot(from: coord.settingsState)
+        ) {
+            captureRuns += 1
+            drawRegion(coord, y: 0.3 + 0.1 * CGFloat(captureRuns))
+            return .empty
+        }
+        #expect(captureRuns == 2, "one re-run at most")
+        #expect(entry.pages[0].regions.count == 3,
+                "the pages are built after the last capture — every region drawn is burned")
+        #expect(entry.burnedRegionVersion == coord.redactionState.regionVersion)
+    }
+
+    @Test("No region change during the capture: the capture runs once")
+    func unchangedRegionsCaptureOnce() async throws {
+        let coord = makeEditingCoordinator()
+        var captureRuns = 0
+        let entry = try await PipelineRunner.captureRunEntry(
+            coordinator: coord, effectiveMode: .secureRasterization,
+            runSettings: .snapshot(from: coord.settingsState)
+        ) {
+            captureRuns += 1
+            return SensitiveTermSet(terms: [SensitiveTerm(text: "Springfield")])
+        }
+        #expect(captureRuns == 1)
+        #expect(entry.captureRuns == 1)
+        #expect(entry.sensitiveTerms.terms.map(\.text) == ["Springfield"])
+        #expect(entry.pages[0].regions.count == 1)
+    }
+
+    @Test("A run cancelled while the capture is pending ends with CancellationError before it snapshots any state")
+    func cancelledDuringCaptureEnds() async {
+        let coord = makeEditingCoordinator()
+        let run = Task<PipelineRunner.RunEntry, any Error> { @MainActor in
+            try await PipelineRunner.captureRunEntry(
+                coordinator: coord, effectiveMode: .secureRasterization,
+                runSettings: .snapshot(from: coord.settingsState)
+            ) {
+                // The window: the detached capture works until the run is
+                // cancelled from under it.
+                while !Task.isCancelled { await Task.yield() }
+                return .empty
+            }
+        }
+        run.cancel()
+        await #expect(throws: CancellationError.self) { try await run.value }
+    }
+}
+
+@Suite("Verification currency — the burned version", .tags(.coordination))
+@MainActor
+struct VerificationCurrencyTests {
+
+    private func makeRedactingCoordinator() -> PipelineCoordinator {
+        let coord = makeCoordinator()
+        coord.documentState.sourceDocument = makeTestPDFDocument()
+        coord.documentState.phase = .editing
+        coord.redactionState.addRegion(.mock(), page: 0, undoManager: nil)
+        coord.documentState.phase = .redacting(
+            progress: .init(currentPage: 0, totalPages: 1, currentStep: "Starting\u{2026}"))
+        return coord
+    }
+
+    private var report: VerificationReport {
+        VerificationReport(layers: [], overallStatus: .pass, durationSeconds: 0)
+    }
+
+    @Test("`.verified` clears the stale flag when the burned version is the live one")
+    func verifiedClearsForTheBurnedVersion() {
+        let coord = makeRedactingCoordinator()
+        #expect(coord.redactionState.isVerificationStale, "precondition: a drawn region marks the run stale")
+        coord.apply(.verified(report, burnedRegionVersion: coord.redactionState.regionVersion))
+        #expect(coord.documentState.phaseKind == .verified)
+        #expect(coord.redactionState.isVerificationStale == false)
+    }
+
+    @Test("`.verified` keeps the stale flag for a region the run did not burn")
+    func verifiedKeepsTheFlagPastTheBurnedVersion() {
+        let coord = makeRedactingCoordinator()
+        let burned = coord.redactionState.regionVersion
+        coord.redactionState.addRegion(
+            .mock(rect: CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.05)), page: 0, undoManager: nil)
+        coord.apply(.verified(report, burnedRegionVersion: burned))
+        #expect(coord.documentState.phaseKind == .verified, "the report is still published")
+        #expect(coord.redactionState.isVerificationStale,
+                "the output does not carry every region on screen — the banner stands")
+    }
+
+    @Test("`.verificationSkipped` follows the same rule")
+    func skippedFollowsTheSameRule() {
+        let cleared = makeRedactingCoordinator()
+        cleared.apply(.verificationSkipped(burnedRegionVersion: cleared.redactionState.regionVersion))
+        #expect(cleared.documentState.phaseKind == .verified)
+        #expect(cleared.redactionState.isVerificationStale == false)
+
+        let kept = makeRedactingCoordinator()
+        let burned = kept.redactionState.regionVersion
+        kept.redactionState.addRegion(
+            .mock(rect: CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.05)), page: 0, undoManager: nil)
+        kept.apply(.verificationSkipped(burnedRegionVersion: burned))
+        #expect(kept.documentState.phaseKind == .verified)
+        #expect(kept.redactionState.isVerificationStale)
+    }
+
+    @Test("The guard itself: an older or newer burned version leaves the flag; the live one clears it")
+    func guardCompares() {
+        let redaction = RedactionState()
+        redaction.addRegion(.mock(), page: 0, undoManager: nil)
+        let live = redaction.regionVersion
+        redaction.markVerificationCurrent(burnedRegionVersion: live - 1)
+        #expect(redaction.isVerificationStale)
+        redaction.markVerificationCurrent(burnedRegionVersion: live + 1)
+        #expect(redaction.isVerificationStale)
+        redaction.markVerificationCurrent(burnedRegionVersion: live)
+        #expect(redaction.isVerificationStale == false)
     }
 }
 
