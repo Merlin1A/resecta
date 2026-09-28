@@ -143,7 +143,7 @@ struct SearchRecheckPipelineTests {
 
     // MARK: - PASS
 
-    @Test("PASS end to end in Searchable: eleven layers, the re-check last, found 2 · applied 2 · 0 remain")
+    @Test("PASS end to end in Searchable: twelve layers, the re-check then the sweep last, found 2 · applied 2 · 0 remain")
     func passSearchable() async throws {
         let h = try await makeHarness(
             outputPageTexts: ["Account holder page one", "Balance for page two"],
@@ -155,8 +155,9 @@ struct SearchRecheckPipelineTests {
 
         let report = try await runVerifyOnly(h)
 
-        #expect(report.layers.count == 11)
-        let last = try #require(report.layers.last)
+        #expect(report.layers.count == 12)
+        #expect(report.layers.last?.layer == .detectionSweep, "the sweep closes the schedule")
+        let last = try #require(report.layers.first { $0.layer == .searchRecheck })
         #expect(last.layer == .searchRecheck)
         #expect(last.name == "Search Re-check")
         #expect(last.status == .pass)
@@ -183,7 +184,7 @@ struct SearchRecheckPipelineTests {
         #expect(!report.overallStatus.isFail && !report.overallStatus.isAttention)
     }
 
-    @Test("Secure Raster schedule: six layers, the re-check last with the same counts (text-layer fixture; Layer 1 reports the fixture's text, not this test's subject)")
+    @Test("Secure Raster schedule: seven layers, the re-check then the sweep last with the same counts (text-layer fixture; Layer 1 reports the fixture's text, not this test's subject)")
     func passRaster() async throws {
         let h = try await makeHarness(
             outputPageTexts: ["Account holder page one", "Balance for page two"],
@@ -193,8 +194,9 @@ struct SearchRecheckPipelineTests {
 
         let report = try await runVerifyOnly(h)
 
-        #expect(report.layers.count == 6)
-        let last = try #require(report.layers.last)
+        #expect(report.layers.count == 7)
+        #expect(report.layers.last?.layer == .detectionSweep, "the sweep closes the schedule")
+        let last = try #require(report.layers.first { $0.layer == .searchRecheck })
         #expect(last.layer == .searchRecheck)
         #expect(last.status == .pass)
         #expect(last.queryLines?.count == 1)
@@ -217,7 +219,7 @@ struct SearchRecheckPipelineTests {
 
         let report = try await runVerifyOnly(h)
 
-        let last = try #require(report.layers.last)
+        let last = try #require(report.layers.first { $0.layer == .searchRecheck })
         #expect(last.layer == .searchRecheck)
         #expect(last.status.isAttention)
         if case .attention(let message) = last.status {
@@ -268,7 +270,7 @@ struct SearchRecheckPipelineTests {
 
         let report = try await runVerifyOnly(h)
 
-        let last = try #require(report.layers.last)
+        let last = try #require(report.layers.first { $0.layer == .searchRecheck })
         #expect(last.layer == .searchRecheck)
         #expect(last.status.isInfo)
         #expect(last.shortDescription == SearchRecheck.infoMessage)
@@ -306,7 +308,7 @@ struct SearchRecheckPipelineTests {
 
         let report = try await runVerifyOnly(h)
 
-        let last = try #require(report.layers.last)
+        let last = try #require(report.layers.first { $0.layer == .searchRecheck })
         #expect(last.status == .pass, "the `?? collectAppliedSearches()` fallback fed the layer")
         #expect(last.queryLines?.first?.appliedCount == 2)
         #expect(last.queryLines?.first?.foundCount == 2)
