@@ -148,7 +148,7 @@ struct VerificationRunVerificationCardTests {
             sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")]))
         #expect(redaction.lastRunInputs?.perPageModes == [.searchableRedaction, .secureRasterization])
         #expect(redaction.lastRunInputs?.perPageFallbackReasons == [nil, .rtlText])
-        #expect(redaction.lastRunInputs?.sensitiveTerms == [SensitiveTerm(text: "Delia Hartwell")])
+        #expect(redaction.lastRunInputs?.sensitiveTerms.terms == [SensitiveTerm(text: "Delia Hartwell")])
 
         redaction.clearOutput()
         #expect(redaction.lastRunInputs == nil,

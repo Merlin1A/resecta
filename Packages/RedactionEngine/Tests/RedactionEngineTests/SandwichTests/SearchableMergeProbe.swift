@@ -121,7 +121,7 @@ enum SearchableMergeProbe {
         sensitiveTerms: [SensitiveTerm] = []
     ) async -> [Int: LayerResult] {
         let engine = VerificationEngine()
-        let count = engine.layerCount(for: .searchableRedaction)
+        let count = engine.layers(for: .searchableRedaction).count
         var out: [Int: LayerResult] = [:]
         for idx in 0..<count {
             out[idx] = await engine.runLayer(

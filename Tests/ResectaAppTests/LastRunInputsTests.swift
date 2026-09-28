@@ -35,6 +35,7 @@ struct LastRunInputsTests {
             perPageModes: [.searchableRedaction, .secureRasterization],
             perPageFallbackReasons: [nil, .rtlText],
             sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")],
+            manualRegionsWithoutText: 2,
             deselection: deselection,
             ocrSkippedPages: [2, 4],
             degradeFailures: ["NameGazetteer"])
@@ -44,7 +45,8 @@ struct LastRunInputsTests {
         #expect(redaction.lastRunInputs == inputs)
         #expect(redaction.lastRunInputs?.perPageModes == [.searchableRedaction, .secureRasterization])
         #expect(redaction.lastRunInputs?.perPageFallbackReasons == [nil, .rtlText])
-        #expect(redaction.lastRunInputs?.sensitiveTerms == [SensitiveTerm(text: "Delia Hartwell")])
+        #expect(redaction.lastRunInputs?.sensitiveTerms.terms == [SensitiveTerm(text: "Delia Hartwell")])
+        #expect(redaction.lastRunInputs?.sensitiveTerms.manualRegionsWithoutText == 2)
         #expect(redaction.lastRunInputs?.appliedSearches == [])
         #expect(redaction.lastRunInputs?.deselection == deselection)
         #expect(redaction.lastRunInputs?.ocrSkippedPages == [2, 4])

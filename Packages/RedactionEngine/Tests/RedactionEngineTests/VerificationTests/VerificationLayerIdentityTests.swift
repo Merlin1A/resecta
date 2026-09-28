@@ -24,8 +24,8 @@ struct VerificationLayerIdentityTests {
         #expect(searchable.suffix(2) == [.searchRecheck, .detectionSweep])
         #expect(raster.last == .detectionSweep)
         #expect(searchable.last == .detectionSweep)
-        #expect(engine.layerCount(for: .secureRasterization) == raster.count)
-        #expect(engine.layerCount(for: .searchableRedaction) == searchable.count)
+        #expect(engine.layers(for: .secureRasterization).count == raster.count)
+        #expect(engine.layers(for: .searchableRedaction).count == searchable.count)
         // The Searchable order IS the declaration order.
         #expect(searchable == VerificationLayer.allCases)
         // Indices 0–4 agree across modes (the five base checks).
@@ -72,14 +72,12 @@ struct VerificationLayerIdentityTests {
 
     @Test("Mode-aware names: index 5 is the re-check in raster and Spatial Verification in searchable")
     func modeAwareNames() {
-        #expect(engine.layerName(at: 5, mode: .secureRasterization) == "Search Re-check")
-        #expect(engine.layerName(at: 6, mode: .secureRasterization) == "Detection Sweep")
-        #expect(engine.layerName(at: 5, mode: .searchableRedaction) == "Spatial Verification")
-        #expect(engine.layerName(at: 10, mode: .searchableRedaction) == "Search Re-check")
-        #expect(engine.layerName(at: 11, mode: .searchableRedaction) == "Detection Sweep")
+        #expect(engine.layers(for: .secureRasterization)[5].name == "Search Re-check")
+        #expect(engine.layers(for: .secureRasterization)[6].name == "Detection Sweep")
+        #expect(engine.layers(for: .searchableRedaction)[5].name == "Spatial Verification")
+        #expect(engine.layers(for: .searchableRedaction)[10].name == "Search Re-check")
+        #expect(engine.layers(for: .searchableRedaction)[11].name == "Detection Sweep")
         #expect(engine.layers(for: .secureRasterization)[5].symbolName == "text.page.badge.magnifyingglass")
-        // Out of range keeps the historical fallback.
-        #expect(engine.layerName(at: 7, mode: .secureRasterization) == "Unknown Layer")
         for (index, layer) in VerificationLayer.allCases.enumerated() {
             #expect(engine.layers(for: .searchableRedaction)[index].name == layer.name)
             #expect(engine.layers(for: .searchableRedaction)[index].symbolName == layer.symbolName)

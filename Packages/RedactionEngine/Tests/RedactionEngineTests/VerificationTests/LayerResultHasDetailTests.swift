@@ -21,7 +21,7 @@ struct LayerResultHasDetailTests {
     private func run(
         _ index: Int, _ doc: PDFDocument, mode: PipelineMode,
         modes: [PipelineMode]? = nil, digests: [PageFilterDigest?]? = nil,
-        terms: [String] = []
+        terms: [String] = [], manualRegionsWithoutText: Int = 0
     ) async -> LayerResult {
         let n = doc.pageCount
         let engine = VerificationEngine()
@@ -31,7 +31,8 @@ struct LayerResultHasDetailTests {
             sensitiveTerms: terms.map { SensitiveTerm(text: $0) },
             pipelineMode: mode,
             filterDigests: digests ?? Array(repeating: nil, count: n),
-            perPageModes: modes ?? Array(repeating: mode, count: n))
+            perPageModes: modes ?? Array(repeating: mode, count: n),
+            manualRegionsWithoutText: manualRegionsWithoutText)
     }
 
     /// `pageCount` empty pages (CGContext-written, no text layer).
@@ -159,5 +160,64 @@ struct LayerResultHasDetailTests {
                 "got: \(r.shortDescription)")
         #expect(r.detailDescription == "", "got: \(r.detailDescription)")
         #expect(r.hasDetail == false)
+    }
+
+    // MARK: - Layer 3: manual regions on image-only pages
+
+    static let oneManualRegionDetail = "1 manual region on an image-only page carries no text to search for."
+    static let manyManualRegionsDetail = "3 manual regions on image-only pages carry no text to search for."
+
+    @Test("Layer 3 INFO (no terms) with manual regions on image-only pages carries the one detail sentence")
+    func layer3InfoCarriesManualRegionsDetail() async throws {
+        let (doc, url) = try TestFixtures.writeTempPDF(TestFixtures.blankPage(), prefix: "hd_l3_manual_info_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let r = await run(2, doc, mode: .secureRasterization, terms: [], manualRegionsWithoutText: 3)
+        #expect(r.status.isInfo, "got \(r.status)")
+        #expect(r.shortDescription == "No sensitive terms were provided — string search did not run.")
+        #expect(r.detailDescription == Self.manyManualRegionsDetail, "got: \(r.detailDescription)")
+        #expect(r.hasDetail)
+    }
+
+    @Test("Layer 3 PASS with a manual region on an image-only page keeps the generic short line and adds the sentence")
+    func layer3PassCarriesManualRegionsDetail() async throws {
+        let (doc, url) = try TestFixtures.writeTempPDF(TestFixtures.blankPage(), prefix: "hd_l3_manual_pass_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let r = await run(2, doc, mode: .secureRasterization, terms: ["Delia Hartwell"], manualRegionsWithoutText: 1)
+        #expect(r.status == .pass, "got \(r.status)")
+        #expect(r.shortDescription == "No issues found.")
+        #expect(r.detailDescription == Self.oneManualRegionDetail, "got: \(r.detailDescription)")
+        #expect(r.hasDetail)
+    }
+
+    @Test("Layer 3 ATTENTION never carries the manual-region sentence; a count of zero adds nothing")
+    func layer3AttentionAndZeroCountCarryNoManualDetail() async throws {
+        let (doc, url) = try TestFixtures.writeTempPDF(
+            TestFixtures.withSensitiveTermInTextStream(term: "Acme"), prefix: "hd_l3_manual_attention_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let attention = await run(2, doc, mode: .searchableRedaction, terms: ["acme"], manualRegionsWithoutText: 2)
+        #expect(attention.status.isAttention, "got \(attention.status)")
+        #expect(attention.detailDescription == "", "got: \(attention.detailDescription)")
+        let (blank, blankURL) = try TestFixtures.writeTempPDF(TestFixtures.blankPage(), prefix: "hd_l3_manual_zero_")
+        defer { try? FileManager.default.removeItem(at: blankURL) }
+        let zero = await run(2, blank, mode: .secureRasterization, terms: ["Delia Hartwell"], manualRegionsWithoutText: 0)
+        #expect(zero.status == .pass, "got \(zero.status)")
+        #expect(zero.detailDescription == "", "got: \(zero.detailDescription)")
+    }
+
+    @Test("The orchestrator threads the manual-region count to Layer 3's row and nowhere else")
+    func orchestratorThreadsTheManualRegionCount() async throws {
+        let (doc, url) = try TestFixtures.writeTempPDF(TestFixtures.blankPage(), prefix: "hd_l3_manual_orch_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let report = try await VerificationOrchestrator().run(
+            outputDocument: SendablePDFDocument(doc), sourcePageCount: 1, regions: [:],
+            sensitiveTerms: [], pipelineMode: .secureRasterization,
+            filterDigests: [nil], perPageModes: [.secureRasterization], perPageFallbackReasons: [nil],
+            appliedSearches: [], manualRegionsWithoutText: 1,
+            provisionLayerDocuments: { _ in nil }, events: { _ in })
+        let l3 = try #require(report.layers.first { $0.layer == .binaryStringSearch })
+        #expect(l3.detailDescription == Self.oneManualRegionDetail, "got: \(l3.detailDescription)")
+        for row in report.layers where row.layer != .binaryStringSearch {
+            #expect(!row.detailDescription.contains("manual region"), "\(row.name): \(row.detailDescription)")
+        }
     }
 }
