@@ -279,13 +279,19 @@ class DocumentState {
     // MARK: - Phase Gating Predicates
 
     /// True when a new document import (drop / file picker / photos) is a
-    /// permitted transition from the current phase. False during phases
-    /// that own in-flight mutation of `sourceDocument` or `redactionState`
-    /// (`.importing`, `.detecting`, `.redacting`, `.verifying`). Predicate
-    /// describes the transition-table contract — entry-point handlers
-    /// consult this before staging an import so a mid-pipeline drop does
-    /// not call `clearForNewDocument()` against an in-flight document.
+    /// permitted transition from the current phase and no run is pending.
+    /// False during phases that own in-flight mutation of `sourceDocument`
+    /// or `redactionState` (`.importing`, `.detecting`, `.redacting`,
+    /// `.verifying`), and while `activePipelineTask` is set: a full run
+    /// holds the task from the Redact tap — through its run-entry capture,
+    /// which suspends while the phase is still `.editing` — to its end, and
+    /// a replacement document admitted under it would be rasterized and
+    /// verified inside the prior document's session. Predicate describes
+    /// the transition-table contract — entry-point handlers consult this
+    /// before staging an import so a mid-pipeline drop does not call
+    /// `clearForNewDocument()` against an in-flight document.
     var canStartImport: Bool {
+        guard activePipelineTask == nil else { return false }
         switch phaseKind {
         case .empty, .editing, .verified, .failed:
             return true

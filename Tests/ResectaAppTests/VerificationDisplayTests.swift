@@ -842,3 +842,68 @@ struct SearchRecheckQueryLineDisplayTests {
     }
 
 }
+
+@Suite("Detection Sweep row caption", .tags(.display))
+@MainActor
+struct DetectionSweepRowCaptionTests {
+
+    private func row(_ layer: VerificationLayer, status: VerificationStatus = .pass) -> LayerResult {
+        LayerResult(name: layer.name, symbolName: layer.symbolName, status: status,
+                    shortDescription: "short line", detailDescription: "detail line",
+                    pageReferences: nil, durationSeconds: 0, layer: layer)
+    }
+
+    @Test("The caption is the sweep's gate, keyed on the layer identity, nil for every other row")
+    func captionKeyedOnTheLayer() {
+        #expect(LayerResultRow.rowCaptionText(layer: row(.detectionSweep))
+                == "Names and addresses are not swept.")
+        #expect(LayerResultRow.rowCaptionText(layer: row(.detectionSweep, status: .info("i")))
+                == "Names and addresses are not swept.")
+        #expect(LayerResultRow.rowCaptionText(layer: row(.searchRecheck)) == nil)
+        #expect(LayerResultRow.rowCaptionText(layer: row(.textExtraction)) == nil)
+        // A label that merely reads like the sweep's is not the sweep.
+        let lookalike = LayerResult(
+            name: VerificationLayer.detectionSweep.name, symbolName: "shield", status: .pass,
+            shortDescription: "Scan (17 detectors) · nothing further", detailDescription: "",
+            pageReferences: nil, durationSeconds: 0, layer: .searchRecheck)
+        #expect(LayerResultRow.rowCaptionText(layer: lookalike) == nil)
+    }
+
+    @Test("The caption is byte-identical to the engine's gate sentence")
+    func captionMatchesTheEngineSentence() {
+        #expect(LayerResultRow.detectionSweepGateCaption == DetectionSweep.gateSentence)
+    }
+
+    @Test("Source pin: the caption renders on the collapsed row only — the expanded detail carries the sentence")
+    func captionRendersCollapsedOnly() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/Views/LayerResultRow.swift")
+        #expect(source.contains("if !isExpanded, let caption = Self.rowCaptionText(layer: layer)"),
+                "the header shows the caption while collapsed; expanded, the detail sentence stands alone")
+    }
+
+    @Test("The sweep row's spoken label states the gate; every other row's label does not")
+    func spokenLabelCarriesTheGate() {
+        let gate = "Names and addresses are not swept."
+        for status in [VerificationStatus.pass, .info("i")] {
+            let spoken = LayerResultRow.accessibilityLabel(layerIndex: 7, layer: row(.detectionSweep, status: status))
+            #expect(spoken.contains(gate), "\(status): \(spoken)")
+            #expect(spoken.contains("short line"), "the layer's own line stays: \(spoken)")
+        }
+        for layer in [VerificationLayer.searchRecheck, .textExtraction] {
+            let spoken = LayerResultRow.accessibilityLabel(layerIndex: 6, layer: row(layer))
+            #expect(!spoken.contains(gate), "\(layer): \(spoken)")
+        }
+    }
+
+    private func loadRepoFile(
+        _ relativePath: String, from file: StaticString = #filePath
+    ) throws -> String {
+        let repoRoot = URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+        return try String(
+            contentsOf: repoRoot.appendingPathComponent(relativePath),
+            encoding: .utf8)
+    }
+}

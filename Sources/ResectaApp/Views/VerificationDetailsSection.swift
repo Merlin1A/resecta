@@ -125,7 +125,7 @@ struct VerificationDetailsSection: View {
                     // deliberately un-checked, say so here, at the surface
                     // where the share decision is made.
                     let showsDeselection = VerificationResultsView.shouldShowDeselectionRow(
-                        snapshot: deselectionSnapshot, report: report)
+                        snapshot: deselectionSnapshot)
                     if report.perPageModes.hasMixedModes || showsDeselection {
                         VStack(alignment: .leading, spacing: 0) {
                             if report.perPageModes.hasMixedModes {
@@ -501,19 +501,18 @@ extension VerificationResultsView {
                 || report.overallStatus.isSkipped)
     }
 
-    /// Row visibility: a snapshot with at least one deselected item, on a
-    /// report that carries no Detection Sweep row — that row's line already
-    /// counts what the user left unredacted, so the standalone row remains
-    /// only for a verify-only report of an older session. Zero-deselection
+    /// Row visibility: a snapshot with at least one deselected item. The
+    /// row stands beside the Detection Sweep row on every report: the
+    /// sweep's line counts only the deselected items it re-detected in the
+    /// categories it reads, so the user's own count is stated here in
+    /// full (a swept item may be counted on both lines). Zero-deselection
     /// runs (and runs with no live scan session at entry, where the
     /// snapshot is nil) render nothing — no noise. Static so the gate is
     /// unit-testable without a SwiftUI host (mirrors `shouldAutoExpand`).
     static func shouldShowDeselectionRow(
-        snapshot: RedactionState.DeselectionSnapshot?,
-        report: VerificationReport
+        snapshot: RedactionState.DeselectionSnapshot?
     ) -> Bool {
         (snapshot?.deselectedCount ?? 0) > 0
-            && !report.layers.contains { $0.layer == .detectionSweep }
     }
 
     /// Row copy. States the user's own choice as a fact — no verdict

@@ -216,25 +216,7 @@ struct DeselectionApplyCommitCaptureTests {
 @MainActor
 struct DeselectionRowTests {
 
-    private func report(withSweepRow: Bool) -> VerificationReport {
-        var layers = [
-            LayerResult(
-                name: VerificationLayer.searchRecheck.name,
-                symbolName: VerificationLayer.searchRecheck.symbolName,
-                status: .pass, shortDescription: "", detailDescription: "",
-                pageReferences: nil, durationSeconds: 0, layer: .searchRecheck),
-        ]
-        if withSweepRow {
-            layers.append(LayerResult(
-                name: VerificationLayer.detectionSweep.name,
-                symbolName: VerificationLayer.detectionSweep.symbolName,
-                status: .pass, shortDescription: "", detailDescription: "",
-                pageReferences: nil, durationSeconds: 0, layer: .detectionSweep))
-        }
-        return VerificationReport(layers: layers, overallStatus: .pass, durationSeconds: 0)
-    }
-
-    @Test("Row shows only for a snapshot with at least one deselection, and only when no Detection Sweep row carries the counts")
+    @Test("Row shows for a snapshot with at least one deselection, on every report, and auto-expands the details")
     func rowVisibilityGate() {
         // Plain `==` comparisons on named locals: `#expect(!call(.init(…)))`
         // trips a swift-testing macro-capture quirk (the call's value is
@@ -242,18 +224,18 @@ struct DeselectionRowTests {
         let zeroDeselected = makeScanSession(total: 4, deselected: 0).deselectionSnapshotForRun()
         let twoDeselected = makeScanSession(total: 5, deselected: 2).deselectionSnapshotForRun()
         #expect(zeroDeselected?.deselectedCount == 0 && twoDeselected?.deselectedCount == 2)
-        let older = report(withSweepRow: false)
-        #expect(VerificationResultsView.shouldShowDeselectionRow(
-            snapshot: nil, report: older) == false)
-        #expect(VerificationResultsView.shouldShowDeselectionRow(
-            snapshot: zeroDeselected, report: older) == false)
-        #expect(VerificationResultsView.shouldShowDeselectionRow(
-            snapshot: twoDeselected, report: older) == true,
-            "a verify-only report of an older session has no sweep row — the standalone row carries the counts")
-        // A report with the Detection Sweep row folds the counts into that
-        // row's line; the standalone row would say the same thing twice.
-        #expect(VerificationResultsView.shouldShowDeselectionRow(
-            snapshot: twoDeselected, report: report(withSweepRow: true)) == false)
+        #expect(VerificationResultsView.shouldShowDeselectionRow(snapshot: nil) == false)
+        #expect(VerificationResultsView.shouldShowDeselectionRow(snapshot: zeroDeselected) == false)
+        // The gate reads the snapshot alone: every report this build
+        // produces carries a Detection Sweep row, whose line counts only
+        // the deselected items it re-detected in the categories it reads;
+        // the user's own count stands beside it (a swept item may be
+        // stated twice).
+        #expect(VerificationResultsView.shouldShowDeselectionRow(snapshot: twoDeselected) == true)
+        // The auto-expand returns with the row.
+        #expect(VerificationResultsView.shouldAutoExpand(
+            status: .pass, hasMixedModes: false,
+            hasDeselection: VerificationResultsView.shouldShowDeselectionRow(snapshot: twoDeselected)) == true)
     }
 
     @Test("Row copy names the counts and pluralizes on total")

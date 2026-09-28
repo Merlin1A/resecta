@@ -234,6 +234,13 @@ struct LayerResultRow: View {
                     // phrase and every other row's description
                     // stay readable under a capture.
                     .privacySensitive(Self.rowSubtitleIsPrivacySensitive(layer: layer))
+                // The Detection Sweep's gate, on the collapsed row only —
+                // the expanded detail states it once already.
+                if !isExpanded, let caption = Self.rowCaptionText(layer: layer) {
+                    Text(caption)
+                        .font(.caption)
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                }
             }
 
             Spacer()
@@ -451,6 +458,23 @@ struct LayerResultRow: View {
         return reviewRowText(termTexts: terms, pages: layer.pageReferences)
     }
 
+    /// The Detection Sweep's gate, as a fixed line of the collapsed row and
+    /// of its spoken label: the row's own short line reports what the
+    /// sweep observed in the categories it reads, and this line says what
+    /// it leaves out. The same bytes as the engine's detail sentence
+    /// (`DetectionSweep.gateSentence` — internal to the engine; pinned
+    /// equal by `DetectionSweepRowCaptionTests`). No content: not
+    /// privacy-sensitive.
+    static let detectionSweepGateCaption = "Names and addresses are not swept."
+
+    /// The collapsed row's caption line: the gate sentence for the
+    /// Detection Sweep — keyed on the layer's identity, never on its label
+    /// text — and nil for every other row. Static so the composition is
+    /// unit-testable without a SwiftUI host.
+    static func rowCaptionText(layer: LayerResult) -> String? {
+        layer.layer == .detectionSweep ? detectionSweepGateCaption : nil
+    }
+
     /// Whether the collapsed-row subtitle names user text: true exactly
     /// when `rowSubtitleText(layer:)` takes the attention arm and composes
     /// its sentence from the review terms. Static so the predicate is
@@ -584,6 +608,11 @@ struct LayerResultRow: View {
     /// sentence they display.
     static func accessibilityLabel(layerIndex: Int, layer: LayerResult) -> String {
         var label = "Layer \(layerIndex), \(layer.name), \(layer.status.layerAccessibilityPhrase) \(Self.rowSubtitleText(layer: layer))"
+        // The sweep's gate rides the spoken label as it rides the
+        // collapsed row.
+        if let caption = Self.rowCaptionText(layer: layer) {
+            label += " \(caption)"
+        }
         if let pages = layer.pageReferences, !pages.isEmpty {
             label += ", \(pages.count) affected page\(pages.count == 1 ? "" : "s")"
         }

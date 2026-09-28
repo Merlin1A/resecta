@@ -367,8 +367,8 @@ final class PipelineCoordinator: @unchecked Sendable {
         phaseKind: DocumentState.PhaseKind
     ) -> PipelineRunRecovery {
         switch (kind, end) {
-        case (.full, .cancelled):
-            return phaseKind != .editing && phaseKind != .verified
+        case (.full, .cancelled):  // `.empty`: the session closed under a pending run
+            return phaseKind != .editing && phaseKind != .verified && phaseKind != .empty
                 ? .returnToEditing(clearOutput: true) : .none
         case (.verifyOnly, .cancelled):
             return phaseKind != .editing && phaseKind != .verified
@@ -541,12 +541,12 @@ final class PipelineCoordinator: @unchecked Sendable {
             // was built with and the results screen describes this run
             // (see RedactionState.LastRunInputs).
             redactionState.recordLastRunInputs(inputs)
-        case .verificationSkipped:
+        case .verificationSkipped(let burnedRegionVersion):
             documentState.transition(to: .verified(report: .skipped))
-            redactionState.markVerificationCurrent()
-        case .verified(let report):
+            redactionState.markVerificationCurrent(burnedRegionVersion: burnedRegionVersion)
+        case .verified(let report, let burnedRegionVersion):
             documentState.transition(to: .verified(report: report))
-            redactionState.markVerificationCurrent()
+            redactionState.markVerificationCurrent(burnedRegionVersion: burnedRegionVersion)
         case .gazetteerDiagnostics(let diagnostics):
             surfaceGazetteerLoadDiagnostics(diagnostics)
         case .detectionBootstrapFailed:

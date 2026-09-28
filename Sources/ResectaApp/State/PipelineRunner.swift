@@ -39,9 +39,13 @@ enum PipelineRunEvent {
     /// retained beside the output.
     case redactionFinished(outputURL: URL, inputs: RedactionState.LastRunInputs)
     /// Auto-verify is off for this run: the skipped report is published.
-    case verificationSkipped
-    /// A verification report to publish.
-    case verified(VerificationReport)
+    /// `burnedRegionVersion` is the region version the run redacted (the
+    /// entry snapshot's); the stale flag clears only while it is still the
+    /// live one (`RedactionState.markVerificationCurrent(burnedRegionVersion:)`).
+    case verificationSkipped(burnedRegionVersion: Int)
+    /// A verification report to publish, with the region version the
+    /// verified output was built from (see `verificationSkipped`).
+    case verified(VerificationReport, burnedRegionVersion: Int)
     /// Detection: the gazetteer-load diagnostics to surface.
     case gazetteerDiagnostics(GazetteerLoadDiagnostics)
     /// Detection: the page-0 bootstrap could not start — degrade to editing.
@@ -122,45 +126,20 @@ struct PipelineRunner {
         var redactionSucceeded = false
         do {
             sink(.runStarted(effectiveMode: effectiveMode))
-            let pages = coordinator.buildPDFPageData(
-                effectiveMode: effectiveMode, runSettings: runSettings)
-            // The term set — the applied terms plus the words captured
-            // under the manual regions — read at run entry (the capture
-            // runs detached; the run waits for it).
-            let sensitiveTerms = await coordinator.collectSensitiveTermSet()
-
-            // Capture the run's deselection facts at run entry,
-            // before any pipeline work. The value is recorded onto
-            // RedactionState only after `processDocument` returns
-            // (inside the run inputs), but reading it HERE pins the
-            // items the user saw when they pressed Redact — a
-            // programmatic or user re-selection during `.redacting` /
-            // `.verifying` cannot drift what the results screen reports.
-            // `runEntryDeselectionSnapshot()` prefers the
-            // apply-commit snapshot (set at the moment the user last
-            // applied selected search results, even if the sheet has
-            // since dismissed and nil'd `activeSearch`) and falls back
-            // to the live search session's snapshot — nil only when
-            // neither source has one (no apply this document session
-            // and no live PII-scan session at run entry).
-            let redactionState = coordinator.redactionState
-            let deselectionSnapshot = redactionState.runEntryDeselectionSnapshot()
-            // The two run facts the results strip states, read at the
-            // same point for the same reason: the session's detection
-            // record and degrade flags describe the session, and a scan
-            // after this run must not move what the strip says about it.
-            let ocrSkippedPages = redactionState.lastDetectionRun?.ocrSkippedPages ?? []
-            let degradeFailures: [String]? = redactionState.autoDetectionDegraded
-                ? redactionState.autoDetectionDegradeFailures : nil
-            // The output re-check requests, read at the same point and from
-            // the same present-region set: the applied searches (typed and
-            // Scan — the Search Re-check and the Detection Sweep re-run
-            // exactly the queries whose regions this run redacts) and the
-            // run's sweep request, at the settings as they stand at entry.
-            // The deselected items ride both so the sweep subtracts them.
-            let deselectedItems = deselectionSnapshot?.items ?? []
-            let appliedSearches = coordinator.collectAppliedSearches(deselected: deselectedItems)
-                + [coordinator.collectSweepRequest(deselected: deselectedItems)]
+            // The run-entry snapshot — the burned pages, the term set, the
+            // deselection facts and the output re-check requests — read
+            // from ONE region state (`captureRunEntry`): the manual-term
+            // capture is the prefix's only suspension and runs FIRST; from
+            // the snapshot to the `.redacting` transition below this
+            // scaffold does not suspend, so no region can change between
+            // what is burned and what is verified.
+            let entry = try await Self.captureRunEntry(
+                coordinator: coordinator, effectiveMode: effectiveMode,
+                runSettings: runSettings, capture: coordinator.collectSensitiveTermSet)
+            let pages = entry.pages
+            let sensitiveTerms = entry.sensitiveTerms
+            let deselectionSnapshot = entry.deselectionSnapshot
+            let appliedSearches = entry.appliedSearches
 
             // Sub-threshold guard — no pages with effective redactions
             guard !pages.allSatisfy({ $0.regions.isEmpty }) else {
@@ -217,8 +196,8 @@ struct PipelineRunner {
                     sensitiveTerms: runContext.sensitiveTerms,
                     appliedSearches: runContext.appliedSearches,
                     deselection: deselectionSnapshot,
-                    ocrSkippedPages: ocrSkippedPages,
-                    degradeFailures: degradeFailures)))
+                    ocrSkippedPages: entry.ocrSkippedPages,
+                    degradeFailures: entry.degradeFailures)))
 
             // --- Verification ---
             // Paranoid-mode override #2: paranoid
@@ -234,9 +213,11 @@ struct PipelineRunner {
                 runSettings.paranoidMode
                 || runSettings.autoVerify
             if verifyForRun {
-                return try await verify(runContext: runContext, effectiveMode: effectiveMode)
+                return try await verify(
+                    runContext: runContext, effectiveMode: effectiveMode,
+                    burnedRegionVersion: entry.burnedRegionVersion)
             } else {
-                sink(.verificationSkipped)
+                sink(.verificationSkipped(burnedRegionVersion: entry.burnedRegionVersion))
                 return .completed
             }
         } catch let cancellation as CancellationError { // LegalPhrases:safe (Swift keyword)
@@ -244,6 +225,95 @@ struct PipelineRunner {
         } catch { // LegalPhrases:safe (Swift keyword)
             throw PipelineRunFailure(underlying: error, redactionSucceeded: redactionSucceeded)
         }
+    }
+
+    // MARK: - Run entry (one region state)
+
+    /// What the full run reads from the region state at entry, read from
+    /// ONE state: the burned pages, the term set, the deselection facts,
+    /// the two strip facts and the output re-check requests, with the
+    /// region version they describe.
+    struct RunEntry {
+        let pages: [PDFPageData]
+        let sensitiveTerms: SensitiveTermSet
+        let deselectionSnapshot: RedactionState.DeselectionSnapshot?
+        let ocrSkippedPages: Set<Int>
+        let degradeFailures: [String]?
+        let appliedSearches: [SearchRecheckRequest]
+        /// `RedactionState.regionVersion` when `pages` were built — the
+        /// version the run burns and verifies. The stale flag clears at
+        /// `.verified` only while it is still the live one.
+        let burnedRegionVersion: Int
+        /// How many times the capture ran: 1, or 2 after a re-run.
+        let captureRuns: Int
+    }
+
+    /// Read the full run's entry snapshot. The manual-term capture
+    /// (`capture`, detached PDFKit work) suspends the run while the phase
+    /// is still `.editing` and the canvas live, so it runs FIRST; when the
+    /// region version moved while it ran, it runs ONCE more — bounded: a
+    /// region drawn during the second run is burned, its words simply not
+    /// captured. After the last suspension the pages, the deselection
+    /// snapshot, the strip facts and the requests are built synchronously
+    /// on the MainActor, so they describe one region state and the caller
+    /// reaches `.redacting` without suspending again. Cancellation is
+    /// honoured after each capture: a session closed during the window
+    /// ends the run before it reads or writes any further state.
+    static func captureRunEntry(
+        coordinator: PipelineCoordinator,
+        effectiveMode: PipelineMode,
+        runSettings: PipelineCoordinator.RunSettings,
+        capture: @MainActor () async -> SensitiveTermSet
+    ) async throws -> RunEntry {
+        let redactionState = coordinator.redactionState
+        let versionBeforeCapture = redactionState.regionVersion
+        var sensitiveTerms = await capture()
+        try Task.checkCancellation()
+        var captureRuns = 1
+        if redactionState.regionVersion != versionBeforeCapture {
+            sensitiveTerms = await capture()
+            try Task.checkCancellation()
+            captureRuns = 2
+        }
+
+        // Synchronous from here: one region state.
+        let pages = coordinator.buildPDFPageData(
+            effectiveMode: effectiveMode, runSettings: runSettings)
+        let burnedRegionVersion = redactionState.regionVersion
+        // The run's deselection facts. The value is recorded onto
+        // RedactionState only after `processDocument` returns (inside the
+        // run inputs), but reading it HERE pins the items the user saw
+        // when they pressed Redact — a programmatic or user re-selection
+        // during `.redacting` / `.verifying` cannot drift what the results
+        // screen reports. `runEntryDeselectionSnapshot()` prefers the
+        // apply-commit snapshot (set when the user last applied selected
+        // search results, even if the sheet has since dismissed and nil'd
+        // `activeSearch`) and falls back to the live search session's
+        // snapshot — nil only when neither source has one.
+        let deselectionSnapshot = redactionState.runEntryDeselectionSnapshot()
+        // The two run facts the results strip states, read at the same
+        // point for the same reason: the session's detection record and
+        // degrade flags describe the session, and a scan after this run
+        // must not move what the strip says about it.
+        let ocrSkippedPages = redactionState.lastDetectionRun?.ocrSkippedPages ?? []
+        let degradeFailures: [String]? = redactionState.autoDetectionDegraded
+            ? redactionState.autoDetectionDegradeFailures : nil
+        // The output re-check requests, from the same region set: the
+        // applied searches (typed and Scan — the Search Re-check and the
+        // Detection Sweep re-run exactly the queries whose regions this
+        // run redacts) and the run's sweep request, at the settings as
+        // they stand at entry. The deselected items ride the Scan
+        // requests and the sweep request; the engine subtracts them on the
+        // applied scans.
+        let deselectedItems = deselectionSnapshot?.items ?? []
+        let appliedSearches = coordinator.collectAppliedSearches(deselected: deselectedItems)
+            + [coordinator.collectSweepRequest(deselected: deselectedItems)]
+        return RunEntry(
+            pages: pages, sensitiveTerms: sensitiveTerms,
+            deselectionSnapshot: deselectionSnapshot,
+            ocrSkippedPages: ocrSkippedPages, degradeFailures: degradeFailures,
+            appliedSearches: appliedSearches,
+            burnedRegionVersion: burnedRegionVersion, captureRuns: captureRuns)
     }
 
     // MARK: - Verify-only re-run
@@ -267,6 +337,10 @@ struct PipelineRunner {
         // per-page fallback record in the report. Fall back to
         // re-synthesis when absent (resumed old session).
         let retained = coordinator.redactionState.lastRunInputs
+        // The output re-verified here was built from the live regions (the
+        // resume banner offers Re-verify only while none changed since);
+        // the version read now is the one the report describes.
+        let burnedRegionVersion = coordinator.redactionState.regionVersion
         let sensitiveTerms: SensitiveTermSet
         if let retainedTerms = retained?.sensitiveTerms {
             sensitiveTerms = retainedTerms
@@ -311,7 +385,9 @@ struct PipelineRunner {
             sensitiveTerms: sensitiveTerms,
             appliedSearches: appliedSearches
         )
-        return try await verify(runContext: runContext, effectiveMode: effectiveMode)
+        return try await verify(
+            runContext: runContext, effectiveMode: effectiveMode,
+            burnedRegionVersion: burnedRegionVersion)
     }
 
     // MARK: - Verification
@@ -324,7 +400,8 @@ struct PipelineRunner {
     /// adapts the orchestrator's events to the `.verifying` transitions and
     /// the VoiceOver announcements, and publishes the report.
     private func verify(
-        runContext: PipelineCoordinator.PipelineRunContext, effectiveMode: PipelineMode
+        runContext: PipelineCoordinator.PipelineRunContext, effectiveMode: PipelineMode,
+        burnedRegionVersion: Int
     ) async throws -> PipelineRunOutcome {
         // `PDFDocument(url:)` is CPU-bound on large outputs; routing
         // through `Task.detached` keeps the MainActor-isolated run free
@@ -385,7 +462,7 @@ struct PipelineRunner {
             }
         )
 
-        sink(.verified(report))
+        sink(.verified(report, burnedRegionVersion: burnedRegionVersion))
         // VoiceOver overall announcement
         sink(.announce("Verification complete. \(report.overallStatus.accessibilityLabel)"))
         return .completed

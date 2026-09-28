@@ -41,7 +41,9 @@ struct PipelineRunRecoveryTests {
                 Issue.record("expected returnToEditing(clearOutput: true) from \(phase)"); return
             }
         }
-        for phase in [DocumentState.PhaseKind.editing, .verified] {
+        // `.empty`: the session closed while the run was still pending
+        // in the capture window — nothing to return to.
+        for phase in [DocumentState.PhaseKind.editing, .verified, .empty] {
             guard case .none = PipelineCoordinator.recovery(
                 for: full, after: .cancelled, phaseKind: phase) else {
                 Issue.record("expected none from \(phase)"); return
