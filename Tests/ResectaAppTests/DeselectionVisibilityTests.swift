@@ -250,10 +250,12 @@ struct DeselectionRowTests {
         #expect(VerificationResultsView.shouldShowDeselectionRow(
             snapshot: twoDeselected, report: older) == true,
             "a verify-only report of an older session has no sweep row — the standalone row carries the counts")
-        // A report with the Detection Sweep row folds the counts into that
-        // row's line; the standalone row would say the same thing twice.
+        // A report with the Detection Sweep row still shows the standalone
+        // row: the sweep's line counts only the deselected items it
+        // re-detected in the categories it reads, so the user's own count
+        // must stand beside it (a gated item may be stated twice).
         #expect(VerificationResultsView.shouldShowDeselectionRow(
-            snapshot: twoDeselected, report: report(withSweepRow: true)) == false)
+            snapshot: twoDeselected, report: report(withSweepRow: true)) == true)
     }
 
     @Test("Row copy names the counts and pluralizes on total")
