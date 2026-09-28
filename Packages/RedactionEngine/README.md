@@ -65,7 +65,8 @@ shared types.
 - **Verification** — Runs multi-layer output verification on redacted
   PDFs, executing byte-oriented pattern matching, OCR confidence checks,
   reconstruction layer checks, and a re-run of the applied searches and
-  the detectors on the output.
+  the structured detectors (names and addresses are not swept) on the
+  output.
 
 ## Privacy contract
 

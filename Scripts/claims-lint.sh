@@ -20,7 +20,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GREP=/usr/bin/grep
 
 # Shipping markdown set (NOT internal /specs or test fixtures).
-DOCS="README.md ENGINEERING.md CONTRIBUTING.md CHANGELOG.md KNOWN_ISSUES.md EULA.md PRIVACY.md SECURITY.md NOTICE Packages/RedactionEngine/README.md Scripts/gazetteer/README.md"
+DOCS="README.md ENGINEERING.md CONTRIBUTING.md CHANGELOG.md KNOWN_ISSUES.md EULA.md PRIVACY.md SECURITY.md THREAT-MODEL.md NOTICE Packages/RedactionEngine/README.md Scripts/gazetteer/README.md"
 
 # Banned tokens — mirror of LegalPhrases.bannedTerms (case-insensitive),
 # plus one doc-only addition beyond that list: subject-scoped device-boundary

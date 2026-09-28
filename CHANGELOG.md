@@ -12,11 +12,12 @@ The entries below follow the Keep-a-Changelog index format.
 
 - Saved searches: a Delete All control in the saved-search list, one per interface, matching the Custom Terms and Saved Regexes controls; the Settings reset dialog names all three stores.
 - **Search re-check.** Verification gains a check that re-runs each search you applied — the same text, pattern, or term list with the same options — on the redacted output through the search engine, and reports per search how many matches it found, how many you applied, and how many remain in the text the app can read. In Secure Rasterization the output has no text layer, so the check reads the rendered pages with OCR and says so. Pages the check could not read are listed rather than counted as clear. Both modes end with this re-check and the detection sweep below; Secure Rasterization output now runs a 7-layer check and Searchable Redaction a 12-layer check.
-- **Detection sweep.** Verification ends with a check that runs the app's detectors on the redacted output through the search engine — your applied scan's categories and every other category at the current preset — and reports what remains, minus the items you chose to leave unredacted, with the pages they are on. In Secure Rasterization the check reads the rendered pages with OCR and says so; pages it could not read are listed rather than counted as clear.
+- **Detection sweep.** Verification ends with a check that runs the app's detectors on the redacted output through the search engine — your applied scan's categories and every other category at the current preset, except names and addresses, which are not swept — and reports what remains, minus the items you chose to leave unredacted, with the pages they are on. In Secure Rasterization the check reads the rendered pages with OCR and says so; pages it could not read are listed rather than counted as clear.
 
 ### Changed
 
-- Verification results: the two informational notes that every run carried — page content outside the redacted regions, and the writer's fixed metadata fields — now read as passing checks with a detail line; the results screen no longer carries the "Automated detection did not run" line — the Detection Sweep row reports what the detectors observed on the output.
+- Verification results: the two informational notes that every run carried — page content outside the redacted regions, and the writer's fixed metadata fields — now read as passing checks with a detail line; the results screen no longer carries the "Automated detection did not run" line — the Detection Sweep row reports what the structured detectors observed on the output, and names and addresses are not swept, which the row states in its collapsed line.
+- Verification: the words fully inside a manual region on a page with a text layer are carried into the term checks, so a word you covered by hand that is still readable elsewhere on the output is reported as Attention Needed; a manual region on a page without a usable text layer is noted in the string-search check.
 - **Stepping through matches.** The parked Search/Scan strip steps through matches with Previous/Next and a one-tap Apply; each match is centred on the page as you step; the page bar steps aside while you step through matches and returns when the sheet expands; the detection review gets the same Previous/Next stepping with a one-tap Select.
 - Diagnostics export: the coverage snapshot share writes inside the per-session directory with complete protection at write time and is withheld while the screen is captured, matching the audit export.
 - Verification: the OCR check now reports a redacted term that is still readable outside every redacted region as Attention Needed on both output modes, naming the text on the results screen; on rasterized pages it was an informational note.
@@ -42,6 +43,7 @@ The entries below follow the Keep-a-Changelog index format.
 - Scanned pages: characters next to a clearly read digit are no longer read as letters.
 - Search: pages with many matches no longer drop results, and a cancelled search's results stay out of the next.
 - Search: bounded repetition such as `(-\d{4})?` is accepted; a refused pattern shows its reason and a plain-text option, and the re-check lists it as not checked; always-flag terms match ligature and full-width forms.
+- Documentation: a public threat model (`THREAT-MODEL.md`) with a dated security-posture table; the security policy gains a note on report classes, the machine-readable policy pointer and an advisory-history line.
 
 ### Removed
 
@@ -51,18 +53,27 @@ The entries below follow the Keep-a-Changelog index format.
 
 - Searchable Redaction: on pages stored with a rotation, the text layer is rebuilt along the source lines and reads in the source's order; the spatial check reads the layer along the axis its lines run on. The rebuilt layer on such pages was previously assembled across lines and could run off the page.
 - A page with an unsupported size or scale factor is reported as unsupported page geometry instead of a memory failure.
+- Temporary files: the foreground sweep leaves the open document's session directory in place, and a session directory removed behind the app is re-created before the next export.
+- Redact: the regions, terms and settings a run uses are read once when the run starts, and a region drawn while the run is starting is included in that run; the changed-since-verification notice follows the regions the run burned; an import is declined while a run is pending, and closing the document cancels a pending run first.
 
 ### Security
 
 - Links inside an imported document are not followed when tapped in the editor, and data detectors are turned off for the document the editor shows.
 - Import: a document that carries JavaScript or a launch action in its catalog's name tree, in its open action, in a page's additional actions, or in an annotation's action is refused at import, as a document with those entries at the top of the catalog already was. The refusal names active content instead of a damaged file.
+- Import: a page whose rotation is not a right angle is refused before rendering, and the render follows the rotation the viewer displays.
 - Export: the file identifier the system PDF writer adds is rewritten to a value derived from the file's own contents, so it carries nothing about the device, the build or the moment of export; the metadata check confirms it. Two exports of identical content carry the same identifier.
 - Searchable Redaction: a page whose unmarked text shows no ink (white on white, invisible, or under a box drawn into the page) is exported as an image only; the results screen names the reason.
-- Detection assets: each bundled table is checked against the size and SHA-256 digest the signed manifest lists for it at first load; a mismatch withholds that loader and raises the degraded-detection banner.
+- Detection assets: each bundled table is checked against the size and SHA-256 digest the signed manifest lists for it at first load; a mismatch on a signature-gated table withholds that loader and raises the degraded-detection banner, and a mismatch on one of the other tables or the classifier assets raises the banner while the asset's fallback stands.
+- Detection assets: the manifest signing key was rotated; the bundled public key's fingerprint is pinned by a test, and the data pipeline's `KEY-MANAGEMENT.md` describes how the key is held, backed up and rotated.
+- Verification: outcomes a check could not fully verify — a page OCR did not read, characters without a measurable position, terms too short to search — take precedence over informational notes and reach the report as could-not-verify; a page with both in-region text and a redacted term outside every region reports both.
+- Verification: an encrypted output fails the structure check, whether or not it opens without a password.
+- Search: the regular-expression gate refuses six more shapes whose matching time can grow exponentially; the gate's accept/reject checks run in the gating test suite.
+- Custom terms: a slow always-flag term no longer uses up the page's time budget for the terms after it; a term that runs out of time is reported as not fully checked on that page.
 
 ### Internal
 
 - Polygon regions, which the editor does not offer in this release: a polygon that covers no pixel is reported as a failed fill, and the polygon commit path applies the rectangle tool's 10-point minimum size.
+- CI: the engine host suite runs on demand only; the pull-request gate's base-branch lint set includes the silent-guard scanner, and a missing or failing scanner fails the gate; `Scripts/release-flag-check.sh --archive` checks an archived app for debug-only launch arguments and bundled test fixtures as a recorded release step.
 
 ## [1.1.0] — 2026-08-28
 

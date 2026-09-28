@@ -39,7 +39,7 @@ struct TransparencyClaimsTests {
     /// The docs that describe where Custom Terms live. `nonisolated` for the
     /// same reason as `MarkdownContentGuardTests.legalDocs`: consumed by
     /// `@Test(arguments:)`, which the macro hoists into a nonisolated peer.
-    nonisolated static let storageDocs = ["README.md", "ENGINEERING.md"]
+    nonisolated static let storageDocs = ["README.md", "ENGINEERING.md", "THREAT-MODEL.md"]
 
     @Test("README.md does not claim Custom Terms are non-persistent")
     func testREADMEDoesNotClaimInSessionOnly() throws {

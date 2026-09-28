@@ -154,7 +154,7 @@ The batched runner builds once, then runs the app suites in serial batches (perf
 
 The pre-push hook that `install-hooks.sh` installs runs both schemes on the simulator through the same batched runner before any push and blocks the push on a gating red (exit 1) or an incomplete run (exit 2); `SKIP_TESTS=1 git push` skips the gate and logs the skip to stderr.
 
-Name and search tests exercise the system on-device name-recognition model (`NLTagger` `.nameType`), delivered as an on-demand OS asset. For the app suites, use a current iOS 26.x simulator runtime where that model is present (the runner picks an available iPhone 17 simulator automatically); where the asset has not downloaded, those tests skip or report different counts rather than failing the build.
+Name and search tests exercise the system on-device name-recognition model (`NLTagger` `.nameType`), delivered as an on-demand OS asset. For the app suites, use a current iOS 26.x simulator runtime where that model is present (`TEST_BATCHED_SIM_UDID` names the simulator the runner uses); where the asset has not downloaded, those tests skip or report different counts rather than failing the build.
 
 ## Questions
 
