@@ -61,7 +61,7 @@ class RedactionState {
         /// Sibling of `perPageModes` — why each page rasterized, not just
         /// that it did.
         let perPageFallbackReasons: [TextLayerDetector.FallbackReason?]
-        let sensitiveTerms: [SensitiveTerm]
+        let sensitiveTerms: SensitiveTermSet
         /// The output re-check requests the run was verified with, one per
         /// distinct applied query; the verify-only path re-feeds them so
         /// the artifact is re-checked against the searches it was built

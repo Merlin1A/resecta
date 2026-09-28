@@ -39,7 +39,7 @@ struct ManualTermsCaptureTests {
     /// Every word's normalized rect on page 0, keyed by text.
     private static func wordRects(_ doc: PDFDocument) throws -> [String: CGRect] {
         guard let page = doc.page(at: 0) else { throw TestError.failed }
-        return Dictionary(TextLayerSpans.words(fullyInside: unit, on: page).map { ($0.text, $0.normalizedRect) },
+        return Dictionary(TextSpan.words(fullyInside: unit, on: page).map { ($0.text, $0.normalizedRect) },
                           uniquingKeysWith: { a, _ in a })
     }
 
@@ -157,14 +157,13 @@ struct ManualTermsCaptureTests {
         #expect(Self.table(set) == ["John": true])
     }
 
-    @Test("A rich-page manual region over no words is counted like a region without text")
-    func richPageRegionOverBlankSpaceIsCounted() throws {
+    @Test("A rich-page manual region over no words contributes nothing and is not counted (only non-rich pages count)")
+    func richPageRegionOverBlankSpaceContributesNothing() throws {
         let doc = Self.textPDF()
         let set = PipelineCoordinator.sensitiveTermSet(
             applied: [], manualRegions: [0: [Self.manual(CGRect(x: 0.6, y: 0.6, width: 0.2, height: 0.1))]],
             in: doc, textLayerStatus: [0: .rich])
-        #expect(set.terms.isEmpty)
-        #expect(set.manualRegionsWithoutText == 1)
+        #expect(set == .empty)
     }
 
     @Test("SensitiveTermSet is one value; the empty set has no terms and no count")

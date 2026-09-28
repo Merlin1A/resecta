@@ -117,7 +117,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         /// reason from each RasterizeResult (nil = kept searchable mode or
         /// secure-raster-mode run).
         let perPageFallbackReasons: [TextLayerDetector.FallbackReason?]
-        let sensitiveTerms: [SensitiveTerm]
+        let sensitiveTerms: SensitiveTermSet
         /// The applied searches the Search Re-check re-runs on the output
         /// (one request per distinct applied query), beside `sensitiveTerms`.
         /// Empty ⇒ the re-check reports INFO. Derived at run entry by
@@ -603,7 +603,7 @@ final class PipelineCoordinator: @unchecked Sendable {
     func processDocument(
         _ pages: [PDFPageData],
         outputURL: URL,
-        sensitiveTerms: [SensitiveTerm],
+        sensitiveTerms: SensitiveTermSet,
         appliedSearches: [SearchRecheckRequest],
         onProgress: (DocumentState.RedactionProgress) -> Void
     ) async throws -> PipelineRunContext {

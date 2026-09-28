@@ -124,7 +124,10 @@ struct PipelineRunner {
             sink(.runStarted(effectiveMode: effectiveMode))
             let pages = coordinator.buildPDFPageData(
                 effectiveMode: effectiveMode, runSettings: runSettings)
-            let sensitiveTerms = coordinator.collectSensitiveTerms()
+            // The term set — the applied terms plus the words captured
+            // under the manual regions — read at run entry (the capture
+            // runs detached; the run waits for it).
+            let sensitiveTerms = await coordinator.collectSensitiveTermSet()
 
             // Capture the run's deselection facts at run entry,
             // before any pipeline work. The value is recorded onto
@@ -264,8 +267,12 @@ struct PipelineRunner {
         // per-page fallback record in the report. Fall back to
         // re-synthesis when absent (resumed old session).
         let retained = coordinator.redactionState.lastRunInputs
-        let sensitiveTerms = retained?.sensitiveTerms
-            ?? coordinator.collectSensitiveTerms()
+        let sensitiveTerms: SensitiveTermSet
+        if let retainedTerms = retained?.sensitiveTerms {
+            sensitiveTerms = retainedTerms
+        } else {
+            sensitiveTerms = await coordinator.collectSensitiveTermSet()
+        }
         // Same retention contract for the output re-check requests:
         // the retained set when the run recorded one, else the same
         // derivation from the live audit plus a sweep at the current
@@ -348,12 +355,13 @@ struct PipelineRunner {
             outputDocument: wrappedDoc,
             sourcePageCount: sourcePageCount,
             regions: regionsSnapshot,
-            sensitiveTerms: runContext.sensitiveTerms,
+            sensitiveTerms: runContext.sensitiveTerms.terms,
             pipelineMode: effectiveMode,
             filterDigests: runContext.filterDigests,
             perPageModes: runContext.perPageModes,
             perPageFallbackReasons: runContext.perPageFallbackReasons,
             appliedSearches: runContext.appliedSearches,
+            manualRegionsWithoutText: runContext.sensitiveTerms.manualRegionsWithoutText,
             provisionLayerDocuments: { layers in
                 // Provision one PDFDocument instance per parallel layer off
                 // MainActor. nil ⇒ at least one re-open failed.
