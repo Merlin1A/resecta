@@ -4,39 +4,31 @@ import RedactionEngine
 /// App-side router from verification-layer identity to the
 /// custom symbol assets in Resources/Assets.xcassets.
 ///
-/// Keyed on the layer's intrinsic `name`, never the stored `symbolName`:
-/// persisted reports carry whatever symbol string the engine wrote at run
-/// time (including Layer 3's invalid `01.rectangle.fill`), so identity is
-/// the only stable key. Anything unmapped falls back to the stored system
-/// symbol — that path is what keeps old persisted reports rendering.
+/// Keyed on `VerificationLayer` — the engine's identity for a check —
+/// never on a name or the stored `symbolName`. A result without an
+/// identity (the Page Count gate row) and an identity without a custom
+/// asset both fall back to the stored system symbol.
 enum VerificationSymbol {
-    /// Layer name → asset name. Names are the engine's
-    /// `VerificationEngine.layerName(at:)` strings;
-    /// VerificationSymbolTests pins the two lists against each other.
-    static let layerAssets: [String: String] = [
-        "Text Extraction": "resecta.verify.layer01",
-        "OCR Check": "resecta.verify.layer02",
-        "Binary String Search": "resecta.verify.layer03",
-        "Structure Check": "resecta.verify.layer04",
-        "Metadata Check": "resecta.verify.layer05",
-        "Spatial Verification": "resecta.verify.layer06",
-        "Character Count": "resecta.verify.layer07",
-        "Font Verification": "resecta.verify.layer08",
-        "Character Lineage": "resecta.verify.layer09",
-        "Operator Re-Extraction": "resecta.verify.layer10",
+    /// Layer identity → asset name, numbered in the canonical order of the
+    /// first ten checks. The post-sequential checks (the Search Re-check
+    /// and later ones) ship on their SF symbols until their glyphs land.
+    static let layerAssets: [VerificationLayer: String] = [
+        .textExtraction: "resecta.verify.layer01",
+        .ocrCheck: "resecta.verify.layer02",
+        .binaryStringSearch: "resecta.verify.layer03",
+        .structureCheck: "resecta.verify.layer04",
+        .metadataCheck: "resecta.verify.layer05",
+        .spatialVerification: "resecta.verify.layer06",
+        .characterCount: "resecta.verify.layer07",
+        .fontVerification: "resecta.verify.layer08",
+        .characterLineage: "resecta.verify.layer09",
+        .operatorReExtraction: "resecta.verify.layer10",
     ]
 
-    /// Asset name for a layer identity; nil routes to the fallback.
-    static func assetName(forLayerNamed name: String) -> String? {
-        layerAssets[name]
-    }
-
-    /// Asset name for a result: the engine's layer identity first, the
-    /// stored name as the fallback for results built without one (legacy
-    /// persisted reports). Nil for an identity without a custom asset (the
-    /// Search Re-check ships on its SF symbol until its glyph lands).
+    /// Asset name for a result's layer identity; nil for a result without
+    /// an identity or for an identity without a custom asset.
     static func assetName(for layer: LayerResult) -> String? {
-        assetName(forLayerNamed: layer.layer?.name ?? layer.name)
+        layer.layer.flatMap { layerAssets[$0] }
     }
 
     /// Whether the row icon is one of the custom assets (drawn at its
@@ -46,8 +38,7 @@ enum VerificationSymbol {
         assetName(for: layer) != nil
     }
 
-    /// Row icon: custom asset by identity, stored-symbol fallback for
-    /// unmapped identities (legacy persisted reports, future layers).
+    /// Row icon: custom asset by identity, stored-symbol fallback otherwise.
     static func icon(for layer: LayerResult) -> Image {
         if let asset = assetName(for: layer) {
             return Image(asset)

@@ -369,11 +369,10 @@ struct DocumentEditorView: View {
                     previewAvailable: previewAvailable,
                     onExport: { handleExportTap(report: report) },
                     onRunVerification: { handleRunVerificationTap() },
-                    deselectionSnapshot: redactionState.lastRunDeselection,
+                    deselectionSnapshot: redactionState.lastRunInputs?.deselection,
                     onReviewDeselections: reviewDeselectionsHandler,
                     runFacts: VerificationResultsView.RunFacts.derive(
-                        lastDetectionRun: redactionState.lastDetectionRun,
-                        hasAppliedRegions: redactionState.hasEffectiveRegions)
+                        inputs: redactionState.lastRunInputs)
                 )
                 .transition(.opacity)
 
@@ -722,7 +721,7 @@ struct DocumentEditorView: View {
         .modifier(ShareRiskConfirmPresentation(
             kind: $shareRiskConfirmKind,
             documentState: documentState,
-            deselectionSnapshot: redactionState.lastRunDeselection,
+            deselectionSnapshot: redactionState.lastRunInputs?.deselection,
             beginExport: beginExport
         ))
         .onDisappear {

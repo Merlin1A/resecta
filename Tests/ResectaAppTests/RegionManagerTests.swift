@@ -173,9 +173,21 @@ struct RegionManagerTests {
 
     // MARK: - Batch Apply Detection Results
 
-    // Reshaped to the unified apply path: the raw detection map is the
-    // detectionResults origin of `applyFindings` (async entry).
-    @Test("Detection-map apply adds regions for multiple pages")
+    /// Stage `results` in the review with every entry accepted, then
+    /// apply through the staged-review origin — the one detection apply
+    /// path (the former raw-map origin had no production caller).
+    private func applyStagedDetections(
+        _ results: [Int: [DetectionResult]], on state: RedactionState,
+        undoManager: UndoManager?
+    ) async {
+        state.pendingTriage = results
+        for detection in results.values.flatMap({ $0 }) {
+            state.triageSelections[detection.id] = true
+        }
+        await state.applyFindings(.stagedDetections, undoManager: undoManager)
+    }
+
+    @Test("Staged-review apply adds regions for multiple pages")
     func batchApply() async {
         let state = RedactionState()
         let det0 = DetectionResult(
@@ -184,14 +196,14 @@ struct RegionManagerTests {
         let det1 = DetectionResult(
             normalizedRect: CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.1),
             kind: .face, confidence: 0.88)
-        await state.applyFindings(.detectionResults([0: [det0], 1: [det1]]), undoManager: nil)
+        await applyStagedDetections([0: [det0], 1: [det1]], on: state, undoManager: nil)
         #expect(state.regions[0]?.count == 1)
         #expect(state.regions[1]?.count == 1)
         #expect(state.regions[0]?.first?.source == .detectedPII(kind: .ssn))
         #expect(state.regions[1]?.first?.source == .detectedFace)
     }
 
-    @Test("Detection-map apply undo removes all batch regions")
+    @Test("Staged-review apply undo removes all batch regions")
     func batchApplyUndo() async {
         let state = RedactionState()
         let undoManager = makeUndoManager()
@@ -199,7 +211,7 @@ struct RegionManagerTests {
             normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
             kind: .pii(.ssn), confidence: 0.95)
         undoManager.beginUndoGrouping()
-        await state.applyFindings(.detectionResults([0: [det]]), undoManager: undoManager)
+        await applyStagedDetections([0: [det]], on: state, undoManager: undoManager)
         undoManager.endUndoGrouping()
         #expect(state.regions[0]?.count == 1)
         undoManager.undo()
@@ -261,11 +273,7 @@ struct RegionManagerTests {
             .appendingPathComponent("redacted_\(UUID().uuidString).pdf")
         try Data("output".utf8).write(to: url)
         state.outputURL = url
-        state.recordLastRunInputs(
-            perPageModes: [.secureRasterization],
-            perPageFallbackReasons: [nil],
-            sensitiveTerms: [],
-            appliedSearches: [])
+        state.recordLastRunInputs(.fixture(perPageModes: [.secureRasterization]))
         state.textExtractionBuffer = [:]
         return url
     }
@@ -276,10 +284,8 @@ struct RegionManagerTests {
         #expect(!FileManager.default.fileExists(atPath: url.path),
                 "\(leg): the previous output file is unlinked at once")
         #expect(state.outputURL == nil, "\(leg): the published URL is nil")
-        #expect(state.lastRunAppliedSearches == nil,
-                "\(leg): the retained applied searches are dropped")
-        #expect(state.lastRunPerPageModes == nil,
-                "\(leg): the retained per-page modes are dropped")
+        #expect(state.lastRunInputs == nil,
+                "\(leg): the retained run inputs are dropped")
         #expect(state.textExtractionBuffer == nil,
                 "\(leg): the extraction buffer is dropped")
     }
@@ -369,7 +375,7 @@ struct RegionManagerTests {
         let det = DetectionResult(
             normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
             kind: .pii(.ssn), confidence: 0.95)
-        await state.applyFindings(.detectionResults([0: [det]]), undoManager: nil)
+        await applyStagedDetections([0: [det]], on: state, undoManager: nil)
         #expect(state.regions[0]?.count == 1)
         expectOutputUnlinked(state, url, "apply")
     }
@@ -409,7 +415,7 @@ struct RegionManagerTests {
             normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
             kind: .pii(.ssn), confidence: 0.95)
         undoManager.beginUndoGrouping()
-        await state.applyFindings(.detectionResults([0: [det]]), undoManager: undoManager)
+        await applyStagedDetections([0: [det]], on: state, undoManager: undoManager)
         undoManager.endUndoGrouping()
         #expect(state.regions[0]?.count == 1)
 
@@ -455,7 +461,7 @@ struct RegionManagerTests {
         #expect(state.effectiveRegionCount == 3)
     }
 
-    @Test("Detection-map apply creates regions with correct source types")
+    @Test("Staged-review apply creates regions with correct source types")
     func applyDetectionResultsCreatesCorrectSources() async {
         let state = RedactionState()
         let ssn = DetectionResult(
@@ -464,7 +470,7 @@ struct RegionManagerTests {
         let face = DetectionResult(
             normalizedRect: CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.2),
             kind: .face, confidence: 0.85)
-        await state.applyFindings(.detectionResults([0: [ssn, face]]), undoManager: nil)
+        await applyStagedDetections([0: [ssn, face]], on: state, undoManager: nil)
         #expect(state.regions[0]?.count == 2)
         #expect(state.regions[0]?[0].source == .detectedPII(kind: .creditCard))
         #expect(state.regions[0]?[1].source == .detectedFace)

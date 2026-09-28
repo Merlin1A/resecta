@@ -236,7 +236,7 @@ struct HomeViewFailureRoutingTests {
         // .failed. We invoke the same operations against a fresh
         // AppCoordinator and assert the terminal phase.
         let settings = SettingsState()
-        let coordinator = AppCoordinator(settingsState: settings)
+        let coordinator = AppCoordinator(settingsState: settings, userTermsStore: UserTermsStore())
         coordinator.openRedact()
         guard case .redact(let workspace) = coordinator.activeWorkspace else {
             Issue.record("openRedact() did not produce a redact workspace")

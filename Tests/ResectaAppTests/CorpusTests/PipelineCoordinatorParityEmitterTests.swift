@@ -159,8 +159,11 @@ struct PipelineCoordinatorParityEmitterTests {
             return (nil, "\(pendingTerms.count) override terms left unseeded")
         }
         // The coordinator's own derivation must equal the mirror's set.
+        // The corpus seeds are detection-applied regions: no audit entry
+        // carries a typed-search record, so the term set is the matched
+        // text alone — the mirror's rule.
         let derived = Set(PipelineCoordinator.sensitiveTerms(
-            fromAppliedRegions: seed.regions, metadata: seed.metadata
+            fromAppliedRegions: seed.regions, metadata: seed.metadata, audit: [:]
         ).map { TermRow(text: $0.text, requires_token_boundary: $0.requiresTokenBoundary) })
         let expected = Set(cell.sensitive_terms)
         guard derived == expected else {

@@ -308,14 +308,6 @@ struct RunFactsStripTests {
         #expect(line == "Pages 3, 5, and 7 were too large to scan for text, so image content there was not examined by detection. Review those pages manually before sharing.")
     }
 
-    // MARK: - Detection-never-ran line
-
-    @Test("Exact text")
-    func detectionNeverRanExactText() {
-        #expect(VerificationResultsView.RunFactsStrip.detectionNeverRanLine
-                == "Automated detection did not run on this document. Every region here came from Search or manual marking — review each page for anything those did not cover before sharing.")
-    }
-
     // MARK: - Degrade line — verbatim reuse
 
     @Test("Degrade line equals DetectionDegradeCopy.banner verbatim on both branches")
@@ -341,9 +333,6 @@ struct RunFactsStripTests {
         let ocrOnly = VerificationResultsView.RunFacts(ocrSkippedPages: [0])
         #expect(VerificationResultsView.RunFactsStrip.lines(for: ocrOnly).count == 1)
 
-        let neverRanOnly = VerificationResultsView.RunFacts(detectionNeverRan: true)
-        #expect(VerificationResultsView.RunFactsStrip.lines(for: neverRanOnly).count == 1)
-
         let degradeOnly = VerificationResultsView.RunFacts(degradeFailures: ["NameGazetteer"])
         #expect(VerificationResultsView.RunFactsStrip.lines(for: degradeOnly).count == 1)
     }
@@ -359,58 +348,54 @@ struct RunFactsStripTests {
             .degradeLine(failedGazetteers: ["NameGazetteer"]))
     }
 
-    @Test("Detection-never-ran line + degrade line render in order")
-    func linesNeverRanAndDegrade() {
-        let facts = VerificationResultsView.RunFacts(
-            detectionNeverRan: true, degradeFailures: ["NameGazetteer"])
-        let lines = VerificationResultsView.RunFactsStrip.lines(for: facts)
+    @Test("The strip has no detection-disclosure line — the two remaining facts are the run's own")
+    func stripCarriesOnlyRunFacts() {
+        // Every line the strip can render comes from the two facts below;
+        // a search-only or manual-only run with neither renders no strip.
+        let every = VerificationResultsView.RunFacts(
+            ocrSkippedPages: [0], degradeFailures: ["NameGazetteer"])
+        let lines = VerificationResultsView.RunFactsStrip.lines(for: every)
         #expect(lines.count == 2)
-        #expect(lines[0] == VerificationResultsView.RunFactsStrip.detectionNeverRanLine)
-        #expect(lines[1] == VerificationResultsView.RunFactsStrip
-            .degradeLine(failedGazetteers: ["NameGazetteer"]))
+        #expect(!lines.contains { $0.contains("Automated detection did not run") })
+        #expect(!lines.contains { $0.contains("Search or manual marking") })
     }
 
-    // MARK: - RunFacts.derive predicate table
+    // MARK: - RunFacts.derive — reads the run's own inputs
 
-    @Test("derive: nil record + no applied regions → nothing")
-    func deriveNilRecordNoRegions() {
-        let facts = VerificationResultsView.RunFacts.derive(
-            lastDetectionRun: nil, hasAppliedRegions: false)
+    @Test("derive: no retained run → nothing")
+    func deriveNoRun() {
+        let facts = VerificationResultsView.RunFacts.derive(inputs: nil)
         #expect(facts == VerificationResultsView.RunFacts())
     }
 
-    @Test("derive: nil record + applied regions → detectionNeverRan only")
-    func deriveNilRecordWithRegions() {
+    @Test("derive: the run's OCR-skip pages are carried")
+    func deriveCarriesOCRSkips() {
         let facts = VerificationResultsView.RunFacts.derive(
-            lastDetectionRun: nil, hasAppliedRegions: true)
-        #expect(facts.detectionNeverRan)
-        #expect(facts.ocrSkippedPages.isEmpty)
+            inputs: .fixture(ocrSkippedPages: [2, 4]))
+        #expect(facts.ocrSkippedPages == [2, 4])
         #expect(facts.degradeFailures == nil)
     }
 
-    @Test("derive: record with skips carries them; detectionNeverRan false")
-    func deriveRecordWithSkips() {
-        let record = RedactionState.DetectionRunRecord(
-            run: 1, outcome: .staged, scanSummary: nil, ocrSkippedPages: [2, 4])
-        let facts = VerificationResultsView.RunFacts.derive(
-            lastDetectionRun: record, hasAppliedRegions: true)
-        #expect(facts.ocrSkippedPages == [2, 4])
-        #expect(!facts.detectionNeverRan)
-    }
-
-    @Test("derive: record with degradeFailures carries them; without, nil")
-    func deriveRecordDegrade() {
-        let degraded = RedactionState.DetectionRunRecord(
-            run: 1, outcome: .staged, scanSummary: nil,
-            degradeFailures: ["NameGazetteer"])
-        let clean = RedactionState.DetectionRunRecord(
-            run: 2, outcome: .staged, scanSummary: nil)
+    @Test("derive: the run's degrade list is carried; nil when the run was not degraded")
+    func deriveCarriesDegrade() {
         #expect(VerificationResultsView.RunFacts.derive(
-            lastDetectionRun: degraded, hasAppliedRegions: true
+            inputs: .fixture(degradeFailures: ["NameGazetteer"])
         ).degradeFailures == ["NameGazetteer"])
         #expect(VerificationResultsView.RunFacts.derive(
-            lastDetectionRun: clean, hasAppliedRegions: true
+            inputs: .fixture()
         ).degradeFailures == nil)
+    }
+
+    @Test("derive: a later scan record does not move the strip — only the run's inputs do")
+    func deriveIgnoresSessionScanRecord() {
+        let state = RedactionState()
+        state.recordLastRunInputs(.fixture(ocrSkippedPages: [1]))
+        // A scan after the run (not followed by another Redact) records
+        // different skips on the session; the on-screen report is still
+        // the run's.
+        state.recordDetectionRun(.staged, ocrSkippedPages: [5, 6])
+        let facts = VerificationResultsView.RunFacts.derive(inputs: state.lastRunInputs)
+        #expect(facts.ocrSkippedPages == [1])
     }
 
     // MARK: - DetectionRunRecord lifecycle
@@ -455,7 +440,6 @@ struct RunFactsStripTests {
         let samples = [
             VerificationResultsView.RunFactsStrip.ocrSkipLine(pages: [6]),
             VerificationResultsView.RunFactsStrip.ocrSkipLine(pages: [2, 4, 6]),
-            VerificationResultsView.RunFactsStrip.detectionNeverRanLine,
             VerificationResultsView.RunFactsStrip.degradeLine(
                 failedGazetteers: ["NameGazetteer"]),
             VerificationResultsView.RunFactsStrip.degradeLine(

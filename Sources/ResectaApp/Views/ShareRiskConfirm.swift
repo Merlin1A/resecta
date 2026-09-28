@@ -348,9 +348,10 @@ struct ShareRiskConfirmSheet: View {
                         }
                     }
 
-                    if VerificationResultsView.shouldShowDeselectionRow(
-                        snapshot: deselectionSnapshot),
-                       let snapshot = deselectionSnapshot {
+                    // The share reminder keeps its own rule — any item left
+                    // unredacted is worth a line at the share decision,
+                    // whichever ledger row carried the counts.
+                    if let snapshot = deselectionSnapshot, snapshot.deselectedCount > 0 {
                         Text(DocumentEditorView.deselectedItemsConfirmLine(
                             count: snapshot.deselectedCount))
                             .font(.subheadline)

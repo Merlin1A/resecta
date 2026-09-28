@@ -125,7 +125,7 @@ struct VerificationDetailsSection: View {
                     // deliberately un-checked, say so here, at the surface
                     // where the share decision is made.
                     let showsDeselection = VerificationResultsView.shouldShowDeselectionRow(
-                        snapshot: deselectionSnapshot)
+                        snapshot: deselectionSnapshot, report: report)
                     if report.perPageModes.hasMixedModes || showsDeselection {
                         VStack(alignment: .leading, spacing: 0) {
                             if report.perPageModes.hasMixedModes {
@@ -501,15 +501,19 @@ extension VerificationResultsView {
                 || report.overallStatus.isSkipped)
     }
 
-    /// Row visibility: a snapshot with at least one deselected item.
-    /// Zero-deselection runs (and runs with no live scan session at entry,
-    /// where the snapshot is nil) render nothing — no noise. Static so the
-    /// gate is unit-testable without a SwiftUI host (mirrors
-    /// `shouldAutoExpand`).
+    /// Row visibility: a snapshot with at least one deselected item, on a
+    /// report that carries no Detection Sweep row — that row's line already
+    /// counts what the user left unredacted, so the standalone row remains
+    /// only for a verify-only report of an older session. Zero-deselection
+    /// runs (and runs with no live scan session at entry, where the
+    /// snapshot is nil) render nothing — no noise. Static so the gate is
+    /// unit-testable without a SwiftUI host (mirrors `shouldAutoExpand`).
     static func shouldShowDeselectionRow(
-        snapshot: RedactionState.DeselectionSnapshot?
+        snapshot: RedactionState.DeselectionSnapshot?,
+        report: VerificationReport
     ) -> Bool {
         (snapshot?.deselectedCount ?? 0) > 0
+            && !report.layers.contains { $0.layer == .detectionSweep }
     }
 
     /// Row copy. States the user's own choice as a fact — no verdict

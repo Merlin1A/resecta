@@ -41,7 +41,7 @@ struct LiveSessionTempDirectoryTests {
 
     @Test("An open redact workspace hands its session directory; home hands none")
     func coordinatorHandsLiveSessionDirectory() {
-        let coordinator = AppCoordinator(settingsState: SettingsState())
+        let coordinator = AppCoordinator(settingsState: SettingsState(), userTermsStore: UserTermsStore())
         #expect(coordinator.liveTempDirectories.isEmpty)
 
         coordinator.openRedact()

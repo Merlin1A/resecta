@@ -131,6 +131,11 @@ final class SearchState: Identifiable {
 
     /// Active search mode selector.
     var searchModeType: SearchModeType = .text
+    /// What the last Scan kickoff ran with (the preset thresholds and the
+    /// user terms); nil for a typed run or before any run. Set by
+    /// `SearchAndRedactSheet+Trigger.prepareSearchRun()`, read by
+    /// `appliedSearchRecord()` so the record reproduces the run.
+    var lastRunScanConfiguration: ScanRunConfiguration?
 
     /// One-shot arm for the toolbar Scan button's one-tap contract:
     /// the button sets this before presenting the sheet, and the
@@ -368,7 +373,7 @@ final class SearchState: Identifiable {
             return nil
         }
         return RedactionState.DeselectionSnapshot(
-            deselectedCount: deselectedCount, totalCount: totalCount)
+            items: results.filter { !$0.isSelected }, totalCount: totalCount)
     }
 
     /// Accumulate per-page overlap-suppressed counts. Invoked from
@@ -853,40 +858,6 @@ final class SearchState: Identifiable {
     /// For multi-term mode: list of terms.
     var searchTerms: [String] = []
 
-    // MARK: - Applied-search record
-
-    /// The record the apply seam stamps on every search-origin
-    /// `MatchAuditSnapshot` (`prepareApply(searchRecord:)`): the query
-    /// as the user ran it — kind + query text(s) + the full `options`,
-    /// the same fields `SearchAndRedactSheet.buildSearchMode()` reads —
-    /// plus this run's result count and coverage facts. Nil for the
-    /// Scan interface (`.piiScan` is a detector run, not a typed search)
-    /// and for an empty query / term set (nothing was searched). Read
-    /// on MainActor at apply time, before the detached prepare step.
-    func appliedSearchRecord() -> AppliedSearchRecord? {
-        let kind: AppliedSearchQuery.Kind
-        switch searchModeType {
-        case .text:
-            guard !queryText.isEmpty else { return nil }
-            kind = .text(queryText)
-        case .regex:
-            guard !queryText.isEmpty else { return nil }
-            kind = .regex(queryText)
-        case .multiTerm:
-            guard !searchTerms.isEmpty else { return nil }
-            kind = .multiTerm(searchTerms)
-        case .piiScan:
-            return nil
-        }
-        return AppliedSearchRecord(
-            query: AppliedSearchQuery(kind: kind, options: options),
-            foundCount: results.count,
-            foundHitCap: resultsAtCap,
-            ocrSkippedPages: ocrSkippedPages,
-            regexTimeoutPages: regexTimeoutPages,
-            unscannedPageCount: capUnscannedPageCount)
-    }
-
     /// In-memory ring of recent multi-term term sets,
     /// surfaced in the multi-term empty state as tappable recall chips.
     /// Capped at `recentMultiTermSetsCap`; dedup is exact-array match
@@ -1222,6 +1193,7 @@ final class SearchState: Identifiable {
     /// filter write, flushed before the session tears down.
     private func clearSessionState() {
         queryText = ""
+        lastRunScanConfiguration = nil
         isSearching = false
         searchTerms = []
         recentMultiTermSets = []

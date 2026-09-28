@@ -62,7 +62,7 @@ struct ResectaApp: App {
         _userTermsStore = State(initialValue: termsStore)
         _savedSearchStore = State(initialValue: searchStore)
         _settingsState = State(initialValue: set)
-        _appCoordinator = State(initialValue: AppCoordinator(settingsState: set))
+        _appCoordinator = State(initialValue: AppCoordinator(settingsState: set, userTermsStore: termsStore))
         // Instantiate alongside AppCoordinator. The monitor begins
         // observing UIScreen notifications immediately in its init.
         _screenCaptureMonitor = State(initialValue: ScreenCaptureMonitor())

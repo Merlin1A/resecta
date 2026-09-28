@@ -140,38 +140,29 @@ struct VerificationRunVerificationCardTests {
     @Test("recordLastRunInputs retains; clearOutput clears")
     func retentionClearedWithOutput() {
         let redaction = RedactionState()
-        #expect(redaction.lastRunPerPageModes == nil)
-        #expect(redaction.lastRunPerPageFallbackReasons == nil)
-        #expect(redaction.lastRunSensitiveTerms == nil)
+        #expect(redaction.lastRunInputs == nil)
 
-        redaction.recordLastRunInputs(
+        redaction.recordLastRunInputs(.fixture(
             perPageModes: [.searchableRedaction, .secureRasterization],
             perPageFallbackReasons: [nil, .rtlText],
-            sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")],
-            appliedSearches: [])
-        #expect(redaction.lastRunPerPageModes == [.searchableRedaction, .secureRasterization])
-        #expect(redaction.lastRunPerPageFallbackReasons == [nil, .rtlText])
-        #expect(redaction.lastRunSensitiveTerms == [SensitiveTerm(text: "Delia Hartwell")])
+            sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")]))
+        #expect(redaction.lastRunInputs?.perPageModes == [.searchableRedaction, .secureRasterization])
+        #expect(redaction.lastRunInputs?.perPageFallbackReasons == [nil, .rtlText])
+        #expect(redaction.lastRunInputs?.sensitiveTerms == [SensitiveTerm(text: "Delia Hartwell")])
 
         redaction.clearOutput()
-        #expect(redaction.lastRunPerPageModes == nil,
+        #expect(redaction.lastRunInputs == nil,
                 "Discarding the output must drop the run inputs that describe it")
-        #expect(redaction.lastRunPerPageFallbackReasons == nil)
-        #expect(redaction.lastRunSensitiveTerms == nil)
     }
 
     @Test("clearForNewDocument clears the retained run inputs")
     func retentionClearedOnNewDocument() {
         let redaction = RedactionState()
-        redaction.recordLastRunInputs(
+        redaction.recordLastRunInputs(.fixture(
             perPageModes: [.secureRasterization],
-            perPageFallbackReasons: [nil],
-            sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")],
-            appliedSearches: [])
+            sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")]))
         redaction.clearForNewDocument()
-        #expect(redaction.lastRunPerPageModes == nil)
-        #expect(redaction.lastRunPerPageFallbackReasons == nil)
-        #expect(redaction.lastRunSensitiveTerms == nil)
+        #expect(redaction.lastRunInputs == nil)
     }
 
     // MARK: - Verify-only input retention (end to end)
@@ -197,11 +188,9 @@ struct VerificationRunVerificationCardTests {
         // fell back with a recorded trigger.
         let originalReasons: [TextLayerDetector.FallbackReason?] =
             [nil, .unresolvedEncoding]
-        redactionState.recordLastRunInputs(
+        redactionState.recordLastRunInputs(.fixture(
             perPageModes: originalModes,
-            perPageFallbackReasons: originalReasons,
-            sensitiveTerms: [],
-            appliedSearches: [])
+            perPageFallbackReasons: originalReasons))
         documentState.lastUsedPipelineMode = .secureRasterization
         documentState.phase = .verified(report: .skipped)
 
@@ -237,11 +226,9 @@ struct VerificationRunVerificationCardTests {
         defer { try? FileManager.default.removeItem(at: outputURL) }
         redactionState.outputURL = outputURL
 
-        redactionState.recordLastRunInputs(
+        redactionState.recordLastRunInputs(.fixture(
             perPageModes: [.secureRasterization],
-            perPageFallbackReasons: [nil],
-            sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")],
-            appliedSearches: [])
+            sensitiveTerms: [SensitiveTerm(text: "Delia Hartwell")]))
         documentState.lastUsedPipelineMode = .secureRasterization
         documentState.phase = .verified(report: .skipped)
 

@@ -130,10 +130,13 @@ extension VerificationCorpusRunnerTests {
     }
 
     /// Sensitive terms for the burned regions, mirroring the app's
-    /// `PipelineCoordinator.sensitiveTerms(fromAppliedRegions:metadata:)`
+    /// `PipelineCoordinator.sensitiveTerms(fromAppliedRegions:metadata:audit:)`
     /// contribution for detection-applied regions: the matched text of every
     /// burned region, with token-boundary matching for a bare single-word
-    /// name token.
+    /// name token. The app's typed-query contribution reads the applied
+    /// record on the audit (a text query as typed; a multi-term row's term;
+    /// a regex or a Scan nothing beyond the matched text); the corpus seeds
+    /// carry no record, so this is the whole rule here.
     static func sensitiveTerms(for seeds: [RegionSeed]) -> [SensitiveTerm] {
         var boundaryByText: [String: Bool] = [:]
         for seed in seeds where !seed.value.isEmpty {
