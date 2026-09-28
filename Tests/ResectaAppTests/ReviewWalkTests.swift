@@ -6,7 +6,7 @@ import RedactionEngine
 
 // The review-origin walk's cursor (`ReviewWalk`), pinned without a
 // SwiftUI host: the item order, the wrap, the re-anchor on removal, the
-// selection toggle, the match line, the empty set.
+// selection toggle, the current row's summary, the empty set.
 
 @Suite("Review walk")
 @MainActor
@@ -99,27 +99,28 @@ struct ReviewWalkTests {
         #expect(selections[id] == true)
     }
 
-    @Test("The match line: the Scan category name · Page k of N · the matched text; the kind's full name and no text for a face; empty before the first step")
+    @Test("The current row's summary (the strip's Select reads it as its accessibility value): the Scan category name · Page k of N · the matched text; the kind's full name and no text for a face; nothing before the first step")
     func line() {
         let ssn = detection("123-45-6789")
         let face = detection(nil, kind: .face)
         var walk = ReviewWalk(items: ReviewWalk.items(from: [1: [ssn], 3: [face]]))
-        #expect(walk.line(pageCount: 5) == .empty)
+        func summary() -> WalkSummary? { walk.current.map { WalkSummary(item: $0, pageCount: 5) } }
+        #expect(summary() == nil)
         walk.next()
-        #expect(walk.line(pageCount: 5)
-                == .match(WalkSummary(kind: "SSN", pageLabel: "Page 2 of 5", text: "123-45-6789")))
+        #expect(summary() == WalkSummary(kind: "SSN", pageLabel: "Page 2 of 5", text: "123-45-6789"))
+        #expect(summary()?.accessibilityValue == "SSN, Page 2 of 5, 123-45-6789")
         walk.next()
-        #expect(walk.line(pageCount: 5)
-                == .match(WalkSummary(kind: "Detected Face", pageLabel: "Page 4 of 5", text: nil)))
-        // The same label the search line uses.
+        #expect(summary() == WalkSummary(kind: "Detected Face", pageLabel: "Page 4 of 5", text: nil))
+        #expect(summary()?.accessibilityValue == "Detected Face, Page 4 of 5")
+        // The same label the search summary uses.
         #expect(WalkSummary.pageLabel(pageIndex: 1, pageCount: 5) == SearchState.walkPageLabel(pageIndex: 1, pageCount: 5))
     }
 
-    @Test("An empty set: no current, the steps are no-ops, the line is empty")
+    @Test("An empty set: no current, the steps are no-ops")
     func empty() {
         var walk = ReviewWalk()
         walk.next(); walk.previous(); walk.focus(on: UUID())
-        #expect(walk.isEmpty && walk.current == nil && walk.line(pageCount: 1) == .empty)
+        #expect(walk.isEmpty && walk.current == nil)
         #expect(walk == ReviewWalk())
     }
 }

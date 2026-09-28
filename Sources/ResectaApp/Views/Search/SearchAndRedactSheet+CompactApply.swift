@@ -9,7 +9,10 @@ import SwiftUI
 //
 // Compact is a glanceable handle — title
 // + result-nav cluster + per-item Apply; every OTHER control lives at
-// medium+, and the canvas owns interaction below the sheet. The Apply
+// medium+, and the canvas owns interaction below the sheet. The button
+// carries the current match — kind, page, text (`WalkSummary`) — as its
+// accessibility value on both origins: the page shows the mark, so the
+// strip draws nothing for it, and VoiceOver hears it here. The Apply
 // marks ONLY the walk's current match: one draft
 // region through the one `applyFindings` seam — the single-result
 // origin, resolved by id at call time — and ONE two-leg `commitApply`
@@ -113,6 +116,7 @@ extension SearchAndRedactSheet {
             }
         }
         .accessibilityLabel("Apply")
+        .accessibilityValue(walkAccessibilityValue)
         .accessibilityHint("Marks the current match for redaction.")
         .accessibilityIdentifier("applyCurrentResultButton")
         .disabled(applyCurrentResultDisabled)
@@ -153,10 +157,32 @@ extension SearchAndRedactSheet {
         .buttonStyle(.capsulePress)
         .sensoryFeedback(.selection, trigger: selected)
         .accessibilityLabel("Select")
+        .accessibilityValue(walkAccessibilityValue)
         .accessibilityHint("Selects the current detection for redaction; tap again to deselect.")
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("applyCurrentResultButton")
         .disabled(liveReviewWalk.current == nil)
+    }
+
+    // MARK: - The current match, for VoiceOver
+
+    /// The walk's current match: the review walk's row while the staged
+    /// review owns the Scan interface, else the search walk's current
+    /// result; nil before the first step.
+    private var currentWalkSummary: WalkSummary? {
+        if isReviewActive {
+            return liveReviewWalk.current.map {
+                WalkSummary(item: $0, pageCount: documentState.pageCount)
+            }
+        }
+        return searchState.currentResult.map {
+            searchState.walkSummary(for: $0, pageCount: documentState.pageCount)
+        }
+    }
+
+    /// The button's value — kind, page, text — or nothing with no current.
+    private var walkAccessibilityValue: String {
+        currentWalkSummary?.accessibilityValue ?? ""
     }
 
     /// The review walk's current row is selected — the checkbox's read

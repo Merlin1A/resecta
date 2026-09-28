@@ -104,8 +104,6 @@ nonisolated final class ResultWalkUITests: XCTestCase {
         let prev = app.buttons["resultNavPrevious"]
         let compactNext = app.buttons["resultNavNext"]
         XCTAssertTrue(apply.waitForExistence(timeout: 5) && prev.exists && compactNext.exists, "The parked strip's controls are missing.")
-        let line = app.descendants(matching: .any).matching(identifier: "walkMatchLine").firstMatch
-        XCTAssertTrue(line.waitForExistence(timeout: 5), "The match line is missing from the parked strip.")
         for (name, element) in [("Apply", apply), ("previous chevron", prev), ("next chevron", compactNext)] {
             XCTAssertGreaterThanOrEqual(element.frame.height, 44, "\(name) height \(element.frame.height) is under the 44-pt effective floor.")
             XCTAssertGreaterThanOrEqual(element.frame.width, 44, "\(name) width \(element.frame.width) is under the 44-pt effective floor.")

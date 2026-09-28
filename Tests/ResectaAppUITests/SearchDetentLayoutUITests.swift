@@ -418,24 +418,19 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         row.tap()
 
         // A row tap drops the sheet to the compact handle, which
-        // carries the walk's match line AND the trailing ‹ k/N ›
-        // cluster so the walk continues while the sheet is parked (the
-        // interface title yields to the match line while a walk is
-        // live). The strip + the line prove the drop landed; the
-        // cluster's presence + hittability at compact was pinned
-        // ABSENT under the earlier title-only contract; the
-        // no-selection-toggle proof is asserted at medium after a
-        // grabber re-expand, one detent later.
+        // carries the per-item Apply AND the trailing ‹ k/N › cluster
+        // so the walk continues while the sheet is parked (the
+        // interface title yields to the controls while a walk is
+        // live). The strip proves the drop landed; the cluster's
+        // presence + hittability at compact was pinned ABSENT under
+        // the earlier title-only contract; the no-selection-toggle
+        // proof is asserted at medium after a grabber re-expand, one
+        // detent later.
         let strip = app.descendants(matching: .any)
             .matching(identifier: "compactFloatStrip").firstMatch
         XCTAssertTrue(
             strip.waitForExistence(timeout: 10),
             "Row tap did not drop the sheet to the compact float."
-        )
-        XCTAssertTrue(
-            app.descendants(matching: .any).matching(identifier: "walkMatchLine").firstMatch
-                .waitForExistence(timeout: 5),
-            "Compact handle is missing the walk's match line."
         )
         let compactNext = app.buttons["Next result"]
         XCTAssertTrue(
@@ -900,8 +895,8 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
     // Review-row canvas-navigation parity — a row-BODY tap drops the
     // sheet to the compact float (the shipped search-row idiom keeps
     // the canvas interactive behind it) and makes the row the review
-    // walk's current (the strip's match line names it). The strip
-    // carries no footer, so the no-selection proof reads one detent
+    // walk's current (the strip's Select names it as its accessibility
+    // value). The strip carries no footer, so the no-selection proof reads one detent
     // later: re-expand to medium and the footer must still read
     // none-selected — a body tap must NAVIGATE, never toggle; the
     // selection circle keeps its own hit region.
@@ -941,15 +936,15 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
             reviewList.exists,
             "Review list still present after the row-tap compact drop."
         )
-        let line = app.descendants(matching: .any)
-            .matching(identifier: "walkMatchLine").firstMatch
+        let select = app.buttons["applyCurrentResultButton"]
         XCTAssertTrue(
-            line.waitForExistence(timeout: 5),
-            "Compact handle is missing the walk's match line after the row-body drop."
+            select.waitForExistence(timeout: 5),
+            "Compact handle is missing the per-item Select after the row-body drop."
         )
+        let selectValue = select.value as? String ?? ""
         XCTAssertTrue(
-            line.label.contains("123-45-6789"),
-            "The match line does not name the tapped row: \(line.label)"
+            selectValue.contains("123-45-6789"),
+            "The strip's Select does not name the tapped row in its accessibility value: \(selectValue)"
         )
         XCTAssertFalse(
             app.staticTexts["0 of 6 selected"].exists,

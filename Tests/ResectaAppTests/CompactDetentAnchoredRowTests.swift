@@ -24,46 +24,36 @@ struct CompactDetentAnchoredRowTests {
 
     @Test("Hug constant matches the compact handle contract")
     func hugConstantMatchesContract() {
-        // 15-pt grabber inset + the 24-pt match line + the 4-pt gap +
-        // the controls row's 46-pt layout floor + breathing room; the
-        // accessibility hug lifts the line to 36. Was 60 under the
-        // title-only handle, 72 under the cluster handle, 80 with the
-        // per-item Apply on board.
-        #expect(CompactFloatDetent.hugHeight == 108)
-        #expect(CompactFloatDetent.accessibilityHugHeight == 120)
+        // 15-pt grabber inset + the controls row's 46-pt layout floor +
+        // breathing room: the row alone, the smallest attached hug. Was
+        // 60 under the title-only handle, 72 under the cluster handle,
+        // 80 with the per-item Apply on board, 108 (120 at accessibility
+        // sizes) while the match line sat over the row.
+        #expect(CompactFloatDetent.hugHeight == 101)
         #expect(CompactFloatDetent.hugHeight
-                == CompactFloatDetent.grabberInset + CompactFloatDetent.matchLineHeight
-                + ResectaTokens.Spacing.xs + ResectaTokens.TouchTarget.minimum
-                + CompactFloatDetent.bottomInset)
-        #expect(CompactFloatDetent.accessibilityHugHeight
-                == CompactFloatDetent.grabberInset + CompactFloatDetent.accessibilityMatchLineHeight
-                + ResectaTokens.Spacing.xs + ResectaTokens.TouchTarget.minimum
+                == CompactFloatDetent.grabberInset + ResectaTokens.TouchTarget.minimum
                 + CompactFloatDetent.bottomInset)
     }
 
-    @Test("The hug sits in the attached sheet regime (≥ 101 on iOS 26) and the accessibility hug at or under the 120 ceiling")
+    @Test("The hug sits in the attached sheet regime — ON its edge (≥ 101 on iOS 26)")
     func hugStaysInTheAttachedRegime() {
         // Measured on the iPhone 17 sim: up to 100 the system draws a
         // floating capsule at a growing scale (0.877 → 0.957, the
         // grabber hidden from ≈94); from 101 an attached sheet at 0.96,
-        // where the 46-pt frames show at 44.2 pt.
+        // where the 46-pt frames show at 44.2 pt. The hug sits on the
+        // edge itself; the on-sim regime check re-ran at this value.
         #expect(CompactFloatDetent.hugHeight >= 101)
-        #expect(CompactFloatDetent.accessibilityHugHeight <= 120)
-        #expect(CompactFloatDetent.accessibilityHugHeight >= CompactFloatDetent.hugHeight)
     }
 
-    @Test("The type-size hug: the accessibility hug from the accessibility sizes up, the hug below")
+    @Test("The type-size hug: one hug for every size — the row is the same height at accessibility sizes")
     func hugFollowsTheTypeSize() {
         #expect(CompactFloatDetent.hug(for: .large) == CompactFloatDetent.hugHeight)
         #expect(CompactFloatDetent.hug(for: .xxxLarge) == CompactFloatDetent.hugHeight)
-        #expect(CompactFloatDetent.hug(for: .accessibility1) == CompactFloatDetent.accessibilityHugHeight)
-        #expect(CompactFloatDetent.hug(for: .accessibility5) == CompactFloatDetent.accessibilityHugHeight)
-        #expect(CompactFloatDetent.compactHeight(maxDetentValue: 568, accessibilitySize: true)
-                == CompactFloatDetent.accessibilityHugHeight)
-        #expect(CompactFloatDetent.compactHeight(maxDetentValue: 40, accessibilitySize: true) == 40)
+        #expect(CompactFloatDetent.hug(for: .accessibility1) == CompactFloatDetent.hugHeight)
+        #expect(CompactFloatDetent.hug(for: .accessibility5) == CompactFloatDetent.hugHeight)
     }
 
-    @Test("The compact handle mounts the result-nav pair at the parked site, which carries the nav ids and the match line")
+    @Test("The compact handle mounts the result-nav pair at the parked site, which carries the nav ids")
     func compactStripCarriesResultNavCluster() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/SearchAndRedactSheet.swift")
         // The strip's body lives in the +CompactStrip extension file.
@@ -75,10 +65,6 @@ struct CompactDetentAnchoredRowTests {
                 "compactFloatStrip must mount the shared result-nav builders at the parked site")
         #expect(strip.contains("accessibilityIdentifier(\"compactFloatStrip\")"),
                 "compactFloatStrip must keep its identifier")
-        #expect(strip.contains("walkMatchLine"),
-                "compactFloatStrip must mount the walk's match line")
-        #expect(stripFile.contains("accessibilityIdentifier(\"walkMatchLine\")"),
-                "the match line must carry its identifier")
         // The chevron builder both sites share carries the ids — so the
         // compact handle carries resultNavNext by construction.
         let pair = try slice(source,
@@ -114,6 +100,10 @@ struct CompactDetentAnchoredRowTests {
                 "the per-item Apply is the filled capsule")
         #expect(builder.contains("ResectaTokens.TouchTarget.minimum"),
                 "the per-item Apply must reference the shared 46-pt floor token")
+        // VoiceOver's read of the current match — kind · page · text —
+        // rides the button's value now that the strip draws no line.
+        #expect(builder.contains("accessibilityValue("),
+                "the per-item Apply / Select must carry the walk summary as its accessibility value")
     }
 
     @Test("The bottom toast hosts lift by the hug while the sheet is parked at the compact float")
@@ -135,6 +125,7 @@ struct CompactDetentAnchoredRowTests {
     @Test("Clamped to the available height when it is below the hug")
     func clampsToAvailableHeight() {
         #expect(CompactFloatDetent.compactHeight(maxDetentValue: 40) == 40)
+        #expect(CompactFloatDetent.compactHeight(maxDetentValue: 568) == CompactFloatDetent.hugHeight)
     }
 
     @Test("compactFloat detent is distinct from .medium and .large")

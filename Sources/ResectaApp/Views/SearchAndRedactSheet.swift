@@ -684,7 +684,7 @@ struct SearchAndRedactSheet: View {
     }
 
     // The compact detent's composition (`compactFloatStrip`, the title,
-    // the walk's match line) lives in `Search/SearchAndRedactSheet+CompactStrip.swift`
+    // the review walk's counter) lives in `Search/SearchAndRedactSheet+CompactStrip.swift`
     // (the M-6 hub cap).
 
     // MARK: - Search Bar
