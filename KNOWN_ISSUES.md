@@ -9,20 +9,19 @@
 ## Open
 
 ### KI-1: CGPDFContext Cannot Replace Written Pages (High)
-**Affects:** Phase 4 (PDF Reconstruction), Phase 5 (Verification)
+**Affects:** PDF reconstruction, verification
 
 Once `CGPDFContext` writes a page via `endPDFPage()`, it cannot be replaced or removed.
-If per-page verification fails after the page is written, the only option is to FAIL the
-entire pipeline and re-run. A two-pass architecture (verify in-memory before writing)
-is deferred to a future release.
-
-**Workaround:** FAIL-and-re-run entire pipeline on any per-page verification failure.
+Fill verification therefore runs on the bitmap before a page is written; a failure
+re-renders the page once at half resolution, then fails the run. The post-export
+verification pass never rewrites pages. A two-pass architecture that verifies the
+whole file in memory before writing is deferred to a later release.
 
 ---
 
 ### KI-2: PDFPage.characterBounds(at:) Regression (High)
-**Affects:** Phase 7 (Text Layer Handling)
-**Apple radar:** FB14843671 (API Pitfalls)
+**Affects:** Text-layer handling
+**Apple radar:** FB14843671
 
 `PDFPage.characterBounds(at:)` regressed in iOS 18. Must use PDFSelection-based
 workaround for character position extraction.
@@ -43,23 +42,25 @@ and close this issue.
 ---
 
 ### KI-5: os_proc_available_memory() Lags for CGImage (Low)
-**Affects:** Phase 3 (Rasterization), Phase 10 (Pipeline Integration)
+**Affects:** Rasterization, pipeline integration
 
 `os_proc_available_memory()` does not accurately reflect CGImage allocations due to
-mmap/copy-on-write backing. Cannot be used for proactive eviction thresholds.
+mmap/copy-on-write backing. It is not reliable for eviction thresholds; it is used
+only for admission pre-flights with a fixed headroom.
 
 **Workaround:** Evict on `didReceiveMemoryWarning` notification, not memory readings.
-**Additional mitigation (2026-04-02):** `DocumentSearcher` enforces a `maxOCRPixelDimension` cap of 10,000 pixels. Pages exceeding this threshold in either axis at 300 DPI are skipped for OCR search rather than allocated, and the app raises a warning naming the affected pages ("N page(s) were too large to scan for text — review them manually"). This prevents oversized bitmap crashes in the search path.
-**Additional mitigation (2026-05-12):** A `maxOCRPixelCount` ceiling of 36,000,000 pixels (≈ 144 MB RGBA8) supplements the per-axis cap. The per-axis check alone admits a 10000 × 10000 thumbnail (~ 400 MB RGBA8) on near-axis-cap pages; the pixel-count cap skips OCR for those pages too, surfaced through the same too-large-to-scan warning.
+**Additional mitigation (2026-04-02):** `DocumentSearcher` enforces a `maxOCRPixelDimension` cap of 10,000 pixels. Pages exceeding this threshold in either axis at 300 DPI are skipped for OCR search rather than allocated, and the search results carry a banner naming the affected pages ("Pages 3 and 5 were too large to scan for text — image content there was not searched."). This prevents oversized bitmap crashes in the search path.
+**Additional mitigation (2026-05-12):** A `maxOCRPixelCount` ceiling of 36,000,000 pixels (≈ 144 MB RGBA8) supplements the per-axis cap. The per-axis check alone admits a 10000 × 10000 thumbnail (~ 400 MB RGBA8) on near-axis-cap pages; the pixel-count cap skips OCR for those pages too, surfaced through the same too-large-to-scan banner.
 
 ---
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low)
 **Affects:** Detection pipeline, region management
 
-Running detection multiple times may produce overlapping regions for the same PII.
-Security-harmless (more redaction, not less) but creates visual clutter. Deduplication
-deferred to post-v1.
+Detection applies run no overlap test, so repeated scans can add overlapping regions
+for the same PII; search-result applies already skip a result an existing region
+covers by more than 80 %. Security-harmless (more redaction, not less) but creates
+visual clutter. Deduplication of detection applies is not scheduled.
 
 **Workaround:** Manually delete duplicate regions before applying redaction.
 
@@ -103,7 +104,7 @@ While drawing, rectangle edges align to other boxes and page guides; alignment t
 ---
 
 ### KI-3: doc.text.redact SF Symbol Availability Unverified (Medium) — FIXED 2026-03-29
-**Resolution:** Runtime availability check with fallback implemented in Phase 8.
+**Resolution:** Runtime availability check with fallback.
 `EULAGateView.swift`, `HomeView.swift`, and (since 2026-09-22) the app-snapshot
 privacy overlay `SnapshotPrivacyOverlay.swift` check `UIImage(systemName: "doc.text.redact")`
 at runtime and fall back to `doc.viewfinder` if unavailable.
@@ -111,7 +112,7 @@ at runtime and fall back to `doc.viewfinder` if unavailable.
 ---
 
 ### KI-4: Output File Purged While Backgrounded (Medium) — FIXED 2026-05-16
-**Affects:** Phase 10 (Pipeline Integration)
+**Affects:** Pipeline integration
 **Spec ref:** `ExportFailure.filePurged` (Export — File purged row)
 
 **Resolution:** Proactive purge re-run toast wired into
@@ -127,14 +128,7 @@ Document" Tier-2 surface remain in place as defense-in-depth.
 
 ---
 
-## Fixes applied 2026-05-12
+### Earlier review fixes
 
-- (High) — fixed — `Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher.swift:592,717`. `validateRegexPattern` now delegates to `RegexSafetyPrecheck.isLikelyPathological` so the ad-hoc trigger, compose sub-mode, custom-terms editor, saved-regex compile, and user-term matcher reject unbounded group-quantifiers over alternation. `searchRegex` and `previewRegex` pass `[.reportProgress]` to `enumerateMatches`, so the per-page timeout / `Task.isCancelled` check fires between match attempts on long alternation walks. New `RegexSearchHardeningTests.swift` (10 tests) covers catastrophic shapes and the cancellation path. Residual risk: catastrophic backtracking inside a single match attempt still blocks the C call — validation in `validateRegexPattern` remains the primary defense.
-- (Medium) — fixed — `Sources/ResectaApp/Views/ImportService.swift:218-253`. Image-import branch now mirrors the PDF branch: `Task.detached` dispatches to a new `nonisolated static loadImageOffMainActor` that performs `UIImage(data:)` decode, dimension cap (5000×5000), `UIGraphicsPDFRenderer.pdfData` render, and `PDFDocument` wrapping; MainActor is re-entered only for `@Observable` state updates. `renderImageAsPDF` made `nonisolated static`.
-- (Low) — fixed — `Sources/ResectaApp/Overlay/RedactionOverlayView.swift:1171-1178`. `removeFromSuperview` now calls the existing `cancelLongPress()` (which invalidates `longPressTimer` and clears its companion state) before `super.removeFromSuperview()`. PDFView overlay-recycling can drop the view mid-long-press, and the scheduled `Timer` otherwise retains itself on the runloop until fire.
-- (Low) — fixed (comment-only) — `Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift:343-346,474-475,580-582`. `Data(contentsOf: url)` with default options resolves to `.mappedIfSafe`, the memory-mapped access the verification path requires. The three in-code comments incorrectly asserted "copy not mmap" and misattributed the rule to logging-only; all three rewritten to describe the actual mapped-if-safe mechanism. No implementation change.
-
-## Fixes applied 2026-05-13
-
-- (High) — fixed — `Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher.swift:735-739`. Whole-word branch of `searchRegex` no longer derives `Range<String.Index>` via `String.index(_:offsetBy:)` on `NSRange.location`/`length`. `NSRegularExpression` reports `NSRange` in UTF-16 code units, while `String.Index` offsets advance by Characters (grapheme clusters); any emoji, accented letter, or CJK glyph in matched text would push the offset past `endIndex` and raise `Fatal error: String index is out of bounds`. Replaced with `Range(_:in:)`, the Foundation interop helper that round-trips UTF-16 ↔ Character correctly and returns nil for invalid ranges. Mirrors the existing safe pattern already used at line 368 (live regex preview) and line 1467 (`contextSnippet`). Sibling `index(offsetBy:)` sites at lines 1251-1252 and 1337-1338 left alone — they offset from `String.distance` (Character count), not from UTF-16, and are safe so long as `TextNormalizer.normalizeForSearch` preserves Character counts.
-- (High) — fixed — `Sources/ResectaApp/Views/DetectionTriageSheet.swift:13,108-112`. Triage sheet's Dismiss button used to call `redactionState.dismissTriage()` directly, then enqueue a toast and toggle a haptic `@State` after the dismissal had already begun. Because the parent's `.sheet(isPresented:)` binding at `DocumentEditorView.swift:280` flips false when `pendingTriage` clears and its setter calls `dismissTriage()` again, the original ordering produced two `dismissTriage()` dispatches and continued mutating `ToastQueueManager` / local `@State` while the view was tearing down — the classic "modifying state during view update" failure under iOS 26's stricter `@Observable` contract. Added `@Environment(\.dismiss) private var dismiss`. New button order: enqueue toast → toggle haptic → `dismiss()`. The binding setter still owns the single call to `dismissTriage()`. `interactiveDismissDisabled(true)` is unchanged, so swipe-to-dismiss is still blocked.
+- 2026-05-12 — regex pathological-shape gate and cooperative cancellation in regex search; image-import decode moved off the main actor (image input later removed in 1.2.0); overlay long-press timer invalidated on view recycling; three verification comments corrected.
+- 2026-05-13 — whole-word regex range mapping fixed for non-ASCII text (a crash); the detection review sheet's dismiss ordering fixed.

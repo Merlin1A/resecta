@@ -1,163 +1,61 @@
 # Contributing to Resecta
 
-Thanks for your interest in contributing. This document covers the workflow, commit conventions, and audit gates that keep the codebase in line with the project's privacy and legal posture.
-
-## Project organization
-
-Resecta is open-source and AI-assisted.
-
-- **App target:** `Sources/ResectaApp/` — iOS 26, Swift 6.2, MainActor default.
-- **Engine package:** `Packages/RedactionEngine/` — SPM library, non-MainActor with `@concurrent`, Swift 6.2 strict concurrency. Import-friendly for non-app consumers.
+Resecta is maintained by one person and does not expect outside contributions in the near term; issues are welcome. This file records the gates every change passes and where each gate lives, so a reader can check that they exist.
 
 ## Setup
 
-After cloning the repo:
+```sh
+git clone https://github.com/Merlin1A/resecta.git && cd resecta
+./Scripts/install-hooks.sh   # pre-commit = Scripts/audit-lint.sh (by symlink); pre-push = both test schemes
+./regenerate.sh              # ResectaApp.xcodeproj from project.yml via XcodeGen
+```
+
+`project.pbxproj` is generated — never edit it by hand; re-run `./regenerate.sh` after adding Swift files. Never bypass a hook with `--no-verify`. Changes land on `main` through pull requests; releases are tagged from it.
+
+## What every change passes
+
+1. **The pre-commit hook** (`Scripts/audit-lint.sh`) runs the mechanical checks on the staged change; it does not read the commit message. Its rules: mechanism-description language on added Swift, string-catalog and Markdown lines (M-1); the banned networking symbols on added Swift source lines (M-3); no `@AppStorage` inside an `@Observable` class (M-4); the two banned APIs, `PKCanvasView` and `PDFPage.draw` (M-5); and the LOC ceilings — 1,500 lines on `Sources/ResectaApp/Views/SearchAndRedactSheet.swift`, 700 on any newly added Swift file (M-6). The script's own six checks: a staged `project.yml` change needs a regenerated project (AL-1); a new entry in the app target's `resources:` block is reported as a warning, because that block enumerates nothing (AL-2); the app-bundle sample statement and the engine's fixture copy stay byte-identical (AL-3), and so do the two loan-packet copies (AL-4); a test that returns before its first assertion is reported on the lines a commit adds (AL-5); and a token in the shape of a private planning identifier is refused on added Swift and string-catalog lines (AL-6). The check ids appear in the hook's messages; the rules and their override markers (`LegalPhrases:safe`, `Networking:exempt`, `SilentGuard:ok`, `Shorthand:ok`) are documented at the top of the script.
+2. **The pre-push hook** runs both test schemes through `Scripts/test-batched.sh` on the simulator and blocks the push on a gating red (exit 1) or an incomplete run (exit 2); `SKIP_TESTS=1 git push` skips the gate and logs the skip to stderr.
+3. **The pull-request gate** (`ci.yml`, the `pr-gate` check required on `main`) builds the app and its unit- and UI-test bundles without running them, runs the audit lint over the lines the change adds and the claims lint over the shipping docs (both from the base branch's copies of the scripts), checks the documented counts (`Scripts/doc-metrics.sh --check`) and the shipped-asset hashes, and fails if a source file already over 800 lines grows (`Scripts/growth-ratchet.sh`: a file that size is split along a seam, not extended — a no-growth rule on large existing files, distinct from M-6's hard caps on new files).
+4. **The hosted suites.** `sim-suite.yml` runs the app's unit suite on a hosted iPhone 17 simulator for every pull request to `main`, as a non-required check; it runs both schemes through the batched runner every Monday and on `v*` tag pushes, and one chosen scheme on manual dispatch (GitHub disables the schedule after sixty days without repository activity). `engine-suite.yml` runs the engine package with `swift test` on the macOS host on manual dispatch only and has not yet reached a verdict on the hosted runner.
+
+Alongside the hooks, every change keeps three floors: tests green on the iPhone 17 simulator for both schemes; no document-derived data persisted; no new dependency, not even an Apple one beyond the current set.
+
+## Running the tests
 
 ```sh
-./Scripts/install-hooks.sh   # symlink the pre-commit (audit-lint) and pre-push (batched tests) hooks
-./regenerate.sh              # generate ResectaApp.xcodeproj from project.yml
+TEST_BATCHED_SIM_UDID=<simulator udid> Scripts/test-batched.sh ResectaApp
+cd Packages/RedactionEngine && swift test --no-parallel --skip FileProtectionTests
 ```
 
-The pre-commit hook lives at `.git/hooks/pre-commit` as a symlink to `Scripts/audit-lint.sh`. Re-run `install-hooks.sh` after a fresh clone if the symlink is missing. Never bypass the hook with `--no-verify`.
+`TEST_BATCHED_SIM_UDID` is required — it pins the simulator by id and the runner exits 2 without it; export it before pushing. The batched runner builds once, then runs the suites in serial batches (performance-budget suites run alone, report-only, and eight suites on the script's exclusion list never gate) to avoid simulator parallel-run flakiness — do not substitute a full-parallel `xcodebuild test` pass. It prints one `state=… tests=… passed=… failed=… skipped=… known-issues=…` line per batch and ends with a `VERDICT:` line: `PASS` (exit 0), `FAIL` (exit 1) listing the offending suites, or `INCOMPLETE` (exit 2) when an invocation had to be killed and its suites went unverified — re-run those. Logs and per-batch `.xcresult` bundles land under `/tmp/test-batched-<scheme>-<stamp>/`.
 
-After adding new Swift files to `Sources/`, run `./regenerate.sh` to refresh the project. `project.pbxproj` is generated; do not edit it by hand.
+The engine run is serial by design (`--no-parallel`). `FileProtectionTests` needs the iOS file-protection classes, which a macOS host filesystem cannot exercise; the simulator suite covers it (the pre-push hook runs the engine scheme there).
 
-## Branch model
-
-- **`main`** — the line shipped to users.
-- **`feat/<topic>`** — feature work.
-- **`refactor/<topic>-YYYY-MM`** — in-flight refactor chains.
-- **`fix/<topic>`** — bug fixes.
-
-Push to your branch, then open a pull request against `main`.
-
-## Commit format
-
-Commit subjects describe the **mechanism** the change introduces, not the outcome it produces. Use verbs like `add`, `extend`, `create`, `seed`, `amend`, `cite`. Keep the subject under 72 characters.
-
-```
-extend README with threat model and quickstart
-
-[body explaining the why]
-
-Audit:
-- [x] Mechanism-description language (per M-1)
-- [x] Zero networking imports (per M-3)
-- [x] No @AppStorage in @Observable (per M-4)
-- [x] No PKCanvasView, no PDFPage.draw() (per M-5)
-- [x] LOC ceilings respected (per M-6)
-- [x] New strings use mechanism-description language (per M-8)
-- [x] Spec edited if contract-touching (per M-9)
-- [x] Tests pass: ResectaApp + RedactionEngine on iPhone 17 sim (per M-10)
-- [x] Privacy floor: no document-derived data persisted (per M-11)
-- [x] No new dependencies (per M-12)
-- [x] No plan-first change without an agreed plan (per M-13)
-
-Signed-off-by: Your Name <you@example.com>
-```
-
-The `Audit:` block is required. Each item is explicitly checked; the pre-commit hook enforces the mechanical items, and the rest are session discipline. The condensed block above is sufficient for external contributors.
-
-## DCO sign-off
-
-Contributions from outside the project carry a `Signed-off-by:` line on every commit (it is not enforced by a check). By signing off, you certify that the contribution can be made under the project's license per the [Developer Certificate of Origin 1.1](https://developercertificate.org/).
-
-The easiest way to add the line is the `-s` flag:
-
-```sh
-git commit -s -m "your message"
-```
-
-Resecta does not use a Contributor License Agreement (CLA); DCO is the contribution model.
-
-## Audit checklist
-
-The audit checklist has two halves: mechanical checks the local pre-commit hook runs automatically, and manual checks that sessions self-verify before each commit. The local pre-commit hook is the developer gate; the pull-request gate on GitHub Actions (`.github/workflows/ci.yml`) re-runs the same mechanical checks over the lines a pull request adds (`Scripts/audit-lint.sh --range base..HEAD`), alongside the claims lint, the documented-counts check (`Scripts/doc-metrics.sh --check`), the app and test-bundle builds, the shipped-asset hash fence and the growth ratchet, and must be green before a merge to `main`.
-
-The growth ratchet (`Scripts/growth-ratchet.sh BASE HEAD`) lists every Swift source file under `Sources/` and `Packages/RedactionEngine/Sources/` that is over 800 lines at the base of a change and reports whether the change grew it. A file that size is split, not extended: a split along a real seam moves code into a new file and the tracked file shrinks. The step enforces (`RATCHET_ENFORCE: '1'` in `ci.yml`): a grown file is an error annotation and fails the gate, and the step summary carries the table. `Scripts/growth-ratchet.sh --self-test` checks the rule against a scratch repository. Everything else is session discipline plus the local test runs in the "Tests" section below.
-
-### Mechanical checks (hook-enforced, local)
-
-The hook (`Scripts/audit-lint.sh`) runs on every commit and blocks the commit on:
-
-- **M-1.** Forbidden-token matches in staged `.swift`, `.xcstrings`, or `.md` diff lines. The regex pattern lives in `Scripts/audit-lint.sh`; the rules are summarized in the "Mechanism-description language" section below.
-- **M-3.** Banned networking symbols in `Sources/` or `Packages/` (added lines only; pre-existing lines are not re-scanned). Override with `Networking:exempt SafariView` on the same line for SafariView-adjacent helpers.
-- **M-4.** `@AppStorage` declarations inside `@Observable` class bodies.
-- **M-5.** Banned APIs (`PKCanvasView`, `PDFPage.draw`).
-- **M-6.** LOC ceilings: 1500 on `Sources/ResectaApp/Views/SearchAndRedactSheet.swift`; 700 on any newly-added Swift file.
-
-### Script-local checks (hook-enforced)
-
-`Scripts/audit-lint.sh` also carries six checks of its own, numbered `AL-*` so they do not collide with the `M-*` list on this page; a hook message naming one of these refers to the script, not to this checklist:
-
-- **AL-1.** XcodeGen sync: a staged `project.yml` change needs a regenerated `project.pbxproj` (skipped in range mode, where CI regenerates the project first).
-- **AL-2.** The ResectaApp target's `resources:` block silently enumerates nothing; a new entry there is reported as a warning only (route shipped resources through `sources:`).
-- **AL-3.** Sample-statement dual copy: the app-bundle statement and the engine test fixture stay byte-identical.
-- **AL-4.** Loan-packet dual copy: the app-bundle packet and the engine test fixture stay byte-identical.
-- **AL-5.** Silent test guard: a test function that `return`s before its first assertion can report PASS with zero assertions. `Scripts/lint-silent-guards.py` walks every test body in a staged test file (comments and strings blanked; a `return` inside a closure, a nested func or a computed property is not an exit) and the hook reports each such guard on a line this commit added. Two shapes pass: `try #require(...)` for a resource the repository tracks (a fixture, a bundled gazetteer, a value the test computes — its absence is a failure), and `TestGate.skip("<why>")` before the `return` for an environmental gate (a runtime asset, an emitter's env var, the host's core count — a warning-severity issue in the result, never silence). The same-line marker `SilentGuard:ok <reason>` exempts a guard; it is a migration aid, not a style. `python3 Scripts/lint-silent-guards.py --census` prints the whole-tree count.
-- **AL-6.** Planning shorthand: shipped source, tests and string tables describe mechanisms and never cite the private planning notes that scheduled the work — a reader of the repository cannot resolve such a citation. On each added line of a `.swift` or `.xcstrings` file the hook reports a token in the register-identifier shape (a short upper-case prefix, a hyphen, digits; the pattern lives in `Scripts/audit-lint.sh`, case-sensitive so that arithmetic like `p3-1` passes, and the hyphen is required so that a literal such as a licence number is not read as a citation). A hit is an offence: the hook blocks the commit and the pull-request gate fails. The same-line marker `Shorthand:ok <reason>` exempts a line. Say what the code does instead; cite the note in the pull-request body if the history matters.
-
-### Manual checks (session discipline)
-
-- **M-2.** `.privacySensitive()` on views that render document-derived text.
-- **M-8.** New strings use mechanism-description language (see below); classifications listed in the commit body.
-- **M-9.** When a change touches a documented contract, the contract description and the code change land in the same commit.
-- **M-10.** Test suites pass on the iPhone 17 simulator (both schemes).
-- **M-11.** Privacy floor: no document-derived data persisted.
-- **M-12.** No new dependencies (even Apple-first-party beyond the current set).
-- **M-13.** No plan-first change without an agreed plan (see "Changes that need an agreed plan" below).
-- Documented counts: `Scripts/doc-metrics.sh --check` passes whenever a change moves the line or test counts that README.md and ENGINEERING.md quote (the pull-request gate runs the same check).
-
-## Mechanism-description language
-
-User-facing strings, doc comments, and commit messages describe what the code does (the mechanism), not what the user experiences (the outcome). Outcome claims create express warranty risk.
-
-Read this section before adding user-facing strings; the pre-commit hook is the mechanical floor, and a manual review pass is required for borderline cases.
-
-In Swift files, M-1 skips a match that is syntax rather than prose: `catch` or `do` at statement position (or a `catch` clause after code on the same line) and a `find(` call pass without a marker. The `LegalPhrases:safe` override is for prose that has to use one of the listed words — a comment, a string, a test name, a document line — and it goes as a trailing comment on the same line (`<!-- LegalPhrases:safe -->` in Markdown). The override is rare; if it appears more than a few times in a single change, the language is probably drifting and needs a rewrite. <!-- LegalPhrases:safe -->
+Name and search tests exercise the system on-device name-recognition model (`NLTagger` `.nameType`), delivered as an on-demand OS asset. Use a current iOS 26.x simulator runtime where that model is present; where the asset has not downloaded, those tests skip or report different counts rather than failing the build.
 
 ## Changes that need an agreed plan
 
-The following changes land only after a written plan — the change, the reason, and how it will be verified — has been proposed and the maintainer has agreed to it; the edit follows the agreement, not the other way round:
+The following land only after a written plan — the change, the reason, and how it will be verified — has been proposed and the maintainer has agreed to it; the edit follows the agreement, not the other way round:
 
 - Any change to the `Phase` enum or transition table.
 - Any modification to the `PipelineError` type hierarchy.
 - Any new dependency (even Apple-first-party beyond the current set).
-- Any new third-party GitHub Action: its `patterns_allowed` entry goes into the repository's Actions settings before the pull request that uses it, or the workflow fails at startup.
+- Any new third-party GitHub Action: its `patterns_allowed` entry goes into the repository's Actions settings before the pull request that uses it, and it is pinned to a full commit SHA (the repository setting requires it), or the workflow fails at startup.
 - Any change to legal or marketing language (including `Legal.xcstrings`, the EULA, and the privacy policy).
 - Any change to the privacy manifest.
 - Any uncertainty about whether existing code matches the spec.
 
-If a PR crosses one of these, mark it as draft and open an issue that states the plan so the maintainer can agree to it before the edit lands.
+If a pull request crosses one of these, mark it as draft and open an issue that states the plan so the maintainer can agree to it before the edit lands. When a change touches a documented contract, the contract description and the code change land in the same commit.
 
-This list is the canonical source for all contributors, including AI-assisted ones.
+## Mechanism-description language
 
-## Security
+User-facing strings, doc comments, and commit messages describe what the code does (the mechanism), not what the user experiences (the outcome); outcome claims create express-warranty risk. The pre-commit hook is the floor and a human read is the bar. `LegalPhrases:safe` (a trailing comment on the line; `<!-- LegalPhrases:safe -->` in Markdown) is for prose that has to use one of the listed words, and it is rare: if it appears more than a few times in one change, the language is drifting and needs a rewrite.
 
-Vulnerability disclosure goes through [`SECURITY.md`](./SECURITY.md), not the public issue tracker. The file lists a dedicated disclosure address plus the GitHub Security Advisories channel, along with the safe-harbor policy and coordinated-disclosure timeline.
+## Sign-off and licence
 
-## Tests
+Contributions from outside the project carry a `Signed-off-by:` line on every commit (`git commit -s`), certifying the [Developer Certificate of Origin 1.1](https://developercertificate.org/); no check enforces it. The project is licensed under Apache-2.0 and uses no Contributor License Agreement.
 
-Tests run locally before opening a PR and before any merge to `main`: the pre-push hook runs both suites through the batched runner, and the pull-request gate builds the app and both test bundles without running them; the batched suites run weekly on a hosted simulator and before every push locally. On GitHub Actions, `sim-suite.yml` runs both schemes through the batched runner on a hosted simulator every Monday, on demand and on release tags (GitHub pauses a scheduled workflow after sixty days without a commit; any commit resumes it), and `engine-suite.yml` runs the engine package on the macOS host on demand only (`FileProtectionTests` is skipped there because a macOS host filesystem cannot exercise the iOS file-protection classes, which the simulator suite covers) — neither is required for a merge. The two suites:
+## Security and conduct
 
-- `ResectaApp` — app-target tests, on the iPhone 17 simulator via the batched runner.
-- `RedactionEngine` — engine package tests, via SwiftPM on the Mac host.
-
-Run both:
-
-```sh
-Scripts/test-batched.sh ResectaApp
-cd Packages/RedactionEngine && swift test --no-parallel
-```
-
-The batched runner builds once, then runs the app suites in serial batches (performance-budget suites run separately, report-only) to avoid simulator parallel-run flakiness — do not substitute a full-parallel `xcodebuild test` pass. It prints one `state=… tests=… passed=… failed=…` line per batch and ends with a `VERDICT:` line: `PASS` (exit 0) when no gating suite is red, `FAIL` (exit 1) listing the offending suites, or `INCOMPLETE` (exit 2) when an invocation had to be killed and its suites went unverified — re-run those. Full logs and per-batch `.xcresult` bundles land under `/tmp/test-batched-ResectaApp-<timestamp>/`. The engine run is serial by design (`--no-parallel`) and must end in a passing `Test run with N tests …` summary with exit 0.
-
-The pre-push hook that `install-hooks.sh` installs runs both schemes on the simulator through the same batched runner before any push and blocks the push on a gating red (exit 1) or an incomplete run (exit 2); `SKIP_TESTS=1 git push` skips the gate and logs the skip to stderr.
-
-Name and search tests exercise the system on-device name-recognition model (`NLTagger` `.nameType`), delivered as an on-demand OS asset. For the app suites, use a current iOS 26.x simulator runtime where that model is present (`TEST_BATCHED_SIM_UDID` names the simulator the runner uses); where the asset has not downloaded, those tests skip or report different counts rather than failing the build.
-
-## Questions
-
-- Build or test issues: open a GitHub issue.
-- Security disclosures: see [`SECURITY.md`](./SECURITY.md).
-- Conduct or other concerns: see [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md).
+Vulnerability disclosure goes through [`SECURITY.md`](./SECURITY.md), not the public issue tracker. Conduct: [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md).
