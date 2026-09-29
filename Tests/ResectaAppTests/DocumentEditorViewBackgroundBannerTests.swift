@@ -179,4 +179,22 @@ struct DocumentEditorViewBackgroundBannerTests {
             DocumentEditorView.resumeAction(forPausedFrom: .verifying) == .fullPipeline
         )
     }
+
+    /// The primary action clears the pause state before it launches the
+    /// run it offers, so when the resumed detection returns to `.editing`
+    /// the banner's guard (`wasPausedByBackground && phaseKind == .editing`)
+    /// reads false and the detection banner stands alone at the anchor.
+    @Test("Resume banner's primary action clears the pause flag and its phase")
+    func testPrimaryActionClearsPauseState() {
+        let documentState = DocumentState()
+        documentState.phase = .editing
+        documentState.wasPausedByBackground = true
+        documentState.pausedFromPhase = .detecting
+
+        DocumentEditorView.clearBackgroundPause(documentState)
+
+        #expect(documentState.wasPausedByBackground == false)
+        #expect(documentState.pausedFromPhase == nil)
+        #expect(documentState.phaseKind == .editing, "the phase is the run's to move, not the banner's")
+    }
 }
