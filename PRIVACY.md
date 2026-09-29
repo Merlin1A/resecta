@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Effective date:** 2026-09-27
+**Effective date:** 2026-09-29
 
 Resecta is an on-device document-redaction app for iOS. This Privacy Policy
 describes how Resecta handles information. It is written to satisfy Apple's
@@ -53,8 +53,9 @@ the iOS "complete" file-protection class applied and a system flag that
 excludes them from device backups, so they are not copied into iCloud or
 computer backups.
 Your remaining preferences — your settings (export resolution, fill colour,
-default redaction mode, detection sensitivity, appearance, and the automatic
-verification, snap-to-text and Paranoid Mode switches), per-category detection
+default redaction mode, detection sensitivity, appearance, the automatic
+verification and Paranoid Mode switches, and a snap-to-text value whose switch
+was removed in 1.1.0), per-category detection
 priors the app maintains and uses when ranking its suggestions, an export
 counter, the last search filter you used (its source, confidence and sort
 order), and your acceptance of the in-app agreement — are stored in the system
@@ -82,9 +83,10 @@ producer tag, creation and modification timestamps, and a file identifier when
 it builds the file. Resecta then replaces the producer tag in the finished file
 with a fixed value ("Resecta") that identifies neither the operating system
 version nor the build that wrote the file. The rest depends on the version. In
-version 1.1.0, the timestamps record when the file was written and the file
-identifier is a per-export value the writer assigns, so if a timestamp matters
-for your situation, account for it before you share. From version 1.2.0,
+versions 1.0.0 and 1.1.0, the timestamps record when the file was written and
+the file identifier is a per-export value the writer assigns, so if a
+timestamp matters for your situation, account for it before you share. From
+version 1.2.0,
 Resecta also replaces both timestamps with a constant date, so they do not
 record the moment the file was written, and rewrites the file identifier to a
 value derived from the file's own contents, so it carries nothing about the
@@ -93,22 +95,23 @@ carry the same identifier. The export therefore carries much less metadata than
 a typical PDF, but it is not metadata-free. The file name of a shared copy
 records when you exported it.
 
-Resecta 1.2.0 opens PDF files only; this note applies to releases that import
-images. Images inside a PDF you open reach the exported file only as redrawn
-page pixels.
+Resecta 1.2.0 opens PDF files only. Images inside a PDF you open reach the
+exported file only as redrawn page pixels.
 
-A separate note applies to photos. An image you import can carry its own
-embedded metadata, such as EXIF or GPS location data. Resecta redraws imported
-images from their pixels before they enter the document, so that embedded
-metadata is not carried into the file Resecta produces.
+In releases that imported images (1.0.0 and 1.1.0), an image you imported could
+carry its own embedded metadata, such as EXIF or GPS location data. Resecta
+redrew imported images from their pixels before they entered the document, so
+that embedded metadata was not carried into the file Resecta produced.
 
 ## On-device detection
 
 Resecta detects candidate sensitive information entirely on your device.
 Detection combines pattern matching with structural validators (for example, a
 checksum test on card numbers), the system Natural Language tagger (`NLTagger`)
-for names, and the system Vision framework for optical character recognition of
-pages without a text layer. Resecta ships no Core ML model and does not use
+for names, the system Vision framework for optical character recognition of
+pages without a text layer, and Vision to locate faces and barcodes on the page
+so they can be redacted; the app computes no face landmarks or face prints and
+stores nothing about them. Resecta ships no Core ML model and does not use
 Apple Intelligence or the Foundation Models system; detection surfaces
 candidates on your device for you to review and redact. Automated detection can
 miss sensitive content; you are responsible for reviewing each page and
