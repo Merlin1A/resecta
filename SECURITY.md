@@ -1,6 +1,6 @@
 # Security Policy
 
-Resecta is an on-device iOS redaction app. Because redaction is a security-sensitive operation, we take reports of vulnerabilities seriously and welcome good-faith security research.
+Resecta is an on-device iOS redaction app. Redaction is a security-sensitive operation; vulnerability reports and good-faith security research are welcome.
 
 The threat model this policy is written against — what the app protects, whom it protects it from, where its trust boundaries lie, and what it does not claim to handle — is published in [`THREAT-MODEL.md`](./THREAT-MODEL.md), together with a dated table of the project's security posture and how to check each line.
 
@@ -23,7 +23,7 @@ Please report suspected vulnerabilities through either of the following channels
 
 Please **do not** file public GitHub issues for security reports until the issue has been addressed and coordinated disclosure has been agreed upon.
 
-Plain email is the default channel and is monitored regularly. If a report needs more confidentiality than email offers, use a private GitHub Security Advisory: it keeps the report restricted to you and the maintainer without a separate encryption key or an out-of-band verification step. No PGP key is published for this address.
+Plain email is the default channel. If a report needs more confidentiality than email offers, use a private GitHub Security Advisory: it keeps the report restricted to you and the maintainer without a separate encryption key or an out-of-band verification step. No PGP key is published for this address.
 
 The machine-readable pointer to this policy is `https://resecta.app/.well-known/security.txt`.
 

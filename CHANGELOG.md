@@ -2,11 +2,11 @@
 
 All notable changes to Resecta are recorded in this file.
 
-The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Subsection ordering within a release: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
-
-The entries below follow the Keep-a-Changelog index format.
+The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Subsection ordering within a release: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`, then a project-specific `Internal`.
 
 ## [Unreleased]
+
+## [1.2.0] — 2026-09-29
 
 ### Added
 
@@ -44,10 +44,11 @@ The entries below follow the Keep-a-Changelog index format.
 - Search: pages with many matches no longer drop results, and a cancelled search's results stay out of the next.
 - Search: bounded repetition such as `(-\d{4})?` is accepted; a refused pattern shows its reason and a plain-text option, and the re-check lists it as not checked; always-flag terms match ligature and full-width forms.
 - Documentation: a public threat model (`THREAT-MODEL.md`) with a dated security-posture table; the security policy gains a note on report classes, the machine-readable policy pointer and an advisory-history line.
+- Documentation: the README, threat model, engineering notes, security policy, known-issues list and contributing guide re-read against the 1.2.0 tree and corrected; the contributing guide shortened to the gates that exist; the package README's module notes corrected.
 
 ### Removed
 
-- Image input: this release opens PDF files only; 1.0.0 and 1.1.0 also opened JPEG, PNG and HEIC images from Files or a drop. The Files picker lists PDFs, a dropped image is declined with the unsupported-format message, and that message now names PDF.
+- Image input: this release opens PDF files only; 1.0.0 and 1.1.0 also opened JPEG, PNG and HEIC images from Files or a drop. The Files picker lists PDFs, a dropped image is declined with the unsupported-format message, and that message now names PDF; the first-launch agreement screen, the empty sidebar and the Paranoid Mode note say PDF.
 
 ### Fixed
 
@@ -55,6 +56,7 @@ The entries below follow the Keep-a-Changelog index format.
 - A page with an unsupported size or scale factor is reported as unsupported page geometry instead of a memory failure.
 - Temporary files: the foreground sweep leaves the open document's session directory in place, and a session directory removed behind the app is re-created before the next export.
 - Redact: the regions, terms and settings a run uses are read once when the run starts, and a region drawn while the run is starting is included in that run; the changed-since-verification notice follows the regions the run burned; an import is declined while a run is pending, and closing the document cancels a pending run first.
+- Search: the live preview's count honours the text-layer classification and counts multi-term AND mode by page.
 
 ### Security
 
@@ -63,7 +65,8 @@ The entries below follow the Keep-a-Changelog index format.
 - Import: a page whose rotation is not a right angle is refused before rendering, and the render follows the rotation the viewer displays.
 - Export: the file identifier the system PDF writer adds is rewritten to a value derived from the file's own contents, so it carries nothing about the device, the build or the moment of export; the metadata check confirms it. Two exports of identical content carry the same identifier.
 - Searchable Redaction: a page whose unmarked text shows no ink (white on white, invisible, or under a box drawn into the page) is exported as an image only; the results screen names the reason.
-- Detection assets: each bundled table is checked against the size and SHA-256 digest the signed manifest lists for it at first load; a mismatch on a signature-gated table withholds that loader and raises the degraded-detection banner, and a mismatch on one of the other tables or the classifier assets raises the banner while the asset's fallback stands.
+- Detection assets: each bundled table is checked against the size and SHA-256 digest the signed manifest lists for it at first load; a mismatch on any signature-gated table withholds all five signature-gated loaders and raises the degraded-detection banner, and a mismatch on one of the other tables, the classifier assets or the audit rule catalog raises the banner while the asset stays in use unless its own loader rejects it.
+- Detection assets: every versioned table fences its wire version; a table from another schema is refused by name and reported through the load diagnostics.
 - Detection assets: the manifest signing key was rotated; the bundled public key's fingerprint is pinned by a test, and the data pipeline's `KEY-MANAGEMENT.md` describes how the key is held, backed up and rotated.
 - Verification: outcomes a check could not fully verify — a page OCR did not read, characters without a measurable position, terms too short to search — take precedence over informational notes and reach the report as could-not-verify; a page with both in-region text and a redacted term outside every region reports both.
 - Verification: an encrypted output fails the structure check, whether or not it opens without a password.
@@ -73,7 +76,8 @@ The entries below follow the Keep-a-Changelog index format.
 ### Internal
 
 - Polygon regions, which the editor does not offer in this release: a polygon that covers no pixel is reported as a failed fill, and the polygon commit path applies the rectangle tool's 10-point minimum size.
-- CI: the engine host suite runs on demand only; the pull-request gate's base-branch lint set includes the silent-guard scanner, and a missing or failing scanner fails the gate; `Scripts/release-flag-check.sh --archive` checks an archived app for debug-only launch arguments and bundled test fixtures as a recorded release step.
+- CI: the engine host suite runs on demand only; the pull-request gate's base-branch lint set includes the silent-guard scanner, and a missing or failing scanner fails the gate; `Scripts/release-flag-check.sh --archive` checks an archived app for debug-only launch arguments and bundled test fixtures as a recorded release step; the app's unit suite runs on pull requests to `main` as a non-required check and both batched suites run weekly.
+- Engine: the public surface is narrowed to the document-runner API and pinned at compile time (`EnginePublicSurfaceTests`); detection, search and model internals become `internal`.
 
 ## [1.1.0] — 2026-08-28
 
@@ -138,8 +142,8 @@ Initial public release.
 - **Two marking interfaces: Scan and Search.** Scan runs the on-device PII text detectors across the document and stages what they flag for review. Search matches exactly what you ask for, in three modes — Text, Regex, and Multi-term. Both interfaces deliver results into one review list with one selection model and one apply path, and each keeps its own saved list (saved scans; saved searches).
 - **Review-first arrival.** Results arrive with nothing selected; a redaction happens only for items you explicitly select and apply.
 - **On-device PII detection.** Regex patterns plus `NLTagger` named-entity recognition. Bundled gazetteers: federal-agency institution names (1,343 rows), address components, ZIP-to-state mapping, surname and given-name Bloom filters.
-- **Custom Terms.** Single-entry CRUD for user-defined detection terms. Bulk operations (paste-many, CSV import / export, share-profile) are V1.1+ scope.
-- **Audit export schema (surface disabled in V1.0).** The v4 match-audit wire schema ships in code, with the user-facing export surface disabled for this release; enabling it is scoped to a future release (see release notes for the column list and version-bump policy).
+- **Custom Terms.** Single-entry CRUD for user-defined detection terms. Bulk operations (paste-many, CSV import / export, share-profile) are not part of this release.
+- **Audit export schema (surface disabled in V1.0).** The v4 match-audit wire schema ships in code, with the user-facing export surface disabled for this release; enabling it is scoped to a future release.
 - **Doctype temperature and preset thresholds** calibrated against an iPhone 17 / A19 softmax dump.
 - **Core workflow** — Import → View → Mark → Apply → Verify → Export — covering PDF input from Files or the bundled sample document, with export via the system share sheet. The Files picker and drag-and-drop also accepted image files such as JPEG, PNG and HEIC, each redrawn from its pixels as a one-page PDF.
 
@@ -156,6 +160,7 @@ Initial public release.
 - **Pixel-destruction core shared by both modes.** Every page is rasterized, marked or not; vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer from marked regions.
 - **Searchable Redaction text-layer design.** The reconstructed text layer uses a fresh monospace font with uniform spacing, designed to remove the glyph-positioning side channels identified in academic research on sandwich PDFs.
 
-[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Merlin1A/resecta/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Merlin1A/resecta/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Merlin1A/resecta/releases/tag/v1.0.0

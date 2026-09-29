@@ -10,15 +10,15 @@ On-device iOS 26 PDF redaction. Free, open-source, zero data collection — all 
 
 **License:** [Apache License 2.0](./LICENSE)
 
-**Latest release:** 1.1.0 — `main` may be ahead of it: the 7-layer and 12-layer verification counts below describe the next release (1.2.0), not the 1.1.0 build. See the [CHANGELOG](./CHANGELOG.md).
-
-Every pull request builds the app and both test bundles, runs the audit and claims lints on the change (from the base branch's copies of the scripts), checks the documented counts and the shipped-asset hashes, and fails if a source file already over 800 lines grows; the app suite also runs on a hosted simulator as a non-blocking check. Both batched suites are scheduled on a hosted simulator every Monday and run on demand and on release tags (GitHub pauses a scheduled workflow after sixty days without a commit; any commit resumes it). The engine suite's macOS host run is on demand only and has not yet reached a verdict on the hosted runner.
+**Latest release:** 1.2.0 — see the [CHANGELOG](./CHANGELOG.md).
 
 ---
 
 ## What it is
 
 Resecta is a focused PDF redaction tool that operates entirely on your device. It is designed for anyone who needs to remove sensitive regions from PDFs before sharing them. The app makes no network requests of its own, does not create accounts, and does not collect analytics or telemetry.
+
+**For reviewers.** The design reasoning and the check behind each claim are in [`ENGINEERING.md`](./ENGINEERING.md) (start at its "Where to start reading"); what the app defends and what it does not is [`THREAT-MODEL.md`](./THREAT-MODEL.md); the test tree is described under Testing below.
 
 ## What it does
 
@@ -29,14 +29,14 @@ The core workflow is:
 1. **Import** a PDF from Files, or open the bundled sample document.
 2. **View** pages and navigate the document.
 3. **Mark** regions for redaction by drawing rectangles, or by selecting and applying results from Scan (on-device text detection) or Search (text, pattern, and multi-term matching).
-4. **Apply** redaction. Every page is rasterized, marked or not — vector text and images are converted into flat bitmap data, marked regions are overwritten in those pixels, and the rebuilt file is designed to leave the original text layer out. Source document metadata (author, editing history, etc.) is stripped; the rebuilt file carries a producer tag that Resecta replaces with a fixed value ("Resecta", identifying neither the operating system version nor the build), plus the writer's creation/modification timestamps, rewritten to a fixed date, so the export is not metadata-free — see [`PRIVACY.md`](./PRIVACY.md).
+4. **Apply** redaction. Every page is rasterized, marked or not — vector text and images are converted into flat bitmap data, marked regions are overwritten in those pixels, and the rebuilt file is designed to leave the original text layer out. Source metadata (author, editing history and the rest) is stripped; the rebuilt file carries a producer tag replaced with a fixed value and timestamps rewritten to a fixed date, so the export is not metadata-free — see [`PRIVACY.md`](./PRIVACY.md).
 5. **Verify.** A multi-layer verification engine scans the output for residual content using text extraction, OCR, binary string search across multiple encodings, structural analysis, and metadata checks.
 6. **Export** via the system share sheet.
 
 ## Two modes
 
 - **Secure Rasterization** — produces image-only output and is the simplest approach for high-sensitivity documents. Verification runs as a 7-layer check.
-- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to remove glyph-positioning side channels identified in academic research. If any unmarked text on a page shows no ink — white on white, invisible, or under a box drawn into the page — that page is exported as an image only. Text covered by a picture in the page can still enter the text layer. Verification runs as a 12-layer check (the five additional checks cover the preserved-text layer; both modes end with a re-run of your applied searches and a detection sweep on the output).
+- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to remove glyph-positioning side channels identified in academic research. Verification runs as a 12-layer check (the five additional checks cover the preserved-text layer; both modes end with a re-run of your applied searches and a detection sweep on the output). If any unmarked text on a page shows no ink — white on white, invisible, or under a box drawn into the page — that page is exported as an image only. The stated limit: text covered by a picture in the page can still enter the text layer.
 
 Both modes share the same pixel-destruction core. Mode choice is per-document.
 
@@ -60,8 +60,7 @@ _All stages run on-device; the redaction pipeline makes no network calls. Verifi
 
 ## Known limitations
 
-Resecta ships the core workflow described above. The following items
-were deliberately deferred to a future release:
+The following were deliberately deferred to a later release:
 
 - **No "Compose" search sub-mode.** The app ships two marking
   interfaces: Scan, which runs the on-device PII text detectors, and
@@ -76,12 +75,13 @@ were deliberately deferred to a future release:
   future release; a v3 column-subset export path is deferred as well.
 - **Single-entry Custom Terms CRUD.** Bulk operations (paste-many,
   CSV import / export, share-profile) are deferred to a future release.
-- **Secure-enclave-backed persistence is deferred to a future release.** Resecta
-  retains Custom Terms (`UserTermsStore` always-flag / never-flag lists)
-  and the saved-regex library (`SavedRegexStore`) across app launches as
-  JSON files in the app's Application Support directory, written with the
-  `complete` file-protection class and flagged for exclusion from device
-  backups. Moving that storage to a secure-enclave-backed store is the
+- **Secure-enclave-backed persistence is deferred to a later release.** Resecta
+  retains Custom Terms (`UserTermsStore` always-flag / never-flag lists),
+  the saved-regex library (`SavedRegexStore`) and saved searches
+  (`SavedSearchStore`) across app launches as JSON files in the app's
+  Application Support directory, written with the `complete`
+  file-protection class and flagged for exclusion from device backups.
+  Encrypting that storage under a Secure Enclave–backed key is the
   deferred work.
 
 See [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md) for the open-bug tracker.
@@ -90,8 +90,8 @@ See [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md) for the open-bug tracker.
 
 - No network: the codebase contains no `URLSession` or `NWConnection` usage. This is verifiable at the source level via grep.
 - No accounts, no analytics, no telemetry, no server-side components.
-- On-device PII detection uses regex patterns and `NLTagger` named-entity recognition; OCR for scanned pages uses the Vision framework. Nothing in the app creates, stores, or transmits biometric data.
-- Sample documents, if any, are bundled into the app binary — not downloaded.
+- On-device detection combines regex patterns and checksum validators, bundled gazetteers and context scoring, `NLTagger` named-entity recognition for names, and Vision for OCR and for locating faces and barcodes on the page. The app locates face regions so they can be redacted; it computes no face landmarks or face prints and stores nothing about them.
+- The sample documents are bundled in the app — not downloaded.
 
 Users are responsible for verifying that redaction output meets their specific requirements before sharing documents.
 
@@ -102,7 +102,7 @@ Resecta is designed to address specific risks that arise when sharing redacted d
 **In scope:**
 
 - **Residual text after redaction.** Both modes are designed to rasterize every page and leave the original text layer out of the rebuilt file; Searchable Redaction adds a rebuilt layer holding only unmarked text. The multi-layer verification pass scans the output for any text or character data that remains.
-- **Document metadata leakage.** Author, editing history, tagged structure, and other source metadata fields are stripped from exported documents. The rebuilt file does carry a producer tag — replaced with a fixed value ("Resecta") that identifies neither the operating system version nor the build — and the writer's creation/modification timestamps, rewritten to a fixed date; it is not metadata-free. See [`PRIVACY.md`](./PRIVACY.md).
+- **Document metadata leakage.** Author, editing history, tagged structure, and other source metadata fields are stripped from exported documents. The rebuilt file does carry a producer tag — replaced with a fixed value ("Resecta") that identifies neither the operating system version nor the build — the writer's creation/modification timestamps, rewritten to a fixed date, and a file identifier derived from the file's own bytes; it is not metadata-free. See [`PRIVACY.md`](./PRIVACY.md).
 - **Font-positioning side channels (Searchable Redaction).** The preserved text layer uses a fresh monospace font with uniform spacing, designed to remove the glyph-positioning side channels identified in academic research on sandwich PDFs.
 
 **Out of scope:**
@@ -118,20 +118,18 @@ Each load-bearing claim in this README is paired with a mechanical check in this
 
 | Claim | Check |
 | --- | --- |
-| Marked regions are destroyed, not covered | Per-region pixel readback after every fill — one wrong pixel fails the export (`Pipeline/PageRasterizer.swift`); the classic annotation-over-text attacks are constructed and destroyed in `SecurityTests/FakeRedactionTests.swift` |
-| The exported file is re-checked independently | The 7/12-layer verification pass re-opens the output and scans text, OCR, raw bytes across seven encodings, structure, and metadata, re-runs each applied search on the output, and runs the app's structured detectors on the output to report what remains — names and addresses are not swept (`Verification/VerificationEngine.swift`) |
+| Marked regions are destroyed, not covered | Per-region pixel readback after every fill — one wrong pixel fails the render, the page is re-rendered once at half resolution, and a second failure fails the export (`Pipeline/PageRasterizer.swift`); the classic annotation-over-text attacks are constructed and destroyed in `SecurityTests/FakeRedactionTests.swift` |
+| The exported file is re-checked independently | The 7/12-layer verification pass re-opens the output and scans its text, OCR of its rendered pages, the raw bytes across seven encodings (outside content streams) plus each page's decoded text, its structure and its metadata, re-runs each applied search on the output, and runs the app's structured detectors on the output to report what remains — names and addresses are not swept (`Verification/VerificationEngine.swift`) |
 | Placement survives rotated pages | A rotation × crop-box-origin test matrix positions its regions with a transform written independently of the production code (`SecurityTests/RotatedPageCoordinateTests.swift`) |
-| No network requests of its own | A source grep for networking symbols returns no code references (the sole hit is a comment); the pre-commit hook rejects those symbols in any staged diff (`Scripts/audit-lint.sh`) |
+| No network requests of its own | A source grep for networking symbols returns no code references (the sole hit is a comment); the pre-commit hook rejects those symbols on every added Swift source line (`Scripts/audit-lint.sh`) |
 | The app's own copy doesn't overclaim | A banned-vocabulary lint walks every localized string and the shipping docs (`Tests/ResectaAppTests/LegalPhraseLintTests.swift`, `Scripts/claims-lint.sh`) |
 | Bundled detection data is what the pipeline signed | An Ed25519 signature over the gazetteer manifest is verified at load; failure degrades detection with a visible banner (`Detection/GazetteerLoader.swift`) |
 
 ## Project layout
 
-App source lives in `Sources/ResectaApp/`. The redaction engine is an SPM package at [`Packages/RedactionEngine/`](./Packages/RedactionEngine/) — import-friendly for non-app consumers (a future macOS or CLI build) via standard SwiftPM.
+App source lives in `Sources/ResectaApp/`. The redaction engine is an SPM package at [`Packages/RedactionEngine/`](./Packages/RedactionEngine/), consumed through standard SwiftPM (the package also builds on macOS for host-side tests; no macOS product exists).
 
 ## Contributor quickstart
-
-A stranger can clone, build, and start contributing with these steps:
 
 1. **Clone and install hooks.**
 
@@ -141,7 +139,7 @@ A stranger can clone, build, and start contributing with these steps:
    ./Scripts/install-hooks.sh
    ```
 
-   The pre-commit hook enforces the mechanism-description language rules and audit-checklist gates documented in [`CONTRIBUTING.md`](./CONTRIBUTING.md). It is a symlink to `Scripts/audit-lint.sh`; never bypass with `--no-verify`.
+   The pre-commit hook is a symlink to `Scripts/audit-lint.sh`, which runs the mechanical checks described in [`CONTRIBUTING.md`](./CONTRIBUTING.md); the pre-push hook runs both test schemes. Never bypass them with `--no-verify`.
 
 2. **Generate the Xcode project.**
 
@@ -159,18 +157,7 @@ A stranger can clone, build, and start contributing with these steps:
 
    Select the **ResectaApp** scheme and an iPhone 17 simulator. Build with `⌘B`. The app target uses iOS 26 and Swift 6.2; the `RedactionEngine` SPM package requires Swift 6.2 strict concurrency.
 
-4. **Run the test suites.**
-
-   ```sh
-   Scripts/test-batched.sh ResectaApp
-   cd Packages/RedactionEngine && swift test --no-parallel
-   ```
-
-   The batched runner executes the app suites in serial batches on an iPhone 17 simulator (performance-budget suites run separately, report-only) to avoid simulator parallel-run flakiness; it ends with a `VERDICT: PASS` line and exit 0 on success. The engine package tests run serially via SwiftPM on the Mac host. Output and exit-code details are in the Tests section of [`CONTRIBUTING.md`](./CONTRIBUTING.md).
-
-   Name and search tests exercise the system on-device name-recognition model (`NLTagger` `.nameType`), delivered as an on-demand OS asset. Run the app suites on a current iOS 26.x simulator runtime where that model is present; where the asset has not downloaded, those tests skip or report different counts rather than failing the build.
-
-5. **Read the contributor guide** in [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the branch model, commit format, audit checklist, and DCO sign-off requirement. The changes that need an agreed plan first are listed in its "Changes that need an agreed plan" section.
+Tests and gates: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Testing
 
@@ -178,23 +165,25 @@ The test tree is larger than the source tree: roughly 68,000 lines of Swift sour
 
 - **Engine package** (`Packages/RedactionEngine/Tests`) — 1,992 Swift Testing `@Test` functions across 270 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
 - **App target** (`Tests/ResectaAppTests`) — 1,711 `@Test` functions across 243 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
-- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 50 XCUITest methods that drive the built app on a simulator: the first-launch legal gate, detection review, search-to-redaction flows, the search re-check on the results screen, and the editor's handling of links inside a document.
+- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 50 XCUITest methods that drive the built app on a simulator (run from Xcode; the batched runner and CI build them without running them): the first-launch legal gate, detection review, search-to-redaction flows, the search re-check on the results screen, and the editor's handling of links inside a document.
 
 Together the suites carry about 9,300 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
 
 Run both suites:
 
 ```sh
-Scripts/test-batched.sh ResectaApp
-cd Packages/RedactionEngine && swift test --no-parallel
+TEST_BATCHED_SIM_UDID=<simulator udid> Scripts/test-batched.sh ResectaApp
+cd Packages/RedactionEngine && swift test --no-parallel --skip FileProtectionTests
 ```
 
+`TEST_BATCHED_SIM_UDID` is required — it pins the simulator by id and the runner exits 2 without it. `FileProtectionTests` needs the iOS file-protection classes, which a macOS host filesystem cannot exercise; the simulator suite covers it.
+
+**On GitHub Actions.** Every pull request runs the required `pr-gate` check (`ci.yml`), which builds the app and its unit- and UI-test bundles without running them, runs the audit lint over the lines the change adds and the claims lint over the shipping docs (both from the base branch's copies of the scripts), checks the documented counts and the shipped-asset hashes, and fails if a source file already over 800 lines grows. `sim-suite.yml` also runs the app's unit suite on a hosted iPhone 17 simulator for every pull request to `main`, as a non-required check; it runs both schemes through the batched runner every Monday and on `v*` tag pushes, and one chosen scheme on manual dispatch (GitHub disables the schedule after sixty days without repository activity). `engine-suite.yml` runs the engine package with `swift test` on the macOS host on manual dispatch only and has not yet reached a verdict on the hosted runner.
 
 ## Contributing
 
-- Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the workflow, commit conventions, audit gates, and the changes that need an agreed plan before they land.
+- Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the gates every change passes and the changes that need an agreed plan before they land.
 - Security issues: please use [`SECURITY.md`](./SECURITY.md) — do not file public issues for vulnerabilities.
-- Feature work lands on `feat/*` branches.
 
 ## License
 
