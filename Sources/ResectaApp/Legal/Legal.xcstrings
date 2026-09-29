@@ -18,7 +18,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Welcome to Resecta.\n\nThis app helps you redact sensitive information in PDFs and images. All processing happens entirely on your device — the app collects no data and makes no network requests of its own. Links you tap open in Safari or Mail.\n\nImportant: This app is provided \"as is\" without warranty of any kind. Automated redaction tools can miss sensitive content. You are responsible for verifying that all sensitive information has been properly redacted before sharing any document.\n\nBy tapping \"I Agree,\" you agree to the End-User License Agreement and acknowledge the Privacy Policy."
+            "value" : "Welcome to Resecta.\n\nThis app helps you redact sensitive information in PDF documents. All processing happens entirely on your device — the app collects no data and makes no network requests of its own. Links you tap open in Safari or Mail.\n\nImportant: This app is provided \"as is\" without warranty of any kind. Automated redaction tools can miss sensitive content. You are responsible for verifying that all sensitive information has been properly redacted before sharing any document.\n\nBy tapping \"I Agree,\" you agree to the End-User License Agreement and acknowledge the Privacy Policy."
           }
         }
       }
