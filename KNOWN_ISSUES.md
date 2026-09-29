@@ -14,7 +14,7 @@
 Once `CGPDFContext` writes a page via `endPDFPage()`, it cannot be replaced or removed.
 If per-page verification fails after the page is written, the only option is to FAIL the
 entire pipeline and re-run. A two-pass architecture (verify in-memory before writing)
-is deferred to post-v1.0.
+is deferred to a future release.
 
 **Workaround:** FAIL-and-re-run entire pipeline on any per-page verification failure.
 
@@ -93,7 +93,7 @@ While drawing, rectangle edges align to other boxes and page guides; alignment t
 ## Fixed
 
 ### KI-6: Multi-Selection State Model Missing (Low–Medium) — FIXED (entry moved 2026-08-25)
-**Resolution:** `RedactionState.selectedRegionIDs` is a `Set<UUID>`; Select All / Deselect All, Shift-tap on iPad and the iPhone "Add to Selection" toggle operate on the set. The entry was stale.
+**Resolution:** `RedactionState.selectedRegionIDs` is a `Set<UUID>`; Select All / Deselect All and the "Add to Selection" toggle operate on the set (the app ships for iPhone only). The entry was stale.
 
 ---
 
@@ -104,7 +104,7 @@ While drawing, rectangle edges align to other boxes and page guides; alignment t
 
 ### KI-3: doc.text.redact SF Symbol Availability Unverified (Medium) — FIXED 2026-03-29
 **Resolution:** Runtime availability check with fallback implemented in Phase 8.
-`EULAGateView.swift`, `EmptyStateView.swift`, `HomeView.swift`, and (since 2026-09-22) the app-snapshot
+`EULAGateView.swift`, `HomeView.swift`, and (since 2026-09-22) the app-snapshot
 privacy overlay `SnapshotPrivacyOverlay.swift` check `UIImage(systemName: "doc.text.redact")`
 at runtime and fall back to `doc.viewfinder` if unavailable.
 
