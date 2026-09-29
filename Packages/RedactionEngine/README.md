@@ -9,11 +9,12 @@ SwiftUI surface.
 
 ## Status
 
-V1.x. Public surface is stable for in-tree consumers; external SPM
-consumption is supported and the package follows semantic versioning
-from 1.0.0, matching the `.package(url: ..., from: "1.0.0")` pin below. A
-per-symbol DocC catalog is deferred to a future release; package-level orientation
-lives in this README.
+V1.x. Public surface is stable for in-tree consumers. The package is
+developed inside the Resecta app repository and is not published as a
+standalone package: another Swift package consumes it as a local
+dependency on a checkout of the app repository (see "Importing as a
+local dependency" below). A per-symbol DocC catalog is deferred to a
+future release; package-level orientation lives in this README.
 
 ## Public surface
 
@@ -133,22 +134,31 @@ Engine APIs that do CPU-bound work (detection, verification,
 rasterization) are off-`MainActor`; APIs that produce progressive
 results return `AsyncStream` so the caller can subscribe from any actor.
 
-## Importing as an SPM dependency
+## Importing as a local dependency
 
-The engine is published as a single library product, `RedactionEngine`,
-with iOS 26 as the minimum platform. To consume it externally:
+RedactionEngine is developed inside the Resecta app repository and is
+not published as a standalone package: the repository has no root
+`Package.swift`, and the package manifest lives at
+`Packages/RedactionEngine/`. The engine is a single library product,
+`RedactionEngine`, with iOS 26 as the minimum platform. To use it from
+another Swift package, check out `Merlin1A/resecta` and add a local
+dependency on the package directory:
 
 ```swift
 // In your Package.swift:
 dependencies: [
-    .package(url: "https://github.com/Merlin1A/resecta", from: "1.0.0"),
+    .package(path: "<checkout>/Packages/RedactionEngine"),
 ],
 targets: [
     .target(name: "YourTarget", dependencies: [
-        .product(name: "RedactionEngine", package: "resecta"),
+        .product(name: "RedactionEngine", package: "RedactionEngine"),
     ]),
 ]
 ```
+
+Releases are tagged on the app repository; `v1.0.0` is a signed tag,
+`v1.1.0` predates signing, and every release tag from `v1.2.0` on is
+signed. The engine carries no separate version.
 
 For monorepo development against a local checkout, swap the `url:` for
 `path:`:
