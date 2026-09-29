@@ -1149,6 +1149,8 @@ public actor DocumentSearcher {
 
         for pageIndex in 0..<pageCount {
             if Task.isCancelled || totalYielded >= Self.maxResults { break }
+            // Per-page yield (mirrors searchRegex) so queued actor setters drain on each page boundary.
+            await Task.yield()
             progress(pageIndex + 1, pageCount)
 
             guard let page = doc.page(at: pageIndex) else {
@@ -1158,9 +1160,8 @@ public actor DocumentSearcher {
             let pageText = page.string ?? ""
 
             if !pageText.isEmpty && pageHasRichTextLayer(pageIndex) {
-                // Text-layer path: run PIIDetector on extracted text,
+                // Text-layer path: PIIDetector on the extracted text, then NSRange → bounding rect via PDFKit selection.
                 pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
-                // then map NSRange → bounding rect via PDFKit selection.
                 var rawMatches = await piiDetector.detect(in: pageText, categories: categories)
                 // Spatial address assembly on the text leg. The line
                 // records come from `EmbeddedTextSource.make` — the SAME
@@ -1177,8 +1178,7 @@ public actor DocumentSearcher {
                     rawMatches.append(contentsOf: assembly.matches)
                     spatialRectByText = assembly.spatialRectByText
                 }
-                // Cross-category overlap resolution before threshold
-                // filter, mirroring DetectionOrchestrator.detectPage.
+                // Cross-category overlap resolution before the threshold filter (mirrors DetectionOrchestrator.detectPage).
                 let resolution = DetectionOrchestrator.resolveOverlaps(rawMatches)
                 if !resolution.suppressedCountByCategory.isEmpty {
                     overlapSink?(resolution.suppressedCountByCategory)
