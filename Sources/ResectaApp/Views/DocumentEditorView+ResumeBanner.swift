@@ -37,6 +37,7 @@ extension DocumentEditorView {
                     label: resume == .detect ? "Resume Detection" : "Restart",
                     action: {
                         dismissBannerTask?.cancel()
+                        Self.clearBackgroundPause(documentState)
                         switch resume {
                         case .detect:
                             coordinator.runDetectionPipeline(
@@ -82,5 +83,17 @@ extension DocumentEditorView {
 
     static func resumeAction(forPausedFrom phase: DocumentState.PhaseKind?) -> ResumeAction {
         phase == .detecting ? .detect : .fullPipeline
+    }
+
+    /// What the banner's primary action clears before it launches the run
+    /// it offers: the pause flag and the phase it was paused from — the
+    /// same pair the dismiss path and the Run Verification card clear
+    /// (`handleRunVerificationTap`). Left set, the banner mounted again
+    /// when the resumed run returned to `.editing` and stacked with the
+    /// detection banner at the same anchor. Static so the pin is testable
+    /// without a SwiftUI host.
+    static func clearBackgroundPause(_ documentState: DocumentState) {
+        documentState.wasPausedByBackground = false
+        documentState.pausedFromPhase = nil
     }
 }

@@ -20,9 +20,9 @@ import SwiftUI
 // The composition is the "Stacked" one of the two finalists the on-sim
 // variant study put to the pick (2026-09-24): a match line over the row
 // — Apply leading, the cluster trailing — so every existing id and tap
-// habit carries over. The line was retired 2026-09-28 (Jesse: the page
-// shows the mark; the line said it twice and looked bad) — the row
-// alone remains, at the smallest attached hug.
+// habit carries over. The line was retired 2026-09-28: the page shows
+// the mark, so the line said it twice — the row alone remains, at the
+// smallest attached hug.
 
 /// Where the ‹ › cluster is mounted. The medium+ search bar keeps its
 /// pinned geometry (Ø44 circles in 46-pt frames, pair spacing 6, a

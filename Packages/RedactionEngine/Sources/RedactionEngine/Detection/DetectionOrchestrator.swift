@@ -535,9 +535,8 @@ public struct DetectionOrchestrator: Sendable {
         // future DoctypeClass addition.
         //
         // Face detection is not derived from the text layer, so it
-        // runs unconditionally on the skip path. Re-stamp the face results
-        // with the page-level provenance so the audit story stays uniform:
-        // "every result on a skipped page carries provenance.ocrSkipped".
+        // runs unconditionally on the skip path; `restamped` gives the
+        // results the page-level provenance there.
         //
         // Vision-error tolerance: face detection is an opportunistic surface
         // on top of the text-PII pass — a missed face is the weaker outcome,
@@ -554,21 +553,7 @@ public struct DetectionOrchestrator: Sendable {
         if Self.shouldRunFaceDetection(for: effectiveDoctype) {
             do {
                 let raw = try await runFaceDetection(on: image)
-                if provenance.ocrSkipped {
-                    faceResults = raw.map { face in
-                        DetectionResult(
-                            id: face.id,
-                            normalizedRect: face.normalizedRect,
-                            kind: face.kind,
-                            confidence: face.confidence,
-                            matchedText: face.matchedText,
-                            recognitionLevel: face.recognitionLevel,
-                            provenance: provenance
-                        )
-                    }
-                } else {
-                    faceResults = raw
-                }
+                faceResults = Self.restamped(raw, provenance: provenance)
             } catch is CancellationError { // LegalPhrases:safe
                 throw CancellationError()
             } catch { // LegalPhrases:safe
@@ -585,8 +570,6 @@ public struct DetectionOrchestrator: Sendable {
         // `shouldRunBarcodeDetection(for:)` defaults to `true` for every
         // doctype today; the exhaustive switch is the compile-time forcing
         // point if a future DoctypeClass wants to skip the work.
-        // Re-stamp provenance on the OCR-skip path so every detection on a
-        // skipped page reports `provenance.ocrSkipped` uniformly.
         //
         // Vision-error tolerance: barcode detection is an
         // opportunistic surface — a missed barcode is suboptimal but the
@@ -601,21 +584,7 @@ public struct DetectionOrchestrator: Sendable {
         if Self.shouldRunBarcodeDetection(for: effectiveDoctype) {
             do {
                 let raw = try await runBarcodeDetection(on: image)
-                if provenance.ocrSkipped {
-                    barcodeResults = raw.map { barcode in
-                        DetectionResult(
-                            id: barcode.id,
-                            normalizedRect: barcode.normalizedRect,
-                            kind: barcode.kind,
-                            confidence: barcode.confidence,
-                            matchedText: barcode.matchedText,
-                            recognitionLevel: barcode.recognitionLevel,
-                            provenance: provenance
-                        )
-                    }
-                } else {
-                    barcodeResults = raw
-                }
+                barcodeResults = Self.restamped(raw, provenance: provenance)
             } catch is CancellationError { // LegalPhrases:safe
                 throw CancellationError()
             } catch { // LegalPhrases:safe
@@ -668,23 +637,7 @@ public struct DetectionOrchestrator: Sendable {
             in: image,
             ocrBlocks: lines
         )
-        if provenance.ocrSkipped {
-            // Re-stamp provenance to keep "every result on a skipped page
-            // carries provenance.ocrSkipped" — same pattern as face above.
-            detections.append(contentsOf: signatureResults.map { result in
-                DetectionResult(
-                    id: result.id,
-                    normalizedRect: result.normalizedRect,
-                    kind: result.kind,
-                    confidence: result.confidence,
-                    matchedText: result.matchedText,
-                    recognitionLevel: result.recognitionLevel,
-                    provenance: provenance
-                )
-            })
-        } else {
-            detections.append(contentsOf: signatureResults)
-        }
+        detections.append(contentsOf: Self.restamped(signatureResults, provenance: provenance))
 
         // Step 7: Build G5 diagnostic (in-memory only; never logged).
         let diagnostic = classifierOutput.topKeywords.isEmpty
@@ -698,6 +651,30 @@ public struct DetectionOrchestrator: Sendable {
             overlapSuppressedCountByCategory: resolved.suppressedCountByCategory,
             ocrProvenance: provenance
         )
+    }
+
+    /// The page-level provenance re-stamp for the detectors that do not
+    /// read the text layer (faces, barcodes, signatures). On a page whose
+    /// OCR was skipped every result is re-issued with the page's
+    /// provenance, every other field copied unchanged (the id included),
+    /// so "every result on a skipped page carries `provenance.ocrSkipped`"
+    /// holds uniformly; on a page whose OCR ran the results return as they
+    /// came (they already carry `.ocrRan`).
+    private static func restamped(
+        _ results: [DetectionResult], provenance: DetectionResult.Provenance
+    ) -> [DetectionResult] {
+        guard provenance.ocrSkipped else { return results }
+        return results.map { result in
+            DetectionResult(
+                id: result.id,
+                normalizedRect: result.normalizedRect,
+                kind: result.kind,
+                confidence: result.confidence,
+                matchedText: result.matchedText,
+                recognitionLevel: result.recognitionLevel,
+                provenance: provenance
+            )
+        }
     }
 
     // MARK: - Face-detection doctype gate

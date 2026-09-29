@@ -7,13 +7,15 @@ import UIKit
 @testable import RedactionEngine
 
 // Pixel buffer zeroize tests. The canonical security guard for the
-// engine's reusable bitmap buffers.
-//
-// What these test:
-//   1. After `zeroizeBitmapBuffer` returns, every byte of the buffer is 0.
-//   2. The zeroize cost on a 300-DPI letter page stays under the 5 ms p95
-//      budget ("Per-page overhead recorded as a baseline." The 5 ms
-//      ceiling is the locked target.)
+// engine's reusable bitmap buffers: the two CORRECTNESS tests — after
+// `zeroizeBitmapBuffer` returns every byte of the buffer is 0, and the
+// CGImage handed out before the wipe keeps its pixels. They run in the
+// batched runner, the pre-push hook and the hosted suites like any other
+// `.critical` suite. The zeroize's wall-clock budget (the 5 ms p95 target
+// on a 300-DPI letter page) is `PixelBufferZeroizeTimingTests`, a
+// `.performance` suite the batched runner runs alone and report-only —
+// keeping the budget in this file had excluded the correctness tests
+// from every batched path along with it.
 
 @Suite("Pixel Buffer Zeroize", .tags(.security, .critical), .serialized)
 struct PixelBufferZeroizeTests {
@@ -117,61 +119,5 @@ struct PixelBufferZeroizeTests {
         #expect(buffer[0] == 0, "head of buffer must be zero")
         #expect(buffer[lastByte] == 0, "tail of buffer must be zero")
         #expect(buffer[byteCount / 2] == 0, "centre of buffer must be zero")
-    }
-
-    // MARK: - testZeroizeOverheadUnder5msFor300DPILetter
-
-    /// Run `zeroizeBitmapBuffer` in a 50-iteration loop against a 300-DPI
-    /// US Letter bitmap. The target is ≤ 5 ms p95 in
-    /// isolated benchmarking (memset of ~33 MB at typical bandwidth ≈
-    /// 3.4 ms). When the engine test suite runs in parallel, memory and
-    /// CPU pressure inflate the wall clock — we set a 25 ms CI ceiling
-    /// (5x the spec target) to absorb that noise while still detecting
-    /// pathological regressions (e.g., per-byte loop). The stress
-    /// baseline records the steady-state number.
-    @Test("zeroize p95 within CI budget on 300-DPI letter page (50 iterations)")
-    func testZeroizeOverheadUnder5msFor300DPILetter() throws {
-        let width = 2550
-        let height = 3300
-        guard let ctx = createBitmapContext(width: width, height: height) else {
-            Issue.record("createBitmapContext failed")
-            return
-        }
-
-        // Warm-up — first iteration includes page-fault cost the steady-
-        // state loop should not pay.
-        memset(ctx.data!, 0xFF, ctx.bytesPerRow * ctx.height)
-        PixelOperations.zeroizeBitmapBuffer(ctx)
-
-        // Measure.
-        let clock = ContinuousClock()
-        var samples: [Duration] = []
-        samples.reserveCapacity(50)
-        for _ in 0..<50 {
-            // Re-fill with 0xFF every iteration so each call actually
-            // wipes the same amount of data (otherwise the second call
-            // onward would be wiping already-zero memory).
-            memset(ctx.data!, 0xFF, ctx.bytesPerRow * ctx.height)
-
-            let start = clock.now
-            PixelOperations.zeroizeBitmapBuffer(ctx)
-            let elapsed = clock.now - start
-            samples.append(elapsed)
-        }
-
-        samples.sort()
-        // p95 = sample at the 95th percentile index (47 out of 50, 0-based).
-        let p95Index = Int(Double(samples.count) * 0.95) - 1
-        let p95 = samples[max(0, min(samples.count - 1, p95Index))]
-        // Spec target: ≤ 5 ms. CI ceiling: 25 ms to
-        // absorb concurrent-suite pressure on the simulator. A real
-        // regression (per-byte loop, accidental hashing) would land in
-        // the 100+ ms range — well outside this budget.
-        let ciCeiling: Duration = .milliseconds(25)
-
-        #expect(
-            p95 <= ciCeiling,
-            "zeroize p95 on 300-DPI letter was \(p95) — CI ceiling is 25 ms (spec target 5 ms)"
-        )
     }
 }

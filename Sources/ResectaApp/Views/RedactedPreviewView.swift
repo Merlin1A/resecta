@@ -129,8 +129,40 @@ struct RedactedPreviewView: View {
 
 // MARK: - UIViewRepresentable Wrapper
 
+/// The preview's link policy — the editor's discipline
+/// (`PDFViewCoordinator`) on the read-only output view: installed as the
+/// view's delegate before any document is assigned (PDFKit follows link
+/// annotations itself without one), and the data detectors turned off
+/// after every assignment (the switch lives on the document, so each
+/// newly assigned output arrives with PDFKit's default). In Searchable
+/// mode the output carries a text layer; a residual number or URL in it
+/// must not become a live link on the surface meant for checking it.
+final class RedactedPreviewLinkPolicy: NSObject, PDFViewDelegate {
+
+    /// Installs this policy as the view's delegate.
+    func applyLinkPolicy(to pdfView: PDFView) {
+        pdfView.delegate = self
+    }
+
+    /// Assigns the document to the view and turns data detectors off for
+    /// it. Both `RedactedPDFView` assignment sites route through here.
+    func assign(_ document: PDFDocument?, to pdfView: PDFView) {
+        pdfView.document = document
+        pdfView.enableDataDetectors = false
+    }
+
+    /// Link annotations in the output are not followed: the app opens no
+    /// URL from document content. Intentionally empty, touches no state.
+    nonisolated func pdfViewWillClick(onLink sender: PDFView, with url: URL) {
+    }
+}
+
 private struct RedactedPDFView: UIViewRepresentable {
     let document: PDFDocument
+
+    func makeCoordinator() -> RedactedPreviewLinkPolicy {
+        RedactedPreviewLinkPolicy()
+    }
 
     func makeUIView(context: Context) -> FitFlooredPDFView {
         // The same zoom floor as the editor — a pinch
@@ -146,7 +178,10 @@ private struct RedactedPDFView: UIViewRepresentable {
         // not carry.
         pdfView.displayMode = .singlePageContinuous
         pdfView.backgroundColor = .systemGroupedBackground
-        pdfView.document = document
+        // The delegate first, then the document through the policy so the
+        // detectors are off for it (see `RedactedPreviewLinkPolicy`).
+        context.coordinator.applyLinkPolicy(to: pdfView)
+        context.coordinator.assign(document, to: pdfView)
         return pdfView
     }
 
@@ -154,7 +189,7 @@ private struct RedactedPDFView: UIViewRepresentable {
         // Swap the document if the parent reloaded a different one
         // (e.g., the user re-redacted and `outputURL` changed).
         if pdfView.document !== document {
-            pdfView.document = document
+            context.coordinator.assign(document, to: pdfView)
         }
     }
 }

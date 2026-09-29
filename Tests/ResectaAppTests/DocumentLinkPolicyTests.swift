@@ -10,6 +10,8 @@ import UIKit
 // PDFView's delegate; its link hook does nothing. The end-to-end pin (a
 // tap on a link annotation leaves the app in front and does not launch
 // Safari, with the drawing tool off and on) is DocumentLinkUITests.
+// The redacted preview's view carries the same policy through
+// `RedactedPreviewLinkPolicy` (the last two tests).
 
 @Suite("Document link policy")
 @MainActor
@@ -101,5 +103,39 @@ struct DocumentLinkPolicyTests {
         #expect(redactionState.regionVersion == regionVersionBefore)
         #expect(redactionState.regions.values.reduce(0) { $0 + $1.count } == regionCountBefore)
         #expect(redactionState.selectedRegionIDs == selectionBefore)
+    }
+
+    // MARK: - The redacted preview
+
+    @Test("The preview's policy becomes the view's delegate and implements the link hook")
+    func previewPolicyIsDelegateAndImplementsLinkHook() {
+        let policy = RedactedPreviewLinkPolicy()
+        let pdfView = PDFView()
+
+        policy.applyLinkPolicy(to: pdfView)
+
+        #expect(pdfView.delegate as AnyObject === policy,
+                "PDFKit follows link annotations itself unless a delegate is installed")
+        #expect(policy.responds(to: #selector(PDFViewDelegate.pdfViewWillClick(onLink:with:))))
+    }
+
+    @Test("Data detectors are off for every output document the preview assigns")
+    func previewDataDetectorsAreOffAfterAssignment() throws {
+        let policy = RedactedPreviewLinkPolicy()
+        let pdfView = PDFView()
+        policy.applyLinkPolicy(to: pdfView)
+
+        let first = try #require(PDFDocument(data: makeTestPDFData()))
+        policy.assign(first, to: pdfView)
+        #expect(pdfView.document === first)
+        #expect(pdfView.enableDataDetectors == false)
+        #expect(pdfView.delegate as AnyObject === policy)
+
+        // The updateUIView path: a re-redacted output arrives with its own
+        // default and is pinned the same way.
+        let second = try #require(PDFDocument(data: makeTestPDFData()))
+        policy.assign(second, to: pdfView)
+        #expect(pdfView.document === second)
+        #expect(pdfView.enableDataDetectors == false)
     }
 }

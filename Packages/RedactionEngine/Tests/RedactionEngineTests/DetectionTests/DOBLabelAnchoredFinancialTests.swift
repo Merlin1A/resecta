@@ -73,14 +73,21 @@ struct DOBLabelAnchoredFinancialTests {
     }
 
     @Test("No doctype (nil): DOBDetector full path runs, not label-anchored only")
-    func nilDoctype_usesFullDetector() async {
+    func nilDoctype_usesFullDetector() async throws {
         // nil doctype → runsDOBFull returns true → DOBDetector runs.
         // The label-anchored path only activates when doctype == .financial.
-        // We verify nil does not accidentally route to the financial branch.
+        // The routing is asserted at the selector and on the match it
+        // produces: the full detector's regex captures the bare date at
+        // its composite confidence (0.05 base + 0.30 label boost here),
+        // while the label-anchored path captures the label with the date
+        // at a fixed 0.85 — the financial case above.
+        #expect(DOBDetector.runsDOBFull(doctype: nil) == true)
+        #expect(DOBDetector().telemetryName(doctype: nil) == "dob")
         let matches = await detectMatches(in: "DOB: 03/15/1985", doctype: nil)
-        // DOBDetector runs; outcome depends on composite confidence.
-        // Verify nil doctype does not accidentally route to the financial branch.
-        _ = matches  // structural: no assertion on count — DOBDetector scope
+        let match = try #require(matches.first, "the label-boosted numeric date must surface")
+        #expect(match.text == "03/15/1985", "the full detector captures the date alone")
+        #expect(match.confidence != 0.85, "0.85 is the label-anchored path's fixed confidence")
+        #expect(abs(match.confidence - 0.35) < 1e-9, "0.05 base + 0.30 label boost")
     }
 
     // MARK: - Confidence clears the posterior threshold gate

@@ -195,24 +195,22 @@ struct SnapToTextBoxTests {
 
     @Test("Setting snapToTextEnabled false persists across SettingsState init")
     func testSettingPersists() {
-        // Clean the key first so the test is hermetic.
-        UserDefaults.standard.removeObject(forKey: "snapToTextEnabled")
+        // A scratch suite the test owns (never the app's own domain), so
+        // the write below leaks into no other test and no other run.
+        withScratchDefaults { defaults in
+            let state = SettingsState(defaults: defaults)
+            #expect(state.snapToTextEnabled == true,
+                    "default value must be true")
 
-        let state = SettingsState()
-        #expect(state.snapToTextEnabled == true,
-                "default value must be true")
+            state.snapToTextEnabled = false
+            #expect(defaults.bool(forKey: "snapToTextEnabled") == false,
+                    "didSet must write to UserDefaults immediately")
 
-        state.snapToTextEnabled = false
-        #expect(UserDefaults.standard.bool(forKey: "snapToTextEnabled") == false,
-                "didSet must write to UserDefaults immediately")
-
-        // Re-init reads from UserDefaults — the stored false survives.
-        let reloaded = SettingsState()
-        #expect(reloaded.snapToTextEnabled == false,
-                "reload must observe the persisted false value")
-
-        // Clean up so other tests start with a fresh default.
-        UserDefaults.standard.removeObject(forKey: "snapToTextEnabled")
+            // Re-init reads from the suite — the stored false survives.
+            let reloaded = SettingsState(defaults: defaults)
+            #expect(reloaded.snapToTextEnabled == false,
+                    "reload must observe the persisted false value")
+        }
     }
 }
 

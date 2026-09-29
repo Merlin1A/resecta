@@ -441,7 +441,7 @@ struct CouldNotVerifyFlagTests {
 
     // MARK: - Source census
 
-    /// Every `.warn(` construction in the six verification files is
+    /// Every `.warn(` construction in the seven verification files is
     /// classified here — the could-not-verify family (23 sites) and the
     /// routine-note WARNs — so a new site cannot land silently: an
     /// unclassified construction, a moved message or a changed count fails.
@@ -485,13 +485,16 @@ struct CouldNotVerifyFlagTests {
                 Marker(text: "had no measurable position", family: true, sites: 1, lines: 1),
                 Marker(text: "Could not inspect page fonts on page", family: true, sites: 1, lines: 1),
                 Marker(text: "has no page-level /Resources", family: true, sites: 1, lines: 1),
+                Marker(text: "A character touches the edge of a redacted area on", family: false, sites: 0, lines: 1),
+                Marker(text: "Character count excess on page", family: false, sites: 0, lines: 1),
+            ],
+            // Layer 10, in its own file since the split beside Layer 3's.
+            "SandwichVerification+Layer10.swift": [
                 Marker(text: "All sensitive terms shorter than 3 characters", family: true, sites: 1, lines: 1),
                 Marker(text: "return (.warn(shortTermTail(droppedTermCount)), nil, nil, true)", family: true, sites: 1, lines: 1),
                 Marker(text: "Operator-semantic term search exceeded size limit", family: true, sites: 1, lines: 1),
                 Marker(text: "Operator scanner unavailable for page", family: true, sites: 1, lines: 1),
                 Marker(text: "Operator scanner could not traverse page", family: true, sites: 1, lines: 1),
-                Marker(text: "A character touches the edge of a redacted area on", family: false, sites: 0, lines: 1),
-                Marker(text: "Character count excess on page", family: false, sites: 0, lines: 1),
             ],
             "SearchRecheck.swift": [
                 Marker(text: "status: .warn(message)", family: true, sites: 1, lines: 1),
@@ -505,7 +508,8 @@ struct CouldNotVerifyFlagTests {
         // Pinned `.warn(` construction counts (pattern matches excluded).
         let constructionCounts = [
             "VerificationEngine.swift": 17, "VerificationEngine+Layer3.swift": 5,
-            "Layer2OCRCheck+Sweep.swift": 3, "SandwichVerification.swift": 10,
+            "Layer2OCRCheck+Sweep.swift": 3, "SandwichVerification.swift": 5,
+            "SandwichVerification+Layer10.swift": 5,
             "SearchRecheck.swift": 1, "DetectionSweep.swift": 1,
         ]
 
