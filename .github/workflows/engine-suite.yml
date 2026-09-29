@@ -37,7 +37,7 @@ defaults:
 
 env:
   HEAVY_SUITES: >-
-    CancellationLatencyTests PixelBufferZeroizeTests
+    CancellationLatencyTests PixelBufferZeroizeTimingTests
     ReverseRationalePerformanceTests ApplyPhaseMemoryStressTests
     ParallelLayerExecutionTests DetectionRasterizeOverlapTests
     Layer2OCRParallelismTests PDFKitConcurrencyStressTests
