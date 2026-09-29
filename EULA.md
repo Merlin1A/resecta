@@ -1,6 +1,6 @@
 # End-User License Agreement
 
-**Effective date:** 2026-07-10
+**Effective date:** 2026-09-29
 
 This End-User License Agreement ("Agreement") is between you and Jesse Brookins
 ("Developer") and governs your use of the Resecta application ("the App"). By
@@ -15,10 +15,9 @@ use, modify, sublicense, and redistribute that source code, and nothing in this
 Agreement revokes, narrows, or adds conditions to those rights.
 
 This Agreement, together with Apple's applicable terms, governs the specific
-compiled copy of the App that you obtain through the App Store, and your
-relationship with Apple — not the source code. To the extent of any conflict,
-the Apache License 2.0 controls as to the source code; this Agreement governs
-only the App Store binary and your relationship with Apple.
+compiled copy of the App that you obtain through the App Store — not the source
+code. To the extent of any conflict, the Apache License 2.0 controls as to the
+source code; this Agreement governs only the App Store binary.
 
 ## 2. No warranty (AS-IS)
 
@@ -139,7 +138,7 @@ They apply in addition to the rest of this Agreement.
     Apple will have the right (and will be deemed to have accepted the right) to
     enforce this Agreement against you as a third-party beneficiary of it.
 
-## 9. Age and capacity
+## 9. Capacity
 
 You represent that you have the legal capacity to enter into this Agreement.
 
