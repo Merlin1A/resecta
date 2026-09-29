@@ -63,10 +63,7 @@ struct DetectorScoreDumpTests {
 
     @Test("Emit detector_score_dump.json from the G8 corpus")
     func emitDetectorScoreDump() async throws {
-        guard let corpus = try loadCorpus() else {
-            print("[detector score dump gate] g8_corpus.json not bundled; skipping")
-            return
-        }
+        let corpus = try #require(try loadCorpus(), "g8_corpus.json not bundled")
 
         let detector = PIIDetector()
         let sortedDocs = corpus.documents.sorted { $0.id < $1.id }
