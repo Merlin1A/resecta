@@ -45,6 +45,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Search: bounded repetition such as `(-\d{4})?` is accepted; a refused pattern shows its reason and a plain-text option, and the re-check lists it as not checked; always-flag terms match ligature and full-width forms.
 - Documentation: a public threat model (`THREAT-MODEL.md`) with a dated security-posture table; the security policy gains a note on report classes, the machine-readable policy pointer and an advisory-history line.
 - Documentation: the README, threat model, engineering notes, security policy, known-issues list and contributing guide re-read against the 1.2.0 tree and corrected; the contributing guide shortened to the gates that exist; the package README's module notes corrected.
+- Documentation: the privacy policy names face and barcode location among the on-device detectors and dates its image-import note to the releases that opened images; the agreement's scope sentence and one heading corrected.
 
 ### Removed
 
