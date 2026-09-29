@@ -1,7 +1,8 @@
 # Pull-request gate. Builds the app and both test bundles, runs the two
 # lints over the lines the change adds, checks the documented counts
-# against the tree, checks the shipped-asset hashes and fails when a source
-# file already over 800 lines grows (the growth ratchet). The scripts run
+# against the tree, checks the shipped-asset hashes, fails when a source
+# file already over 800 lines grows (the growth ratchet) and reports the
+# silent-guard census over the three test trees. The scripts run
 # from the base branch's copies, so a change cannot edit the lint it is
 # gated by; the change's own copies run once more, report-only. About five
 # minutes on a hosted macos-26 runner. The batched simulator suites
@@ -126,6 +127,27 @@ jobs:
       - name: Shipped-asset hash fence
         run: |
           "${BASE_SCRIPTS}/verify-shipped-asset-hashes.sh"
+
+      # The silent-guard census over the three test trees (report-only): the
+      # per-target SILENT and NO-ASSERT counts and the inventory behind them,
+      # in the log and the step summary. The audit lint above gates the guard
+      # lines a change adds (AL-5); the census shows the whole tree, so a
+      # test that can pass without asserting is visible on every pull request.
+      - name: Silent-guard census (report-only)
+        continue-on-error: true
+        run: |
+          rc=0
+          python3 "${BASE_SCRIPTS}/lint-silent-guards.py" --census "$GITHUB_WORKSPACE" > census.log || rc=$?
+          cat census.log
+          {
+            echo "## silent-guard census"
+            echo
+            echo '```'
+            sed -n '/^TEST-TARGET MAP/,/^SILENT total/p' census.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          [ "$rc" -eq 0 ] || echo "::warning::silent-guard census: a silent test is in the tree (see the inventory in the log)"
+          exit "$rc"
 
       # Growth ratchet: a source file over 800 lines at the base of the change
       # may not be larger at its head (Scripts/growth-ratchet.sh; a split along
