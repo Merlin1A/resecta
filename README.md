@@ -59,34 +59,6 @@ flowchart LR
 
 _All stages run on-device; the redaction pipeline makes no network calls. Verification is a check, not a substitute for human review of the output._
 
-## Known limitations
-
-The following are deliberately not in this release:
-
-- **No "Compose" search sub-mode.** The search sheet has two
-  interfaces: Scan, which runs the on-device PII text detectors, and
-  Search, with three modes (Text, Regex, Multi-term). A Compose mode
-  for stacked filter combinations is not part of this release.
-- **No per-region exemption tagging.** User-defined detection terms
-  live in a flat `UserTermsStore` (always-flag / never-flag lists)
-  and `SavedRegexStore` (saved-regex library); regions carry no FOIA
-  exemption labels.
-- **No audit export.** The match-audit export surface is disabled in
-  this release; its v4 wire schema (`schemaVersion = 4`) ships in code.
-- **Custom Terms are entered one at a time.** Bulk entry and sharing
-  (paste-many, CSV import / export, share-profile) are not part of
-  this release.
-- **Secure-enclave-backed persistence is deferred to a later release.** Resecta
-  retains Custom Terms (`UserTermsStore` always-flag / never-flag lists),
-  the saved-regex library (`SavedRegexStore`) and saved searches
-  (`SavedSearchStore`) across app launches as JSON files in the app's
-  Application Support directory, written with the `complete`
-  file-protection class and flagged for exclusion from device backups.
-  Encrypting that storage under a Secure Enclave–backed key is the
-  deferred work.
-
-See [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md) for the open-bug tracker.
-
 ## On-device operation
 
 - No network requests of its own: the source contains no `URLSession` or `NWConnection` usage (the check is in [How we verify these claims](#how-we-verify-these-claims)).
@@ -177,6 +149,7 @@ The commands that run both suites locally, and what the batched runner reports, 
 ## Contributing
 
 - Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the gates every change passes and the changes that need an agreed plan before they land.
+- Open bugs and implementation constraints are tracked in [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md).
 - Security issues: please use [`SECURITY.md`](./SECURITY.md) — do not file public issues for vulnerabilities.
 
 ## License
