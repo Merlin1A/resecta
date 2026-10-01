@@ -36,7 +36,7 @@ The core workflow is:
 ## Two modes
 
 - **Secure Rasterization** — produces image-only output and is the simplest approach for high-sensitivity documents. Verification runs as a 7-layer check.
-- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to reduce the glyph-positioning side channels identified in academic research. Verification runs as a 12-layer check (the five additional checks cover the preserved-text layer; both modes end with a re-run of your applied searches and a detection sweep on the output). If any unmarked text on a page shows no ink — white on white, invisible, or under a box drawn into the page — that page is exported as an image only. The stated limit: text covered by a picture in the page can still enter the text layer.
+- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to reduce the glyph-positioning side channels identified in academic research. Verification runs as a 12-layer check (the five additional checks cover the preserved-text layer). If any unmarked text on a page shows no ink — white on white, invisible, or under a box drawn into the page — that page is exported as an image only. The stated limit: text covered by a picture in the page can still enter the text layer.
 
 Both modes share the same pixel-destruction core. Settings holds the default mode and each document can override it; Paranoid Mode pins Secure Rasterization.
 
@@ -61,7 +61,7 @@ _All stages run on-device; the redaction pipeline makes no network calls. Verifi
 
 ## Known limitations
 
-The following were deliberately deferred to a later release:
+The following are deliberately not in this release:
 
 - **No "Compose" search sub-mode.** The search sheet has two
   interfaces: Scan, which runs the on-device PII text detectors, and
@@ -109,13 +109,13 @@ Resecta is designed to address specific risks that arise when sharing redacted d
 **Out of scope:**
 
 - **Compromised device.** Resecta runs on the user's device. If the device is compromised, the threat model assumes the attacker already has access to whatever the user is redacting.
-- **Exploits of Apple's PDF parsers.** Resecta does not sandbox PDF parsers. A document crafted to exploit Apple's PDF or image stack is outside the scope of what this tool addresses.
+- **Exploits of Apple's PDF and image frameworks.** Resecta does not sandbox them; a document crafted to exploit them is outside the scope of what this tool addresses.
 - **Network adversaries.** Resecta makes no network requests of its own.
 - **Human review of output.** Users are responsible for visually reviewing redacted documents before sharing. The verification pass is a check, not a substitute for review.
 
 ## How we verify these claims
 
-Each claim in the map below is paired with a mechanical check in this repo. The map is the short version; the depth, the design reasoning, and the honest limits of each check are in [`ENGINEERING.md`](./ENGINEERING.md). Paths that do not start with `Scripts/` or `Tests/` are inside the engine package's sources or tests.
+Each claim in the map below is paired with a mechanical check in this repo. The map is the short version; the depth, the design reasoning, and the honest limits of each check are in [`ENGINEERING.md`](./ENGINEERING.md). Paths in the map that do not start with `Scripts/` or `Tests/` are inside the engine package's sources or tests.
 
 | Claim | Check |
 | --- | --- |
@@ -166,13 +166,13 @@ The test tree is larger than the source tree: roughly 68,000 lines of Swift sour
 
 - **Engine package** (`Packages/RedactionEngine/Tests`) — 1,992 Swift Testing `@Test` functions across 270 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
 - **App target** (`Tests/ResectaAppTests`) — 1,711 `@Test` functions across 243 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
-- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 50 XCUITest methods that drive the built app on a simulator (run from Xcode; the batched runner and CI build them without running them): the first-launch legal gate, detection review, search-to-redaction flows, the search re-check on the results screen, and the editor's handling of links inside a document.
+- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 50 XCUITest methods that drive the built app on a simulator (run from Xcode; the batched runner and CI build them without running them): the first-launch legal gate, search-to-redaction flows, the search re-check on the results screen, and the editor's handling of links inside a document.
 
 Together the suites carry about 9,300 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
 
 The commands that run both suites locally, and what the batched runner reports, are in [`CONTRIBUTING.md`](./CONTRIBUTING.md#running-the-tests).
 
-**On GitHub Actions.** Every pull request runs the required `pr-gate` check (`ci.yml`), which builds the app and its unit- and UI-test bundles without running them and runs the lints and fences listed in [`CONTRIBUTING.md`](./CONTRIBUTING.md#what-every-change-passes). `sim-suite.yml` also runs the app's unit suite on a hosted iPhone 17 simulator for every pull request to `main`, as a non-required check, and both schemes through the batched runner every Monday and on `v*` tag pushes. `engine-suite.yml` runs the engine package with `swift test` on the macOS host on manual dispatch only and has not yet reached a verdict on the hosted runner.
+**On GitHub Actions.** Every pull request runs the required `pr-gate` check (`ci.yml`), which builds the app and its unit- and UI-test bundles without running them and runs the lint, count and hash checks. The app's unit suite also runs on a hosted simulator for every pull request, as a non-required check, and both suites run weekly and on release tags; the engine's host-side workflow has not yet reached a verdict on the hosted runner. The full gate list is in [`CONTRIBUTING.md`](./CONTRIBUTING.md#what-every-change-passes).
 
 ## Contributing
 

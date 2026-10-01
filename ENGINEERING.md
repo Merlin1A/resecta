@@ -8,10 +8,10 @@ check that keeps it true, and names the limits of that check in the same
 breath, because a check whose boundaries you don't know is worse than no check
 at all.
 
-Paths that start with `Pipeline/`, `Verification/`, `Detection/` or a test
-directory (`SecurityTests/`, `SearchTests/`) are inside the engine, an SPM
-package at `Packages/RedactionEngine/`; the rest are relative to the repo
-root. The line counts, the isolation opt-out count and the encoding count in
+Paths that start with `Pipeline/`, `Verification/`, `Detection/`,
+`SecurityTests/` or `SearchTests/` are inside the engine, an SPM package at
+`Packages/RedactionEngine/`; the rest are relative to the repo root, apart
+from the data pipeline's own files named in §8. The line counts, the isolation opt-out count and the encoding count in
 this file are measured from the tree you are looking at by
 `Scripts/doc-metrics.sh`, which the pull-request gate runs, not from a
 dashboard. If you have time for one path through the code, skip to
@@ -42,7 +42,9 @@ the expected fill pattern (`verifyFill` in `Pipeline/PixelOperations.swift`,
 called from `Pipeline/PageRasterizer.swift`). This is not sampling and there
 is no threshold: one wrong pixel fails that render; the page is re-rendered
 once at the lowest resolution tier (150 DPI) and re-verified, and a second
-failure fails the whole export with an error rather than shipping. Polygon
+failure fails the whole export with an error rather than shipping (the retry
+is the app's: `rasterizeWithRetry` in
+`Sources/ResectaApp/State/PipelineCoordinator.swift`). Polygon
 regions — a path the editor does not offer in this release — get the same
 readback, with the mask built by a scanline rasteriser written independently
 of the Core Graphics fill, so the check shares no code with the thing it
@@ -60,8 +62,7 @@ you share from, says so in its closing note.
 
 Once the output file is written, a verification engine re-opens it *as a file*
 and hunts for residue (`Verification/VerificationEngine.swift`). Secure
-Rasterization output gets seven layers, numbered here as the results screen
-numbers them:
+Rasterization output gets seven layers, numbered here in the engine's order:
 
 1. text extraction over every page;
 2. OCR of the rendered output, with word-level boxes gated against the
@@ -82,12 +83,13 @@ numbers them:
    chose to leave unredacted.
 
 Searchable Redaction adds five more over the preserved text layer (twelve in
-total), reported as layers 6–10 ahead of the re-check and the sweep: spatial
+total), numbered 6–10 ahead of the re-check and the sweep: spatial
 exclusion (no character geometry inside a redacted region), character-count
 cross-checks, font verification, character lineage, and an operator-level
 re-extraction that walks the output's content streams with Core Graphics'
-scanner and decodes each text operand separately from PDFKit's page text — a
-second decoder cross-checking the byte-level sweep.
+scanner and decodes each text-show operand with Core Graphics' own string
+decoder, independent of PDFKit's page text — a second decoder cross-checking
+the byte-level sweep.
 
 Details a reviewer should know exist:
 
@@ -108,7 +110,8 @@ Details a reviewer should know exist:
   while every could-not-verify condition keeps its severity. A warning tier
   that fires on every normal document carries no information.
 - Verification is advisory by design. A failed or attention-level verdict, a
-  check that could not run, or a verification that did not run does not
+  check that reports something it could not verify, skipped checks in a
+  report with no other warning, or a verification that did not run does not
   hard-block export — it routes the share action through an explicit
   confirmation instead. I chose that over hard-blocking because the check has
   known epistemic limits (below), and a tool that refuses to hand you your own
@@ -271,12 +274,13 @@ concurrent entry points. The working rules, checkable by grep:
   (`PipelineCoordinatorRestartRaceTests`), cancelling during verification
   keeps the output and reports the check as skipped
   (`DocumentStateVerifyingCancelTests`), and `ImportServiceCancelTests`
-  covers import cancellation.
+  covers import cancellation (report-only in the batched runner).
 - When a crash could only be reproduced in the running app (a SwiftUI
   Observation crash from cache mutation during `List` body evaluation), the
-  regression test drives the real app flow (`SearchMarkForRedactionUITests`);
-  the hosted-view suite beside it does not reproduce the crash and says so in
-  its header (`SearchResultsListObservationCrashTests`).
+  regression test drives the real app flow (`SearchMarkForRedactionUITests`,
+  a UI test run from Xcode); the hosted-view suite beside it does not
+  reproduce the crash and says so in its header
+  (`SearchResultsListObservationCrashTests`).
 - Memory hygiene is mechanical: bitmap buffers are wiped with `memset_s`
   (which the compiler cannot elide) before returning to the context pool;
   temp export files are hardened, excluded from backups, and cleaned per
@@ -298,9 +302,9 @@ assets. The contract between the two repos is enforced, not eyeballed:
   the last passing one (always, in the pipeline's weekly verify workflow) —
   the same inputs must produce byte-identical outputs side by side. Raw inputs
   are fetched by hand: most fetch scripts record each file's SHA-256 in
-  `SOURCES.md` and refuse a later fetch whose bytes differ (the ParaNames
-  corpus is checked against its pinned row), and the rest leave that row to a
-  hand step. The build targets make no network calls, and a personal-e-mail
+  `SOURCES.md` and refuse a later fetch whose bytes differ; the rest leave
+  that row to a hand step, and the ParaNames fetch checks its download
+  against the pinned row. The builders make no network calls, and a personal-e-mail
   guard (`scripts/check_no_pii.py`) runs on every pull request and first in
   the verify script, so cleanup rules are enforced by tooling rather than by
   memory.

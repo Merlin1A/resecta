@@ -54,18 +54,6 @@ only for admission pre-flights with a fixed headroom.
 
 ---
 
-### KI-8: Duplicate Regions from Multiple Scan Runs (Low)
-**Affects:** Detection pipeline, region management
-
-Detection applies run no overlap test, so repeated scans can add overlapping regions
-for the same PII; search-result applies already skip a result an existing region
-covers by more than 80 %. Security-harmless (more redaction, not less) but creates
-visual clutter. Deduplication of detection applies is not scheduled.
-
-**Workaround:** Manually delete duplicate regions before applying redaction.
-
----
-
 ### KI-9: Per-Page Render Timeout Reports, Not Bounds (Low–Medium)
 **Affects:** Redaction pipeline (page rasterization)
 
@@ -92,6 +80,11 @@ While drawing, rectangle edges align to other boxes and page guides; alignment t
 ---
 
 ## Fixed
+
+### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
+**Resolution:** Scan results are applied through the same path as search results, which skips a result that an existing region already covers by more than four fifths of its area, so applying the same scan twice adds no second region. The entry was stale.
+
+---
 
 ### KI-6: Multi-Selection State Model Missing (Low–Medium) — FIXED (entry moved 2026-08-25)
 **Resolution:** `RedactionState.selectedRegionIDs` is a `Set<UUID>`; Select All / Deselect All and the "Add to Selection" toggle operate on the set (the app ships for iPhone only). The entry was stale.

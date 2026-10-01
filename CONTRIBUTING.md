@@ -28,7 +28,7 @@ TEST_BATCHED_SIM_UDID=<simulator udid> Scripts/test-batched.sh ResectaApp
 cd Packages/RedactionEngine && swift test --no-parallel --skip FileProtectionTests
 ```
 
-`TEST_BATCHED_SIM_UDID` is required — it pins the simulator by id and the runner exits 2 without it; export it before pushing. The batched runner builds once, then runs the suites in serial batches (performance-budget suites run alone, report-only, and eight suites on the script's exclusion list never gate), because a full-parallel run has wedged the simulator runtime — do not substitute a full-parallel `xcodebuild test` pass. It prints one `state=… tests=… passed=… failed=… skipped=… known-issues=…` line per batch and ends with a `VERDICT:` line: `PASS` (exit 0), `FAIL` (exit 1) listing the offending suites, or `INCOMPLETE` (exit 2) when an invocation had to be killed, or its test host twice refused to launch, and its suites went unverified — re-run those. Logs and per-batch `.xcresult` bundles land under `/tmp/test-batched-<scheme>-<stamp>/`.
+`TEST_BATCHED_SIM_UDID` is required — it pins the simulator by id and the runner exits 2 without it; export it before pushing. The batched runner builds once, then runs the suites in serial batches (performance-budget suites run alone, report-only, and the suites on the script's exclusion list never gate), because a full-parallel run has wedged the simulator runtime — do not substitute a full-parallel `xcodebuild test` pass. It prints one `state=… tests=… passed=… failed=… skipped=… known-issues=…` line per batch and ends with a `VERDICT:` line: `PASS` (exit 0), `FAIL` (exit 1) listing the offending suites, or `INCOMPLETE` (exit 2) when an invocation had to be killed, or its test host twice refused to launch, and its suites went unverified — re-run those. Logs and per-batch `.xcresult` bundles land under `/tmp/test-batched-<scheme>-<stamp>/`.
 
 The engine run is serial by design (`--no-parallel`). `FileProtectionTests` needs the iOS file-protection classes, which a macOS host filesystem cannot exercise; the simulator suite covers it (the pre-push hook runs the engine scheme there).
 
@@ -44,13 +44,13 @@ The following land only after a written plan — the change, the reason, and how
 - Any new third-party GitHub Action: its `patterns_allowed` entry goes into the repository's Actions settings before the pull request that uses it, and it is pinned to a full commit SHA (the repository setting requires it), or the workflow fails at startup.
 - Any change to legal or marketing language (including `Legal.xcstrings`, the EULA, and the privacy policy).
 - Any change to the privacy manifest.
-- Any uncertainty about whether existing code matches the spec.
+- Any uncertainty about whether existing code matches its documented contract.
 
 If a pull request crosses one of these, mark it as draft and open an issue that states the plan so the maintainer can agree to it before the edit lands. When a change touches a documented contract, the contract description and the code change land in the same commit.
 
 ## Mechanism-description language
 
-User-facing strings, doc comments, and commit messages describe what the code does (the mechanism), not what the user experiences (the outcome); outcome claims create express-warranty risk. The pre-commit hook checks the lines a change adds and is the floor; commit messages, and everything else, rest on a human read, which is the bar. `LegalPhrases:safe` (a trailing comment on the line; `<!-- LegalPhrases:safe -->` in Markdown) is for prose that has to use one of the listed words, and it is rare: if it appears more than a few times in one change, the language is drifting and needs a rewrite.
+User-facing strings, doc comments, and commit messages describe what the code does (the mechanism), not what the user experiences (the outcome); outcome claims create express-warranty risk. The pre-commit hook checks only the lines a change adds, never the commit message; it is the floor, and a human read of everything is the bar. `LegalPhrases:safe` (a trailing comment on the line; `<!-- LegalPhrases:safe -->` in Markdown) is for prose that has to use one of the listed words, and it is rare: if it appears more than a few times in one change, the language is drifting and needs a rewrite.
 
 ## Sign-off and licence
 
