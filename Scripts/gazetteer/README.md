@@ -1,8 +1,9 @@
 # Golden-file Bloom builder
 
-Builds the golden-file Bloom filter that the engine's cross-language test reads
-(`BloomFilterTests`, on `Fixtures/TestResources/golden-1000.bloom`). The
-production filters the app ships are built and signed by
+Builds the golden-file Bloom filter, `Fixtures/TestResources/golden-1000.bloom`,
+that the engine's Bloom-filter and name-gazetteer tests read; `BloomFilterTests`
+is the cross-language check of the format. The production filters the app ships
+are built and signed by
 [resecta-datapipeline](https://github.com/Merlin1A/resecta-datapipeline), not here.
 
 ## Scaffold inputs
@@ -11,10 +12,10 @@ The scaffold's optional raw inputs (placed in `sources/`) are:
 
 | File | Source | License (SPDX) | Description |
 |------|--------|-----------------|-------------|
-| `census-2010-surnames.csv` | U.S. Census Bureau | Public domain | ~150K surnames with ethnicity columns |
-| `census-spanish-surnames.csv` | U.S. Census Bureau | Public domain | ~12K Spanish-origin surnames |
-| `ssa-baby-names/` | Social Security Administration | CC0-1.0 | ~100K given names (yob1880–present) |
-| `popular-names-by-country.csv` | sigpwned | CC0-1.0 | ~50K names across countries |
+| `census-2010-surnames.csv` | U.S. Census Bureau | Public domain | Surnames with race and ethnicity columns |
+| `census-spanish-surnames.csv` | U.S. Census Bureau | Public domain | Spanish-origin surnames |
+| `ssa-baby-names/` | Social Security Administration | Public domain | Given names, one `yob*.txt` file per birth year |
+| `popular-names-by-country.csv` | sigpwned | CC0-1.0 | Popular given names and surnames by country |
 
 These are scaffold inputs only. The shipped filters' sources are listed in the
 signed `gazetteer-manifest.json` and in the pipeline's `SOURCES.md`.

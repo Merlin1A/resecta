@@ -36,8 +36,9 @@ Third-party MIT-licensed inputs (Apache License 2.0, Section 4(d))
 
 The name Bloom-filter artifacts bundled in this product (given-names.bloom,
 surnames.bloom) are produced at build time by resecta-datapipeline. The person-
-name Bloom filters are membership-derived from the MIT-licensed bltlab/paranames
-corpus. Faker (MIT) is used by resecta-datapipeline to generate this project's
+name Bloom filters are membership-derived in part from the MIT-licensed
+bltlab/paranames corpus; their other inputs are public-domain and CC0 name
+lists. Faker (MIT) is used by resecta-datapipeline to generate this project's
 synthetic evaluation corpus. The MIT permission notice is reproduced once below
 and applies to each input listed.
 
@@ -68,6 +69,6 @@ SOFTWARE.
   [x] bltlab/paranames (MIT) — person-name Bloom / gazetteer inputs.
       Copyright (c) 2022 Jonne Sälevä and Constantine Lignos
       (https://github.com/bltlab/paranames)
-      The name Bloom filters are membership-derived from the ParaNames corpus;
-      the upstream Wikidata CC0 chain is discharged by this MIT compilation
-      notice, so no separate CC0 row is required.
+      The name Bloom filters are membership-derived in part from the ParaNames
+      corpus; the upstream Wikidata CC0 chain is discharged by this MIT
+      compilation notice, so no separate CC0 row is required.
