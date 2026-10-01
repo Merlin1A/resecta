@@ -1,9 +1,10 @@
 # Golden-file Bloom builder
 
-Builds the golden-file Bloom filter, `Fixtures/TestResources/golden-1000.bloom`,
-that the engine's Bloom-filter and name-gazetteer tests read; `BloomFilterTests`
-is the cross-language check of the format. The production filters the app ships
-are built and signed by
+Builds the golden-file Bloom filter that the engine's Bloom-filter and
+name-gazetteer tests read
+(`Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/TestResources/golden-1000.bloom`);
+`BloomFilterTests` is the cross-language check of the format. The production
+filters the app ships are built and signed by
 [resecta-datapipeline](https://github.com/Merlin1A/resecta-datapipeline), not here.
 
 ## Scaffold inputs

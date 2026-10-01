@@ -10,18 +10,18 @@ macOS is a tooling destination, not a supported product.
 
 The public surface kept on purpose is the document-runner API in
 [`ENGINEERING.md`](../../ENGINEERING.md) §9; `EnginePublicSurfaceTests`
-pins that each of its symbols stays `public`. The rest of the package is
-`internal` or on its way there: some declarations are still `public`
-because the app names them. The package is
-developed inside the Resecta app repository and is not published as a
-standalone package (see "Importing as a local dependency" below). A
-per-symbol DocC catalog is deferred to a later release; package-level
-orientation lives in this README.
+pins that each of its symbols stays `public`. Other declarations are
+`public` too — types those signatures carry, symbols the app names, and
+some not yet narrowed — and the rest of the package is `internal`. The
+package is developed inside the Resecta app repository and is not
+published as a standalone package (see "Importing as a local dependency"
+below). A per-symbol DocC catalog is deferred to a later release;
+package-level orientation lives in this README.
 
 ## Source layout
 
 The package source root is `Sources/RedactionEngine/`, organized into the
-twelve top-level subdirectories below. The entries describe what each
+top-level subdirectories below. The entries describe what each
 subsystem produces or consumes; the subsystems call each other directly
 and pass the shared `Models/` types between them.
 
@@ -97,7 +97,7 @@ runtime.
   result-diff fingerprint is composed from page, geometry and category
   only — never a hash or copy of matched text.
 - **Saved-search payloads carry query shape only.** In the app target,
-  the `SavedSearch` Codable surface stores a name, mode, query / terms,
+  the `SavedSearch` Codable surface stores an id, a name, mode, query / terms,
   enabled categories, matching options, threshold floors, and filter
   shape. The encoder writes only those keys; the decoder rejects a row
   that carries any other key, which keeps it out of the app's saved-search
@@ -115,7 +115,7 @@ mechanism-description language (see the root
 
 ## Gazetteer extension shape
 
-The detection data tables live at
+The gazetteer tables live at
 `Sources/RedactionEngine/Resources/Gazetteers/`. Adding a new table:
 
 1. Build the table in resecta-datapipeline, which lists it with its size

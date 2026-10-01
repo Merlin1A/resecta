@@ -6,9 +6,9 @@
 # pull request to main as a non-required check (about twenty minutes).
 # RedactionEngine here runs the engine package's suites on the simulator
 # instead of the macOS host, where the whole-package run stalls
-# (engine-suite.yml), and stays off pull requests for its length: its
-# scheduled run has taken close to an hour. The runner takes its simulator
-# by id and its DerivedData path from the environment set below.
+# (engine-suite.yml), and stays off pull requests for its length. The
+# runner takes its simulator by id and its DerivedData path from the
+# environment set below.
 name: sim-suite
 
 on:
@@ -20,8 +20,9 @@ on:
         options: [ResectaApp, RedactionEngine]
         default: ResectaApp
   # KEEP-ALIVE: GitHub disables a scheduled workflow after sixty days
-  # without repository activity; a disabled workflow is re-enabled by
-  # hand in the Actions tab.
+  # without repository activity (a commit inside that window keeps it
+  # running); a disabled workflow is re-enabled by hand in the Actions
+  # tab.
   schedule:
     - cron: '0 9 * * 1' # Monday 09:00 UTC
   push:
