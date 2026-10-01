@@ -3,12 +3,12 @@
 # an iPhone 17 simulator under a watchdog, perf suites alone and
 # report-only. Both schemes run every Monday and on release tags, one job
 # each; a dispatch runs the scheme it names; ResectaApp alone runs on every
-# pull request as a non-required check (about twenty minutes). RedactionEngine
-# here runs the engine package's suites on the simulator instead of the
-# macOS host, where the whole-package run stalls (engine-suite.yml), and
-# stays off pull requests for its length. Twenty to forty minutes per
-# scheme. The runner takes its simulator by id and its DerivedData path from
-# the environment set below.
+# pull request to main as a non-required check (about twenty minutes).
+# RedactionEngine here runs the engine package's suites on the simulator
+# instead of the macOS host, where the whole-package run stalls
+# (engine-suite.yml), and stays off pull requests for its length. The
+# runner takes its simulator by id and its DerivedData path from the
+# environment set below.
 name: sim-suite
 
 on:
@@ -20,7 +20,9 @@ on:
         options: [ResectaApp, RedactionEngine]
         default: ResectaApp
   # KEEP-ALIVE: GitHub disables a scheduled workflow after sixty days
-  # without a commit to the repository; any commit re-enables it.
+  # without repository activity (a commit inside that window keeps it
+  # running); a disabled workflow is re-enabled by hand in the Actions
+  # tab.
   schedule:
     - cron: '0 9 * * 1' # Monday 09:00 UTC
   push:
