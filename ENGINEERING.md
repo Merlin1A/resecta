@@ -10,9 +10,11 @@ at all.
 
 Paths that start with `Pipeline/`, `Verification/`, `Detection/`,
 `SecurityTests/` or `SearchTests/` are inside the engine, an SPM package at
-`Packages/RedactionEngine/`; the rest are relative to the repo root, apart
-from the data pipeline's own files named in §8. The line counts, the isolation opt-out count and the encoding count in
-this file are measured from the tree you are looking at by
+`Packages/RedactionEngine/` (under its `Sources/RedactionEngine/` or
+`Tests/RedactionEngineTests/`); the rest are relative to the repo root, apart
+from the data pipeline's own files named in §8. The line counts, the
+isolation opt-out count and the encoding count in this file are measured
+from the tree you are looking at by
 `Scripts/doc-metrics.sh`, which the pull-request gate runs, not from a
 dashboard. If you have time for one path through the code, skip to
 [Where to start reading](#where-to-start-reading).
@@ -211,9 +213,10 @@ Overclaiming is a defect class here, tested like any other:
   Swift, string-catalog and Markdown lines a commit adds, and banned
   networking symbols on the Swift source lines it adds — the same gate for me
   and for contributors (`CONTRIBUTING.md`).
-- The honesty-surface tests (`Tests/ResectaAppTests/HonestySurfacesTests.swift`)
-  pin the mount predicate of the disclaimer naming the checks' limits on the
-  verification results screen and its single mount, and that failed,
+- The honesty-surface tests
+  (`Tests/ResectaAppTests/HonestySurfacesTests.swift`) pin the mount predicate
+  of the disclaimer naming the checks' limits on the verification results
+  screen and its single mount, and that failed,
   attention-level and skipped verdicts surface an in-context cue on the
   output preview. The honesty copy is
   load-bearing UI, so its presence is a tested invariant, not a style choice.
@@ -239,9 +242,9 @@ The expected result is a single match — a code comment noting the fact. The
 pre-commit hook rejects `URLSession`, `URLRequest`, `NWConnection`,
 `NWPathMonitor`, and `WKWebView` on every added Swift source line (the hook
 defines one override marker, for a Safari-view wrapper; no line in the tree
-uses it), so the property holds going forward, not just today. The in-app legal/support links open in a
-Safari view or Mail, each in its own process — the binary embeds no web engine
-of its own. The privacy manifest ships at `Resources/PrivacyInfo.xcprivacy`
+uses it), so the property holds going forward, not just today. The in-app
+legal/support links open in a Safari view or Mail, each in its own process —
+the binary embeds no web engine of its own. The privacy manifest ships at `Resources/PrivacyInfo.xcprivacy`
 and declares no collected data types and no tracking, matching `PRIVACY.md`
 ("Data Not Collected"). And the dependency footprint makes the review
 tractable: the app's only dependency is its own engine package — there is no
@@ -327,8 +330,7 @@ assets. The contract between the two repos is enforced, not eyeballed:
   read, five loaders are withheld from detection and reported by name: the
   name Bloom filters (with their sidecars), the driver's-license and passport
   pattern gazetteers, the context-keywords loader, and the negative-context
-  gazetteer (the context-keyword and institution tokens still seed the OCR
-  recognizer's custom-word hints outside the verdict).
+  gazetteer.
 - Three reference tables load outside that verdict by design and stay live —
   the institution gazetteer, the address-components gazetteer, and the
   ZIP-to-state table — as do the Classifier assets and the audit rule catalog;
@@ -350,9 +352,10 @@ assets. The contract between the two repos is enforced, not eyeballed:
   SHA-256 constants that move as single, reviewed changes — drift between
   what the pipeline builds and what the app's tests expect shows up as a red
   test, not a silent skew. `Scripts/verify-shipped-asset-hashes.sh`, which the
-  pull-request gate runs, pins `preset-thresholds.json`, `context-scorer.json`
-  and the manifest public key byte-exact and checks the signed manifest's
-  asset list against the shipped tree.
+  pull-request gate runs, pins the engine's classifier files
+  `preset-thresholds.json` and `context-scorer.json` and the manifest public
+  key byte-exact and checks the signed manifest's asset list against the
+  shipped tree.
 
 The trust boundary this section implements — what the signature proves and
 what it does not — is stated for readers in [`THREAT-MODEL.md`](./THREAT-MODEL.md)

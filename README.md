@@ -119,7 +119,7 @@ Each claim in the map below is paired with a mechanical check in this repo. The 
 
 | Claim | Check |
 | --- | --- |
-| Marked regions are destroyed, not covered | Per-region pixel readback after every fill — one wrong pixel fails the render, the page is re-rendered once at the lowest resolution tier, and a second failure fails the export (`Pipeline/PageRasterizer.swift`); the classic annotation-over-text attacks are constructed and destroyed in `SecurityTests/FakeRedactionTests.swift` |
+| Marked regions are destroyed, not covered | Per-region pixel readback after every fill (`Pipeline/PageRasterizer.swift`) — one wrong pixel fails the render, the page is re-rendered once at the lowest resolution tier, and a second failure fails the export; the classic annotation-over-text attacks are constructed and destroyed in `SecurityTests/FakeRedactionTests.swift` |
 | The exported file is re-checked independently | The 7/12-layer verification pass re-opens the output and scans its text, OCR of its rendered pages, the raw bytes across seven encodings (outside stream data) plus each page's decoded text, its structure and its metadata, re-runs each applied search on the output, and runs the app's structured detectors on the output to report what remains — names and addresses are not swept (`Verification/VerificationEngine.swift`) |
 | Placement survives rotated pages | A rotation × crop-box-origin test matrix positions its regions with a transform written independently of the production code (`SecurityTests/RotatedPageCoordinateTests.swift`) |
 | No network requests of its own | A source grep for networking symbols returns no code references (the sole hit is a comment); the pre-commit hook rejects those symbols on added Swift source lines (`Scripts/audit-lint.sh`) |
@@ -172,7 +172,7 @@ Together the suites carry about 9,300 `#expect`/`#require` assertions. Beyond or
 
 The commands that run both suites locally, and what the batched runner reports, are in [`CONTRIBUTING.md`](./CONTRIBUTING.md#running-the-tests).
 
-**On GitHub Actions.** Every pull request runs the required `pr-gate` check (`ci.yml`), which builds the app and its unit- and UI-test bundles without running them and runs the lint, count and hash checks. The app's unit suite also runs on a hosted simulator for every pull request, as a non-required check, and both suites run weekly and on release tags; the engine's host-side workflow has not yet reached a verdict on the hosted runner. The full gate list is in [`CONTRIBUTING.md`](./CONTRIBUTING.md#what-every-change-passes).
+**On GitHub Actions.** Every pull request runs the required `pr-gate` check (`ci.yml`), which builds the app and its unit- and UI-test bundles without running them and runs the lint, count and hash checks. The app's unit suite also runs on a hosted simulator for every pull request to `main`, as a non-required check, and both schemes (app and engine) run weekly and on release tags; the engine's host-side workflow has not yet reached a verdict on the hosted runner. The full gate list is in [`CONTRIBUTING.md`](./CONTRIBUTING.md#what-every-change-passes).
 
 ## Contributing
 
