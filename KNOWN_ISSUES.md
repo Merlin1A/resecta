@@ -13,7 +13,8 @@
 
 Once `CGPDFContext` writes a page via `endPDFPage()`, it cannot be replaced or removed.
 Fill verification therefore runs on the bitmap before a page is written; a failure
-re-renders the page once at half resolution, then fails the run. The post-export
+re-renders the page once at the lowest resolution tier (150 DPI), and a second
+failure fails the run. The post-export
 verification pass never rewrites pages. A two-pass architecture that verifies the
 whole file in memory before writing is deferred to a later release.
 
@@ -23,10 +24,9 @@ whole file in memory before writing is deferred to a later release.
 **Affects:** Text-layer handling
 **Apple radar:** FB14843671
 
-`PDFPage.characterBounds(at:)` regressed in iOS 18. Must use PDFSelection-based
-workaround for character position extraction.
+`PDFPage.characterBounds(at:)` regressed in iOS 18.
 
-**Workaround:** Use PDFSelection-based character position extraction
+**Workaround:** Character positions are extracted through `PDFSelection`
 (`TextLayerExtractor.extractCharacters`).
 
 **iOS 26 recheck (2026-06-14):** Still present on the
@@ -99,13 +99,13 @@ While drawing, rectangle edges align to other boxes and page guides; alignment t
 ---
 
 ### KI-7: Detection Orchestration Wrapper Undefined (Medium) — FIXED 2026-03-30
-**Resolution:** `DetectionOrchestrator` implemented in `Packages/RedactionEngine/Sources/RedactionEngine/Detection/DetectionOrchestrator.swift`. Bridges `PIIDetector.detect(in:)` with per-page orchestration including OCR, PII detection, and face detection.
+**Resolution:** `DetectionOrchestrator` implemented in `Packages/RedactionEngine/Sources/RedactionEngine/Detection/DetectionOrchestrator.swift` (per-page OCR and detection orchestration). The app's Scan interface runs the text detectors through the search engine and does not use it.
 
 ---
 
 ### KI-3: doc.text.redact SF Symbol Availability Unverified (Medium) — FIXED 2026-03-29
 **Resolution:** Runtime availability check with fallback.
-`EULAGateView.swift`, `HomeView.swift`, and (since 2026-09-22) the app-snapshot
+`EULAGateView.swift`, `HomeView.swift`, and the app-snapshot
 privacy overlay `SnapshotPrivacyOverlay.swift` check `UIImage(systemName: "doc.text.redact")`
 at runtime and fall back to `doc.viewfinder` if unavailable.
 
@@ -113,7 +113,6 @@ at runtime and fall back to `doc.viewfinder` if unavailable.
 
 ### KI-4: Output File Purged While Backgrounded (Medium) — FIXED 2026-05-16
 **Affects:** Pipeline integration
-**Spec ref:** `ExportFailure.filePurged` (Export — File purged row)
 
 **Resolution:** Proactive purge re-run toast wired into
 `DocumentEditorView.handleScenePhaseChange(old:new:)`. The handler observes `\.scenePhase`; on a
@@ -123,12 +122,11 @@ at runtime and fall back to `doc.viewfinder` if unavailable.
 and — if the output is missing — enqueues a `.warning` `ToastQueueManager`
 toast with `actionLabel: "Re-run"` that invokes
 `PipelineCoordinator.runFullPipeline(documentOverride:)`. The pre-existing
-`canExport` Share-button disable and the `FailedStateView` "Re-open
-Document" Tier-2 surface remain in place as defense-in-depth.
+`canExport` Share-button disable remains in place as defense-in-depth.
 
 ---
 
 ### Earlier review fixes
 
-- 2026-05-12 — regex pathological-shape gate and cooperative cancellation in regex search; image-import decode moved off the main actor (image input later removed in 1.2.0); overlay long-press timer invalidated on view recycling; three verification comments corrected.
-- 2026-05-13 — whole-word regex range mapping fixed for non-ASCII text (a crash); the detection review sheet's dismiss ordering fixed.
+- 2026-05-12 — regex pathological-shape gate and cooperative cancellation in regex search; image-import decode moved off the main actor (image input later removed in 1.2.0); overlay long-press timer invalidated on view recycling.
+- 2026-05-13 — whole-word regex range mapping fixed for non-ASCII text (a crash); the detection review's dismiss ordering fixed.
