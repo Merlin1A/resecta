@@ -8,10 +8,16 @@ check that keeps it true, and names the limits of that check in the same
 breath, because a check whose boundaries you don't know is worse than no check
 at all.
 
-Paths are relative to the repo root. The engine is an SPM package at
-`Packages/RedactionEngine/`; every number in this file is measured from the
-tree you are looking at by `Scripts/doc-metrics.sh`, which the pull-request
-gate runs, not from a dashboard.
+Paths that start with `Pipeline/`, `Verification/`, `Detection/`,
+`SecurityTests/` or `SearchTests/` are inside the engine, an SPM package at
+`Packages/RedactionEngine/` (under its `Sources/RedactionEngine/` or
+`Tests/RedactionEngineTests/`); the rest are relative to the repo root, apart
+from the data pipeline's own files named in §8. The line counts, the
+isolation opt-out count and the encoding count in this file are measured
+from the tree you are looking at by
+`Scripts/doc-metrics.sh`, which the pull-request gate runs, not from a
+dashboard. If you have time for one path through the code, skip to
+[Where to start reading](#where-to-start-reading).
 
 ## 1. Redaction is destructive, and the app reads back its own output
 
@@ -22,7 +28,8 @@ document's object graph — its text runs, annotations, form fields, embedded
 fonts — is parsed for rendering and text extraction, but it is never handed to
 the export writer. There is no code path from source PDF objects to output PDF
 objects. The writer (`Pipeline/PDFStreamReconstructor.swift`) receives an image
-per page and, in Searchable mode, a text layer rebuilt from scratch (§3).
+per page and, in Searchable mode, the surviving characters as plain values,
+from which it draws a text layer rebuilt from scratch (§3).
 
 The fill itself is written to be verifiable: copy blend mode (destination
 pixels are replaced, not blended), anti-aliasing disabled, and every region
@@ -36,8 +43,10 @@ is read back and every row of every region is compared byte-for-byte against
 the expected fill pattern (`verifyFill` in `Pipeline/PixelOperations.swift`,
 called from `Pipeline/PageRasterizer.swift`). This is not sampling and there
 is no threshold: one wrong pixel fails that render; the page is re-rendered
-once at half resolution (not below 96 DPI) and re-verified, and a second
-failure fails the whole export with an error rather than shipping. Polygon
+once at the lowest resolution tier (150 DPI) and re-verified, and a second
+failure fails the whole export with an error rather than shipping (the retry
+is the app's: `rasterizeWithRetry` in
+`Sources/ResectaApp/State/PipelineCoordinator.swift`). Polygon
 regions — a path the editor does not offer in this release — get the same
 readback, with the mask built by a scanline rasteriser written independently
 of the Core Graphics fill, so the check shares no code with the thing it
@@ -48,21 +57,20 @@ pixel inside the region carries the fill colour. It cannot prove the region
 was in the *right place*. Placement is covered separately: by the rotation ×
 geometry test matrix (§4) and by the verification pass, which inspects the
 finished file with no knowledge of how it was produced (§2). And no automated
-check replaces looking at the output — the app's own UI says so at the moment
-you share.
+check replaces looking at the output — the verification results screen, where
+you share from, says so in its closing note.
 
 ## 2. Verification is a second, independent pass over the finished file
 
-After export, a verification engine re-opens the output *as a file* and hunts
-for residue (`Verification/VerificationEngine.swift`). Secure Rasterization
-output gets seven layers, listed here in the order the results screen reports
-them:
+Once the output file is written, a verification engine re-opens it *as a file*
+and hunts for residue (`Verification/VerificationEngine.swift`). Secure
+Rasterization output gets seven layers, numbered here in the engine's order:
 
 1. text extraction over every page;
 2. OCR of the rendered output, with word-level boxes gated against the
    redacted regions;
-3. a byte-level sweep of the raw file for the sensitive terms that were
-   redacted;
+3. a byte-level sweep of the raw file outside its stream data, plus a re-scan
+   of each page's decoded text, for the sensitive terms that were redacted;
 4. structural checks for active content and tampering (JavaScript, automatic
    actions, embedded files, form dictionaries, encryption, and multiple
    end-of-file markers — the signature of an incremental update appended
@@ -72,17 +80,18 @@ them:
    engine itself against the output (OCR of the rendered pages in this mode)
    and reports what it observed per search;
 7. a detection sweep that runs the app's structured detectors on the output
-   through the search engine (names and addresses are not swept; read by OCR
-   on rasterized pages) and reports what remains in those categories, minus
-   what you chose to leave unredacted.
+   through the search engine (by OCR in this mode; names and addresses are
+   not swept) and reports what remains in those categories, minus what you
+   chose to leave unredacted.
 
 Searchable Redaction adds five more over the preserved text layer (twelve in
-total), reported as layers 6–10 ahead of the re-check and the sweep: spatial
+total), numbered 6–10 ahead of the re-check and the sweep: spatial
 exclusion (no character geometry inside a redacted region), character-count
 cross-checks, font verification, character lineage, and an operator-level
-re-extraction that decodes the output's content streams directly — a second
-decoder cross-checking the byte-level sweep, sharing no code with the toolkit
-extraction.
+re-extraction that walks the output's content streams with Core Graphics'
+scanner and decodes each text-show operand with Core Graphics' own string
+decoder, independent of PDFKit's page text — a second decoder cross-checking
+the byte-level sweep.
 
 Details a reviewer should know exist:
 
@@ -97,12 +106,14 @@ Details a reviewer should know exist:
 - Checks that cannot run say so: pages skipped by OCR resource caps, pages
   OCR did not read for the re-check or the sweep, layers that could not
   execute, and per-page fallbacks all reach the results screen as explicit
-  could-not-verify states, never folded into a pass.
+  lines or states, never folded into a pass.
 - The verdict tiers are calibrated against alarm fatigue: conditions that are
   expected under the chosen mode read as passing checks with a detail line,
   while every could-not-verify condition keeps its severity. A warning tier
   that fires on every normal document carries no information.
-- Verification is advisory by design. A failed or skipped verdict does not
+- Verification is advisory by design. A failed or attention-level verdict, a
+  check that reports something it could not verify, skipped checks in a
+  report with no other warning, or a verification that did not run does not
   hard-block export — it routes the share action through an explicit
   confirmation instead. I chose that over hard-blocking because the check has
   known epistemic limits (below), and a tool that refuses to hand you your own
@@ -111,9 +122,9 @@ Details a reviewer should know exist:
 **The honest limits:** OCR-based checking is bounded by OCR itself — recall on
 degraded scans is materially lower than on digital text, which is one reason
 the product treats verification as a check on your review, not a substitute
-for it (`THREAT-MODEL.md` §6). The search re-check and the detection
-sweep on image-only output are OCR-bounded the same way and say so in their
-rows. The five text-layer checks
+for it (`THREAT-MODEL.md`, its opening paragraph and §6). The search re-check
+and the detection sweep on image-only output are OCR-bounded the same way and
+say so in their rows. The five text-layer checks
 in Searchable mode inspect the text layer the app itself rebuilt; they are
 strong against construction bugs, weaker against threat classes nobody has
 named yet. That is the standing posture everywhere: mechanism claims, not
@@ -131,8 +142,9 @@ asserts the pipeline destroys them
   annotation, and the test first asserts the attack works — the text *is*
   extractable from the fixture. A fixture that doesn't demonstrate the failure
   can't demonstrate the fix.
-- The document is run through the real pipeline (not a mock), and the output
-  must satisfy three separate properties: the text layer no longer contains
+- The document is run through the production render, fill, readback and
+  writer code (not a mock), and the output must satisfy three separate
+  properties: the text layer no longer contains
   the string; the raw output bytes do not contain the string in UTF-8,
   UTF-16BE, or UTF-16LE; and zero annotations survive into the output.
 
@@ -168,21 +180,21 @@ handling goes wrong, so they are pinned by a dedicated matrix
 (`SecurityTests/RotatedPageCoordinateTests.swift`): all four rotations × two
 crop-box origins (zero and offset), each case asserting that the character
 filter excludes exactly the glyphs under the displayed region (counted against
-an unrotated reference extraction), that the full pipeline's Searchable layers
-6–10 do not fail on the result, and that a tampered variant makes the spatial
-check fail.
+an unrotated reference extraction), that Searchable layers 6–10 do not fail
+on the exported result, and that a tampered variant makes the spatial check
+fail.
 
 The matrix has one property I want a reviewer to notice: the test positions
 its regions using its own transform, written separately from the production
-rotation transform. If the production mapping is wrong or missing, the test's
-independently-computed region lands somewhere else and the assertions go red.
-A matrix that used the production transform to place its own test regions
+rotation transform. If the production mapping is wrong or missing, the glyphs
+it places miss the test's independently-computed region and the assertions go
+red. A matrix that used the production transform to place its own test regions
 would verify the code against itself.
 
 Search-driven redaction on rotated pages carries the same discipline
 (`SearchTests/RotatedSearchRegionTests.swift`): regions minted from search
-results on rotated, origin-shifted pages must export with the term absent and
-OCR-clean.
+results on a rotated page must export OCR-clean, and with the term absent at
+both a zero and an offset crop-box origin.
 
 ## 5. The app's own copy is under test
 
@@ -197,13 +209,16 @@ Overclaiming is a defect class here, tested like any other:
 - `Scripts/claims-lint.sh` sweeps the shipping markdown set and the SwiftUI
   view-layer string literals for the same vocabulary, so the docs are held to
   the same bar as the UI.
-- The pre-commit hook (`Scripts/audit-lint.sh`) blocks banned phrasing and
-  banned networking symbols in every staged diff — the same gate for me and
-  for contributors (`CONTRIBUTING.md`).
-- The honesty-surface tests (`HonestySurfacesTests.swift`) pin the mount
-  predicate of the disclaimer naming the checks' limits on the verification
-  results screen and its single mount, and that failed/skipped verdicts
-  surface an in-context cue on the output preview. The honesty copy is
+- The pre-commit hook (`Scripts/audit-lint.sh`) blocks banned phrasing on the
+  Swift, string-catalog and Markdown lines a commit adds, and banned
+  networking symbols on the Swift source lines it adds — the same gate for me
+  and for contributors (`CONTRIBUTING.md`).
+- The honesty-surface tests
+  (`Tests/ResectaAppTests/HonestySurfacesTests.swift`) pin the mount predicate
+  of the disclaimer naming the checks' limits on the verification results
+  screen and its single mount, and that failed,
+  attention-level and skipped verdicts surface an in-context cue on the
+  output preview. The honesty copy is
   load-bearing UI, so its presence is a tested invariant, not a style choice.
 - `TransparencyClaimsTests` exists because I shipped an overclaim: early docs
   said user-entered Custom Terms don't persist across launches. They do (in
@@ -225,11 +240,11 @@ grep -rn "URLSession\|NWConnection" Sources/ Packages/RedactionEngine/Sources
 
 The expected result is a single match — a code comment noting the fact. The
 pre-commit hook rejects `URLSession`, `URLRequest`, `NWConnection`,
-`NWPathMonitor`, and `WKWebView` on every added Swift source line (one audited
-override marker exists, for the Safari-view wrapper), so the property holds
-going forward, not just today. The in-app legal/support links open in a
-Safari view or Mail, each in its own process — the binary embeds no web engine
-of its own. The privacy manifest ships at `Resources/PrivacyInfo.xcprivacy`
+`NWPathMonitor`, and `WKWebView` on every added Swift source line (the hook
+defines one override marker, for a Safari-view wrapper; no line in the tree
+uses it), so the property holds going forward, not just today. The in-app
+legal/support links open in a Safari view or Mail, each in its own process —
+the binary embeds no web engine of its own. The privacy manifest ships at `Resources/PrivacyInfo.xcprivacy`
 and declares no collected data types and no tracking, matching `PRIVACY.md`
 ("Data Not Collected"). And the dependency footprint makes the review
 tractable: the app's only dependency is its own engine package — there is no
@@ -257,22 +272,26 @@ concurrent entry points. The working rules, checkable by grep:
   render completes, and the app's Cancel is likewise ineffective for the
   duration of one page's draw (`KNOWN_ISSUES.md` KI-9). The one place
   cancellation cannot reach is documented rather than assumed away.
-- Cancel/restart races have their own regression suites
-  (`PipelineCoordinatorRestartRaceTests`, `DocumentStateVerifyingCancelTests`):
-  re-running the pipeline mid-flight must not interleave two runs' state;
-  `ImportServiceCancelTests` covers import cancellation.
-- When a crash could only be reproduced under production view hosting (a
-  SwiftUI Observation crash from cache mutation during `List` body
-  evaluation), the regression test hosts real views rather than settling for
-  a unit harness that provably could not reproduce it
+- Cancel and restart paths have their own regression suites: re-running the
+  pipeline mid-flight must not interleave two runs' state
+  (`PipelineCoordinatorRestartRaceTests`), cancelling during verification
+  keeps the output and reports the check as skipped
+  (`DocumentStateVerifyingCancelTests`), and `ImportServiceCancelTests`
+  covers import cancellation (report-only in the batched runner).
+- When a crash could only be reproduced in the running app (a SwiftUI
+  Observation crash from cache mutation during `List` body evaluation), the
+  regression test drives the real app flow (`SearchMarkForRedactionUITests`,
+  a UI test run from Xcode); the hosted-view suite beside it does not
+  reproduce the crash and says so in its header
   (`SearchResultsListObservationCrashTests`).
 - Memory hygiene is mechanical: bitmap buffers are wiped with `memset_s`
   (which the compiler cannot elide) before returning to the context pool;
   temp export files are hardened, excluded from backups, and cleaned per
   session — each property pinned by its own test
   (`PixelBufferZeroizeTests`, `BackupExclusionTests`, `FileProtectionTests`;
-  the zeroize suite runs alone and report-only in the batched runner because
-  it carries a timing budget).
+  the zeroize timing budget sits in its own suite,
+  `PixelBufferZeroizeTimingTests`, which the batched runner runs alone and
+  report-only).
 
 ## 8. The detection data ships under contract
 
@@ -283,13 +302,15 @@ assets. The contract between the two repos is enforced, not eyeballed:
 - The pipeline's gate (`make verify`) runs lint, types, tests, schema
   validation, a hash-lock check of built artifacts against pinned SHA-256
   values, and a determinism rebuild whenever a builder's inputs changed since
-  the last passing one (always, in the pipeline's CI verify) — the same inputs
-  must produce byte-identical outputs side by side. Raw inputs are fetched by
-  hand by scripts that record each file's SHA-256 in `SOURCES.md` and refuse a
-  later fetch whose bytes differ (the ParaNames corpus is checked against its
-  pinned row), the build targets make no network calls, and a personal-e-mail
-  guard (`scripts/check_no_pii.py`) runs first in the pipeline's CI verify
-  script, so cleanup rules are enforced by tooling rather than by memory.
+  the last passing one (always, in the pipeline's weekly verify workflow) —
+  the same inputs must produce byte-identical outputs side by side. Raw inputs
+  are fetched by hand: most fetch scripts record each file's SHA-256 in
+  `SOURCES.md` and refuse a later fetch whose bytes differ; the rest leave
+  that row to a hand step, and the ParaNames fetch checks its download
+  against the pinned row. The builders make no network calls, and a personal-e-mail
+  guard (`scripts/check_no_pii.py`) runs on every pull request and first in
+  the verify script, so cleanup rules are enforced by tooling rather than by
+  memory.
 - At first load, the app verifies an Ed25519 signature over the gazetteer
   manifest (`Detection/GazetteerLoader.swift`): detached signature, bundled
   public key, both produced by the pipeline's signing step. The signed
@@ -309,13 +330,12 @@ assets. The contract between the two repos is enforced, not eyeballed:
   read, five loaders are withheld from detection and reported by name: the
   name Bloom filters (with their sidecars), the driver's-license and passport
   pattern gazetteers, the context-keywords loader, and the negative-context
-  gazetteer (the context-keyword and institution tokens still seed the OCR
-  recognizer's custom-word hints outside the verdict).
+  gazetteer.
 - Three reference tables load outside that verdict by design and stay live —
   the institution gazetteer, the address-components gazetteer, and the
   ZIP-to-state table — as do the Classifier assets and the audit rule catalog;
-  a digest failure on one of them reports under that asset's own diagnostic
-  and raises the banner, and the asset stays in use unless its own loader
+  a digest failure on one of them is recorded in the load diagnostics and
+  raises the banner, and the asset stays in use unless its own loader
   rejects it, when its built-in fallback applies. Every loader that decodes a
   versioned table fences its wire version, so a table from a future or stale
   schema is refused by name rather than read. The degraded-detection banner
@@ -332,9 +352,10 @@ assets. The contract between the two repos is enforced, not eyeballed:
   SHA-256 constants that move as single, reviewed changes — drift between
   what the pipeline builds and what the app's tests expect shows up as a red
   test, not a silent skew. `Scripts/verify-shipped-asset-hashes.sh`, which the
-  pull-request gate runs, pins `preset-thresholds.json`, `context-scorer.json`
-  and the manifest public key byte-exact and checks the signed manifest's
-  asset list against the shipped tree.
+  pull-request gate runs, pins the engine's classifier files
+  `preset-thresholds.json` and `context-scorer.json` and the manifest public
+  key byte-exact and checks the signed manifest's asset list against the
+  shipped tree.
 
 The trust boundary this section implements — what the signature proves and
 what it does not — is stated for readers in [`THREAT-MODEL.md`](./THREAT-MODEL.md)
@@ -362,8 +383,9 @@ detect, search, rebuild, verify and export without the app's view code:
   `MatchAuditExporter`
 
 `TextSpan.words(fullyInside:polygon:on:)` returns the words of a page's text
-layer fully inside a region, in the displayed frame; the verification run
-captures a manual region's words through it on pages with a usable text layer.
+layer fully inside a region, in the displayed frame; at the start of each run
+the app captures a manual region's words through it, on pages with a usable
+text layer, as terms the verification pass searches for.
 
 These are public because a runner or the app consumes them, along with the
 types their signatures carry and whatever else the app names; everything else
