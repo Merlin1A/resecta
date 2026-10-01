@@ -1,14 +1,16 @@
-# Pull-request gate. Builds the app and both test bundles, runs the two
-# lints over the lines the change adds, checks the documented counts
-# against the tree, checks the shipped-asset hashes, fails when a source
-# file already over 800 lines grows (the growth ratchet) and reports the
+# Pull-request gate; also runs on every push to main. Builds the app and
+# its unit- and UI-test bundles without running them, runs the audit lint
+# over the lines the change adds and the claims lint over the shipping
+# docs and the view-layer strings, checks the documented counts against
+# the tree, checks the shipped-asset hashes, fails when a source file
+# already over 800 lines grows (the growth ratchet) and reports the
 # silent-guard census over the three test trees. The scripts run
 # from the base branch's copies, so a change cannot edit the lint it is
 # gated by; the change's own copies run once more, report-only. About five
 # minutes on a hosted macos-26 runner. The batched simulator suites
 # (sim-suite.yml) run weekly, on demand and on release tags, and the app
-# suite on every pull request as a non-blocking check; the engine host
-# suite (engine-suite.yml) runs on demand only. Neither runs here.
+# suite on every pull request to main as a non-required check; the engine
+# host suite (engine-suite.yml) runs on demand only. Neither runs here.
 name: ci
 
 on:
@@ -75,8 +77,8 @@ jobs:
       # The copies sit one directory under the checkout because two of the
       # scripts locate the tree relative to their own path. audit-lint.sh
       # runs the silent-guard scanner that sits beside it, so the scanner is
-      # copied too. On a push to main the base is the parent commit, i.e. the
-      # merged tree's scripts.
+      # copied too. On a push to main the base is the first parent, i.e. the
+      # scripts main carried before the push.
       - name: Lint scripts from the base branch
         env:
           BASE_REF: ${{ github.base_ref }}
