@@ -70,7 +70,7 @@ Each of the following is true of the current design and is accepted rather than 
 10. The detection sweep at the end of verification reads the structured categories; names and addresses are not swept, so a name or address you did not mark is not something the sweep reports.
 11. The checks read the text the app can read: the rebuilt text layer where one exists, and OCR of the rendered pages otherwise. A page OCR could not read is listed as not checked, not counted as clear; text that OCR misread is text the checks did not see.
 
-## 7. Security posture as of 2026-09-29 (commit 71404bdc)
+## 7. Security posture as of 2026-10-02 (commit 3abe6679)
 
 Each line names how a reader can check the state without trusting this document. States are what was true on the date above; the repository's settings pages and the files named are the source of truth after that. The state is recorded for the three public repositories (the app, the data pipeline and the sample-document generator) unless a line says otherwise.
 
@@ -80,7 +80,7 @@ Each line names how a reader can check the state without trusting this document.
 | Push protection | On | The same page |
 | Dependabot alerts and security updates | On | The same page; `.github/dependabot.yml` lists the ecosystems that receive version updates |
 | Private vulnerability reporting | On | Each repository's Security tab shows "Report a vulnerability" |
-| CodeQL code scanning | On | Each repository's Security tab → Code scanning |
+| CodeQL code scanning | On; in the app repository the Swift analysis covers the engine package, and the app target is not yet in its database | Each repository's Security tab → Code scanning; the Swift database's file list, through the code-scanning API |
 | GitHub Actions allow-listed and pinned to full commit SHAs (the repository setting requires the pins) | On | Each repository's Settings → Actions → General; read any workflow file under `.github/workflows` |
 | Branch rules on `main`: pull requests only; the CI check must pass | On | Each repository's Settings → Rules |
 | The app's pull-request gate builds the app and runs the documented lints from the base branch | On | The job list in `.github/workflows/ci.yml` |
@@ -89,7 +89,8 @@ Each line names how a reader can check the state without trusting this document.
 | Signed detection-data manifest with per-asset digests, and a pinned public-key fingerprint | On | In the engine package: `Detection/GazetteerLoader.swift`, `Detection/Gazetteer/AssetIntegrity.swift`; the `SignedManifestTests`, `AssetTamperMatrixTests` and `ManifestPublicKeyPinTests` suites |
 | Signing-key custody documented (location, backup, rotation, compromise procedure) | On | `KEY-MANAGEMENT.md` in the data pipeline repository |
 | Release build checked for named debug-only launch arguments and for bundled test fixtures before submission | On (a recorded release step) | `Scripts/release-flag-check.sh --archive` |
-| Signed release tag | `v1.0.0` is a signed annotated tag; `v1.1.0` is an unsigned lightweight tag; release tags from `v1.2.0` on are signed | `git tag -v <tag>`; the tag's Verified badge on GitHub |
+| Signed release tag | `v1.0.0` is a signed annotated tag; `v1.1.0` is an unsigned lightweight tag; release tags from `v1.2.0` on are signed | `git tag -v <tag>`, with the signing key published at `https://api.github.com/users/Merlin1A/ssh_signing_keys` in your allowed-signers file; the tag's Verified badge on GitHub |
+| Reproducible build of the App Store binary | None | §4 Build and distribution, §6 item 8 |
 | Public threat model | On (this document) | This file |
 | `security.txt` and a published disclosure policy | On | `https://resecta.app/.well-known/security.txt` (expires 2027-04-19) |
 | Mail authentication on the reporting domain (DMARC) | On | `dig +short TXT _dmarc.resecta.app` |
