@@ -53,6 +53,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The engine's unsupported-format message names the formats: PDF files and JPEG, PNG and HEIC images.
 - Import lives in `Services/Import/`: a loader protocol with its payload, limits and facts types; a router that reads the leading bytes, never the declared type, and refuses every image signature before any decode; the PDF stages as a pure function of the bytes; and a wrapper that applies the facts to the editor's state in one place and reports whether the import completed. The image decode and image-to-PDF render no door reached, and the Live Photo auxiliary-metadata stripper only they called, are deleted.
 - The run's page-data bridge is a pure function of values (`RunInputs.pageData`); the rasterization steps sit in `PipelineCoordinator+Rasterization.swift`; the stores share one lenient row wrapper and one legacy-defaults move; the regex sentinel is entered through one `PatternAdmission` path; the sidebar's thumbnail cache keys on the document as well as the page.
+- CI: CodeQL runs from a workflow in the repository (`.github/workflows/codeql.yml`) instead of the default setup; the Swift job builds the Xcode project, so the app target and the engine package are both in the Swift database, and the Actions and Python analyses run without a build.
 
 ## [1.2.0] — 2026-09-29
 
