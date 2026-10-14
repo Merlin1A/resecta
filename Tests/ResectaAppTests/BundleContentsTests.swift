@@ -30,23 +30,6 @@ struct BundleContentsTests {
         )
     }
 
-    @Test("Custom-terms license-plate template ships and round-trips")
-    func customTermsTemplateLicensePlateIsBundled() throws {
-        #expect(
-            appBundle.url(
-                forResource: "license_plate_us_50_state_starter",
-                withExtension: "json"
-            ) != nil,
-            "license_plate_us_50_state_starter.json missing from the app bundle — its project.yml sources: entry is gone"
-        )
-        // Full round-trip against the real bundled JSON: throws
-        // .resourceMissing when the sources: routing is absent.
-        let template = try CustomTermsTemplateLoader.licensePlate50StateStarter(
-            bundle: appBundle
-        )
-        #expect(!template.entries.isEmpty)
-    }
-
     @Test("SampleDocument.pdf ships in the app bundle (regression)")
     func sampleDocumentIsBundled() {
         #expect(

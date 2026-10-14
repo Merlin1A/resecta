@@ -10,7 +10,7 @@ import RedactionEngine
 // results screen and their tests read them there.
 
     /// Saturation message promoted from a flat
-    /// `Image + Text` row to an actionable banner with three inline
+    /// `Image + Text` row to an actionable banner with two inline
     /// shortcuts that re-target the saturated query. Each shortcut
     /// mutates the corresponding `searchState` field then invokes
     /// `onTriggerSearch` so the saturated query re-runs with the new
@@ -18,8 +18,8 @@ import RedactionEngine
     /// disappear stays inside the existing `livePreviewRow` show/hide
     /// branch — no new explicit transition. Reduce Motion preserved
     /// via the `reduceMotion` environment threaded above.
-    /// "Add whole-word filter" / "Toggle case-sensitive" / "Scope to
-    /// current page" are mechanism-description action labels.
+    /// "Add whole-word filter" / "Toggle case-sensitive" are
+    /// mechanism-description action labels.
 struct SearchSaturationBanner: View {
     let searchState: SearchState
     let onTriggerSearch: () -> Void
@@ -61,46 +61,11 @@ struct SearchSaturationBanner: View {
                 .disabled(searchState.isSearching)
                 .accessibilityLabel(SaturationBannerCopy.toggleCaseSensitive)
 
-                // Dark with the scope picker — with the
-                // picker retired this shortcut was a one-way door into
-                // page-scoped traversal with no readout and no way
-                // back. The banner and its two option legs stay; the
-                // model chain (`scopeToCurrentPage()`) stays compiled
-                // and unit-pinned.
-                if SearchState.navigationScopeControlsEnabled {
-                    Button {
-                        scopeSaturatedSearchToCurrentPage()
-                    } label: {
-                        Text(SaturationBannerCopy.scopeToCurrentPage)
-                            .font(.caption2)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(searchState.navigationScope == .currentPage || searchState.isSearching)
-                    .accessibilityLabel(SaturationBannerCopy.scopeToCurrentPage)
-                }
             }
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .padding(.vertical, ResectaTokens.Spacing.xs)
         .background(Color.orange.opacity(0.08))
-    }
-
-    /// Scope-to-current-page handler for the
-    /// saturation banner. Delegates the flush → cancel → scope chain
-    /// to `SearchState.scopeToCurrentPage()` (testable) then invokes
-    /// `onTriggerSearch` so the saturated query re-runs against the
-    /// page-scoped constraint. The page index that the
-    /// `.currentPage` filter resolves against is read fresh by
-    /// `scopedResults(currentPageIndex:)` at J/K-tap time —
-    /// `documentState.currentPageIndex` is captured at tap time
-    /// transitively through the SwiftUI button action firing
-    /// synchronously when the user taps.
-    private func scopeSaturatedSearchToCurrentPage() {
-        Task { @MainActor in
-            await searchState.scopeToCurrentPage()
-            onTriggerSearch()
-        }
     }
 }
 

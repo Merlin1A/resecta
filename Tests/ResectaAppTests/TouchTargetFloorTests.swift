@@ -81,7 +81,6 @@ struct TouchTargetFloorTests {
         let expectations: [(path: String, identifier: String)] = [
             ("Sources/ResectaApp/Views/Search/ScanReviewSection.swift", "detectorEvaluationButton"),
             ("Sources/ResectaApp/Views/SearchResultRow.swift", "rationaleDisclosureButton"),
-            ("Sources/ResectaApp/Views/Search/SearchToolbarSection.swift", "rescanButton"),
             ("Sources/ResectaApp/Views/SearchAndRedactSheet.swift", "rescanButton"),
             ("Sources/ResectaApp/Views/SearchAndRedactSheet.swift", "savedSearchesBookmark"),
             ("Sources/ResectaApp/Views/SearchAndRedactSheet.swift", "resultNavPrevious"),

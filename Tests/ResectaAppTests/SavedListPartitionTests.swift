@@ -104,11 +104,6 @@ struct SavedListPartitionTests {
 
     @Test("Recall does not narrow detectors while the category strip is dark")
     func recallDoesNotNarrowWhileStripDark() {
-        // Premise guard: this process launches without the DEBUG
-        // reveal arg, so the strip is dark — the shipped 1.0 state.
-        #expect(!SearchState.scanCategoryStripEnabled,
-                "test process unexpectedly running with --showRetiredSheetControls — this pin exercises the shipped flag-dark path")
-
         let narrowed = SavedSearch(
             name: "ssn-only", mode: .piiScan,
             enabledPIICategories: [.ssn],

@@ -22,91 +22,6 @@ final class SearchState: Identifiable {
     /// the macro does not wrap the concrete UserDefaults reference.
     @ObservationIgnored private let defaults: UserDefaults
 
-    // MARK: - Feature flags
-
-    /// V1.0 ships without the audit-export / scan-coverage surfaces;
-    /// the Export Audit button, the Scan Coverage report (incl. Share
-    /// Snapshot), and the verification-results "Review" hook are gated
-    /// off behind this flag.
-    /// All machinery (MatchAuditExporter, MatchExportService, coverage-report
-    /// computation) stays compiled and unit-tested; restore = flip to `true`
-    /// + update the pin test, or in DEBUG launch with `--enableAuditSurfaces`
-    /// (one arg shared with `searchDiagnosticSurfacesEnabled` — the
-    /// measurement harness's walkthrough evidence hook; compiled out of
-    /// Release, proven by `Scripts/release-flag-check.sh`). These surfaces
-    /// are revisited for 1.1. Mirrors `CustomTermsView.templatePickerEnabled`.
-    // nonisolated: Sendable constant read from nonisolated test contexts.
-    nonisolated static let searchAuditSurfacesEnabled: Bool = {
-        #if DEBUG
-        CommandLine.arguments.contains("--enableAuditSurfaces")
-        #else
-        false
-        #endif
-    }()
-
-    /// V1.0 ships without the doctype diagnostic surfaces; the
-    /// doctype banner and the footer Document-profile disclosure (two
-    /// mounts of `DoctypeDiagnosticView`) are gated off behind this
-    /// flag.
-    /// All machinery (doctype classifier, `lastDoctypeExplanation`,
-    /// `WU07Strings`, `DoctypeBannerTests`) stays compiled and
-    /// unit-tested; restore = flip to `true` + update the pin test, or in
-    /// DEBUG launch with `--enableAuditSurfaces` (one arg shared with
-    /// `searchAuditSurfacesEnabled` above — see its note).
-    /// These surfaces are revisited for 1.1.
-    // nonisolated: Sendable constant read from nonisolated test contexts.
-    nonisolated static let searchDiagnosticSurfacesEnabled: Bool = {
-        #if DEBUG
-        CommandLine.arguments.contains("--enableAuditSurfaces")
-        #else
-        false
-        #endif
-    }()
-
-    /// V1.0 ships without the Scan category-chips strip (per-run
-    /// detector narrowing over `enabledPIICategories`, its in-row ↻,
-    /// and the "no categories selected" notice): with the
-    /// strip dark the surface always scans the full detector set —
-    /// already the untouched default — and the ↻ re-run affordance
-    /// relocates to the sheet's search-bar row. All machinery (the
-    /// chips views, `enabledPIICategories`, `effectiveScanCategories`,
-    /// the kickoff snapshot) stays compiled and unit-tested;
-    /// revival = flip to `true`, or in DEBUG launch with
-    /// `--showRetiredSheetControls` (which also re-hides the relocated
-    /// ↻ so the surface never renders two run controls). The
-    /// saved-search recall writer is gated on this flag too — recall
-    /// must not silently narrow detectors the user can't see.
-    /// This is revisited post-launch.
-    // nonisolated: Sendable constant read from nonisolated test contexts.
-    nonisolated static let scanCategoryStripEnabled: Bool = {
-        #if DEBUG
-        CommandLine.arguments.contains("--showRetiredSheetControls")
-        #else
-        false
-        #endif
-    }()
-
-    /// V1.0 ships without the "This page | Whole document" navigation
-    /// -scope picker (both interfaces) and the saturation banner's
-    /// "Scope to current page" shortcut: the control is
-    /// navigation-only by design (it scopes chevron/J/K/Cmd+G
-    /// traversal, never the rendered list or counts), so its sole
-    /// effect is imperceptible and the control reads as broken. With
-    /// no live writers besides `clear()`'s reset, `navigationScope`
-    /// stays `.wholeDocument` (the shipped default); `scopedResults`
-    /// and `navigateToNext/Previous` stay live and unit-tested,
-    /// degenerating to whole-document traversal. Revival = flip to
-    /// `true`, or in DEBUG launch with `--showRetiredSheetControls`.
-    /// This is revisited post-launch.
-    // nonisolated: Sendable constant read from nonisolated test contexts.
-    nonisolated static let navigationScopeControlsEnabled: Bool = {
-        #if DEBUG
-        CommandLine.arguments.contains("--showRetiredSheetControls")
-        #else
-        false
-        #endif
-    }()
-
     // MARK: - Last-used filter shape
 
     /// Codable bag of the three filter fields that restore across sheet
@@ -464,11 +379,6 @@ final class SearchState: Identifiable {
 
     // MARK: - Intra-Session Diff
 
-    /// Snapshot of fingerprints from the PREVIOUS scan
-    /// in this session. `diffSinceLastScan()` compares the snapshot
-    /// against the current `results` to surface added / removed /
-    /// unchanged counts in `CoverageReportView`.
-    ///
     /// SECURITY: geometry + category only — NEVER
     /// matched text. Hashing `matchedText`, even into an in-memory
     /// `Set<String>`, would constitute document-derived retention
@@ -1231,24 +1141,6 @@ final class SearchState: Identifiable {
         activeSearchTask = nil
         isSearching = false
         flushPendingResults()
-    }
-
-    /// Action chain for the saturation banner's "Scope to current
-    /// page" shortcut. Flushes the pending result buffer before
-    /// cancelling the in-flight scan, then sets the navigation scope
-    /// to `.currentPage`. Caller invokes `triggerSearch` after this
-    /// returns so the saturated query re-runs against the page-scoped
-    /// constraint per state-snapshot lifetime — flush MUST
-    /// happen before cancel so accumulated counts in the pending
-    /// buffer survive the re-target. (The full re-trigger path
-    /// itself wipes `results` via `clearResults`, so the preserved
-    /// counts only matter for any UI that reads `results` between the
-    /// scope set and the next flush — defensive ordering documented
-    /// here for readers + future per-page-banner consumers.)
-    func scopeToCurrentPage() async {
-        flushPendingResults()
-        await cancelSearch()
-        navigationScope = .currentPage
     }
 
     /// Replace-selection primitive: every result's `isSelected` is set to

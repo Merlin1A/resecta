@@ -42,27 +42,7 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Scan surface with the chips strip revealed (`scanCategoryChips`
-    /// is flag-dark in the shipping build; the strip converts with its
-    /// component family).
-    private func launchScanWithStrip() {
-        app.launchArguments = [
-            "--uitesting", "--loadTestDocument", "--openSearchSheet",
-            "--searchMode=piiScan", "--showRetiredSheetControls",
-        ]
-        app.launch()
-        XCTAssertTrue(
-            app.buttons["Scan document for PII"].waitForExistence(timeout: 30),
-            "Search sheet never presented — check the --openSearchSheet launch hook."
-        )
-    }
-
     private var window: XCUIElement { app.windows.firstMatch }
-
-    private var scanStrip: XCUIElement {
-        app.descendants(matching: .any)
-            .matching(identifier: "scanCategoryChips").firstMatch
-    }
 
     private var substrateStrip: XCUIElement {
         app.descendants(matching: .any)
@@ -128,42 +108,6 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         add(shot)
     }
 
-    // MARK: - Geometry: Scan surface
-
-    func testExpandedDetent_scanChromeDrawsRuledCompactGeometry() {
-        launchScanWithStrip()
-        // First-pan settle retry (house idiom — the first drag after
-        // presentation can be swallowed while custom-detent resolution
-        // settles; a genuinely dead expand still fails the assert).
-        dragSheetToExpanded()
-        sleep(2)
-        if app.buttons["searchDismissButton"].firstMatch.frame.minY
-            > window.frame.height * 0.2 {
-            dragSheetToExpanded()
-            sleep(2)
-        }
-        assertSheetExpanded()
-
-        // Icon circles: whole element = the 46pt square floor.
-        let rescan = app.buttons["rescanButton"].firstMatch
-        XCTAssertTrue(rescan.waitForExistence(timeout: 10), "In-row ↻ not found under the reveal.")
-        assertRuledFloor(rescan.frame.width, axis: "width", of: "rescan ↻")
-        assertRuledFloor(rescan.frame.height, axis: "height", of: "rescan ↻")
-
-        let bookmark = app.buttons["savedSearchesBookmark"].firstMatch
-        XCTAssertTrue(bookmark.waitForExistence(timeout: 10), "Saved-searches bookmark not found.")
-        assertRuledFloor(bookmark.frame.width, axis: "width", of: "bookmark")
-        assertRuledFloor(bookmark.frame.height, axis: "height", of: "bookmark")
-
-        // FilterChip: floored height 46 — the retired chain drew 54+
-        // (floor inside the padding/background).
-        XCTAssertTrue(scanStrip.waitForExistence(timeout: 10), "scanCategoryChips strip not found.")
-        let chip = scanStrip.buttons.firstMatch
-        XCTAssertTrue(chip.waitForExistence(timeout: 5), "No chip found inside the strip.")
-        assertRuledFloor(chip.frame.height, axis: "height", of: "category chip")
-        attachScreenshot(named: "uifix-scan-geometry")
-    }
-
     // MARK: - Geometry: Search surface
 
     func testExpandedDetent_searchChromeDrawsRuledCompactGeometry() {
@@ -221,85 +165,6 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         XCTAssertTrue(selectAll.waitForExistence(timeout: 10), "Footer Select All not found.")
         assertRuledFloor(selectAll.frame.height, axis: "height", of: "Select All")
         attachScreenshot(named: "uifix-search-geometry")
-    }
-
-    // MARK: - Strip cooperation (leg a — scan strip)
-
-    func testMediumDetent_verticalDragOnScanStripResizesSheetBothDirections() {
-        launchScanWithStrip()
-        normalizeToMedium()
-        XCTAssertTrue(scanStrip.waitForExistence(timeout: 10), "scanCategoryChips strip not found.")
-
-        let dismiss = app.buttons["searchDismissButton"].firstMatch
-        let headerYAtMedium = dismiss.frame.minY
-
-        // Vertical drag STARTING on the strip must cooperatively
-        // EXPAND the sheet — the horizontal ScrollView must not
-        // swallow the vertical pan (first-pan settle retry).
-        for _ in 0..<2 {
-            let start = scanStrip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05))
-            start.press(forDuration: 0.1, thenDragTo: end)
-            sleep(2)
-            if abs(dismiss.frame.minY - headerYAtMedium) > 10 { break }
-        }
-        XCTAssertLessThan(
-            dismiss.frame.minY, window.frame.height * 0.2,
-            "A vertical drag starting on the scan chip strip did not expand the sheet — the strip swallowed the pan."
-        )
-        attachScreenshot(named: "uifix-scanstrip-expanded")
-
-        // And back DOWN from the strip: collapse to medium.
-        let headerYAtTop = dismiss.frame.minY
-        for _ in 0..<2 {
-            let start = scanStrip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
-            start.press(forDuration: 0.1, thenDragTo: end)
-            sleep(2)
-            if abs(dismiss.frame.minY - headerYAtTop) > 10 { break }
-        }
-        assertMediumBand(dismiss.frame.minY, "the strip down-drag")
-        attachScreenshot(named: "uifix-scanstrip-collapsed")
-    }
-
-    // MARK: - Strip cooperation (leg b — horizontal scroll, 17-category reachability)
-
-    func testScanStripHorizontalDragScrollsAllCategoriesOnScreen() {
-        launchScanWithStrip()
-        XCTAssertTrue(scanStrip.waitForExistence(timeout: 10), "scanCategoryChips strip not found.")
-
-        // Single-row proof: the strip container is one chip row tall —
-        // the retired 17-chip wrap measured hundreds of points.
-        XCTAssertLessThan(
-            scanStrip.frame.height, 60,
-            "The scan chips render \(scanStrip.frame.height)pt tall — a wrap, not the ruled single-row strip."
-        )
-
-        // The last category chip overflows the strip at default type
-        // size (`isHittable`, not `exists` — offscreen strip content
-        // stays in the tree).
-        let lastChip = app.buttons["License Plate detector"].firstMatch
-        XCTAssertFalse(
-            lastChip.exists && lastChip.isHittable,
-            "The 17-category set no longer overflows the strip — the reachability leg would prove nothing."
-        )
-
-        var reached = false
-        for _ in 0..<4 {
-            let start = scanStrip.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
-            let end = scanStrip.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5))
-            start.press(forDuration: 0.05, thenDragTo: end)
-            sleep(1)
-            if lastChip.exists && lastChip.isHittable {
-                reached = true
-                break
-            }
-        }
-        XCTAssertTrue(
-            reached,
-            "Horizontal drags never brought the last category chip on screen — the strip did not scroll (17-category reachability)."
-        )
-        attachScreenshot(named: "uifix-scanstrip-scrolled")
     }
 
     // MARK: - Strip cooperation (leg a — post-scan substrate strip)

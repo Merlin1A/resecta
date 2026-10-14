@@ -12,24 +12,9 @@ import RedactionEngine
 struct SearchResultsSection: View {
     @Bindable var searchState: SearchState
     @Environment(DocumentState.self) private var documentState
-    @Environment(RedactionState.self) private var redactionState
-    // ToastQueueManager injected so the coverage
-    // snapshot share path can surface a `.error` toast when the temp
-    // file write fails (previously a silent return — indistinguishable
-    // from a UI bug).
-    @Environment(ToastQueueManager.self) private var toastManager
     // `appliedResultIDs` lives on `searchState`.
     // Reads go through `searchState.appliedResultIDs`.
     @Binding var selectedDetent: PresentationDetent
-    /// The coordinator's hardened session directory, passed down from the
-    /// sheet as a value (it is a `let` on the coordinator; the sheet holds
-    /// the environment read): the coverage snapshot pair is written there,
-    /// as the audit export's is.
-    let tempExportDirectory: TempExportDirectory
-    /// Passed down from the sheet as a value (the let-injection pattern
-    /// the sheet documents), never read from the environment here: the
-    /// share is withheld while the screen is captured or mirrored.
-    let captureMonitor: ScreenCaptureMonitor
     let onRequestWhy: (SearchResult) -> Void
     let onApplyShortcut: () -> Void
     /// Gates the invisible Return-key Button. Held-Return key-repeat
@@ -49,9 +34,6 @@ struct SearchResultsSection: View {
     /// next 300 ms debounce would eventually run, but the banner's tap
     /// would feel broken in the interim.
     let onTriggerSearch: () -> Void
-    /// Present the saved-searches list — the parent owns the single
-    /// modal slot. Wired to the Scan-side bookmark on the scope row.
-    let onShowSavedSearches: () -> Void
     /// Result navigation is ONE seam on the hub (`focusWalk(on:parking:)`,
     /// `+Walk.swift`) — the row tap and the J/K keyboard buttons call
     /// back through this with the result id instead of a section-side
@@ -61,11 +43,6 @@ struct SearchResultsSection: View {
     /// row tap, like the hub's chevrons / ⌘G, passes `true` and parks
     /// the sheet at the compact float.
     let onFocusWalk: (UUID, Bool) -> Void
-
-    /// Per-sheet-session dismiss state for the doctype banner.
-    /// `SearchResultsSection` is re-instantiated when the sheet
-    /// re-opens, so dismissal naturally resets per sheet session.
-    @State private var isDoctypeBannerDismissed: Bool = false
 
     /// Anchored-row contract — when
     /// tap-on-row drops the sheet to compact, the row the user tapped
@@ -155,44 +132,6 @@ struct SearchResultsSection: View {
     /// the inset region.
     private var sectionTopChrome: some View {
         VStack(spacing: 0) {
-            // Fold the live applied / deselected view-state
-            // counts into the stored scan report so the panel AND the shared
-            // audit snapshot (`shareCoverageSnapshot` below, which reads the
-            // same `report`) reflect what the user has applied/deselected,
-            // not the scan-time zeros `makeCoverageReport` stored.
-            // The whole Scan Coverage surface (incl. the auto-open
-            // and Share Snapshot) is hidden for 1.0 behind
-            // `searchAuditSurfacesEnabled`; the report computation itself
-            // keeps running in SearchState.
-            if SearchState.searchAuditSurfacesEnabled,
-               let report = searchState.coverageReportForDisplay(),
-               searchState.searchModeType == .piiScan {
-                CoverageReportView(
-                    report: report,
-                    results: searchState.results,
-                    diff: searchState.diffSinceLastScan(),
-                    onShareSnapshot: { shareCoverageSnapshot(report: report) }
-                )
-                .padding(.horizontal, ResectaTokens.Spacing.md)
-                .padding(.top, ResectaTokens.Spacing.xs)
-            }
-
-            // Doctype banner — always-visible primary doctype +
-            // detector count above the results list for simplicity.
-            // Hidden for 1.0 behind `searchDiagnosticSurfacesEnabled`.
-            if SearchState.searchDiagnosticSurfacesEnabled,
-               searchState.searchModeType == .piiScan,
-               let explanation = searchState.lastDoctypeExplanation,
-               !isDoctypeBannerDismissed {
-                DoctypeDiagnosticView(
-                    explanation: explanation,
-                    style: .banner(
-                        enabledPIICategories: searchState.enabledPIICategories,
-                        onDismiss: { isDoctypeBannerDismissed = true }
-                    )
-                )
-            }
-
             // Per-page regex-timeout banner. Surfaces
             // when `DocumentSearcher`'s timeout sink fired for one or more
             // pages during the active scan. Copy NEVER echoes pattern text —
@@ -213,20 +152,6 @@ struct SearchResultsSection: View {
             // Live preview row (counts + saturation/invalid signal).
             livePreviewRow
 
-            // Session-scoped navigation scope — the shared page-scope
-            // control (it scopes J/K and Cmd+G result traversal, never
-            // the rendered list or counts). Retired for
-            // 1.0 in BOTH interfaces behind
-            // `navigationScopeControlsEnabled` — its sole effect is
-            // imperceptible outside a chevron walk, so it read as
-            // broken. `navigationScope` then keeps its
-            // `.wholeDocument` default by absence of writers. The
-            // saved-searches bookmark that rode this row on the Scan
-            // interface relocated to the sheet's search-bar row.
-            // Machinery and tests stay compiled.
-            if SearchState.navigationScopeControlsEnabled {
-                scopeRow
-            }
             // The "Add to selection" Menu that closed
             // this stack now rides the footer beside Select All — the
             // freed full-width row returns to the results viewport.
@@ -287,54 +212,6 @@ struct SearchResultsSection: View {
             line += " \u{00B7} Total: \(committedTotal)"
         }
         return line
-    }
-
-    // MARK: - Scope Row
-
-    /// The scope picker row (dark for 1.0 behind
-    /// `navigationScopeControlsEnabled`; renders under the DEBUG
-    /// reveal). The saved-searches bookmark that rode
-    /// this row on the Scan interface moved permanently to the
-    /// sheet's search-bar row — reachable at every detent, which
-    /// this home never was at compact — so the reveal renders the
-    /// picker alone in both interfaces.
-    private var scopeRow: some View {
-        HStack(spacing: ResectaTokens.Spacing.sm) {
-            scopePicker
-        }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.xxs)
-    }
-
-    private var scopePicker: some View {
-        Picker("Scope", selection: $searchState.navigationScope) {
-            Text("This page").tag(SearchNavigationScope.currentPage)
-            Text("Whole document").tag(SearchNavigationScope.wholeDocument)
-        }
-        .pickerStyle(.segmented)
-        .accessibilityLabel("Navigation scope")
-    }
-
-    /// Bookmark button presenting the saved-searches list. Parked
-    /// while staged detections await review: a recall re-triggers a
-    /// run, and a run must not race the pending review for the Scan
-    /// surface. (While a review is active this section isn't rendered
-    /// at all — the review section replaces it — so the gate is a belt
-    /// on top of that structural rule.)
-    /// DORMANT — no render site since the bookmark moved
-    /// to the sheet's search-bar row (`SearchAndRedactSheet`'s
-    /// `savedSearchesBookmark` is the live instance, both
-    /// interfaces). Kept compiled per the hide-never-delete posture.
-    private var savedSearchesBookmark: some View {
-        Button {
-            onShowSavedSearches()
-        } label: {
-            Image(systemName: "bookmark")
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .disabled(redactionState.pendingTriage != nil)
-        .accessibilityLabel("Saved Searches")
     }
 
     // MARK: - Keyboard Shortcuts (J / K / Space / Return)
@@ -732,40 +609,6 @@ struct SearchResultsSection: View {
             )
         } description: {
             Text(SearchEmptyStateCopy.filteredOutDescription)
-        }
-    }
-
-    // MARK: - Coverage Snapshot Share
-
-    /// Build counts-only export metadata + invoke the system
-    /// share sheet via `MatchExportService.shareCoverageSnapshot`. The
-    /// payload is structurally counts-only (no per-match data);
-    /// the existing share surface stays unchanged. The pair lands in the
-    /// hardened session directory and the share is withheld while
-    /// shielded, the way the audit export threads both.
-    private func shareCoverageSnapshot(report: CoverageReport) {
-        guard let presenter = MatchExportService.topViewController() else { return }
-        let metadata = ExportMetadata(
-            appVersion: Bundle.main.appVersion,
-            presetName: "Default",
-            perCategoryOverrides: [:],
-            documentName: "document",
-            totalMatches: report.candidateCountByCategory.values.reduce(0, +),
-            appliedMatches: report.appliedCount
-        )
-        // shareCoverageSnapshot is now async (it awaits the
-        // off-MainActor write). Spawn from this MainActor view method; the
-        // Task inherits MainActor isolation so `presenter` (non-Sendable)
-        // never crosses an actor boundary.
-        Task { @MainActor in
-            await MatchExportService.shareCoverageSnapshot(
-                report: report,
-                metadata: metadata,
-                tempDirectory: tempExportDirectory,
-                captureMonitor: captureMonitor,
-                toastManager: toastManager,
-                from: presenter
-            )
         }
     }
 }
