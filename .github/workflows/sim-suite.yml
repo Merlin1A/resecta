@@ -3,12 +3,24 @@
 # an iPhone 17 simulator under a watchdog, perf suites alone and
 # report-only. Both schemes run every Monday and on release tags, one job
 # each; a dispatch runs the scheme it names; ResectaApp alone runs on every
-# pull request to main as a non-required check (about twenty minutes).
-# RedactionEngine here runs the engine package's suites on the simulator
-# instead of the macOS host, where the whole-package run stalls
-# (engine-suite.yml), and stays off pull requests for its length. The
-# runner takes its simulator by id and its DerivedData path from the
-# environment set below.
+# pull request to main as a non-required check (twenty to forty minutes).
+# RedactionEngine here runs the engine package's suites on the simulator;
+# the engine package has no hosted run of its own, and this one stays off
+# pull requests for its length. The runner takes its simulator by id and
+# its DerivedData path from the environment set below.
+#
+# The account runs at most five macOS jobs at once, and every push to a
+# pull request starts three of them (the ci.yml gate, this workflow's
+# ResectaApp job and code scanning's Swift analysis): a fourth job on the
+# same account waits for a slot. The weekly and tag runs add the engine
+# job; a dispatch adds one job.
+#
+# The hosted runner is a three-vCPU virtual machine without Neural Engine
+# access, so Vision's text recognition runs on the CPU and a verification
+# pass over a rasterized output takes minutes where a Mac takes seconds.
+# The runner's stall watchdog is widened here (TEST_BATCHED_STALL_SECS)
+# so a slow test finishes and a hung one is named by its own time limit;
+# the per-invocation ceiling (--timeout-mins) still bounds each batch.
 name: sim-suite
 
 on:
@@ -56,6 +68,9 @@ jobs:
         scheme: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.scheme || 'ResectaApp')) || github.event_name == 'pull_request' && fromJSON('["ResectaApp"]') || fromJSON('["ResectaApp", "RedactionEngine"]') }}
     env:
       SCHEME: ${{ matrix.scheme }}
+      # Seconds of no output before the batched runner kills an invocation
+      # (the local default is 180). See the header.
+      TEST_BATCHED_STALL_SECS: '900'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -161,3 +176,35 @@ jobs:
           path: upload
           retention-days: 14
           if-no-files-found: warn
+
+  # A scheduled or tag run that fails leaves an annotation and a step
+  # summary; when the repository variable NTFY_TOPIC is set, the run's URL
+  # is also posted to that ntfy topic. A variable, not a secret: the public
+  # repositories carry no Actions secrets, and the topic is masked in the
+  # log and never printed. The body names the repository, the workflow and
+  # the run; no test name and no finding. Linux runner, no macOS slot.
+  failure-notice:
+    needs: sim-suite
+    if: ${{ failure() && (github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      NTFY_TOPIC: ${{ vars.NTFY_TOPIC }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - run: |
+          echo "::error::sim-suite failed on ${GITHUB_EVENT_NAME} (${GITHUB_REF_NAME}): ${RUN_URL}"
+          {
+            echo "## failure notice"
+            echo
+            echo "- sim-suite failed on ${GITHUB_EVENT_NAME} (${GITHUB_REF_NAME}): ${RUN_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$NTFY_TOPIC" ]; then
+            echo "::add-mask::$NTFY_TOPIC"
+            curl -fsS --max-time 20 \
+              -d "${GITHUB_REPOSITORY} · sim-suite failed on ${GITHUB_EVENT_NAME} · ${RUN_URL}" \
+              "https://ntfy.sh/${NTFY_TOPIC}" || echo '::warning::the notice was not delivered'
+          else
+            echo "NTFY_TOPIC is not set; the annotation and the step summary are the notice"
+          fi
