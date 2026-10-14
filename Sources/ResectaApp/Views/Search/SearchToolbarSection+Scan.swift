@@ -26,32 +26,6 @@ extension SearchToolbarSection {
             // review-side confidence tool (the Select-where ≥75/≥90
             // predicates retired with the footer menu).
 
-            // Category chips — pre-scan detector selection over
-            // `enabledPIICategories` — plus the trailing re-run
-            // affordance. Toggling narrows the NEXT run; runs stay
-            // trigger-driven (no auto re-run on chip change).
-            // The strip is retired for 1.0 — dark behind
-            // `scanCategoryStripEnabled` (the ↻ re-run relocated to
-            // the sheet's search-bar row; the "no categories" notice
-            // below goes unreachable with it, since the strip is the
-            // only UI that can empty the selection). Machinery and
-            // tests stay compiled.
-            if SearchState.scanCategoryStripEnabled {
-                scanChipsRow
-            }
-
-            // An empty selection means the next run scans everything —
-            // say so where the chips would otherwise read as "nothing".
-            if searchState.enabledPIICategories.isEmpty {
-                HStack {
-                    Text("No categories selected \u{2014} the next scan runs all detectors.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .padding(.horizontal, ResectaTokens.Spacing.md)
-            }
-
             // The whole OCR block (toggle + controls row) renders
             // only when a page can actually route to OCR; on all-`.rich`
             // documents the engine never runs OCR, so the controls carry

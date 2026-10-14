@@ -393,107 +393,6 @@ struct SearchToolbarSection: View {
         )
     }
 
-    // MARK: - Scan Category Chips (pre-scan selection)
-
-    /// Chips row: the scrolling category chips plus the compact re-run
-    /// button pinned at the trailing edge (chips scroll beside it).
-    /// The re-run affordance replaces the retired persistent
-    /// "Scan Document" capsule — entry auto-run is how scans start;
-    /// this button covers re-running after narrowing categories.
-    var scanChipsRow: some View {
-        HStack(spacing: 0) {
-            scanCategoryChips
-            rescanButton
-                .padding(.trailing, ResectaTokens.Spacing.md)
-        }
-    }
-
-    /// Compact re-run control for the Scan interface. Inherits the
-    /// retired run button's accessibility label — the stable-label
-    /// policy: existing UI-test queries and VoiceOver habits keep
-    /// resolving to the surface's one run control.
-    private var rescanButton: some View {
-        Button {
-            onTriggerSearch()
-        } label: {
-            // The sheet's circular icon chrome — a Ø44 circle + 18pt
-            // glyph in place of the `.bordered` wash that rendered as a
-            // ~64pt slab; the 46pt floor is a LAYOUT frame AFTER the
-            // chrome (hit area unchanged, visual back to circle scale).
-            // States live on `CircularIconButtonStyle`.
-            SearchAndRedactSheet.circularIconLabel("arrow.clockwise")
-        }
-        .buttonStyle(.circularIcon)
-        // An empty chip selection does not disable the run — it means
-        // scan everything (`effectiveScanCategories`).
-        .disabled(searchState.isSearching)
-        .accessibilityLabel("Scan document for PII")
-        .accessibilityIdentifier("rescanButton")
-    }
-
-    /// Pre-scan detector-selection chips over the full category set.
-    /// Distinct from `piiCategoryFilterChips` (post-scan result
-    /// filtering): these choose what the NEXT run requests. Toggling
-    /// routes through the chip's action (a user gesture) — never
-    /// value observation — and deliberately does NOT re-trigger the
-    /// scan; runs stay trigger-driven. Rendered through `FilterChip`
-    /// (the one chip component), category-tinted.
-    private var scanCategoryChips: some View {
-        // Single-row horizontal strip inside the
-        // sheet's existing safeAreaInset chrome layer. Detent
-        // cooperation binds GEOMETRICALLY: the List stays root-bound
-        // at the sheet top with ALL fixed chrome on the
-        // `.safeAreaInset(.top)` stack, and the horizontal chip
-        // ScrollView does not interfere with that binding — a strip
-        // inside the inset chrome keeps the cooperation intact.
-        // The surface stays flag-dark (`--showRetiredSheetControls`)
-        // and converts with its component family; the 17-category set
-        // scrolls in one row, with the wrap returning at
-        // accessibility type sizes so every chip stays visible.
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                FlowLayout(spacing: ResectaTokens.Spacing.xs) {
-                    scanCategoryChipItems
-                }
-                .padding(.horizontal, ResectaTokens.Spacing.md)
-            } else {
-                chipStrip {
-                    scanCategoryChipItems
-                }
-            }
-        }
-        // Chips freeze while a run is in flight, matching the
-        // sibling ↻ control: kickoff snapshots the category set, so a
-        // mid-run toggle neither re-scopes the running scan nor warns —
-        // it only desynced the completion copy from the run that
-        // actually executed.
-        .disabled(searchState.isSearching)
-        // Container id rides the strip/wrap chassis.
-        .accessibilityIdentifier("scanCategoryChips")
-    }
-
-    /// The 17 pre-scan detector chips — shared by the strip and its
-    /// accessibility-size wrap fallback.
-    private var scanCategoryChipItems: some View {
-        ForEach(PIICategory.allCases, id: \.self) { category in
-            let isEnabled = searchState.enabledPIICategories.contains(category)
-            FilterChip(
-                label: category.rawValue,
-                systemImage: category.symbolName,
-                tint: SearchResultRow.categoryColor(category),
-                isSelected: isEnabled
-            ) {
-                if isEnabled {
-                    searchState.enabledPIICategories.remove(category)
-                } else {
-                    searchState.enabledPIICategories.insert(category)
-                }
-            }
-            .accessibilityLabel("\(category.rawValue) detector")
-            .accessibilityValue(isEnabled ? "enabled" : "disabled")
-            .accessibilityHint("Applies to the next scan")
-        }
-    }
 
     // MARK: - Chip-Row Substrate
 
@@ -510,8 +409,7 @@ struct SearchToolbarSection: View {
     /// One chip block hosting all post-scan filter chips — a
     /// single-row horizontal strip inside the
     /// sheet's inset chrome layer, wrapping again at accessibility
-    /// type sizes (see `scanCategoryChips` for the mechanism this
-    /// strip shares). Established as
+    /// type sizes (the FlowLayout fallback). Established as
     /// the integration substrate; downstream additions append chip
     /// groups inside `chipRowSubstrateItems` without altering the
     /// chassis.
@@ -536,8 +434,7 @@ struct SearchToolbarSection: View {
                 }
             }
         }
-        // Container id for the XCUI strip-cooperation battery —
-        // mirrors `scanCategoryChips`' container-id shape.
+        // Container id for the XCUI strip-cooperation battery.
         .accessibilityIdentifier("chipRowSubstrate")
     }
 
@@ -565,8 +462,8 @@ struct SearchToolbarSection: View {
         // Downstream chip groups inserted here.
     }
 
-    /// The strip chassis shared by `scanCategoryChips` and
-    /// `chipRowSubstrate` — exactly these two surfaces;
+    /// The strip chassis of `chipRowSubstrate` — exactly that one
+    /// surface;
     /// the options rows, multi-term chips, and the review bar keep
     /// their wraps. Single row, 8pt gap, with a trailing ~44pt fade
     /// that signals the pan without stealing touches.

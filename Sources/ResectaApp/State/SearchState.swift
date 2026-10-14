@@ -24,29 +24,6 @@ final class SearchState: Identifiable {
 
     // MARK: - Feature flags
 
-    /// V1.0 ships without the Scan category-chips strip (per-run
-    /// detector narrowing over `enabledPIICategories`, its in-row ↻,
-    /// and the "no categories selected" notice): with the
-    /// strip dark the surface always scans the full detector set —
-    /// already the untouched default — and the ↻ re-run affordance
-    /// relocates to the sheet's search-bar row. All machinery (the
-    /// chips views, `enabledPIICategories`, `effectiveScanCategories`,
-    /// the kickoff snapshot) stays compiled and unit-tested;
-    /// revival = flip to `true`, or in DEBUG launch with
-    /// `--showRetiredSheetControls` (which also re-hides the relocated
-    /// ↻ so the surface never renders two run controls). The
-    /// saved-search recall writer is gated on this flag too — recall
-    /// must not silently narrow detectors the user can't see.
-    /// This is revisited post-launch.
-    // nonisolated: Sendable constant read from nonisolated test contexts.
-    nonisolated static let scanCategoryStripEnabled: Bool = {
-        #if DEBUG
-        CommandLine.arguments.contains("--showRetiredSheetControls")
-        #else
-        false
-        #endif
-    }()
-
     /// V1.0 ships without the "This page | Whole document" navigation
     /// -scope picker (both interfaces) and the saturation banner's
     /// "Scope to current page" shortcut: the control is

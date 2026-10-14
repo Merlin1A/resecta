@@ -671,9 +671,7 @@ struct SearchAndRedactSheet: View {
                 // and result-navigation jobs at the trailing edge,
                 // giving Scan the same leading-controls … trailing-nav
                 // read as Search.
-                if !SearchState.scanCategoryStripEnabled {
                     scanRescanButton
-                }
                 savedSearchesBookmark
                 Spacer(minLength: 0)
             } else if searchState.searchModeType == .multiTerm {
@@ -834,22 +832,10 @@ struct SearchAndRedactSheet: View {
 
     /// Compact re-run control for the Scan interface bar — the
     /// relocated home of the retired chips-row ↻.
-    /// Inherits the run control's stable accessibility label
-    /// ("Scan document for PII") so existing UI-test queries and
-    /// VoiceOver habits keep resolving to the surface's one run
-    /// control; the render site above gates on
-    /// `!scanCategoryStripEnabled` so the DEBUG reveal — which
-    /// restores the chips row and its in-row ↻ — never co-renders a
-    /// second one. An empty chip selection never disables the run
-    /// (it means scan everything via `effectiveScanCategories`).
     private var scanRescanButton: some View {
         Button {
             triggerSearch()
         } label: {
-            // The ruled circle chrome, same as
-            // SearchToolbarSection.rescanButton; identifier matches
-            // that sibling since the two are mutually exclusive (only
-            // one renders per `scanCategoryStripEnabled` state).
             Self.circularIconLabel("arrow.clockwise")
         }
         .buttonStyle(.circularIcon)

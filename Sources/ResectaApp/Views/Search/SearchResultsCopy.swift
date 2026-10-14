@@ -252,9 +252,9 @@ enum SearchEmptyStateCopy {
         "A zero result means nothing on the scanned pages cleared the current threshold for those detectors \u{2014} it is not a statement about what the document contains."
 
     /// Pointer line naming the three existing recourse
-    /// controls by their shipped labels/glyphs: the chips-row re-run
+    /// controls by their shipped labels/glyphs: the search-bar re-run
     /// affordance (\u{21bb}, accessibility label "Scan document for
-    /// PII", `SearchToolbarSection.rescanButton`), the Search
+    /// PII", `SearchAndRedactSheet.scanRescanButton`), the Search
     /// interface's literal-match modes (`SearchInterface.search`
     /// displayName "Search"), and the Settings "Detection Sensitivity"
     /// preset picker (`SettingsView`). Names no control beyond what
