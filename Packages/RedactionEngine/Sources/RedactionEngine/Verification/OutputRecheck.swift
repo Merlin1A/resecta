@@ -17,8 +17,9 @@ import PDFKit
 // the observations are sorted before they are returned.
 //
 // Honesty: a page the searcher could not read (OCR did not run, oversize,
-// unopenable, regex timeout, the per-page result cap, a pattern the regex
-// safety gate refused) is recorded as such, never counted as clear. A
+// unopenable, a typed or custom regex term's timeout, the per-page result
+// cap, a pattern the regex safety gate refused) is recorded as such, never
+// counted as clear. A
 // Scan's remaining items keep their page, category and rect for the
 // sweep's subtraction; nothing here logs.
 
@@ -67,6 +68,12 @@ struct RecheckObservation: Sendable, Equatable {
 
 struct OutputRecheck: Sendable {
 
+    /// Per-call override of the searcher's per-page regex budget
+    /// (`DocumentSearcher.regexTimeoutOverride`), handed to every page's
+    /// searcher. Production leaves it nil; a test sets it to make a regex
+    /// term run out of time on a page without waiting the budget out.
+    var regexTimeoutOverride: Duration? = nil
+
     /// Re-run every request on every page of `outputDocument`; one
     /// observation per page, in page order, counts keyed by request index.
     func observe(
@@ -103,7 +110,8 @@ struct OutputRecheck: Sendable {
                 for item in work {
                     group.addTask {
                         try Task.checkCancellation()
-                        return await Self.observePage(item, requests: requests)
+                        return await Self.observePage(
+                            item, requests: requests, regexTimeoutOverride: regexTimeoutOverride)
                     }
                 }
                 var out: [RecheckObservation] = []
@@ -171,7 +179,7 @@ struct OutputRecheck: Sendable {
 
     /// Run every request on one page through its own searcher.
     private static func observePage(
-        _ work: PageWork, requests: [SearchRecheckRequest]
+        _ work: PageWork, requests: [SearchRecheckRequest], regexTimeoutOverride: Duration?
     ) async -> RecheckObservation {
         var observation = RecheckObservation(
             pageIndex: work.index, route: nil, regexTimedOut: false, counts: [:])
@@ -182,10 +190,13 @@ struct OutputRecheck: Sendable {
             return observation
         }
 
-        let searcher = DocumentSearcher()
+        let searcher = DocumentSearcher(regexTimeoutOverride: regexTimeoutOverride)
         let box = CoverageBox()
         await searcher.setPageCoverageSink { coverage in box.record(coverage.route) }
         await searcher.setRegexTimeoutSink { _ in box.recordTimeout() }
+        // A custom regex term that runs out its share of the page budget
+        // reports through its own sink; the page is then not read in full.
+        await searcher.setUserTermsTimeoutSink { _, _ in box.recordTimeout() }
         let wrapped = SendablePDFDocument(pageDocument)
 
         for requestIndex in work.requestIndices {

@@ -97,6 +97,33 @@ struct OutputRecheckTests {
         #expect(page.counts[0]?.items.first?.category == nil, "an always-flag hit has no detector category")
     }
 
+    @Test("A custom regex term that runs out of time on a page marks that page as not checked, never as read")
+    func customRegexTermTimeoutMarksThePageUnchecked() async throws {
+        let doc = try output(["The ACME contract 4111 is on file", "second page"])
+        let flagged = SearchRecheckRequest(
+            record: AppliedSearchRecord(
+                query: AppliedSearchQuery(kind: .piiScan(categories: [.ssn]), options: SearchOptions()),
+                foundCount: 1,
+                scanConfiguration: ScanRunConfiguration(
+                    thresholdVector: nil,
+                    alwaysFlag: [UserTerm(pattern: #"ACME \d+"#, isRegex: true)])),
+            appliedCount: 1, appliedPages: [0])
+        // A zero budget: every regex term is reported as timed out on every
+        // page before it runs; the detectors themselves are unaffected.
+        var runner = OutputRecheck()
+        runner.regexTimeoutOverride = .zero
+        let observations = try await runner.observe(outputDocument: doc, requests: [flagged])
+        #expect(observations.count == 2)
+        for page in observations {
+            #expect(page.regexTimedOut, "page \(page.pageIndex): the custom term's timeout reaches the observation")
+        }
+        let outcome = DetectionSweep.fold(requests: [flagged], observations: observations, pageCount: 2)
+        #expect(outcome.status.isWarn, "a page the term could not be checked on is reported; got \(outcome.status)")
+        let message = TestFixtures.message(of: outcome.status) ?? ""
+        #expect(message.contains("2 pages could not be checked"), "got \(message)")
+        #expect(message.contains("the pattern took too long"), "got \(message)")
+    }
+
     @Test("The category gate: a scan re-run reads the structured families only; a name on the page is never an item")
     func categoryGateInTheRunner() async throws {
         let doc = try output(["Patient John Smith SSN 123-45-6789 on file"])
