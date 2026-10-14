@@ -183,7 +183,10 @@ struct SearchToolbarSectionTests {
 
     @Test("Source pin: optionChip, the Include OCR Pages toggle, and the multi-term conjunction toggle all route through optionControlsDisabled")
     func h13SourceSitesRouteThroughContract() throws {
+        // The three sites span the toolbar's base file and its Scan
+        // extension (the Include OCR Pages toggle sits in the Scan options).
         let source = try loadRepoFile("Sources/ResectaApp/Views/Search/SearchToolbarSection.swift")
+            + loadRepoFile("Sources/ResectaApp/Views/Search/SearchToolbarSection+Scan.swift")
         let occurrences = source.components(separatedBy: "optionControlsDisabled(isSearching:").count - 1
         #expect(occurrences == 3,
                 "expected 3 call sites (optionChip, Include OCR Pages toggle, multi-term conjunction toggle); found \(occurrences)")

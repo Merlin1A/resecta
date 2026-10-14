@@ -199,7 +199,7 @@ struct SearchResultsSection: View {
             // only generic active-pattern phrasing — so a
             // pasted PII-like regex can't leak via the banner.
             if !searchState.regexTimeoutPages.isEmpty {
-                regexTimeoutBanner
+                SearchRegexTimeoutBanner(searchState: searchState)
             }
 
             // Per-page OCR-skip banner. Surfaces when
@@ -207,7 +207,7 @@ struct SearchResultsSection: View {
             // pages during the active scan: those pages exceeded the OCR
             // pixel caps, so their image content was never text-scanned.
             if !searchState.ocrSkippedPages.isEmpty {
-                ocrSkipBanner
+                SearchOCRSkipBanner(searchState: searchState)
             }
 
             // Live preview row (counts + saturation/invalid signal).
@@ -242,7 +242,7 @@ struct SearchResultsSection: View {
            searchState.searchModeType != .piiScan,
            let preview = searchState.livePreview {
             if preview.saturated {
-                saturationBanner
+                SearchSaturationBanner(searchState: searchState, onTriggerSearch: onTriggerSearch)
             } else {
                 HStack(spacing: ResectaTokens.Spacing.xs) {
                     if preview.regexInvalid {
@@ -287,181 +287,6 @@ struct SearchResultsSection: View {
             line += " \u{00B7} Total: \(committedTotal)"
         }
         return line
-    }
-
-    // MARK: - Saturation Banner
-
-    /// Saturation message promoted from a flat
-    /// `Image + Text` row to an actionable banner with three inline
-    /// shortcuts that re-target the saturated query. Each shortcut
-    /// mutates the corresponding `searchState` field then invokes
-    /// `onTriggerSearch` so the saturated query re-runs with the new
-    /// constraint without waiting for the next debounce. Banner appear/
-    /// disappear stays inside the existing `livePreviewRow` show/hide
-    /// branch — no new explicit transition. Reduce Motion preserved
-    /// via the `reduceMotion` environment threaded above.
-    /// "Add whole-word filter" / "Toggle case-sensitive" / "Scope to
-    /// current page" are mechanism-description action labels.
-    private var saturationBanner: some View {
-        VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
-            HStack(spacing: ResectaTokens.Spacing.xs) {
-                Image(systemName: "exclamationmark.circle.fill")
-                    .foregroundStyle(.orange)
-                Text(WU23Strings.headline)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.orange)
-                Spacer()
-            }
-            .accessibilityElement(children: .combine)
-
-            HStack(spacing: ResectaTokens.Spacing.sm) {
-                Button {
-                    searchState.options.wholeWord = true
-                    onTriggerSearch()
-                } label: {
-                    Text(WU23Strings.addWholeWord)
-                        .font(.caption2)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(searchState.options.wholeWord || searchState.isSearching)
-                .accessibilityLabel(WU23Strings.addWholeWord)
-
-                Button {
-                    searchState.options.caseSensitive.toggle()
-                    onTriggerSearch()
-                } label: {
-                    Text(WU23Strings.toggleCaseSensitive)
-                        .font(.caption2)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(searchState.isSearching)
-                .accessibilityLabel(WU23Strings.toggleCaseSensitive)
-
-                // Dark with the scope picker — with the
-                // picker retired this shortcut was a one-way door into
-                // page-scoped traversal with no readout and no way
-                // back. The banner and its two option legs stay; the
-                // model chain (`scopeToCurrentPage()`) stays compiled
-                // and unit-pinned.
-                if SearchState.navigationScopeControlsEnabled {
-                    Button {
-                        scopeSaturatedSearchToCurrentPage()
-                    } label: {
-                        Text(WU23Strings.scopeToCurrentPage)
-                            .font(.caption2)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(searchState.navigationScope == .currentPage || searchState.isSearching)
-                    .accessibilityLabel(WU23Strings.scopeToCurrentPage)
-                }
-            }
-        }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.xs)
-        .background(Color.orange.opacity(0.08))
-    }
-
-    /// Scope-to-current-page handler for the
-    /// saturation banner. Delegates the flush → cancel → scope chain
-    /// to `SearchState.scopeToCurrentPage()` (testable) then invokes
-    /// `onTriggerSearch` so the saturated query re-runs against the
-    /// page-scoped constraint. The page index that the
-    /// `.currentPage` filter resolves against is read fresh by
-    /// `scopedResults(currentPageIndex:)` at J/K-tap time —
-    /// `documentState.currentPageIndex` is captured at tap time
-    /// transitively through the SwiftUI button action firing
-    /// synchronously when the user taps.
-    private func scopeSaturatedSearchToCurrentPage() {
-        Task { @MainActor in
-            await searchState.scopeToCurrentPage()
-            onTriggerSearch()
-        }
-    }
-
-    // MARK: - Regex Timeout Banner
-
-    /// Surfaces when one or more pages bailed on
-    /// the regex per-page timeout. Copy NEVER echoes pattern text —
-    /// uses only the generic active-pattern phrasing so a
-    /// pasted PII-like regex can't leak via the banner. Pinned by
-    /// `RegexTimeoutBannerTests.bannerCopyNeverEchoesPattern` (the test
-    /// feeds a known-distinctive pattern and greps the banner output).
-    private var regexTimeoutBanner: some View {
-        let pages = searchState.regexTimeoutPages.sorted()
-        let headline = Self.regexTimeoutBannerHeadline(pages: pages)
-        return HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
-            Image(systemName: "clock.badge.exclamationmark")
-                .foregroundStyle(.secondary)
-            Text(headline)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: ResectaTokens.Spacing.xs)
-        }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.xs)
-        .background(Color.orange.opacity(0.08))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(headline)
-    }
-
-    /// Banner headline copy. Pages are 0-indexed internally;
-    /// rendered as 1-based page numbers for the user.
-    static func regexTimeoutBannerHeadline(pages: [Int]) -> String {
-        let oneBased = pages.map { $0 + 1 }
-        let list = formatPageList(oneBased)
-        let pageNoun = oneBased.count == 1 ? "page" : "pages"
-        return "The active regex pattern timed out on \(pageNoun) \(list). Results may be incomplete."
-    }
-
-    // MARK: - OCR-Skip Banner
-
-    /// Surfaces when one or more pages exceeded the OCR pixel caps during
-    /// the active scan, so OCR never ran there. Same shape as the
-    /// regex-timeout banner above; copy names only page numbers, never
-    /// document content. Pinned by `OCRSkipBannerTests`.
-    private var ocrSkipBanner: some View {
-        let pages = searchState.ocrSkippedPages.sorted()
-        let headline = Self.ocrSkipBannerHeadline(pages: pages)
-        return HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(.secondary)
-            Text(headline)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: ResectaTokens.Spacing.xs)
-        }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.xs)
-        .background(Color.orange.opacity(0.08))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(headline)
-    }
-
-    /// Banner headline. Pages are 0-indexed internally; rendered
-    /// as 1-based page numbers for the user. Mechanism description only.
-    static func ocrSkipBannerHeadline(pages: [Int]) -> String {
-        let oneBased = pages.map { $0 + 1 }
-        let list = formatPageList(oneBased)
-        let pageNoun = oneBased.count == 1 ? "Page \(list) was" : "Pages \(list) were"
-        return "\(pageNoun) too large to scan for text — image content there was not searched."
-    }
-
-    /// English-list formatter for page numbers. "3" / "3 and 5"
-    /// / "3, 5, and 7". Caller passes 1-based numbers.
-    static func formatPageList(_ pages: [Int]) -> String {
-        switch pages.count {
-        case 0:  return ""
-        case 1:  return "\(pages[0])"
-        case 2:  return "\(pages[0]) and \(pages[1])"
-        default:
-            let leading = pages.dropLast().map(String.init).joined(separator: ", ")
-            return "\(leading), and \(pages.last!)"
-        }
     }
 
     // MARK: - Scope Row
@@ -593,13 +418,17 @@ struct SearchResultsSection: View {
                         ? " on pages with all terms" : ""
                     ForEach(terms, id: \.self) { term in
                         if let termResults = searchState.resultsByTerm[term] {
-                            Section("\"\(term)\" — \(termResults.count) match\(termResults.count == 1 ? "" : "es")\(conjunctionSuffix)") {
+                            Section {
                                 ForEach(termResults) { result in
                                     // By-term sections are
                                     // the one page-UNSECTIONED list, so the
                                     // rows carry the page label here.
                                     resultRow(for: result, showTermLabel: false, showsPageLabel: true)
                                 }
+                            } header: {
+                                // The header echoes the term the user typed.
+                                Text("\"\(term)\" — \(termResults.count) match\(termResults.count == 1 ? "" : "es")\(conjunctionSuffix)")
+                                    .privacySensitive()
                             }
                         }
                     }
@@ -784,7 +613,7 @@ struct SearchResultsSection: View {
     // discipline. The pre-scan / post-scan-zero / pre-search /
     // no-match / no-recents discriminator drives the headline,
     // description, and (multi-term only) recall-chip surface.
-    // `WU20Strings` static functions are mechanism-description
+    // `SearchEmptyStateCopy` static functions are mechanism-description
     // copy. Outcome promises (e.g., "no PII found",
     // "all clear") are forbidden.
 
@@ -792,23 +621,23 @@ struct SearchResultsSection: View {
         let context = currentEmptyStateContext()
         return ContentUnavailableView {
             Label(
-                WU20Strings.headline(for: context),
-                systemImage: WU20Strings.headlineSymbol(for: context)
+                SearchEmptyStateCopy.headline(for: context),
+                systemImage: SearchEmptyStateCopy.headlineSymbol(for: context)
             )
         } description: {
             VStack(alignment: .center, spacing: ResectaTokens.Spacing.sm) {
                 // Interface-level role line for the Search side,
                 // above the per-mode caption. The Scan side's role
                 // sentence lives inside its description string.
-                if WU20Strings.showsSearchRoleSubtitle(for: context) {
-                    Text(WU20Strings.searchRoleSubtitle)
+                if SearchEmptyStateCopy.showsSearchRoleSubtitle(for: context) {
+                    Text(SearchEmptyStateCopy.searchRoleSubtitle)
                 }
                 // Markdown-bold markers only parse through the
                 // LocalizedStringKey overload of `Text(_:)`; a plain
                 // String variable hits the verbatim overload and renders
                 // the asterisks literally (screenshot evidence) — the
                 // explicit `.init` routes back to the markdown-aware path.
-                Text(.init(WU20Strings.description(for: context)))
+                Text(.init(SearchEmptyStateCopy.description(for: context)))
                 if context == .multiTermPreSearchWithRecents {
                     multiTermRecallChips
                 }
@@ -844,10 +673,10 @@ struct SearchResultsSection: View {
     /// stay on the toolbar's progress row alone.
     private var scanInFlightState: some View {
         ContentUnavailableView {
-            Label(WU20Strings.scanInFlightHeadline, systemImage: "doc.viewfinder")
+            Label(SearchEmptyStateCopy.scanInFlightHeadline, systemImage: "doc.viewfinder")
         } description: {
             VStack(alignment: .center, spacing: ResectaTokens.Spacing.sm) {
-                Text(WU20Strings.piiScanRoleSentence)
+                Text(SearchEmptyStateCopy.piiScanRoleSentence)
                 ProgressView()
             }
         }
@@ -858,7 +687,7 @@ struct SearchResultsSection: View {
     /// with the parked strip's status line). Pure — pinned by
     /// EmptyStateTests so the discriminator stays in sync with the
     /// copy table.
-    private func currentEmptyStateContext() -> WU20Strings.EmptyContext {
+    private func currentEmptyStateContext() -> SearchEmptyStateCopy.EmptyContext {
         searchState.emptyStateContext
     }
 
@@ -868,7 +697,7 @@ struct SearchResultsSection: View {
     /// `onTriggerSearch`.
     private var multiTermRecallChips: some View {
         VStack(alignment: .center, spacing: ResectaTokens.Spacing.xs) {
-            Text(WU20Strings.recentSearchesHeader)
+            Text(SearchEmptyStateCopy.recentSearchesHeader)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             HStack(spacing: ResectaTokens.Spacing.xs) {
@@ -877,14 +706,16 @@ struct SearchResultsSection: View {
                         searchState.searchTerms = recall
                         onTriggerSearch()
                     } label: {
-                        Text(WU20Strings.recallChipLabel(terms: recall))
+                        Text(SearchEmptyStateCopy.recallChipLabel(terms: recall))
                             .font(.caption2)
                             .lineLimit(1)
+                            // The recalled terms are the user's own query text.
+                            .privacySensitive()
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .accessibilityLabel(
-                        WU20Strings.recallChipAccessibilityLabel(terms: recall)
+                        SearchEmptyStateCopy.recallChipAccessibilityLabel(terms: recall)
                     )
                 }
             }
@@ -896,11 +727,11 @@ struct SearchResultsSection: View {
     private var filteredOutState: some View {
         ContentUnavailableView {
             Label(
-                WU20Strings.filteredOutHeadline,
+                SearchEmptyStateCopy.filteredOutHeadline,
                 systemImage: "line.3.horizontal.decrease.circle"
             )
         } description: {
-            Text(WU20Strings.filteredOutDescription)
+            Text(SearchEmptyStateCopy.filteredOutDescription)
         }
     }
 
@@ -937,331 +768,4 @@ struct SearchResultsSection: View {
             )
         }
     }
-}
-
-// MARK: - Saturation Banner Strings
-//
-// Mechanism-description action labels — describe the affordance the
-// user invokes, not an outcome promise.
-// Kept off `Legal.xcstrings` because they are
-// operational copy, not legal/marketing copy. Pinned by
-// `SaturationBannerTests`.
-
-enum WU23Strings {
-    static let headline = "\u{2265} 10,000 matches \u{2014} refine query"
-    static let addWholeWord = "Add whole-word filter"
-    static let toggleCaseSensitive = "Toggle case-sensitive"
-    static let scopeToCurrentPage = "Scope to current page"
-}
-
-// MARK: - Empty State Strings
-//
-// Mode-specific actionable copy. Mechanism-description
-// discipline. Outcome promises (e.g., "no PII found", "all clear",
-// "your document is clean", "nothing to redact") are forbidden.
-// Every branch describes the engine's
-// mechanism, not a verdict on the document. Pinned by
-// `EmptyStateTests`.
-
-enum WU20Strings {
-
-    /// Discriminator for the per-mode empty-state branches. Drives
-    /// headline / description / chip-row visibility from a single
-    /// pure function so tests can pin the per-context copy without
-    /// instantiating the SwiftUI view.
-    enum EmptyContext: Equatable {
-        case textPreSearch
-        case textNotRun
-        case textNoMatch
-        case regexPreSearch
-        case regexNotRun
-        case regexNoMatch
-        case multiTermPreSearchNoRecents
-        case multiTermPreSearchWithRecents
-        case multiTermNotRun
-        case multiTermNoMatch
-        case multiTermNoMatchConjunction
-        case piiScanPreScan
-        case piiScanStartFailed
-        case piiScanPostScanZero(detectorCount: Int)
-        case piiScanCancelled(pagesScanned: Int, pageCount: Int)
-    }
-
-    /// Pure-function context discriminator. Tested directly by
-    /// `EmptyStateTests`; the view-side helper just forwards.
-    static func context(
-        mode: SearchModeType,
-        queryText: String,
-        multiTermTerms: [String],
-        recentMultiTermSets: [[String]],
-        multiTermConjunction: Bool,
-        currentSearchPage: Int,
-        totalPages: Int,
-        totalCount: Int,
-        enabledPIICategoryCount: Int,
-        hasCompletedRun: Bool,
-        scanStartFailed: Bool
-    ) -> EmptyContext {
-        switch mode {
-        case .text:
-            if queryText.isEmpty { return .textPreSearch }
-            // A carried query the mode switch deliberately did not
-            // re-run must not read as a no-match verdict.
-            return hasCompletedRun ? .textNoMatch : .textNotRun
-        case .regex:
-            if queryText.isEmpty { return .regexPreSearch }
-            return hasCompletedRun ? .regexNoMatch : .regexNotRun
-        case .multiTerm:
-            if multiTermTerms.isEmpty {
-                return recentMultiTermSets.isEmpty
-                    ? .multiTermPreSearchNoRecents
-                    : .multiTermPreSearchWithRecents
-            }
-            if !hasCompletedRun { return .multiTermNotRun }
-            // Under conjunction, per-term occurrences may exist even
-            // when no page satisfies every term — the copy must not
-            // claim "no occurrences … for any of the terms".
-            return multiTermConjunction
-                ? .multiTermNoMatchConjunction
-                : .multiTermNoMatch
-        case .piiScan:
-            // A failed start outranks the pre-scan default: the toast
-            // that announced it expires, and "Not scanned yet" would
-            // erase the failure from the surface.
-            if scanStartFailed && totalCount == 0 {
-                return .piiScanStartFailed
-            }
-            // Post-scan zero-result requires `currentSearchPage > 0`
-            // (the scan ran), `totalCount == 0` (no matches), AND
-            // `hasCompletedRun` (the run finished). A cancelled run
-            // leaves `currentSearchPage` at the cancelled position with
-            // `hasCompletedRun` false — that state must never render
-            // the "Scan complete" clean bill on a partially-scanned
-            // document: it gets its own cancelled render.
-            if currentSearchPage > 0 && totalCount == 0 {
-                return hasCompletedRun
-                    ? .piiScanPostScanZero(detectorCount: enabledPIICategoryCount)
-                    : .piiScanCancelled(
-                        pagesScanned: currentSearchPage, pageCount: totalPages)
-            }
-            return .piiScanPreScan
-        }
-    }
-
-    /// Headline per branch.
-    static func headline(for context: EmptyContext) -> String {
-        switch context {
-        case .textPreSearch:
-            return "Text search"
-        case .textNotRun, .regexNotRun, .multiTermNotRun:
-            return "Not run yet"
-        case .textNoMatch:
-            return "No matches"
-        case .regexPreSearch:
-            return "Regex search"
-        case .regexNoMatch:
-            return "No matches"
-        case .multiTermPreSearchNoRecents:
-            return "Multi-term search"
-        case .multiTermPreSearchWithRecents:
-            return "Multi-term search"
-        case .multiTermNoMatch, .multiTermNoMatchConjunction:
-            return "No matches"
-        case .piiScanStartFailed:
-            return "Scan didn't start"
-        case .piiScanPreScan:
-            // Pre-scan headline must not read as a verdict.
-            // "Not scanned yet" states the actual condition; the
-            // description below carries the role sentence.
-            return "Not scanned yet"
-        case .piiScanPostScanZero:
-            // Names what the run produced, not an
-            // affirmation: matches the canvas banner's own voice
-            // ("…flagged no items"). A checkmark-style "Scan complete"
-            // read as a clean bill; this names the produced count
-            // instead (zero, stated plainly).
-            return "No items flagged"
-        case .piiScanCancelled:
-            return "Scan cancelled"
-        }
-    }
-
-    static func headlineSymbol(for context: EmptyContext) -> String {
-        switch context {
-        case .textPreSearch, .multiTermPreSearchNoRecents,
-             .multiTermPreSearchWithRecents, .regexPreSearch,
-             .textNotRun, .regexNotRun, .multiTermNotRun:
-            return "magnifyingglass"
-        // The post-scan-zero branch shares the neutral
-        // no-match glyph with its Search-side siblings: a checkmark
-        // read as an affirmative clean bill, which this state must
-        // never imply.
-        case .textNoMatch, .regexNoMatch, .multiTermNoMatch,
-             .multiTermNoMatchConjunction, .piiScanPostScanZero:
-            return "doc.text.magnifyingglass"
-        // The Scan side dropped the shield family: `doc.viewfinder`
-        // matches the toolbar Scan entry's own glyph, and the outcome
-        // states use the plain severity symbols. (The verification
-        // surfaces keep their shields — different vocabulary.)
-        case .piiScanPreScan:
-            return "doc.viewfinder"
-        case .piiScanStartFailed:
-            return "exclamationmark.triangle"
-        case .piiScanCancelled:
-            return "stop.circle"
-        }
-    }
-
-    /// Description per branch. Mechanism-description copy — describes
-    /// the engine path or the affordance, not a verdict.
-    static func description(for context: EmptyContext) -> String {
-        switch context {
-        case .textPreSearch:
-            return "Type a word, phrase, or pattern to match against the document text."
-        case .textNotRun:
-            return "This query hasn't been run in this mode yet. Press Return to run it, or edit it to search as you type."
-        case .textNoMatch:
-            return "No occurrences in the document for the active query. Try a broader term or change the search options."
-        case .regexPreSearch:
-            return "Enter a regular expression to match against the document text. Example: \\d{3}-\\d{2}-\\d{4} for SSN-style sequences."
-        case .regexNotRun:
-            return "This pattern hasn't been run in this mode yet. Press Return to run it, or edit it to search as you type."
-        case .regexNoMatch:
-            return "The active pattern produced no matches. Adjust the pattern or the search options."
-        case .multiTermPreSearchNoRecents:
-            return "Type a term above and press Return to add it. Each term searches the document independently."
-        case .multiTermPreSearchWithRecents:
-            return "Type a term above and press Return to add it, or recall a recent term set below."
-        case .multiTermNotRun:
-            return "These terms haven't been run in this mode yet. Press Return in the term field to run them."
-        case .multiTermNoMatch:
-            return "No occurrences in the document for any of the active terms."
-        case .multiTermNoMatchConjunction:
-            return "No page contains all of the active terms together. Individual terms may still occur on their own — turn off \"All terms must match\" to see per-term occurrences."
-        case .piiScanStartFailed:
-            // Names no control: the retry is the state's own inline
-            // "Scan Again" action, rendered beside this copy.
-            return "The last scan couldn't start because the document wasn't ready."
-        case .piiScanPreScan:
-            // The vestigial pre-scan state (entry auto-run makes it
-            // unreachable in practice; the case stays for
-            // discriminator completeness) keeps the role sentence as
-            // residue — if a failure edge ever surfaces it, the copy
-            // stays true and names no retired control.
-            return piiScanRoleSentence
-        case .piiScanPostScanZero(let detectorCount):
-            // The threshold-count sentence stays first,
-            // verbatim, then the calibration line and the recourse
-            // pointer (both pinned builders below) so a zero result
-            // never reads as an unqualified clean bill.
-            let suffix = detectorCount == 1 ? "" : "s"
-            let base = "\(detectorCount) detector\(suffix) matched 0 candidates above threshold."
-            return "\(base)\n\n\(piiScanZeroCalibrationLine)\n\n\(piiScanZeroRecourseLine)"
-        case .piiScanCancelled(let pagesScanned, let pageCount):
-            // Mechanism description, no verdict: a partial run must
-            // never read as a clean bill. Names the unscanned remainder
-            // explicitly; the chips-row ↻ is the re-run affordance.
-            let suffix = pageCount == 1 ? "" : "s"
-            return "Detection stopped after \(pagesScanned) of \(pageCount) page\(suffix) — the remaining pages weren't scanned."
-        }
-    }
-
-    // MARK: Post-scan-zero recourse
-    //
-    // Fence-safe: copy + pointers to controls that already ship.
-    // No near-threshold candidate display, no new detection surface,
-    // no new setting. Composed into `description(for:
-    // .piiScanPostScanZero)` above; pinned separately by
-    // `EmptyStateTests` so the wording stays testable without
-    // decoding the composed string.
-
-    /// Calibration line: a zero result is a threshold
-    /// outcome, not a verdict on document content. Mechanism
-    /// description only — no outcome promise about what the document
-    /// does or doesn't contain.
-    static let piiScanZeroCalibrationLine =
-        "A zero result means nothing on the scanned pages cleared the current threshold for those detectors \u{2014} it is not a statement about what the document contains."
-
-    /// Pointer line naming the three existing recourse
-    /// controls by their shipped labels/glyphs: the chips-row re-run
-    /// affordance (\u{21bb}, accessibility label "Scan document for
-    /// PII", `SearchToolbarSection.rescanButton`), the Search
-    /// interface's literal-match modes (`SearchInterface.search`
-    /// displayName "Search"), and the Settings "Detection Sensitivity"
-    /// preset picker (`SettingsView`). Names no control beyond what
-    /// already ships.
-    static let piiScanZeroRecourseLine =
-        "To look further: re-run with different detectors (\u{21bb}), search for specific terms in Search, or change the Detection Sensitivity preset in Settings."
-
-    // MARK: Search-interface role line
-
-    /// One-line role sentence for the Search interface, rendered above
-    /// the per-mode caption on the pre-search empty states (the Scan
-    /// interface's counterpart is folded into the `piiScanPreScan`
-    /// description above). States the literal-match contract: matches
-    /// follow the query and its options; nothing is inferred beyond
-    /// them. Pinned by `EmptyStateTests`.
-    static let searchRoleSubtitle =
-        "Matches exactly what you ask for \u{2014} nothing more, nothing inferred."
-
-    /// True for the Search-side pre-search contexts that mount the
-    /// role line. Pure predicate consumed by the empty state and
-    /// pinned by `EmptyStateTests`. No-match branches stay
-    /// role-line-free (they carry result feedback), and the Scan-side
-    /// branches have their own role copy.
-    static func showsSearchRoleSubtitle(for context: EmptyContext) -> Bool {
-        switch context {
-        case .textPreSearch, .regexPreSearch,
-             .multiTermPreSearchNoRecents, .multiTermPreSearchWithRecents:
-            return true
-        case .textNoMatch, .regexNoMatch, .multiTermNoMatch,
-             .multiTermNoMatchConjunction,
-             .textNotRun, .regexNotRun, .multiTermNotRun,
-             .piiScanPreScan, .piiScanStartFailed, .piiScanPostScanZero,
-             .piiScanCancelled:
-            return false
-        }
-    }
-
-    // MARK: Scan role sentence + in-flight state
-
-    /// The Scan interface's role sentence. Primary home: the
-    /// in-flight state's description, read exactly while the user
-    /// waits on an auto-run; the vestigial `piiScanPreScan`
-    /// description returns the same constant as residue. States the
-    /// mechanism on its own terms: text detectors, on-device,
-    /// whole-document default, text content only — plus the
-    /// rationale-visibility half of the role. Wording constraints
-    /// pinned by `PIIScanRoleCopyTests`.
-    /// (The former "Detectors active: N." secondary line retired with
-    /// the run button: the selected chips already show the active set,
-    /// and the zero-result copy carries the count.)
-    static let piiScanRoleSentence =
-        "Runs the on-device PII text detectors across the whole document \u{2014} text content only. Results show why each item was flagged."
-
-    /// Headline for the Scan-run in-flight surface.
-    static let scanInFlightHeadline = "Scanning…"
-
-    // MARK: Multi-term recall chips
-
-    static let recentSearchesHeader = "Recent searches"
-
-    /// Chip label joins terms with `\u{00A0}+\u{00A0}` (non-breaking
-    /// spaces around the plus sign) so the chip width doesn't break
-    /// awkwardly mid-set at smaller widths.
-    static func recallChipLabel(terms: [String]) -> String {
-        terms.joined(separator: "\u{00A0}+\u{00A0}")
-    }
-
-    /// Spelled-out accessibility label for the recall chip; uses
-    /// "and" between terms for VoiceOver pacing.
-    static func recallChipAccessibilityLabel(terms: [String]) -> String {
-        let joined = terms.joined(separator: " and ")
-        return "Recall recent search: \(joined)"
-    }
-
-    // MARK: Filtered-out state
-
-    static let filteredOutHeadline = "No results match current filters"
-    static let filteredOutDescription = "Your active filters hide all candidates. Adjust source, confidence, or category filters to see results."
 }

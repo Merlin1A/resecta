@@ -7,8 +7,8 @@ import RedactionEngine
 
 // nonisolated: a pure Sendable value type (kind/confidence/labels — no region
 // geometry) constructed off MainActor inside `prepareApply` and carried back in
-// the Sendable `PreparedApply`. Its explicit `init` (and the static label helpers
-// it calls) would otherwise become MainActor-isolated under the SE-0466
+// the Sendable `PreparedApply`. Its explicit `init` (and the label reads it
+// makes) would otherwise become MainActor-isolated under the SE-0466
 // MainActor-default flip, breaking the detached apply-prepare path; pin the type
 // nonisolated to restore its pre-flip status (mirrors UserTermsBlob et al.).
 nonisolated struct RegionMetadata: Sendable {
@@ -30,10 +30,10 @@ nonisolated struct RegionMetadata: Sendable {
     /// Cached at init — all inputs are `let`, so the value never changes.
     let badgeLabel: String
 
-    /// Full description for accessibility and hover tooltip.
-    /// Labels MUST match `DetectionResult.Kind.fullName`
-    /// (Extensions/DetectionKind+Display.swift) exactly — VoiceOver
-    /// users encounter both surfaces for the same detection.
+    /// Full description for accessibility and hover tooltip. Read from
+    /// `DetectionResult.Kind.fullName` (Extensions/DetectionKind+Display.swift),
+    /// the one label table, so VoiceOver users hear the same words on
+    /// both surfaces for the same detection.
     let accessibilityDescription: String
 
     init(piiKind: DetectionResult.Kind, confidence: Double,
@@ -45,76 +45,13 @@ nonisolated struct RegionMetadata: Sendable {
         self.recognitionLevel = recognitionLevel
         self.isAmbiguousSurname = isAmbiguousSurname
 
-        self.badgeLabel = Self.computeKindLabel(piiKind)
+        self.badgeLabel = piiKind.badge
 
         // A qualitative descriptor replaces the raw
         // percent. `SearchResultRow.absoluteConfidenceTier` is the one
         // threshold source (same-target reference; acceptable — the
         // thresholds themselves must not be duplicated here).
         let descriptor = SearchResultRow.absoluteConfidenceTier(confidence).descriptor
-        self.accessibilityDescription = "\(Self.computeFullDescription(piiKind)), \(descriptor)"
-    }
-
-    private static func computeKindLabel(_ kind: DetectionResult.Kind) -> String {
-        switch kind {
-        case .pii(let k):
-            switch k {
-            case .ssn:            "SSN"
-            case .creditCard:     "Card"
-            case .name:           "Name"
-            case .address:        "Addr"
-            case .email:          "Email"
-            case .phone:          "Phone"
-            case .ein:            "EIN"
-            case .itin:           "ITIN"
-            case .driversLicense: "DL"
-            case .passport:       "PP"
-            case .medicalRecord:  "MRN"
-            case .dateOfBirth:    "DOB"
-            case .npi:            "NPI"
-            case .dea:            "DEA"
-            case .account:        "Acct"
-            case .routingNumber:  "RTN"
-            case .licensePlate:   "LP"
-            case .barcode:        "Code"
-            // Heuristic signature suggestion (triage-only).
-            case .signatureCandidate: "Sig"
-            case .other:          "PII"
-            }
-        case .face: "Face"
-        case .searchMatch: "Find"
-        }
-    }
-
-    private static func computeFullDescription(_ kind: DetectionResult.Kind) -> String {
-        switch kind {
-        case .pii(let k):
-            switch k {
-            case .ssn:            "Social Security Number"
-            case .creditCard:     "Credit Card Number"
-            case .name:           "Personal Name"
-            case .address:        "Physical Address"
-            case .email:          "Email Address"
-            case .phone:          "Phone Number"
-            case .ein:            "Employer ID Number"
-            case .itin:           "Individual Taxpayer ID"
-            case .driversLicense: "Driver's License"
-            case .passport:       "Passport Number"
-            case .medicalRecord:  "Medical Record Number"
-            case .dateOfBirth:    "Date of Birth"
-            case .npi:            "National Provider ID"
-            case .dea:            "DEA Registration"
-            case .account:        "Account Number"
-            case .routingNumber:  "ABA Routing Number"
-            case .licensePlate:   "License Plate"
-            case .barcode:        "Barcode / QR"
-            // Mechanism-description copy: describes what the
-            // heuristic suggests, no outcome promise.
-            case .signatureCandidate: "Possible Signature"
-            case .other:          "Personal Information"
-            }
-        case .face: "Detected Face"
-        case .searchMatch: "Search Match"
-        }
+        self.accessibilityDescription = "\(piiKind.fullName), \(descriptor)"
     }
 }
