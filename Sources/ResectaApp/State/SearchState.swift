@@ -24,26 +24,6 @@ final class SearchState: Identifiable {
 
     // MARK: - Feature flags
 
-    /// V1.0 ships without the audit-export / scan-coverage surfaces;
-    /// the Export Audit button, the Scan Coverage report (incl. Share
-    /// Snapshot), and the verification-results "Review" hook are gated
-    /// off behind this flag.
-    /// All machinery (MatchAuditExporter, MatchExportService, coverage-report
-    /// computation) stays compiled and unit-tested; restore = flip to `true`
-    /// + update the pin test, or in DEBUG launch with `--enableAuditSurfaces`
-    /// (one arg shared with `searchDiagnosticSurfacesEnabled` — the
-    /// measurement harness's walkthrough evidence hook; compiled out of
-    /// Release, proven by `Scripts/release-flag-check.sh`). These surfaces
-    /// are revisited for 1.1. Mirrors `CustomTermsView.templatePickerEnabled`.
-    // nonisolated: Sendable constant read from nonisolated test contexts.
-    nonisolated static let searchAuditSurfacesEnabled: Bool = {
-        #if DEBUG
-        CommandLine.arguments.contains("--enableAuditSurfaces")
-        #else
-        false
-        #endif
-    }()
-
     /// V1.0 ships without the doctype diagnostic surfaces; the
     /// doctype banner and the footer Document-profile disclosure (two
     /// mounts of `DoctypeDiagnosticView`) are gated off behind this

@@ -18,9 +18,6 @@ struct VerificationDetailsSection: View {
     /// Deselection facts captured at run entry (see
     /// `VerificationResultsView.deselectionSnapshot`).
     let deselectionSnapshot: RedactionState.DeselectionSnapshot?
-    /// Tap handler for the deselection row's Review affordance; nil hides
-    /// the affordance (see `VerificationResultsView.onReviewDeselections`).
-    let onReviewDeselections: (() -> Void)?
     /// The disclosure's open state — owned by the parent, which auto-expands
     /// it on appear per `VerificationResultsView.shouldAutoExpand`.
     @Binding var isExpanded: Bool
@@ -253,16 +250,6 @@ struct VerificationDetailsSection: View {
                 .font(.caption)
                 .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-            if let onReviewDeselections {
-                Button("Review", action: onReviewDeselections)
-                    .font(.caption.weight(.medium))
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .frame(minHeight: ResectaTokens.TouchTarget.minimum)
-                    .accessibilityLabel(
-                        "Review deselected items. Returns to the editor and opens the scan coverage panel.")
-            }
         }
         .padding(.vertical, ResectaTokens.Spacing.sm)
         .accessibilityElement(children: .contain)

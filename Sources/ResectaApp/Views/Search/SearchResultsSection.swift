@@ -13,23 +13,9 @@ struct SearchResultsSection: View {
     @Bindable var searchState: SearchState
     @Environment(DocumentState.self) private var documentState
     @Environment(RedactionState.self) private var redactionState
-    // ToastQueueManager injected so the coverage
-    // snapshot share path can surface a `.error` toast when the temp
-    // file write fails (previously a silent return — indistinguishable
-    // from a UI bug).
-    @Environment(ToastQueueManager.self) private var toastManager
     // `appliedResultIDs` lives on `searchState`.
     // Reads go through `searchState.appliedResultIDs`.
     @Binding var selectedDetent: PresentationDetent
-    /// The coordinator's hardened session directory, passed down from the
-    /// sheet as a value (it is a `let` on the coordinator; the sheet holds
-    /// the environment read): the coverage snapshot pair is written there,
-    /// as the audit export's is.
-    let tempExportDirectory: TempExportDirectory
-    /// Passed down from the sheet as a value (the let-injection pattern
-    /// the sheet documents), never read from the environment here: the
-    /// share is withheld while the screen is captured or mirrored.
-    let captureMonitor: ScreenCaptureMonitor
     let onRequestWhy: (SearchResult) -> Void
     let onApplyShortcut: () -> Void
     /// Gates the invisible Return-key Button. Held-Return key-repeat
@@ -155,28 +141,6 @@ struct SearchResultsSection: View {
     /// the inset region.
     private var sectionTopChrome: some View {
         VStack(spacing: 0) {
-            // Fold the live applied / deselected view-state
-            // counts into the stored scan report so the panel AND the shared
-            // audit snapshot (`shareCoverageSnapshot` below, which reads the
-            // same `report`) reflect what the user has applied/deselected,
-            // not the scan-time zeros `makeCoverageReport` stored.
-            // The whole Scan Coverage surface (incl. the auto-open
-            // and Share Snapshot) is hidden for 1.0 behind
-            // `searchAuditSurfacesEnabled`; the report computation itself
-            // keeps running in SearchState.
-            if SearchState.searchAuditSurfacesEnabled,
-               let report = searchState.coverageReportForDisplay(),
-               searchState.searchModeType == .piiScan {
-                CoverageReportView(
-                    report: report,
-                    results: searchState.results,
-                    diff: searchState.diffSinceLastScan(),
-                    onShareSnapshot: { shareCoverageSnapshot(report: report) }
-                )
-                .padding(.horizontal, ResectaTokens.Spacing.md)
-                .padding(.top, ResectaTokens.Spacing.xs)
-            }
-
             // Doctype banner — always-visible primary doctype +
             // detector count above the results list for simplicity.
             // Hidden for 1.0 behind `searchDiagnosticSurfacesEnabled`.
@@ -732,40 +696,6 @@ struct SearchResultsSection: View {
             )
         } description: {
             Text(SearchEmptyStateCopy.filteredOutDescription)
-        }
-    }
-
-    // MARK: - Coverage Snapshot Share
-
-    /// Build counts-only export metadata + invoke the system
-    /// share sheet via `MatchExportService.shareCoverageSnapshot`. The
-    /// payload is structurally counts-only (no per-match data);
-    /// the existing share surface stays unchanged. The pair lands in the
-    /// hardened session directory and the share is withheld while
-    /// shielded, the way the audit export threads both.
-    private func shareCoverageSnapshot(report: CoverageReport) {
-        guard let presenter = MatchExportService.topViewController() else { return }
-        let metadata = ExportMetadata(
-            appVersion: Bundle.main.appVersion,
-            presetName: "Default",
-            perCategoryOverrides: [:],
-            documentName: "document",
-            totalMatches: report.candidateCountByCategory.values.reduce(0, +),
-            appliedMatches: report.appliedCount
-        )
-        // shareCoverageSnapshot is now async (it awaits the
-        // off-MainActor write). Spawn from this MainActor view method; the
-        // Task inherits MainActor isolation so `presenter` (non-Sendable)
-        // never crosses an actor boundary.
-        Task { @MainActor in
-            await MatchExportService.shareCoverageSnapshot(
-                report: report,
-                metadata: metadata,
-                tempDirectory: tempExportDirectory,
-                captureMonitor: captureMonitor,
-                toastManager: toastManager,
-                from: presenter
-            )
         }
     }
 }

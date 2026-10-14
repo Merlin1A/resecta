@@ -116,8 +116,6 @@ struct SearchAndRedactSheet: View {
     // through `searchState.appliedResultIDs`; cleared symmetrically by
     // `SearchState.clear()` and `clearResults()`.
     @State var searcher = DocumentSearcher()
-    /// Controls the match-audit share confirmation dialog.
-    @State private var showAuditExport = false
 
     /// Single sheet-presentation slot. The cases of
     /// `SearchModal` cover what was previously four overlapping modifiers
@@ -231,7 +229,6 @@ struct SearchAndRedactSheet: View {
                     if !reviewFindings.isEmpty {
                         SearchFooterSection(
                             searchState: searchState,
-                            showAuditExport: $showAuditExport,
                             review: SearchFooterSection.ReviewFooterModel(
                                 selectedCount: reviewAcceptedCount,
                                 visibleCount: reviewVisibleIDs.count,
@@ -246,8 +243,6 @@ struct SearchAndRedactSheet: View {
                     SearchResultsSection(
                         searchState: searchState,
                         selectedDetent: $selectedDetent,
-                        tempExportDirectory: pipelineCoordinator.tempExportDirectory,
-                        captureMonitor: captureMonitor,
                         onRequestWhy: presentReverseRationale,
                         onApplyShortcut: applyFromKeyboardShortcut,
                         applyShortcutEnabled: applyShortcutEnabled,
@@ -287,7 +282,6 @@ struct SearchAndRedactSheet: View {
                     if searchState.filteredCount > 0 {
                         SearchFooterSection(
                             searchState: searchState,
-                            showAuditExport: $showAuditExport
                         )
                     }
                 }
@@ -343,33 +337,6 @@ struct SearchAndRedactSheet: View {
         // Apply) enqueue a success toast via `toastManager` so the
         // search sheet stays interactive after every apply — no
         // blocking alert, no confirmation dialog.
-        // Match audit export. One share option — abbreviated content —
-        // plus Cancel; Cancel dismisses without writing anything.
-        // The dialog routes through
-        // `exportAudit(includeSensitive:schema:)` with `.v4` and
-        // abbreviated content only: a raw-content share is not a dialog
-        // row — that revival is a deliberate re-add, not a flag flip.
-        // The dialog-shape choice (vs. a custom sheet) keeps the
-        // `.confirmationDialog` fitting inside the iOS sheet at
-        // AX5 since each label is single-line. V1.1+ scope
-        // re-introduces a v3 surface only if the per-region exemption
-        // tagging deferral lands (a late-cutover deferral).
-        // With the audit surfaces hidden for 1.0 the Export Audit
-        // button (the only setter of `showAuditExport`) is gone; the
-        // constant-false binding keeps this dialog unpresentable too.
-        .confirmationDialog(
-            "Share match audit log?",
-            isPresented: SearchState.searchAuditSurfacesEnabled
-                ? $showAuditExport : .constant(false),
-            titleVisibility: .visible
-        ) {
-            Button("Share v4 (redacted content)") {
-                Task { await exportAudit(includeSensitive: false, schema: .v4) }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Creates a CSV and JSON record of each detected match and the rule that triggered it. Designed for legal review of detection reasoning. Matched text is abbreviated.")
-        }
         // One `.sheet(item:)` replaces the prior pair of
         // `.sheet`s and the per-row rationale sheet on
         // `SearchResultRow` — a single presentation slot on the
@@ -1275,9 +1242,6 @@ struct SearchAndRedactSheet: View {
             EmptyView()
         }
     }
-
-    // `exportAudit(includeSensitive:)` lives in
-    // `Search/SearchAndRedactSheet+AuditExport.swift`.
 
     func buildSearchMode() -> SearchMode {
         let options = searchState.options

@@ -320,24 +320,6 @@ struct SearchStateTests {
         )
     }
 
-    // MARK: - Audit surfaces hidden for V1.0
-
-    @Test("Audit-export / scan-coverage surfaces are gated off for 1.0")
-    func testAuditSurfacesHiddenForV1() {
-        // Export Audit, the Scan Coverage report (incl. Share Snapshot), and
-        // the verification-results "Review" hook are behind this flag.
-        // An accidental flip re-exposes all three surfaces — this pin makes
-        // that a loud CI red. Restoring these surfaces means flipping the
-        // flag and updating this test.
-        // The flag is now the DEBUG launch-arg shape
-        // (`--enableAuditSurfaces`); the xctest runner never carries the
-        // arg, so this pin still asserts `false`. The Release side is
-        // proven at the binary level by `Scripts/release-flag-check.sh`;
-        // the arg-on mounting is covered by
-        // `AuditSurfacesDebugLaunchArgUITests`.
-        #expect(SearchState.searchAuditSurfacesEnabled == false)
-    }
-
     // MARK: - Doctype diagnostic surfaces hidden for V1.0
 
     @Test("Doctype diagnostic surfaces are gated off for 1.0")

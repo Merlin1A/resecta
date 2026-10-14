@@ -17,7 +17,6 @@ import SwiftUI
 struct SearchFooterSection: View {
     @Bindable var searchState: SearchState
     @Environment(RedactionState.self) private var redactionState
-    @Binding var showAuditExport: Bool
 
     /// Review-origin inputs. nil → the footer reads `searchState`
     /// (search origin). Non-nil → counts and Select All target the
@@ -75,22 +74,6 @@ struct SearchFooterSection: View {
                     .foregroundStyle(.secondary)
 
                 Spacer()
-
-                // Export audit log (CSV + JSON). Enabled when there
-                // are live results OR any previously-applied audit entries.
-                // Hidden for 1.0 behind `searchAuditSurfacesEnabled`.
-                if SearchState.searchAuditSurfacesEnabled, review == nil {
-                    Button {
-                        showAuditExport = true
-                    } label: {
-                        Label("Export Audit", systemImage: "square.and.arrow.up")
-                            .font(.caption)
-                    }
-                    .controlSize(.small)
-                    .disabled(searchState.results.isEmpty
-                              && redactionState.appliedMatchAudit.isEmpty)
-                    .accessibilityHint("Share a CSV and JSON record of detected matches and their detection rules.")
-                }
 
                 // Grouping toggle. The piiScan "By Category"
                 // sibling was deleted (redundant with the category

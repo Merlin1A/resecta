@@ -370,7 +370,6 @@ struct DocumentEditorView: View {
                     onExport: { handleExportTap(report: report) },
                     onRunVerification: { handleRunVerificationTap() },
                     deselectionSnapshot: redactionState.lastRunInputs?.deselection,
-                    onReviewDeselections: reviewDeselectionsHandler,
                     runFacts: VerificationResultsView.RunFacts.derive(
                         inputs: redactionState.lastRunInputs)
                 )
@@ -1716,61 +1715,6 @@ struct DocumentEditorView: View {
     ) {
         redactionState.dismissActiveSearch()
         documentState.transition(to: .editing)
-    }
-
-    // MARK: - Deselection review routing
-
-    /// The deselection row's Review affordance is offered only while the
-    /// search session the counts came from is still alive — the
-    /// `.sheet(item:)` slot re-presents a live `activeSearch` the moment
-    /// the phase returns to `.editing`, so routing works by construction.
-    /// A torn-down session (the sheet's close buttons nil `activeSearch`)
-    /// has no coverage panel left to reopen; re-creating a fresh
-    /// `SearchState` would mount an empty panel that contradicts the
-    /// recorded counts. Static so the gate is unit-testable without a
-    /// SwiftUI host.
-    static func deselectionReviewAvailable(hasLiveSearchSession: Bool) -> Bool {
-        hasLiveSearchSession
-    }
-
-    /// Detent the Review route raises the search sheet to. `.compactFloat`
-    /// shows only the title-only handle — the coverage panel
-    /// mounts topmost in `SearchResultsSection`, which `.medium` reveals.
-    static let deselectionReviewDetent: PresentationDetent = .medium
-
-    /// State preamble for the deselection-review route: the row lives on
-    /// the verification-results screen (`.verified`), the coverage panel
-    /// inside the search sheet, which only presents over the editor. The
-    /// `verified -> editing` transition is the same legal round-trip the
-    /// KI-4 purge re-run uses (`prepareForPurgeRerun`) — Keep Editing's
-    /// behavior, minus that path's search teardown, since the live session
-    /// IS the destination here. Static so the transition is testable
-    /// without a SwiftUI host.
-    @MainActor
-    static func prepareForDeselectionReview(documentState: DocumentState) {
-        documentState.transition(to: .editing)
-    }
-
-    /// Review handler threaded into `VerificationResultsView`. Nil when
-    /// the search session is gone, which hides the affordance entirely.
-    private var reviewDeselectionsHandler: (() -> Void)? {
-        // The button's a11y label promises the scan coverage panel,
-        // which is hidden for 1.0 — pass nil so only the Review affordance
-        // disappears; the deselection row text itself stays.
-        guard SearchState.searchAuditSurfacesEnabled else { return nil }
-        guard Self.deselectionReviewAvailable(
-            hasLiveSearchSession: redactionState.activeSearch != nil
-        ) else { return nil }
-        return { handleReviewDeselectionsTap() }
-    }
-
-    /// Raise the sheet detent BEFORE the phase transition: the search
-    /// sheet re-presents as a side effect of `.editing` re-mounting the
-    /// editor under the `.sheet(item:)` slot, and the presentation reads
-    /// the detent selection binding as it comes up.
-    private func handleReviewDeselectionsTap() {
-        searchSheetDetent = Self.deselectionReviewDetent
-        Self.prepareForDeselectionReview(documentState: documentState)
     }
 
     /// Clear the per-window `UndoManager` stack when the editor
