@@ -27,12 +27,18 @@ struct FailClosedReadDefaultsTests {
         ], rootId: 1)
     }
 
-    /// A page tree whose one kid is an integer, not a page dictionary.
+    /// A two-page tree whose second kid points at an object the file never
+    /// defines: CoreGraphics opens the document and counts two pages, and
+    /// the second reads no dictionary.
     private static func pageWithoutDictionary() -> Data {
         buildRawPDF(objects: [
             PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
-            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-            PDFObject(id: 3, content: "42"),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 >>"),
+            PDFObject(id: 3, content: """
+                << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] \
+                /Contents 4 0 R /Resources << >> >>
+                """),
+            PDFObject(id: 4, content: "<< /Length 0 >>\nstream\n\nendstream"),
         ], rootId: 1)
     }
 
@@ -82,24 +88,26 @@ struct FailClosedReadDefaultsTests {
 
     // MARK: - The walks on a reader that cannot read
 
-    @Test("A document with no catalog answers could-not-scan and hidden, not clean")
-    func noCatalogAnswersCouldNotScan() throws {
-        let document = cgDocument(Self.catalogless())
-        // The shape CoreGraphics gives these bytes is part of the record: a
-        // document with no catalog, or no document at all (the app's reader
-        // stage refuses that shape on its own).
-        #expect(document != nil, "CoreGraphics opened the catalog-less bytes")
-        #expect(document?.catalog == nil, "the catalog-less bytes read no catalog")
-        if let document {
-            #expect(ActiveContentScan.firstLocation(in: document) == .couldNotScan)
-            #expect(TextLayerExtractor.documentHasHiddenOCG(document) == true)
-        }
+    @Test("Bytes with no usable catalog give no reader at all; the import's reader stage refuses them")
+    func noCatalogGivesNoReader() {
+        // Every shape tried for a document without a catalog — a /Root the
+        // file never defines, or one that is not a dictionary — is refused by
+        // CoreGraphics before it yields a document, so the walks never see a
+        // nil catalog from bytes; their nil-catalog arms stay as defaults and
+        // the app's reader stage (a nil reader is refused) is the pin for
+        // this shape. PDFKit refuses the same bytes. Recorded here so the
+        // platform fact is on file beside the arms it leaves unreachable.
+        let data = Self.catalogless()
+        #expect(cgDocument(data) == nil, "CoreGraphics opened the catalog-less bytes")
+        #expect(PDFDocument(data: data) == nil, "PDFKit opened the catalog-less bytes")
     }
 
     @Test("A page that reads no dictionary answers could-not-scan")
     func pageWithoutDictionaryAnswersCouldNotScan() throws {
         let document = try #require(cgDocument(Self.pageWithoutDictionary()))
-        #expect(document.numberOfPages == 1)
+        #expect(document.numberOfPages == 2)
+        #expect(document.page(at: 1)?.dictionary != nil)
+        #expect(document.page(at: 2)?.dictionary == nil)
         #expect(ActiveContentScan.firstLocation(in: document) == .couldNotScan)
     }
 
