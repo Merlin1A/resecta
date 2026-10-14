@@ -56,7 +56,7 @@ public enum TextLayerDetector {
         }
 
         // Vertical text mode: WMode=1 in page fonts
-        if hasVerticalWritingMode(page) {
+        if hasVerticalWritingMode(page) == true {
             return .verticalText
         }
 
@@ -114,7 +114,8 @@ public enum TextLayerDetector {
 
     /// Check for vertical writing mode (WMode=1) in page fonts.
     /// Horizontal Td positioning model does not apply to vertical text.
-    private static func hasVerticalWritingMode(_ page: PDFPage) -> Bool {
+    /// Internal so the unknown arm can be driven by a test.
+    static func hasVerticalWritingMode(_ page: PDFPage) -> Bool? {
         guard let pageRef = page.pageRef,
               let dict = pageRef.dictionary else { return false }
 

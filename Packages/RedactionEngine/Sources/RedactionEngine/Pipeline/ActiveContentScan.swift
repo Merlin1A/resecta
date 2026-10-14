@@ -20,6 +20,11 @@ public enum ActiveContentLocation: Sendable, Equatable {
     /// An annotation on the page carries a `/A` action that is (or chains
     /// to) a JavaScript or launch action.
     case annotationAction(pageIndex: Int)
+    /// The walk could not read the structure it inspects — no catalog, a
+    /// page with no dictionary, an action chain past the depth bound — so
+    /// the document is not known to be clean. The app refuses it as a file
+    /// it cannot read, never as active content.
+    case couldNotScan
 }
 
 /// The import-time active-content walk. Runs once at import over the raw
