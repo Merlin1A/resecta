@@ -87,11 +87,6 @@ private struct SendableCGPDFPage: @unchecked Sendable {
 /// `PDFPageData`; the concurrent render path is then CG-only.
 public final class PageRasterizer: @unchecked Sendable {
 
-    /// Test seam: observes each first-render bitmap context at the point
-    /// the render releases it, while the context is still alive, so a test
-    /// can read its bytes. Task-local, nil in every production flow.
-    @TaskLocal static var renderContextWipeProbe: (@Sendable (CGContext) -> Void)?
-
     /// Bitmap context pool. Released when the rasterizer goes out of
     /// scope at the end of the pipeline run.
     private let bitmapPool = BitmapContextPool()
@@ -633,13 +628,8 @@ public final class PageRasterizer: @unchecked Sendable {
         guard let ctx = createBitmapContext(width: pw, height: ph) else {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
         }
-        // The first-render bitmap is wiped at its release. `makeImage()` hands
-        // back a copy (the invariant `PixelBufferZeroizeTests` pins), so the
-        // image survives the wipe.
-        defer {
-            PixelOperations.zeroizeBitmapBuffer(ctx)
-            Self.renderContextWipeProbe?(ctx)
-        }
+        // The first-render bitmap is wiped at its release (`FirstRenderBitmap`).
+        defer { FirstRenderBitmap.release(ctx) }
 
         // 4. White background (UIColor on iOS)
         #if canImport(UIKit)
@@ -717,13 +707,8 @@ public final class PageRasterizer: @unchecked Sendable {
         guard let ctx = createBitmapContext(width: pw, height: ph) else {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
         }
-        // The first-render bitmap is wiped at its release. `makeImage()` hands
-        // back a copy (the invariant `PixelBufferZeroizeTests` pins), so the
-        // image survives the wipe.
-        defer {
-            PixelOperations.zeroizeBitmapBuffer(ctx)
-            Self.renderContextWipeProbe?(ctx)
-        }
+        // The first-render bitmap is wiped at its release (`FirstRenderBitmap`).
+        defer { FirstRenderBitmap.release(ctx) }
 
         // White background (UIColor on iOS)
         #if canImport(UIKit)

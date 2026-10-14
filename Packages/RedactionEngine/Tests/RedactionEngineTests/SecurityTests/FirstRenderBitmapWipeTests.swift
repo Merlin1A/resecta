@@ -47,7 +47,7 @@ struct FirstRenderBitmapWipeTests {
         let page = try #require(doc.page(at: 0))
         let observation = Observation()
 
-        let image = try await PageRasterizer.$renderContextWipeProbe.withValue(Self.observe(observation)) {
+        let image = try await FirstRenderBitmap.$wipeProbe.withValue(Self.observe(observation)) {
             try await PageRasterizer().renderPage(page, pageIndex: 0, dpi: 36)
         }
 
@@ -64,7 +64,7 @@ struct FirstRenderBitmapWipeTests {
         let cgPage = try #require(page.pageRef)
         let observation = Observation()
 
-        let image = try await PageRasterizer.$renderContextWipeProbe.withValue(Self.observe(observation)) {
+        let image = try await FirstRenderBitmap.$wipeProbe.withValue(Self.observe(observation)) {
             try await PageRasterizer().renderPageFromCGPage(
                 cgPage, bounds: page.bounds(for: .cropBox), rotation: page.rotation,
                 pageIndex: 0, dpi: 36)
