@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - A report-only test lists every app test that builds its settings on the shared defaults domain instead of a scratch suite; with `RESECTA_PIN_SCRATCH_DEFAULTS=1` it fails on them.
 - `CHANGELOG.md` merges with git's union driver (`.gitattributes`), so two pull requests that each add lines under `[Unreleased]` no longer conflict on them.
 - The audit exporter blanks the exemption, citation and note fields when sensitive content is excluded (the app passes none).
+- The engine's unsupported-format message names the formats: PDF files and JPEG, PNG and HEIC images.
 
 ## [1.2.0] — 2026-09-29
 
