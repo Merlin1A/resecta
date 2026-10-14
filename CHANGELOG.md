@@ -23,6 +23,11 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The audit lint's shorthand check reads five more shapes on added Swift and string-catalog lines: a section sign with no standard or repository document named beside it, a Markdown file name the repository does not track, and, in comments, planning-process words, step tokens and the maintainer's first name.
 - A report-only test lists every app test that builds its settings on the shared defaults domain instead of a scratch suite; with `RESECTA_PIN_SCRATCH_DEFAULTS=1` it fails on them.
 - `CHANGELOG.md` merges with git's union driver (`.gitattributes`), so two pull requests that each add lines under `[Unreleased]` no longer conflict on them.
+- `pr-closed.yml` leaves a merged pull request's runs to finish; only a pull request closed without a merge has its `ci` and `sim-suite` runs cancelled, so the hosted simulator suite of a merged change reaches a verdict.
+- The batched runner (`Scripts/test-batched.sh`) reads its stall allowance and its recovery shape from the environment: the hosted simulator suite widens the no-output watchdog to 900 seconds, and a recovery after a wedge shuts the simulator down and boots it again, waiting for it, instead of erasing it (the erase stays opt-in). Its suite enumerator reads `@Test` functions inside extensions of a suite type.
+- `sim-suite.yml` names the account's five-macOS-job cap in its header, runs the editor's link-policy UI tests on the weekly and tag runs, and reports a failed weekly or tag run through an error annotation, a step summary and, when the repository variable `NTFY_TOPIC` is set, a post to that ntfy topic.
+- The asset-tamper matrix measures the bundled assets with the name-model probe forced present, so a simulator without the OS name model measures every cell instead of raising the banner on each.
+- Removed: the golden Bloom builder under `Scripts/gazetteer/` (its fixture is committed; the shipped filters come from the data pipeline), `engine-suite.yml` (the on-demand host run of the engine package, which never reached a verdict; the simulator suite's engine job is the hosted run) and five permanently disabled wall-clock tests.
 
 ## [1.2.0] — 2026-09-29
 
