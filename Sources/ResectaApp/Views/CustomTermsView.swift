@@ -22,38 +22,21 @@ struct CustomTermsView: View {
     @State private var newNeverIsRegex: Bool = false
     @State private var neverError: String?
 
-    @State private var showingTemplatePicker = false
 
     // Destructive-action confirmation symmetry (mirrors the
     // Settings Reset-to-Defaults dialog): the delete-all row confirms
     // before dropping both lists.
     @State private var showClearAllConfirmation = false
 
-    /// V1.0 ships without the
-    /// template-picker entry point; the browse button is gated off behind
-    /// this flag. Flip it to `true` to re-enable the UI — the picker view,
-    /// import machinery, template JSON, and their test suites are
-    /// intentionally preserved and stay compiled and green, so revival is
-    /// a one-line flip. Mirrors
-    /// `DocumentEditorView.advancedDrawToolsEnabled`.
-    static let templatePickerEnabled = false
-
     var body: some View {
         Form {
             aboutSection
-            if Self.templatePickerEnabled {
-                templatesSection
-            }
             alwaysFlagSection
             neverFlagSection
             clearAllSection
         }
         .navigationTitle("Custom Terms")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingTemplatePicker) {
-            CustomTermsTemplatePicker(isPresented: $showingTemplatePicker)
-                .environment(userTermsStore)
-        }
         // Destructive confirm mirroring the Settings
         // Reset-to-Defaults dialog. Copy names exactly what is cleared:
         // both lists in this store, nothing else.
@@ -90,21 +73,6 @@ struct CustomTermsView: View {
             } footer: {
                 Text("Removes every term from both lists on this device.")
             }
-        }
-    }
-
-    // MARK: - Templates
-
-    private var templatesSection: some View {
-        Section {
-            Button {
-                showingTemplatePicker = true
-            } label: {
-                Label("Browse starter templates", systemImage: "square.and.arrow.down.on.square")
-            }
-        } footer: {
-            Text("Templates ship with placeholder patterns the user can edit after import.")
-                .font(.caption)
         }
     }
 
