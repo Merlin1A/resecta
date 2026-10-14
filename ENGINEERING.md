@@ -210,9 +210,11 @@ Overclaiming is a defect class here, tested like any other:
   view-layer string literals for the same vocabulary, so the docs are held to
   the same bar as the UI.
 - The pre-commit hook (`Scripts/audit-lint.sh`) blocks banned phrasing on the
-  Swift, string-catalog and Markdown lines a commit adds, and banned
-  networking symbols on the Swift source lines it adds — the same gate for me
-  and for contributors (`CONTRIBUTING.md`).
+  Swift, string-catalog and Markdown lines a commit adds, banned networking
+  symbols on the Swift source lines it adds, and any call-shaped networking
+  or hand-off symbol anywhere in the shipping source that is not one of the
+  sites pinned in the script with its reason — the same gate for me and for
+  contributors (`CONTRIBUTING.md`).
 - The honesty-surface tests
   (`Tests/ResectaAppTests/HonestySurfacesTests.swift`) pin the mount predicate
   of the disclaimer naming the checks' limits on the verification results
@@ -242,7 +244,16 @@ The expected result is a single match — a code comment noting the fact. The
 pre-commit hook rejects `URLSession`, `URLRequest`, `NWConnection`,
 `NWPathMonitor`, and `WKWebView` on every added Swift source line (the hook
 defines one override marker, for a Safari-view wrapper; no line in the tree
-uses it), so the property holds going forward, not just today. The in-app
+uses it), and on every run it scans the whole shipping source — `Sources/`
+and the engine package, the test trees excluded — for the call-shaped
+networking and hand-off symbols: a bare `Link(`, `NWListener(`,
+`NWBrowser(`, `NSURLConnection(`, the CFNetwork socket and stream
+constructors, the BSD `socket(` / `connect(` / `getaddrinfo(` calls,
+`openURL`, `UIApplication.shared.open(` and an `import Network` line, with
+comments and string literals skipped. Every hit must be a site pinned in the
+script with its reason; today that is one site, the Settings view's feedback
+link, a `mailto:` hand-off to Mail. A new site fails the hook and the gate,
+so the property holds going forward, not just today. The in-app
 legal/support links open in a Safari view or Mail, each in its own process —
 the binary embeds no web engine of its own. The privacy manifest ships at `Resources/PrivacyInfo.xcprivacy`
 and declares no collected data types and no tracking, matching `PRIVACY.md`
