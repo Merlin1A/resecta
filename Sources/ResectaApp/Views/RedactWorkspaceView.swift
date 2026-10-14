@@ -2,10 +2,11 @@ import SwiftUI
 import PDFKit
 
 // Redact workspace container — extracted from ContentView.
-// Owns the navigation container, import handlers, and import-related state.
+// Owns the navigation container, the drop door and its import state.
 // Injects workspace-scoped state into the environment for downstream views.
 // NavigationSplitView on iPad, NavigationStack on iPhone.
-// Import sources: Files, drag-and-drop.
+// The one import source inside the workspace is drag-and-drop; files are
+// opened from Home.
 
 struct RedactWorkspaceView: View {
     let workspace: RedactWorkspace
@@ -17,15 +18,11 @@ struct RedactWorkspaceView: View {
     // same content the canvas does and must be covered alongside the editor.
     @Environment(ScreenCaptureMonitor.self) private var captureMonitor
 
-    // Import state (moved from ContentView)
-    @State private var showFilePicker = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
 
-    /// Handle for the in-flight import dispatch. Each
-    /// dispatch site (drop, file picker, pending-import after
-    /// confirmation) cancels the prior task before launching a
-    /// new one. Without this, a rapid double-input (e.g., two drops in
-    /// quick succession, or the file picker re-firing on a held button)
+    /// Handle for the in-flight import dispatch. The drop door cancels
+    /// the prior task before launching a new one. Without this, two drops
+    /// in quick succession
     /// would race two ImportService.importDocument calls against the
     /// same `documentState.activeImportTask` slot — the later
     /// `activeImportTask = workTask` write inside ImportService stomps
@@ -36,20 +33,8 @@ struct RedactWorkspaceView: View {
     // Settings sheet
     @State private var showSettings = false
 
-    // Import-while-editing confirmation
-    @State private var showImportWhileEditingConfirmation = false
-    @State private var pendingImportURL: URL?
-
     var body: some View {
         navigationContainer
-            // File importer
-            .fileImporter(
-                isPresented: $showFilePicker,
-                allowedContentTypes: [.pdf],
-                allowsMultipleSelection: false
-            ) { result in
-                handleFileImportResult(result)
-            }
             // Fire the text-layer toast on import completion for EVERY
             // import path. The Home -> redact load (openRedactWithDocument) runs
             // its import in AppCoordinator AFTER this view mounts, so the in-view
@@ -72,9 +57,8 @@ struct RedactWorkspaceView: View {
                     return true
                 }
                 // Reject drops while the pipeline is
-                // active OR a detection review is open. The drag-drop path is
-                // the sole importer that bypasses the import-while-editing
-                // confirmation the file picker stages, so it consults the
+                // active OR a detection review is open. A drop replaces an
+                // open document with no confirmation, so it consults the
                 // composed `canStartImport(with:)` gate directly — a stranded
                 // triage sheet over a replacement document could stamp the prior
                 // document's page-coordinate regions onto the new one. The drop
@@ -117,23 +101,6 @@ struct RedactWorkspaceView: View {
                     // workspace environment.
                     .environment(workspace.redactionState)
                     .presentationDetents([.medium, .large])
-            }
-            // Import-while-editing confirmation dialog
-            .confirmationDialog(
-                RedactWorkspaceView.importWhileEditingTitle,
-                isPresented: $showImportWhileEditingConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button(RedactWorkspaceView.importWhileEditingConfirmButton, role: .destructive) {
-                    performPendingImport()
-                }
-                Button("Cancel", role: .cancel) {
-                    pendingImportURL = nil
-                }
-            } message: {
-                // Names what actually clears — there is no save
-                // concept here for "unsaved changes" to point at.
-                Text("Importing a new file will replace the current document. Drawn regions and detection results will be cleared.")
             }
             // Environment injection — satisfies @Environment reads in
             // DocumentEditorView and all downstream views.
@@ -179,65 +146,8 @@ struct RedactWorkspaceView: View {
     @ViewBuilder
     private var detailContent: some View {
         DocumentEditorView(
-            showFilePicker: $showFilePicker,
             showSettings: $showSettings
         )
-    }
-
-    // MARK: - Import Handlers
-
-    private func handleFileImportResult(_ result: Result<[URL], any Error>) {
-        switch result {
-        case .success(let urls):
-            guard let url = urls.first else { return }
-            // File-importer cannot stage a new
-            // document while the pipeline holds in-flight state.
-            guard workspace.documentState.canStartImport else {
-                enqueueImportBlockedToast()
-                return
-            }
-            // Confirm if a document is already open
-            if workspace.documentState.sourceDocument != nil {
-                pendingImportURL = url
-                showImportWhileEditingConfirmation = true
-            } else {
-                // Cancel any prior in-flight import
-                // dispatch — see `activeImportDispatch` doc-comment.
-                activeImportDispatch?.cancel()
-                activeImportDispatch = Task {
-                    await ImportService.importDocument(
-                        from: url,
-                        documentState: workspace.documentState,
-                        redactionState: workspace.redactionState
-                    )
-                }
-            }
-        case .failure:
-            // User cancelled or system error — no action needed
-            break
-        }
-    }
-
-    /// Dialog-grammar normalization — sentence-case question title,
-    /// bare-verb destructive button.
-    static let importWhileEditingTitle = "Replace the open document?"
-    static let importWhileEditingConfirmButton = "Replace"
-
-    /// Execute the pending import after user confirms replacement.
-    private func performPendingImport() {
-        // Cancel any prior in-flight import dispatch —
-        // see `activeImportDispatch` doc-comment.
-        activeImportDispatch?.cancel()
-        activeImportDispatch = Task {
-            if let url = pendingImportURL {
-                pendingImportURL = nil
-                await ImportService.importDocument(
-                    from: url,
-                    documentState: workspace.documentState,
-                    redactionState: workspace.redactionState
-                )
-            }
-        }
     }
 
     // MARK: - Toast Helpers
@@ -268,8 +178,7 @@ struct RedactWorkspaceView: View {
         }
     }
 
-    /// Surface the rejection when a drop or a file picker
-    /// invocation arrives while the pipeline owns
+    /// Surface the rejection when a drop arrives while the pipeline owns
     /// in-flight state. Mechanism-description copy lives on
     /// `DocumentState.importBlockedDuringPipelineMessage` so unit tests
     /// can assert on the exact string without crossing the View boundary.
