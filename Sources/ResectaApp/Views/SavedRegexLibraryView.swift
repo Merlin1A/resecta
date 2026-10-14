@@ -179,23 +179,15 @@ struct SavedRegexLibraryView: View {
         let trimmedPattern = newPattern.trimmingCharacters(in: .whitespaces)
         guard !trimmedLabel.isEmpty, !trimmedPattern.isEmpty else { return }
         addInFlight = true
-        let accepted = await RegexSentinelCheck.validate(trimmedPattern)
+        let outcome = await PatternAdmission.admit(
+            label: trimmedLabel, pattern: trimmedPattern, into: savedRegexStore)
         addInFlight = false
-        guard accepted else {
-            addError = String(
-                localized: "profile.regex.sentinel.rejected",
-                table: "Legal",
-                bundle: .main
-            )
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-            return
-        }
-        let added = savedRegexStore.add(label: trimmedLabel, pattern: trimmedPattern)
-        if added {
+        switch outcome {
+        case .added:
             newLabel = ""
             newPattern = ""
-        } else {
-            addError = "Pattern rejected. Check the syntax, length, or label uniqueness."
+        case .refused(let message):
+            addError = message
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }

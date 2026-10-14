@@ -1299,7 +1299,7 @@ struct SearchAndRedactSheet: View {
         guard !trimmedLabel.isEmpty, !trimmedPattern.isEmpty else {
             return "Label and pattern must not be empty."
         }
-        let accepted = await RegexSentinelCheck.validate(trimmedPattern)
+        let accepted = await PatternAdmission.sentinelAdmits(trimmedPattern)
         guard accepted else {
             return String(
                 localized: "profile.regex.sentinel.rejected",
