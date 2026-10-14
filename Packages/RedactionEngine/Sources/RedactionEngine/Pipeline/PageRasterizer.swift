@@ -305,15 +305,27 @@ public final class PageRasterizer: @unchecked Sendable {
                         )
                     }
 
-                    textLayerEntries = validated.result.surviving
-                    redactionRectsForTextLayer = redactionRectsInPoints
-                    pageDigest = validated.result.toDigest(
-                        pageIndex: page.pageIndex,
-                        redactionRects: redactionRectsInPoints,
-                        safetyMargin: safetyMarginPoints,
-                        drawnCellRuleExcludedCount: validated.dropped,
-                        frame: frame
-                    )
+                    if validated.settled {
+                        textLayerEntries = validated.result.surviving
+                        redactionRectsForTextLayer = redactionRectsInPoints
+                        pageDigest = validated.result.toDigest(
+                            pageIndex: page.pageIndex,
+                            redactionRects: redactionRectsInPoints,
+                            safetyMargin: safetyMarginPoints,
+                            drawnCellRuleExcludedCount: validated.dropped,
+                            frame: frame
+                        )
+                    } else {
+                        // The re-flow limit left a drawn cell inside a
+                        // region: the rule has not seen the layout settle,
+                        // so the page is written without a text layer —
+                        // the same arm as an extraction that threw (entries
+                        // and digest never set, the reason recorded).
+                        fallbackReason = .extractionFailed
+                        pageRasterizerLogger.log(
+                            "page \(page.pageIndex) fell back to secure rasterization at runtime (the text layer did not settle outside the redaction regions)"
+                        )
+                    }
                 } else {
                     // shouldFallback or empty: textLayerEntries remains nil,
                     // page processed as Secure Rasterization.

@@ -327,12 +327,15 @@ enum TestPipeline {
                         redactionRects: redactionRectsInPoints
                     )
                     // The writer-side drawn-cell rule, as production runs it
-                    // before the digest is taken — in the page's source frame.
-                    textLayerEntries = TextLayerReconstructor.validateSurvivors(
+                    // before the digest is taken — in the page's source frame;
+                    // a set the re-flow limit leaves unsettled gives the page
+                    // no text layer, as in production.
+                    let validated = TextLayerReconstructor.validateSurvivors(
                         filterResult,
                         regionShapes: TestPipeline.rectShapes(redactionRectsInPoints),
                         frame: PageFrame(rotation: page.rotation, displayedSize: regionBasis.size)
-                    ).result.surviving
+                    )
+                    textLayerEntries = validated.settled ? validated.result.surviving : nil
                 }
             }
 
@@ -418,6 +421,8 @@ enum TestPipeline {
                 regionShapes: TestPipeline.rectShapes(redactionRectsInPoints),
                 frame: frame
             )
+            // An unsettled set gives the page no text layer and no digest.
+            guard validated.settled else { continue }
             digests[pageIndex] = validated.result.toDigest(
                 pageIndex: pageIndex,
                 redactionRects: redactionRectsInPoints,
