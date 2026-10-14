@@ -152,6 +152,7 @@ enum ImportService {
         documentState: DocumentState,
         redactionState: RedactionState
     ) async -> ImportOutcome {
+        let limits = ImportLimits.standard
         do {
             let payload: ImportPayload
             switch source {
@@ -160,7 +161,7 @@ enum ImportService {
             case .file(let url, let declaredType):
                 // Offload file I/O to avoid blocking MainActor. Cancellation
                 // is propagated to the detached read via `withTaskCancellationHandler`.
-                let readTask = Task.detached { try Data(contentsOf: url) }
+                let readTask = Task.detached { try readPayload(from: url, limits: limits) }
                 let data = try await withTaskCancellationHandler {
                     try await readTask.value
                 } onCancel: {
@@ -169,7 +170,6 @@ enum ImportService {
                 payload = .bytes(data, declaredType: declaredType, door: .files)
             }
 
-            let limits = ImportLimits.standard
             // Size check — 50 MB practical limit based on memory budget
             guard payload.data.count <= limits.maxBytes else {
                 throw PipelineError.importError(.tooLarge(bytesRead: payload.data.count))
@@ -221,6 +221,18 @@ enum ImportService {
             ))
             return .refused
         }
+    }
+
+    // MARK: - Reading a file
+
+    /// Read a file's bytes for import. The byte cap is checked after the
+    /// read; the import's size guard then refuses what is over it.
+    nonisolated static func readPayload(from url: URL, limits: ImportLimits = .standard) throws -> Data {
+        let data = try Data(contentsOf: url)
+        guard data.count <= limits.maxBytes else {
+            throw PipelineError.importError(.tooLarge(bytesRead: data.count))
+        }
+        return data
     }
 
     // MARK: - The facts applier

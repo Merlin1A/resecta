@@ -182,6 +182,7 @@ struct PageThumbnailList: View {
 
 /// NSCache-backed thumbnail cache. Auto-evicts on memory pressure.
 /// Keyed by page index; cleared when the source document changes.
+/// Internal so the keying can be driven by a test.
 ///
 /// Explicit `countLimit` and `totalCostLimit` so the
 /// cache cannot grow without bound on multi-hundred-page documents.
@@ -193,7 +194,7 @@ struct PageThumbnailList: View {
 /// visible page set on either device class, and 64 MB caps the
 /// retained bitmaps at roughly 320 KB / thumb (the rasterized PDFKit
 /// thumbnail size at the sidebar scale).
-private enum ThumbnailCache {
+enum ThumbnailCache {
     // nonisolated(unsafe): all callers are MainActor-isolated (SwiftUI views).
     // NSCache is thread-safe internally but not Sendable.
     nonisolated(unsafe) static let cache: NSCache<NSNumber, UIImage> = {
@@ -203,10 +204,10 @@ private enum ThumbnailCache {
         return c
     }()
     static let writeQueue = DispatchQueue(label: "thumbnailCache.write")
-    static func get(_ pageIndex: Int) -> UIImage? {
+    static func get(document: PDFDocument, pageIndex: Int) -> UIImage? {
         cache.object(forKey: NSNumber(value: pageIndex))
     }
-    static func set(_ image: UIImage, for pageIndex: Int) {
+    static func set(_ image: UIImage, document: PDFDocument, pageIndex: Int) {
         writeQueue.async {
             cache.setObject(image, forKey: NSNumber(value: pageIndex))
         }
@@ -255,12 +256,13 @@ struct PageThumbnailView: View {
             }
         }
         .task(id: pageIndex) {
+            guard let document else { return }
             // Check cache first
-            if let cached = ThumbnailCache.get(pageIndex) {
+            if let cached = ThumbnailCache.get(document: document, pageIndex: pageIndex) {
                 thumbnail = cached
                 return
             }
-            guard let page = document?.page(at: pageIndex) else { return }
+            guard let page = document.page(at: pageIndex) else { return }
             // PDFPage is not Sendable; render via nonisolated(unsafe) bridge.
             nonisolated(unsafe) let unsafePage = page
             // Render at the display size, not 2× oversized.
@@ -272,7 +274,7 @@ struct PageThumbnailView: View {
                 unsafePage.thumbnail(of: size, for: .cropBox)
             }.value
             if !Task.isCancelled {
-                ThumbnailCache.set(rendered, for: pageIndex)
+                ThumbnailCache.set(rendered, document: document, pageIndex: pageIndex)
                 thumbnail = rendered
             }
         }
