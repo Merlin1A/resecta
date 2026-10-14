@@ -24,25 +24,6 @@ final class SearchState: Identifiable {
 
     // MARK: - Feature flags
 
-    /// V1.0 ships without the doctype diagnostic surfaces; the
-    /// doctype banner and the footer Document-profile disclosure (two
-    /// mounts of `DoctypeDiagnosticView`) are gated off behind this
-    /// flag.
-    /// All machinery (doctype classifier, `lastDoctypeExplanation`,
-    /// `WU07Strings`, `DoctypeBannerTests`) stays compiled and
-    /// unit-tested; restore = flip to `true` + update the pin test, or in
-    /// DEBUG launch with `--enableAuditSurfaces` (one arg shared with
-    /// `searchAuditSurfacesEnabled` above — see its note).
-    /// These surfaces are revisited for 1.1.
-    // nonisolated: Sendable constant read from nonisolated test contexts.
-    nonisolated static let searchDiagnosticSurfacesEnabled: Bool = {
-        #if DEBUG
-        CommandLine.arguments.contains("--enableAuditSurfaces")
-        #else
-        false
-        #endif
-    }()
-
     /// V1.0 ships without the Scan category-chips strip (per-run
     /// detector narrowing over `enabledPIICategories`, its in-row ↻,
     /// and the "no categories selected" notice): with the

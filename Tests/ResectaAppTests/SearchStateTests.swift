@@ -320,20 +320,6 @@ struct SearchStateTests {
         )
     }
 
-    // MARK: - Doctype diagnostic surfaces hidden for V1.0
-
-    @Test("Doctype diagnostic surfaces are gated off for 1.0")
-    func testDiagnosticSurfacesHiddenForV1() {
-        // The doctype banner and the footer Document-profile disclosure
-        // are behind this flag. An accidental flip re-exposes both mounts —
-        // this pin makes that a loud CI red. Restoring these surfaces means
-        // flipping the flag and updating this test.
-        // Same DEBUG launch-arg shape as the audit flag above (one shared
-        // `--enableAuditSurfaces` arg) — the runner carries no arg, so
-        // `false` still holds here.
-        #expect(SearchState.searchDiagnosticSurfacesEnabled == false)
-    }
-
     /// A scan-completion skeleton report. `makeCoverageReport`
     /// leaves `appliedCount` / `deselectedCount` at 0; `coverageReportForDisplay()`
     /// folds the live counts in. `belowThresholdSuppressed: 3` pins a scan-time

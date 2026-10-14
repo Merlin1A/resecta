@@ -36,14 +36,6 @@ struct SearchFooterSection: View {
 
     var body: some View {
         VStack(spacing: ResectaTokens.Spacing.xxs) {
-            // Hidden for 1.0 behind `searchDiagnosticSurfacesEnabled`.
-            if SearchState.searchDiagnosticSurfacesEnabled,
-               review == nil,
-               let explanation = searchState.lastDoctypeExplanation,
-               searchState.searchModeType == .piiScan {
-                DoctypeDiagnosticView(explanation: explanation)
-                    .padding(.bottom, ResectaTokens.Spacing.xxs)
-            }
             if review == nil, searchState.resultsAtCap {
                 // The cap banner carries the unscanned remainder
                 // so "showing first N" stops reading as full coverage.

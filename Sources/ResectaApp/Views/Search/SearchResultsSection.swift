@@ -48,11 +48,6 @@ struct SearchResultsSection: View {
     /// the sheet at the compact float.
     let onFocusWalk: (UUID, Bool) -> Void
 
-    /// Per-sheet-session dismiss state for the doctype banner.
-    /// `SearchResultsSection` is re-instantiated when the sheet
-    /// re-opens, so dismissal naturally resets per sheet session.
-    @State private var isDoctypeBannerDismissed: Bool = false
-
     /// Anchored-row contract — when
     /// tap-on-row drops the sheet to compact, the row the user tapped
     /// must remain topmost in the (much shorter) results list. The tap
@@ -141,22 +136,6 @@ struct SearchResultsSection: View {
     /// the inset region.
     private var sectionTopChrome: some View {
         VStack(spacing: 0) {
-            // Doctype banner — always-visible primary doctype +
-            // detector count above the results list for simplicity.
-            // Hidden for 1.0 behind `searchDiagnosticSurfacesEnabled`.
-            if SearchState.searchDiagnosticSurfacesEnabled,
-               searchState.searchModeType == .piiScan,
-               let explanation = searchState.lastDoctypeExplanation,
-               !isDoctypeBannerDismissed {
-                DoctypeDiagnosticView(
-                    explanation: explanation,
-                    style: .banner(
-                        enabledPIICategories: searchState.enabledPIICategories,
-                        onDismiss: { isDoctypeBannerDismissed = true }
-                    )
-                )
-            }
-
             // Per-page regex-timeout banner. Surfaces
             // when `DocumentSearcher`'s timeout sink fired for one or more
             // pages during the active scan. Copy NEVER echoes pattern text —
