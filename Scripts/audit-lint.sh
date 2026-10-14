@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# audit-lint.sh — pre-commit gate (mechanical checks M-1..M-6; see
-# CONTRIBUTING "Audit checklist"), plus the script-local checks AL-1..AL-6
-# (XcodeGen sync · resources: no-op warn · sample-statement and loan-packet
-# dual-copy byte identity · silent test guards on added lines · planning
-# shorthand on added lines) — numbering note at the AL-1 section below.
+# audit-lint.sh — pre-commit gate (mechanical checks M-1, M-3..M-6; see
+# CONTRIBUTING "What every change passes"), plus the script-local checks
+# AL-1..AL-6 (XcodeGen sync · resources: no-op warn · sample-statement and
+# loan-packet dual-copy byte identity · silent test guards on added lines ·
+# planning shorthand on added lines: a register-identifier token, a section
+# sign with no standard or repository document named beside it, a Markdown
+# file name the repository does not track, a planning-process word, a step
+# token or the maintainer's first name in a comment) — numbering note at
+# the AL-1 section below.
 # Symlinked into .git/hooks/pre-commit by install-hooks.sh.
 #
 # Scope: staged Added/Modified files (`git diff --cached --diff-filter=AM`).
@@ -21,7 +25,7 @@
 # Usage: Scripts/audit-lint.sh                 (staged mode; the pre-commit hook)
 #        Scripts/audit-lint.sh --range A..B    (range mode; the pull-request gate)
 #        Scripts/audit-lint.sh --self-test     (the M-1 keyword rule and the AL-6
-#                                               shorthand rule against synthetic
+#                                               shorthand rules against synthetic
 #                                               lines; exit 1 on drift)
 #
 # Override markers (substring on the same line):
@@ -94,7 +98,11 @@ violate() { printf '%s\n' "$1" >&2; FAIL=$((FAIL + 1)); }
 # The line scanner (perl; env-configured). Reads a unified diff and walks
 # its added (+) lines, or with PLAIN=1 reads plain lines (the self-test).
 # PATTERN = the regex, case-insensitive unless CASE_SENSITIVE=1; OVERRIDE = the same-line marker
-# that exempts a line (empty disables); KEYWORD_EXEMPT=1 = the M-1 Swift
+# that exempts a line (empty disables); EXEMPT = a second regex that, when
+# it matches anywhere on the line, exempts the line (empty disables);
+# COMMENT_ONLY=1 = only the part of the line from its first `//` onward is
+# matched, so a token in code or in a string literal passes and a line with
+# no comment never offends; KEYWORD_EXEMPT=1 = the M-1 Swift
 # rule: a match is skipped when it sits in the code part of the line
 # (before any `//`) and is `catch` / `do` at statement position (only
 # whitespace and an optional `}` before it; `do` also needs `{` or the
@@ -109,9 +117,17 @@ SCAN_PERL='
     my $ovr   = $ENV{OVERRIDE} // "";
     my $plain = $ENV{PLAIN} // "";
     my $kw    = $ENV{KEYWORD_EXEMPT} // "";
+    my $ex    = ($ENV{EXEMPT} // "") ne "" ? ($ENV{CASE_SENSITIVE} ? qr/$ENV{EXEMPT}/ : qr/$ENV{EXEMPT}/i) : undef;
+    my $cmt   = $ENV{COMMENT_ONLY} // "";
     sub offends {
         my ($body) = @_;
         return 0 if $ovr && index($body, $ovr) >= 0;
+        return 0 if $ex && $body =~ $ex;
+        if ($cmt) {
+            my $at = index($body, "//");
+            return 0 if $at < 0;
+            $body = substr($body, $at);
+        }
         return ($body =~ $re) ? 1 : 0 unless $kw;
         my $code_end = index($body, "//");
         $code_end = length($body) if $code_end < 0;
@@ -152,11 +168,13 @@ SCAN_PERL='
 # Walk added (+) lines from $1's staged diff. Match perl regex $2,
 # skip lines containing override marker $3 (empty disables override);
 # $4 = 1 applies the Swift keyword rule (M-1 on .swift files). The regex
-# is case-insensitive unless the caller sets CASE_SENSITIVE=1 (AL-6).
+# is case-insensitive unless the caller sets CASE_SENSITIVE=1 (AL-6); the
+# caller's EXEMPT and COMMENT_ONLY pass through to the scanner.
 scan_added() {
     local path="$1" pattern="$2" override="$3" keyword="${4:-}"
     diff_added_hunks "$path" \
-        | PATTERN="$pattern" OVERRIDE="$override" KEYWORD_EXEMPT="$keyword" CASE_SENSITIVE="${CASE_SENSITIVE:-}" perl -e "$SCAN_PERL"
+        | PATTERN="$pattern" OVERRIDE="$override" KEYWORD_EXEMPT="$keyword" CASE_SENSITIVE="${CASE_SENSITIVE:-}" \
+          EXEMPT="${EXEMPT:-}" COMMENT_ONLY="${COMMENT_ONLY:-}" perl -e "$SCAN_PERL"
 }
 
 # ── M-1 forbidden phrases (.swift / .xcstrings / .md) ───────────────────
@@ -172,6 +190,39 @@ M1_RE='\b(guarantee[ds]?|ensure[ds]?|impossible|find(?:s|ing)?|catch(?:es|ing)?|
 # prefix running straight into digits (a licence number such as `S4482911`)
 # would read as a citation.
 AL6_RE='\b(D12|C12|F12|M12|Q12|RB12|SR12|SR|AL|PB|UXC|DC|R111|S4|P3)-[0-9]+\b'
+# The five further shorthand shapes, each its own pattern so that the
+# message can name the shape and so that none widens into a generic
+# upper-case-plus-digits rule (which would refuse `UTF-8` and `SE-0466`):
+# (section reference) a `§` on a line that names no public standard and no
+#   document this repository tracks — `ISO 32000 §8.3.2`, `C11 §K.3.7.4.1`,
+#   `21 CFR §1301.11` and `ENGINEERING.md §8` pass; `plan §6` does not.
+#   The document names come from `git ls-files` (the Markdown basenames and,
+#   for the root documents, their bare stems).
+# (markdown name) a `name.md` token that is no tracked Markdown file. A
+#   member access (`ResectaTokens.Spacing.md`), a path into a sibling
+#   `resecta-*` repository and a file the line itself writes
+#   (`appendingPathComponent("SUMMARY.md")`) pass.
+# (process word) the planning vocabulary — ruling, ruled, rules of record,
+#   adjudicate…, reserved to, ratified, approved by, -approved,
+#   hand-review…, re-review… — in the comment part of the line only.
+# (step token) a whole-token step name — W1..W99, S1..S99, B01..B09,
+#   T1..T99, C1..C99 — in the comment part only; the C standards (C89, C90,
+#   C99, C11, C17, C23) pass, and generic parameters such as `T1` in code do
+#   not reach the check.
+# (author name) the maintainer's first name in the comment part only; the
+#   developer-credit string in the Settings view is code and passes.
+AL6_SECTION_RE='§'
+AL6_MDREF_EXEMPT='resecta-[a-z-]+/|appendingPathComponent\('
+AL6_PROCESS_RE='\b(?:ruling|ruled|rules of record|adjudicat\w*|reserved to|ratified|approved by|hand-review\w*|re-review\w*)\b|-approved\b'
+AL6_STEP_RE='(?<![\w-])(?!C(?:89|90|99|11|17|23)\b)(?:W[1-9][0-9]?|S[1-9][0-9]?|B0[1-9]|T[1-9][0-9]?|C[1-9][0-9]?)(?![\w-])'
+AL6_NAME_RE='\bJesse\b'
+# The tracked Markdown names, as one alternation for the two patterns that
+# read them (built once; the root documents' stems join it for `§` lines).
+al6_tracked_md() { git ls-files -- '*.md' | sed 's#.*/##' | sort -u | sed 's/\./\\./g' | paste -sd '|' -; }
+AL6_TRACKED_MD="$(al6_tracked_md)"
+AL6_TRACKED_STEMS="$(git ls-files -- '*.md' | /usr/bin/grep -v '/' | sed 's/\.md$//' | sort -u | paste -sd '|' -)"
+AL6_SECTION_EXEMPT="\\b(?:ISO|IEC|RFC|ECMA|IEEE|NIST|FIPS|POSIX|ICAO|CFR|USC|U\\.S\\.C\\.|UAX|UTS|Unicode|PDF ?[0-9]|PDF/A|C(?:89|90|99|11|17|23))\\b|\\b(?:${AL6_TRACKED_MD}|${AL6_TRACKED_STEMS})\\b"
+AL6_MDREF_RE="(?<![.\\w])(?!(?:${AL6_TRACKED_MD})\\b)[A-Za-z0-9_-]+\\.md\\b"
 
 # AL-5's scanner call (used by the self-test below and the AL-5 section at
 # the end). Prints the scanner's offence lines for one file and returns 0,
@@ -228,6 +279,98 @@ if [ -n "$SELF_TEST" ]; then
         echo "audit-lint --self-test: AL-6 shorthand rule OK (hits on lines 1 and 4 of 6; the comment and the string)"
     else
         echo "audit-lint --self-test: AL-6 shorthand rule DRIFTED — expected hits on lines 1 and 4, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+        exit 1
+    fi
+    # AL-6 (section reference) against seven lines: a planning `§` (1) and a
+    # register `§` (7) are the hits; a public standard (2, 4, 6), a tracked
+    # document (3) and a marked line (5) pass.
+    expected=$'1\n7'
+    actual=$(printf '%s\n' \
+        '        // the plan §6 names this seam' \
+        '        /// ISO 32000 §8.3.2' \
+        '        // ENGINEERING.md §8' \
+        '        // C11 §K.3.7.4.1' \
+        '        // (§5.2) Shorthand:ok cited on purpose' \
+        '        // 21 CFR §1301.11' \
+        '        // registers/31- §B row 2' \
+        | PATTERN="$AL6_SECTION_RE" EXEMPT="$AL6_SECTION_EXEMPT" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL" \
+        | cut -d: -f1)
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: AL-6 section-reference rule OK (hits on lines 1 and 7 of 7)"
+    else
+        echo "audit-lint --self-test: AL-6 section-reference rule DRIFTED — expected hits on lines 1 and 7, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+        exit 1
+    fi
+    # AL-6 (markdown name) against six lines: an untracked name (1) and a
+    # planning path (6) are the hits; a design-token member (2), a tracked
+    # document (3), a file the line writes (4) and a sibling repository's
+    # path (5) pass.
+    expected=$'1\n6'
+    actual=$(printf '%s\n' \
+        '        // see KEY-MANAGEMENT.md for the key' \
+        '        .padding(.horizontal, ResectaTokens.Spacing.md)' \
+        '        // ENGINEERING.md names the closure' \
+        '        try text.write(to: dir.appendingPathComponent("SUMMARY.md"), atomically: true, encoding: .utf8)' \
+        '        // logged in resecta-datapipeline/SOURCES.md' \
+        '        // the plan is in sessions/notes-2026-10-06.md' \
+        | PATTERN="$AL6_MDREF_RE" EXEMPT="$AL6_MDREF_EXEMPT" OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL" \
+        | cut -d: -f1)
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: AL-6 markdown-name rule OK (hits on lines 1 and 6 of 6)"
+    else
+        echo "audit-lint --self-test: AL-6 markdown-name rule DRIFTED — expected hits on lines 1 and 6, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+        exit 1
+    fi
+    # AL-6 (process word) against five lines: two comments with planning
+    # words (1, 3) are the hits; the same word in code (2), a byte comment
+    # (4) and ordinary prose (5) pass.
+    expected=$'1\n3'
+    actual=$(printf '%s\n' \
+        '        // the ruled order; the error is nilled after' \
+        '        let ruled = true // the flag the view reads' \
+        '        // approved by the reviewer before the merge' \
+        '        // UTF-8 bytes' \
+        '        // the order the user chose' \
+        | PATTERN="$AL6_PROCESS_RE" COMMENT_ONLY=1 OVERRIDE="Shorthand:ok" PLAIN=1 perl -e "$SCAN_PERL" \
+        | cut -d: -f1)
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: AL-6 process-word rule OK (hits on lines 1 and 3 of 5; the comment part only)"
+    else
+        echo "audit-lint --self-test: AL-6 process-word rule DRIFTED — expected hits on lines 1 and 3, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+        exit 1
+    fi
+    # AL-6 (step token) against seven lines: a step name in a comment (1, 6)
+    # is the hit; generic parameters in code (2), a C standard (3), a Swift
+    # Evolution id (4), an encoding (5) and a version (7) pass.
+    expected=$'1\n6'
+    actual=$(printf '%s\n' \
+        '        // W4 lands this seam' \
+        '        func f<T1, T2>() {}' \
+        '        // C11 K.3.7.4.1' \
+        '        // SE-0466' \
+        '        // UTF-8 bytes' \
+        '        // the T2 rung of the ladder' \
+        '        // iOS 26 beta 3' \
+        | PATTERN="$AL6_STEP_RE" COMMENT_ONLY=1 OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL" \
+        | cut -d: -f1)
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: AL-6 step-token rule OK (hits on lines 1 and 6 of 7; the comment part only)"
+    else
+        echo "audit-lint --self-test: AL-6 step-token rule DRIFTED — expected hits on lines 1 and 6, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+        exit 1
+    fi
+    # AL-6 (author name) against two lines: the name in a comment (1) is the
+    # hit; the developer-credit string (2) is code and passes.
+    expected='1'
+    actual=$(printf '%s\n' \
+        '        // Jesse chose the order' \
+        '                Text("Jesse Brookins")' \
+        | PATTERN="$AL6_NAME_RE" COMMENT_ONLY=1 OVERRIDE="Shorthand:ok" CASE_SENSITIVE=1 PLAIN=1 perl -e "$SCAN_PERL" \
+        | cut -d: -f1)
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: AL-6 author-name rule OK (a hit on line 1 of 2; the comment part only)"
+    else
+        echo "audit-lint --self-test: AL-6 author-name rule DRIFTED — expected a hit on line 1, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
         exit 1
     fi
     # AL-5's scanner call fails closed: a missing scanner and a crashing
@@ -352,9 +495,9 @@ done
 # project.pbxproj is GENERATED from project.yml; landing a project.yml
 # change without a regenerate means every local build/test ran against a
 # stale project. AL-* are this script's own checks; M-* belong to
-# CONTRIBUTING "Audit checklist" (M-1..M-6 are the mechanical rules this
-# script enforces above; its manual session-discipline checks live only
-# on that page and are never referenced here).
+# CONTRIBUTING "What every change passes" (M-1, M-3..M-6 are the
+# mechanical rules this script enforces above; that page lists them with
+# their override markers and is never referenced here beyond its name).
 PBXPROJ="ResectaApp.xcodeproj/project.pbxproj"
 for path in "${STAGED[@]}"; do
     [ "$path" = "project.yml" ] || continue
@@ -506,21 +649,41 @@ done
 # reader of the repository has no way to resolve such a citation. This
 # check reports, on each added line of a .swift or .xcstrings file, a token
 # in the register-identifier shape (AL6_RE, defined with M-1 above) as an
-# offence: the pre-commit hook blocks the commit and the pull-request gate
-# fails. Same-line marker: `Shorthand:ok <reason>`. The mechanical twin
-# of the datapipeline's hygiene gate (scripts/hygiene_gate.py there scans
-# the whole tree; this one scans the lines a change adds).
+# offence, and likewise the five shapes defined beside it: a section sign
+# with no standard or repository document named on the line, a Markdown
+# name the repository does not track, a planning-process word, a step
+# token and the maintainer's first name (the last three in the comment
+# part of the line only). The pre-commit hook blocks the commit and the
+# pull-request gate fails; each message names the shape. Same-line marker:
+# `Shorthand:ok <reason>`. The mechanical twin of the datapipeline's
+# hygiene gate (scripts/hygiene_gate.py there scans the whole tree; this
+# one scans the lines a change adds).
 for path in "${STAGED[@]}"; do
     case "$path" in *.swift|*.xcstrings) ;; *) continue ;; esac
     while IFS= read -r off; do
         [ -n "$off" ] && violate "AL-6 planning shorthand: $path:$off"
     done < <(CASE_SENSITIVE=1 scan_added "$path" "$AL6_RE" "Shorthand:ok")
+    while IFS= read -r off; do
+        [ -n "$off" ] && violate "AL-6 planning shorthand (section reference): $path:$off"
+    done < <(CASE_SENSITIVE=1 EXEMPT="$AL6_SECTION_EXEMPT" scan_added "$path" "$AL6_SECTION_RE" "Shorthand:ok")
+    while IFS= read -r off; do
+        [ -n "$off" ] && violate "AL-6 planning shorthand (markdown name): $path:$off"
+    done < <(CASE_SENSITIVE=1 EXEMPT="$AL6_MDREF_EXEMPT" scan_added "$path" "$AL6_MDREF_RE" "Shorthand:ok")
+    while IFS= read -r off; do
+        [ -n "$off" ] && violate "AL-6 planning shorthand (process word): $path:$off"
+    done < <(COMMENT_ONLY=1 scan_added "$path" "$AL6_PROCESS_RE" "Shorthand:ok")
+    while IFS= read -r off; do
+        [ -n "$off" ] && violate "AL-6 planning shorthand (step token): $path:$off"
+    done < <(CASE_SENSITIVE=1 COMMENT_ONLY=1 scan_added "$path" "$AL6_STEP_RE" "Shorthand:ok")
+    while IFS= read -r off; do
+        [ -n "$off" ] && violate "AL-6 planning shorthand (author name): $path:$off"
+    done < <(CASE_SENSITIVE=1 COMMENT_ONLY=1 scan_added "$path" "$AL6_NAME_RE" "Shorthand:ok")
 done
 
 # ── Summary ─────────────────────────────────────────────────────────────
 if [ "$FAIL" -gt 0 ]; then
     printf '\naudit-lint: %d offence(s); commit blocked.\n' "$FAIL" >&2
-    printf 'Reference: CONTRIBUTING.md "Audit checklist" (M-1..M-6 mechanical) and this script'"'"'s AL-1..AL-6\n' >&2
+    printf 'Reference: CONTRIBUTING.md "What every change passes" (M-1, M-3..M-6 mechanical) and this script'"'"'s AL-1..AL-6\n' >&2
     exit 1
 fi
 exit 0
