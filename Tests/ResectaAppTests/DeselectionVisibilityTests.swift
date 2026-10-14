@@ -249,34 +249,6 @@ struct DeselectionRowTests {
     }
 }
 
-@Suite("Deselection review routing", .tags(.coordination))
-@MainActor
-struct DeselectionReviewRoutingTests {
-
-    @Test("Review preamble round-trips verified -> editing (Keep Editing's transition)")
-    func preambleRoutesToEditing() {
-        let doc = DocumentState()
-        doc.phase = .verified(report: .skipped)
-
-        DocumentEditorView.prepareForDeselectionReview(documentState: doc)
-
-        #expect(doc.phaseKind == .editing)
-    }
-
-    @Test("Review raises the sheet past compactFloat so the panel mount is on screen")
-    func reviewDetentRevealsPanel() {
-        #expect(DocumentEditorView.deselectionReviewDetent == .medium)
-    }
-
-    @Test("Review affordance is offered only while the search session is alive")
-    func affordanceRequiresLiveSession() {
-        #expect(DocumentEditorView.deselectionReviewAvailable(
-            hasLiveSearchSession: true))
-        #expect(!DocumentEditorView.deselectionReviewAvailable(
-            hasLiveSearchSession: false))
-    }
-}
-
 // MARK: - Fixtures
 
 /// A `.piiScan` session with `total` results, the first `deselected` of

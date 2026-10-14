@@ -265,6 +265,8 @@ struct SavedSearchListSheet: View {
                 Text(search.name)
                     .font(.headline)
                     .foregroundStyle(.primary)
+                    // The name the user gave the search may itself be PII.
+                    .privacySensitive()
                 HStack(spacing: ResectaTokens.Spacing.xs) {
                     Text(search.mode.displayName)
                         .font(.caption2.bold())
@@ -393,17 +395,6 @@ struct SavedSearchListSheet: View {
         // every Scan→Scan recall is same-mode.
         searchState.piiCategoryFilter = nil
         searchState.sortOrder = .discoveryOrder
-        // Category restore only while the chips strip is
-        // live — with the strip dark there is no UI that shows or
-        // undoes a narrowed detector set, so recall must not silently
-        // narrow what the next scan runs. The persisted
-        // `enabledPIICategories` field is untouched (schema and codec
-        // unchanged; capture still writes it) and restore revives with
-        // the flag. Pinned by `SavedListPartitionTests`.
-        if SearchState.scanCategoryStripEnabled,
-           let categories = saved.enabledPIICategories {
-            searchState.enabledPIICategories = categories
-        }
         searchState.options.caseSensitive = saved.caseSensitive
         searchState.options.wholeWord = saved.wholeWord
         searchState.options.stripDigitSeparators = saved.stripDigitSeparators

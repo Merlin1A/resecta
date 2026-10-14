@@ -44,12 +44,6 @@ struct VerificationResultsView: View {
     /// Nil (also the default, so fixture call sites stay source-compatible)
     /// or zero deselections renders no row.
     var deselectionSnapshot: RedactionState.DeselectionSnapshot? = nil
-    /// Tap handler for the deselection row's Review affordance. Routing
-    /// (Keep Editing + re-presenting the search sheet's coverage panel)
-    /// lives on `DocumentEditorView`, which owns the sheet detent and the
-    /// phase transition. Nil hides the affordance — the search session the
-    /// counts came from is gone, so there is no panel to reopen.
-    var onReviewDeselections: (() -> Void)? = nil
     /// Pre-derived run facts for the run-facts strip.
     /// This view injects no RedactionState (mirrors
     /// `deselectionSnapshot`/`previewAvailable`); `DocumentEditorView`
@@ -634,7 +628,6 @@ struct VerificationResultsView: View {
         VerificationDetailsSection(
             report: report,
             deselectionSnapshot: deselectionSnapshot,
-            onReviewDeselections: onReviewDeselections,
             isExpanded: $detailsExpanded,
             columnMaxWidth: columnMaxWidth
         )

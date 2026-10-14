@@ -6,8 +6,9 @@ import RedactionEngine
 
 extension DetectionResult.Kind {
 
-    /// Short badge label for compact display (filter chips, row badges).
-    var badge: String {
+    /// Short badge label for compact display (filter chips, row badges,
+    /// the canvas badge through `RegionMetadata`).
+    nonisolated var badge: String {
         switch self {
         case .pii(let k):
             switch k {
@@ -38,8 +39,9 @@ extension DetectionResult.Kind {
         }
     }
 
-    /// Full descriptive name for detail display and sorting.
-    var fullName: String {
+    /// Full descriptive name for detail display, sorting and the
+    /// accessibility description `RegionMetadata` carries.
+    nonisolated var fullName: String {
         switch self {
         case .pii(let k):
             switch k {

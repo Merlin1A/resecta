@@ -240,25 +240,6 @@ struct PencilCircleSelectTests {
         )
     }
 
-    // MARK: - Touch-source discrimination
-
-    @Test("Pencil touch-type activates the gesture")
-    func isPencilEventForPencil() {
-        #expect(SearchResultsSection.isPencilEvent(touchType: .pencil) == true)
-    }
-
-    @Test("Finger touch-type does not activate the gesture")
-    func isPencilEventForFinger() {
-        #expect(SearchResultsSection.isPencilEvent(touchType: .direct) == false)
-    }
-
-    @Test("Indirect touch (trackpad) does not activate the gesture")
-    func isPencilEventForIndirect() {
-        #expect(
-            SearchResultsSection.isPencilEvent(touchType: .indirectPointer)
-                == false
-        )
-    }
 
     // MARK: - Enclosed-row aggregator
 

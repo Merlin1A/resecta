@@ -33,7 +33,7 @@ struct SearchToolbarSection: View {
     // caption: when no page classifies `.sparse`/`.none`, no OCR leg will
     // run and "Awaiting OCR results" would promise something that never
     // arrives.
-    @Environment(DocumentState.self) private var documentState
+    @Environment(DocumentState.self) var documentState
     @Binding var duplicateTermMessage: String?
     let onTriggerSearch: () -> Void
     /// "Save current..." requests the naming prompt from the
@@ -393,236 +393,6 @@ struct SearchToolbarSection: View {
         )
     }
 
-    // MARK: - Scan Options
-
-    private var scanOptions: some View {
-        VStack(spacing: ResectaTokens.Spacing.xs) {
-            // The role subtitle moved from here into
-            // the pre-scan empty state
-            // (`WU20Strings.description(for: .piiScanPreScan)`).
-            //
-            // The per-run Confidence slider that lived here is retired:
-            // Settings' Detection Sensitivity preset is the one
-            // engine-level control, and the confidence sort is the
-            // review-side confidence tool (the Select-where ≥75/≥90
-            // predicates retired with the footer menu).
-
-            // Category chips — pre-scan detector selection over
-            // `enabledPIICategories` — plus the trailing re-run
-            // affordance. Toggling narrows the NEXT run; runs stay
-            // trigger-driven (no auto re-run on chip change).
-            // The strip is retired for 1.0 — dark behind
-            // `scanCategoryStripEnabled` (the ↻ re-run relocated to
-            // the sheet's search-bar row; the "no categories" notice
-            // below goes unreachable with it, since the strip is the
-            // only UI that can empty the selection). Machinery and
-            // tests stay compiled.
-            if SearchState.scanCategoryStripEnabled {
-                scanChipsRow
-            }
-
-            // An empty selection means the next run scans everything —
-            // say so where the chips would otherwise read as "nothing".
-            if searchState.enabledPIICategories.isEmpty {
-                HStack {
-                    Text("No categories selected \u{2014} the next scan runs all detectors.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .padding(.horizontal, ResectaTokens.Spacing.md)
-            }
-
-            // The whole OCR block (toggle + controls row) renders
-            // only when a page can actually route to OCR; on all-`.rich`
-            // documents the engine never runs OCR, so the controls carry
-            // no information there. Fail-open on an unknown map.
-            if Self.piiScanOCRBlockShouldShow(
-                anyPageAwaitsOCR: documentState.textLayerStatus.values
-                    .contains { $0 != .rich },
-                statusKnown: !documentState.textLayerStatus.isEmpty
-            ) {
-                // Include OCR toggle for the scan run
-                HStack {
-                    Toggle("Include OCR Pages", isOn: $searchState.options.includeOCR)
-                        .toggleStyle(.button)
-                        .controlSize(.small)
-                        // Disable while a run is in flight.
-                        .disabled(Self.optionControlsDisabled(isSearching: searchState.isSearching))
-                        .accessibilityLabel("Include scanned page text")
-                    Spacer()
-                }
-                .padding(.horizontal, ResectaTokens.Spacing.md)
-
-                // Mirror the source-filter + OCR
-                // confidence slider into the Scan interface. Reuses
-                // the same `ocrControlsRow` component so the gating helpers
-                // (`ocrControlsShouldShow`, `ocrSliderShouldBeDisabled`,
-                // `awaitingOCRResultsCaption`) stay canonical across modes.
-                ocrControlsRow
-            }
-        }
-    }
-
-    // MARK: - Scan Category Chips (pre-scan selection)
-
-    /// Chips row: the scrolling category chips plus the compact re-run
-    /// button pinned at the trailing edge (chips scroll beside it).
-    /// The re-run affordance replaces the retired persistent
-    /// "Scan Document" capsule — entry auto-run is how scans start;
-    /// this button covers re-running after narrowing categories.
-    private var scanChipsRow: some View {
-        HStack(spacing: 0) {
-            scanCategoryChips
-            rescanButton
-                .padding(.trailing, ResectaTokens.Spacing.md)
-        }
-    }
-
-    /// Compact re-run control for the Scan interface. Inherits the
-    /// retired run button's accessibility label — the stable-label
-    /// policy: existing UI-test queries and VoiceOver habits keep
-    /// resolving to the surface's one run control.
-    private var rescanButton: some View {
-        Button {
-            onTriggerSearch()
-        } label: {
-            // The sheet's circular icon chrome — a Ø44 circle + 18pt
-            // glyph in place of the `.bordered` wash that rendered as a
-            // ~64pt slab; the 46pt floor is a LAYOUT frame AFTER the
-            // chrome (hit area unchanged, visual back to circle scale).
-            // States live on `CircularIconButtonStyle`.
-            SearchAndRedactSheet.circularIconLabel("arrow.clockwise")
-        }
-        .buttonStyle(.circularIcon)
-        // An empty chip selection does not disable the run — it means
-        // scan everything (`effectiveScanCategories`).
-        .disabled(searchState.isSearching)
-        .accessibilityLabel("Scan document for PII")
-        .accessibilityIdentifier("rescanButton")
-    }
-
-    /// Pre-scan detector-selection chips over the full category set.
-    /// Distinct from `piiCategoryFilterChips` (post-scan result
-    /// filtering): these choose what the NEXT run requests. Toggling
-    /// routes through the chip's action (a user gesture) — never
-    /// value observation — and deliberately does NOT re-trigger the
-    /// scan; runs stay trigger-driven. Rendered through `FilterChip`
-    /// (the one chip component), category-tinted.
-    private var scanCategoryChips: some View {
-        // Single-row horizontal strip inside the
-        // sheet's existing safeAreaInset chrome layer. Detent
-        // cooperation binds GEOMETRICALLY: the List stays root-bound
-        // at the sheet top with ALL fixed chrome on the
-        // `.safeAreaInset(.top)` stack, and the horizontal chip
-        // ScrollView does not interfere with that binding — a strip
-        // inside the inset chrome keeps the cooperation intact.
-        // The surface stays flag-dark (`--showRetiredSheetControls`)
-        // and converts with its component family; the 17-category set
-        // scrolls in one row, with the wrap returning at
-        // accessibility type sizes so every chip stays visible.
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                FlowLayout(spacing: ResectaTokens.Spacing.xs) {
-                    scanCategoryChipItems
-                }
-                .padding(.horizontal, ResectaTokens.Spacing.md)
-            } else {
-                chipStrip {
-                    scanCategoryChipItems
-                }
-            }
-        }
-        // Chips freeze while a run is in flight, matching the
-        // sibling ↻ control: kickoff snapshots the category set, so a
-        // mid-run toggle neither re-scopes the running scan nor warns —
-        // it only desynced the completion copy from the run that
-        // actually executed.
-        .disabled(searchState.isSearching)
-        // Container id rides the strip/wrap chassis.
-        .accessibilityIdentifier("scanCategoryChips")
-    }
-
-    /// The 17 pre-scan detector chips — shared by the strip and its
-    /// accessibility-size wrap fallback.
-    private var scanCategoryChipItems: some View {
-        ForEach(PIICategory.allCases, id: \.self) { category in
-            let isEnabled = searchState.enabledPIICategories.contains(category)
-            FilterChip(
-                label: category.rawValue,
-                systemImage: category.symbolName,
-                tint: SearchResultRow.categoryColor(category),
-                isSelected: isEnabled
-            ) {
-                if isEnabled {
-                    searchState.enabledPIICategories.remove(category)
-                } else {
-                    searchState.enabledPIICategories.insert(category)
-                }
-            }
-            .accessibilityLabel("\(category.rawValue) detector")
-            .accessibilityValue(isEnabled ? "enabled" : "disabled")
-            .accessibilityHint("Applies to the next scan")
-        }
-    }
-
-    // MARK: - OCR Controls (shared by standardSearchOptions + piiScanOptions)
-
-    /// Shared source filter + OCR confidence slider.
-    /// Visibility gate via `ocrControlsShouldShow(includeOCR:)`; disabled
-    /// state via `ocrSliderShouldBeDisabled(hasOCRResults:)`. Caption
-    /// text comes from `awaitingOCRResultsCaption`. Used by both
-    /// `standardSearchOptions` (text/regex/multi-term) and
-    /// `piiScanOptions` (PII Scan).
-    @ViewBuilder
-    private var ocrControlsRow: some View {
-        if Self.ocrControlsShouldShow(includeOCR: searchState.options.includeOCR) {
-            let isDisabled = Self.ocrSliderShouldBeDisabled(
-                hasOCRResults: searchState.hasOCRResults
-            )
-            HStack(spacing: ResectaTokens.Spacing.md) {
-                Picker("Source", selection: $searchState.sourceFilter) {
-                    ForEach(SourceFilter.allCases, id: \.self) { filter in
-                        Text(filter.rawValue).tag(filter)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .accessibilityLabel("Filter by source")
-
-                if searchState.sourceFilter != .textOnly {
-                    HStack(spacing: 4) {
-                        Text("OCR ≥\(Int(searchState.minimumOCRConfidence * 100))%")
-                            .font(.caption)
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                            .frame(width: 70, alignment: .trailing)
-                        Slider(value: $searchState.minimumOCRConfidence, in: 0...1, step: 0.05)
-                            .frame(maxWidth: 120)
-                            .accessibilityLabel("Minimum OCR confidence")
-                    }
-                }
-            }
-            .padding(.horizontal, ResectaTokens.Spacing.md)
-            .disabled(isDisabled)
-
-            if isDisabled {
-                // The caption is conditional: "awaiting" only
-                // when at least one page will actually route to OCR.
-                let caption = Self.ocrDisabledCaption(
-                    anyPageAwaitsOCR: documentState.textLayerStatus.values
-                        .contains { $0 != .rich }
-                )
-                Text(caption)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, ResectaTokens.Spacing.md)
-                    // The caption is a full sentence that may open with
-                    // an acronym ("OCR not needed …") — lowercasing it
-                    // produced "ocr not needed" in the spoken label.
-                    .accessibilityLabel("OCR controls disabled: \(caption)")
-            }
-        }
-    }
 
     // MARK: - Chip-Row Substrate
 
@@ -639,8 +409,7 @@ struct SearchToolbarSection: View {
     /// One chip block hosting all post-scan filter chips — a
     /// single-row horizontal strip inside the
     /// sheet's inset chrome layer, wrapping again at accessibility
-    /// type sizes (see `scanCategoryChips` for the mechanism this
-    /// strip shares). Established as
+    /// type sizes (the FlowLayout fallback). Established as
     /// the integration substrate; downstream additions append chip
     /// groups inside `chipRowSubstrateItems` without altering the
     /// chassis.
@@ -665,8 +434,7 @@ struct SearchToolbarSection: View {
                 }
             }
         }
-        // Container id for the XCUI strip-cooperation battery —
-        // mirrors `scanCategoryChips`' container-id shape.
+        // Container id for the XCUI strip-cooperation battery.
         .accessibilityIdentifier("chipRowSubstrate")
     }
 
@@ -694,8 +462,8 @@ struct SearchToolbarSection: View {
         // Downstream chip groups inserted here.
     }
 
-    /// The strip chassis shared by `scanCategoryChips` and
-    /// `chipRowSubstrate` — exactly these two surfaces;
+    /// The strip chassis of `chipRowSubstrate` — exactly that one
+    /// surface;
     /// the options rows, multi-term chips, and the review bar keep
     /// their wraps. Single row, 8pt gap, with a trailing ~44pt fade
     /// that signals the pan without stealing touches.

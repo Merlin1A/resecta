@@ -219,21 +219,6 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         dragSheetToExpanded()
         assertSheetExpanded()
 
-        // The retired controls must not render (asserted at the
-        // expanded detent, where they WOULD be visible if present).
-        XCTAssertFalse(
-            segment("This page").exists,
-            "The retired scope picker rendered on the Scan surface with the flag dark."
-        )
-        XCTAssertFalse(
-            segment("Whole document").exists,
-            "The retired scope picker rendered on the Scan surface with the flag dark."
-        )
-        XCTAssertFalse(
-            app.descendants(matching: .any)
-                .matching(identifier: "scanCategoryChips").firstMatch.exists,
-            "The retired category-chips strip rendered with the flag dark."
-        )
         // Exactly one run control — the no-double-↻ contract.
         XCTAssertEqual(
             app.buttons.matching(
@@ -264,38 +249,6 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         XCTAssertTrue(
             app.navigationBars["Saved Searches"].waitForExistence(timeout: 10),
             "Tapping the bookmark did not present the saved list — the seq-134 occlusion no-op."
-        )
-
-        // Reveal smoke: relaunch with the
-        // DEBUG reveal arg — the retired rows render again and the
-        // run control collapses back to the chips-row ↻, still
-        // exactly one.
-        app.terminate()
-        app.launchArguments = [
-            "--uitesting", "--loadTestDocument", "--openSearchSheet",
-            "--searchMode=piiScan", "--showRetiredSheetControls",
-        ]
-        app.launch()
-        XCTAssertTrue(
-            app.buttons["Scan document for PII"].waitForExistence(timeout: 30),
-            "Reveal relaunch never presented the sheet."
-        )
-        XCTAssertTrue(
-            app.descendants(matching: .any)
-                .matching(identifier: "scanCategoryChips").firstMatch
-                .waitForExistence(timeout: 10),
-            "--showRetiredSheetControls did not restore the category-chips strip."
-        )
-        dragSheetToExpanded()
-        assertSheetExpanded()
-        XCTAssertTrue(
-            segment("This page").waitForExistence(timeout: 10),
-            "--showRetiredSheetControls did not restore the scope picker."
-        )
-        XCTAssertEqual(
-            app.buttons.matching(
-                NSPredicate(format: "label == %@", "Scan document for PII")).count, 1,
-            "The reveal co-rendered two Scan run controls — the bar ↻ must hide whenever the chips strip (and its in-row ↻) returns."
         )
     }
 

@@ -8,8 +8,8 @@ import UIKit
 // through untouched to the List's native scroll / select behavior.
 //
 // The geometry helpers (`isClosedLoop`, `shoelaceArea`, `isPointInPolygon`,
-// `isRowEnclosed`) and the touch-source discriminator (`isPencilEvent`)
-// are pure functions on `SearchResultsSection` so the gating contract is
+// `isRowEnclosed`) are pure functions on `SearchResultsSection` so the
+// gating contract is
 // testable without a UIView host. The actual gesture wiring lives in
 // `PencilCircleSelectOverlay` (UIViewRepresentable) below.
 //
@@ -100,15 +100,6 @@ extension SearchResultsSection {
     ) -> Bool {
         let centroid = CGPoint(x: rowFrame.midX, y: rowFrame.midY)
         return isPointInPolygon(point: centroid, polygon: loop)
-    }
-
-    /// Touch-source discrimination: only `UITouch.TouchType.pencil`
-    /// drives circle-to-select. Finger and indirect touches fall
-    /// through to the List's native scroll / select gestures. Pure
-    /// function — pinned by
-    /// `PencilCircleSelectTests.isPencilEvent*`.
-    static func isPencilEvent(touchType: UITouch.TouchType) -> Bool {
-        touchType == .pencil
     }
 
     /// Stroke-lifecycle gate transition for the row-frame
