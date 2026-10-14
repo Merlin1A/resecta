@@ -374,4 +374,39 @@ struct ImportServiceTests {
         doc.phase = .importing
         #expect(doc.canStartImport(with: redaction) == false)
     }
+
+    // MARK: - The outcome
+
+    @Test("A valid import reports completed; a refused one reports refused")
+    func outcomeReportsCompletedOrRefused() async {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+
+        let completed = await ImportService.importDocument(
+            data: makeTestPDFData(), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+        #expect(completed == .completed)
+        #expect(doc.phaseKind == .editing)
+
+        let refused = await ImportService.importDocument(
+            data: Data([0xDE, 0xAD]), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+        #expect(refused == .refused)
+        #expect(doc.phaseKind == .failed)
+    }
+
+    @Test("An import the phase gate refuses reports refused and moves nothing")
+    func gateRefusalReportsRefused() async {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        doc.phase = .importing   // a phase that forbids a new import
+
+        let outcome = await ImportService.importDocument(
+            data: makeTestPDFData(), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+
+        #expect(outcome == .refused)
+        #expect(doc.sourceDocument == nil)
+        #expect(doc.phaseKind == .importing)
+    }
 }

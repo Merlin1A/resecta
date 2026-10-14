@@ -52,7 +52,7 @@ struct RedactWorkspaceView: View {
                 // at the door with the unsupported-format message the Files
                 // import shows. Returning true snaps the payload back, as
                 // the gate below does on a rejection.
-                guard ImportService.admitsDroppedPayload(data) else {
+                guard ImportRouter.admitsDroppedPayload(data) else {
                     enqueueImportRefusedNotPDFToast()
                     return true
                 }
@@ -74,16 +74,14 @@ struct RedactWorkspaceView: View {
                     return true
                 }
                 // Phase admission has already passed by this point; the
-                // label handed on is the sniffed kind's, and the import
-                // reads the bytes again before any parse.
-                let suggestedType = ImportService.detectPayloadKind(from: data).suggestedType
+                // import reads the bytes again before any parse.
                 // Cancel any prior in-flight import
                 // dispatch so a rapid double-drop doesn't race two
                 // ImportService.importDocument calls.
                 activeImportDispatch?.cancel()
                 activeImportDispatch = Task {
-                    await ImportService.importDocument(
-                        data: data, suggestedType: suggestedType,
+                    _ = await ImportService.importDocument(
+                        data: data, door: .drop,
                         documentState: workspace.documentState,
                         redactionState: workspace.redactionState
                     )
