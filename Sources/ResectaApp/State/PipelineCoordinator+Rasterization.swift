@@ -116,17 +116,20 @@ extension PipelineCoordinator {
 
     // MARK: - Per-Page Retry
 
-    /// Per-page DPI floor for the verification-retry fallback. Tuned to keep
-    /// the second-attempt buffer small enough to fit under typical memory
-    /// pressure while leaving enough resolution for Vision-level pixel
-    /// verification. Locked at 96.
+    /// The floor under the one retry's DPI cap, `max(retryDPIFloor,
+    /// primaryDPICap / 2)`. The rasterizer picks its DPI from the tiers 150,
+    /// 200 and 300 and has no lower tier, so the retry lands at the 150 tier
+    /// whatever the halved cap reads (or the rasterizer declines the page
+    /// for memory); the floor only bounds the arithmetic.
     // nonisolated: read by the `nonisolated rasterizeWithRetry` parallel TaskGroup body
     // (a @Sendable closure). A plain Int constant — opted out of the SE-0466
     // MainActor default so the off-actor retry path can read it directly.
     nonisolated static let retryDPIFloor: Int = 96
 
     /// Rasterize a single page; on `fillVerificationFailed`,
-    /// re-rasterize once at `max(retryDPIFloor, primaryDPICap / 2)`. A second
+    /// re-rasterize once with the cap halved and floored by `retryDPIFloor`,
+    /// which the rasterizer's DPI tiers turn into the 150 tier: at most one
+    /// retry, at 150 DPI. A second
     /// failure propagates the original error type so the caller surfaces the
     /// page index unchanged.
     ///
@@ -171,8 +174,8 @@ extension PipelineCoordinator {
     /// binds it to the coordinator's live `dpiCap` / `parallelismOverride`
     /// reads, its `rasterizeWithRetry`, the `.redacting` progress transition
     /// and the DEBUG residency telemetry. Each parallel task wraps the
-    /// rasterize call in `rasterizeWithRetry`, so the per-page half-DPI retry
-    /// on `fillVerificationFailed` happens inside the task — preserving the
+    /// rasterize call in `rasterizeWithRetry`, so the per-page retry at the
+    /// 150 tier on `fillVerificationFailed` happens inside the task — preserving the
     /// per-page retry semantics under parallel execution.
     ///
     /// `internal` access (rather than `private`) so the page-parallel test suite
