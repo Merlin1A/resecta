@@ -12,7 +12,7 @@ import PDFKit
 // loop is `OutputRecheck`, shared with the Search Re-check so the two rows
 // read one OCR pass per page.
 //
-// The category gate (ruled on the sweep-residual measurement over the
+// The category gate (set by the sweep-residual measurement over the
 // corpus): the structured families only — names and addresses are not
 // swept, by either origin.
 // On fully-applied output the detectors re-read names at a rate no user

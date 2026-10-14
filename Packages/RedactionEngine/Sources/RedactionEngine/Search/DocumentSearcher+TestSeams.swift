@@ -11,7 +11,7 @@ extension DocumentSearcher {
     #if DEBUG
     internal var _testOCRCacheKeys: Set<Int> { ocrPageCache.cachedKeys }
     internal var _testOCRNormalizedConcatKeys: Set<Int> { ocrPageCache.normalizedKeys }
-    /// H3.1 (1.2 instrumentation plan §6) — read-only view of one page's
+    /// The search ground-truth harness's seam — read-only view of one page's
     /// cached Vision lines so the search-GT harness can emit the exact OCR
     /// text the OCR leg matched against. Observation-only, same contract as
     /// `_testOCRCacheKeys` above; never touches the LRU access ordering.

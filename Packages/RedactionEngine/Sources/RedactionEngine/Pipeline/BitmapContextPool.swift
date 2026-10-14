@@ -114,7 +114,7 @@ public final class BitmapContextPool: @unchecked Sendable {
     // MARK: - Flush
 
     /// Drop every pooled context, releasing the up to ~135 MB of held
-    /// bitmap memory (4 entries × a ~33.7 MB US-Letter raster: 2550×3300
+    /// bitmap memory (4 entries × a ~33.7 MB US-Letter raster: 2550×3301
     /// px × 4 B at 300 DPI). Idempotent and thread-safe against in-flight
     /// `checkOut`/`checkIn`. Called from
     /// `PipelineCoordinator.memoryWarningTask` after iOS posts

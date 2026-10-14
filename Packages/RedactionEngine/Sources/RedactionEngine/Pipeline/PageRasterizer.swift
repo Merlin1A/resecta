@@ -96,7 +96,7 @@ public final class PageRasterizer: @unchecked Sendable {
     /// Drop every entry in the per-rasterizer bitmap pool. Called from
     /// `PipelineCoordinator.memoryWarningTask` after iOS posts a memory
     /// warning, so the up to ~135 MB of held bitmap buffers (4 entries ×
-    /// a ~33.7 MB US-Letter raster: 2550×3300 px × 4 B at 300 DPI) are
+    /// a ~33.7 MB US-Letter raster: 2550×3301 px × 4 B at 300 DPI) are
     /// released immediately rather than waiting for the rasterizer to drop at
     /// run end. Idempotent and thread-safe against in-flight
     /// `rasterize(...)` calls (pool guards `entries` internally).
@@ -388,7 +388,7 @@ public final class PageRasterizer: @unchecked Sendable {
 
             ctx.draw(renderedImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 
-            // 4b. The hidden-text ink test (C12-01). A Searchable page's
+            // 4b. The hidden-text ink test. A Searchable page's
             // surviving glyphs are read back from the RENDERED pixels — what
             // the reader will see. A glyph whose pixel box is uniform carries
             // no visible ink (white-on-white text, an invisible render mode,

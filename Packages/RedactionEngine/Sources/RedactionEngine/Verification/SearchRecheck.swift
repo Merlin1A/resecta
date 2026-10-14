@@ -94,7 +94,7 @@ struct SearchRecheck: Sendable {
         var ocrPagesByRequest = [Int](repeating: 0, count: requestCount)
         var textPages = 0
         var ocrPages = 0
-        // Unchecked pages → reason clauses (§5.2), in page order.
+        // Unchecked pages → reason clauses, in page order.
         var uncheckedClauses: [Int: [String]] = [:]
         // Requests the searcher refused to re-run on at least one page.
         var uncheckedByRequest = [Bool](repeating: false, count: requestCount)
@@ -256,7 +256,7 @@ struct SearchRecheck: Sendable {
         }
     }
 
-    /// The route sentence of the detail copy (§5.2). Empty when no page was
+    /// The route sentence of the detail copy. Empty when no page was
     /// read at all — the copy then carries only the unchecked-page clause.
     static func routeSentence(textPages: Int, ocrPages: Int) -> String {
         switch (textPages > 0, ocrPages > 0) {
