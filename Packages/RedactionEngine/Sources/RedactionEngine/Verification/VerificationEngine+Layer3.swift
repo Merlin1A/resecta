@@ -18,8 +18,8 @@ extension VerificationEngine {
     /// might be under them.
     static func manualRegionsWithoutTextDetail(_ count: Int) -> String {
         count == 1
-            ? "1 manual region on an image-only page carries no text to search for."
-            : "\(count) manual regions on image-only pages carry no text to search for."
+            ? "1 manual region is on a page with no text layer to capture terms from."
+            : "\(count) manual regions are on pages with no text layer to capture terms from."
     }
 
     /// Layer 3's copy for a run with such regions: the clean line (PASS's

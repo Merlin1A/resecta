@@ -20,6 +20,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Verification: the search re-check and the detection sweep list a page as not checked when a custom regular-expression term ran out of time on it, instead of counting the page as read.
 - Verification: the detection sweep reports a custom term added after a scan was applied as a possible item instead of discarding it as the scan's.
 - Verification: the sweep's count of items you left unredacted pairs each one with what it reads on the output by its text first and its position second, so scanned output no longer misattributes them.
+- Verification: a typed pattern that ran out of time marks only its own search as not checked on that page; the detection sweep's row no longer carries another search's timeout.
+- Verification: two applied scans that share a category count an item they both read once.
+- Verification: the string-search check's note on manual regions names the mechanism — pages with no text layer to capture terms from — instead of calling the pages image-only.
 
 ### Internal
 

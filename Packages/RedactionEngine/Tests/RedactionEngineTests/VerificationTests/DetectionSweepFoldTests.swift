@@ -57,16 +57,19 @@ struct DetectionSweepFoldTests {
             appliedCount: 0, appliedPages: [], origin: .sweep)
     }
 
-    /// One page's observation: per request index, the items the stream yielded.
+    /// One page's observation: per request index, the items the stream
+    /// yielded; `timedOut` names the requests whose pattern ran out of time.
     private func page(_ index: Int, route: PageSearchCoverage.Route? = .textLayer,
-                      _ itemsByRequest: [Int: [Item]]) -> RecheckObservation {
+                      _ itemsByRequest: [Int: [Item]], timedOut: Set<Int> = []) -> RecheckObservation {
         var counts: [Int: Count] = [:]
         for (request, items) in itemsByRequest {
             var perTerm: [String: Int] = [:]
             for i in items { perTerm[i.category?.rawValue ?? "Custom", default: 0] += 1 }
-            counts[request] = Count(remaining: items.count, hitCap: false, perTerm: perTerm, items: items)
+            counts[request] = Count(remaining: items.count, hitCap: false, perTerm: perTerm,
+                                    timedOut: timedOut.contains(request), items: items)
         }
-        return RecheckObservation(pageIndex: index, route: route, regexTimedOut: false, counts: counts)
+        return RecheckObservation(
+            pageIndex: index, route: route, regexTimedOut: !timedOut.isEmpty, counts: counts)
     }
 
     private func message(_ status: VerificationStatus) -> String {
@@ -221,8 +224,7 @@ struct DetectionSweepFoldTests {
 
     @Test("WARN could-not-verify on unchecked pages, with the re-check's clause vocabulary")
     func warnUncheckedPages() {
-        var timedOut = page(2, route: .textLayer, [0: []])
-        timedOut.regexTimedOut = true
+        let timedOut = page(2, route: .textLayer, [0: []], timedOut: [0])
         let outcome = DetectionSweep.fold(
             requests: [sweep],
             observations: [
@@ -310,6 +312,26 @@ struct DetectionSweepFoldTests {
         #expect(DetectionSweep.subtractDeselected([left], from: [item(0, .phone, box)]).consumed == 0)
         // The text key: case, ligatures and whitespace runs do not tell items apart.
         #expect(DetectionSweep.pairingText("  Acme\tOﬃce ") == DetectionSweep.pairingText("acme office"))
+    }
+
+    @Test("Two applied scans sharing a category count an item they both read once, and subtract it once")
+    func sharedCategoryItemCountedOnce() {
+        let box = rect(0.1, 0.5)
+        let first = applied([.ssn], deselected: [result(0, .ssn, box)])
+        let second = applied([.ssn, .phone], deselected: [result(0, .ssn, box)])
+        let both = DetectionSweep.fold(
+            requests: [first, second],
+            observations: [page(0, [0: [item(0, .ssn, box)], 1: [item(0, .ssn, box)]])], pageCount: 1)
+        #expect(both.status == .pass, "got \(both.status)")
+        #expect(both.copyOverride?.short == "Re-ran your scan on the output — 1 remains, the 1 you left unredacted.")
+        // Left unselected in one of the two scans: still one item, still the one left.
+        let once = DetectionSweep.fold(
+            requests: [first, applied([.ssn, .phone])],
+            observations: [page(0, [0: [item(0, .ssn, box)], 1: [item(0, .ssn, box)]])], pageCount: 1)
+        #expect(once.status == .pass, "got \(once.status)")
+        #expect(once.copyOverride?.short == "Re-ran your scan on the output — 1 remains, the 1 you left unredacted.")
+        // The per-request lines still say what each scan read.
+        #expect(both.queryLines?.map(\.remainingCount) == [1, 1])
     }
 
     // MARK: - The scope split and custom terms

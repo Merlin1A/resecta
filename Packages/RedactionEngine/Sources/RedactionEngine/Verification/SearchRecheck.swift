@@ -116,11 +116,9 @@ struct SearchRecheck: Sendable {
             case .unopenable?, nil:
                 uncheckedClauses[page, default: []] = uncheckedClauses[page] ?? []
             }
-            if observation.regexTimedOut {
-                uncheckedClauses[page, default: []].append("the pattern took too long")
-            }
             var pageHitCap = false
             var pageRefused = false
+            var pageTimedOut = false
             for (requestIndex, count) in observation.counts {
                 if count.rejected {
                     // No count for this request on this page: the page is
@@ -128,6 +126,12 @@ struct SearchRecheck: Sendable {
                     uncheckedByRequest[requestIndex] = true
                     pageRefused = true
                     continue
+                }
+                // The request's own pattern ran out of time on the page:
+                // unchecked for it; what it read before is still counted.
+                if count.timedOut {
+                    uncheckedByRequest[requestIndex] = true
+                    pageTimedOut = true
                 }
                 remainingByRequest[requestIndex] += count.remaining
                 if count.remaining > 0 {
@@ -148,6 +152,9 @@ struct SearchRecheck: Sendable {
             if pageHitCap {
                 uncheckedClauses[page, default: []]
                     .append("the re-check stopped at 1,000 matches on the page")
+            }
+            if pageTimedOut {
+                uncheckedClauses[page, default: []].append("the pattern took too long")
             }
             if pageRefused {
                 uncheckedClauses[page, default: []].append("the pattern was not accepted")
