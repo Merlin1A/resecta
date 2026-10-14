@@ -250,9 +250,6 @@ struct SearchAndRedactSheet: View {
                             activeModal = .rowRationale(rowID: rowID)
                         },
                         onTriggerSearch: triggerSearch,
-                        onShowSavedSearches: {
-                            activeModal = .savedSearches
-                        },
                         onFocusWalk: focusWalk(on:parking:)
                     )
                     .safeAreaInset(edge: .top, spacing: 0) {

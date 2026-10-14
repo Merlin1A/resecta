@@ -321,31 +321,6 @@ struct SearchResultRow: View {
         .padding(.bottom, ResectaTokens.Spacing.xxs)
     }
 
-    /// Single-capsule renderer for the source badge. Branch order
-    /// Custom → Regex → category/source. This two-parameter signature
-    /// stays the public/test contract; it computes the signal flags and
-    /// delegates to the flag-taking canonical implementation below —
-    /// the row build precomputes the flags once and calls the
-    /// canonical form directly.
-    @ViewBuilder
-    static func badgeView(
-        for result: SearchResult,
-        searchMode: SearchModeType,
-        ocrFloor: Float = 0.0
-    ) -> some View {
-        let isCustomHit = Self.isCustomTermHit(result)
-        badgeView(
-            for: result,
-            isCustomHit: isCustomHit,
-            isRegexHit: Self.isRegexHit(result, searchMode: searchMode),
-            tier: Self.confidenceTier(
-                for: result,
-                ocrFloor: Double(ocrFloor),
-                isCustomHit: isCustomHit
-            )
-        )
-    }
-
     /// Canonical badge renderer over precomputed signal flags. The
     /// flags fully determine the branch together with `result` itself
     /// (`searchMode` participates only through `isRegexHit`). `tier` is

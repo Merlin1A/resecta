@@ -12,7 +12,6 @@ import RedactionEngine
 struct SearchResultsSection: View {
     @Bindable var searchState: SearchState
     @Environment(DocumentState.self) private var documentState
-    @Environment(RedactionState.self) private var redactionState
     // `appliedResultIDs` lives on `searchState`.
     // Reads go through `searchState.appliedResultIDs`.
     @Binding var selectedDetent: PresentationDetent
@@ -35,9 +34,6 @@ struct SearchResultsSection: View {
     /// next 300 ms debounce would eventually run, but the banner's tap
     /// would feel broken in the interim.
     let onTriggerSearch: () -> Void
-    /// Present the saved-searches list — the parent owns the single
-    /// modal slot. Wired to the Scan-side bookmark on the scope row.
-    let onShowSavedSearches: () -> Void
     /// Result navigation is ONE seam on the hub (`focusWalk(on:parking:)`,
     /// `+Walk.swift`) — the row tap and the J/K keyboard buttons call
     /// back through this with the result id instead of a section-side
@@ -216,28 +212,6 @@ struct SearchResultsSection: View {
             line += " \u{00B7} Total: \(committedTotal)"
         }
         return line
-    }
-
-    /// Bookmark button presenting the saved-searches list. Parked
-    /// while staged detections await review: a recall re-triggers a
-    /// run, and a run must not race the pending review for the Scan
-    /// surface. (While a review is active this section isn't rendered
-    /// at all — the review section replaces it — so the gate is a belt
-    /// on top of that structural rule.)
-    /// DORMANT — no render site since the bookmark moved
-    /// to the sheet's search-bar row (`SearchAndRedactSheet`'s
-    /// `savedSearchesBookmark` is the live instance, both
-    /// interfaces). Kept compiled per the hide-never-delete posture.
-    private var savedSearchesBookmark: some View {
-        Button {
-            onShowSavedSearches()
-        } label: {
-            Image(systemName: "bookmark")
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .disabled(redactionState.pendingTriage != nil)
-        .accessibilityLabel("Saved Searches")
     }
 
     // MARK: - Keyboard Shortcuts (J / K / Space / Return)

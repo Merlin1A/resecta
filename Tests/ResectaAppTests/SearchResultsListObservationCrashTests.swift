@@ -130,14 +130,11 @@ struct SearchResultsListObservationCrashTests {
         let section = SearchResultsSection(
             searchState: searchState,
             selectedDetent: .constant(.large),
-            tempExportDirectory: TempExportDirectory(),
-            captureMonitor: ScreenCaptureMonitor(),
             onRequestWhy: { _ in },
             onApplyShortcut: {},
             applyShortcutEnabled: true,
             onRequestShowRationale: { _ in },
             onTriggerSearch: {},
-            onShowSavedSearches: {},
             // The seam takes `dropToCompact`; inert here.
             onFocusWalk: { _, _ in }
         )
