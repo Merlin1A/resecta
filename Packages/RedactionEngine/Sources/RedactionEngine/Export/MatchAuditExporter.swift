@@ -13,6 +13,8 @@ import Foundation
 //   • userAlwaysFlag /      → the user's pattern arg is stripped to
 //     userNeverFlag args       `userFlag([redacted])` via
 //                             `sanitizedRationaleSummary`
+//   • foiaExemption /       → blank: the three are the user's own notes
+//     foiaCitation / foiaNote  about the match (the app passes none today)
 // All other columns are structural metadata (rule names, scores,
 // closed-vocabulary gazetteer keywords) and pass through unchanged.
 
@@ -97,9 +99,9 @@ public enum MatchAuditExporter {
             record.isSelected ? "true" : "false",
             record.wasApplied ? "true" : "false",
             record.suppressedByOverlap ? "true" : "false",
-            record.foiaExemption ?? "",
-            record.foiaCitation ?? "",
-            record.foiaNote ?? "",
+            includeSensitive ? record.foiaExemption ?? "" : "",
+            includeSensitive ? record.foiaCitation ?? "" : "",
+            includeSensitive ? record.foiaNote ?? "" : "",
         ]
         return fields.map(csvEscape).joined(separator: ",")
     }
@@ -198,9 +200,11 @@ public enum MatchAuditExporter {
                     isSelected: record.isSelected,
                     wasApplied: record.wasApplied,
                     suppressedByOverlap: record.suppressedByOverlap,
-                    foiaExemption: record.foiaExemption,
-                    foiaCitation: record.foiaCitation,
-                    foiaNote: record.foiaNote,
+                    // The user's own notes about the match: blank, as the
+                    // CSV path leaves them (the key is then omitted).
+                    foiaExemption: nil,
+                    foiaCitation: nil,
+                    foiaNote: nil,
                     ruleVersion: record.ruleVersion,
                     gazetteerManifestVersion: record.gazetteerManifestVersion
                 )
