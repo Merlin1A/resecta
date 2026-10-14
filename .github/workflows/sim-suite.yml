@@ -17,11 +17,16 @@
 # job and the egress pins step below; a dispatch adds one job.
 #
 # The hosted runner is a three-vCPU virtual machine without Neural Engine
-# access, so Vision's text recognition runs on the CPU and a verification
-# pass over a rasterized output takes minutes where a Mac takes seconds.
-# The runner's stall watchdog is widened here (TEST_BATCHED_STALL_SECS)
-# so a slow test finishes and a hung one is named by its own time limit;
-# the per-invocation ceiling (--timeout-mins) still bounds each batch.
+# access (the engine logs "E5RTNetwork: unable to compile network" there),
+# and a full pipeline run's verification pass over the rasterized output
+# never returns on it, and neither does the engine's OCR sweep or re-check
+# over rasterized pages: 900 seconds of silence with no output, and the
+# test's own time limit cannot end a hang inside a system framework. The
+# five suites that run such a pass are left out on this runtime
+# (TEST_BATCHED_EXCLUDE below; named in every verdict; the pre-push hook
+# runs them on every push), the runner's stall watchdog is widened
+# (TEST_BATCHED_STALL_SECS) for the OCR-heavy tests that merely run slowly
+# here, and a recovery reboots the simulator instead of erasing it.
 name: sim-suite
 
 on:
@@ -72,6 +77,13 @@ jobs:
       # Seconds of no output before the batched runner kills an invocation
       # (the local default is 180). See the header.
       TEST_BATCHED_STALL_SECS: '900'
+      # Suites not run on this runtime: a full pipeline run's verification
+      # pass, and the engine's OCR sweep and re-check over rasterized pages,
+      # hang on the hosted virtual machine (see the header), and a test's
+      # own time limit cannot end a hang inside a system framework. The
+      # runner leaves them out, names them in the summary and counts them in
+      # the VERDICT line; the pre-push hook runs every suite on every push.
+      TEST_BATCHED_EXCLUDE: ${{ matrix.scheme == 'ResectaApp' && 'PipelineCoordinatorSecurityTests PageParallelRasterizationTests' || 'PacketOCRQualityRoleTests SearchRecheckOCRTests SearchRecheckParallelismTests' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

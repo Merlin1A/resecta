@@ -28,6 +28,17 @@
 #                          times slower than a Mac and widens this; the
 #                          per-invocation ceiling (--timeout-mins) still
 #                          bounds each batch.
+#   TEST_BATCHED_EXCLUDE   suite names (space-separated) that are NOT run on
+#                          this runtime: a suite that hangs on the hosted
+#                          virtual machine (the verification pass of a full
+#                          pipeline run never returns there, and the test's
+#                          own time limit cannot end a hang inside a system
+#                          framework) is named here by the workflow, left
+#                          out of the batches, listed in the summary and
+#                          counted in the VERDICT line as `excluded=N`, so a
+#                          verdict that skipped a body is never read as one
+#                          that proved it. Empty locally: the pre-push hook
+#                          runs every suite.
 #   TEST_BATCHED_RECOVERY  what the recovery after a wedge does to the
 #                          simulator: `reboot` (default) shuts it down and
 #                          boots it again; `erase` also erases it first. An
@@ -83,6 +94,7 @@ BATCH_SIZE=28          # ~25-32 suites per batch
 TIMEOUT_MINS=15        # hard per-invocation ceiling
 STALL_SECS="${TEST_BATCHED_STALL_SECS:-180}"   # kill if the log stops growing this long
 RECOVERY="${TEST_BATCHED_RECOVERY:-reboot}"    # reboot | erase (see the header)
+EXCLUDE="${TEST_BATCHED_EXCLUDE:-}"            # suites not run on this runtime (see the header)
 BOOT_WAIT_SECS=300     # how long the recovery waits for the simulator to report booted
 LOAD_WARN=8            # 1-min load average warning threshold
 LOG_CAP_BYTES=20000000 # per-batch filtered-log size bound
@@ -192,6 +204,16 @@ self_test() {
     printf '%s\n' "$body" | $GREP -B1 'simctl erase "\$SIM_UDID"' | $GREP -q '"\$RECOVERY" = "erase"' \
         || { echo "self-test: the erase in recover_sim is not behind TEST_BATCHED_RECOVERY=erase" >&2; n=1; }
     if [ "$n" -eq 0 ]; then echo "self-test: stall allowance + recovery shape from the environment; recovery boots and waits; erase opt-in OK"; else fails=1; fi
+    # 7. The runtime exclusion list is read from the environment, applied
+    #    before batching, and every VERDICT line carries `excluded=`.
+    n=0
+    $GREP -qE '^EXCLUDE="\$\{TEST_BATCHED_EXCLUDE:-\}"' "$me" \
+        || { echo "self-test: EXCLUDE is not read from TEST_BATCHED_EXCLUDE" >&2; n=1; }
+    $GREP -q 'if in_list "\$s" "\$EXCLUDE"; then EXCLUDED+=("\$s")' "$me" \
+        || { echo "self-test: the exclusion is not applied before batching" >&2; n=1; }
+    [ "$($GREP -c 'VERDICT: .* excluded=\${#EXCLUDED\[@\]}' "$me")" -eq 2 ] \
+        || { echo "self-test: a VERDICT line does not carry excluded=" >&2; n=1; }
+    if [ "$n" -eq 0 ]; then echo "self-test: runtime exclusion list from the environment, applied before batching, named in the verdict OK"; else fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
@@ -280,10 +302,13 @@ in_list() { # word, space-separated list
 
 BATCHABLE=()
 ALONE=()
+EXCLUDED=()
 while IFS= read -r s; do
-    if in_list "$s" "$PERF_ALONE"; then ALONE+=("$s"); else BATCHABLE+=("$s"); fi
+    if in_list "$s" "$EXCLUDE"; then EXCLUDED+=("$s")
+    elif in_list "$s" "$PERF_ALONE"; then ALONE+=("$s"); else BATCHABLE+=("$s"); fi
 done < "$SUITES_FILE"
-echo "batchable: ${#BATCHABLE[@]}   perf-alone: ${#ALONE[@]}"
+echo "batchable: ${#BATCHABLE[@]}   perf-alone: ${#ALONE[@]}   excluded on this runtime: ${#EXCLUDED[@]}"
+[ "${#EXCLUDED[@]}" -gt 0 ] && echo "excluded (TEST_BATCHED_EXCLUDE; not run here, not verified here): ${EXCLUDED[*]}"
 
 # ── Build once ────────────────────────────────────────────────────────────
 
@@ -512,7 +537,8 @@ if [ -s "$FAILURES_FILE" ]; then
 fi
 
 echo ""
-echo "totals: tests=$TOT_TESTS suites=$TOT_SUITES failed=$TOT_FAILED known-issues=$TOT_KNOWN wedged=$WEDGED"
+echo "totals: tests=$TOT_TESTS suites=$TOT_SUITES failed=$TOT_FAILED known-issues=$TOT_KNOWN wedged=$WEDGED excluded=${#EXCLUDED[@]}"
+[ "${#EXCLUDED[@]}" -gt 0 ] && echo "excluded on this runtime (not verified here; the pre-push hook runs them): ${EXCLUDED[*]}"
 [ -n "$EXCUSED" ] && echo "non-gating reds (perf-alone or on the exclusion list — never gate locally):$EXCUSED"
 [ -s "$FAILURES_FILE" ] && { echo "failure detail:"; sed 's/^/  /' "$FAILURES_FILE"; }
 [ -n "$WEDGED_LABELS" ] && echo "incomplete invocations (suites NOT verified — re-run or salvage):$WEDGED_LABELS"
@@ -522,9 +548,9 @@ if [ -n "$OFFENDERS" ]; then
     echo "VERDICT: FAIL scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES gating-failures-in:$OFFENDERS"
     exit 1
 elif [ "$WEDGED" -gt 0 ]; then
-    echo "VERDICT: INCOMPLETE scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES wedged=$WEDGED (no gating reds in completed batches)"
+    echo "VERDICT: INCOMPLETE scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES wedged=$WEDGED excluded=${#EXCLUDED[@]} (no gating reds in completed batches)"
     exit 2
 else
-    echo "VERDICT: PASS scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES known-issues=$TOT_KNOWN gating-failures=0"
+    echo "VERDICT: PASS scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES known-issues=$TOT_KNOWN gating-failures=0 excluded=${#EXCLUDED[@]}"
     exit 0
 fi
