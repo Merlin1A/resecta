@@ -225,14 +225,34 @@ enum ImportService {
 
     // MARK: - Reading a file
 
-    /// Read a file's bytes for import. The byte cap is checked after the
-    /// read; the import's size guard then refuses what is over it.
+    /// Read a file's bytes for import. The size is checked from the file's
+    /// attributes before any byte is read, so a file over the cap is
+    /// refused unread; the read itself maps the file when the system allows
+    /// it instead of copying it into memory.
     nonisolated static func readPayload(from url: URL, limits: ImportLimits = .standard) throws -> Data {
-        let data = try Data(contentsOf: url)
-        guard data.count <= limits.maxBytes else {
-            throw PipelineError.importError(.tooLarge(bytesRead: data.count))
+        let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        guard size <= limits.maxBytes else {
+            throw PipelineError.importError(.tooLarge(bytesRead: size))
         }
-        return data
+        return try Data(contentsOf: url, options: .mappedIfSafe)
+    }
+
+    // MARK: - A refusal met at the door
+
+    /// Record a refusal a door met before any bytes reached the import — a
+    /// dropped file over the size cap. The phase takes the same
+    /// `.importing → .failed` pair a failed load produces, so the failed
+    /// screen names the refusal; an open document is kept.
+    @MainActor
+    static func refuse(_ failure: PipelineError.ImportFailure, documentState: DocumentState) {
+        guard documentState.canStartImport else { return }
+        let returnPhase: DocumentState.ReturnPhase =
+            documentState.phaseKind == .editing ? .editing : .empty
+        guard documentState.transition(to: .importing) else { return }
+        documentState.transition(to: .failed(
+            error: .importError(failure),
+            returnPhase: returnPhase
+        ))
     }
 
     // MARK: - The facts applier

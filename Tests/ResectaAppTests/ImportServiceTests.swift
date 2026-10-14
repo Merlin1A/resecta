@@ -395,6 +395,34 @@ struct ImportServiceTests {
         #expect(doc.phaseKind == .failed)
     }
 
+    @Test("A refusal met at the door reaches the failed screen and keeps the open document")
+    func doorRefusalReachesTheFailedScreen() async {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        await ImportService.importDocument(
+            data: makeTestPDFData(), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+        let open = doc.sourceDocument
+        #expect(open != nil)
+
+        ImportService.refuse(.tooLarge(bytesRead: 60 * 1024 * 1024), documentState: doc)
+
+        #expect(doc.phaseKind == .failed)
+        #expect(doc.sourceDocument === open)
+        if case .failed(let error, let returnPhase) = doc.phase {
+            if case .importError(.tooLarge(let bytes)) = error {
+                #expect(bytes == 60 * 1024 * 1024)
+            } else {
+                Issue.record("Expected .importError(.tooLarge), got \(error)")
+            }
+            if case .editing = returnPhase {
+                // Expected: the refusal returns to the open document.
+            } else {
+                Issue.record("Expected .editing return phase, got \(returnPhase)")
+            }
+        }
+    }
+
     @Test("An import the phase gate refuses reports refused and moves nothing")
     func gateRefusalReportsRefused() async {
         let doc = DocumentState()

@@ -75,4 +75,31 @@ struct ImportFileReadTests {
         #expect(refusalName { try ImportService.readPayload(from: url, limits: ImportLimits(maxBytes: 4_096)) }
                 == "none")
     }
+
+    // MARK: - The drop door's receive path
+
+    @Test("A dropped file over the cap arrives as the size refusal, unread")
+    func droppedOversizedFileArrivesAsARefusal() throws {
+        let sixtyMB: UInt64 = 60 * 1024 * 1024
+        let url = try makeScratchFile(bytes: sixtyMB, permissions: 0o000, name: "dropped-unreadable")
+        defer { remove(url) }
+
+        if case .refused(let failure) = DroppedDocument.payload(reading: url) {
+            #expect(String(describing: failure) == "tooLarge(bytesRead: \(sixtyMB))")
+        } else {
+            Issue.record("an oversized drop must arrive as a refusal")
+        }
+    }
+
+    @Test("A dropped file under the cap arrives as its bytes")
+    func droppedReadableFileArrivesAsBytes() throws {
+        let url = try makeScratchFile(bytes: 4_096, permissions: 0o600, name: "dropped-readable")
+        defer { remove(url) }
+
+        if case .bytes(let data) = DroppedDocument.payload(reading: url) {
+            #expect(data.count == 4_096)
+        } else {
+            Issue.record("a readable drop must arrive as its bytes")
+        }
+    }
 }

@@ -181,8 +181,10 @@ struct PageThumbnailList: View {
 // MARK: - Thumbnail Cache
 
 /// NSCache-backed thumbnail cache. Auto-evicts on memory pressure.
-/// Keyed by page index; cleared when the source document changes.
-/// Internal so the keying can be driven by a test.
+/// Keyed by document identity and page index: a thumbnail belongs to one
+/// document's page, so a second document never reads the first's picture.
+/// The sidebar also clears it when the source document changes. Internal
+/// so the keying can be driven by a test.
 ///
 /// Explicit `countLimit` and `totalCostLimit` so the
 /// cache cannot grow without bound on multi-hundred-page documents.
@@ -197,19 +199,23 @@ struct PageThumbnailList: View {
 enum ThumbnailCache {
     // nonisolated(unsafe): all callers are MainActor-isolated (SwiftUI views).
     // NSCache is thread-safe internally but not Sendable.
-    nonisolated(unsafe) static let cache: NSCache<NSNumber, UIImage> = {
-        let c = NSCache<NSNumber, UIImage>()
+    nonisolated(unsafe) static let cache: NSCache<NSString, UIImage> = {
+        let c = NSCache<NSString, UIImage>()
         c.countLimit = 200
         c.totalCostLimit = 64 * 1024 * 1024  // 64 MB
         return c
     }()
     static let writeQueue = DispatchQueue(label: "thumbnailCache.write")
+    /// The document's identity and the page index.
+    private static func key(_ document: PDFDocument, _ pageIndex: Int) -> NSString {
+        "\(ObjectIdentifier(document))#\(pageIndex)" as NSString
+    }
     static func get(document: PDFDocument, pageIndex: Int) -> UIImage? {
-        cache.object(forKey: NSNumber(value: pageIndex))
+        cache.object(forKey: key(document, pageIndex))
     }
     static func set(_ image: UIImage, document: PDFDocument, pageIndex: Int) {
         writeQueue.async {
-            cache.setObject(image, forKey: NSNumber(value: pageIndex))
+            cache.setObject(image, forKey: key(document, pageIndex))
         }
     }
     static func clear() { cache.removeAllObjects() }

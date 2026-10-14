@@ -45,14 +45,18 @@ struct RedactWorkspaceView: View {
                     checkTextLayerToast()
                 }
             }
-            // Drag and drop (iPad)
-            .dropDestination(for: Data.self) { items, _ in
-                guard let data = items.first else { return false }
+            // Drag and drop (iPad). The dropped file is read inside its
+            // transfer (size on disk first, then the bytes), so an
+            // oversized drop arrives as a refusal and never as 50 MB of
+            // memory.
+            .dropDestination(for: DroppedDocument.self) { items, _ in
+                guard let dropped = items.first else { return false }
                 // Resecta opens PDF files only: an image payload is refused
                 // at the door with the unsupported-format message the Files
                 // import shows. Returning true snaps the payload back, as
                 // the gate below does on a rejection.
-                guard ImportRouter.admitsDroppedPayload(data) else {
+                if case .bytes(let data) = dropped.payload,
+                   !ImportRouter.admitsDroppedPayload(data) {
                     enqueueImportRefusedNotPDFToast()
                     return true
                 }
@@ -80,11 +84,19 @@ struct RedactWorkspaceView: View {
                 // ImportService.importDocument calls.
                 activeImportDispatch?.cancel()
                 activeImportDispatch = Task {
-                    _ = await ImportService.importDocument(
-                        data: data, door: .drop,
-                        documentState: workspace.documentState,
-                        redactionState: workspace.redactionState
-                    )
+                    switch dropped.payload {
+                    case .bytes(let data):
+                        _ = await ImportService.importDocument(
+                            data: data, door: .drop,
+                            documentState: workspace.documentState,
+                            redactionState: workspace.redactionState
+                        )
+                    case .refused(let failure):
+                        // The door met the refusal before any byte was read
+                        // (a file over the size cap); it reaches the failed
+                        // screen the way a failed load does.
+                        ImportService.refuse(failure, documentState: workspace.documentState)
+                    }
                 }
                 return true
             }
