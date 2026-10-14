@@ -156,20 +156,6 @@ struct SearchResultsSection: View {
             // Live preview row (counts + saturation/invalid signal).
             livePreviewRow
 
-            // Session-scoped navigation scope — the shared page-scope
-            // control (it scopes J/K and Cmd+G result traversal, never
-            // the rendered list or counts). Retired for
-            // 1.0 in BOTH interfaces behind
-            // `navigationScopeControlsEnabled` — its sole effect is
-            // imperceptible outside a chevron walk, so it read as
-            // broken. `navigationScope` then keeps its
-            // `.wholeDocument` default by absence of writers. The
-            // saved-searches bookmark that rode this row on the Scan
-            // interface relocated to the sheet's search-bar row.
-            // Machinery and tests stay compiled.
-            if SearchState.navigationScopeControlsEnabled {
-                scopeRow
-            }
             // The "Add to selection" Menu that closed
             // this stack now rides the footer beside Select All — the
             // freed full-width row returns to the results viewport.
@@ -230,32 +216,6 @@ struct SearchResultsSection: View {
             line += " \u{00B7} Total: \(committedTotal)"
         }
         return line
-    }
-
-    // MARK: - Scope Row
-
-    /// The scope picker row (dark for 1.0 behind
-    /// `navigationScopeControlsEnabled`; renders under the DEBUG
-    /// reveal). The saved-searches bookmark that rode
-    /// this row on the Scan interface moved permanently to the
-    /// sheet's search-bar row — reachable at every detent, which
-    /// this home never was at compact — so the reveal renders the
-    /// picker alone in both interfaces.
-    private var scopeRow: some View {
-        HStack(spacing: ResectaTokens.Spacing.sm) {
-            scopePicker
-        }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.xxs)
-    }
-
-    private var scopePicker: some View {
-        Picker("Scope", selection: $searchState.navigationScope) {
-            Text("This page").tag(SearchNavigationScope.currentPage)
-            Text("Whole document").tag(SearchNavigationScope.wholeDocument)
-        }
-        .pickerStyle(.segmented)
-        .accessibilityLabel("Navigation scope")
     }
 
     /// Bookmark button presenting the saved-searches list. Parked

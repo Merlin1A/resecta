@@ -219,16 +219,6 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         dragSheetToExpanded()
         assertSheetExpanded()
 
-        // The retired controls must not render (asserted at the
-        // expanded detent, where they WOULD be visible if present).
-        XCTAssertFalse(
-            segment("This page").exists,
-            "The retired scope picker rendered on the Scan surface with the flag dark."
-        )
-        XCTAssertFalse(
-            segment("Whole document").exists,
-            "The retired scope picker rendered on the Scan surface with the flag dark."
-        )
         // Exactly one run control — the no-double-↻ contract.
         XCTAssertEqual(
             app.buttons.matching(

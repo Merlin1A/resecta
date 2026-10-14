@@ -20,7 +20,6 @@ enum SaturationBannerCopy {
     static let headline = "\u{2265} 10,000 matches \u{2014} refine query"
     static let addWholeWord = "Add whole-word filter"
     static let toggleCaseSensitive = "Toggle case-sensitive"
-    static let scopeToCurrentPage = "Scope to current page"
 }
 
 // MARK: - Empty State Strings

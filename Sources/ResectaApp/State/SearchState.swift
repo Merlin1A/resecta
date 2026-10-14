@@ -22,29 +22,6 @@ final class SearchState: Identifiable {
     /// the macro does not wrap the concrete UserDefaults reference.
     @ObservationIgnored private let defaults: UserDefaults
 
-    // MARK: - Feature flags
-
-    /// V1.0 ships without the "This page | Whole document" navigation
-    /// -scope picker (both interfaces) and the saturation banner's
-    /// "Scope to current page" shortcut: the control is
-    /// navigation-only by design (it scopes chevron/J/K/Cmd+G
-    /// traversal, never the rendered list or counts), so its sole
-    /// effect is imperceptible and the control reads as broken. With
-    /// no live writers besides `clear()`'s reset, `navigationScope`
-    /// stays `.wholeDocument` (the shipped default); `scopedResults`
-    /// and `navigateToNext/Previous` stay live and unit-tested,
-    /// degenerating to whole-document traversal. Revival = flip to
-    /// `true`, or in DEBUG launch with `--showRetiredSheetControls`.
-    /// This is revisited post-launch.
-    // nonisolated: Sendable constant read from nonisolated test contexts.
-    nonisolated static let navigationScopeControlsEnabled: Bool = {
-        #if DEBUG
-        CommandLine.arguments.contains("--showRetiredSheetControls")
-        #else
-        false
-        #endif
-    }()
-
     // MARK: - Last-used filter shape
 
     /// Codable bag of the three filter fields that restore across sheet
@@ -1169,24 +1146,6 @@ final class SearchState: Identifiable {
         activeSearchTask = nil
         isSearching = false
         flushPendingResults()
-    }
-
-    /// Action chain for the saturation banner's "Scope to current
-    /// page" shortcut. Flushes the pending result buffer before
-    /// cancelling the in-flight scan, then sets the navigation scope
-    /// to `.currentPage`. Caller invokes `triggerSearch` after this
-    /// returns so the saturated query re-runs against the page-scoped
-    /// constraint per state-snapshot lifetime — flush MUST
-    /// happen before cancel so accumulated counts in the pending
-    /// buffer survive the re-target. (The full re-trigger path
-    /// itself wipes `results` via `clearResults`, so the preserved
-    /// counts only matter for any UI that reads `results` between the
-    /// scope set and the next flush — defensive ordering documented
-    /// here for readers + future per-page-banner consumers.)
-    func scopeToCurrentPage() async {
-        flushPendingResults()
-        await cancelSearch()
-        navigationScope = .currentPage
     }
 
     /// Replace-selection primitive: every result's `isSelected` is set to
