@@ -71,6 +71,52 @@ LOG_CAP_BYTES=20000000 # per-batch filtered-log size bound
 
 usage() { sed -n '3,42p' "$0"; exit 64; }
 
+# ── Suite enumeration (runtime, from Tests sources) ──────────────────────
+# Every top-level (column-0) type whose body carries a `@Test` function — with
+# or without a `@Suite` attribute (Swift Testing runs a bare type holding
+# `@Test` functions as an implicit suite, and `-only-testing:` addresses it by
+# type name) — plus XCTestCase subclasses, plus a column-0 `extension` of such
+# a type whose body carries a `@Test` function (a test file split across
+# several files keeps its functions in extensions of the one suite type; the
+# runner addresses the type, so the extension's tests run with it).
+# Attribute-only detection used to miss implicit suites and the multi-line
+# `@Suite(` form, so their tests never ran under this runner. Validated
+# 2026-08-27 against the live trees: engine 207, app 209.
+enumerate_suites() { # test-source-dir — one suite name per line, sorted
+    python3 - "$1" <<'PYEOF'
+import os, re, sys
+
+ATTRS = re.compile(r'^(?:@\w+(?:\([^)]*\))?\s*)+')
+MODS = r'(?:(?:private|fileprivate|internal|public|final)\s+)*'
+TYPE_DECL = re.compile(r'^' + MODS + r'(?:class|struct|enum|actor|extension)\s+(\w+)')
+XCTEST_DECL = re.compile(r'^' + MODS + r'class\s+(\w+)\s*:\s*[^{]*\bXCTestCase\b')
+TEST_ATTR = re.compile(r'^\s+@Test\b')
+
+suites = set()
+for dirpath, _, files in os.walk(sys.argv[1]):
+    for fn in sorted(files):
+        if not fn.endswith('.swift'):
+            continue
+        lines = open(os.path.join(dirpath, fn), encoding='utf-8',
+                     errors='replace').read().splitlines()
+        current = None   # the column-0 type whose body the scan is inside
+        for line in lines:
+            decl = ATTRS.sub('', line) if line.startswith('@') else line
+            m = XCTEST_DECL.match(decl)
+            if m:
+                suites.add(m.group(1)); current = None; continue
+            m = TYPE_DECL.match(decl)
+            if m:
+                current = m.group(1); continue
+            if line.startswith('}'):
+                current = None; continue
+            if current and TEST_ATTR.match(line):
+                suites.add(current)
+for s in sorted(suites):
+    print(s)
+PYEOF
+}
+
 # --self-test: the lane-safety rules against this file and one dry
 # invocation. Exit 0 = every rule holds; 1 = a rule drifted (named).
 self_test() {
@@ -100,6 +146,18 @@ self_test() {
         case " $NON_GATING " in *" $pat "*) ;; *) echo "self-test: $pat is not in NON_GATING" >&2; fails=1 ;; esac
     done
     [ "$fails" -eq 0 ] && echo "self-test: the four wall-clock suites are report-only OK"
+    # 5. The suite enumerator reads `extension` blocks: a @Test inside a
+    #    column-0 extension of a type is enumerated under that type; a type
+    #    with a @Test in its body still is; an extension with no @Test is not.
+    local tdir got
+    tdir="$(mktemp -d "${TMPDIR:-/tmp}/test-batched-selftest.XXXXXX")"
+    printf 'import Testing\nstruct ExtensionOnlyHost {}\n\nextension ExtensionOnlyHost {\n    @Test func inExtension() {}\n}\n' > "$tdir/ExtensionOnly.swift"
+    printf 'import Testing\nstruct PlainType {\n    @Test func inBody() {}\n}\n\nextension PlainType {\n    func helper() {}\n}\n' > "$tdir/Plain.swift"
+    printf 'import Testing\nstruct NoTests {}\n\nextension NoTests {\n    func helper() {}\n}\n' > "$tdir/NoTests.swift"
+    got="$(enumerate_suites "$tdir" | tr '\n' ' ')"
+    rm -rf "$tdir"
+    if [ "$got" = "ExtensionOnlyHost PlainType " ]; then echo "self-test: enumerator reads extension blocks (ExtensionOnlyHost, PlainType; NoTests absent) OK"
+    else echo "self-test: enumerator expected 'ExtensionOnlyHost PlainType', got '$got'" >&2; fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
@@ -171,48 +229,8 @@ fi
 
 echo "simulator: $SIM_UDID (pinned via TEST_BATCHED_SIM_UDID)"
 
-# ── Suite enumeration (runtime, from Tests sources) ──────────────────────
-# Every top-level (column-0) type whose body carries a `@Test` function — with
-# or without a `@Suite` attribute (Swift Testing runs a bare type holding
-# `@Test` functions as an implicit suite, and `-only-testing:` addresses it by
-# type name) — plus XCTestCase subclasses. Attribute-only detection used to
-# miss implicit suites and the multi-line `@Suite(` form, so their tests never
-# ran under this runner. Validated 2026-08-27 against the live trees:
-# engine 207, app 209.
-
 SUITES_FILE="$RUN_DIR/suites.txt"
-python3 - "$TEST_SRC" > "$SUITES_FILE" <<'PYEOF'
-import os, re, sys
-
-ATTRS = re.compile(r'^(?:@\w+(?:\([^)]*\))?\s*)+')
-MODS = r'(?:(?:private|fileprivate|internal|public|final)\s+)*'
-TYPE_DECL = re.compile(r'^' + MODS + r'(?:class|struct|enum|actor)\s+(\w+)')
-XCTEST_DECL = re.compile(r'^' + MODS + r'class\s+(\w+)\s*:\s*[^{]*\bXCTestCase\b')
-TEST_ATTR = re.compile(r'^\s+@Test\b')
-
-suites = set()
-for dirpath, _, files in os.walk(sys.argv[1]):
-    for fn in sorted(files):
-        if not fn.endswith('.swift'):
-            continue
-        lines = open(os.path.join(dirpath, fn), encoding='utf-8',
-                     errors='replace').read().splitlines()
-        current = None   # the column-0 type whose body the scan is inside
-        for line in lines:
-            decl = ATTRS.sub('', line) if line.startswith('@') else line
-            m = XCTEST_DECL.match(decl)
-            if m:
-                suites.add(m.group(1)); current = None; continue
-            m = TYPE_DECL.match(decl)
-            if m:
-                current = m.group(1); continue
-            if line.startswith('}'):
-                current = None; continue
-            if current and TEST_ATTR.match(line):
-                suites.add(current)
-for s in sorted(suites):
-    print(s)
-PYEOF
+enumerate_suites "$TEST_SRC" > "$SUITES_FILE"
 
 TOTAL_SUITES="$(wc -l < "$SUITES_FILE" | tr -d ' ')"
 [ "$TOTAL_SUITES" -gt 0 ] || { echo "suite enumeration produced nothing — check $TEST_SRC" >&2; exit 1; }
