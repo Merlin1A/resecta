@@ -22,6 +22,20 @@
 #                          runs on one machine each own their own simulator.
 #   TEST_BATCHED_DD        DerivedData for this run (default <repo>/.dd), so
 #                          a build elsewhere never invalidates a run in flight.
+#   TEST_BATCHED_STALL_SECS  seconds of no output before an invocation is
+#                          killed (default 180). A hosted runner without
+#                          Neural Engine access runs OCR-heavy tests many
+#                          times slower than a Mac and widens this; the
+#                          per-invocation ceiling (--timeout-mins) still
+#                          bounds each batch.
+#   TEST_BATCHED_RECOVERY  what the recovery after a wedge does to the
+#                          simulator: `reboot` (default) shuts it down and
+#                          boots it again; `erase` also erases it first. An
+#                          erase wipes the simulator's provisioned assets
+#                          (the name model, the Vision data files) and
+#                          forces a cold boot, which on a hosted runner
+#                          outlasts the stall allowance and wedges the next
+#                          batch in turn.
 #
 # Exit codes:
 #   0  all reds (if any) are on the exclusion list, no incomplete batches
@@ -32,7 +46,9 @@
 #
 # Recovery after a wedge is scoped to this run: the run's own xcodebuild and
 # its descendants are killed, then only $TEST_BATCHED_SIM_UDID is shut down
-# and erased. Nothing here signals another run's processes or simulators.
+# (and erased, with TEST_BATCHED_RECOVERY=erase), booted again and waited
+# for, so the next invocation starts on a booted simulator. Nothing here
+# signals another run's processes or simulators.
 #
 # Logs and .xcresult bundles land under /tmp/test-batched-<scheme>-<stamp>/.
 # Logs are spam-filtered (attributedStringScaled framework noise) and size-
@@ -65,11 +81,13 @@ NON_GATING="ScreenCaptureShieldTests PageParallelRasterizationTests StressCorpus
 
 BATCH_SIZE=28          # ~25-32 suites per batch
 TIMEOUT_MINS=15        # hard per-invocation ceiling
-STALL_SECS=180         # kill if the log stops growing this long
+STALL_SECS="${TEST_BATCHED_STALL_SECS:-180}"   # kill if the log stops growing this long
+RECOVERY="${TEST_BATCHED_RECOVERY:-reboot}"    # reboot | erase (see the header)
+BOOT_WAIT_SECS=300     # how long the recovery waits for the simulator to report booted
 LOAD_WARN=8            # 1-min load average warning threshold
 LOG_CAP_BYTES=20000000 # per-batch filtered-log size bound
 
-usage() { sed -n '3,42p' "$0"; exit 64; }
+usage() { sed -n '3,58p' "$0"; exit 64; }
 
 # ── Suite enumeration (runtime, from Tests sources) ──────────────────────
 # Every top-level (column-0) type whose body carries a `@Test` function — with
@@ -158,12 +176,30 @@ self_test() {
     rm -rf "$tdir"
     if [ "$got" = "ExtensionOnlyHost PlainType " ]; then echo "self-test: enumerator reads extension blocks (ExtensionOnlyHost, PlainType; NoTests absent) OK"
     else echo "self-test: enumerator expected 'ExtensionOnlyHost PlainType', got '$got'" >&2; fails=1; fi
+    # 6. The stall allowance and the recovery shape are read from the
+    #    environment with the local defaults; the recovery boots the
+    #    simulator again and waits for it; the erase is behind the knob.
+    n=0
+    $GREP -qE '^STALL_SECS="\$\{TEST_BATCHED_STALL_SECS:-180\}"' "$me" \
+        || { echo "self-test: STALL_SECS is not read from TEST_BATCHED_STALL_SECS with the default 180" >&2; n=1; }
+    $GREP -qE '^RECOVERY="\$\{TEST_BATCHED_RECOVERY:-reboot\}"' "$me" \
+        || { echo "self-test: RECOVERY is not read from TEST_BATCHED_RECOVERY with the default reboot" >&2; n=1; }
+    body="$(sed -n '/^recover_sim()/,/^}/p' "$me")"
+    printf '%s\n' "$body" | $GREP -q 'xcrun simctl boot "\$SIM_UDID"' \
+        || { echo "self-test: recover_sim does not boot the simulator again" >&2; n=1; }
+    printf '%s\n' "$body" | $GREP -q 'simctl bootstatus "\$SIM_UDID" -b' \
+        || { echo "self-test: recover_sim does not wait for the simulator to boot" >&2; n=1; }
+    printf '%s\n' "$body" | $GREP -B1 'simctl erase "\$SIM_UDID"' | $GREP -q '"\$RECOVERY" = "erase"' \
+        || { echo "self-test: the erase in recover_sim is not behind TEST_BATCHED_RECOVERY=erase" >&2; n=1; }
+    if [ "$n" -eq 0 ]; then echo "self-test: stall allowance + recovery shape from the environment; recovery boots and waits; erase opt-in OK"; else fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
 
 [ $# -ge 1 ] || usage
 [ "$1" = "--self-test" ] && self_test
+case "$RECOVERY" in reboot|erase) ;; *) echo "TEST_BATCHED_RECOVERY must be reboot or erase (got $RECOVERY)" >&2; exit 64 ;; esac
+case "$STALL_SECS" in ''|*[!0-9]*) echo "TEST_BATCHED_STALL_SECS must be a whole number of seconds (got $STALL_SECS)" >&2; exit 64 ;; esac
 SCHEME="$1"; shift
 case "$SCHEME" in
     RedactionEngine)
@@ -269,15 +305,33 @@ descendants() { # pid — every process below it, deepest first
 }
 
 recover_sim() { # xcodebuild-pid — this run's process tree and this run's simulator, nothing else
-    local xcb="$1" tree
+    local xcb="$1" tree t0 bp
     tree="$(descendants "$xcb")"
-    echo "  recovery: killing this run's xcodebuild ($xcb) and its process tree, resetting simulator $SIM_UDID" >&2
+    echo "  recovery: killing this run's xcodebuild ($xcb) and its process tree, resetting simulator $SIM_UDID ($RECOVERY)" >&2
     kill -TERM "$xcb" 2>/dev/null || true
     sleep 5
     kill -KILL "$xcb" $tree 2>/dev/null || true   # the tree is a pid list, unquoted on purpose
     sleep 2
     xcrun simctl shutdown "$SIM_UDID" 2>/dev/null || true
-    xcrun simctl erase "$SIM_UDID" 2>/dev/null || true
+    if [ "$RECOVERY" = "erase" ]; then
+        xcrun simctl erase "$SIM_UDID" 2>/dev/null || true
+    fi
+    # Boot it again here and wait, so the next invocation starts on a booted
+    # simulator instead of booting one silently under the watchdog.
+    xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
+    t0=$SECONDS
+    xcrun simctl bootstatus "$SIM_UDID" -b >/dev/null 2>&1 &
+    bp=$!
+    while kill -0 "$bp" 2>/dev/null; do
+        if [ $((SECONDS - t0)) -ge "$BOOT_WAIT_SECS" ]; then
+            echo "  recovery: simulator $SIM_UDID did not report booted within ${BOOT_WAIT_SECS}s; continuing" >&2
+            kill "$bp" 2>/dev/null || true
+            break
+        fi
+        sleep 5
+    done
+    wait "$bp" 2>/dev/null || true
+    echo "  recovery: simulator $SIM_UDID booted again ($((SECONDS - t0))s)" >&2
 }
 
 # Results accumulated as parallel indexed arrays (bash 3.2 — no assoc arrays).
