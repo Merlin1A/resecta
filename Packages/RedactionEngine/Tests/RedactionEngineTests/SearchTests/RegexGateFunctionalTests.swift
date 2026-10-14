@@ -100,6 +100,17 @@ struct RegexGateFunctionalTests {
         #expect(DocumentSearcher.validateRegexPattern(longPattern) == nil)
     }
 
+    @Test("validateRegexPattern returns a verdict for a literal whose uppercase form is two letters",
+          arguments: ["[a-z]+ß", "[a-z]+ﬁ"])
+    func acceptsLiteralWhoseUppercaseIsTwoLetters(_ pattern: String) {
+        // The class scan compares the literal against the class through its
+        // case variants; "ß" and "ﬁ" uppercase to two letters, which is not
+        // one Character. The literal separates the run from the class, so
+        // the shape is accepted — and the verdict must arrive at all.
+        #expect(DocumentSearcher.validateRegexPattern(pattern) != nil,
+                "pattern must be accepted by validateRegexPattern: \(pattern)")
+    }
+
 
     // MARK: - Structured exponential shapes
 

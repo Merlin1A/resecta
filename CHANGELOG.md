@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - The search sheet's disabled audit-export, scan-coverage, doctype-diagnostic and category-strip surfaces, the navigation-scope controls, the custom-terms template picker and the two debug launch arguments that revealed them: each sat behind a flag that was false in every shipped build, so no shipped screen changes. The match rationale's classifier explanation and the coverage counts the verification screen reads stay.
 
+### Fixed
+
+- Custom terms and saved patterns: a regular expression holding a character whose uppercase form is two letters (such as ß or the ﬁ ligature) no longer stops the app when the pattern is validated.
+
 ### Internal
 
 - `Scripts/release-flag-check.sh` censuses the remaining debug-only launch argument, the saved-searches sim-drive hook, as its positive control.

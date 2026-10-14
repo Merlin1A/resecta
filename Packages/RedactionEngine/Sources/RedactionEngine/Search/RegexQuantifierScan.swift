@@ -108,7 +108,7 @@ enum RegexQuantifierScan {
             if shorthands.contains(where: { $0.canMatch(c) }) { inside = true }
             if !inside, singles.contains(where: { Atom.sameIgnoringCase($0, c) }) { inside = true }
             if !inside {
-                let variants = [c, Character(c.lowercased()), Character(c.uppercased())]
+                let variants = [String(c), c.lowercased(), c.uppercased()]
                     .filter { $0.unicodeScalars.count == 1 }
                     .map { $0.unicodeScalars.first!.value }
                 if ranges.contains(where: { r in variants.contains { r.contains($0) } }) { inside = true }
