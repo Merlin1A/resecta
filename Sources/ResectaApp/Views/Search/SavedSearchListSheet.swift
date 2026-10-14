@@ -265,6 +265,8 @@ struct SavedSearchListSheet: View {
                 Text(search.name)
                     .font(.headline)
                     .foregroundStyle(.primary)
+                    // The name the user gave the search may itself be PII.
+                    .privacySensitive()
                 HStack(spacing: ResectaTokens.Spacing.xs) {
                     Text(search.mode.displayName)
                         .font(.caption2.bold())

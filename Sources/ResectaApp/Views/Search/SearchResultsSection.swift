@@ -418,13 +418,17 @@ struct SearchResultsSection: View {
                         ? " on pages with all terms" : ""
                     ForEach(terms, id: \.self) { term in
                         if let termResults = searchState.resultsByTerm[term] {
-                            Section("\"\(term)\" — \(termResults.count) match\(termResults.count == 1 ? "" : "es")\(conjunctionSuffix)") {
+                            Section {
                                 ForEach(termResults) { result in
                                     // By-term sections are
                                     // the one page-UNSECTIONED list, so the
                                     // rows carry the page label here.
                                     resultRow(for: result, showTermLabel: false, showsPageLabel: true)
                                 }
+                            } header: {
+                                // The header echoes the term the user typed.
+                                Text("\"\(term)\" — \(termResults.count) match\(termResults.count == 1 ? "" : "es")\(conjunctionSuffix)")
+                                    .privacySensitive()
                             }
                         }
                     }
@@ -705,6 +709,8 @@ struct SearchResultsSection: View {
                         Text(SearchEmptyStateCopy.recallChipLabel(terms: recall))
                             .font(.caption2)
                             .lineLimit(1)
+                            // The recalled terms are the user's own query text.
+                            .privacySensitive()
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
