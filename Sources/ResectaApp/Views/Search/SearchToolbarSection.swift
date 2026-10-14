@@ -399,7 +399,7 @@ struct SearchToolbarSection: View {
         VStack(spacing: ResectaTokens.Spacing.xs) {
             // The role subtitle moved from here into
             // the pre-scan empty state
-            // (`WU20Strings.description(for: .piiScanPreScan)`).
+            // (`SearchEmptyStateCopy.description(for: .piiScanPreScan)`).
             //
             // The per-run Confidence slider that lived here is retired:
             // Settings' Detection Sensitivity preset is the one

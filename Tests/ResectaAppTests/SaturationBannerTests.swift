@@ -23,14 +23,14 @@ struct SaturationBannerTests {
         // The banner promotes (not replaces) the prior inline message,
         // so the headline string remains "≥ 10,000 matches — refine query".
         let expected = "\u{2265} 10,000 matches \u{2014} refine query"
-        #expect(WU23Strings.headline == expected)
+        #expect(SaturationBannerCopy.headline == expected)
     }
 
     @Test("Shortcut button labels are mechanism-description action labels")
     func shortcutLabels() {
-        #expect(WU23Strings.addWholeWord == "Add whole-word filter")
-        #expect(WU23Strings.toggleCaseSensitive == "Toggle case-sensitive")
-        #expect(WU23Strings.scopeToCurrentPage == "Scope to current page")
+        #expect(SaturationBannerCopy.addWholeWord == "Add whole-word filter")
+        #expect(SaturationBannerCopy.toggleCaseSensitive == "Toggle case-sensitive")
+        #expect(SaturationBannerCopy.scopeToCurrentPage == "Scope to current page")
     }
 
     // MARK: - Add whole-word filter shortcut

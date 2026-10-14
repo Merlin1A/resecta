@@ -307,7 +307,7 @@ struct SearchResultsSection: View {
             HStack(spacing: ResectaTokens.Spacing.xs) {
                 Image(systemName: "exclamationmark.circle.fill")
                     .foregroundStyle(.orange)
-                Text(WU23Strings.headline)
+                Text(SaturationBannerCopy.headline)
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.orange)
                 Spacer()
@@ -319,25 +319,25 @@ struct SearchResultsSection: View {
                     searchState.options.wholeWord = true
                     onTriggerSearch()
                 } label: {
-                    Text(WU23Strings.addWholeWord)
+                    Text(SaturationBannerCopy.addWholeWord)
                         .font(.caption2)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(searchState.options.wholeWord || searchState.isSearching)
-                .accessibilityLabel(WU23Strings.addWholeWord)
+                .accessibilityLabel(SaturationBannerCopy.addWholeWord)
 
                 Button {
                     searchState.options.caseSensitive.toggle()
                     onTriggerSearch()
                 } label: {
-                    Text(WU23Strings.toggleCaseSensitive)
+                    Text(SaturationBannerCopy.toggleCaseSensitive)
                         .font(.caption2)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(searchState.isSearching)
-                .accessibilityLabel(WU23Strings.toggleCaseSensitive)
+                .accessibilityLabel(SaturationBannerCopy.toggleCaseSensitive)
 
                 // Dark with the scope picker — with the
                 // picker retired this shortcut was a one-way door into
@@ -349,13 +349,13 @@ struct SearchResultsSection: View {
                     Button {
                         scopeSaturatedSearchToCurrentPage()
                     } label: {
-                        Text(WU23Strings.scopeToCurrentPage)
+                        Text(SaturationBannerCopy.scopeToCurrentPage)
                             .font(.caption2)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(searchState.navigationScope == .currentPage || searchState.isSearching)
-                    .accessibilityLabel(WU23Strings.scopeToCurrentPage)
+                    .accessibilityLabel(SaturationBannerCopy.scopeToCurrentPage)
                 }
             }
         }
@@ -784,7 +784,7 @@ struct SearchResultsSection: View {
     // discipline. The pre-scan / post-scan-zero / pre-search /
     // no-match / no-recents discriminator drives the headline,
     // description, and (multi-term only) recall-chip surface.
-    // `WU20Strings` static functions are mechanism-description
+    // `SearchEmptyStateCopy` static functions are mechanism-description
     // copy. Outcome promises (e.g., "no PII found",
     // "all clear") are forbidden.
 
@@ -792,23 +792,23 @@ struct SearchResultsSection: View {
         let context = currentEmptyStateContext()
         return ContentUnavailableView {
             Label(
-                WU20Strings.headline(for: context),
-                systemImage: WU20Strings.headlineSymbol(for: context)
+                SearchEmptyStateCopy.headline(for: context),
+                systemImage: SearchEmptyStateCopy.headlineSymbol(for: context)
             )
         } description: {
             VStack(alignment: .center, spacing: ResectaTokens.Spacing.sm) {
                 // Interface-level role line for the Search side,
                 // above the per-mode caption. The Scan side's role
                 // sentence lives inside its description string.
-                if WU20Strings.showsSearchRoleSubtitle(for: context) {
-                    Text(WU20Strings.searchRoleSubtitle)
+                if SearchEmptyStateCopy.showsSearchRoleSubtitle(for: context) {
+                    Text(SearchEmptyStateCopy.searchRoleSubtitle)
                 }
                 // Markdown-bold markers only parse through the
                 // LocalizedStringKey overload of `Text(_:)`; a plain
                 // String variable hits the verbatim overload and renders
                 // the asterisks literally (screenshot evidence) — the
                 // explicit `.init` routes back to the markdown-aware path.
-                Text(.init(WU20Strings.description(for: context)))
+                Text(.init(SearchEmptyStateCopy.description(for: context)))
                 if context == .multiTermPreSearchWithRecents {
                     multiTermRecallChips
                 }
@@ -844,10 +844,10 @@ struct SearchResultsSection: View {
     /// stay on the toolbar's progress row alone.
     private var scanInFlightState: some View {
         ContentUnavailableView {
-            Label(WU20Strings.scanInFlightHeadline, systemImage: "doc.viewfinder")
+            Label(SearchEmptyStateCopy.scanInFlightHeadline, systemImage: "doc.viewfinder")
         } description: {
             VStack(alignment: .center, spacing: ResectaTokens.Spacing.sm) {
-                Text(WU20Strings.piiScanRoleSentence)
+                Text(SearchEmptyStateCopy.piiScanRoleSentence)
                 ProgressView()
             }
         }
@@ -858,7 +858,7 @@ struct SearchResultsSection: View {
     /// with the parked strip's status line). Pure — pinned by
     /// EmptyStateTests so the discriminator stays in sync with the
     /// copy table.
-    private func currentEmptyStateContext() -> WU20Strings.EmptyContext {
+    private func currentEmptyStateContext() -> SearchEmptyStateCopy.EmptyContext {
         searchState.emptyStateContext
     }
 
@@ -868,7 +868,7 @@ struct SearchResultsSection: View {
     /// `onTriggerSearch`.
     private var multiTermRecallChips: some View {
         VStack(alignment: .center, spacing: ResectaTokens.Spacing.xs) {
-            Text(WU20Strings.recentSearchesHeader)
+            Text(SearchEmptyStateCopy.recentSearchesHeader)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             HStack(spacing: ResectaTokens.Spacing.xs) {
@@ -877,14 +877,14 @@ struct SearchResultsSection: View {
                         searchState.searchTerms = recall
                         onTriggerSearch()
                     } label: {
-                        Text(WU20Strings.recallChipLabel(terms: recall))
+                        Text(SearchEmptyStateCopy.recallChipLabel(terms: recall))
                             .font(.caption2)
                             .lineLimit(1)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .accessibilityLabel(
-                        WU20Strings.recallChipAccessibilityLabel(terms: recall)
+                        SearchEmptyStateCopy.recallChipAccessibilityLabel(terms: recall)
                     )
                 }
             }
@@ -896,11 +896,11 @@ struct SearchResultsSection: View {
     private var filteredOutState: some View {
         ContentUnavailableView {
             Label(
-                WU20Strings.filteredOutHeadline,
+                SearchEmptyStateCopy.filteredOutHeadline,
                 systemImage: "line.3.horizontal.decrease.circle"
             )
         } description: {
-            Text(WU20Strings.filteredOutDescription)
+            Text(SearchEmptyStateCopy.filteredOutDescription)
         }
     }
 

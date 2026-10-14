@@ -29,7 +29,7 @@ struct PIIScanIdleHonestyTests {
         let state = SearchState()
         state.currentSearchPage = 7
         state.clearResults()
-        let ctx = WU20Strings.context(
+        let ctx = SearchEmptyStateCopy.context(
             mode: .piiScan,
             queryText: "",
             multiTermTerms: [],
@@ -47,7 +47,7 @@ struct PIIScanIdleHonestyTests {
 
     @Test("pre-scan headline states the actual condition, not a verdict")
     func preScanHeadlineIsHonest() {
-        let headline = WU20Strings.headline(for: .piiScanPreScan)
+        let headline = SearchEmptyStateCopy.headline(for: .piiScanPreScan)
         #expect(headline == "Not scanned yet")
         #expect(!headline.lowercased().contains("complete"))
     }
@@ -92,7 +92,7 @@ struct PIIScanRoleCopyTests {
     // The role copy's history: it moved from the piiScan toolbar
     // (`SearchToolbarSection.piiScanRoleSubtitle`, deleted) into the
     // pre-scan empty state, and now lives on
-    // `WU20Strings.piiScanRoleSentence` — primary home: the scan
+    // `SearchEmptyStateCopy.piiScanRoleSentence` — primary home: the scan
     // in-flight state's description; residue home: the vestigial
     // pre-scan state. The QRC-16a wording constraints follow the
     // sentence wherever it renders.
@@ -109,7 +109,7 @@ struct PIIScanRoleCopyTests {
         // rationale visibility (results show the reasoning behind
         // each item). No reference to a surface that no longer
         // exists.
-        let copy = WU20Strings.description(for: .piiScanPreScan)
+        let copy = SearchEmptyStateCopy.description(for: .piiScanPreScan)
         #expect(copy.contains("on-device"))
         #expect(copy.contains("PII text detectors"))
         #expect(copy.contains("whole document"))
@@ -123,13 +123,13 @@ struct PIIScanRoleCopyTests {
         // The in-flight state renders `piiScanRoleSentence` directly;
         // the pre-scan description must keep returning the same
         // constant so the sentence cannot drift between its homes.
-        #expect(WU20Strings.description(for: .piiScanPreScan)
-                == WU20Strings.piiScanRoleSentence)
+        #expect(SearchEmptyStateCopy.description(for: .piiScanPreScan)
+                == SearchEmptyStateCopy.piiScanRoleSentence)
     }
 
     @Test("piiScan role copy is mechanism-description (no outcome promise)")
     func subtitleIsMechanism() {
-        let copy = WU20Strings.description(for: .piiScanPreScan).lowercased()
+        let copy = SearchEmptyStateCopy.description(for: .piiScanPreScan).lowercased()
         // Forbidden absolutes assembled from halves so this source
         // does not itself trip the M-1 sweep.
         let halves: [(String, String)] = [

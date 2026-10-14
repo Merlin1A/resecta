@@ -16,7 +16,7 @@ import RedactionEngine
 // operational copy, not legal/marketing copy. Pinned by
 // `SaturationBannerTests`.
 
-enum WU23Strings {
+enum SaturationBannerCopy {
     static let headline = "\u{2265} 10,000 matches \u{2014} refine query"
     static let addWholeWord = "Add whole-word filter"
     static let toggleCaseSensitive = "Toggle case-sensitive"
@@ -32,7 +32,7 @@ enum WU23Strings {
 // mechanism, not a verdict on the document. Pinned by
 // `EmptyStateTests`.
 
-enum WU20Strings {
+enum SearchEmptyStateCopy {
 
     /// Discriminator for the per-mode empty-state branches. Drives
     /// headline / description / chip-row visibility from a single
@@ -334,3 +334,8 @@ enum WU20Strings {
     static let filteredOutHeadline = "No results match current filters"
     static let filteredOutDescription = "Your active filters hide all candidates. Adjust source, confidence, or category filters to see results."
 }
+
+// `SearchState+WalkSummary.swift` reads the empty-state discriminator
+// under the catalog's former name (`emptyStateContext`); the alias keeps
+// that caller compiling until its own file is next touched.
+typealias WU20Strings = SearchEmptyStateCopy

@@ -17,7 +17,7 @@ struct EmptyStateTests {
 
     @Test("Text mode pre-search context when query is empty")
     func textPreSearchContext() {
-        let ctx = WU20Strings.context(
+        let ctx = SearchEmptyStateCopy.context(
             mode: .text,
             queryText: "",
             multiTermTerms: [],
@@ -35,7 +35,7 @@ struct EmptyStateTests {
 
     @Test("Text mode no-match context when query is non-empty and a run completed")
     func textNoMatchContext() {
-        let ctx = WU20Strings.context(
+        let ctx = SearchEmptyStateCopy.context(
             mode: .text,
             queryText: "alpha",
             multiTermTerms: [],
@@ -56,7 +56,7 @@ struct EmptyStateTests {
         // The mode switch carries the query text but deliberately does
         // not re-run; until a run completes, the empty state
         // must not claim the query produced no matches.
-        let text = WU20Strings.context(
+        let text = SearchEmptyStateCopy.context(
             mode: .text, queryText: "alpha",
             multiTermTerms: [], recentMultiTermSets: [],
             multiTermConjunction: false,
@@ -66,7 +66,7 @@ struct EmptyStateTests {
         )
         #expect(text == .textNotRun)
 
-        let regex = WU20Strings.context(
+        let regex = SearchEmptyStateCopy.context(
             mode: .regex, queryText: "Page \\d+",
             multiTermTerms: [], recentMultiTermSets: [],
             multiTermConjunction: false,
@@ -76,7 +76,7 @@ struct EmptyStateTests {
         )
         #expect(regex == .regexNotRun)
 
-        let terms = WU20Strings.context(
+        let terms = SearchEmptyStateCopy.context(
             mode: .multiTerm, queryText: "",
             multiTermTerms: ["alpha"], recentMultiTermSets: [],
             multiTermConjunction: false,
@@ -89,18 +89,18 @@ struct EmptyStateTests {
 
     @Test("Not-run copy names a run affordance")
     func notRunCopyNamesRunAffordance() {
-        #expect(WU20Strings.description(for: .textNotRun).contains("Return"))
-        #expect(WU20Strings.description(for: .regexNotRun).contains("Return"))
-        #expect(WU20Strings.description(for: .multiTermNotRun).contains("Return"))
+        #expect(SearchEmptyStateCopy.description(for: .textNotRun).contains("Return"))
+        #expect(SearchEmptyStateCopy.description(for: .regexNotRun).contains("Return"))
+        #expect(SearchEmptyStateCopy.description(for: .multiTermNotRun).contains("Return"))
         // The failed-start state's run affordance is its inline
         // "Scan Again" action, not the copy — the description must
         // not name the retired run button.
-        #expect(!WU20Strings.description(for: .piiScanStartFailed).contains("Scan Document"))
+        #expect(!SearchEmptyStateCopy.description(for: .piiScanStartFailed).contains("Scan Document"))
     }
 
     @Test("Conjunction zero-hit names the all-terms gate, not per-term absence")
     func conjunctionNoMatchContext() {
-        let ctx = WU20Strings.context(
+        let ctx = SearchEmptyStateCopy.context(
             mode: .multiTerm, queryText: "",
             multiTermTerms: ["alpha", "zzz"], recentMultiTermSets: [],
             multiTermConjunction: true,
@@ -109,7 +109,7 @@ struct EmptyStateTests {
             hasCompletedRun: true, scanStartFailed: false
         )
         #expect(ctx == .multiTermNoMatchConjunction)
-        let copy = WU20Strings.description(for: .multiTermNoMatchConjunction)
+        let copy = SearchEmptyStateCopy.description(for: .multiTermNoMatchConjunction)
         // Under conjunction, individual terms may still occur — the
         // copy must not claim absence "for any of the active terms".
         #expect(!copy.contains("for any of the active terms"))
@@ -118,7 +118,7 @@ struct EmptyStateTests {
 
     @Test("Failed scan start outranks the pre-scan default")
     func scanStartFailedContext() {
-        let ctx = WU20Strings.context(
+        let ctx = SearchEmptyStateCopy.context(
             mode: .piiScan, queryText: "",
             multiTermTerms: [], recentMultiTermSets: [],
             multiTermConjunction: false,
@@ -131,7 +131,7 @@ struct EmptyStateTests {
 
     @Test("Multi-term pre-search context flips on recents presence")
     func multiTermPreSearchFlipsOnRecents() {
-        let noRecents = WU20Strings.context(
+        let noRecents = SearchEmptyStateCopy.context(
             mode: .multiTerm,
             queryText: "",
             multiTermTerms: [],
@@ -146,7 +146,7 @@ struct EmptyStateTests {
         )
         #expect(noRecents == .multiTermPreSearchNoRecents)
 
-        let withRecents = WU20Strings.context(
+        let withRecents = SearchEmptyStateCopy.context(
             mode: .multiTerm,
             queryText: "",
             multiTermTerms: [],
@@ -164,7 +164,7 @@ struct EmptyStateTests {
 
     @Test("Multi-term no-match context when terms present and a run completed")
     func multiTermNoMatchContext() {
-        let ctx = WU20Strings.context(
+        let ctx = SearchEmptyStateCopy.context(
             mode: .multiTerm,
             queryText: "",
             multiTermTerms: ["alpha", "beta"],
@@ -182,7 +182,7 @@ struct EmptyStateTests {
 
     @Test("PII Scan pre-scan context when currentSearchPage = 0")
     func piiScanPreScanContext() {
-        let ctx = WU20Strings.context(
+        let ctx = SearchEmptyStateCopy.context(
             mode: .piiScan,
             queryText: "",
             multiTermTerms: [],
@@ -200,7 +200,7 @@ struct EmptyStateTests {
 
     @Test("PII Scan post-scan zero-result context carries detector count")
     func piiScanPostScanZeroContext() {
-        let ctx = WU20Strings.context(
+        let ctx = SearchEmptyStateCopy.context(
             mode: .piiScan,
             queryText: "",
             multiTermTerms: [],
@@ -222,7 +222,7 @@ struct EmptyStateTests {
         // position with hasCompletedRun still false — exactly the state
         // that used to render "Scan complete · N detectors matched 0
         // candidates" on a partially-scanned document.
-        let ctx = WU20Strings.context(
+        let ctx = SearchEmptyStateCopy.context(
             mode: .piiScan,
             queryText: "",
             multiTermTerms: [],
@@ -240,12 +240,12 @@ struct EmptyStateTests {
 
     @Test("Cancelled-scan copy names the partial coverage, no completion claim")
     func piiScanCancelledCopy() {
-        let context = WU20Strings.EmptyContext
+        let context = SearchEmptyStateCopy.EmptyContext
             .piiScanCancelled(pagesScanned: 8, pageCount: 120)
-        #expect(WU20Strings.headline(for: context) == "Scan cancelled")
+        #expect(SearchEmptyStateCopy.headline(for: context) == "Scan cancelled")
         // The completed-run checkmark is reserved for full runs.
-        #expect(WU20Strings.headlineSymbol(for: context) == "stop.circle")
-        let copy = WU20Strings.description(for: context)
+        #expect(SearchEmptyStateCopy.headlineSymbol(for: context) == "stop.circle")
+        let copy = SearchEmptyStateCopy.description(for: context)
         #expect(copy == "Detection stopped after 8 of 120 pages — the remaining pages weren't scanned.")
         #expect(!copy.contains("complete"))
         #expect(!copy.contains("detector"))
@@ -255,7 +255,7 @@ struct EmptyStateTests {
 
     @Test("Text pre-search description uses mechanism-description verbs")
     func textPreSearchCopyMechanism() {
-        let copy = WU20Strings.description(for: .textPreSearch)
+        let copy = SearchEmptyStateCopy.description(for: .textPreSearch)
         // Must use "match" not the audit-lint-forbidden lookup
         // verb (assembled via concat to keep this test source clean).
         let forbidden = "fin" + "d"
@@ -270,16 +270,16 @@ struct EmptyStateTests {
         // role sentence as residue (wording constraints pinned by
         // `PIIScanRoleCopyTests`) and must not point at the retired
         // button.
-        let copy = WU20Strings.description(for: .piiScanPreScan)
+        let copy = SearchEmptyStateCopy.description(for: .piiScanPreScan)
         #expect(!copy.contains("Scan Document"))
     }
 
     @Test("Browse Templates copy is removed from piiScanPreScan description")
     func testBrowseTemplatesCopyRemoved() {
-        let copy = WU20Strings.description(for: .piiScanPreScan)
+        let copy = SearchEmptyStateCopy.description(for: .piiScanPreScan)
         // Retires the dead "Browse Templates" affordance
         // from the empty-state copy. This test verifies the old string is
-        // absent from the WU20Strings surface.
+        // absent from the SearchEmptyStateCopy surface.
         #expect(!copy.contains("Browse Templates"))
     }
 
@@ -290,11 +290,11 @@ struct EmptyStateTests {
         // not render on no-match branches (result feedback owns those)
         // or on the Scan side (whose role copy lives in the
         // piiScanPreScan description).
-        let mounted: [WU20Strings.EmptyContext] = [
+        let mounted: [SearchEmptyStateCopy.EmptyContext] = [
             .textPreSearch, .regexPreSearch,
             .multiTermPreSearchNoRecents, .multiTermPreSearchWithRecents,
         ]
-        let bare: [WU20Strings.EmptyContext] = [
+        let bare: [SearchEmptyStateCopy.EmptyContext] = [
             .textNoMatch, .regexNoMatch, .multiTermNoMatch,
             .multiTermNoMatchConjunction,
             .textNotRun, .regexNotRun, .multiTermNotRun,
@@ -303,18 +303,18 @@ struct EmptyStateTests {
             .piiScanCancelled(pagesScanned: 3, pageCount: 12),
         ]
         for context in mounted {
-            #expect(WU20Strings.showsSearchRoleSubtitle(for: context),
+            #expect(SearchEmptyStateCopy.showsSearchRoleSubtitle(for: context),
                     "role line missing on \(context)")
         }
         for context in bare {
-            #expect(!WU20Strings.showsSearchRoleSubtitle(for: context),
+            #expect(!SearchEmptyStateCopy.showsSearchRoleSubtitle(for: context),
                     "role line unexpectedly mounted on \(context)")
         }
     }
 
     @Test("Search role line states the literal-match contract, mechanism-description only")
     func searchRoleSubtitleWording() {
-        let copy = WU20Strings.searchRoleSubtitle
+        let copy = SearchEmptyStateCopy.searchRoleSubtitle
         // The literal-match contract: results follow the query, and
         // nothing is inferred beyond it.
         #expect(copy.contains("Matches exactly what you ask for"))
@@ -337,10 +337,10 @@ struct EmptyStateTests {
 
     @Test("PII Scan post-scan zero-result is mechanism-description (no outcome promise)")
     func piiScanPostScanZeroIsMechanism() {
-        let copy = WU20Strings.description(for: .piiScanPostScanZero(detectorCount: 7))
+        let copy = SearchEmptyStateCopy.description(for: .piiScanPostScanZero(detectorCount: 7))
         #expect(copy == "7 detectors matched 0 candidates above threshold.\n\n"
-            + WU20Strings.piiScanZeroCalibrationLine + "\n\n"
-            + WU20Strings.piiScanZeroRecourseLine)
+            + SearchEmptyStateCopy.piiScanZeroCalibrationLine + "\n\n"
+            + SearchEmptyStateCopy.piiScanZeroRecourseLine)
         // Forbidden outcome promises — assembled via concat so
         // the source itself does not trip the audit-lint hook.
         let outcomePhrases: [String] = [
@@ -357,40 +357,40 @@ struct EmptyStateTests {
 
     @Test("PII Scan post-scan zero-result uses singular suffix for 1 detector")
     func piiScanPostScanZeroSingular() {
-        let copy = WU20Strings.description(for: .piiScanPostScanZero(detectorCount: 1))
+        let copy = SearchEmptyStateCopy.description(for: .piiScanPostScanZero(detectorCount: 1))
         #expect(copy == "1 detector matched 0 candidates above threshold.\n\n"
-            + WU20Strings.piiScanZeroCalibrationLine + "\n\n"
-            + WU20Strings.piiScanZeroRecourseLine)
+            + SearchEmptyStateCopy.piiScanZeroCalibrationLine + "\n\n"
+            + SearchEmptyStateCopy.piiScanZeroRecourseLine)
     }
 
     // MARK: - Post-scan-zero headline, glyph, recourse
 
     @Test("Post-scan-zero headline names the produced count, not a clean-bill affirmation")
     func piiScanPostScanZeroHeadline() {
-        let headline = WU20Strings.headline(for: .piiScanPostScanZero(detectorCount: 5))
+        let headline = SearchEmptyStateCopy.headline(for: .piiScanPostScanZero(detectorCount: 5))
         #expect(headline == "No items flagged")
         #expect(!headline.lowercased().contains("complete"))
     }
 
     @Test("Post-scan-zero glyph matches the Search-side no-match sibling glyph")
     func piiScanPostScanZeroGlyph() {
-        let zeroGlyph = WU20Strings.headlineSymbol(for: .piiScanPostScanZero(detectorCount: 5))
+        let zeroGlyph = SearchEmptyStateCopy.headlineSymbol(for: .piiScanPostScanZero(detectorCount: 5))
         #expect(zeroGlyph == "doc.text.magnifyingglass")
-        #expect(zeroGlyph == WU20Strings.headlineSymbol(for: .textNoMatch))
-        #expect(zeroGlyph == WU20Strings.headlineSymbol(for: .regexNoMatch))
-        #expect(zeroGlyph == WU20Strings.headlineSymbol(for: .multiTermNoMatch))
+        #expect(zeroGlyph == SearchEmptyStateCopy.headlineSymbol(for: .textNoMatch))
+        #expect(zeroGlyph == SearchEmptyStateCopy.headlineSymbol(for: .regexNoMatch))
+        #expect(zeroGlyph == SearchEmptyStateCopy.headlineSymbol(for: .multiTermNoMatch))
         #expect(zeroGlyph != "checkmark.circle")
     }
 
     @Test("Calibration line states a threshold outcome, not a content verdict")
     func piiScanZeroCalibrationLineWording() {
-        let copy = WU20Strings.piiScanZeroCalibrationLine
+        let copy = SearchEmptyStateCopy.piiScanZeroCalibrationLine
         #expect(copy == "A zero result means nothing on the scanned pages cleared the current threshold for those detectors \u{2014} it is not a statement about what the document contains.")
     }
 
     @Test("Recourse line names the three existing controls by their shipped labels")
     func piiScanZeroRecourseLineWording() {
-        let copy = WU20Strings.piiScanZeroRecourseLine
+        let copy = SearchEmptyStateCopy.piiScanZeroRecourseLine
         #expect(copy == "To look further: re-run with different detectors (\u{21bb}), search for specific terms in Search, or change the Detection Sensitivity preset in Settings.")
         #expect(copy.contains("Search"))
         #expect(copy.contains("Settings"))
@@ -416,7 +416,7 @@ struct EmptyStateTests {
             "protect" + "ed",
             "zero networking",
         ]
-        for line in [WU20Strings.piiScanZeroCalibrationLine, WU20Strings.piiScanZeroRecourseLine] {
+        for line in [SearchEmptyStateCopy.piiScanZeroCalibrationLine, SearchEmptyStateCopy.piiScanZeroRecourseLine] {
             let lowered = line.lowercased()
             for phrase in forbidden {
                 #expect(!lowered.contains(phrase), "forbidden phrase '\(phrase)' in: \(line)")
@@ -426,15 +426,15 @@ struct EmptyStateTests {
 
     @Test("No percent sign in any post-scan-zero-state line")
     func piiScanZeroLinesNoPercentSign() {
-        #expect(!WU20Strings.piiScanZeroCalibrationLine.contains("%"))
-        #expect(!WU20Strings.piiScanZeroRecourseLine.contains("%"))
-        let composed = WU20Strings.description(for: .piiScanPostScanZero(detectorCount: 3))
+        #expect(!SearchEmptyStateCopy.piiScanZeroCalibrationLine.contains("%"))
+        #expect(!SearchEmptyStateCopy.piiScanZeroRecourseLine.contains("%"))
+        let composed = SearchEmptyStateCopy.description(for: .piiScanPostScanZero(detectorCount: 3))
         #expect(!composed.contains("%"))
     }
 
     @Test("Filtered-out copy points at filter chips, mechanism-description")
     func filteredOutCopyMechanism() {
-        let copy = WU20Strings.filteredOutDescription
+        let copy = SearchEmptyStateCopy.filteredOutDescription
         #expect(copy.contains("filters"))
         let forbidden = "fin" + "d"
         #expect(!copy.lowercased().contains(forbidden))
@@ -442,7 +442,7 @@ struct EmptyStateTests {
 
     @Test("All branches contain no audit-lint-forbidden phrases")
     func allBranchesNoForbiddenPhrases() {
-        let allContexts: [WU20Strings.EmptyContext] = [
+        let allContexts: [SearchEmptyStateCopy.EmptyContext] = [
             .textPreSearch, .textNotRun, .textNoMatch,
             .regexPreSearch, .regexNotRun, .regexNoMatch,
             .multiTermPreSearchNoRecents, .multiTermPreSearchWithRecents,
@@ -469,7 +469,7 @@ struct EmptyStateTests {
             "cat" + "ching",
         ]
         for context in allContexts {
-            let copy = WU20Strings.description(for: context).lowercased()
+            let copy = SearchEmptyStateCopy.description(for: context).lowercased()
             for phrase in forbidden {
                 #expect(
                     !copy.contains(phrase),
@@ -483,19 +483,19 @@ struct EmptyStateTests {
 
     @Test("Recall chip label joins terms with non-breaking-space-plus")
     func recallChipLabelFormat() {
-        let label = WU20Strings.recallChipLabel(terms: ["alpha", "beta", "gamma"])
+        let label = SearchEmptyStateCopy.recallChipLabel(terms: ["alpha", "beta", "gamma"])
         #expect(label == "alpha\u{00A0}+\u{00A0}beta\u{00A0}+\u{00A0}gamma")
     }
 
     @Test("Recall chip accessibility label uses 'and' between terms for VoiceOver")
     func recallChipAccessibilityLabelFormat() {
-        let label = WU20Strings.recallChipAccessibilityLabel(terms: ["alpha", "beta"])
+        let label = SearchEmptyStateCopy.recallChipAccessibilityLabel(terms: ["alpha", "beta"])
         #expect(label == "Recall recent search: alpha and beta")
     }
 
     @Test("Recent searches header copy is exactly 'Recent searches'")
     func recentSearchesHeader() {
-        #expect(WU20Strings.recentSearchesHeader == "Recent searches")
+        #expect(SearchEmptyStateCopy.recentSearchesHeader == "Recent searches")
     }
 }
 
