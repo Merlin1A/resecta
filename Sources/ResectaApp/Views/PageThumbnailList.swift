@@ -92,7 +92,8 @@ struct PageThumbnailList: View {
                                     document: documentState.sourceDocument,
                                     pageIndex: index
                                 )
-                                .frame(width: 60, height: 80)
+                                .frame(width: PageThumbnailView.thumbnailSize.width,
+                                       height: PageThumbnailView.thumbnailSize.height)
                                 .clipShape(RoundedRectangle(cornerRadius: 4))
                                 // Status dots — orange dot = has regions, none = untouched.
                                 // Pattern from Working Copy / PDF Expert.
@@ -233,6 +234,11 @@ extension PageThumbnailList {
 /// Renders a PDF page thumbnail asynchronously to avoid blocking MainActor.
 /// Uses ThumbnailCache to avoid re-rendering on repeated sidebar scrolls.
 struct PageThumbnailView: View {
+    /// The thumbnail's display size in points. The sidebar frames each
+    /// thumbnail at this size and the renderer draws it at this size times
+    /// the display scale.
+    static let thumbnailSize = CGSize(width: 60, height: 80)
+
     let document: PDFDocument?
     let pageIndex: Int
 
@@ -257,10 +263,11 @@ struct PageThumbnailView: View {
             guard let page = document?.page(at: pageIndex) else { return }
             // PDFPage is not Sendable; render via nonisolated(unsafe) bridge.
             nonisolated(unsafe) let unsafePage = page
-            // Render at display size (60×80pt), not 2× oversized.
+            // Render at the display size, not 2× oversized.
             // Saves ~75% pixel work and cache memory per thumbnail.
             let scale = UITraitCollection.current.displayScale
-            let size = CGSize(width: 60 * scale, height: 80 * scale)
+            let size = CGSize(width: Self.thumbnailSize.width * scale,
+                              height: Self.thumbnailSize.height * scale)
             let rendered = await Task.detached(priority: .utility) {
                 unsafePage.thumbnail(of: size, for: .cropBox)
             }.value
