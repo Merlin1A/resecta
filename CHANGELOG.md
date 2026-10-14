@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Verification: a typed pattern that ran out of time marks only its own search as not checked on that page; the detection sweep's row no longer carries another search's timeout.
 - Verification: two applied scans that share a category count an item they both read once.
 - Verification: the string-search check's note on manual regions names the mechanism — pages with no text layer to capture terms from — instead of calling the pages image-only.
+- Custom terms: a literal term typed with a ligature or a compatibility character matches its plain spelling on pages whose text is plain ASCII.
 
 ### Internal
 
