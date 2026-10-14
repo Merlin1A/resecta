@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # audit-lint.sh — pre-commit gate (mechanical checks M-1, M-3..M-6; see
 # CONTRIBUTING "What every change passes"), plus the script-local checks
-# AL-1..AL-6 (XcodeGen sync · resources: no-op warn · sample-statement and
-# loan-packet dual-copy byte identity · silent test guards on added lines ·
+# AL-1..AL-6 (XcodeGen sync · resources: no-op warn · sample-statement
+# dual-copy byte identity · AL-4 retired with the bundled packet it compared ·
+# silent test guards on added lines ·
 # planning shorthand on added lines: a register-identifier token, a section
 # sign with no standard or repository document named beside it, a Markdown
 # file name the repository does not track, a planning-process word, a step
@@ -585,27 +586,6 @@ if [ "$sample_touched" -eq 1 ]; then
         violate "AL-3 sample-statement dual-copy: a copy is missing ($SAMPLE_APP / $SAMPLE_ENGINE) — both must exist and match"
     elif ! cmp -s "$SAMPLE_APP" "$SAMPLE_ENGINE"; then
         violate "AL-3 sample-statement dual-copy DIFFERS: $SAMPLE_APP vs $SAMPLE_ENGINE — the statement is FROZEN (three names, one SHA); re-sync the copies"
-    fi
-fi
-
-# ── AL-4 loan-packet dual-copy byte identity (sample-packet series) ──────
-# The Hartwell loan packet (the SECOND in-app sample) lives in TWO repo
-# locations that must stay byte-identical (one SHA): the app-bundle copy and
-# the engine test fixture. The SHA is pinned on both sides (BundleContentsTests
-# app-side, TestFixtures.loanPacketSHA256 engine-side, both against
-# 362375…f54339a); this is the commit-time cmp backstop. Triggers whenever
-# either copy is staged.
-PACKET_APP="Resources/packet.pdf"
-PACKET_ENGINE="Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/TestResources/packet.pdf"
-packet_touched=0
-for path in "${STAGED[@]}"; do
-    case "$path" in "$PACKET_APP"|"$PACKET_ENGINE") packet_touched=1 ;; esac
-done
-if [ "$packet_touched" -eq 1 ]; then
-    if [ ! -f "$PACKET_APP" ] || [ ! -f "$PACKET_ENGINE" ]; then
-        violate "AL-4 loan-packet dual-copy: a copy is missing ($PACKET_APP / $PACKET_ENGINE) — both must exist and match"
-    elif ! cmp -s "$PACKET_APP" "$PACKET_ENGINE"; then
-        violate "AL-4 loan-packet dual-copy DIFFERS: $PACKET_APP vs $PACKET_ENGINE — the packet is byte-deterministic (one SHA); re-sync the copies (the generator is the source of truth)"
     fi
 fi
 

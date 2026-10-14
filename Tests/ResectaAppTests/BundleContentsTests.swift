@@ -64,41 +64,6 @@ struct BundleContentsTests {
         )
     }
 
-    // App half of the loan-packet dual-copy
-    // identity guard. The Hartwell loan packet ships as the second in-app
-    // sample (bundled asset only, no UI picker yet). It lives in TWO
-    // repo locations that must stay byte-identical (one SHA): the app-bundle
-    // copy (packet.pdf, here) and the engine test fixture
-    // (Packages/RedactionEngine/Tests/.../TestResources/packet.pdf, pinned by
-    // TestFixtures.loanPacketSHA256). Same rationale as the statement
-    // guard: cross-bundle byte compare in one test is not feasible, so each
-    // side SHA-pins to the SAME shared constant and Scripts/audit-lint.sh
-    // (AL-4) cmp's the two repo files at commit time.
-    @Test("packet.pdf ships in the app bundle (second sample)")
-    func loanPacketIsBundled() {
-        #expect(
-            appBundle.url(forResource: "packet", withExtension: "pdf") != nil,
-            "packet.pdf missing from the app bundle — its project.yml sources: entry is gone"
-        )
-    }
-
-    @Test("packet.pdf bytes match the loan-packet SHA (dual-copy guard)")
-    func loanPacketMatchesFixtureSHA() throws {
-        let url = try #require(
-            appBundle.url(forResource: "packet", withExtension: "pdf"),
-            "packet.pdf missing from the app bundle"
-        )
-        let data = try Data(contentsOf: url)
-        let hex = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        // MUST equal TestFixtures.loanPacketSHA256 in the RedactionEngine test
-        // target (different bundle — cannot be imported here). The commit-time
-        // cmp in Scripts/audit-lint.sh (AL-4) is the byte-identity backstop.
-        #expect(
-            hex == "362375692b8cff378d66c43fcf46f00ba09e1ea982602fcc5c8b70e96f54339a",
-            "app-bundle packet.pdf SHA drift — no longer matches the committed engine packet fixture"
-        )
-    }
-
     // Export-compliance key ships in the bundle.
     // The app declares ITSAppUsesNonExemptEncryption = NO (its only cryptography
     // is Ed25519 verification of its own bundled gazetteer manifest), so the App
