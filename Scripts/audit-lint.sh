@@ -498,7 +498,7 @@ while IFS= read -r hit; do
 done <<< "$m3_tree_hits"
 while IFS='|' read -r ppath psymbol preason; do
     [ -n "$ppath" ] || continue
-    printf '%s' "$m3_tree_hits" | $GREP -qF "$ppath:" && printf '%s' "$m3_tree_hits" | $GREP -F "$ppath:" | $GREP -qF ":$psymbol" \
+    printf '%s' "$m3_tree_hits" | /usr/bin/grep -F "$ppath:" | /usr/bin/grep -qF ":$psymbol" \
         || echo "audit-lint: M-3 pinned site no longer matches ($ppath $psymbol) — remove its pin" >&2
 done <<< "$M3_TREE_PINNED"
 
