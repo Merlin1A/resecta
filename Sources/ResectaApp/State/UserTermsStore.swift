@@ -90,7 +90,7 @@ final class UserTermsStore {
             schemaVersion: Self.schemaVersion,
             fallback: .empty
         )
-        Self.migrateLegacyDefaultsIfNeeded(from: legacyDefaults, into: storage)
+        storage.migrateLegacyDefaultsIfNeeded(from: legacyDefaults, key: Self.storageKey)
         if asyncHydrate {
             self.blob = .empty
             let captured = self.storage
@@ -104,30 +104,6 @@ final class UserTermsStore {
             let loaded = storage.load()
             self.blob = Self.sanitize(loaded)
             self.isHydrated = true
-        }
-    }
-
-    /// One-shot move of the pre-file `UserDefaults` blob into the
-    /// protected Application Support file (same clean-break shape as
-    /// `SearchState.purgeRetiredRecentsStorage`, but carrying the data
-    /// forward). If the legacy key holds a decodable blob it is written
-    /// through the file store; the key is removed only after the file
-    /// is confirmed on disk, so a failed write retries next launch.
-    /// Envelope shape and schema version are unchanged on both sides.
-    nonisolated private static func migrateLegacyDefaultsIfNeeded(
-        from defaults: UserDefaults,
-        into storage: FileJSONBlob<UserTermsBlob>
-    ) {
-        guard defaults.data(forKey: storageKey) != nil else { return }
-        let legacy = UserDefaultsJSONBlob<UserTermsBlob>(
-            key: storageKey,
-            schemaVersion: schemaVersion,
-            defaults: defaults,
-            fallback: .empty
-        )
-        storage.save(legacy.load())
-        if FileManager.default.fileExists(atPath: storage.fileURL.path) {
-            defaults.removeObject(forKey: storageKey)
         }
     }
 
