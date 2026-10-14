@@ -134,12 +134,30 @@ extension ImportService {
     /// `documentURL` nil and the engine cannot walk it later; it threads into
     /// every `PDFPageData` through `DocumentState.sourceHasHiddenOCG`.
     /// `expectedPageCount` is PDFKit's page count for the same bytes.
+    ///
+    /// The reader must open, be unlocked, read a catalog and agree with
+    /// PDFKit on the page count, and the walk must read every page and every
+    /// action chain to its bound; otherwise the walks would answer "clean"
+    /// for what they could not see, so the document is refused as one the
+    /// app cannot read. An owner-password-only file opens with no prompt in
+    /// PDFKit; CoreGraphics may report it locked until the empty user
+    /// password is tried, so that is tried first.
     nonisolated static func inspectWalkReader(data: Data, expectedPageCount: Int) throws -> Bool {
         guard let provider = CGDataProvider(data: data as CFData),
               let cgDoc = CGPDFDocument(provider) else {
-            return false
+            throw PipelineError.importError(.corrupt)
+        }
+        if !cgDoc.isUnlocked {
+            _ = cgDoc.unlockWithPassword("")
+        }
+        guard cgDoc.isUnlocked, cgDoc.catalog != nil,
+              cgDoc.numberOfPages == expectedPageCount else {
+            throw PipelineError.importError(.corrupt)
         }
         if let location = ActiveContentScan.firstLocation(in: cgDoc) {
+            if case .couldNotScan = location {
+                throw PipelineError.importError(.corrupt)
+            }
             throw PipelineError.importError(.activeContent(location: location))
         }
         return TextLayerExtractor.documentHasHiddenOCG(cgDoc)

@@ -410,10 +410,20 @@ public final class PageRasterizer: @unchecked Sendable {
                 textLayerEntries = nil
                 redactionRectsForTextLayer = []
                 pageDigest = nil
-                fallbackReason = .hiddenText
-                pageRasterizerLogger.log(
-                    "page \(page.pageIndex) fell back to secure rasterization at runtime (hidden text)"
-                )
+                if Self.inkTestCanRun(context: ctx, pageSize: effectiveSize) {
+                    fallbackReason = .hiddenText
+                    pageRasterizerLogger.log(
+                        "page \(page.pageIndex) fell back to secure rasterization at runtime (hidden text)"
+                    )
+                } else {
+                    // The test could not run; the page is not known to be
+                    // clean, so it takes the secure path with the reason that
+                    // reads true for it.
+                    fallbackReason = .extractionFailed
+                    pageRasterizerLogger.log(
+                        "page \(page.pageIndex) fell back to secure rasterization at runtime (the ink test could not run)"
+                    )
+                }
             }
 
             // 5. Apply fills — bitmap dimensions only, no PDF geometry.
@@ -484,6 +494,11 @@ public final class PageRasterizer: @unchecked Sendable {
 
     // MARK: - Hidden-text ink test
 
+    /// Whether the ink test has a bitmap to read and a page size to map onto.
+    static func inkTestCanRun(context: CGContext, pageSize: CGSize) -> Bool {
+        context.data != nil && pageSize.width > 0 && pageSize.height > 0
+    }
+
     /// Pixel-area floor under which a glyph box is not tested (a box this
     /// small at any DPI cannot show a glyph edge either way).
     static let hiddenTextMinimumBoxArea: Int = 4
@@ -499,12 +514,16 @@ public final class PageRasterizer: @unchecked Sendable {
     /// pixel), so the test sees exactly the pixels the fills and the verify
     /// loop see. Whitespace-lineage glyphs, off-bitmap boxes and boxes under
     /// `hiddenTextMinimumBoxArea` are exempt. Cooperative cancellation every
-    /// 256 glyphs.
+    /// 256 glyphs. A test that cannot run — no bitmap data to read, no page
+    /// size to map onto — also answers true: a page that could not be
+    /// checked is not known to be clean (`inkTestCanRun` tells the two
+    /// apart for the recorded reason).
     static func hasInklessGlyph(
         context: CGContext, entries: [CharacterInfo], pageSize: CGSize
     ) throws -> Bool {
-        guard let data = context.data, pageSize.width > 0, pageSize.height > 0 else {
-            return false
+        guard inkTestCanRun(context: context, pageSize: pageSize),
+              let data = context.data else {
+            return true
         }
         let buffer = data.assumingMemoryBound(to: UInt8.self)
         let bitmap = CGRect(x: 0, y: 0, width: context.width, height: context.height)
@@ -614,7 +633,13 @@ public final class PageRasterizer: @unchecked Sendable {
         guard let ctx = createBitmapContext(width: pw, height: ph) else {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
         }
-        defer { Self.renderContextWipeProbe?(ctx) }
+        // The first-render bitmap is wiped at its release. `makeImage()` hands
+        // back a copy (the invariant `PixelBufferZeroizeTests` pins), so the
+        // image survives the wipe.
+        defer {
+            PixelOperations.zeroizeBitmapBuffer(ctx)
+            Self.renderContextWipeProbe?(ctx)
+        }
 
         // 4. White background (UIColor on iOS)
         #if canImport(UIKit)
@@ -692,7 +717,13 @@ public final class PageRasterizer: @unchecked Sendable {
         guard let ctx = createBitmapContext(width: pw, height: ph) else {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
         }
-        defer { Self.renderContextWipeProbe?(ctx) }
+        // The first-render bitmap is wiped at its release. `makeImage()` hands
+        // back a copy (the invariant `PixelBufferZeroizeTests` pins), so the
+        // image survives the wipe.
+        defer {
+            PixelOperations.zeroizeBitmapBuffer(ctx)
+            Self.renderContextWipeProbe?(ctx)
+        }
 
         // White background (UIColor on iOS)
         #if canImport(UIKit)
