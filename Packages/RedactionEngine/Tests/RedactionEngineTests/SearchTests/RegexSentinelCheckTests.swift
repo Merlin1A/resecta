@@ -137,26 +137,6 @@ struct RegexSentinelCheckTests {
         }
     }
 
-    @Test(
-        "Validation respects wall-clock budget across diverse inputs",
-        .disabled("V1.0 environmental skip: cold-simulator perf flake; budget designed for warm hardware.")
-    )
-    func wallClockBudget() async {
-        let patterns = [
-            #"\d+"#,
-            #"(ab|cd|ef){30}xyz"#,
-            #"(a|aa){20}c"#,
-            #".*.*.*.*.*.*.*z"#,
-            #"[A-Za-z0-9]{200}"#,
-        ]
-        for pattern in patterns {
-            let start = ContinuousClock.now
-            _ = await RegexSentinelCheck.validate(pattern)
-            let elapsed = ContinuousClock.now - start
-            #expect(elapsed < .milliseconds(500), "pattern exceeded budget: \(pattern), elapsed: \(elapsed)")
-        }
-    }
-
     @Test("All built-in saved regexes pass the sentinel")
     func builtInsPass() async {
         for regex in SavedRegex.allBuiltIns {

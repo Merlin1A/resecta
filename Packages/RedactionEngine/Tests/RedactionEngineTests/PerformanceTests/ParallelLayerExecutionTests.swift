@@ -368,12 +368,10 @@ struct ParallelLayerExecutionTests {
 
     // Wall-clock acceptance test. Asserts that the parallel dispatch
     // reduces verification wall-clock vs. the sequential baseline;
-    // reports the 0.5× strict target as a non-asserting log line. Same
-    // convention as the existing `SearchPerformanceTests` and
-    // `RegexSentinelCheckTests` env-skip entries — `.disabled` under
-    // default green-bar runs because Swift Testing schedules tests
-    // across CPU cores by default and parallel-scheduling contention
-    // with other wall-clock-budgeted suites distorts the ratio.
+    // reports the 0.5× strict target as a non-asserting log line.
+    // `.disabled` under default green-bar runs because Swift Testing
+    // schedules tests across CPU cores by default and parallel-scheduling
+    // contention with other wall-clock-budgeted suites distorts the ratio.
     // Explicit invocation gate:
     //   xcodebuild test -only-testing:'RedactionEngineTests/ParallelLayerExecutionTests/testVerifyWallClockUnderHalfBaseline()'
     @Test("Parallel verify wall-clock beats sequential baseline (acceptance gate)",
