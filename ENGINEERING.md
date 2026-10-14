@@ -396,7 +396,10 @@ The check: `EnginePublicSurfaceTests` names every symbol in the list through a
 plain `import RedactionEngine`, so making one of them `internal` stops the
 engine test target from compiling. Its limit: it pins presence, not absence —
 nothing in it stops a new declaration from being made `public`; that stays a
-review question.
+review question. The pull-request gate covers the count: it reads the package's
+`public` and `open` declaration lines and fails a change whose count exceeds the
+cap it carries (`Scripts/engine-public-surface-check.sh`), so a new `public`
+declaration spends headroom the change's description has to name.
 
 ## Where to start reading
 
