@@ -5,22 +5,16 @@
 # Method: code under `#if DEBUG` is not compiled in Release, so its launch-arg
 # string literal cannot appear in the Release binary. A `strings` census over
 # the built app binary is therefore a proof independent of the test runner
-# (which only ever builds Debug). The existing `--showRetiredSheetControls`
-# arg (SearchState.scanCategoryStripEnabled) is the positive control that the
+# (which only ever builds Debug). The `--openSavedSearches` sim-drive hook
+# (SearchAndRedactSheet, under `#if DEBUG`) is the positive control that the
 # method detects a literal when one IS compiled in.
 #
 # Usage:
-#   Scripts/release-flag-check.sh                # post-re-light expectations:
-#                                                #   Release: 0 of each arg
-#                                                #   Debug:  >=1 of each arg
-#   Scripts/release-flag-check.sh --pre-relight  # baseline before the
-#                                                # --enableAuditSurfaces re-light
-#                                                # lands: that arg must be 0 in
-#                                                # BOTH configs; the precedent
-#                                                # arg still proves the method.
+#   Scripts/release-flag-check.sh                # Release: 0 of the arg
+#                                                # Debug:  >=1 of the arg
 #   Scripts/release-flag-check.sh --archive PATH/ResectaApp.app
-#                                                # the archived app itself: both
-#                                                # args 0 in its code images and
+#                                                # the archived app itself: the
+#                                                # arg 0 in its code images and
 #                                                # no UITestFixtures file name
 #                                                # anywhere in the bundle. Run at
 #                                                # the archive SHA; its two
@@ -35,11 +29,7 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GREP=/usr/bin/grep
 
-NEW_ARG='--enableAuditSurfaces'
-PRECEDENT_ARG='--showRetiredSheetControls'
-
-PRE_RELIGHT=0
-if [ "${1:-}" = "--pre-relight" ]; then PRE_RELIGHT=1; fi
+DEBUG_ARG='--openSavedSearches'
 
 SCRATCH="$(mktemp -d /tmp/release-flag-check.XXXXXX)"
 trap 'rm -rf "$SCRATCH"' EXIT
@@ -50,18 +40,17 @@ FAIL=0
 # dylib. Under Xcode's debug-dylib layout the Debug main binary is a thin
 # launcher stub and ALL app code (and its literals) lives in
 # ResectaApp.debug.dylib — a main-binary-only census reads 0 forever.
-# Sets N_NEW and N_PRECEDENT.
+# Sets N_DEBUG_ARG.
 census_app() {
     APP="$1"
     IMAGES="$APP/ResectaApp"
     for d in "$APP"/*.dylib; do
         [ -e "$d" ] && IMAGES="$IMAGES $d"
     done
-    N_NEW=0; N_PRECEDENT=0
+    N_DEBUG_ARG=0
     for img in $IMAGES; do
-        n1="$(strings "$img" | $GREP -c -- "$NEW_ARG" || true)"
-        n2="$(strings "$img" | $GREP -c -- "$PRECEDENT_ARG" || true)"
-        N_NEW=$((N_NEW + n1)); N_PRECEDENT=$((N_PRECEDENT + n2))
+        n="$(strings "$img" | $GREP -c -- "$DEBUG_ARG" || true)"
+        N_DEBUG_ARG=$((N_DEBUG_ARG + n))
     done
 }
 
@@ -92,9 +81,9 @@ archive_check() {
     fi
     census_app "$APP"
     fixtures_in_app "$APP" "$ROOT/UITestFixtures"
-    echo "archive counts: $NEW_ARG=$N_NEW $PRECEDENT_ARG=$N_PRECEDENT"
+    echo "archive counts: $DEBUG_ARG=$N_DEBUG_ARG"
     echo "archive fixtures: $N_FIXTURES of $N_FIXTURE_NAMES UITestFixtures file names present${FIXTURE_HITS:+ (}${FIXTURE_HITS# }${FIXTURE_HITS:+)}"
-    [ "$N_NEW" -eq 0 ] && [ "$N_PRECEDENT" -eq 0 ] && [ "$N_FIXTURES" -eq 0 ]
+    [ "$N_DEBUG_ARG" -eq 0 ] && [ "$N_FIXTURES" -eq 0 ]
 }
 
 if [ "${1:-}" = "--archive" ]; then
@@ -110,7 +99,7 @@ if [ "${1:-}" = "--self-test" ]; then
     make_app clean "plain launcher text"
     make_app fixture "plain launcher text"
     cp "$ROOT/UITestFixtures/test_sample.pdf" "$SCRATCH/fixture.app/"
-    make_app literal "release build $PRECEDENT_ARG"
+    make_app literal "release build $DEBUG_ARG"
     archive_check "$SCRATCH/clean.app" >/dev/null || ok=0
     archive_check "$SCRATCH/fixture.app" >/dev/null && ok=0
     archive_check "$SCRATCH/literal.app" >/dev/null && ok=0
@@ -143,7 +132,7 @@ count_in_binary() {
     fi
     census_app "$APP"
     echo "$CONFIG images: $IMAGES"
-    echo "$CONFIG counts: $NEW_ARG=$N_NEW $PRECEDENT_ARG=$N_PRECEDENT"
+    echo "$CONFIG counts: $DEBUG_ARG=$N_DEBUG_ARG"
 }
 
 check() {
@@ -158,19 +147,11 @@ check() {
 
 echo "== Release =="
 count_in_binary Release
-REL_NEW="$N_NEW"; REL_PRECEDENT="$N_PRECEDENT"
-check "Release $NEW_ARG" "$REL_NEW" zero
-check "Release $PRECEDENT_ARG" "$REL_PRECEDENT" zero
+check "Release $DEBUG_ARG" "$N_DEBUG_ARG" zero
 
 echo "== Debug =="
 count_in_binary Debug
-DBG_NEW="$N_NEW"; DBG_PRECEDENT="$N_PRECEDENT"
-check "Debug $PRECEDENT_ARG (method positive control)" "$DBG_PRECEDENT" nonzero
-if [ "$PRE_RELIGHT" -eq 1 ]; then
-    check "Debug $NEW_ARG (pre-re-light baseline)" "$DBG_NEW" zero
-else
-    check "Debug $NEW_ARG" "$DBG_NEW" nonzero
-fi
+check "Debug $DEBUG_ARG (method positive control)" "$N_DEBUG_ARG" nonzero
 
 echo "== #if DEBUG census (drift alarm, not a gate) =="
 $GREP -rn '#if DEBUG' "$ROOT/Sources" | sed "s|$ROOT/||" || true
