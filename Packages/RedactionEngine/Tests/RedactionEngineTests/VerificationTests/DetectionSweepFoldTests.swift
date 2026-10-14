@@ -29,21 +29,31 @@ struct DetectionSweepFoldTests {
                      source: .textLayer, term: category.rawValue, piiCategory: category)
     }
 
+    /// The scan configuration a request ran with: its always-flag literal
+    /// terms, or nil when it carried none.
+    private func configuration(alwaysFlag: [String]) -> ScanRunConfiguration? {
+        alwaysFlag.isEmpty ? nil : ScanRunConfiguration(
+            thresholdVector: nil, alwaysFlag: alwaysFlag.map { UserTerm(pattern: $0, isRegex: false) })
+    }
+
     private func applied(
-        _ categories: Set<PIICategory>, found: Int = 4, applied: Int = 4, deselected: [SearchResult] = []
+        _ categories: Set<PIICategory>, found: Int = 4, applied: Int = 4, deselected: [SearchResult] = [],
+        alwaysFlag: [String] = []
     ) -> SearchRecheckRequest {
         SearchRecheckRequest(
             record: AppliedSearchRecord(
                 query: AppliedSearchQuery(kind: .piiScan(categories: categories), options: SearchOptions()),
-                foundCount: found),
+                foundCount: found, scanConfiguration: configuration(alwaysFlag: alwaysFlag)),
             appliedCount: applied, appliedPages: [0], deselected: deselected)
     }
 
-    private var sweep: SearchRecheckRequest {
+    private var sweep: SearchRecheckRequest { sweepRequest() }
+
+    private func sweepRequest(alwaysFlag: [String] = []) -> SearchRecheckRequest {
         SearchRecheckRequest(
             record: AppliedSearchRecord(
                 query: AppliedSearchQuery(kind: .piiScan(categories: Set(PIICategory.allCases)), options: SearchOptions()),
-                foundCount: 0),
+                foundCount: 0, scanConfiguration: configuration(alwaysFlag: alwaysFlag)),
             appliedCount: 0, appliedPages: [], origin: .sweep)
     }
 
@@ -249,13 +259,14 @@ struct DetectionSweepFoldTests {
         #expect(DetectionSweep.isSwept(nil), "an always-flag hit counts")
         #expect(DetectionSweep.isSwept(.ssn) && !DetectionSweep.isSwept(.name) && !DetectionSweep.isSwept(.address))
         let outcome = DetectionSweep.fold(
-            requests: [applied([.ssn, .name, .address]), sweep],
+            requests: [applied([.ssn, .name, .address], alwaysFlag: ["ACME"]), sweep],
             observations: [page(0, [0: [item(0, .name, rect(0.1, 0.1)), item(0, .address, rect(0.1, 0.2))],
                                     1: [item(0, .name, rect(0.1, 0.1)), item(0, .address, rect(0.1, 0.2)), item(0, nil, rect(0.1, 0.3), text: "ACME")]])],
             pageCount: 1)
-        // The names and the address vanish; the always-flag hit belongs to
-        // the applied scan (in scope), and an in-scope item of the SWEEP
-        // request is the re-run's to count, not the sweep's — nothing further.
+        // The names and the address vanish; the custom-term hit belongs to
+        // the applied scan that carried the term (in scope), and an in-scope
+        // item of the SWEEP request is the re-run's to count, not the
+        // sweep's — nothing further.
         #expect(outcome.status == .pass, "got \(outcome.status)")
         #expect(outcome.queryLines?[0].remainingCount == 0, "the applied scan's names and address do not count")
         #expect(outcome.queryLines?[1].remainingCount == 0, "the sweep's out-of-scope count carries no name or address")
@@ -264,6 +275,37 @@ struct DetectionSweepFoldTests {
             requests: [applied([.name])], observations: [page(0, [0: [item(0, .name, rect(0.1, 0.1))]])], pageCount: 1)
         #expect(clean.status == .pass, "a name-only scan re-run reads nothing it counts; got \(clean.status)")
         #expect(clean.copyOverride?.detail.hasSuffix(DetectionSweep.gateSentence) == true)
+    }
+
+    // MARK: - The scope split and custom terms
+
+    @Test("A custom term added after the scan was applied is reported by the sweep as a possible item")
+    func lateCustomTermSurvivesTheAppliedScanFilter() {
+        // The applied scan ran with the term ACME; the run's sweep carries
+        // ACME and the later term BETA. Both read on the output: the ACME
+        // hit is the scan's (in scope); the BETA hit no applied scan carried.
+        let outcome = DetectionSweep.fold(
+            requests: [applied([.ssn], alwaysFlag: ["ACME"]), sweepRequest(alwaysFlag: ["ACME", "BETA"])],
+            observations: [page(0, [
+                0: [item(0, nil, rect(0.1, 0.1), text: "ACME")],
+                1: [item(0, nil, rect(0.1, 0.1), text: "ACME"), item(0, nil, rect(0.1, 0.3), text: "BETA")],
+            ])],
+            pageCount: 1)
+        #expect(outcome.status.isInfo, "got \(outcome.status)")
+        let m = message(outcome.status)
+        #expect(m.contains("in your scan's categories: 1 remains"), "the scan's own term; got \(m)")
+        #expect(m.contains("outside them: 1 possible item"), "the later term is a possible item; got \(m)")
+        #expect(outcome.queryLines?[1].remainingCount == 1, "the sweep's line counts the later term")
+        #expect(outcome.queryLines?[1].perTerm?.map(\.term) == ["Custom"])
+
+        // An applied scan that carried no custom term: every custom-term hit
+        // the sweep reads is a possible item.
+        let none = DetectionSweep.fold(
+            requests: [applied([.ssn]), sweepRequest(alwaysFlag: ["BETA"])],
+            observations: [page(0, [0: [], 1: [item(0, nil, rect(0.1, 0.3), text: "BETA")]])],
+            pageCount: 1)
+        #expect(none.status.isInfo, "got \(none.status)")
+        #expect(message(none.status).contains("outside them: 1 possible item"), "got \(message(none.status))")
     }
 
     // MARK: - Invariants

@@ -208,8 +208,11 @@ struct DetectionSweep: Sendable {
 
         // The scope split: an applied scan's categories are "yours"; the
         // sweep reports what it reads outside them. Without an applied scan
-        // everything the sweep reads is a possible item. An always-flag hit
-        // (no category) belongs to the scan when one was applied.
+        // everything the sweep reads is a possible item. A custom-term hit
+        // (no category) belongs to an applied scan only when that scan
+        // carried a term that reads the hit's text — a remaining item keeps
+        // its text, not its pattern — so a term added after the apply is a
+        // possible item, not the scan's.
         let appliedIndices = requests.indices.filter { requests[$0].origin == .applied }
         let sweepIndices = requests.indices.filter { requests[$0].origin == .sweep }
         let hasApplied = !appliedIndices.isEmpty
@@ -223,11 +226,16 @@ struct DetectionSweep: Sendable {
         let rawRemaining = appliedIndices.reduce(0) { $0 + rawRemainingByRequest[$1] }
         let subtracted = appliedIndices.reduce(0) { $0 + subtractedByRequest[$1] }
         let furtherApplied = appliedIndices.flatMap { furtherByRequest[$0] }
+        let carriedTerms = UserTermMatcher.compile(
+            alwaysFlag: appliedIndices.flatMap { requests[$0].record.scanConfiguration?.alwaysFlag ?? [] },
+            neverFlag: [])
         var outOfScopeByRequest = [[RecheckObservation.RemainingItem]](repeating: [], count: requestCount)
         for index in sweepIndices {
             outOfScopeByRequest[index] = furtherByRequest[index].filter { item in
                 guard hasApplied else { return true }
-                guard let category = item.category else { return false }
+                guard let category = item.category else {
+                    return carriedTerms.matchesAlwaysFlag(item.matchedText) == nil
+                }
                 return !appliedCategories.contains(category)
             }
         }
