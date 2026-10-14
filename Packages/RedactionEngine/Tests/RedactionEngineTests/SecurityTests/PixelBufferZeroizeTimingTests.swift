@@ -10,7 +10,7 @@ import UIKit
 // so the batched runner's perf-alone list names this suite and the two
 // correctness tests batch with every other `.critical` suite. Report-only
 // where the runner lists it (`Scripts/test-batched.sh`
-// `PERF_ALONE_RedactionEngine`; `engine-suite.yml` `HEAVY_SUITES`).
+// `PERF_ALONE_RedactionEngine`).
 //
 // What this tests: the zeroize cost on a 300-DPI letter page stays under
 // the 5 ms p95 budget ("Per-page overhead recorded as a baseline." The

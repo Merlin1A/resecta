@@ -4,10 +4,11 @@
 # report-only. Both schemes run every Monday and on release tags, one job
 # each; a dispatch runs the scheme it names; ResectaApp alone runs on every
 # pull request to main as a non-required check (twenty to forty minutes).
-# RedactionEngine here runs the engine package's suites on the simulator;
-# the engine package has no hosted run of its own, and this one stays off
-# pull requests for its length. The runner takes its simulator by id and
-# its DerivedData path from the environment set below.
+# RedactionEngine here runs the engine package's suites on the simulator
+# (the package's one hosted run: a host `swift test` of the whole package
+# never reached a verdict on a hosted runner) and stays off pull requests
+# for its length. The runner takes its simulator by id and its
+# DerivedData path from the environment set below.
 #
 # The account runs at most five macOS jobs at once, and every push to a
 # pull request starts three of them (the ci.yml gate, this workflow's
