@@ -379,11 +379,6 @@ final class SearchState: Identifiable {
 
     // MARK: - Intra-Session Diff
 
-    /// Snapshot of fingerprints from the PREVIOUS scan
-    /// in this session. `diffSinceLastScan()` compares the snapshot
-    /// against the current `results` to surface added / removed /
-    /// unchanged counts in `CoverageReportView`.
-    ///
     /// SECURITY: geometry + category only — NEVER
     /// matched text. Hashing `matchedText`, even into an in-memory
     /// `Set<String>`, would constitute document-derived retention
