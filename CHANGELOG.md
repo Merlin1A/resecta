@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Internal
+
+- The pull-request gate counts the engine package's `public` and `open` declaration lines and fails a change whose count exceeds the cap the script carries, printing the count, the headroom under the cap and the release line caps on the largest source files (`Scripts/engine-public-surface-check.sh`); a change that adds to the count names the declarations in its description.
+- The growth ratchet tracks the two test trees as well as the source trees: a test file over 800 lines at the base of a change may not grow.
+- The audit lint's shorthand check reads five more shapes on added Swift and string-catalog lines: a section sign with no standard or repository document named beside it, a Markdown file name the repository does not track, and, in comments, planning-process words, step tokens and the maintainer's first name.
+- A report-only test lists every app test that builds its settings on the shared defaults domain instead of a scratch suite; with `RESECTA_PIN_SCRATCH_DEFAULTS=1` it fails on them.
+- `CHANGELOG.md` merges with git's union driver (`.gitattributes`), so two pull requests that each add lines under `[Unreleased]` no longer conflict on them.
+
 ## [1.2.0] — 2026-09-29
 
 ### Added

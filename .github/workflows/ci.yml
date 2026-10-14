@@ -2,9 +2,11 @@
 # its unit- and UI-test bundles without running them, runs the audit lint
 # over the lines the change adds and the claims lint over the shipping
 # docs and the view-layer strings, checks the documented counts against
-# the tree, checks the shipped-asset hashes, fails when a source file
-# already over 800 lines grows (the growth ratchet) and reports the
-# silent-guard census over the three test trees. The scripts run
+# the tree, checks the shipped-asset hashes, fails when a source or test
+# file already over 800 lines grows (the growth ratchet), fails when the
+# engine package's public and open declaration lines exceed their cap
+# (the engine public-surface check) and reports the silent-guard census
+# over the three test trees. The scripts run
 # from the base branch's copies, so a change cannot edit the lint it is
 # gated by; the change's own copies run once more, report-only. About five
 # minutes on a hosted macos-26 runner. The batched simulator suites
@@ -151,7 +153,7 @@ jobs:
           [ "$rc" -eq 0 ] || echo "::warning::silent-guard census: a silent test is in the tree (see the inventory in the log)"
           exit "$rc"
 
-      # Growth ratchet: a source file over 800 lines at the base of the change
+      # Growth ratchet: a source or test file over 800 lines at the base of the change
       # may not be larger at its head (Scripts/growth-ratchet.sh; a split along
       # a real seam shrinks the file and passes). Enforcing: with
       # RATCHET_ENFORCE at '1' a grown file is an error annotation and fails
@@ -180,7 +182,37 @@ jobs:
           "$script" "$base" HEAD
           echo "RATCHET_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
 
-      # The change's own copies of the four scripts, so an edit to a lint is
+      # Engine public surface: the count of public and open declaration lines
+      # in the engine package may not exceed the cap the script carries
+      # (Scripts/engine-public-surface-check.sh); the step prints the count,
+      # the headroom under the cap and the release line caps on the largest
+      # files. Runs the base branch's copy of the script when the base has
+      # one, so a change cannot edit the cap it is gated by; on the change
+      # that first adds the script this change's copy runs report-only and
+      # the check gates from the next pull request.
+      - name: Engine public surface
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          t0=$SECONDS
+          base="${PR_BASE:-$PUSH_BEFORE}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="$(git rev-parse HEAD~1)"
+          fi
+          script="${BASE_SCRIPTS}/engine-public-surface-check.sh"
+          if git show "${base}:Scripts/engine-public-surface-check.sh" > "$script" 2>/dev/null && [ -s "$script" ]; then
+            chmod +x "$script"
+            echo "engine-public-surface range: ${base}..HEAD"
+            "$script" "$base" HEAD
+          else
+            echo "engine-public-surface-check.sh is absent at ${base}; running this change's copy report-only"
+            Scripts/engine-public-surface-check.sh "$base" HEAD \
+              || echo "::warning::engine public surface (report-only on this change): the base branch has no copy of the check yet; it gates from the next pull request"
+          fi
+          echo "SURFACE_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
+
+      # The change's own copies of the lint scripts, so an edit to a lint is
       # exercised before it merges. Never gates.
       - name: Lint scripts from this change (report-only)
         continue-on-error: true
@@ -197,6 +229,7 @@ jobs:
           Scripts/doc-metrics.sh --check || { echo "::warning::this change's doc-metrics.sh --check failed"; rc=1; }
           Scripts/audit-lint.sh --range "${base}..HEAD" || { echo "::warning::this change's audit-lint.sh failed"; rc=1; }
           Scripts/verify-shipped-asset-hashes.sh || { echo "::warning::this change's verify-shipped-asset-hashes.sh failed"; rc=1; }
+          Scripts/engine-public-surface-check.sh "${base}" HEAD || { echo "::warning::this change's engine-public-surface-check.sh failed"; rc=1; }
           exit "$rc"
 
       - name: Summary
@@ -213,6 +246,7 @@ jobs:
             echo "| doc-metrics (check) | ${DOCMETRICS_SECS:-—} |"
             echo "| audit-lint (range) | ${AUDIT_SECS:-—} |"
             echo "| growth-ratchet | ${RATCHET_SECS:-—} |"
+            echo "| engine-public-surface | ${SURFACE_SECS:-—} |"
             echo
             echo "lint scripts from: ${LINT_SCRIPTS_FROM:-—}"
           } >> "$GITHUB_STEP_SUMMARY"
