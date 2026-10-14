@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - Search sheet: the recent-search recall chips, the per-term section headers of the results list and the saved-search names are marked privacy-sensitive, matching the result rows and the saved-query previews.
 - Import: a file over the 50 MB cap is refused by its size on disk before any byte is read, from the Files picker and from a drop alike; a dropped file arrives as a file and is read inside its transfer rather than as 50 MB of memory.
+- Import: a document whose structure the app cannot read in full is refused rather than opened unscanned. The reader the active-content and hidden-layer walks inspect must open, be unlocked, read a catalog and agree with PDFKit on the page count; a walk that cannot read a page or follow an action chain to its bound refuses instead of answering clean; an `/OCProperties` entry without its default configuration reads as a hidden layer. An owner-password-only document still opens.
 
 ### Removed
 
@@ -53,6 +54,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The engine's unsupported-format message names the formats: PDF files and JPEG, PNG and HEIC images.
 - Import lives in `Services/Import/`: a loader protocol with its payload, limits and facts types; a router that reads the leading bytes, never the declared type, and refuses every image signature before any decode; the PDF stages as a pure function of the bytes; and a wrapper that applies the facts to the editor's state in one place and reports whether the import completed. The image decode and image-to-PDF render no door reached, and the Live Photo auxiliary-metadata stripper only they called, are deleted.
 - The run's page-data bridge is a pure function of values (`RunInputs.pageData`); the rasterization steps sit in `PipelineCoordinator+Rasterization.swift`; the stores share one lenient row wrapper and one legacy-defaults move; the regex sentinel is entered through one `PatternAdmission` path; the sidebar's thumbnail cache keys on the document as well as the page.
+- A page whose hidden-text check cannot run — no bitmap to read, no page dictionary to inspect — takes the secure path and records that the check could not run, instead of reading as clean; the first-render bitmap is wiped when the render releases it, the image handed on being a copy. The robustness runner's import mirror and the verification corpus mirror follow the same reader rules.
 
 ## [1.2.0] — 2026-09-29
 
