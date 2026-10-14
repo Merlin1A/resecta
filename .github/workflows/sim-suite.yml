@@ -13,7 +13,7 @@
 # pull request starts three of them (the ci.yml gate, this workflow's
 # ResectaApp job and code scanning's Swift analysis): a fourth job on the
 # same account waits for a slot. The weekly and tag runs add the engine
-# job; a dispatch adds one job.
+# job and the egress pins step below; a dispatch adds one job.
 #
 # The hosted runner is a three-vCPU virtual machine without Neural Engine
 # access, so Vision's text recognition runs on the CPU and a verification
@@ -136,6 +136,33 @@ jobs:
           Scripts/test-batched.sh "$SCHEME" --timeout-mins 25 2>&1 | tee batched.log || rc=$?
           echo "SUITE_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
           echo "SUITE_RC=$rc" >> "$GITHUB_ENV"
+          exit "$rc"
+
+      # The editor's link-policy pins (Tests/ResectaAppUITests/
+      # DocumentLinkUITests.swift) drive the built app and assert that a
+      # tapped link annotation does not leave the app. The batched runner
+      # never executes the UI-test bundle, so they run here on the weekly
+      # and tag runs only (never on a pull request: a macOS slot), against
+      # the bundles the runner already built and the simulator it used.
+      - name: Egress UI pins
+        if: ${{ !cancelled() && matrix.scheme == 'ResectaApp' && (github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v')) }}
+        run: |
+          t0=$SECONDS
+          rc=0
+          xcodebuild test-without-building -scheme ResectaApp \
+            -destination "id=$TEST_BATCHED_SIM_UDID" -derivedDataPath "$TEST_BATCHED_DD" \
+            -resultBundlePath "$RUNNER_TEMP/egress-ui-pins.xcresult" \
+            -only-testing:ResectaAppUITests/DocumentLinkUITests 2>&1 \
+            | /usr/bin/grep -vE 'attributedStringScaled' | tee egress-ui-pins.log || rc=$?
+          {
+            echo "## egress UI pins (DocumentLinkUITests)"
+            echo
+            echo "- wall: $((SECONDS - t0)) s · rc: $rc"
+            echo
+            echo '```'
+            /usr/bin/grep -E "Test Case '-\[.*\]' (passed|failed)|Executed [0-9]+ tests?" egress-ui-pins.log | tail -n 6 || echo "(no test lines)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           exit "$rc"
 
       - name: Collect logs and failing result bundles
