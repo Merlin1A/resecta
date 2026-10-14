@@ -206,7 +206,7 @@ struct LivePhotoAuxStripperTests {
     @Test("Import path strips source EXIF/GPS from the rendered PDF")
     @MainActor
     func testRenderedPDFHasNoEXIF() async throws {
-        let jpeg = try #require(makeJPEGWithEXIFAndGPS(), "failed to build EXIF JPEG fixture")
+        let jpeg = try #require(makeJPEGWithEXIFAndGPS(probe: Self.exifProbe), "failed to build EXIF JPEG fixture")
         // Sanity: the SOURCE blob really carries the EXIF APP1 marker — so the
         // assertions below are meaningful, not vacuous.
         #expect(containsEXIFMarker(jpeg), "fixture JPEG should embed an EXIF APP1 marker")
@@ -237,43 +237,5 @@ struct LivePhotoAuxStripperTests {
     private func containsEXIFMarker(_ data: Data) -> Bool {
         let exifSig = Data([0x45, 0x78, 0x69, 0x66, 0x00, 0x00]) // "Exif\0\0"
         return data.range(of: exifSig) != nil
-    }
-
-    /// Build a small JPEG that embeds an EXIF dictionary (with a probe
-    /// UserComment) and a GPS dictionary via ImageIO, so the no-EXIF assertion
-    /// is meaningful. Returns nil only if ImageIO fails to construct the image.
-    private func makeJPEGWithEXIFAndGPS() -> Data? {
-        let width = 8, height = 8
-        guard let ctx = CGContext(
-            data: nil, width: width, height: height,
-            bitsPerComponent: 8, bytesPerRow: 0,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return nil }
-        ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
-        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        guard let cg = ctx.makeImage() else { return nil }
-
-        let exif: [CFString: Any] = [
-            kCGImagePropertyExifUserComment: Self.exifProbe,
-            kCGImagePropertyExifDateTimeOriginal: "2024:01:01 12:00:00"
-        ]
-        let gps: [CFString: Any] = [
-            kCGImagePropertyGPSLatitude: 41.7658,
-            kCGImagePropertyGPSLatitudeRef: "N",
-            kCGImagePropertyGPSLongitude: 72.6734,
-            kCGImagePropertyGPSLongitudeRef: "W"
-        ]
-        let props: [CFString: Any] = [
-            kCGImagePropertyExifDictionary: exif,
-            kCGImagePropertyGPSDictionary: gps
-        ]
-        let out = NSMutableData()
-        guard let dest = CGImageDestinationCreateWithData(
-            out as CFMutableData, "public.jpeg" as CFString, 1, nil
-        ) else { return nil }
-        CGImageDestinationAddImage(dest, cg, props as CFDictionary)
-        guard CGImageDestinationFinalize(dest) else { return nil }
-        return out as Data
     }
 }
