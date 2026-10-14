@@ -89,25 +89,19 @@ struct RedactWorkspaceView: View {
                     }
                     return true
                 }
-                // Magic bytes are sniffed BEFORE dispatch. The previous
-                // hardcoded `suggestedType: "pdf"` forced every drop
-                // through the PDF branch, making the image branch dead
-                // code on this entry point. Phase admission has already
-                // passed by this point; only the routing label is being
-                // chosen.
+                // Phase admission has already passed by this point; the
+                // label handed on is the sniffed kind's, and the import
+                // reads the bytes again before any parse.
                 let suggestedType = ImportService.detectPayloadKind(from: data).suggestedType
                 // Cancel any prior in-flight import
                 // dispatch so a rapid double-drop doesn't race two
                 // ImportService.importDocument calls.
                 activeImportDispatch?.cancel()
                 activeImportDispatch = Task {
-                    // Paranoid mode enables the LivePhotoAuxStripper
-                    // hook on the import path.
                     await ImportService.importDocument(
                         data: data, suggestedType: suggestedType,
                         documentState: workspace.documentState,
-                        redactionState: workspace.redactionState,
-                        stripAuxData: settingsState.paranoidMode
+                        redactionState: workspace.redactionState
                     )
                 }
                 return true
@@ -211,13 +205,10 @@ struct RedactWorkspaceView: View {
                 // dispatch — see `activeImportDispatch` doc-comment.
                 activeImportDispatch?.cancel()
                 activeImportDispatch = Task {
-                    // Paranoid mode enables the LivePhotoAuxStripper
-                    // hook on the import path.
                     await ImportService.importDocument(
                         from: url,
                         documentState: workspace.documentState,
-                        redactionState: workspace.redactionState,
-                        stripAuxData: settingsState.paranoidMode
+                        redactionState: workspace.redactionState
                     )
                 }
             }
@@ -240,13 +231,10 @@ struct RedactWorkspaceView: View {
         activeImportDispatch = Task {
             if let url = pendingImportURL {
                 pendingImportURL = nil
-                // Paranoid mode enables the LivePhotoAuxStripper hook
-                // on the import path.
                 await ImportService.importDocument(
                     from: url,
                     documentState: workspace.documentState,
-                    redactionState: workspace.redactionState,
-                    stripAuxData: settingsState.paranoidMode
+                    redactionState: workspace.redactionState
                 )
             }
         }

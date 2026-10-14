@@ -1,35 +1,24 @@
 import Foundation
 import PDFKit
-import UIKit
-import ImageIO
 import CoreGraphics
 import RedactionEngine
 
-// Import validation, loading, and image-to-PDF conversion.
+// Import validation and loading.
 
 enum ImportService {
 
     // MARK: - Magic-Byte Format Detection
 
-    /// Routing categories recognized by the drop handler. PDF and image
-    /// payloads take different validation paths inside `importDocument`;
-    /// `unknown` falls back to whatever the entry point can infer.
-    ///
-    /// Drag-and-drop previously hardcoded
-    /// `suggestedType: "pdf"` on every payload, making the image branch
-    /// dead code on the drop entry point. Inspecting magic bytes first
-    /// routes JPEG / PNG / HEIC / WEBP payloads to the image branch and
-    /// leaves PDFs reaching the PDF branch.
+    /// What the leading bytes of a payload say it is. Resecta opens PDF
+    /// files only: an `image` payload is refused before any decode; `pdf`
+    /// and `unknown` payloads reach the PDF parser, which decides.
     enum DroppedPayloadKind {
         case pdf
         case image
         case unknown
 
-        /// Suggested-type string accepted by `importDocument(data:suggestedType:...)`.
-        /// Inside `validateAndLoad` the suggested type is consulted alongside
-        /// the same `%PDF` magic-byte check, so unknown payloads keep the
-        /// previous default (`"pdf"`) — the PDF branch's magic-byte sniff
-        /// then either accepts the data or routes to the failure path.
+        /// The type label handed to `importDocument(data:suggestedType:...)`.
+        /// Routing reads the bytes, never this label.
         var suggestedType: String {
             switch self {
             case .pdf, .unknown: return "pdf"
@@ -38,8 +27,8 @@ enum ImportService {
         }
     }
 
-    /// Sniff the leading bytes of a dropped payload to decide which import
-    /// branch it should take. See `DroppedPayloadKind` for routing rules.
+    /// Sniff the leading bytes of a payload to decide whether it may enter
+    /// the PDF path. See `DroppedPayloadKind` for the routing rule.
     ///
     /// Recognized signatures:
     /// - `%PDF` (`25 50 44 46`)             → `.pdf`
@@ -139,8 +128,7 @@ enum ImportService {
     static func importDocument(
         from url: URL,
         documentState: DocumentState,
-        redactionState: RedactionState,
-        stripAuxData: Bool = false
+        redactionState: RedactionState
     ) async {
         // Defensive precondition. The transition table
         // is the canonical authority for "may we enter `.importing` now".
@@ -175,18 +163,15 @@ enum ImportService {
         // nonisolated(unsafe): @Observable prevents Sendable; Task captures
         // the references implicitly. Safe because all access is on MainActor
         // (mirrors the `PipelineCoordinator` Task-dispatch pattern).
-        let pathExtension = url.pathExtension
         nonisolated(unsafe) let docState = documentState
         nonisolated(unsafe) let redactState = redactionState
         let workTask = Task<Void, Never> { @MainActor in
             await runImport(
                 data: nil,
                 url: url,
-                suggestedType: pathExtension,
                 returnPhase: returnPhase,
                 documentState: docState,
-                redactionState: redactState,
-                stripAuxData: stripAuxData
+                redactionState: redactState
             )
         }
         documentState.activeImportTask = workTask
@@ -207,13 +192,13 @@ enum ImportService {
 
     /// Full import flow from in-memory data.
     /// Async for consistency with URL-based import; validation runs on MainActor.
-    /// Same Task-registration pattern as the URL variant.
+    /// Same Task-registration pattern as the URL variant. `suggestedType` is
+    /// the type the caller declares; the bytes decide the route.
     static func importDocument(
         data: Data,
         suggestedType: String,
         documentState: DocumentState,
-        redactionState: RedactionState,
-        stripAuxData: Bool = false
+        redactionState: RedactionState
     ) async {
         // Defensive precondition mirrors the URL-based
         // overload above. See comment there for the rationale.
@@ -231,11 +216,9 @@ enum ImportService {
             await runImport(
                 data: data,
                 url: nil,
-                suggestedType: suggestedType,
                 returnPhase: returnPhase,
                 documentState: docState,
-                redactionState: redactState,
-                stripAuxData: stripAuxData
+                redactionState: redactState
             )
         }
         documentState.activeImportTask = workTask
@@ -258,11 +241,9 @@ enum ImportService {
     private static func runImport(
         data: Data?,
         url: URL?,
-        suggestedType: String,
         returnPhase: DocumentState.ReturnPhase,
         documentState: DocumentState,
-        redactionState: RedactionState,
-        stripAuxData: Bool
+        redactionState: RedactionState
     ) async {
         do {
             let loadedData: Data
@@ -282,10 +263,8 @@ enum ImportService {
             }
             try await validateAndLoad(
                 data: loadedData,
-                suggestedType: suggestedType,
                 documentState: documentState,
-                redactionState: redactionState,
-                stripAuxData: stripAuxData
+                redactionState: redactionState
             )
         } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
             // Cooperative cancellation surrenders silently —
@@ -294,7 +273,7 @@ enum ImportService {
             // the user-initiated cancel.
             return
         } catch let error as PipelineError { // LegalPhrases:safe (Swift keyword)
-            // Defensive path: PDFKit / loadImage may surface a typed error
+            // Defensive path: PDFKit may surface a typed error
             // on rare timing before the cancellation propagates back.
             guard documentState.phaseKind == .importing else { return }
             documentState.transition(to: .failed(error: error, returnPhase: returnPhase))
@@ -316,10 +295,8 @@ enum ImportService {
     /// PDF validation runs off MainActor via Task.detached to avoid blocking UI.
     private static func validateAndLoad(
         data: Data,
-        suggestedType: String,
         documentState: DocumentState,
-        redactionState: RedactionState,
-        stripAuxData: Bool
+        redactionState: RedactionState
     ) async throws {
         // Size check — 50 MB practical limit based on memory budget
         let maxSize = 50 * 1024 * 1024
@@ -327,78 +304,45 @@ enum ImportService {
             throw PipelineError.importError(.tooLarge(bytesRead: data.count))
         }
 
-        // PDF magic bytes: %PDF
-        let isPDF = suggestedType.lowercased() == "pdf"
-            || data.starts(with: [0x25, 0x50, 0x44, 0x46])
-
-        if isPDF {
-            // Offload all CPU-intensive PDF work off MainActor.
-            // Cancellation propagates from the outer `activeImportTask`
-            // via `withTaskCancellationHandler` to the detached task,
-            // which observes it through the `Task.checkCancellation()`
-            // calls in `validatePDFOffMainActor`.
-            let detached = Task.detached {
-                try await validatePDFOffMainActor(data: data)
-            }
-            let result = try await withTaskCancellationHandler {
-                try await detached.value
-            } onCancel: {
-                detached.cancel()
-            }
-
-            // Re-check cancellation before mutating state — a cancel
-            // signal arriving between the detached task's return and
-            // this point should not produce a half-loaded document.
-            try Task.checkCancellation()
-
-            // Back on MainActor — apply validated results to state
-            redactionState.clearForNewDocument()
-            documentState.sourceDocument = result.document.document
-            documentState.currentPageIndex = 0
-            documentState.textLayerStatus = result.textLayerStatus
-            documentState.sourceHasHiddenOCG = result.hasHiddenOCG
-            documentState.sourceAnnotationFindings = result.annotationFindings
-            documentState.sourceFilledFormFieldCount = result.filledFormFieldCount
-            documentState.annotationNoticeDismissed = false
-            documentState.lastUsedPipelineMode = nil
-            documentState.wasPausedByBackground = false
-            documentState.pausedFromPhase = nil  // clear alongside wasPausedByBackground
-            documentState.transition(to: .editing)
-        } else {
-            // Offload image decode + PDF render off MainActor (matches PDF branch).
-            // When `stripAuxData` is true, the import path runs the
-            // Live Photo / Portrait depth aux-metadata stripper before the
-            // PDF render. Default is false (no behavior change here);
-            // paranoid mode flips the flag when it is enabled.
-            // Same cancellation propagation as the PDF branch.
-            let detached = Task.detached {
-                try loadImageOffMainActor(data: data, stripAuxData: stripAuxData)
-            }
-            let sendableDoc = try await withTaskCancellationHandler {
-                try await detached.value
-            } onCancel: {
-                detached.cancel()
-            }
-
-            try Task.checkCancellation()
-
-            // Back on MainActor — apply validated results to state
-            redactionState.clearForNewDocument()
-            documentState.sourceDocument = sendableDoc.document
-            documentState.currentPageIndex = 0
-            documentState.textLayerStatus = [:]
-            documentState.sourceHasHiddenOCG = false
-            // A page rendered from image pixels carries no annotations
-            // and no form fields.
-            documentState.sourceAnnotationFindings = []
-            documentState.sourceFilledFormFieldCount = 0
-            documentState.annotationNoticeDismissed = false
-            documentState.lastUsedPipelineMode = nil
-            documentState.wasPausedByBackground = false
-            documentState.pausedFromPhase = nil  // clear alongside wasPausedByBackground
-            // Image imports have no text layer — status stays empty
-            documentState.transition(to: .editing)
+        // The bytes decide the route. Resecta opens PDF files only: an
+        // image signature is refused before any decode; `%PDF` and unknown
+        // payloads reach the PDF parser, which reports what it cannot open.
+        guard detectPayloadKind(from: data) != .image else {
+            throw PipelineError.importError(.unsupportedFormat)
         }
+
+        // Offload all CPU-intensive PDF work off MainActor.
+        // Cancellation propagates from the outer `activeImportTask`
+        // via `withTaskCancellationHandler` to the detached task,
+        // which observes it through the `Task.checkCancellation()`
+        // calls in `validatePDFOffMainActor`.
+        let detached = Task.detached {
+            try await validatePDFOffMainActor(data: data)
+        }
+        let result = try await withTaskCancellationHandler {
+            try await detached.value
+        } onCancel: {
+            detached.cancel()
+        }
+
+        // Re-check cancellation before mutating state — a cancel
+        // signal arriving between the detached task's return and
+        // this point should not produce a half-loaded document.
+        try Task.checkCancellation()
+
+        // Back on MainActor — apply validated results to state
+        redactionState.clearForNewDocument()
+        documentState.sourceDocument = result.document.document
+        documentState.currentPageIndex = 0
+        documentState.textLayerStatus = result.textLayerStatus
+        documentState.sourceHasHiddenOCG = result.hasHiddenOCG
+        documentState.sourceAnnotationFindings = result.annotationFindings
+        documentState.sourceFilledFormFieldCount = result.filledFormFieldCount
+        documentState.annotationNoticeDismissed = false
+        documentState.lastUsedPipelineMode = nil
+        documentState.wasPausedByBackground = false
+        documentState.pausedFromPhase = nil  // clear alongside wasPausedByBackground
+        documentState.transition(to: .editing)
     }
 
     // MARK: - Off-MainActor PDF Validation
@@ -507,102 +451,6 @@ enum ImportService {
             annotationFindings: annotationResult.findings,
             filledFormFieldCount: filledFormFieldCount
         )
-    }
-
-    // MARK: - Off-MainActor Image Decode and PDF Render
-
-    /// Decode an image blob and wrap it as a single-page PDFDocument off MainActor.
-    /// nonisolated: explicitly opted out of SE-0466 MainActor default so the
-    /// `UIImage(data:)` decode and `UIGraphicsPDFRenderer.pdfData` call do not
-    /// block the UI on large photos.
-    private nonisolated static func loadImageOffMainActor(
-        data: Data,
-        stripAuxData: Bool
-    ) throws -> SendablePDFDocument {
-        guard let image = UIImage(data: data) else {
-            throw PipelineError.importError(.unsupportedFormat)
-        }
-        // Cap at 5000×5000 to match PDF page dimension limits.
-        // A 50 MB JPEG can decompress to enormous bitmaps (e.g., 20000×20000 = 1.6 GB).
-        //
-        // The cap is on the backing bitmap size, not the layout-point
-        // size. UIImage.size returns POINTS (size = pixels / scale). A
-        // `scale: 3.0` image at 4000×4000 pt is 12000×12000 px = 144 MP;
-        // the point check would let it through and the renderer would
-        // allocate ~575 MB to draw it. Prefer the cgImage's pixel
-        // dimensions; fall back to size × scale when the CIImage-backed
-        // path makes cgImage nil.
-        let pixelWidth: CGFloat
-        let pixelHeight: CGFloat
-        if let cgImage = image.cgImage {
-            pixelWidth = CGFloat(cgImage.width)
-            pixelHeight = CGFloat(cgImage.height)
-        } else {
-            pixelWidth = image.size.width * image.scale
-            pixelHeight = image.size.height * image.scale
-        }
-        guard pixelWidth <= 5000, pixelHeight <= 5000 else {
-            throw PipelineError.importError(.invalidPageDimensions(pageIndex: 0))
-        }
-
-        // Default off: when `stripAuxData` is true, run the
-        // LivePhotoAuxStripper across the image's property dictionary. V1
-        // strips the dict only — the CGImage is returned unchanged. The
-        // PDF render below does not propagate ImageIO property
-        // dictionaries, so the V1 contract here is "the helper executed
-        // and dropped aux keys" rather than "the output PDF would
-        // otherwise have contained them." Paranoid mode flips the gate
-        // when it is enabled.
-        if stripAuxData, let cgImage = image.cgImage,
-           let source = CGImageSourceCreateWithData(data as CFData, nil) {
-            let rawProperties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil)
-                ?? ([:] as CFDictionary)
-            let stripper = LivePhotoAuxStripper()
-            _ = stripper.strip(cgImage, properties: rawProperties)
-            // The stripped CGImage / properties dict is intentionally discarded:
-            // V1 only verifies the helper ran on the import path. Discarding the
-            // stripped output is harmless because `renderImageAsPDF` below
-            // rebuilds the page from a fresh bitmap (UIGraphicsImageRenderer),
-            // which drops ALL ImageIO metadata — the source EXIF/GPS cannot
-            // reach the output PDF regardless of this branch.
-            //
-            // (HISTORY: an earlier render path
-            // drew the ORIGINAL `image`, so UIGraphicsPDFRenderer embedded the
-            // source JPEG's APP1/EXIF — incl. GPS — into the PDF and the discard
-            // was NOT equivalent. The render boundary was rewritten to strip
-            // metadata; `LivePhotoAuxStripperTests.testRenderedPDFHasNoEXIF` now
-            // guards it as a hard assertion.)
-        }
-
-        let pdfData = renderImageAsPDF(image)
-        guard let doc = PDFDocument(data: pdfData) else {
-            throw PipelineError.importError(.corrupt)
-        }
-        return SendablePDFDocument(doc)
-    }
-
-    // MARK: - Image to PDF Conversion
-
-    /// Convert a UIImage to a single-page PDF document.
-    /// nonisolated: called from `loadImageOffMainActor` on the cooperative thread pool.
-    private nonisolated static func renderImageAsPDF(_ image: UIImage) -> Data {
-        let bounds = CGRect(origin: .zero, size: image.size)   // points: orientation-aware
-        // Redraw the decoded image into a FRESH bitmap before
-        // embedding it. UIGraphicsPDFRenderer would otherwise embed the source
-        // JPEG verbatim (APP1/EXIF incl. GPS, IPTC, TIFF, XMP, MakerApple) as a
-        // DCTDecode stream. Rendering through UIGraphicsImageRenderer drops ALL
-        // ImageIO metadata and bakes `imageOrientation` upright, so the page is
-        // built from pixels only — no source metadata can survive into the PDF.
-        let format = UIGraphicsImageRendererFormat.preferred()
-        format.scale = image.scale                             // preserve native pixels
-        let flat = UIGraphicsImageRenderer(bounds: bounds, format: format).image { _ in
-            image.draw(in: bounds)                             // UIKit applies imageOrientation
-        }
-        let renderer = UIGraphicsPDFRenderer(bounds: bounds)
-        return renderer.pdfData { ctx in
-            ctx.beginPage()
-            flat.draw(in: bounds)                              // `flat` carries no EXIF/GPS
-        }
     }
 
     // MARK: - Sample Document Loading
