@@ -94,17 +94,18 @@ struct DetectionSweepFoldTests {
         #expect(outcome.queryLines?.first?.remainingCount == 2)
     }
 
-    @Test("IoU just under the bar does not subtract; a different category does not subtract")
+    @Test("IoU just under the bar does not subtract an item of another text; a different category does not subtract")
     func subtractionNeedsOverlapAndCategory() {
         let base = rect(0.10, 0.50, 0.20, 0.04)
         // Same height, shifted so the overlap is 0.49 of the union.
         let shifted = CGRect(x: 0.10 + 0.20 * (1 - 0.49) / (1 + 0.49) + 0.0001, y: 0.50, width: 0.20, height: 0.04)
         #expect(DetectionSweep.intersectionOverUnion(base, shifted) < 0.5)
         #expect(DetectionSweep.intersectionOverUnion(base, shifted) > 0.45)
+        // Another text in the under-bar box: neither key pairs it.
         let underBar = DetectionSweep.fold(
             requests: [applied([.ssn], deselected: [result(0, .ssn, shifted)])],
-            observations: [page(0, [0: [item(0, .ssn, base)]])], pageCount: 1)
-        #expect(underBar.status.isInfo, "IoU under 0.5 leaves the item further; got \(underBar.status)")
+            observations: [page(0, [0: [item(0, .ssn, base, text: "987-65-4321")]])], pageCount: 1)
+        #expect(underBar.status.isInfo, "IoU under 0.5 and another text leave the item further; got \(underBar.status)")
         #expect(!message(underBar.status).contains("left unredacted"))
 
         let otherCategory = DetectionSweep.fold(
@@ -275,6 +276,40 @@ struct DetectionSweepFoldTests {
             requests: [applied([.name])], observations: [page(0, [0: [item(0, .name, rect(0.1, 0.1))]])], pageCount: 1)
         #expect(clean.status == .pass, "a name-only scan re-run reads nothing it counts; got \(clean.status)")
         #expect(clean.copyOverride?.detail.hasSuffix(DetectionSweep.gateSentence) == true)
+    }
+
+    @Test("An OCR-read item whose box drifted pairs with the deselected item by its text")
+    func subtractionPairsByTextWhenTheBoxDrifted() {
+        // The deselected item's text-layer rect, and what OCR read on the
+        // rasterized output: the same text in a looser box (IoU ≈ 0.33).
+        let deselected = rect(0.10, 0.50, 0.20, 0.04)
+        let drifted = rect(0.08, 0.48, 0.30, 0.08)
+        #expect(DetectionSweep.intersectionOverUnion(deselected, drifted) < 0.5)
+        let outcome = DetectionSweep.fold(
+            requests: [applied([.ssn], deselected: [result(0, .ssn, deselected)])],
+            observations: [page(0, route: .ocr, [0: [item(0, .ssn, drifted)]])], pageCount: 1)
+        #expect(outcome.status == .pass, "the one remaining item is the one left unredacted; got \(outcome.status)")
+        #expect(outcome.copyOverride?.short == "Re-ran your scan on the output — 1 remains, the 1 you left unredacted.")
+    }
+
+    @Test("Two same-category items on one line are told apart by their text, not by the closer box")
+    func subtractionTellsItemsApartByText() {
+        let box = rect(0.10, 0.50)
+        let shifted = rect(0.12, 0.50)
+        #expect(DetectionSweep.intersectionOverUnion(box, shifted) > 0.5)
+        let left = result(0, .ssn, box)
+        let pool = [item(0, .ssn, box, text: "987-65-4321"), item(0, .ssn, shifted, text: "123-45-6789")]
+        let paired = DetectionSweep.subtractDeselected([left], from: pool)
+        #expect(paired.consumed == 1)
+        #expect(paired.remaining.map(\.matchedText) == ["987-65-4321"],
+                "the item that reads the deselected text is the one paired, not the one in the same box")
+        // The same text anywhere on the page pairs, whatever the overlap;
+        // another text pairs only at the overlap bar; another category never.
+        #expect(DetectionSweep.subtractDeselected([left], from: [item(0, .ssn, rect(0.6, 0.6))]).consumed == 1)
+        #expect(DetectionSweep.subtractDeselected([left], from: [item(0, .ssn, rect(0.6, 0.6), text: "987-65-4321")]).consumed == 0)
+        #expect(DetectionSweep.subtractDeselected([left], from: [item(0, .phone, box)]).consumed == 0)
+        // The text key: case, ligatures and whitespace runs do not tell items apart.
+        #expect(DetectionSweep.pairingText("  Acme\tOﬃce ") == DetectionSweep.pairingText("acme office"))
     }
 
     // MARK: - The scope split and custom terms

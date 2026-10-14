@@ -54,8 +54,10 @@ struct DetectionSweep: Sendable {
     static let gateSentence = "Names and addresses are not swept."
 
     /// A deselected item subtracts one remaining item on the same page and
-    /// category whose rect overlaps it by at least this intersection over
-    /// union (robust to OCR drift on rasterized output).
+    /// category: the one that reads the same text, else one whose rect
+    /// overlaps it by at least this intersection over union (the text pairs
+    /// an OCR-read item whose box drifted; the overlap pairs one whose text
+    /// OCR misread).
     static let subtractionOverlap: CGFloat = 0.5
 
     /// What `runLayer` folds into the `LayerResult`.
@@ -179,31 +181,16 @@ struct DetectionSweep: Sendable {
         }
 
         // The subtraction: each item the user left unselected consumes ONE
-        // remaining item of its own request on the same page and category,
-        // the best overlap at or above the bar. Never two.
+        // remaining item of its own request on the same page and category —
+        // by text first, by overlap second (`subtractDeselected`). Never two.
         var subtractedByRequest = [Int](repeating: 0, count: requestCount)
         var furtherByRequest = [[RecheckObservation.RemainingItem]](repeating: [], count: requestCount)
         for index in requests.indices {
-            var pool = itemsByRequest[index]
-            var consumed = 0
-            if requests[index].origin == .applied {
-                for left in requests[index].deselected {
-                    var best: (position: Int, overlap: CGFloat)?
-                    for (position, item) in pool.enumerated()
-                    where item.pageIndex == left.pageIndex && item.category == left.piiCategory {
-                        let overlap = intersectionOverUnion(item.normalizedRect, left.normalizedRect)
-                        if overlap >= subtractionOverlap, overlap > (best?.overlap ?? -1) {
-                            best = (position, overlap)
-                        }
-                    }
-                    if let best {
-                        pool.remove(at: best.position)
-                        consumed += 1
-                    }
-                }
-            }
-            subtractedByRequest[index] = consumed
-            furtherByRequest[index] = pool
+            let subtraction = requests[index].origin == .applied
+                ? subtractDeselected(requests[index].deselected, from: itemsByRequest[index])
+                : (remaining: itemsByRequest[index], consumed: 0)
+            subtractedByRequest[index] = subtraction.consumed
+            furtherByRequest[index] = subtraction.remaining
         }
 
         // The scope split: an applied scan's categories are "yours"; the
@@ -377,6 +364,45 @@ struct DetectionSweep: Sendable {
             pageReferences: nil,
             reviewTermTexts: nil,
             queryLines: queryLines)
+    }
+
+    /// The text key the subtraction pairs on first: search-normalized
+    /// (ligatures expanded, compatibility forms folded, case-folded), with
+    /// runs of whitespace collapsed to one space.
+    static func pairingText(_ text: String) -> String {
+        TextNormalizer.normalizeForSearch(text, caseSensitive: false)
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    /// Pair each deselected item with ONE remaining item of the same page
+    /// and category: the one that reads the same text (the best overlap
+    /// among those, whatever the overlap), else the best rect overlap at or
+    /// above `subtractionOverlap`. Returns what remains and how many paired.
+    static func subtractDeselected(
+        _ deselected: [SearchResult], from items: [RecheckObservation.RemainingItem]
+    ) -> (remaining: [RecheckObservation.RemainingItem], consumed: Int) {
+        var pool = items
+        var consumed = 0
+        for left in deselected {
+            let leftText = pairingText(left.matchedText)
+            var best: (position: Int, byText: Bool, overlap: CGFloat)?
+            for (position, item) in pool.enumerated()
+            where item.pageIndex == left.pageIndex && item.category == left.piiCategory {
+                let overlap = intersectionOverUnion(item.normalizedRect, left.normalizedRect)
+                let byText = pairingText(item.matchedText) == leftText
+                guard byText || overlap >= subtractionOverlap else { continue }
+                if let current = best,
+                   !((byText && !current.byText) || (byText == current.byText && overlap > current.overlap)) {
+                    continue
+                }
+                best = (position, byText, overlap)
+            }
+            if let best {
+                pool.remove(at: best.position)
+                consumed += 1
+            }
+        }
+        return (pool, consumed)
     }
 
     /// Intersection over union of two normalized rects; 0 when either is
