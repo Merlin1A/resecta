@@ -126,6 +126,27 @@ extension SearchAndRedactSheet {
         }
     }
 
+    /// The one failure path of `prepareSearchRun()`'s two guards (no
+    /// document to copy; the private copy did not build): the in-flight
+    /// flag drops, a mechanism toast names the failure — a silent exit
+    /// reads as "never ran" once the sheet re-renders — and a Scan-
+    /// interface run leaves a durable failed record, since a notice that
+    /// only ever lived in a transient toast is no record at all (the
+    /// banner persists it).
+    private func failSearchPreparation() {
+        searchState.isSearching = false
+        toastManager.enqueue(
+            "Could not prepare the document for search. Try again.",
+            severity: .warning
+        )
+        if searchState.searchModeType == .piiScan {
+            searchState.scanStartFailed = true
+            redactionState.recordDetectionRun(
+                .failed,
+                scanSummary: .init(foundCount: 0, pageCount: 0))
+        }
+    }
+
     /// The run's setup — everything between the prior task's
     /// cancel-await and the run task: the fingerprint snapshot and the
     /// clear, the run token, the regex pre-validation, the multi-term
@@ -186,20 +207,7 @@ extension SearchAndRedactSheet {
         searchState.isSearching = true
 
         guard let liveDoc = documentState.sourceDocument else {
-            searchState.isSearching = false
-            // Same feedback contract as the copy-failure guard
-            // below — a silent exit reads as "never ran" once the
-            // sheet re-renders.
-            toastManager.enqueue(
-                "Could not prepare the document for search. Try again.",
-                severity: .warning
-            )
-            if searchState.searchModeType == .piiScan {
-                searchState.scanStartFailed = true
-                redactionState.recordDetectionRun(
-                    .failed,
-                    scanSummary: .init(foundCount: 0, pageCount: 0))
-            }
+            failSearchPreparation()
             return nil
         }
 
@@ -214,20 +222,7 @@ extension SearchAndRedactSheet {
         guard let searchDoc = await Task.detached(priority: .utility, operation: {
             DocumentState.makeSearchCopy(of: liveDocBox)
         }).value else {
-            searchState.isSearching = false
-            toastManager.enqueue(
-                "Could not prepare the document for search. Try again.",
-                severity: .warning
-            )
-            // Scan-interface runs leave a durable failed record —
-            // a failure notice that only ever lived in a transient
-            // toast is no record at all (the banner persists it).
-            if searchState.searchModeType == .piiScan {
-                searchState.scanStartFailed = true
-                redactionState.recordDetectionRun(
-                    .failed,
-                    scanSummary: .init(foundCount: 0, pageCount: 0))
-            }
+            failSearchPreparation()
             return nil
         }
 
