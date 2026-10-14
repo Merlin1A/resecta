@@ -268,9 +268,17 @@ extension VerificationCorpusRunnerTests {
         }
     }
 
+    /// The import's hidden-layer fact for the cell. A reader CoreGraphics
+    /// cannot open answers true, as the import's own reader stage refuses
+    /// the file: the cell then runs its pages on the secure path, and the
+    /// stderr line records that the walk reader was unavailable.
     static func documentHasHiddenOCG(_ data: Data) -> Bool {
         guard let provider = CGDataProvider(data: data as CFData),
-              let cgDoc = CGPDFDocument(provider) else { return false }
+              let cgDoc = CGPDFDocument(provider) else {
+            FileHandle.standardError.write(
+                Data("verification corpus mirror: walk reader unavailable; hidden-layer fact read as true\n".utf8))
+            return true
+        }
         return TextLayerExtractor.documentHasHiddenOCG(cgDoc)
     }
 
