@@ -411,9 +411,8 @@ public final class PageRasterizer: @unchecked Sendable {
                         "page \(page.pageIndex) fell back to secure rasterization at runtime (hidden text)"
                     )
                 } else {
-                    // The test could not run; the page is not known to be
-                    // clean, so it takes the secure path with the reason that
-                    // reads true for it.
+                    // The test could not run: not known clean, so the secure
+                    // path, with the reason that reads true for it.
                     fallbackReason = .extractionFailed
                     pageRasterizerLogger.log(
                         "page \(page.pageIndex) fell back to secure rasterization at runtime (the ink test could not run)"
@@ -628,8 +627,7 @@ public final class PageRasterizer: @unchecked Sendable {
         guard let ctx = createBitmapContext(width: pw, height: ph) else {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
         }
-        // The first-render bitmap is wiped at its release (`FirstRenderBitmap`).
-        defer { FirstRenderBitmap.release(ctx) }
+        defer { FirstRenderBitmap.release(ctx) } // the first-render bitmap is wiped at its release
 
         // 4. White background (UIColor on iOS)
         #if canImport(UIKit)
@@ -707,8 +705,7 @@ public final class PageRasterizer: @unchecked Sendable {
         guard let ctx = createBitmapContext(width: pw, height: ph) else {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
         }
-        // The first-render bitmap is wiped at its release (`FirstRenderBitmap`).
-        defer { FirstRenderBitmap.release(ctx) }
+        defer { FirstRenderBitmap.release(ctx) } // the first-render bitmap is wiped at its release
 
         // White background (UIColor on iOS)
         #if canImport(UIKit)
