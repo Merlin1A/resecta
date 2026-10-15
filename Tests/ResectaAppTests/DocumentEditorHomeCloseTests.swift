@@ -14,9 +14,7 @@ import Foundation
 //  2. `closeDialogMessage(phaseKind:)` — the shared dialog's message: the
 //     `.verified` literal stays byte-identical to the copy pinned by
 //     `VerificationActionBarDoneConfirmationTests`; every other phase reads
-//     the Replace-import dialog's second sentence, byte-identical to the
-//     literal in `RedactWorkspaceView.swift` (asserted by value against the
-//     source file — the string is deliberately NOT hoisted across files).
+//     the detection-results sentence.
 
 @Suite("Document editor Home close (1.1.0 Home swap)")
 @MainActor
@@ -69,15 +67,6 @@ struct DocumentEditorHomeCloseTests {
         }
     }
 
-    @Test("The editing message is byte-identical to the Replace-import dialog sentence in RedactWorkspaceView")
-    func editingMessageMatchesD12Literal() throws {
-        let source = try loadRepoFile("Sources/ResectaApp/Views/RedactWorkspaceView.swift")
-        let sentence = DocumentEditorView.closeDialogMessage(phaseKind: .editing)
-        #expect(
-            source.contains("Importing a new file will replace the current document. \(sentence)\""),
-            "RedactWorkspaceView's Replace-import message must end with the exact sentence the Home close dialog reads"
-        )
-    }
 
     // MARK: - A presented sheet parks before the dialog
 

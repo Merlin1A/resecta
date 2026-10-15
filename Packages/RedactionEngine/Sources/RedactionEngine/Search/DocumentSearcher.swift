@@ -17,7 +17,7 @@ private extension NSImage {
 
 // Engine-layer document search with text-layer,
 // regex, and OCR paths. Returns results via AsyncStream for progressive UI.
-// C-5 seam, 1.1.1: page coverage reporting for the verification re-check
+// Page coverage reporting for the verification re-check
 // (`setPageCoverageSink`) — reporting-only, no change to what is yielded.
 
 /// Performs text search across a PDF document with dual-path
@@ -205,7 +205,7 @@ public actor DocumentSearcher {
     // Side-effect only — never changes which results are yielded.
     private var scannedRegionNotAnalyzedSink: (@Sendable (Int) -> Void)?
 
-    // C-5 seam (1.1.1): per-page coverage reporting for the verification
+    // Per-page coverage reporting for the verification
     // search re-check. Fires for every page a search visits with which
     // evidence the page was read from (text layer · OCR) or why it was not
     // read (OCR pixel cap · OCR unavailable · unopenable page). Reporting-
@@ -407,7 +407,7 @@ public actor DocumentSearcher {
     }
 
     /// Install the per-page coverage sink — the search-side seam for the
-    /// verification search re-check (C-5, 1.1.1). Reporting-only; pass nil
+    /// verification search re-check. Reporting-only; pass nil
     /// to disable. See `PageSearchCoverage`.
     func setPageCoverageSink(_ sink: (@Sendable (PageSearchCoverage) -> Void)?) {
         self.pageCoverageSink = sink

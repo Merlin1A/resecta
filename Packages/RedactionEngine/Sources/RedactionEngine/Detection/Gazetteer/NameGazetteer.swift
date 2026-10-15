@@ -344,8 +344,8 @@ public struct NameGazetteer: Sendable {
     /// is overwhelmingly ASCII so this is an acceptable simplification for
     /// Phase 2; Phase 3 can extend the alphabet if needed.
     ///
-    /// Phase-2 scope: no production call site yet. Phase-3 name / address
-    /// detectors will be first callers.
+    /// Called from `queryBoosted` when the fuzzy option is on; a hit feeds
+    /// `hadSupport` through `fuzzySurnameHit`.
     internal func fuzzyContains(surname: String) -> Double? {
         let input = TextNormalizer.normalize(surname).lowercased()
         guard !input.isEmpty else { return nil }

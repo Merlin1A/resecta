@@ -12,7 +12,7 @@ import PDFKit
 // loop is `OutputRecheck`, shared with the Search Re-check so the two rows
 // read one OCR pass per page.
 //
-// The category gate (ruled on the sweep-residual measurement over the
+// The category gate (set by the sweep-residual measurement over the
 // corpus): the structured families only — names and addresses are not
 // swept, by either origin.
 // On fully-applied output the detectors re-read names at a rate no user
@@ -54,8 +54,10 @@ struct DetectionSweep: Sendable {
     static let gateSentence = "Names and addresses are not swept."
 
     /// A deselected item subtracts one remaining item on the same page and
-    /// category whose rect overlaps it by at least this intersection over
-    /// union (robust to OCR drift on rasterized output).
+    /// category: the one that reads the same text, else one whose rect
+    /// overlaps it by at least this intersection over union (the text pairs
+    /// an OCR-read item whose box drifted; the overlap pairs one whose text
+    /// OCR misread).
     static let subtractionOverlap: CGFloat = 0.5
 
     /// What `runLayer` folds into the `LayerResult`.
@@ -143,16 +145,20 @@ struct DetectionSweep: Sendable {
             case .unopenable?, nil:
                 uncheckedClauses[page, default: []] = uncheckedClauses[page] ?? []
             }
-            if observation.regexTimedOut {
-                uncheckedClauses[page, default: []].append("the pattern took too long")
-            }
             var pageHitCap = false
             var pageRefused = false
+            var pageTimedOut = false
             for (requestIndex, count) in observation.counts where requestIndex < requestCount {
                 if count.rejected {
                     uncheckedByRequest[requestIndex] = true
                     pageRefused = true
                     continue
+                }
+                // The request's own pattern ran out of time on the page:
+                // unchecked for it; what it read before is still counted.
+                if count.timedOut {
+                    uncheckedByRequest[requestIndex] = true
+                    pageTimedOut = true
                 }
                 // The gate: only swept categories count (the runner already
                 // reads only those; a caller-built observation is filtered
@@ -173,45 +179,55 @@ struct DetectionSweep: Sendable {
                 uncheckedClauses[page, default: []]
                     .append("the re-check stopped at 1,000 matches on the page")
             }
+            if pageTimedOut {
+                uncheckedClauses[page, default: []].append("the pattern took too long")
+            }
             if pageRefused {
                 uncheckedClauses[page, default: []].append("the pattern was not accepted")
             }
         }
 
-        // The subtraction: each item the user left unselected consumes ONE
-        // remaining item of its own request on the same page and category,
-        // the best overlap at or above the bar. Never two.
-        var subtractedByRequest = [Int](repeating: 0, count: requestCount)
-        var furtherByRequest = [[RecheckObservation.RemainingItem]](repeating: [], count: requestCount)
-        for index in requests.indices {
-            var pool = itemsByRequest[index]
-            var consumed = 0
-            if requests[index].origin == .applied {
-                for left in requests[index].deselected {
-                    var best: (position: Int, overlap: CGFloat)?
-                    for (position, item) in pool.enumerated()
-                    where item.pageIndex == left.pageIndex && item.category == left.piiCategory {
-                        let overlap = intersectionOverUnion(item.normalizedRect, left.normalizedRect)
-                        if overlap >= subtractionOverlap, overlap > (best?.overlap ?? -1) {
-                            best = (position, overlap)
-                        }
-                    }
-                    if let best {
-                        pool.remove(at: best.position)
-                        consumed += 1
-                    }
-                }
+        // The applied scans' items, pooled: two applied scans that share a
+        // category read the same item on the output, and it is ONE item —
+        // one entry in the pool (an item a later scan reads again is not
+        // added twice; what one scan read stays as it read it), subtracted
+        // once by the union of what the user left unselected (the same
+        // rule). The subtraction: each item left unselected consumes ONE
+        // pooled item on the same page and category — by text first, by
+        // overlap second (`subtractDeselected`). Never two.
+        let appliedIndices = requests.indices.filter { requests[$0].origin == .applied }
+        let sweepIndices = requests.indices.filter { requests[$0].origin == .sweep }
+        var appliedPool: [RecheckObservation.RemainingItem] = []
+        var seenItems = Set<RecheckObservation.RemainingItem>()
+        var left: [SearchResult] = []
+        var seenLeft = Set<RecheckObservation.RemainingItem>()
+        for index in appliedIndices {
+            let freshItems = itemsByRequest[index].filter { !seenItems.contains($0) }
+            appliedPool.append(contentsOf: freshItems)
+            seenItems.formUnion(freshItems)
+            let freshLeft = requests[index].deselected.filter {
+                !seenLeft.contains(RecheckObservation.RemainingItem(
+                    pageIndex: $0.pageIndex, category: $0.piiCategory,
+                    normalizedRect: $0.normalizedRect, matchedText: $0.matchedText))
             }
-            subtractedByRequest[index] = consumed
-            furtherByRequest[index] = pool
+            left.append(contentsOf: freshLeft)
+            seenLeft.formUnion(freshLeft.map {
+                RecheckObservation.RemainingItem(
+                    pageIndex: $0.pageIndex, category: $0.piiCategory,
+                    normalizedRect: $0.normalizedRect, matchedText: $0.matchedText)
+            })
         }
+        let subtraction = subtractDeselected(left, from: appliedPool)
+        var furtherByRequest = [[RecheckObservation.RemainingItem]](repeating: [], count: requestCount)
+        for index in sweepIndices { furtherByRequest[index] = itemsByRequest[index] }
 
         // The scope split: an applied scan's categories are "yours"; the
         // sweep reports what it reads outside them. Without an applied scan
-        // everything the sweep reads is a possible item. An always-flag hit
-        // (no category) belongs to the scan when one was applied.
-        let appliedIndices = requests.indices.filter { requests[$0].origin == .applied }
-        let sweepIndices = requests.indices.filter { requests[$0].origin == .sweep }
+        // everything the sweep reads is a possible item. A custom-term hit
+        // (no category) belongs to an applied scan only when that scan
+        // carried a term that reads the hit's text — a remaining item keeps
+        // its text, not its pattern — so a term added after the apply is a
+        // possible item, not the scan's.
         let hasApplied = !appliedIndices.isEmpty
         let hasSweep = !sweepIndices.isEmpty
         var appliedCategories = Set<PIICategory>()
@@ -220,14 +236,19 @@ struct DetectionSweep: Sendable {
                 appliedCategories.formUnion(categories)
             }
         }
-        let rawRemaining = appliedIndices.reduce(0) { $0 + rawRemainingByRequest[$1] }
-        let subtracted = appliedIndices.reduce(0) { $0 + subtractedByRequest[$1] }
-        let furtherApplied = appliedIndices.flatMap { furtherByRequest[$0] }
+        let rawRemaining = appliedPool.count
+        let subtracted = subtraction.consumed
+        let furtherApplied = subtraction.remaining
+        let carriedTerms = UserTermMatcher.compile(
+            alwaysFlag: appliedIndices.flatMap { requests[$0].record.scanConfiguration?.alwaysFlag ?? [] },
+            neverFlag: [])
         var outOfScopeByRequest = [[RecheckObservation.RemainingItem]](repeating: [], count: requestCount)
         for index in sweepIndices {
             outOfScopeByRequest[index] = furtherByRequest[index].filter { item in
                 guard hasApplied else { return true }
-                guard let category = item.category else { return false }
+                guard let category = item.category else {
+                    return carriedTerms.matchesAlwaysFlag(item.matchedText) == nil
+                }
                 return !appliedCategories.contains(category)
             }
         }
@@ -369,6 +390,45 @@ struct DetectionSweep: Sendable {
             pageReferences: nil,
             reviewTermTexts: nil,
             queryLines: queryLines)
+    }
+
+    /// The text key the subtraction pairs on first: search-normalized
+    /// (ligatures expanded, compatibility forms folded, case-folded), with
+    /// runs of whitespace collapsed to one space.
+    static func pairingText(_ text: String) -> String {
+        TextNormalizer.normalizeForSearch(text, caseSensitive: false)
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    /// Pair each deselected item with ONE remaining item of the same page
+    /// and category: the one that reads the same text (the best overlap
+    /// among those, whatever the overlap), else the best rect overlap at or
+    /// above `subtractionOverlap`. Returns what remains and how many paired.
+    static func subtractDeselected(
+        _ deselected: [SearchResult], from items: [RecheckObservation.RemainingItem]
+    ) -> (remaining: [RecheckObservation.RemainingItem], consumed: Int) {
+        var pool = items
+        var consumed = 0
+        for left in deselected {
+            let leftText = pairingText(left.matchedText)
+            var best: (position: Int, byText: Bool, overlap: CGFloat)?
+            for (position, item) in pool.enumerated()
+            where item.pageIndex == left.pageIndex && item.category == left.piiCategory {
+                let overlap = intersectionOverUnion(item.normalizedRect, left.normalizedRect)
+                let byText = pairingText(item.matchedText) == leftText
+                guard byText || overlap >= subtractionOverlap else { continue }
+                if let current = best,
+                   !((byText && !current.byText) || (byText == current.byText && overlap > current.overlap)) {
+                    continue
+                }
+                best = (position, byText, overlap)
+            }
+            if let best {
+                pool.remove(at: best.position)
+                consumed += 1
+            }
+        }
+        return (pool, consumed)
     }
 
     /// Intersection over union of two normalized rects; 0 when either is

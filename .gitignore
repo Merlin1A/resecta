@@ -52,3 +52,13 @@ Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/StressTests
 # a formerly gitignored real-document copy that served the
 # `--multipageDoc` launch hook), so clean checkouts run the multipage UI
 # tests without manual fixture restoration.
+
+# Never a key, a key wrapper or a derived-data directory, whatever a tool
+# writes here: the detection-data signing key lives outside every
+# repository. The one tracked PEM is the public key the signed manifest
+# verifies against, named below so the rule cannot swallow it.
+.dd*/
+*.age
+*private-key*
+*.pem
+!Packages/RedactionEngine/Sources/RedactionEngine/Resources/Gazetteers/manifest_public_key.pem

@@ -3,7 +3,7 @@ import Foundation
 // The `Resources/Audit/rule-catalog.json` loader + engine-rule-id
 // translation layer (the alias-map below is the shipped V1 design).
 //
-// The catalog ships 19 entries with `rule_id` in `pii.<X>.[<sub>.]v1` form;
+// The catalog ships 21 entries with `rule_id` in `pii.<X>.[<sub>.]v1` form;
 // the engine emits ruleIDs in `<family>.<sub>` form (e.g.,
 // `ssn.state-machine`, `cc.luhn`). The hand-curated alias map below
 // translates engine ruleIDs into catalog `rule_id` values so that

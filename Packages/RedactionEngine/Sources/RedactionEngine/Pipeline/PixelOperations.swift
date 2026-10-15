@@ -701,8 +701,8 @@ public func selectDPI(
     // where availableMemory <= 150 MB — the tier loop returns nil gracefully.
     let budget = max(0, availableMemory - 150_000_000)
     // Compute actual memory needed at each DPI tier based on page dimensions.
-    // 2× multiplier accounts for concurrent render + fill bitmap contexts
-    // during PageRasterizer.rasterize().
+    // The tier test budgets TWO bitmaps per page (the render and the fill
+    // contexts); the admission predicate below budgets three.
     let tiers = [300, 200, 150].filter { $0 <= clampedMax }
     for dpi in tiers {
         let scale = CGFloat(dpi) / 72.0

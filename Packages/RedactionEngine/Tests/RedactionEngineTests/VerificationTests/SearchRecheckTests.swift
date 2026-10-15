@@ -224,7 +224,7 @@ struct SearchRecheckTests {
             pageIndex: page, route: route, regexTimedOut: timeout,
             counts: route == nil || route == .unopenable
                 ? [:]
-                : [request: .init(remaining: remaining, hitCap: hitCap, perTerm: [:])])
+                : [request: .init(remaining: remaining, hitCap: hitCap, perTerm: [:], timedOut: timeout)])
     }
 
     @Test("An unchecked page's WARN carries couldNotVerify through runLayer; a clean re-run and INFO do not")

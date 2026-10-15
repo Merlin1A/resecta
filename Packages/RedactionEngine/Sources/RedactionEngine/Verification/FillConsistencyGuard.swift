@@ -102,7 +102,7 @@ extension VerificationEngine {
     /// inside the sample edge survives the trim (contrast 0.125, maxDev 1.0 →
     /// KEPT); a 3 px strip collapses the inset and the un-inset fallback keeps
     /// the ink; ink hugging the strip's outer edge is trimmed and demotes —
-    /// bounded at the fill-artifact WARN, never a clean PASS.
+    /// bounded at the fill-artifact INFO note, never a clean PASS.
     private static let fillSampleInsetPixels: CGFloat = 2
 
     /// The candidate boxes an OCR hit contributes to the in-region decision: the

@@ -92,7 +92,8 @@ struct PageThumbnailList: View {
                                     document: documentState.sourceDocument,
                                     pageIndex: index
                                 )
-                                .frame(width: 60, height: 80)
+                                .frame(width: PageThumbnailView.thumbnailSize.width,
+                                       height: PageThumbnailView.thumbnailSize.height)
                                 .clipShape(RoundedRectangle(cornerRadius: 4))
                                 // Status dots — orange dot = has regions, none = untouched.
                                 // Pattern from Working Copy / PDF Expert.
@@ -180,7 +181,10 @@ struct PageThumbnailList: View {
 // MARK: - Thumbnail Cache
 
 /// NSCache-backed thumbnail cache. Auto-evicts on memory pressure.
-/// Keyed by page index; cleared when the source document changes.
+/// Keyed by document identity and page index: a thumbnail belongs to one
+/// document's page, so a second document never reads the first's picture.
+/// The sidebar also clears it when the source document changes. Internal
+/// so the keying can be driven by a test.
 ///
 /// Explicit `countLimit` and `totalCostLimit` so the
 /// cache cannot grow without bound on multi-hundred-page documents.
@@ -192,22 +196,27 @@ struct PageThumbnailList: View {
 /// visible page set on either device class, and 64 MB caps the
 /// retained bitmaps at roughly 320 KB / thumb (the rasterized PDFKit
 /// thumbnail size at the sidebar scale).
-private enum ThumbnailCache {
+enum ThumbnailCache {
     // nonisolated(unsafe): all callers are MainActor-isolated (SwiftUI views).
     // NSCache is thread-safe internally but not Sendable.
-    nonisolated(unsafe) static let cache: NSCache<NSNumber, UIImage> = {
-        let c = NSCache<NSNumber, UIImage>()
+    nonisolated(unsafe) static let cache: NSCache<NSString, UIImage> = {
+        let c = NSCache<NSString, UIImage>()
         c.countLimit = 200
         c.totalCostLimit = 64 * 1024 * 1024  // 64 MB
         return c
     }()
     static let writeQueue = DispatchQueue(label: "thumbnailCache.write")
-    static func get(_ pageIndex: Int) -> UIImage? {
-        cache.object(forKey: NSNumber(value: pageIndex))
+    /// The document's identity and the page index.
+    private static func key(_ document: PDFDocument, _ pageIndex: Int) -> NSString {
+        "\(ObjectIdentifier(document))#\(pageIndex)" as NSString
     }
-    static func set(_ image: UIImage, for pageIndex: Int) {
+    static func get(document: PDFDocument, pageIndex: Int) -> UIImage? {
+        cache.object(forKey: key(document, pageIndex))
+    }
+    static func set(_ image: UIImage, document: PDFDocument, pageIndex: Int) {
+        let key = key(document, pageIndex)
         writeQueue.async {
-            cache.setObject(image, forKey: NSNumber(value: pageIndex))
+            cache.setObject(image, forKey: key)
         }
     }
     static func clear() { cache.removeAllObjects() }
@@ -233,6 +242,11 @@ extension PageThumbnailList {
 /// Renders a PDF page thumbnail asynchronously to avoid blocking MainActor.
 /// Uses ThumbnailCache to avoid re-rendering on repeated sidebar scrolls.
 struct PageThumbnailView: View {
+    /// The thumbnail's display size in points. The sidebar frames each
+    /// thumbnail at this size and the renderer draws it at this size times
+    /// the display scale.
+    static let thumbnailSize = CGSize(width: 60, height: 80)
+
     let document: PDFDocument?
     let pageIndex: Int
 
@@ -249,23 +263,25 @@ struct PageThumbnailView: View {
             }
         }
         .task(id: pageIndex) {
+            guard let document else { return }
             // Check cache first
-            if let cached = ThumbnailCache.get(pageIndex) {
+            if let cached = ThumbnailCache.get(document: document, pageIndex: pageIndex) {
                 thumbnail = cached
                 return
             }
-            guard let page = document?.page(at: pageIndex) else { return }
+            guard let page = document.page(at: pageIndex) else { return }
             // PDFPage is not Sendable; render via nonisolated(unsafe) bridge.
             nonisolated(unsafe) let unsafePage = page
-            // Render at display size (60×80pt), not 2× oversized.
+            // Render at the display size, not 2× oversized.
             // Saves ~75% pixel work and cache memory per thumbnail.
             let scale = UITraitCollection.current.displayScale
-            let size = CGSize(width: 60 * scale, height: 80 * scale)
+            let size = CGSize(width: Self.thumbnailSize.width * scale,
+                              height: Self.thumbnailSize.height * scale)
             let rendered = await Task.detached(priority: .utility) {
                 unsafePage.thumbnail(of: size, for: .cropBox)
             }.value
             if !Task.isCancelled {
-                ThumbnailCache.set(rendered, for: pageIndex)
+                ThumbnailCache.set(rendered, document: document, pageIndex: pageIndex)
                 thumbnail = rendered
             }
         }

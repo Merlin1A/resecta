@@ -162,12 +162,12 @@ struct LayerResultHasDetailTests {
         #expect(r.hasDetail == false)
     }
 
-    // MARK: - Layer 3: manual regions on image-only pages
+    // MARK: - Layer 3: manual regions on pages with no text layer
 
-    static let oneManualRegionDetail = "1 manual region on an image-only page carries no text to search for."
-    static let manyManualRegionsDetail = "3 manual regions on image-only pages carry no text to search for."
+    static let oneManualRegionDetail = "1 manual region is on a page with no text layer to capture terms from."
+    static let manyManualRegionsDetail = "3 manual regions are on pages with no text layer to capture terms from."
 
-    @Test("Layer 3 INFO (no terms) with manual regions on image-only pages carries the one detail sentence")
+    @Test("Layer 3 INFO (no terms) with manual regions on pages with no text layer carries the one detail sentence")
     func layer3InfoCarriesManualRegionsDetail() async throws {
         let (doc, url) = try TestFixtures.writeTempPDF(TestFixtures.blankPage(), prefix: "hd_l3_manual_info_")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -178,7 +178,7 @@ struct LayerResultHasDetailTests {
         #expect(r.hasDetail)
     }
 
-    @Test("Layer 3 PASS with a manual region on an image-only page keeps the generic short line and adds the sentence")
+    @Test("Layer 3 PASS with a manual region on a page with no text layer keeps the generic short line and adds the sentence")
     func layer3PassCarriesManualRegionsDetail() async throws {
         let (doc, url) = try TestFixtures.writeTempPDF(TestFixtures.blankPage(), prefix: "hd_l3_manual_pass_")
         defer { try? FileManager.default.removeItem(at: url) }

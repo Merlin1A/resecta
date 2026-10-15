@@ -78,7 +78,7 @@ public enum PipelineError: Sendable, LocalizedError {
             case .corrupt: "This document could not be opened. The file may be damaged."
             case .passwordProtected: "This document is password-protected. Resecta does not support encrypted PDFs."
             case .tooLarge: "This document is too large to process on this device."
-            case .unsupportedFormat: "This file format is not supported. Resecta works with PDF and image files."
+            case .unsupportedFormat: "This file format is not supported. Resecta works with PDF files and JPEG, PNG and HEIC images."
             case .invalidPageDimensions(let p): "Page \(p + 1) has unsupported dimensions and cannot be processed."
             case .activeContent: "This document contains JavaScript or a launch action and was not imported."
             }

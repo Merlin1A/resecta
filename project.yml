@@ -37,13 +37,6 @@ targets:
       # ImportService.loadSampleDocument. Routed through `sources:` because
       # the target's `resources:` block silently fails to enumerate.
       - path: Resources/SampleDocument.pdf
-      # Second bundled sample: the synthetic Hartwell loan-packet (12 pp).
-      # Ships as a bundled asset only — no UI picker yet. Same `sources:`
-      # routing as SampleDocument.pdf. Held
-      # byte-identical to the engine fixture
-      # (Packages/RedactionEngine/Tests/.../TestResources/packet.pdf) — one SHA,
-      # guarded by BundleContentsTests (app side) + audit-lint.sh AL-4 (cmp).
-      - path: Resources/packet.pdf
       # Privacy manifest — must ship in the bundle root or every
       # App Store submission trips ITMS-91053. Routed through `sources:`
       # because the target's `resources:` block silently fails to enumerate

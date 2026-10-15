@@ -4,7 +4,7 @@ import RedactionEngine
 @testable import ResectaApp
 
 // Resecta opens PDF files only. These pins cover the input surfaces that
-// have no pure-function seam: the two Files pickers declare the PDF type
+// have no pure-function seam: the Files picker declares the PDF type
 // alone, no Photos picker is mounted anywhere in the app, and the
 // unsupported-format message and the drop-refusal toast read the same
 // words and name PDF without naming an image format. Source files are
@@ -13,18 +13,14 @@ import RedactionEngine
 @Suite("PDF-only import surfaces", .tags(.importFlow))
 struct PDFOnlyImportSurfaceTests {
 
-    @Test("Both Files pickers list PDF files only")
-    func filePickersDeclarePDFOnly() throws {
-        for path in [
-            "Sources/ResectaApp/Views/HomeView.swift",
-            "Sources/ResectaApp/Views/RedactWorkspaceView.swift",
-        ] {
-            let source = try loadRepoFile(path)
-            #expect(source.contains("allowedContentTypes: [.pdf]"),
-                    "\(path): the Files picker must declare [.pdf]")
-            #expect(!source.contains(".image]") && !source.contains(".image,"),
-                    "\(path): the Files picker must not list an image type")
-        }
+    @Test("The Files picker lists PDF files only")
+    func filePickerDeclaresPDFOnly() throws {
+        let path = "Sources/ResectaApp/Views/HomeView.swift"
+        let source = try loadRepoFile(path)
+        #expect(source.contains("allowedContentTypes: [.pdf]"),
+                "\(path): the Files picker must declare [.pdf]")
+        #expect(!source.contains(".image]") && !source.contains(".image,"),
+                "\(path): the Files picker must not list an image type")
     }
 
     @Test("No Photos picker is mounted in the app")

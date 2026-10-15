@@ -9,10 +9,30 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Changed
 
 - Search sheet: the recent-search recall chips, the per-term section headers of the results list and the saved-search names are marked privacy-sensitive, matching the result rows and the saved-query previews.
+- Import: a file over the 50 MB cap is refused by its size on disk before any byte is read, from the Files picker and from a drop alike; a dropped file arrives as a file and is read inside its transfer rather than as 50 MB of memory.
 
 ### Removed
 
 - The search sheet's disabled audit-export, scan-coverage, doctype-diagnostic and category-strip surfaces, the navigation-scope controls, the custom-terms template picker and the two debug launch arguments that revealed them: each sat behind a flag that was false in every shipped build, so no shipped screen changes. The match rationale's classifier explanation and the coverage counts the verification screen reads stay.
+- The workspace's in-editor file importer and its "Replace the open document?" dialog, which nothing could present (the drop target stays), and the second sample packet bundled with no screen that opened it.
+
+### Security
+
+- The pre-commit hook and the pull-request gate scan the whole shipping source, on every run, for the call-shaped networking and hand-off symbols (a bare `Link(`, the Network framework's listener and browser, the socket and stream constructors, `openURL`, `UIApplication.shared.open(`, an `import Network` line) against the sites pinned in `Scripts/audit-lint.sh` with their reasons; one site is pinned, the Settings view's `mailto:` feedback link.
+- The shipped-asset fence (`Scripts/verify-shipped-asset-hashes.sh`) verifies the gazetteer manifest's Ed25519 signature with a verifier outside the engine (OpenSSL 3, else CryptoKit through `swift`; no verifier fails the fence), beside the blob and digest pins it already held.
+- `SECURITY.md` says how a security fix is announced: the changelog's `Security` heading of the release that carries it, the App Store availability date, a GitHub security advisory with a CVE through GitHub's CNA where a report warrants one, and that a fix reaches users only as an update. `THREAT-MODEL.md`'s build-and-distribution boundary says that the app repository holds no Actions secret, so no workflow can sign or upload a build, and that the detection-data signing key never enters a repository.
+### Fixed
+
+- Custom terms and saved patterns: a regular expression holding a character whose uppercase form is two letters (such as ß or the ﬁ ligature) no longer stops the app when the pattern is validated.
+- Verification: the search re-check and the detection sweep list a page as not checked when a custom regular-expression term ran out of time on it, instead of counting the page as read.
+- Verification: the detection sweep reports a custom term added after a scan was applied as a possible item instead of discarding it as the scan's.
+- Verification: the sweep's count of items you left unredacted pairs each one with what it reads on the output by its text first and its position second, so scanned output no longer misattributes them.
+- Verification: a typed pattern that ran out of time marks only its own search as not checked on that page; the detection sweep's row no longer carries another search's timeout.
+- Verification: two applied scans that share a category count an item they both read once.
+- Verification: the string-search check's note on manual regions names the mechanism — pages with no text layer to capture terms from — instead of calling the pages image-only.
+- Custom terms: a literal term typed with a ligature or a compatibility character matches its plain spelling on pages whose text is plain ASCII.
+- Verification: the Character Count and Font Verification checks report the per-page warnings their checks raise — a count excess as a note, a page whose fonts could not be inspected as not verified — where before the check passed.
+- Searchable Redaction: a page whose text layout does not settle within the re-flow limit is written without a text layer instead of with a character placed inside a redacted area.
 
 ### Internal
 
@@ -28,6 +48,11 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - `sim-suite.yml` names the account's five-macOS-job cap in its header, runs the editor's link-policy UI tests on the weekly and tag runs, and reports a failed weekly or tag run through an error annotation, a step summary and, when the repository variable `NTFY_TOPIC` is set, a post to that ntfy topic.
 - The asset-tamper matrix measures the bundled assets with the name-model probe forced present, so a simulator without the OS name model measures every cell instead of raising the banner on each.
 - Removed: the golden Bloom builder under `Scripts/gazetteer/` (its fixture is committed; the shipped filters come from the data pipeline), `engine-suite.yml` (the on-demand host run of the engine package, which never reached a verdict; the simulator suite's engine job is the hosted run) and five permanently disabled wall-clock tests.
+- `Scripts/doc-metrics.sh` counts the log interpolations marked `privacy: .public` and the `print`, `NSLog` and `debugPrint` calls in the shipping source and holds `ENGINEERING.md` to both numbers (61 and none); its `--self-test` proves the claims move. The pull-request gate's checkout no longer keeps the token, and its toolchain is selected by name (`DEVELOPER_DIR`) with the version printed in the summary. The ignore file refuses an age wrapper, a private key, a PEM file and a derived-data directory, with the one tracked public key named as the exception.
+- The audit exporter blanks the exemption, citation and note fields when sensitive content is excluded (the app passes none).
+- The engine's unsupported-format message names the formats: PDF files and JPEG, PNG and HEIC images.
+- Import lives in `Services/Import/`: a loader protocol with its payload, limits and facts types; a router that reads the leading bytes, never the declared type, and refuses every image signature before any decode; the PDF stages as a pure function of the bytes; and a wrapper that applies the facts to the editor's state in one place and reports whether the import completed. The image decode and image-to-PDF render no door reached, and the Live Photo auxiliary-metadata stripper only they called, are deleted.
+- The run's page-data bridge is a pure function of values (`RunInputs.pageData`); the rasterization steps sit in `PipelineCoordinator+Rasterization.swift`; the stores share one lenient row wrapper and one legacy-defaults move; the regex sentinel is entered through one `PatternAdmission` path; the sidebar's thumbnail cache keys on the document as well as the page.
 
 ## [1.2.0] — 2026-09-29
 

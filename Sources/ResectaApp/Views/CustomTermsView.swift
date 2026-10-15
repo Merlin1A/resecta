@@ -333,7 +333,7 @@ struct AddTermRow: View {
     /// validation chain mirroring `SavedRegexLibraryView.commitAdd`.
     /// For regex submissions: sync `validateRegexPattern` is the
     /// fast-fail (200-char cap, nested-quantifier heuristic, NSRegex
-    /// compile), then `RegexSentinelCheck.validate` runs the ReDoS
+    /// compile), then `PatternAdmission.sentinelAdmits` runs the ReDoS
     /// sentinel probe. Literal submissions skip the regex chain — the
     /// sync length guard alone is sufficient since they are not
     /// compiled by the engine.
@@ -355,14 +355,8 @@ struct AddTermRow: View {
             guard DocumentSearcher.validateRegexPattern(trimmed) != nil else {
                 return .invalidRegex(message: "Invalid or unsafe regex pattern.")
             }
-            let accepted = await RegexSentinelCheck.validate(trimmed)
-            guard accepted else {
-                let message = String(
-                    localized: "profile.regex.sentinel.rejected",
-                    table: "Legal",
-                    bundle: .main
-                )
-                return .sentinelRejected(message: message)
+            guard await PatternAdmission.sentinelAdmits(trimmed) else {
+                return .sentinelRejected(message: PatternAdmission.sentinelRejectedMessage)
             }
         }
         return .accepted(UserTerm(pattern: trimmed, isRegex: isRegex))
