@@ -422,6 +422,101 @@ struct VerificationRowModelTests {
         #expect(VerificationOutcome.allCases.filter(\.gatesSharing) == [.couldNotVerify, .needsReview, .failed])
     }
 
+    // MARK: - The summary line
+
+    static let secureChecks: [VerificationLayer] = [
+        .textExtraction, .ocrCheck, .binaryStringSearch, .structureCheck, .metadataCheck,
+        .searchRecheck, .detectionSweep,
+    ]
+    static let secure: [PipelineMode] = [.secureRasterization, .secureRasterization]
+    static let searchable: [PipelineMode] = [.searchableRedaction, .searchableRedaction]
+
+    /// A report over `checks`, every row passing except those in `rows`.
+    static func report(_ checks: [VerificationLayer], _ modes: [PipelineMode],
+                       _ overall: VerificationStatus = .pass,
+                       _ rows: [VerificationLayer: LayerResult] = [:]) -> VerificationReport {
+        VerificationReport(layers: checks.map { rows[$0] ?? layer(.pass, identity: $0) },
+                           overallStatus: overall, durationSeconds: 1, perPageModes: modes)
+    }
+
+    static let sweepNote = layer(.info("x"), identity: .detectionSweep, pages: [0, 2], lines: [sweepLine])
+    static let idleRecheck = layer(.info("x"), identity: .searchRecheck)
+    static let all = VerificationLayer.allCases
+
+    /// The eleven summary lines of the merged design, one per report shape.
+    static let summaries: [(VerificationReport, String)] = [
+        (report(secureChecks, secure), "7 of 7 checks passed"),
+        (report(secureChecks, secure, .pass, [.detectionSweep: sweepNote]), "6 of 7 checks passed · 1\u{00A0}note"),
+        (report(secureChecks, secure, .pass, [.detectionSweep: sweepNote, .searchRecheck: idleRecheck]),
+         "5 of 7 checks passed · 1\u{00A0}note · 1\u{00A0}had nothing to check"),
+        (report(all, searchable), "12 of 12 checks passed"),
+        (report(all, secure), "9 of 12 checks passed · 3\u{00A0}had nothing to check"),
+        (report(all, searchable, .warn("x"), [
+            .spatialVerification: layer(.warn("x"), identity: .spatialVerification),
+            .ocrCheck: layer(.info("x"), identity: .ocrCheck)]),
+         "10 of 12 checks passed · 1\u{00A0}warning · 1\u{00A0}note"),
+        (report(all, searchable, .warn("x"), [
+            .ocrCheck: layer(.warn("x"), identity: .ocrCheck, cnv: true), .searchRecheck: idleRecheck]),
+         "10 of 12 checks passed · 1\u{00A0}could not verify · 1\u{00A0}had nothing to check"),
+        (report(all, searchable, .attention("x"), [
+            .binaryStringSearch: layer(.attention("x"), identity: .binaryStringSearch, terms: ["Delia"]),
+            .ocrCheck: layer(.warn("x"), identity: .ocrCheck, cnv: true),
+            .spatialVerification: layer(.warn("x"), identity: .spatialVerification),
+            .searchRecheck: idleRecheck]),
+         "8 of 12 checks passed · 1\u{00A0}needs review · 1\u{00A0}could not verify · 1\u{00A0}warning"
+            + " · 1\u{00A0}had nothing to check"),
+        (report(secureChecks, secure, .fail("x"), [.metadataCheck: layer(.fail("x"), identity: .metadataCheck)]),
+         "6 of 7 checks passed · 1\u{00A0}failed"),
+        (report(all, searchable, .warn("x"), [
+            .characterCount: layer(.skipped, identity: .characterCount),
+            .characterLineage: layer(.skipped, identity: .characterLineage),
+            .ocrCheck: layer(.info("x"), identity: .ocrCheck)]),
+         "9 of 12 checks passed · 2\u{00A0}could not verify · 1\u{00A0}note"),
+        (VerificationReport(layers: [layer(.fail("x"), identity: nil)], overallStatus: .fail("x"),
+                            durationSeconds: 0),
+         "0 of 1 checks passed · 1\u{00A0}failed"),
+    ]
+
+    @Test("The summary line counts only passing checks and names every other outcome")
+    func elevenSummaryLines() {
+        #expect(Self.summaries.count == 11)
+        for (report, expected) in Self.summaries {
+            #expect(VerificationResultsView.detailsSummaryText(for: report) == expected)
+        }
+    }
+
+    @Test("Every clause, singular and plural, in severity order after the passed base")
+    func clausesInOrderSingularAndPlural() {
+        let one: [VerificationLayer: LayerResult] = [
+            .textExtraction: Self.layer(.fail("x"), identity: .textExtraction),
+            .ocrCheck: Self.layer(.attention("x"), identity: .ocrCheck),
+            .binaryStringSearch: Self.layer(.warn("x"), identity: .binaryStringSearch, cnv: true),
+            .structureCheck: Self.layer(.warn("x"), identity: .structureCheck),
+            .metadataCheck: Self.layer(.info("x"), identity: .metadataCheck),
+            .searchRecheck: Self.idleRecheck,
+        ]
+        #expect(VerificationResultsView.detailsSummaryText(for: Self.report(Self.secureChecks, Self.secure,
+                                                                            .fail("x"), one))
+                == "1 of 7 checks passed · 1\u{00A0}failed · 1\u{00A0}needs review · 1\u{00A0}could not verify"
+                + " · 1\u{00A0}warning · 1\u{00A0}note · 1\u{00A0}had nothing to check")
+        let pairs: [VerificationLayer: LayerResult] = [
+            .textExtraction: Self.layer(.fail("x"), identity: .textExtraction),
+            .ocrCheck: Self.layer(.fail("x"), identity: .ocrCheck),
+            .binaryStringSearch: Self.layer(.attention("x"), identity: .binaryStringSearch),
+            .operatorReExtraction: Self.layer(.attention("x"), identity: .operatorReExtraction),
+            .structureCheck: Self.layer(.warn("x"), identity: .structureCheck, cnv: true),
+            .characterLineage: Self.layer(.skipped, identity: .characterLineage),
+            .metadataCheck: Self.layer(.warn("x"), identity: .metadataCheck),
+            .spatialVerification: Self.layer(.warn("x"), identity: .spatialVerification),
+            .characterCount: Self.layer(.info("x"), identity: .characterCount),
+            .detectionSweep: Self.sweepNote,
+            .searchRecheck: Self.idleRecheck,
+        ]
+        #expect(VerificationResultsView.detailsSummaryText(for: Self.report(Self.all, Self.secure, .fail("x"), pairs))
+                == "0 of 12 checks passed · 2\u{00A0}failed · 2\u{00A0}need review · 2\u{00A0}could not verify"
+                + " · 2\u{00A0}warnings · 2\u{00A0}notes · 2\u{00A0}had nothing to check")
+    }
+
     @Test("Each outcome has its outline mark")
     func markSymbols() {
         #expect(VerificationOutcome.allCases.map(\.markSymbolName) == [

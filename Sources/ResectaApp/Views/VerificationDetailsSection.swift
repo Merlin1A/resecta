@@ -147,18 +147,19 @@ struct VerificationDetailsSection: View {
                     // index. .skipped rides under FINDINGS (a skipped check is
                     // something the user should notice), not silently in the
                     // passed group.
-                    let partition = VerificationLayerPartition(layers: report.layers)
+                    let partition = VerificationLayerPartition(
+                        layers: report.layers, perPageModes: report.perPageModes)
 
                     if partition.isWhollyClean {
                         // Wholly clean doc — one group, no header.
                         VStack(alignment: .leading, spacing: 0) {
-                            layerRows(partition.passed)
+                            layerRows(partition.cluster)
                         }
                     } else {
-                        if !partition.findings.isEmpty {
+                        if !partition.findings.isEmpty || !partition.couldNotVerify.isEmpty {
                             VStack(alignment: .leading, spacing: 0) {
                                 sectionHeader("FINDINGS")
-                                layerRows(partition.findings)
+                                layerRows(partition.findings + partition.couldNotVerify)
                                 // The full-width break between the
                                 // findings and the clean checks — the
                                 // group boundary.
@@ -168,13 +169,13 @@ struct VerificationDetailsSection: View {
                                 }
                                 // Clean checks ride under FINDINGS so the user
                                 // sees the full surface that was inspected.
-                                layerRows(partition.passed)
+                                layerRows(partition.cluster)
                             }
                         } else {
                             // Notes-only — passed rows lead with no header,
                             // the NOTES group below.
                             VStack(alignment: .leading, spacing: 0) {
-                                layerRows(partition.passed)
+                                layerRows(partition.cluster)
                             }
                         }
                         if !partition.notes.isEmpty {
@@ -511,51 +512,13 @@ extension VerificationResultsView {
             + "\(total == 1 ? "item" : "items") unredacted."
     }
 
-    /// Static for exact-string test pinning (house pattern —
-    /// `fallbackReasonRowText`). Pinned by `VerificationDisplayTests`.
+    /// The header's summary line — "{P} of {T} checks passed", where only
+    /// a passing check counts as passed, then one clause per other outcome
+    /// present (`VerificationLayerPartition.summaryText`). Static for
+    /// exact-string test pinning (house pattern — `fallbackReasonRowText`).
+    /// Pinned by `VerificationDisplayTests`.
     static func detailsSummaryText(for report: VerificationReport) -> String {
-        // The same partition the disclosure groups by — "passed" counts
-        // .pass + .info (no actionable issue); `.skipped` is surfaced
-        // separately below, never rolled into the passed count; `.info`
-        // also appears under the NOTES group, preserving the prior shape.
-        let counts = VerificationLayerPartition(layers: report.layers)
-        let total = counts.total
-        // "· 1 metadata" read as a dangling adjective — name the
-        // noun. "informational", not "metadata" — INFO rows include
-        // OCR/spatial observations, and "informational" keeps the segment
-        // distinct from the WARN arm's "· N note(s)".
-        // A no-break space after each segment's numeral keeps "3 informational
-        // notes" from wrapping between the count and its noun; the base
-        // "N of M checks passed" keeps ordinary spaces (VoiceOver reads
-        // both alike; the XCUI pin reads the base segment).
-        let metaSuffix = counts.infoCount > 0
-            ? " · \(counts.infoCount)\u{00A0}informational \(counts.infoCount == 1 ? "note" : "notes")" : ""
-        let skippedSuffix = counts.skippedCount > 0 ? " · \(counts.skippedCount)\u{00A0}skipped" : ""
-        let notesSuffix = counts.warnCount > 0
-            ? " · \(counts.warnCount)\u{00A0}\(counts.warnCount == 1 ? "note" : "notes")" : ""
-        switch report.overallStatus {
-        case .pass, .info, .skipped:
-            return "\(counts.passedCount) of \(total) checks passed" + metaSuffix + skippedSuffix
-        case .warn:
-            // An overall WARN can now be skip-induced with zero
-            // WARN layers — omit the notes segment in that case.
-            // Under the "Completed with Notes" masthead, "4 of 5
-            // checks passed" implied the noted check failed. "Completed"
-            // keeps the arithmetic honest (a note is a note, not a
-            // failure) without touching any verdict semantics; the
-            // completed tally counts every layer that ran (WARN aggregate
-            // carries no FAILs — fail forces the .fail arm below).
-            return "\(counts.completedCount) of \(total) checks completed" + notesSuffix + metaSuffix + skippedSuffix
-        case .attention:
-            // ATTENTION aggregate carries no FAILs (fail forces the .fail arm
-            // below) but may ride beside WARN notes — surface both segments.
-            let reviewSuffix = " · " + (counts.attentionCount == 1
-                ? "1\u{00A0}needs review" : "\(counts.attentionCount)\u{00A0}need review")
-            return "\(counts.passedCount) of \(total) checks passed" + reviewSuffix + notesSuffix + metaSuffix + skippedSuffix
-        case .fail:
-            let issuesSuffix = " · \(counts.failCount)\u{00A0}\(counts.failCount == 1 ? "issue" : "issues")"
-            return "\(counts.passedCount) of \(total) checks passed" + issuesSuffix + metaSuffix + skippedSuffix
-        }
+        VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes).summaryText
     }
 
     /// Fallback-reason row copy. Static so tests pin the exact string (mirrors
