@@ -13,7 +13,7 @@ import OSLog
 // as inventory support. The Bloom filters themselves are never edited by
 // this file: demote, never strip.
 //
-// The file is a standalone sidecar (not part of the signed Bloom manifest).
+// The file is a standalone sidecar, trust-gated by the signed asset manifest.
 // Absent or unreadable → the gazetteer runs without it → no demotion
 // (fail-open, matching the nickname sidecar's posture).
 //

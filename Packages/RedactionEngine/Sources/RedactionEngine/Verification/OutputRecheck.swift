@@ -17,8 +17,9 @@ import PDFKit
 // the observations are sorted before they are returned.
 //
 // Honesty: a page the searcher could not read (OCR did not run, oversize,
-// unopenable, regex timeout, the per-page result cap, a pattern the regex
-// safety gate refused) is recorded as such, never counted as clear. A
+// unopenable, a typed or custom regex term's timeout, the per-page result
+// cap, a pattern the regex safety gate refused) is recorded as such, never
+// counted as clear. A
 // Scan's remaining items keep their page, category and rect for the
 // sweep's subtraction; nothing here logs.
 
@@ -41,6 +42,11 @@ struct RecheckObservation: Sendable, Equatable {
         /// The searcher refused the request's pattern before reading the
         /// page; `remaining` is not a measurement.
         var rejected: Bool = false
+        /// The request's own pattern — a typed regex, or a custom regex term
+        /// of a Scan — ran out of time on the page; the page was not read
+        /// in full for THIS request. Another request's timeout is not this
+        /// request's.
+        var timedOut: Bool = false
         /// A Scan request's remaining items (empty for a typed request).
         var items: [RemainingItem] = []
     }
@@ -49,23 +55,33 @@ struct RecheckObservation: Sendable, Equatable {
     /// The worst route the searcher reported for the page; nil when no
     /// request read it (the search finished without visiting the page).
     var route: PageSearchCoverage.Route?
+    /// The page view: some request's pattern ran out of time here. The
+    /// folds read the per-request `Count.timedOut`, never this.
     var regexTimedOut: Bool
     /// Keyed by request index.
     var counts: [Int: Count]
 
     /// The same observation keyed by a subset of the requests, in the
-    /// subset's order: `indices[k]` becomes key `k`.
+    /// subset's order: `indices[k]` becomes key `k`; the page view follows
+    /// the subset.
     func restricted(to indices: [Int]) -> RecheckObservation {
         var subset: [Int: Count] = [:]
         for (k, original) in indices.enumerated() {
             if let count = counts[original] { subset[k] = count }
         }
         return RecheckObservation(
-            pageIndex: pageIndex, route: route, regexTimedOut: regexTimedOut, counts: subset)
+            pageIndex: pageIndex, route: route,
+            regexTimedOut: subset.values.contains(where: \.timedOut), counts: subset)
     }
 }
 
 struct OutputRecheck: Sendable {
+
+    /// Per-call override of the searcher's per-page regex budget
+    /// (`DocumentSearcher.regexTimeoutOverride`), handed to every page's
+    /// searcher. Production leaves it nil; a test sets it to make a regex
+    /// term run out of time on a page without waiting the budget out.
+    var regexTimeoutOverride: Duration? = nil
 
     /// Re-run every request on every page of `outputDocument`; one
     /// observation per page, in page order, counts keyed by request index.
@@ -103,7 +119,8 @@ struct OutputRecheck: Sendable {
                 for item in work {
                     group.addTask {
                         try Task.checkCancellation()
-                        return await Self.observePage(item, requests: requests)
+                        return await Self.observePage(
+                            item, requests: requests, regexTimeoutOverride: regexTimeoutOverride)
                     }
                 }
                 var out: [RecheckObservation] = []
@@ -126,13 +143,12 @@ struct OutputRecheck: Sendable {
         let requestIndices: [Int]
     }
 
-    /// Route + timeout collector for one page's searcher. The sinks fire
-    /// from the actor; the box is locked so the values are read after the
-    /// stream finishes.
+    /// Route collector for one page's searcher. The sink fires from the
+    /// actor; the box is locked so the value is read after the stream
+    /// finishes.
     private final class CoverageBox: @unchecked Sendable {
         private let lock = NSLock()
         private var worst: PageSearchCoverage.Route?
-        private var timedOut = false
 
         private static func rank(_ route: PageSearchCoverage.Route?) -> Int {
             switch route {
@@ -150,19 +166,15 @@ struct OutputRecheck: Sendable {
             if Self.rank(route) > Self.rank(worst) { worst = route }
         }
 
-        func recordTimeout() {
+        var snapshot: PageSearchCoverage.Route? {
             lock.lock(); defer { lock.unlock() }
-            timedOut = true
-        }
-
-        var snapshot: (route: PageSearchCoverage.Route?, timedOut: Bool) {
-            lock.lock(); defer { lock.unlock() }
-            return (worst, timedOut)
+            return worst
         }
     }
 
-    /// Set once by the searcher's rejection sink for one request.
-    private final class RejectionFlag: @unchecked Sendable {
+    /// Set once by one of the searcher's sinks during one request's stream
+    /// (the rejection sink; the two timeout sinks).
+    private final class OnceFlag: @unchecked Sendable {
         private let lock = NSLock()
         private var fired = false
         func set() { lock.lock(); fired = true; lock.unlock() }
@@ -171,7 +183,7 @@ struct OutputRecheck: Sendable {
 
     /// Run every request on one page through its own searcher.
     private static func observePage(
-        _ work: PageWork, requests: [SearchRecheckRequest]
+        _ work: PageWork, requests: [SearchRecheckRequest], regexTimeoutOverride: Duration?
     ) async -> RecheckObservation {
         var observation = RecheckObservation(
             pageIndex: work.index, route: nil, regexTimedOut: false, counts: [:])
@@ -182,10 +194,9 @@ struct OutputRecheck: Sendable {
             return observation
         }
 
-        let searcher = DocumentSearcher()
+        let searcher = DocumentSearcher(regexTimeoutOverride: regexTimeoutOverride)
         let box = CoverageBox()
         await searcher.setPageCoverageSink { coverage in box.record(coverage.route) }
-        await searcher.setRegexTimeoutSink { _ in box.recordTimeout() }
         let wrapped = SendablePDFDocument(pageDocument)
 
         for requestIndex in work.requestIndices {
@@ -216,8 +227,15 @@ struct OutputRecheck: Sendable {
             var items: [RecheckObservation.RemainingItem] = []
             // A pattern the safety gate refuses finishes the stream empty;
             // the sink is what tells that apart from a page with no match.
-            let rejection = RejectionFlag()
+            let rejection = OnceFlag()
             await searcher.setRegexRejectionSink { _ in rejection.set() }
+            // A pattern that runs out of time — the typed regex, or a custom
+            // regex term of a Scan running out its share of the page budget
+            // — reports through one of two sinks; both land on THIS request's
+            // flag, installed fresh per request so no timeout crosses over.
+            let timeout = OnceFlag()
+            await searcher.setRegexTimeoutSink { _ in timeout.set() }
+            await searcher.setUserTermsTimeoutSink { _, _ in timeout.set() }
             let stream = searcher.search(wrapped, mode: mode, progress: { _, _ in })
             for await result in stream {
                 if Task.isCancelled { break }
@@ -236,12 +254,12 @@ struct OutputRecheck: Sendable {
                 hitCap: remaining >= DocumentSearcher.maxResults,
                 perTerm: perTerm,
                 rejected: rejection.value,
+                timedOut: timeout.value,
                 items: items)
         }
 
-        let coverage = box.snapshot
-        observation.route = coverage.route
-        observation.regexTimedOut = coverage.timedOut
+        observation.route = box.snapshot
+        observation.regexTimedOut = observation.counts.values.contains(where: \.timedOut)
         return observation
     }
 }

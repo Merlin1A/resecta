@@ -29,34 +29,47 @@ struct DetectionSweepFoldTests {
                      source: .textLayer, term: category.rawValue, piiCategory: category)
     }
 
+    /// The scan configuration a request ran with: its always-flag literal
+    /// terms, or nil when it carried none.
+    private func configuration(alwaysFlag: [String]) -> ScanRunConfiguration? {
+        alwaysFlag.isEmpty ? nil : ScanRunConfiguration(
+            thresholdVector: nil, alwaysFlag: alwaysFlag.map { UserTerm(pattern: $0, isRegex: false) })
+    }
+
     private func applied(
-        _ categories: Set<PIICategory>, found: Int = 4, applied: Int = 4, deselected: [SearchResult] = []
+        _ categories: Set<PIICategory>, found: Int = 4, applied: Int = 4, deselected: [SearchResult] = [],
+        alwaysFlag: [String] = []
     ) -> SearchRecheckRequest {
         SearchRecheckRequest(
             record: AppliedSearchRecord(
                 query: AppliedSearchQuery(kind: .piiScan(categories: categories), options: SearchOptions()),
-                foundCount: found),
+                foundCount: found, scanConfiguration: configuration(alwaysFlag: alwaysFlag)),
             appliedCount: applied, appliedPages: [0], deselected: deselected)
     }
 
-    private var sweep: SearchRecheckRequest {
+    private var sweep: SearchRecheckRequest { sweepRequest() }
+
+    private func sweepRequest(alwaysFlag: [String] = []) -> SearchRecheckRequest {
         SearchRecheckRequest(
             record: AppliedSearchRecord(
                 query: AppliedSearchQuery(kind: .piiScan(categories: Set(PIICategory.allCases)), options: SearchOptions()),
-                foundCount: 0),
+                foundCount: 0, scanConfiguration: configuration(alwaysFlag: alwaysFlag)),
             appliedCount: 0, appliedPages: [], origin: .sweep)
     }
 
-    /// One page's observation: per request index, the items the stream yielded.
+    /// One page's observation: per request index, the items the stream
+    /// yielded; `timedOut` names the requests whose pattern ran out of time.
     private func page(_ index: Int, route: PageSearchCoverage.Route? = .textLayer,
-                      _ itemsByRequest: [Int: [Item]]) -> RecheckObservation {
+                      _ itemsByRequest: [Int: [Item]], timedOut: Set<Int> = []) -> RecheckObservation {
         var counts: [Int: Count] = [:]
         for (request, items) in itemsByRequest {
             var perTerm: [String: Int] = [:]
             for i in items { perTerm[i.category?.rawValue ?? "Custom", default: 0] += 1 }
-            counts[request] = Count(remaining: items.count, hitCap: false, perTerm: perTerm, items: items)
+            counts[request] = Count(remaining: items.count, hitCap: false, perTerm: perTerm,
+                                    timedOut: timedOut.contains(request), items: items)
         }
-        return RecheckObservation(pageIndex: index, route: route, regexTimedOut: false, counts: counts)
+        return RecheckObservation(
+            pageIndex: index, route: route, regexTimedOut: !timedOut.isEmpty, counts: counts)
     }
 
     private func message(_ status: VerificationStatus) -> String {
@@ -84,17 +97,18 @@ struct DetectionSweepFoldTests {
         #expect(outcome.queryLines?.first?.remainingCount == 2)
     }
 
-    @Test("IoU just under the bar does not subtract; a different category does not subtract")
+    @Test("IoU just under the bar does not subtract an item of another text; a different category does not subtract")
     func subtractionNeedsOverlapAndCategory() {
         let base = rect(0.10, 0.50, 0.20, 0.04)
         // Same height, shifted so the overlap is 0.49 of the union.
         let shifted = CGRect(x: 0.10 + 0.20 * (1 - 0.49) / (1 + 0.49) + 0.0001, y: 0.50, width: 0.20, height: 0.04)
         #expect(DetectionSweep.intersectionOverUnion(base, shifted) < 0.5)
         #expect(DetectionSweep.intersectionOverUnion(base, shifted) > 0.45)
+        // Another text in the under-bar box: neither key pairs it.
         let underBar = DetectionSweep.fold(
             requests: [applied([.ssn], deselected: [result(0, .ssn, shifted)])],
-            observations: [page(0, [0: [item(0, .ssn, base)]])], pageCount: 1)
-        #expect(underBar.status.isInfo, "IoU under 0.5 leaves the item further; got \(underBar.status)")
+            observations: [page(0, [0: [item(0, .ssn, base, text: "987-65-4321")]])], pageCount: 1)
+        #expect(underBar.status.isInfo, "IoU under 0.5 and another text leave the item further; got \(underBar.status)")
         #expect(!message(underBar.status).contains("left unredacted"))
 
         let otherCategory = DetectionSweep.fold(
@@ -210,8 +224,7 @@ struct DetectionSweepFoldTests {
 
     @Test("WARN could-not-verify on unchecked pages, with the re-check's clause vocabulary")
     func warnUncheckedPages() {
-        var timedOut = page(2, route: .textLayer, [0: []])
-        timedOut.regexTimedOut = true
+        let timedOut = page(2, route: .textLayer, [0: []], timedOut: [0])
         let outcome = DetectionSweep.fold(
             requests: [sweep],
             observations: [
@@ -249,13 +262,14 @@ struct DetectionSweepFoldTests {
         #expect(DetectionSweep.isSwept(nil), "an always-flag hit counts")
         #expect(DetectionSweep.isSwept(.ssn) && !DetectionSweep.isSwept(.name) && !DetectionSweep.isSwept(.address))
         let outcome = DetectionSweep.fold(
-            requests: [applied([.ssn, .name, .address]), sweep],
+            requests: [applied([.ssn, .name, .address], alwaysFlag: ["ACME"]), sweep],
             observations: [page(0, [0: [item(0, .name, rect(0.1, 0.1)), item(0, .address, rect(0.1, 0.2))],
                                     1: [item(0, .name, rect(0.1, 0.1)), item(0, .address, rect(0.1, 0.2)), item(0, nil, rect(0.1, 0.3), text: "ACME")]])],
             pageCount: 1)
-        // The names and the address vanish; the always-flag hit belongs to
-        // the applied scan (in scope), and an in-scope item of the SWEEP
-        // request is the re-run's to count, not the sweep's — nothing further.
+        // The names and the address vanish; the custom-term hit belongs to
+        // the applied scan that carried the term (in scope), and an in-scope
+        // item of the SWEEP request is the re-run's to count, not the
+        // sweep's — nothing further.
         #expect(outcome.status == .pass, "got \(outcome.status)")
         #expect(outcome.queryLines?[0].remainingCount == 0, "the applied scan's names and address do not count")
         #expect(outcome.queryLines?[1].remainingCount == 0, "the sweep's out-of-scope count carries no name or address")
@@ -264,6 +278,91 @@ struct DetectionSweepFoldTests {
             requests: [applied([.name])], observations: [page(0, [0: [item(0, .name, rect(0.1, 0.1))]])], pageCount: 1)
         #expect(clean.status == .pass, "a name-only scan re-run reads nothing it counts; got \(clean.status)")
         #expect(clean.copyOverride?.detail.hasSuffix(DetectionSweep.gateSentence) == true)
+    }
+
+    @Test("An OCR-read item whose box drifted pairs with the deselected item by its text")
+    func subtractionPairsByTextWhenTheBoxDrifted() {
+        // The deselected item's text-layer rect, and what OCR read on the
+        // rasterized output: the same text in a looser box (IoU ≈ 0.33).
+        let deselected = rect(0.10, 0.50, 0.20, 0.04)
+        let drifted = rect(0.08, 0.48, 0.30, 0.08)
+        #expect(DetectionSweep.intersectionOverUnion(deselected, drifted) < 0.5)
+        let outcome = DetectionSweep.fold(
+            requests: [applied([.ssn], deselected: [result(0, .ssn, deselected)])],
+            observations: [page(0, route: .ocr, [0: [item(0, .ssn, drifted)]])], pageCount: 1)
+        #expect(outcome.status == .pass, "the one remaining item is the one left unredacted; got \(outcome.status)")
+        #expect(outcome.copyOverride?.short == "Re-ran your scan on the output — 1 remains, the 1 you left unredacted.")
+    }
+
+    @Test("Two same-category items on one line are told apart by their text, not by the closer box")
+    func subtractionTellsItemsApartByText() {
+        let box = rect(0.10, 0.50)
+        let shifted = rect(0.12, 0.50)
+        #expect(DetectionSweep.intersectionOverUnion(box, shifted) > 0.5)
+        let left = result(0, .ssn, box)
+        let pool = [item(0, .ssn, box, text: "987-65-4321"), item(0, .ssn, shifted, text: "123-45-6789")]
+        let paired = DetectionSweep.subtractDeselected([left], from: pool)
+        #expect(paired.consumed == 1)
+        #expect(paired.remaining.map(\.matchedText) == ["987-65-4321"],
+                "the item that reads the deselected text is the one paired, not the one in the same box")
+        // The same text anywhere on the page pairs, whatever the overlap;
+        // another text pairs only at the overlap bar; another category never.
+        #expect(DetectionSweep.subtractDeselected([left], from: [item(0, .ssn, rect(0.6, 0.6))]).consumed == 1)
+        #expect(DetectionSweep.subtractDeselected([left], from: [item(0, .ssn, rect(0.6, 0.6), text: "987-65-4321")]).consumed == 0)
+        #expect(DetectionSweep.subtractDeselected([left], from: [item(0, .phone, box)]).consumed == 0)
+        // The text key: case, ligatures and whitespace runs do not tell items apart.
+        #expect(DetectionSweep.pairingText("  Acme\tOﬃce ") == DetectionSweep.pairingText("acme office"))
+    }
+
+    @Test("Two applied scans sharing a category count an item they both read once, and subtract it once")
+    func sharedCategoryItemCountedOnce() {
+        let box = rect(0.1, 0.5)
+        let first = applied([.ssn], deselected: [result(0, .ssn, box)])
+        let second = applied([.ssn, .phone], deselected: [result(0, .ssn, box)])
+        let both = DetectionSweep.fold(
+            requests: [first, second],
+            observations: [page(0, [0: [item(0, .ssn, box)], 1: [item(0, .ssn, box)]])], pageCount: 1)
+        #expect(both.status == .pass, "got \(both.status)")
+        #expect(both.copyOverride?.short == "Re-ran your scan on the output — 1 remains, the 1 you left unredacted.")
+        // Left unselected in one of the two scans: still one item, still the one left.
+        let once = DetectionSweep.fold(
+            requests: [first, applied([.ssn, .phone])],
+            observations: [page(0, [0: [item(0, .ssn, box)], 1: [item(0, .ssn, box)]])], pageCount: 1)
+        #expect(once.status == .pass, "got \(once.status)")
+        #expect(once.copyOverride?.short == "Re-ran your scan on the output — 1 remains, the 1 you left unredacted.")
+        // The per-request lines still say what each scan read.
+        #expect(both.queryLines?.map(\.remainingCount) == [1, 1])
+    }
+
+    // MARK: - The scope split and custom terms
+
+    @Test("A custom term added after the scan was applied is reported by the sweep as a possible item")
+    func lateCustomTermSurvivesTheAppliedScanFilter() {
+        // The applied scan ran with the term ACME; the run's sweep carries
+        // ACME and the later term BETA. Both read on the output: the ACME
+        // hit is the scan's (in scope); the BETA hit no applied scan carried.
+        let outcome = DetectionSweep.fold(
+            requests: [applied([.ssn], alwaysFlag: ["ACME"]), sweepRequest(alwaysFlag: ["ACME", "BETA"])],
+            observations: [page(0, [
+                0: [item(0, nil, rect(0.1, 0.1), text: "ACME")],
+                1: [item(0, nil, rect(0.1, 0.1), text: "ACME"), item(0, nil, rect(0.1, 0.3), text: "BETA")],
+            ])],
+            pageCount: 1)
+        #expect(outcome.status.isInfo, "got \(outcome.status)")
+        let m = message(outcome.status)
+        #expect(m.contains("in your scan's categories: 1 remains"), "the scan's own term; got \(m)")
+        #expect(m.contains("outside them: 1 possible item"), "the later term is a possible item; got \(m)")
+        #expect(outcome.queryLines?[1].remainingCount == 1, "the sweep's line counts the later term")
+        #expect(outcome.queryLines?[1].perTerm?.map(\.term) == ["Custom"])
+
+        // An applied scan that carried no custom term: every custom-term hit
+        // the sweep reads is a possible item.
+        let none = DetectionSweep.fold(
+            requests: [applied([.ssn]), sweepRequest(alwaysFlag: ["BETA"])],
+            observations: [page(0, [0: [], 1: [item(0, nil, rect(0.1, 0.3), text: "BETA")]])],
+            pageCount: 1)
+        #expect(none.status.isInfo, "got \(none.status)")
+        #expect(message(none.status).contains("outside them: 1 possible item"), "got \(message(none.status))")
     }
 
     // MARK: - Invariants

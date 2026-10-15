@@ -992,7 +992,7 @@ public struct VerificationEngine: Sendable {
     // MARK: - Layer 7: Character Count Cross-Check
 
     /// Dispatch character count verification across all Searchable Redaction pages.
-    /// Collects all failing pages for tappable navigation chips.
+    /// Collects every failing page, else every warned page, for the chips.
     private func runLayer7CharacterCount(
         _ doc: PDFDocument,
         filterDigests: [PageFilterDigest?],
@@ -1001,8 +1001,7 @@ public struct VerificationEngine: Sendable {
     ) async throws -> (VerificationStatus, [Int]?, Bool) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
-        var failingPages: [Int] = []
-        var firstFailMessage: String?
+        var outcomes = PerPageOutcomes()
         // Track how many pages this
         // digest-consuming layer was eligible to cross-check vs how many it
         // actually checked, so a layer that ran no comparisons reports the
@@ -1025,14 +1024,9 @@ public struct VerificationEngine: Sendable {
             let result = try await verifier.verifyCharacterCount(
                 outputPage: page, digest: digest
             )
-            if case .fail(let msg) = result {
-                failingPages.append(i)
-                if firstFailMessage == nil { firstFailMessage = msg }
-            }
+            outcomes.record(result, page: i)
         }
-        if let msg = firstFailMessage {
-            return (.fail(msg), failingPages, false)
-        }
+        if let failure = outcomes.failure { return failure }
         // Eligible-but-unchecked → honest .skipped (the verify-only
         // resume path rebuilds all-nil digests). Partial coverage → .warn
         // (defensive; unreachable today since digests are all-present or
@@ -1054,13 +1048,16 @@ public struct VerificationEngine: Sendable {
             return (perPageModeCoverageWarn(
                 uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
         }
+        // The verifier's per-page count-excess warnings: a note (the check
+        // ran), ranked below the could-not-verify warnings above.
+        if let warning = outcomes.warning(couldNotVerify: false) { return warning }
         return (.pass, nil, false)
     }
 
     // MARK: - Layer 8: Font Verification
 
     /// Dispatch font verification across all Searchable Redaction pages.
-    /// Collects all failing pages for tappable navigation chips.
+    /// Collects every failing page, else every warned page, for the chips.
     private func runLayer8FontVerification(
         _ doc: PDFDocument,
         perPageModes: [PipelineMode],
@@ -1068,8 +1065,7 @@ public struct VerificationEngine: Sendable {
     ) async throws -> (VerificationStatus, [Int]?, Bool) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
-        var failingPages: [Int] = []
-        var firstFailMessage: String?
+        var outcomes = PerPageOutcomes()
         // See runLayer1TextExtraction — unreadable eligible pages WARN
         // on the otherwise-PASS path.
         var unreadablePages: [Int] = []
@@ -1086,14 +1082,9 @@ public struct VerificationEngine: Sendable {
 
             let result = try await verifier.verifyFontsAreMonospace(
                 outputPage: page, pageIndex: i)
-            if case .fail(let msg) = result {
-                failingPages.append(i)
-                if firstFailMessage == nil { firstFailMessage = msg }
-            }
+            outcomes.record(result, page: i)
         }
-        if let msg = firstFailMessage {
-            return (.fail(msg), failingPages, false)
-        }
+        if let failure = outcomes.failure { return failure }
         if !unreadablePages.isEmpty {
             return (unreadablePagesWarn(unreadablePages), unreadablePages, true)
         }
@@ -1105,6 +1096,9 @@ public struct VerificationEngine: Sendable {
             return (perPageModeCoverageWarn(
                 uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
         }
+        // The verifier's per-page warnings — a font it could not inspect,
+        // a page with no page-level resources: the check did not run there.
+        if let warning = outcomes.warning(couldNotVerify: true) { return warning }
         return (.pass, nil, false)
     }
 

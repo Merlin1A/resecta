@@ -155,8 +155,9 @@ public struct UserTermMatcher: Sendable {
     /// per-character map so the returned NSRange resolves PDFKit selection
     /// bounds on the page's own characters via
     /// `DocumentSearcher.boundingRect(for:page:)`. An all-ASCII page takes
-    /// the plain case-insensitive search (the two are equivalent there),
-    /// as does a page whose per-character normalization cannot be mapped.
+    /// the plain case-insensitive search with the normalized literal (the
+    /// two are equivalent there); a page whose per-character normalization
+    /// cannot be mapped takes it with the term as typed.
     ///
     /// Literal terms run first (linear in the page); then each regex term
     /// gets its own share of what is left of the per-page budget — the page
@@ -185,6 +186,9 @@ public struct UserTermMatcher: Sendable {
 
         let ns = pageText as NSString
         let fullRange = NSRange(location: 0, length: ns.length)
+        // A plain-ASCII page is its own search-normalized form: the plain
+        // search below runs with the term's normalized literal there.
+        let plainASCIIPage = pageText.utf8.count == pageText.unicodeScalars.count
         let startTime = ContinuousClock.now
         let timeout = timeoutOverride ?? DocumentSearcher.perPageRegexTimeout
         // Built once per page, on the first literal term that needs it.
@@ -235,10 +239,16 @@ public struct UserTermMatcher: Sendable {
                 normalizedPage = mapped
                 hitsByTerm[index].append(contentsOf: Self.literalHits(literal, in: mapped, pattern: term.pattern))
             } else {
+                // The plain case-insensitive search. On a plain-ASCII page
+                // the needle is the term's search-normalized literal, so a
+                // ligature or a compatibility character in the term reads
+                // as its plain spelling; on a page the per-character map
+                // cannot describe, the needle is the term as typed.
+                let needle = plainASCIIPage ? (term.normalizedLiteral ?? term.pattern) : term.pattern
                 var searchRange = fullRange
                 while searchRange.length > 0 {
                     let found = ns.range(
-                        of: term.pattern,
+                        of: needle,
                         options: .caseInsensitive,
                         range: searchRange
                     )

@@ -97,6 +97,59 @@ struct OutputRecheckTests {
         #expect(page.counts[0]?.items.first?.category == nil, "an always-flag hit has no detector category")
     }
 
+    @Test("A custom regex term that runs out of time on a page marks that page as not checked, never as read")
+    func customRegexTermTimeoutMarksThePageUnchecked() async throws {
+        let doc = try output(["The ACME contract 4111 is on file", "second page"])
+        let flagged = SearchRecheckRequest(
+            record: AppliedSearchRecord(
+                query: AppliedSearchQuery(kind: .piiScan(categories: [.ssn]), options: SearchOptions()),
+                foundCount: 1,
+                scanConfiguration: ScanRunConfiguration(
+                    thresholdVector: nil,
+                    alwaysFlag: [UserTerm(pattern: #"ACME \d+"#, isRegex: true)])),
+            appliedCount: 1, appliedPages: [0])
+        // A zero budget: every regex term is reported as timed out on every
+        // page before it runs; the detectors themselves are unaffected.
+        var runner = OutputRecheck()
+        runner.regexTimeoutOverride = .zero
+        let observations = try await runner.observe(outputDocument: doc, requests: [flagged])
+        #expect(observations.count == 2)
+        for page in observations {
+            #expect(page.regexTimedOut, "page \(page.pageIndex): the custom term's timeout reaches the observation")
+        }
+        let outcome = DetectionSweep.fold(requests: [flagged], observations: observations, pageCount: 2)
+        #expect(outcome.status.isWarn, "a page the term could not be checked on is reported; got \(outcome.status)")
+        let message = TestFixtures.message(of: outcome.status) ?? ""
+        #expect(message.contains("2 pages could not be checked"), "got \(message)")
+        #expect(message.contains("the pattern took too long"), "got \(message)")
+    }
+
+    @Test("A typed pattern's timeout is its own request's: the scan beside it is not marked unchecked")
+    func typedPatternTimeoutStaysWithItsRequest() async throws {
+        let doc = try output(["Patient record SSN 123-45-6789 ref 4111"])
+        let typed = TestFixtures.regexRequest(#"\d+"#)
+        let scan = scanRequest([.ssn], ssnCutoff: nil)
+        var runner = OutputRecheck()
+        runner.regexTimeoutOverride = .zero
+        let observations = try await runner.observe(outputDocument: doc, requests: [typed, scan])
+        let page = try #require(observations.first)
+        #expect(page.regexTimedOut, "the typed pattern ran out of time on the page")
+        #expect(page.counts[0]?.timedOut == true, "the typed request's own flag")
+        #expect(page.counts[1]?.timedOut == false, "the scan beside it ran its detectors in full")
+        #expect(page.restricted(to: [1]).regexTimedOut == false, "the page view follows the subset")
+        // The sweep folds the scan request alone: the typed pattern's
+        // timeout is not the scan's.
+        let sweep = DetectionSweep.fold(
+            requests: [scan], observations: observations.map { $0.restricted(to: [1]) }, pageCount: 1)
+        #expect(!sweep.status.isWarn, "the sweep row carries no other request's timeout; got \(sweep.status)")
+        // The re-check folds the typed request: the page is unchecked for it.
+        let recheck = SearchRecheck.fold(
+            requests: [typed], observations: observations.map { $0.restricted(to: [0]) }, pageCount: 1)
+        #expect(recheck.status.isWarn, "got \(recheck.status)")
+        #expect((TestFixtures.message(of: recheck.status) ?? "").contains("the pattern took too long"))
+        #expect(recheck.queryLines?.first?.unchecked == true)
+    }
+
     @Test("The category gate: a scan re-run reads the structured families only; a name on the page is never an item")
     func categoryGateInTheRunner() async throws {
         let doc = try output(["Patient John Smith SSN 123-45-6789 on file"])
@@ -109,22 +162,25 @@ struct OutputRecheckTests {
         #expect(page.counts[1]?.remaining == 0, "a names-only sweep request reads nothing")
     }
 
-    @Test("Observations keyed by the whole request list re-key to a subset in the subset's order")
+    @Test("Observations keyed by the whole request list re-key to a subset in the subset's order; the page's timeout view follows the subset")
     func restrictionRekeys() {
         let full = RecheckObservation(
             pageIndex: 3, route: .ocr, regexTimedOut: true,
             counts: [
                 0: RecheckObservation.Count(remaining: 1, hitCap: false, perTerm: ["a": 1]),
                 1: RecheckObservation.Count(remaining: 2, hitCap: true, perTerm: ["b": 2]),
-                2: RecheckObservation.Count(remaining: 3, hitCap: false, perTerm: ["c": 3]),
+                2: RecheckObservation.Count(remaining: 3, hitCap: false, perTerm: ["c": 3], timedOut: true),
             ])
         let subset = full.restricted(to: [2, 0])
         #expect(subset.pageIndex == 3)
         #expect(subset.route == .ocr)
-        #expect(subset.regexTimedOut)
+        #expect(subset.regexTimedOut, "request 2's timeout is in the subset")
         #expect(subset.counts[0]?.remaining == 3)
+        #expect(subset.counts[0]?.timedOut == true)
         #expect(subset.counts[1]?.remaining == 1)
+        #expect(subset.counts[1]?.timedOut == false)
         #expect(subset.counts[2] == nil)
+        #expect(full.restricted(to: [0, 1]).regexTimedOut == false, "a subset without the timed-out request reads none")
     }
 
     @Test("Every page is observed; a page the sub-document cannot open carries no count, never a clear")

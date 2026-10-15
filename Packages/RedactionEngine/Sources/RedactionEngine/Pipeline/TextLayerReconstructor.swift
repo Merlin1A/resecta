@@ -377,7 +377,8 @@ public enum TextLayerReconstructor {
 
     /// Upper bound on re-flow passes of `validateSurvivors`. A pass that
     /// continues has dropped at least one entry, so the loop ends on its own;
-    /// the bound only caps a pathological page.
+    /// the bound only caps a pathological page — and a page the bound leaves
+    /// unsettled is reported so, never written as it stands.
     static let drawnCellRulePassLimit = 16
 
     /// Indices of `entries` whose DRAWN glyph cell is centred inside an
@@ -496,30 +497,42 @@ public enum TextLayerReconstructor {
     /// a region there — nothing more. (The former displayed-frame assembly
     /// of such a page displaced glyphs by the hundreds; the rule was gated
     /// off it until the layout was faithful.)
+    ///
+    /// `settled` is false when `passLimit` passes left a drawn cell inside
+    /// a region: the rule has not seen the layout settle, so those entries
+    /// are dropped too and the caller writes the page without a text layer
+    /// (the surviving set is not one the writer may draw).
     static func validateSurvivors(
         _ result: FilterResult,
         regionShapes: [RegionShape],
-        frame: PageFrame
-    ) -> (result: FilterResult, dropped: Int) {
+        frame: PageFrame,
+        passLimit: Int = drawnCellRulePassLimit
+    ) -> (result: FilterResult, dropped: Int, settled: Bool) {
         var surviving = result.surviving
         var dropped = 0
         var passes = 0
-        while passes < drawnCellRulePassLimit {
-            let hits = inRegionDrawnGlyphIndices(
-                entries: surviving, regionShapes: regionShapes, frame: frame)
-            if hits.isEmpty { break }
+        func drop(_ hits: IndexSet) {
             surviving = surviving.enumerated()
                 .filter { !hits.contains($0.offset) }
                 .map(\.element)
             dropped += hits.count
-            passes += 1
         }
+        var hits = inRegionDrawnGlyphIndices(
+            entries: surviving, regionShapes: regionShapes, frame: frame)
+        while !hits.isEmpty, passes < passLimit {
+            drop(hits)
+            passes += 1
+            hits = inRegionDrawnGlyphIndices(
+                entries: surviving, regionShapes: regionShapes, frame: frame)
+        }
+        let settled = hits.isEmpty
+        if !settled { drop(hits) }
         return (
             FilterResult(
                 surviving: surviving,
                 totalCharacters: result.totalCharacters,
                 excludedCount: result.excludedCount + dropped),
-            dropped)
+            dropped, settled)
     }
 
     // MARK: - Text Run Grouping

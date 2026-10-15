@@ -186,7 +186,7 @@ public struct AhoCorasick: Sendable {
     /// and no compatibility character; up to 56 for a term with a ligature
     /// site; up to 84 only for a term that itself carries a compatibility
     /// character AND a ligature site (its normalized form and the composed
-    /// form both differ from the variant). The 1 MB memory bound counts the
+    /// form both differ from the variant). The 2 MB memory bound counts the
     /// emitted bytes of every form. Order-stable.
     public static func encodeForSearch(_ term: String) -> [[UInt8]] {
         let nfc = term.precomposedStringWithCanonicalMapping

@@ -352,13 +352,12 @@ struct CouldNotVerifyFlagTests {
         expectFlag(coverage, true, "L8 coverage")
     }
 
-    @Test("Layers 7 and 8: the verifier's per-page WARNs do not reach the dispatcher (known issue F12-23)")
-    func verifierWarnsDroppedByDispatchers() async throws {
+    @Test("Layers 7 and 8: the verifier's per-page WARNs reach the layer — Layer 8's set the flag, Layer 7's excess is a note")
+    func verifierWarnsReachTheDispatchers() async throws {
         // Layer 8: a page with no page-level /Resources — the verifier WARNs
-        // ("font verification skipped"), the dispatcher collects per-page
-        // FAILs only and the layer PASSes. Layer 7: a count excess — the same
-        // shape. The flag cannot be set at those sites until the dispatchers
-        // carry the WARN; the pin comes off with that fix.
+        // ("font verification skipped") and the layer carries it, flagged:
+        // the check did not run there. Layer 7: a count excess — the same
+        // shape, carried as a note (the check ran and reports what it saw).
         let (noRes, u1) = try TestFixtures.writeTempPDF(TestFixtures.pageWithoutResources(), prefix: "cnv_l8r_")
         defer { try? FileManager.default.removeItem(at: u1) }
         let fontsDirect = try await SandwichVerification().verifyFontsAreMonospace(
@@ -374,12 +373,14 @@ struct CouldNotVerifyFlagTests {
 
         let l8 = await run(7, noRes, mode: .searchableRedaction)
         let l7 = await run(6, excess, mode: .searchableRedaction, digests: [zeroDigest(page: 0)])
-        withKnownIssue("F12-23: the Layer 7/8 dispatchers collect per-page FAILs only, so the verifier's WARNs are dropped and both layers PASS") {
-            #expect(l8.status.isWarn, "Layer 8 must carry the verifier's WARN; got \(l8.status)")
-            #expect(l8.couldNotVerify, "no /Resources: font verification did not run")
-            #expect(l7.status.isWarn, "Layer 7 must carry the verifier's WARN; got \(l7.status)")
-        }
+        #expect(l8.status.isWarn, "Layer 8 carries the verifier's WARN; got \(l8.status)")
+        #expect(message(l8).contains("has no page-level /Resources"), "got \(l8.status)")
+        expectFlag(l8, true, "L8 no /Resources: font verification did not run")
+        #expect(l8.pageReferences == [0], "the page the check could not run on; got \(String(describing: l8.pageReferences))")
+        #expect(l7.status.isWarn, "Layer 7 carries the verifier's WARN; got \(l7.status)")
+        #expect(message(l7).contains("Character count excess on page 1"), "got \(l7.status)")
         expectFlag(l7, false, "L7 count excess is a note")
+        #expect(l7.pageReferences == [0], "the page with the excess; got \(String(describing: l7.pageReferences))")
     }
 
     // MARK: - Layer 10 (Operator Re-Extraction)
@@ -441,7 +442,7 @@ struct CouldNotVerifyFlagTests {
 
     // MARK: - Source census
 
-    /// Every `.warn(` construction in the seven verification files is
+    /// Every `.warn(` construction in the eight verification files is
     /// classified here — the could-not-verify family (23 sites) and the
     /// routine-note WARNs — so a new site cannot land silently: an
     /// unclassified construction, a moved message or a changed count fails.
@@ -468,6 +469,12 @@ struct CouldNotVerifyFlagTests {
                 // `zeroBoundsWarning` (the classifying site); the graze class
                 // returns `grazeWarning`, a note.
                 Marker(text: "return (.warn(msg), (unmeasuredPages + grazePages).sorted(), true)", family: false, sites: 0, lines: 1),
+            ],
+            // The Layer 7/8 per-page fold: passes the verifier's WARN through
+            // (the classifying sites are the verifier's, in
+            // `SandwichVerification.swift` below).
+            "VerificationEngine+CouldNotVerify.swift": [
+                Marker(text: "firstWarnMessage.map { (.warn($0), warnedPages, couldNotVerify) }", family: false, sites: 0, lines: 1),
             ],
             "VerificationEngine+Layer3.swift": [
                 Marker(text: "All sensitive terms shorter than 3 characters", family: true, sites: 1, lines: 1),
@@ -507,7 +514,8 @@ struct CouldNotVerifyFlagTests {
         ]
         // Pinned `.warn(` construction counts (pattern matches excluded).
         let constructionCounts = [
-            "VerificationEngine.swift": 17, "VerificationEngine+Layer3.swift": 5,
+            "VerificationEngine.swift": 17, "VerificationEngine+CouldNotVerify.swift": 1,
+            "VerificationEngine+Layer3.swift": 5,
             "Layer2OCRCheck+Sweep.swift": 3, "SandwichVerification.swift": 5,
             "SandwichVerification+Layer10.swift": 5,
             "SearchRecheck.swift": 1, "DetectionSweep.swift": 1,
