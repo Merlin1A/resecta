@@ -353,9 +353,9 @@ struct VerificationDisplayTests {
             layers: [layer(.pass), layer(.pass), layer(.info("a")), layer(.info("b"))],
             overallStatus: .pass, durationSeconds: 1.0)
         #expect(VerificationResultsView.mastheadSubtitle(report: withNotes) == nil)
-        // The count and the notes pointer survive one row down.
+        // The count and the notes survive one row down; a note is not a pass.
         #expect(VerificationResultsView.detailsSummaryText(for: withNotes)
-                == "4 of 4 checks passed · 2\u{00A0}informational notes")
+                == "2 of 4 checks passed · 2\u{00A0}notes")
 
         let info = VerificationReport(
             layers: [layer(.info("i"))], overallStatus: .info("i"), durationSeconds: 0)
@@ -378,23 +378,23 @@ struct VerificationDisplayTests {
         #expect(!(subtitle ?? "").isEmpty)
     }
 
-    @Test("detailsSummaryText: a pass run with INFO layers reads passed + informational-notes suffix")
+    @Test("detailsSummaryText: a pass run with INFO layers counts only the passes and names the notes")
     func detailsSummaryPassWithInfoNotes() {
-        // INFO layers count as passed (no actionable issue) and ride the
-        // informational-notes suffix; an info-only run aggregates .pass, so
-        // this is the stock line for e.g. a run whose only non-pass layer is
-        // the demoted fill-artifact note.
+        // A note is not a pass: INFO layers ride their own "notes" clause;
+        // an info-only run aggregates .pass, so this is the stock line for
+        // e.g. a run whose only non-pass layer is the demoted fill-artifact
+        // note.
         let report = VerificationReport(
             layers: [layer(.pass), layer(.pass), layer(.info("note"))],
             overallStatus: .pass, durationSeconds: 0)
         #expect(VerificationResultsView.detailsSummaryText(for: report)
-                == "3 of 3 checks passed · 1\u{00A0}informational note")
+                == "2 of 3 checks passed · 1\u{00A0}note")
 
         let two = VerificationReport(
             layers: [layer(.pass), layer(.info("a")), layer(.info("b"))],
             overallStatus: .pass, durationSeconds: 0)
         #expect(VerificationResultsView.detailsSummaryText(for: two)
-                == "3 of 3 checks passed · 2\u{00A0}informational notes")
+                == "1 of 3 checks passed · 2\u{00A0}notes")
     }
 
     @Test("detailsSummaryText: an all-pass run carries no suffix")
@@ -409,7 +409,7 @@ struct VerificationDisplayTests {
     @Test("detailsSummaryText: an ATTENTION run reads passed + need-review segments")
     func detailsSummaryAttentionShape() {
         // The residual-tier sample shape: 2 residual layers, 1 warn,
-        // 3 info, 4 pass → passed counts pass+info.
+        // 3 info, 4 pass → passed counts the passes only.
         let report = VerificationReport(
             layers: [layer(.pass), layer(.pass), layer(.pass), layer(.pass),
                      layer(.info("a")), layer(.info("b")), layer(.info("c")),
@@ -417,7 +417,7 @@ struct VerificationDisplayTests {
                      layer(.warn("n"))],
             overallStatus: .attention("r1"), durationSeconds: 0)
         #expect(VerificationResultsView.detailsSummaryText(for: report)
-                == "7 of 10 checks passed · 2\u{00A0}need review · 1\u{00A0}note · 3\u{00A0}informational notes")
+                == "4 of 10 checks passed · 2\u{00A0}need review · 1\u{00A0}warning · 3\u{00A0}notes")
 
         let single = VerificationReport(
             layers: [layer(.pass), layer(.attention("r"))],
@@ -454,13 +454,13 @@ struct VerificationDisplayTests {
         #expect(outcome.markSymbolName == expected)
     }
 
-    @Test("detailsSummaryText: a WARN run keeps the completed + notes shape")
+    @Test("detailsSummaryText: a WARN run counts the passes and names the warning and the note")
     func detailsSummaryWarnShape() {
         let report = VerificationReport(
             layers: [layer(.pass), layer(.warn("w")), layer(.info("i"))],
             overallStatus: .warn("w"), durationSeconds: 0)
         #expect(VerificationResultsView.detailsSummaryText(for: report)
-                == "3 of 3 checks completed · 1\u{00A0}note · 1\u{00A0}informational note")
+                == "1 of 3 checks passed · 1\u{00A0}warning · 1\u{00A0}note")
     }
 }
 

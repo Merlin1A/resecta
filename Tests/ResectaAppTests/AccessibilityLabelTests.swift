@@ -228,12 +228,12 @@ struct AccessibilityLabelTests {
 
     @Test("Layer-scoped phrases never reuse the overall-run phrasing",
           arguments: [
-            (VerificationStatus.pass, "Check passed."),
-            (VerificationStatus.warn("w"), "Check found a note."),
-            (VerificationStatus.info("i"), "Informational note."),
-            (VerificationStatus.attention("a"), "Check needs review."),
-            (VerificationStatus.fail("f"), "Check found an issue."),
-            (VerificationStatus.skipped, "Check was skipped."),
+            (VerificationStatus.pass, "Passed."),
+            (VerificationStatus.warn("w"), "Warning."),
+            (VerificationStatus.info("i"), "Note."),
+            (VerificationStatus.attention("a"), "Needs review."),
+            (VerificationStatus.fail("f"), "Failed."),
+            (VerificationStatus.skipped, "Could not verify."),
           ])
     func testLayerAccessibilityPhrase(status: VerificationStatus, expected: String) {
         // Per-layer surfaces must not speak "All checks completed without
@@ -315,7 +315,7 @@ struct AccessibilityLabelTests {
         )
         #expect(
             warn.completionAnnouncement(layerNumber: 2)
-            == "Layer 2, OCR Check, Check found a note. OCR could not be run on 1 page."
+            == "Layer 2, OCR Check, Warning. OCR could not be run on 1 page."
         )
 
         let fail = Self.layer(
@@ -324,17 +324,17 @@ struct AccessibilityLabelTests {
         )
         #expect(
             fail.completionAnnouncement(layerNumber: 6)
-            == "Layer 6, OCR Check, Check found an issue. Text remains on 1 page."
+            == "Layer 6, OCR Check, Failed. Text remains on 1 page."
         )
 
         // pass/skipped stay a plain phrase — no filler sentence per layer.
         #expect(
             Self.layer(status: .pass).completionAnnouncement(layerNumber: 1)
-            == "Layer 1, OCR Check, Check passed."
+            == "Layer 1, OCR Check, Passed."
         )
         #expect(
             Self.layer(status: .skipped).completionAnnouncement(layerNumber: 9)
-            == "Layer 9, OCR Check, Check was skipped."
+            == "Layer 9, OCR Check, Could not verify."
         )
     }
 }
