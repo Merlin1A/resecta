@@ -37,12 +37,6 @@ struct ResectaApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
-        // Pin the cold-start baseline at the earliest user-controllable
-        // point. First-call-wins; release builds compile to a no-op shim.
-        // Pairs with the DataPipeline `bundle_size.json` build probe via
-        // `_meta.git_head` (engineer-facing diagnostic; not consumed at runtime).
-        ColdStartTimer.shared.captureProcessStart()
-
         // The persisted-recents feature is excised. Sweep its
         // four retired storage keys out of existing installs at every
         // launch — unconditional and idempotent (no marker key).

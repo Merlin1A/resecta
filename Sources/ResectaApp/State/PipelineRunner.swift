@@ -1,7 +1,6 @@
 import Foundation
 import PDFKit
 import UIKit
-import Vision
 import RedactionEngine
 
 // MARK: - Kinds, events, outcomes
@@ -13,9 +12,6 @@ enum PipelineRunKind: Sendable {
     case full(effectiveMode: PipelineMode, runSettings: PipelineCoordinator.RunSettings)
     /// Verify the existing output again without re-rasterizing (`runVerifyOnly`).
     case verifyOnly(outputURL: URL, effectiveMode: PipelineMode)
-    /// PII and face detection across all pages (`runDetectionPipeline`).
-    case detection(recognitionLevel: VNRequestTextRecognitionLevel,
-                   runSettings: PipelineCoordinator.RunSettings)
 }
 
 /// What the runner reports to its sink. The runner performs no
@@ -46,12 +42,6 @@ enum PipelineRunEvent {
     /// A verification report to publish, with the region version the
     /// verified output was built from (see `verificationSkipped`).
     case verified(VerificationReport, burnedRegionVersion: Int)
-    /// Detection: the gazetteer-load diagnostics to surface.
-    case gazetteerDiagnostics(GazetteerLoadDiagnostics)
-    /// Detection: the page-0 bootstrap could not start — degrade to editing.
-    case detectionBootstrapFailed
-    /// Detection: every page detected — the accumulators to write and stage.
-    case detectionFinished(PipelineRunner.DetectionResults)
 }
 
 /// How a run ended when it did not throw. Informational: the launcher's
@@ -62,10 +52,6 @@ enum PipelineRunOutcome: Sendable {
     case noEffectiveRegions
     /// The redacted output could not be opened for verification.
     case verificationLoadFailed
-    /// Detection could not render page 0.
-    case detectionBootstrapFailed
-    /// Detection could not read the next page for the lookahead render.
-    case detectionLookaheadPageMissing(pageIndex: Int)
 }
 
 /// A non-cancellation error thrown out of a run, with the stage marker
@@ -81,7 +67,7 @@ struct PipelineRunFailure: Error {
 
 // MARK: - The runner
 
-/// The one run path behind the coordinator's three entry points. UI-free:
+/// The one run path behind the coordinator's two entry points. UI-free:
 /// it reads the document, redaction and settings state through the
 /// coordinator, performs the pipeline work, and reports every state change
 /// as a `PipelineRunEvent` to `sink` — it writes no `DocumentState` /
@@ -102,9 +88,6 @@ struct PipelineRunner {
                 return try await runFull(effectiveMode: effectiveMode, runSettings: runSettings)
             case .verifyOnly(let outputURL, let effectiveMode):
                 return try await runVerifyOnly(outputURL: outputURL, effectiveMode: effectiveMode)
-            case .detection(let recognitionLevel, let runSettings):
-                return try await runDetection(
-                    recognitionLevel: recognitionLevel, runSettings: runSettings)
             }
         } catch let cancellation as CancellationError { // LegalPhrases:safe (Swift keyword)
             throw cancellation

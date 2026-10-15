@@ -170,8 +170,8 @@ struct CancellationTests {
                 "Cancel-from-verifying must land on the .skipped sentinel report")
     }
 
-    // The three pipeline CancellationError handlers (runFullPipeline /
-    // runDetectionPipeline / verifyDocument) wrap their @Observable state
+    // The pipeline CancellationError handlers (runFullPipeline /
+    // verifyDocument) wrap their @Observable state
     // mutation in `await MainActor.run { MainActor.assertIsolated(); … }`,
     // because a thrown CancellationError can resume a handler OFF the
     // MainActor (a Task.detached intermediate breaks actor inheritance).
@@ -192,7 +192,7 @@ struct CancellationTests {
         // off it.
         MainActor.assertIsolated()
 
-        // runDetectionPipeline's CancellationError recovery: detecting → editing.
+        // The detecting → editing recovery transition.
         let detect = DocumentState()
         detect.phase = .detecting(progress:
             .init(currentPage: 1, totalPages: 3, currentStep: "Scanning…"))
