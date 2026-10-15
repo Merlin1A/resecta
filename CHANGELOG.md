@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - Search sheet: the recent-search recall chips, the per-term section headers of the results list and the saved-search names are marked privacy-sensitive, matching the result rows and the saved-query previews.
 - Import: a file over the 50 MB cap is refused by its size on disk before any byte is read, from the Files picker and from a drop alike; a dropped file arrives as a file and is read inside its transfer rather than as 50 MB of memory.
+- Verification results: the Verification Details list groups each check by its outcome — findings first, then checks that could not verify part of the output or were skipped (Share asks you to confirm before sending), then notes and checks that had nothing to check, then one line for the checks that passed, which opens to the individual rows. Every row shows the check's glyph, one status mark and one status word; the header counts only passing checks as passed and names failed checks, checks that need review, checks that could not verify, warnings, notes and checks with nothing to check separately. The ten core checks carry plain-language titles, a passing check's row says in one line what the check reads, and the results headline names warnings and checks that could not verify in the list's words.
 
 ### Removed
 
@@ -34,6 +35,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Custom terms: a literal term typed with a ligature or a compatibility character matches its plain spelling on pages whose text is plain ASCII.
 - Verification: the Character Count and Font Verification checks report the per-page warnings their checks raise — a count excess as a note, a page whose fonts could not be inspected as not verified — where before the check passed.
 - Searchable Redaction: a page whose text layout does not settle within the re-flow limit is written without a text layer instead of with a character placed inside a redacted area.
+- Verification results: the Verification Details summary no longer counts notes or checks with nothing to check as passed, and no longer reports a check that could not verify part of the output as completed.
+- Share: a report with a skipped check asks for confirmation before sharing even when another check reported a routine warning.
+- Verification results: a search line starting 'Scan (' keeps its term formatting.
 
 ### Internal
 

@@ -19,21 +19,6 @@ extension VerificationStatus {
         }
     }
 
-    /// The ledger's shape badge: a filled-circle glyph hung off the status
-    /// tile's corner (`LayerResultRow`), so a row's status reads by shape
-    /// and not by hue alone. Pass rows never carry it — the ledger marks a
-    /// clean pass with its ✓ column instead.
-    var badgeSymbolName: String {
-        switch self {
-        case .pass:      "checkmark.circle.fill"
-        case .warn:      "exclamationmark.circle.fill"
-        case .info:      "info.circle.fill"
-        case .attention: "eye.circle.fill"
-        case .fail:      "xmark.circle.fill"
-        case .skipped:   "minus.circle.fill"
-        }
-    }
-
     // MARK: - Colors
 
     var color: Color {
@@ -78,13 +63,6 @@ extension VerificationStatus {
         }
     }
 
-    /// The text-tier shade for a GLYPH drawn on this status's tinted wash
-    /// (LayerResultRow's tile). The deliberate exception to "glyphs stay on
-    /// the system tier": on a 10 %/18 % wash of the same hue the system
-    /// glyph measures ≈ 2:1, the text tier 4.4–6.1:1 (contrast.py,
-    /// 2026-09-24). Never for text; never off a wash.
-    var glyphOnWash: Color { textColor }
-
     // MARK: - Titles
 
     var title: String {
@@ -111,20 +89,21 @@ extension VerificationStatus {
         }
     }
 
-    /// Layer-scoped VoiceOver phrase for a single check. `accessibilityLabel`
+    /// Layer-scoped VoiceOver phrase for a single check, in the Verification
+    /// Details words (a skipped check could not verify). `accessibilityLabel`
     /// above describes the OVERALL run ("All checks completed without
-    /// issues.") — spoken per-row or per-layer mid-run, that phrasing is the
-    /// same premature-confidence anchoring problem intermediateColor exists
-    /// to prevent. Per-layer surfaces (LayerResultRow, the coordinator's
-    /// layer-completion announcements) speak this instead.
+    /// issues.") — spoken per-layer mid-run, that phrasing is the same
+    /// premature-confidence anchoring problem intermediateColor exists to
+    /// prevent. The coordinator's layer-completion announcements speak this
+    /// instead; the finished rows speak their outcome's word.
     var layerAccessibilityPhrase: String {
         switch self {
-        case .pass:      "Check passed."
-        case .warn:      "Check found a note."
-        case .info:      "Informational note."
-        case .attention: "Check needs review."
-        case .fail:      "Check found an issue."
-        case .skipped:   "Check was skipped."
+        case .pass:      "Passed."
+        case .warn:      "Warning."
+        case .info:      "Note."
+        case .attention: "Needs review."
+        case .fail:      "Failed."
+        case .skipped:   "Could not verify."
         }
     }
 }

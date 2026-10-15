@@ -281,7 +281,14 @@ struct VerificationResultsView: View {
             if warnCount == 0 && skippedCount > 0 {
                 return "Completed with \(skippedCount) of \(report.layers.count) checks skipped — results may be incomplete."
             }
-            return "Verification completed with \(warnCount) \(warnCount == 1 ? "note" : "notes"). Review below before sharing."
+            // Otherwise name what the Verification Details list names, in
+            // its words: the checks that could not verify (a skip included)
+            // and the warnings, from the same partition as its header.
+            let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
+            let clauses = [VerificationOutcome.couldNotVerify, .warning]
+                .compactMap { $0.headerClause(count: partition.count($0)) }
+            let named = clauses.isEmpty ? "notes" : clauses.joined(separator: " · ")
+            return "Verification completed with \(named). Review below before sharing."
         case .info:
             // Overall status never aggregates to .info — aggregateStatus
             // returns .fail/.warn/.pass, or .skipped when every layer was

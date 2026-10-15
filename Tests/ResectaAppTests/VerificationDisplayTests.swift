@@ -353,9 +353,9 @@ struct VerificationDisplayTests {
             layers: [layer(.pass), layer(.pass), layer(.info("a")), layer(.info("b"))],
             overallStatus: .pass, durationSeconds: 1.0)
         #expect(VerificationResultsView.mastheadSubtitle(report: withNotes) == nil)
-        // The count and the notes pointer survive one row down.
+        // The count and the notes survive one row down; a note is not a pass.
         #expect(VerificationResultsView.detailsSummaryText(for: withNotes)
-                == "4 of 4 checks passed · 2\u{00A0}informational notes")
+                == "2 of 4 checks passed · 2\u{00A0}notes")
 
         let info = VerificationReport(
             layers: [layer(.info("i"))], overallStatus: .info("i"), durationSeconds: 0)
@@ -378,23 +378,23 @@ struct VerificationDisplayTests {
         #expect(!(subtitle ?? "").isEmpty)
     }
 
-    @Test("detailsSummaryText: a pass run with INFO layers reads passed + informational-notes suffix")
+    @Test("detailsSummaryText: a pass run with INFO layers counts only the passes and names the notes")
     func detailsSummaryPassWithInfoNotes() {
-        // INFO layers count as passed (no actionable issue) and ride the
-        // informational-notes suffix; an info-only run aggregates .pass, so
-        // this is the stock line for e.g. a run whose only non-pass layer is
-        // the demoted fill-artifact note.
+        // A note is not a pass: INFO layers ride their own "notes" clause;
+        // an info-only run aggregates .pass, so this is the stock line for
+        // e.g. a run whose only non-pass layer is the demoted fill-artifact
+        // note.
         let report = VerificationReport(
             layers: [layer(.pass), layer(.pass), layer(.info("note"))],
             overallStatus: .pass, durationSeconds: 0)
         #expect(VerificationResultsView.detailsSummaryText(for: report)
-                == "3 of 3 checks passed · 1\u{00A0}informational note")
+                == "2 of 3 checks passed · 1\u{00A0}note")
 
         let two = VerificationReport(
             layers: [layer(.pass), layer(.info("a")), layer(.info("b"))],
             overallStatus: .pass, durationSeconds: 0)
         #expect(VerificationResultsView.detailsSummaryText(for: two)
-                == "3 of 3 checks passed · 2\u{00A0}informational notes")
+                == "1 of 3 checks passed · 2\u{00A0}notes")
     }
 
     @Test("detailsSummaryText: an all-pass run carries no suffix")
@@ -409,7 +409,7 @@ struct VerificationDisplayTests {
     @Test("detailsSummaryText: an ATTENTION run reads passed + need-review segments")
     func detailsSummaryAttentionShape() {
         // The residual-tier sample shape: 2 residual layers, 1 warn,
-        // 3 info, 4 pass → passed counts pass+info.
+        // 3 info, 4 pass → passed counts the passes only.
         let report = VerificationReport(
             layers: [layer(.pass), layer(.pass), layer(.pass), layer(.pass),
                      layer(.info("a")), layer(.info("b")), layer(.info("c")),
@@ -417,7 +417,7 @@ struct VerificationDisplayTests {
                      layer(.warn("n"))],
             overallStatus: .attention("r1"), durationSeconds: 0)
         #expect(VerificationResultsView.detailsSummaryText(for: report)
-                == "7 of 10 checks passed · 2\u{00A0}need review · 1\u{00A0}note · 3\u{00A0}informational notes")
+                == "4 of 10 checks passed · 2\u{00A0}need review · 1\u{00A0}warning · 3\u{00A0}notes")
 
         let single = VerificationReport(
             layers: [layer(.pass), layer(.attention("r"))],
@@ -436,57 +436,31 @@ struct VerificationDisplayTests {
         #expect(ResectaTokens.Opacity.tileWashDark == 0.18)
     }
 
-    // The ROW wash (an attention or fail row's tint across the whole row):
-    // light shares the tile's 0.10; dark is its own, lighter value — 0.18
-    // across a whole row reads muddy and greys the teal page chip.
-    @Test("The row wash's dark opacity token is pinned")
-    func rowWashDarkTokenIsPinned() {
-        #expect(ResectaTokens.Opacity.rowWashDark == 0.12)
-    }
+    // MARK: - Status marks
 
-    // MARK: - Badge symbols
-
-    // The ledger's shape badge — a filled circle glyph per status, hung off
-    // the status tile's corner so the status reads by shape, not hue alone.
-    @Test("badgeSymbolName maps each status to its filled-circle badge",
+    // The row's status mark — an outline circle glyph per outcome, so the
+    // status reads by shape and word, not hue alone.
+    @Test("markSymbolName maps each outcome to its outline-circle mark",
           arguments: [
-            (VerificationStatus.pass, "checkmark.circle.fill"),
-            (VerificationStatus.warn("w"), "exclamationmark.circle.fill"),
-            (VerificationStatus.info("i"), "info.circle.fill"),
-            (VerificationStatus.attention("a"), "eye.circle.fill"),
-            (VerificationStatus.fail("f"), "xmark.circle.fill"),
-            (VerificationStatus.skipped, "minus.circle.fill"),
+            (VerificationOutcome.passed, "checkmark.circle"),
+            (VerificationOutcome.nothingToCheck, "minus.circle"),
+            (VerificationOutcome.note, "info.circle"),
+            (VerificationOutcome.warning, "exclamationmark.circle"),
+            (VerificationOutcome.couldNotVerify, "questionmark.circle"),
+            (VerificationOutcome.needsReview, "eye.circle"),
+            (VerificationOutcome.failed, "xmark.circle"),
           ])
-    func badgeSymbolNameForAllCases(status: VerificationStatus, expected: String) {
-        #expect(status.badgeSymbolName == expected)
+    func markSymbolNameForAllOutcomes(outcome: VerificationOutcome, expected: String) {
+        #expect(outcome.markSymbolName == expected)
     }
 
-    // MARK: - Glyph on wash
-
-    // The one deliberate exception to "glyphs stay on the system tier": a
-    // glyph drawn on its own status's tinted wash routes through the text
-    // tier (the system hue on a wash of the same hue measures ≈ 2:1).
-    @Test("glyphOnWash is the status's text-tier shade",
-          arguments: [
-            (VerificationStatus.pass, ResectaTokens.SemanticColor.passText),
-            (VerificationStatus.warn("w"), ResectaTokens.SemanticColor.warnText),
-            (VerificationStatus.info("i"), ResectaTokens.SemanticColor.infoText),
-            (VerificationStatus.attention("a"), ResectaTokens.SemanticColor.attentionText),
-            (VerificationStatus.fail("f"), ResectaTokens.SemanticColor.failText),
-            (VerificationStatus.skipped, Color.secondary),
-          ])
-    func glyphOnWashEqualsTextColorForAllCases(status: VerificationStatus, expected: Color) {
-        #expect(status.glyphOnWash == expected)
-        #expect(status.glyphOnWash == status.textColor)
-    }
-
-    @Test("detailsSummaryText: a WARN run keeps the completed + notes shape")
+    @Test("detailsSummaryText: a WARN run counts the passes and names the warning and the note")
     func detailsSummaryWarnShape() {
         let report = VerificationReport(
             layers: [layer(.pass), layer(.warn("w")), layer(.info("i"))],
             overallStatus: .warn("w"), durationSeconds: 0)
         #expect(VerificationResultsView.detailsSummaryText(for: report)
-                == "3 of 3 checks completed · 1\u{00A0}note · 1\u{00A0}informational note")
+                == "1 of 3 checks passed · 1\u{00A0}warning · 1\u{00A0}note")
     }
 }
 
@@ -567,8 +541,8 @@ struct AttentionRowCompositionTests {
     @Test("Spoken row label speaks the composed attention sentence")
     func spokenLabelUsesComposedText() {
         let layer = attentionLayer(terms: ["DELIA"], pages: [1, 2])
-        let label = LayerResultRow.accessibilityLabel(layerIndex: 3, layer: layer)
-        #expect(label.contains("Check needs review."))
+        let label = LayerResultRow.accessibilityLabel(model: .init(layer: layer, perPageModes: []), layer: layer)
+        #expect(label.contains("Binary String Search, Needs review."))
         #expect(label.contains("'DELIA' is still readable on pages 2 and 3."))
     }
 }
@@ -601,12 +575,12 @@ struct SearchRecheckQueryLineDisplayTests {
             label: "\u{201C}(a+)+b\u{201D}", foundCount: 1, foundHitCap: false,
             appliedCount: 1, remainingCount: 0, route: .mixed(textPages: 0, ocrPages: 0),
             unchecked: true)
-        #expect(LayerResultRow.queryLineText(refused)
+        #expect(LayerResultRow.queryLineText(refused, in: .searchRecheck)
                 == "\u{201C}(a+)+b\u{201D} · found 1 · applied 1 · not re-checked (pattern not accepted)")
         let checked = SearchRecheckQueryLine(
             label: "\u{201C}Delia\u{201D}", foundCount: 2, foundHitCap: false,
             appliedCount: 2, remainingCount: 0, route: .textLayer)
-        #expect(LayerResultRow.queryLineText(checked) == "\u{201C}Delia\u{201D} · found 2 · applied 2 · 0 remain")
+        #expect(LayerResultRow.queryLineText(checked, in: .searchRecheck) == "\u{201C}Delia\u{201D} · found 2 · applied 2 · 0 remain")
     }
 
     @Test("queryLineTexts composes label · found · applied · remain, the badges, the cap, and per-term sub-lines")
@@ -629,13 +603,13 @@ struct SearchRecheckQueryLineDisplayTests {
                 .init(term: "beta", found: 4, applied: 2, remaining: 1),
             ])
 
-        #expect(LayerResultRow.queryLineText(plain) == "\u{201C}Delia\u{201D} · found 9 · applied 9 · 0 remain")
-        #expect(LayerResultRow.queryLineText(badged)
+        #expect(LayerResultRow.queryLineText(plain, in: .searchRecheck) == "\u{201C}Delia\u{201D} · found 9 · applied 9 · 0 remain")
+        #expect(LayerResultRow.queryLineText(badged, in: .searchRecheck)
                 == "\u{201C}Delia\u{201D} · found 3 · applied 2 · 1 remain · case-sensitive · whole word")
-        #expect(LayerResultRow.queryLineText(capped)
+        #expect(LayerResultRow.queryLineText(capped, in: .searchRecheck)
                 == "\u{201C}\\d{3}-\\d{2}-\\d{4}\u{201D} · found 1,000+ · applied 12 · 3 remain")
-        #expect(LayerResultRow.perTermLineTexts(plain).isEmpty)
-        #expect(LayerResultRow.perTermLineTexts(multi)
+        #expect(LayerResultRow.perTermLineTexts(plain, in: .searchRecheck).isEmpty)
+        #expect(LayerResultRow.perTermLineTexts(multi, in: .searchRecheck)
                 == ["\u{201C}alpha\u{201D} · 0 remain", "\u{201C}beta\u{201D} · found 4 · applied 2 · 1 remain"])
 
         let layer = recheckLayer(status: .pass, queryLines: [plain, multi])
@@ -673,8 +647,8 @@ struct SearchRecheckQueryLineDisplayTests {
         #expect(LayerResultRow.rowSubtitleText(layer: layer)
                 == "'Delia' is still readable on page 2. It matches text you redacted elsewhere. "
                 + "Use text search to redact remaining instances.")
-        let spoken = LayerResultRow.accessibilityLabel(layerIndex: 6, layer: layer)
-        #expect(spoken.hasPrefix("Layer 6, Search Re-check, Check needs review. 'Delia' is still readable on page 2."))
+        let spoken = LayerResultRow.accessibilityLabel(model: .init(layer: layer, perPageModes: []), layer: layer)
+        #expect(spoken.hasPrefix("Search Re-check, Needs review. 'Delia' is still readable on page 2."))
         #expect(spoken.contains("1 affected page"))
         // The expanded detail's query line names the counts.
         #expect(LayerResultRow.queryLineTexts(layer: layer) == ["\u{201C}Delia\u{201D} · found 9 · applied 8 · 1 remain"])
@@ -751,15 +725,15 @@ struct SearchRecheckQueryLineDisplayTests {
             unchecked: false)
     }
 
-    @Test("The engine labels a scan line \"Scan (N detectors)\" — the prefix the app's composition keys on")
+    @Test("A scan line is the Detection Sweep's, whatever its label; a re-check query reading \"Scan (\" stays typed")
     func scanLabelPrefix() {
         let two = AppliedSearchQuery(kind: .piiScan(categories: [.ssn, .name]), options: SearchOptions())
         #expect(two.displayLabel == "Scan (2 detectors)")
-        let one = AppliedSearchQuery(kind: .piiScan(categories: [.ssn]), options: SearchOptions())
-        #expect(one.displayLabel == "Scan (1 detector)")
-        #expect(LayerResultRow.isScanLine(scanLine(label: two.displayLabel, found: 3, applied: 3, remaining: 0)))
-        #expect(!LayerResultRow.isScanLine(scanLine(label: "\u{201C}Scan (2 detectors)\u{201D}", found: 1, applied: 1, remaining: 0)),
-                "a typed query that happens to read like a scan label is quoted, so the prefix does not match")
+        let typed = scanLine(label: two.displayLabel, found: 1, applied: 1, remaining: 1, perCategory: [("Scan (", 1)])
+        #expect(LayerResultRow.isScanLine(scanLine(label: "\u{201C}x\u{201D}", found: 3, applied: 3, remaining: 0), in: .detectionSweep))
+        #expect(!LayerResultRow.isScanLine(typed, in: .searchRecheck))
+        #expect(LayerResultRow.perTermLineTexts(typed, in: .searchRecheck) == ["\u{201C}Scan (\u{201D} · 1 remain"],
+                "a re-check query labelled like a scan renders its terms quoted")
     }
 
     @Test("An applied scan's line reads found · applied · remain, with per-category sub-lines unquoted")
@@ -767,8 +741,8 @@ struct SearchRecheckQueryLineDisplayTests {
         let line = scanLine(
             label: "Scan (17 detectors)", found: 23, applied: 20, remaining: 3,
             perCategory: [("Name", 1), ("SSN", 2)])
-        #expect(LayerResultRow.queryLineText(line) == "Scan (17 detectors) · found 23 · applied 20 · 3 remain")
-        #expect(LayerResultRow.perTermLineTexts(line) == ["Name · 1 remain", "SSN · 2 remain"])
+        #expect(LayerResultRow.queryLineText(line, in: .detectionSweep) == "Scan (17 detectors) · found 23 · applied 20 · 3 remain")
+        #expect(LayerResultRow.perTermLineTexts(line, in: .detectionSweep) == ["Name · 1 remain", "SSN · 2 remain"])
     }
 
     @Test("The sweep's line (nothing found, nothing applied) reads what the detectors observed, never \"found 0 · applied 0\"")
@@ -776,18 +750,18 @@ struct SearchRecheckQueryLineDisplayTests {
         let several = scanLine(
             label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 4,
             perCategory: [("Name", 1), ("SSN", 3)])
-        #expect(LayerResultRow.isSweepLine(several))
-        #expect(LayerResultRow.queryLineText(several) == "Scan (17 detectors) · 4 possible items")
-        #expect(LayerResultRow.perTermLineTexts(several) == ["Name · 1 possible item", "SSN · 3 possible items"])
+        #expect(LayerResultRow.isSweepLine(several, in: .detectionSweep))
+        #expect(LayerResultRow.queryLineText(several, in: .detectionSweep) == "Scan (17 detectors) · 4 possible items")
+        #expect(LayerResultRow.perTermLineTexts(several, in: .detectionSweep) == ["Name · 1 possible item", "SSN · 3 possible items"])
         let one = scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 1)
-        #expect(LayerResultRow.queryLineText(one) == "Scan (17 detectors) · 1 possible item")
+        #expect(LayerResultRow.queryLineText(one, in: .detectionSweep) == "Scan (17 detectors) · 1 possible item")
         let clean = scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 0)
-        #expect(LayerResultRow.queryLineText(clean) == "Scan (17 detectors) · nothing further")
-        #expect(LayerResultRow.perTermLineTexts(clean).isEmpty)
+        #expect(LayerResultRow.queryLineText(clean, in: .detectionSweep) == "Scan (17 detectors) · nothing further")
+        #expect(LayerResultRow.perTermLineTexts(clean, in: .detectionSweep).isEmpty)
         // An applied scan that read nothing further is not the sweep shape.
         let appliedClean = scanLine(label: "Scan (2 detectors)", found: 5, applied: 5, remaining: 0)
-        #expect(!LayerResultRow.isSweepLine(appliedClean))
-        #expect(LayerResultRow.queryLineText(appliedClean) == "Scan (2 detectors) · found 5 · applied 5 · 0 remain")
+        #expect(!LayerResultRow.isSweepLine(appliedClean, in: .detectionSweep))
+        #expect(LayerResultRow.queryLineText(appliedClean, in: .detectionSweep) == "Scan (2 detectors) · found 5 · applied 5 · 0 remain")
     }
 
     @Test("A Detection Sweep row exposes its lines in order — the applied scan's, then the sweep's")
@@ -812,10 +786,10 @@ struct SearchRecheckQueryLineDisplayTests {
     @Test("The sweep line vocabulary stays mechanism-only")
     func sweepLineVocabulary() {
         let samples = [
-            LayerResultRow.queryLineText(scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 4)),
-            LayerResultRow.queryLineText(scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 0)),
+            LayerResultRow.queryLineText(scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 4), in: .detectionSweep),
+            LayerResultRow.queryLineText(scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 0), in: .detectionSweep),
         ] + LayerResultRow.perTermLineTexts(
-            scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 2, perCategory: [("SSN", 2)]))
+            scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 2, perCategory: [("SSN", 2)]), in: .detectionSweep)
         for sample in samples {
             for banned in LegalPhrases.bannedTerms {
                 #expect(!sample.lowercased().contains(banned.lowercased()), "'\(banned)' in: \(sample)")
@@ -885,14 +859,17 @@ struct DetectionSweepRowCaptionTests {
     func spokenLabelCarriesTheGate() {
         let gate = "Names and addresses are not swept."
         for status in [VerificationStatus.pass, .info("i")] {
-            let spoken = LayerResultRow.accessibilityLabel(layerIndex: 7, layer: row(.detectionSweep, status: status))
-            #expect(spoken.contains(gate), "\(status): \(spoken)")
-            #expect(spoken.contains("short line"), "the layer's own line stays: \(spoken)")
+            let sweep = row(.detectionSweep, status: status), model = VerificationRowModel(layer: sweep, perPageModes: [])
+            #expect(spoken(sweep).contains(gate), "\(status): \(spoken(sweep))")
+            #expect(spoken(sweep).hasPrefix(model.spokenLabel), "the row's own caption stays: \(spoken(sweep))")
         }
         for layer in [VerificationLayer.searchRecheck, .textExtraction] {
-            let spoken = LayerResultRow.accessibilityLabel(layerIndex: 6, layer: row(layer))
-            #expect(!spoken.contains(gate), "\(layer): \(spoken)")
+            #expect(!spoken(row(layer)).contains(gate), "\(layer): \(spoken(row(layer)))")
         }
+    }
+
+    private func spoken(_ layer: LayerResult) -> String {
+        LayerResultRow.accessibilityLabel(model: .init(layer: layer, perPageModes: []), layer: layer)
     }
 
     private func loadRepoFile(

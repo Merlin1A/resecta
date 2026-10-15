@@ -263,7 +263,7 @@ struct SearchRecheckPipelineTests {
 
     // MARK: - INFO
 
-    @Test("Zero applied searches → the re-check is an informational note counted as passed")
+    @Test("Zero applied searches → the re-check is an info row that had nothing to check")
     func zeroSearchesIsInfo() async throws {
         let h = try await makeHarness(
             outputPageTexts: ["Account holder page one", "Balance for page two"],
@@ -283,18 +283,16 @@ struct SearchRecheckPipelineTests {
         #expect(LayerResultRow.queryLineTexts(layer: last).isEmpty)
         #expect(!report.layers.contains { $0.status.isSkipped }, ".info never .skipped")
 
-        // The Details summary counts INFO rows as passed and names them.
+        // The Details summary counts only the passes and names the idle
+        // re-check as a check that had nothing to check.
         let summary = VerificationResultsView.detailsSummaryText(for: report)
         let total = report.layers.count
-        let passed = report.layers.filter { $0.status == .pass || $0.status.isInfo }.count
+        let passed = report.layers.filter { $0.status == .pass }.count
         let infoCount = report.layers.filter(\.status.isInfo).count
         #expect(infoCount >= 1)
-        #expect(summary.contains("\(infoCount)\u{00A0}informational note"))
-        if report.overallStatus.isWarn {
-            #expect(summary.hasPrefix("\(total) of \(total) checks completed"))
-        } else {
-            #expect(summary.hasPrefix("\(passed) of \(total) checks passed"))
-        }
+        #expect(VerificationRowModel(layer: last, perPageModes: report.perPageModes).outcome == .nothingToCheck)
+        #expect(summary.contains("\u{00A0}had nothing to check"), "\(summary)")
+        #expect(summary.hasPrefix("\(passed) of \(total) checks passed"), "\(summary)")
     }
 
     // MARK: - Resume path

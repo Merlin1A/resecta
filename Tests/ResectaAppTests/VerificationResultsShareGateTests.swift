@@ -598,10 +598,10 @@ struct ShareRiskConfirmSheetTests {
             == DocumentEditorView.couldNotVerifyItemLines(report: warnReport))
         #expect(ShareRiskConfirmKind.incompleteWarn(warnReport).itemLines
             == ["OCR could not be run on 2 pages"])
-        // The masthead sentence the arm keeps above the list is the WARN
-        // count line, never the skip sentence, when real WARN layers exist.
+        // The masthead sentence the arm keeps above the list names the
+        // list's own clauses, never the skip sentence, when WARN layers exist.
         #expect(VerificationResultsView.mastheadSubtitle(report: warnReport)
-            == "Verification completed with 2 notes. Review below before sharing.")
+            == "Verification completed with 1\u{00A0}could not verify · 1\u{00A0}warning. Review below before sharing.")
 
         let allSkipped = VerificationReport(
             layers: [layer(.skipped, shortDescription: "s"), layer(.skipped, shortDescription: "s")],
@@ -832,17 +832,17 @@ struct IncompleteWarnShareGateTests {
             report: incompleteWarnReport(), acknowledged: true) == false)
     }
 
-    @Test("A WARN mixing a routine WARN note with a skipped layer does NOT need this confirm")
-    func mixedRoutineWarnAndSkipDoesNotConfirm() {
-        // The masthead's skip-sentence branch requires warnCount == 0 and
-        // the routine note is not a could-not-verify condition; the shape
-        // stays confirm-free like any other routine WARN.
+    @Test("A WARN mixing a routine WARN note with a skipped layer needs this confirm")
+    func mixedRoutineWarnAndSkipConfirms() {
+        // A skipped layer is a check that did not run on the output; a
+        // routine note beside it does not make the run complete, so the
+        // shape asks before sharing like the skip-only degrade.
         let mixed = VerificationReport(
             layers: [routineWarnLayer(), layer(.skipped)],
             overallStatus: .warn("w"), durationSeconds: 0
         )
         #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
-            report: mixed, acknowledged: false) == false)
+            report: mixed, acknowledged: false) == true)
     }
 
     @Test("A routine WARN note with no skipped layers does not need this confirm")
