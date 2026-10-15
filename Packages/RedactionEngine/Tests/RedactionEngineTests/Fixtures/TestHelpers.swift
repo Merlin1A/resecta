@@ -241,6 +241,19 @@ enum TestPipeline {
         fillColor: FillColor = .black,
         dpi: Int = 150
     ) async throws -> URL {
+        try await productionRun(
+            fixtureData, mode: mode, regions: regions, fillColor: fillColor, dpi: dpi).url
+    }
+
+    /// The run behind `processAndExport`: the output URL and the production
+    /// loop's outcome (its per-page filter digests and modes).
+    static func productionRun(
+        _ fixtureData: Data,
+        mode: PipelineMode,
+        regions: [Int: [RedactionRegion]]?,
+        fillColor: FillColor = .black,
+        dpi: Int = 150
+    ) async throws -> (url: URL, outcome: ProductionPageLoop.RedactionOutcome) {
         guard let doc = PDFDocument(data: fixtureData) else {
             throw TestPipelineError.invalidFixture
         }
@@ -278,92 +291,24 @@ enum TestPipeline {
 
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("test_pipeline_\(UUID().uuidString).pdf")
-        _ = try await ProductionPageLoop.runRedaction(
+        let outcome = try await ProductionPageLoop.runRedaction(
             pages: pages, outputURL: outputURL, dpiCap: dpi)
-        return outputURL
+        return (outputURL, outcome)
     }
 
-    /// Compute the per-page `PageFilterDigest` array for a fixture under the
-    /// SAME extraction + filtering `processAndExport` performs in
-    /// `.searchableRedaction` mode. Filtering is deterministic, so the digests
-    /// returned here match the exported invisible text layer whenever this is
-    /// called with the same `regions` as the `processAndExport` run.
-    ///
-    /// `processAndExport` returns only the output URL and discards the filter
-    /// digests; Layers 7 (Character Count) and 9 (Character Lineage) require
-    /// the per-page `PageFilterDigest`, so the measurement harness surfaces
-    /// them here via `FilterResult.toDigest(pageIndex:redactionRects:safetyMargin:)`.
-    /// Test-only and purely additive — the production helper is unchanged.
+    /// The per-page `PageFilterDigest` array the production page loop
+    /// reports for a fixture in `.searchableRedaction` mode with these
+    /// `regions` (nil = the default strip, as in `processAndExport`): the
+    /// digests behind the text layer `processAndExport` writes for the same
+    /// call, nil for a page written without a text layer. Layers 7
+    /// (Character Count) and 9 (Character Lineage) read them.
     static func searchableDigests(
         _ fixtureData: Data,
         regions: [Int: [RedactionRegion]]? = nil
     ) async throws -> [PageFilterDigest?] {
-        guard let doc = PDFDocument(data: fixtureData) else {
-            throw TestPipelineError.invalidFixture
-        }
-        let pageCount = doc.pageCount
-        var digests: [PageFilterDigest?] = Array(repeating: nil, count: pageCount)
-        let extractor = TextLayerExtractor()
-        for pageIndex in 0..<pageCount {
-            guard let page = doc.page(at: pageIndex) else { continue }
-            // Mirror processAndExport's region defaulting exactly so a nil
-            // `regions` argument produces digests consistent with that helper.
-            let pageRegions: [RedactionRegion]
-            if let regions {
-                pageRegions = regions[pageIndex] ?? []
-            } else {
-                pageRegions = [
-                    RedactionRegion(
-                        id: UUID(),
-                        normalizedRect: CGRect(x: 0.1, y: 0.8, width: 0.8, height: 0.05),
-                        source: .manual
-                    )
-                ]
-            }
-            guard let characters = try? await extractor.extractCharacters(from: page),
-                  !characters.isEmpty else { continue }
-            // Zero-origin DISPLAYED region basis, mirroring
-            // processAndExport and production PageRasterizer (see above).
-            let regionBasis = CGRect(
-                origin: .zero,
-                size: effectiveBounds(page.bounds(for: .cropBox), rotation: page.rotation).size
-            )
-            let redactionRectsInPoints = pageRegions.map {
-                normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: regionBasis)
-            }
-            let filterResult = try await filterCharacters(
-                characters: characters,
-                redactionRects: redactionRectsInPoints
-            )
-            // The writer-side drawn-cell rule, as production runs it — in
-            // the page's source frame, which the digest records for Layer 9.
-            let frame = PageFrame(rotation: page.rotation, displayedSize: regionBasis.size)
-            let validated = TextLayerReconstructor.validateSurvivors(
-                filterResult,
-                regionShapes: TestPipeline.rectShapes(redactionRectsInPoints),
-                frame: frame
-            )
-            // An unsettled set gives the page no text layer and no digest.
-            guard validated.settled else { continue }
-            digests[pageIndex] = validated.result.toDigest(
-                pageIndex: pageIndex,
-                redactionRects: redactionRectsInPoints,
-                safetyMargin: safetyMarginPoints,
-                drawnCellRuleExcludedCount: validated.dropped,
-                frame: frame
-            )
-        }
-        return digests
-    }
-
-    /// Rect regions as the engine's `RegionShape` (un-expanded `bounds`, the
-    /// safety-margin halo in `expandedBounds`), mirroring `PageRasterizer`.
-    static func rectShapes(_ rects: [CGRect]) -> [RegionShape] {
-        rects.map {
-            RegionShape(
-                expandedBounds: $0.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-                polygonVertices: nil, bounds: $0)
-        }
+        let run = try await productionRun(fixtureData, mode: .searchableRedaction, regions: regions)
+        try? FileManager.default.removeItem(at: run.url)
+        return run.outcome.filterDigests
     }
 }
 
