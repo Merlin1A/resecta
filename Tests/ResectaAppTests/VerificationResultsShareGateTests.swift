@@ -832,17 +832,17 @@ struct IncompleteWarnShareGateTests {
             report: incompleteWarnReport(), acknowledged: true) == false)
     }
 
-    @Test("A WARN mixing a routine WARN note with a skipped layer does NOT need this confirm")
-    func mixedRoutineWarnAndSkipDoesNotConfirm() {
-        // The masthead's skip-sentence branch requires warnCount == 0 and
-        // the routine note is not a could-not-verify condition; the shape
-        // stays confirm-free like any other routine WARN.
+    @Test("A WARN mixing a routine WARN note with a skipped layer needs this confirm")
+    func mixedRoutineWarnAndSkipConfirms() {
+        // A skipped layer is a check that did not run on the output; a
+        // routine note beside it does not make the run complete, so the
+        // shape asks before sharing like the skip-only degrade.
         let mixed = VerificationReport(
             layers: [routineWarnLayer(), layer(.skipped)],
             overallStatus: .warn("w"), durationSeconds: 0
         )
         #expect(DocumentEditorView.shareNeedsIncompleteWarnConfirm(
-            report: mixed, acknowledged: false) == false)
+            report: mixed, acknowledged: false) == true)
     }
 
     @Test("A routine WARN note with no skipped layers does not need this confirm")
