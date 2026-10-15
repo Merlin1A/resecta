@@ -91,6 +91,62 @@ struct VerificationOrchestratorTests {
         }
     }
 
+    @Test("Searchable mode: the four-layer batch starts once and publishes in canonical order, Operator Re-Extraction last; then each sequential layer starts and finishes in order")
+    func searchableEventsFollowTheSchedule() async throws {
+        let (doc, url) = try await makeGrayOutput(pages: 2)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let modes: [PipelineMode] = [.searchableRedaction, .searchableRedaction]
+        var events: [VerificationRunEvent] = []
+        let report = try await VerificationOrchestrator().run(
+            outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: 2,
+            regions: [:],
+            sensitiveTerms: [],
+            pipelineMode: .searchableRedaction,
+            filterDigests: [nil, nil],
+            perPageModes: modes,
+            perPageFallbackReasons: [nil, nil],
+            appliedSearches: [],
+            provisionLayerDocuments: { layers in
+                var docs: [VerificationLayer: SendablePDFDocument] = [:]
+                for layer in layers {
+                    guard let d = PDFDocument(url: url) else { return nil }
+                    docs[layer] = SendablePDFDocument(d)
+                }
+                return docs
+            },
+            events: { events.append($0) }
+        )
+
+        let layers = VerificationEngine().layers(for: .searchableRedaction)
+        #expect(layers.count == 12)
+        #expect(report.layers.map(\.name) == layers.map(\.name),
+                "the report lists every layer in canonical order")
+        #expect(events.map(shape) == [
+            "S1/12 textExtraction after:0",
+            "F1 textExtraction", "F2 ocrCheck", "F3 binaryStringSearch", "F10 operatorReExtraction",
+            "S4/12 structureCheck after:4", "F4 structureCheck",
+            "S5/12 metadataCheck after:5", "F5 metadataCheck",
+            "S6/12 spatialVerification after:6", "F6 spatialVerification",
+            "S7/12 characterCount after:7", "F7 characterCount",
+            "S8/12 fontVerification after:8", "F8 fontVerification",
+            "S9/12 characterLineage after:9", "F9 characterLineage",
+            "S11/12 searchRecheck after:10", "F11 searchRecheck",
+            "S12/12 detectionSweep after:11", "F12 detectionSweep",
+        ], "the batch publishes in canonical order, then the catalog readers, the sandwich checks and the post batch each start and finish in order")
+        // The results a `.layerStarted` carries are exactly the ones
+        // published before it, in publication order.
+        var published: [String] = []
+        for event in events {
+            switch event {
+            case .layerStarted(_, _, _, let completed):
+                #expect(completed.map(\.name) == published)
+            case .layerFinished(_, _, let result):
+                published.append(result.name)
+            }
+        }
+    }
+
     @Test("Page-count mismatch: one FAIL layer, an overall FAIL, and no layer events")
     func pageCountGateShortCircuits() async throws {
         let (doc, url) = try await makeGrayOutput(pages: 2)
