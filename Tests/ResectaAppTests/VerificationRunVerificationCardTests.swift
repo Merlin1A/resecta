@@ -63,7 +63,7 @@ struct VerificationRunVerificationCardTests {
                 == "Completed with 2 of 3 checks skipped — results may be incomplete.")
     }
 
-    @Test("Warn-layer WARN masthead is unchanged")
+    @Test("Warn-layer WARN masthead names the warning in the list's words")
     func mastheadWarnLayerWarn() {
         let report = VerificationReport(
             layers: [
@@ -74,13 +74,13 @@ struct VerificationRunVerificationCardTests {
             durationSeconds: 0.5
         )
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Verification completed with 1 note. Review below before sharing.")
+                == "Verification completed with 1\u{00A0}warning. Review below before sharing.")
     }
 
-    @Test("WARN with both warn and skipped layers keeps the note-count copy")
+    @Test("WARN with both warn and skipped layers names the skip as could not verify")
     func mastheadWarnWithSkips() {
         // A real WARN layer takes precedence — the skip arm applies only
-        // when NO row backs up a note count.
+        // when NO row backs up a warning; the skip reads as could not verify.
         let report = VerificationReport(
             layers: [
                 makeLayer(name: "Check A", status: .warn("noise")),
@@ -90,7 +90,7 @@ struct VerificationRunVerificationCardTests {
             durationSeconds: 0.5
         )
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Verification completed with 1 note. Review below before sharing.")
+                == "Verification completed with 1\u{00A0}could not verify · 1\u{00A0}warning. Review below before sharing.")
     }
 
     // MARK: - RedactionState retention lifecycle

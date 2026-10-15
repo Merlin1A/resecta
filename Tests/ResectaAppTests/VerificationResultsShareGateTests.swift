@@ -598,10 +598,10 @@ struct ShareRiskConfirmSheetTests {
             == DocumentEditorView.couldNotVerifyItemLines(report: warnReport))
         #expect(ShareRiskConfirmKind.incompleteWarn(warnReport).itemLines
             == ["OCR could not be run on 2 pages"])
-        // The masthead sentence the arm keeps above the list is the WARN
-        // count line, never the skip sentence, when real WARN layers exist.
+        // The masthead sentence the arm keeps above the list names the
+        // list's own clauses, never the skip sentence, when WARN layers exist.
         #expect(VerificationResultsView.mastheadSubtitle(report: warnReport)
-            == "Verification completed with 2 notes. Review below before sharing.")
+            == "Verification completed with 1\u{00A0}could not verify · 1\u{00A0}warning. Review below before sharing.")
 
         let allSkipped = VerificationReport(
             layers: [layer(.skipped, shortDescription: "s"), layer(.skipped, shortDescription: "s")],
