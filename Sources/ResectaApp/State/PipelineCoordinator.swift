@@ -1,23 +1,7 @@
 import Foundation
 import PDFKit
 import UIKit
-import Vision
-import os
 import RedactionEngine
-
-/// Signpost emission for the detection-pipeline depth-2
-/// lookahead. The rasterize-for-detection and detect-page intervals are
-/// emitted to this category so they can be sampled in Instruments
-/// without re-instrumenting every release. Cheap when idle.
-// nonisolated: file-level OSSignposter (Sendable, immutable) read from both the
-// MainActor detection-pipeline closures and the `nonisolated renderPageForDetection`
-// rasterize path. Under the SE-0466 MainActor-default flip an unannotated global
-// `let` becomes MainActor-isolated, which the nonisolated callers cannot touch; pin
-// it nonisolated to restore the pre-flip cross-isolation access (signposting is
-// thread-safe).
-nonisolated let detectionRasterizeSignposter = OSSignposter(
-    subsystem: "com.resecta.app", category: "DetectionRasterize"
-)
 
 /// Orchestrates the redaction pipeline. MainActor by SE-0466 default.
 /// Does NOT hold progress or status state — all UI-facing state lives
@@ -128,9 +112,9 @@ final class PipelineCoordinator: @unchecked Sendable {
     }
 
     /// Snapshot of pipeline-affecting settings, captured once
-    /// at `runFullPipeline` / `runDetectionPipeline` entry. Subsequent
+    /// at `runFullPipeline` entry. Subsequent
     /// mid-run reads route through the snapshot so a settings toggle
-    /// during `.detecting / .redacting / .verifying` cannot divert
+    /// during `.redacting / .verifying` cannot divert
     /// kickoff-time behavior from run-time behavior. Mirrors the
     /// existing `effectiveMode` snapshot pattern (see `runFullPipeline`).
     /// Pairs with the SettingsView in-progress banner that
@@ -146,8 +130,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         /// immutable snapshot. Callers are expected to be on MainActor
         /// (or otherwise serialized w.r.t. SettingsState mutation) — the
         /// PipelineCoordinator only invokes this from MainActor entry
-        /// points (`runFullPipeline`, `runDetectionPipeline`,
-        /// `buildPDFPageData`, `buildOCRSkipHint`). No explicit
+        /// points (`runFullPipeline`, `buildPDFPageData`). No explicit
         /// isolation annotation: matches the surrounding nonisolated
         /// method context the `@Observable @unchecked Sendable`
         /// coordinator already uses for synchronous `settingsState`
@@ -340,7 +323,7 @@ final class PipelineCoordinator: @unchecked Sendable {
     }
 
     /// The state change a run's early end drives — the transitions the
-    /// three scaffolds' recovery handlers made, one case per shape.
+    /// two scaffolds' recovery handlers made, one case per shape.
     enum PipelineRunRecovery {
         /// Nothing to drive (a superseded run, or a phase already settled
         /// by `cancelActivePipeline()`).
@@ -352,8 +335,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         /// `.failed(error:returnPhase:)`, optionally discarding the
         /// registered output first.
         case failed(PipelineError, returnPhase: DocumentState.ReturnPhase, clearOutput: Bool)
-        /// `degradeDetectionToEditing()`.
-        case degradeDetection
     }
 
     /// The recovery table: today's transitions per kind and end, exactly.
@@ -373,8 +354,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         case (.verifyOnly, .cancelled):
             return phaseKind != .editing && phaseKind != .verified
                 ? .verifiedSkippedCancelled : .none
-        case (.detection, .cancelled):
-            return phaseKind != .editing ? .returnToEditing(clearOutput: false) : .none
         case (.full, .failed(let error, let stage)):
             // Classify by the FAILING STAGE, not by outputURL presence.
             // A redaction/import-stage error means the output was never
@@ -402,16 +381,10 @@ final class PipelineCoordinator: @unchecked Sendable {
                     ?? .verificationError(.engineCrash(layerIndex: 0)),
                 returnPhase: .verified(report: .skipped(reason: .error)),
                 clearOutput: false)
-        case (.detection, .failed):
-            // Graceful degradation: a detection/render error (notably the
-            // page-0 rasterize failing on a platform that can't service
-            // Vision/Core Graphics, e.g. the Simulator) returns to a safe
-            // `.editing` state with a mechanism-description toast.
-            return .degradeDetection
         }
     }
 
-    /// The one launch path behind the three entry points: mint the run
+    /// The one launch path behind the two entry points: mint the run
     /// token, create the run `Task` from the MainActor, hand the run to
     /// `PipelineRunner` with this coordinator as its event sink, and drive
     /// the recovery table when the run ends early.
@@ -499,8 +472,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         case .failed(let error, let returnPhase, let clearOutput):
             if clearOutput { redactionState.clearOutput() }
             documentState.transition(to: .failed(error: error, returnPhase: returnPhase))
-        case .degradeDetection:
-            degradeDetectionToEditing()
         }
     }
 
@@ -547,50 +518,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         case .verified(let report, let burnedRegionVersion):
             documentState.transition(to: .verified(report: report))
             redactionState.markVerificationCurrent(burnedRegionVersion: burnedRegionVersion)
-        case .gazetteerDiagnostics(let diagnostics):
-            surfaceGazetteerLoadDiagnostics(diagnostics)
-        case .detectionBootstrapFailed:
-            degradeDetectionToEditing()
-        case .detectionFinished(let detection):
-            // Write to state only after all pages succeed
-            redactionState.detectionResults = detection.results
-            redactionState.pageDiagnostics = detection.diagnostics
-            redactionState.ocrPixelCapSkippedPages = detection.ocrPixelCapSkippedPages
-            redactionState.ambiguousSurnameDetectionIDs = detection.ambiguousSurnameDetectionIDs
-            redactionState.crossPageEntityGroups = detection.crossPageEntityGroups
-            let allResults = detection.results
-
-            if allResults.values.allSatisfy({ $0.isEmpty }) {
-                // No detections — transition to editing. The run record
-                // drives the persistent summary banner: the
-                // prior info toast was the only trace and expired in
-                // seconds, leaving no way to tell "ran and found
-                // nothing" from "never ran".
-                documentState.transition(to: .editing)
-                redactionState.recordDetectionRun(
-                    .nothingFound(pageCount: documentState.pageCount),
-                    ocrSkippedPages: redactionState.ocrPixelCapSkippedPages)
-                return
-            }
-
-            // Stage for triage review — every detection run is
-            // reviewed; the auto-apply branch retired with its
-            // Settings toggle (no region is created without an
-            // explicit user selection).
-            redactionState.pendingTriage = allResults
-
-            // Review-first arrival: detections arrive with NOTHING
-            // selected — the machine proposes, only the user
-            // selects. An empty map is the whole contract now: the
-            // one apply path reads an absent id as not accepted, so
-            // staging just clears any stale entries.
-            redactionState.triageSelections = [:]
-
-            documentState.transition(to: .editing)
-            redactionState.recordDetectionRun(
-                .staged,
-                ocrSkippedPages: redactionState.ocrPixelCapSkippedPages)
-            // Triage sheet appears automatically via .sheet binding on pendingTriage
         }
     }
 
@@ -671,172 +598,9 @@ final class PipelineCoordinator: @unchecked Sendable {
             )
     }
 
-    // MARK: - Detection Pipeline
-
-    /// Run PII and face detection across all pages.
-    /// Adds DetectionOrchestrator and triage support.
-    func runDetectionPipeline(recognitionLevel: VNRequestTextRecognitionLevel = .fast) {
-        guard documentState.activePipelineTask == nil else { return }
-        guard redactionState.pendingTriage == nil else { return }  // Block while triaging
-
-        // Record the recognition level so an editing-phase
-        // background-resume banner can re-run detection at the SAME level the
-        // user originally chose (fallback .accurate when nil at resume time).
-        documentState.lastUsedRecognitionLevel = recognitionLevel
-
-        // Snapshot pipeline-affecting settings once at run entry.
-        // With the auto-apply branch retired (every detection run now
-        // stages for triage review unconditionally), the detection
-        // path's only remaining snapshot reader is `buildOCRSkipHint`
-        // (pipelineMode). Mirrors `effectiveMode`.
-        let runSettings = RunSettings.snapshot(from: settingsState)
-
-        launch(.detection(recognitionLevel: recognitionLevel, runSettings: runSettings))
-    }
-
-    /// Graceful degradation for the detection pipeline. Returns to a safe
-    /// `.editing` state and surfaces a mechanism-description toast. Detection
-    /// is an optional enhancement: on a render/detection error — notably the
-    /// page-0 rasterize failing on a platform that cannot service Vision/Core
-    /// Graphics (e.g. the Simulator) — the source document is intact, so we
-    /// degrade (the user can retry or draw redactions manually) rather than
-    /// perform an illegal `editing → failed` transition. The transition table
-    /// has no `editing → failed` pair, and none is added.
-    /// The `!= .editing` guard keeps the transition legal
-    /// when the failure happened mid-detection (`.detecting → .editing`) and is
-    /// a no-op when the page-0 bootstrap failed before the per-page loop
-    /// entered `.detecting` (phase still `.editing`). Mirrors the
-    /// CancellationError handler's recovery guard and the "No items detected"
-    /// success path — both end in `.editing`.
-    func degradeDetectionToEditing() {
-        if documentState.phaseKind != .editing {
-            documentState.transition(to: .editing)
-        }
-        // The failed outcome also lands in the run record so the
-        // summary banner keeps a dismissable trace after this toast expires.
-        // ocrSkippedPages stays at its default empty set here: a
-        // run that did not complete never reached the write at line 1842,
-        // so `ocrPixelCapSkippedPages` on state may still hold a prior
-        // run's pages, and this outcome must not carry that value forward.
-        redactionState.recordDetectionRun(.failed)
-        enqueueToast(
-            "Couldn't scan this document. Manual redaction tools remain available.",
-            severity: .warning)
-    }
-
-    /// Phase label for the page render in the detection pipeline.
-    /// Used by `renderPageForDetection` to stamp `os_signpost` intervals so
-    /// the depth-2 lookahead overlap is observable in Instruments.
-    ///
-    /// - `.rasterizePreflight`: the bootstrap render at iteration entry
-    ///   (page 0). Runs alone — there is no concurrent detect to overlap
-    ///   with — so this interval is intentionally NOT counted toward the
-    ///   overlap-rate metric in the acceptance test.
-    /// - `.rasterizeLookahead`: a depth-2 lookahead render dispatched
-    ///   concurrently with `orchestrator.detectPage` for the previous
-    ///   iteration's page. These intervals form the numerator of the
-    ///   overlap-rate metric.
-    enum DetectionRasterizePhase: String, Sendable {
-        case rasterizePreflight
-        case rasterizeLookahead
-    }
-
-    /// Render a PDF page to CGImage at 150 DPI for detection.
-    /// 150 DPI is sufficient for OCR and saves memory vs. the 300 DPI export
-    /// resolution.
-    ///
-    /// Emits an `os_signpost` interval around the synchronous
-    /// rasterize work so the depth-2 lookahead overlap is observable
-    /// in Instruments.
-    /// nonisolated(unsafe): PDFPage is not Sendable but is accessed
-    /// single-threaded *per call* — the depth-2 lookahead dispatches
-    /// `renderPageForDetection` on at most 2 *different* pages in flight,
-    /// never the same page twice (same safety model as processDocument).
-    nonisolated func renderPageForDetection(
-        _ page: PDFPage, pageIndex: Int,
-        phase: DetectionRasterizePhase = .rasterizePreflight,
-        doctype: DoctypeClass? = nil
-    ) async throws -> CGImage {
-        // Memory budget check mirrors the main pipeline's selectDPI()
-        // memory check; detection was missing this guard.
-        let rawBounds = page.bounds(for: .cropBox)
-        let effectiveSize = effectiveBounds(rawBounds, rotation: page.rotation).size
-
-        // DPI selection + the
-        // 4096-px photo-PDF cap live in the engine's DetectionRenderPolicy
-        // (financial → 200 DPI, everything else 150; one source of truth
-        // shared with the measurement harness). `doctype` is the window
-        // seed available at render time — the previous page's recorded
-        // classification, nil for bootstrap/unseeded pages.
-        let detectionDPI = DetectionRenderPolicy.cappedDetectionDPI(
-            for: doctype, effectiveSize: effectiveSize
-        )
-
-        let scale = detectionDPI / 72.0
-        let bytesNeeded = Int(ceil(effectiveSize.width * scale))
-                        * Int(ceil(effectiveSize.height * scale)) * 4
-        let available = os_proc_available_memory()
-        // Memory pre-flight is summed across the lookahead (up
-        // to 2 in-flight pages) by passing a 3× factor: current page's
-        // detect-resident CGImage + concurrent lookahead's render +
-        // selectDPI's 2× allocator headroom for the render context.
-        // Conservative — pages are usually identically sized so the
-        // budget rarely shrinks against a single-page estimate.
-        guard bytesNeeded * 3 < Int(available) - 150_000_000 else {
-            throw PipelineError.detectionError(.visionError(pageIndex: pageIndex))
-        }
-
-        // nonisolated(unsafe): rebind `page` for the engine call below.
-        // Single-threaded per call — the depth-2 lookahead has at most two
-        // DIFFERENT pages in flight, never the same page twice (see this
-        // method's doc comment).
-        nonisolated(unsafe) let unsafePage = page
-
-        // Signpost interval around the synchronous rasterize call.
-        // `OSSignposter` emits to the configured subsystem when Instruments
-        // is attached; cheap when idle.
-        let signpostID = detectionRasterizeSignposter.makeSignpostID()
-        let signpostState = detectionRasterizeSignposter.beginInterval(
-            "renderPageForDetection", id: signpostID,
-            "page=\(pageIndex) phase=\(phase.rawValue) dpi=\(Int(detectionDPI))"
-        )
-        defer {
-            detectionRasterizeSignposter.endInterval(
-                "renderPageForDetection", signpostState
-            )
-        }
-
-        return try await PageRasterizer().renderPage(
-            unsafePage, pageIndex: pageIndex, dpi: detectionDPI)
-    }
-
-    // MARK: - Degraded-mode surface
-
-    /// Inspect a `GazetteerLoadDiagnostics` produced by
-    /// `PIIDetector.loadWithDiagnostics(...)`. On the first qualifying
-    /// failure of the session, post a warning toast (mechanism-description
-    /// copy) and flip `RedactionState.autoDetectionDegraded = true`.
-    /// Subsequent runs that re-discover the same failure are silent — the
-    /// persistent banner on the search sheet's Scan interface already
-    /// communicates the state.
-    func surfaceGazetteerLoadDiagnostics(_ diagnostics: GazetteerLoadDiagnostics) {
-        guard diagnostics.didDegrade else { return }
-        // Only toast once per session — `autoDetectionDegraded` doubles as
-        // the "first-failure already announced" gate.
-        guard !redactionState.autoDetectionDegraded else { return }
-        redactionState.autoDetectionDegraded = true
-        redactionState.autoDetectionDegradeFailures = diagnostics.failedGazetteers
-        enqueueToast(
-            DetectionDegradeCopy.toast(
-                failedGazetteers: diagnostics.failedGazetteers),
-            severity: .warning
-        )
-    }
-
     /// Enqueue a toast notification. Statically MainActor-isolated: the
     /// coordinator is MainActor by the SE-0466 default, so every caller
-    /// already runs on the MainActor — the detection pipeline's degrade and
-    /// diagnostics paths hop through `MainActor.run` before they call in.
+    /// already runs on the MainActor.
     /// `ToastQueueManager.enqueue` drives `withAnimation`, a UIKit feedback
     /// generator and a UIAccessibility post, all of which need the main
     /// thread; the isolation proves that at compile time, where a runtime

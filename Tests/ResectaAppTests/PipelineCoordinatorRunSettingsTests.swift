@@ -6,19 +6,18 @@ import Foundation
 // Settings snapshot at run entry.
 //
 // `RunSettings` captures pipeline-affecting settings once at the top of
-// `runFullPipeline` / `runDetectionPipeline`, mirroring the existing
+// `runFullPipeline`, mirroring the existing
 // `effectiveMode` snapshot pattern. Mid-run reads of
 // `autoVerify`, `paranoidMode`, `pipelineMode`, `fillColor`, and
 // `exportDPI` route through the snapshot — a user toggling SettingsView
-// during `.detecting / .redacting / .verifying` cannot divert kickoff-
+// during `.redacting / .verifying` cannot divert kickoff-
 // time behavior from run-time behavior.
 //
 // These tests pin the snapshot value itself (independence from the live
 // SettingsState after capture). The end-to-end "mid-run toggle does not
 // affect the run" contract is enforced structurally by the runSettings
-// threading in `runFullPipeline` and `runDetectionPipeline`; the live
-// pipeline path is exercised by `FullPipelineFlowTests` /
-// `DetectionPipelineTests` which already round-trip the run-entry
+// threading in `runFullPipeline`; the live pipeline path is exercised by
+// `FullPipelineFlowTests`, which already round-trips the run-entry
 // snapshot.
 
 @Suite("PipelineCoordinator.RunSettings")
@@ -176,80 +175,5 @@ struct PipelineCoordinatorRunSettingsTests {
         let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
         #expect(pages.first?.fillColor == .white)
         #expect(pages.first?.targetDPI == 200)
-    }
-
-    // MARK: - buildOCRSkipHint honors runSettings override
-
-    @Test("buildOCRSkipHint routes pipelineMode through the runSettings snapshot")
-    func buildOCRSkipHintHonorsSnapshot() {
-        let (defaults, suiteName) = makeScratchDefaults()
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let coord = makeCoordinator(settingsState: SettingsState(defaults: defaults))
-        coord.documentState.sourceDocument = makeTestPDFDocument()
-        // Mark page 0 as rich so non-mode gates pass.
-        coord.documentState.textLayerStatus[0] = .rich
-
-        // Live settings would allow OCR skip; snapshot forces .secureRasterization,
-        // which unconditionally blocks OCR skip — buildOCRSkipHint must return nil.
-        coord.settingsState.pipelineMode = .searchableRedaction
-
-        let snapshot = PipelineCoordinator.RunSettings(
-            pipelineMode: .secureRasterization,
-            autoVerify: true,
-            paranoidMode: false,
-            fillColor: .black,
-            exportDPI: 300
-        )
-
-        guard let doc = coord.documentState.sourceDocument,
-              let page = doc.page(at: 0) else {
-            Issue.record("Test fixture missing source page")
-            return
-        }
-        let (source, _) = coord.buildOCRSkipHint(
-            for: page, pageIndex: 0, runSettings: snapshot,
-            textLayerStatus: coord.documentState.textLayerStatus)
-
-        #expect(source == nil,
-                "Snapshot pipelineMode=.secureRasterization must hard-stop OCR skip even when live settingsState says .searchableRedaction.")
-    }
-
-    // MARK: - Hint runs off the MainActor
-
-    @Test("buildOCRSkipHint is nonisolated and runs off the MainActor")
-    func buildOCRSkipHintRunsOffMainActor() async {
-        let (defaults, suiteName) = makeScratchDefaults()
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let coord = makeCoordinator(settingsState: SettingsState(defaults: defaults))
-        coord.documentState.sourceDocument = makeTestPDFDocument()
-        coord.documentState.textLayerStatus[0] = .rich
-
-        // .secureRasterization hard-stops the hint → (nil, nil), so the result
-        // is deterministic without running Vision/OCR on the simulator.
-        let snapshot = PipelineCoordinator.RunSettings(
-            pipelineMode: .secureRasterization,
-            autoVerify: true,
-            paranoidMode: false,
-            fillColor: .black,
-            exportDPI: 300
-        )
-        guard let doc = coord.documentState.sourceDocument,
-              let page = doc.page(at: 0) else {
-            Issue.record("Test fixture missing source page")
-            return
-        }
-        let statusSnapshot = coord.documentState.textLayerStatus
-        // Compiles + runs only because `buildOCRSkipHint` is `nonisolated`: a
-        // MainActor-isolated method could not be invoked inside Task.detached.
-        // PipelineCoordinator is Sendable so it crosses in directly; only the
-        // non-Sendable PDFPage needs the unsafe capture.
-        nonisolated(unsafe) let offMainPage = page
-        let (source, _) = await Task.detached(priority: .userInitiated) {
-            coord.buildOCRSkipHint(
-                for: offMainPage, pageIndex: 0,
-                runSettings: snapshot, textLayerStatus: statusSnapshot)
-        }.value
-
-        #expect(source == nil)
     }
 }
