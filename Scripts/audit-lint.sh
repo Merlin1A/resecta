@@ -14,7 +14,10 @@
 # Line-based checks (M-1, M-3, M-5) scan only the diff hunks added by this
 # commit; pre-existing in-file content is not re-checked. M-4 walks each
 # staged Swift file as a state machine. M-6 is a whole-file LOC count on
-# staged files.
+# staged files. M-3's second half is a whole-tree pass: every tracked Swift
+# file of the shipping source (Sources/ and the engine package, the test
+# trees excluded by name) is scanned for the call-shaped networking and
+# hand-off symbols against a pinned list of known sites, in both modes.
 #
 # Range mode (CI): `--range A..B` (or the env AUDIT_LINT_RANGE=A..B) swaps
 # the staged diff for the commit range A..B — the same rules over the lines
@@ -24,7 +27,8 @@
 #
 # Usage: Scripts/audit-lint.sh                 (staged mode; the pre-commit hook)
 #        Scripts/audit-lint.sh --range A..B    (range mode; the pull-request gate)
-#        Scripts/audit-lint.sh --self-test     (the M-1 keyword rule and the AL-6
+#        Scripts/audit-lint.sh --self-test     (the M-1 keyword rule, the M-3
+#                                               whole-tree scanner and the AL-6
 #                                               shorthand rules against synthetic
 #                                               lines; exit 1 on drift)
 #
@@ -183,6 +187,36 @@ scan_added() {
 # without a marker; the same words in a comment, a string or a doc line
 # are still reported and still take `LegalPhrases:safe`.
 M1_RE='\b(guarantee[ds]?|ensure[ds]?|impossible|find(?:s|ing)?|catch(?:es|ing)?|perfectly|flawlessly)\b|100%'
+# M-3's whole-tree pattern (used by the self-test below and the M-3 section):
+# the call-shaped networking and hand-off forms — a bare `Link(` (SwiftUI's
+# link view; `NavigationLink(` is excluded by the look-behind), the Network
+# framework's listener and browser, the Foundation and CFNetwork socket and
+# stream constructors, the BSD socket calls as free functions (a member call
+# such as `publisher.connect(` is excluded by the same look-behind), the
+# `openURL` environment action, `UIApplication.shared.open(`, an
+# `import Network` line, and the five symbols of the added-line rule in any
+# code position. String literals are blanked and the comment part of a line
+# is dropped before the match, so a comment or a PDF name such as
+# `/Subtype /Link` never counts.
+M3_TREE_RE='(?<![\w.])(?:Link|NWListener|NWBrowser|NSURLConnection|CFSocketCreate\w*|CFStreamCreate\w*|CFReadStreamCreate\w*|CFWriteStreamCreate\w*|socket|connect|getaddrinfo)\(|\bopenURL\b|UIApplication\.shared\.open\(|^\s*import Network\b|\b(?:URLSession|URLRequest|NWConnection|NWPathMonitor|WKWebView)\b'
+# The known sites, one per line: `path|symbol|reason`. A hit anywhere else
+# is an offence; a pinned site with no hit is reported (remove the pin).
+M3_TREE_PINNED='Sources/ResectaApp/Views/SettingsView.swift|Link(|the Send-feedback row opens a mailto: link, a hand-off to Mail that the threat model names'
+# Prints `line:symbol` for every whole-tree hit in one file (plain lines on
+# stdin, no git access): string literals blanked, the comment part dropped.
+m3_tree_scan() {
+    PATTERN="$M3_TREE_RE" perl -e '
+        my $re = qr/$ENV{PATTERN}/;
+        while (<>) {
+            chomp;
+            my $code = $_;
+            $code =~ s/"(?:[^"\\]|\\.)*"/""/g;
+            my $at = index($code, "//");
+            $code = substr($code, 0, $at) if $at >= 0;
+            while ($code =~ /$re/g) { print "$.:$&\n"; }
+        }'
+}
+
 # AL-6's pattern (used by the self-test below and the AL-6 section at the end):
 # the register-identifier shape of the private planning notes — a short
 # upper-case prefix, a hyphen, digits. Case-sensitive on purpose: `p3-1` is
@@ -259,6 +293,32 @@ if [ -n "$SELF_TEST" ]; then
         echo "audit-lint --self-test: M-1 keyword rule OK (hits on lines 3 and 5 of 5; the two comment lines)"
     else
         echo "audit-lint --self-test: M-1 keyword rule DRIFTED — expected hits on lines 3 and 5, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+        exit 1
+    fi
+    # M-3 (whole tree) against twelve synthetic lines: the call-shaped hits
+    # are lines 1, 3, 5, 7, 9 and 11; a `NavigationLink(` (2), a comment
+    # naming a symbol (4), a PDF name in a string (6), a member `.connect(`
+    # (8), a comment-only `import Network` (10) and a plain identifier (12)
+    # pass.
+    expected=$'1\n3\n5\n7\n9\n11'
+    actual=$(printf '%s\n' \
+        '            Link(destination: Links.sendFeedback) {' \
+        '            NavigationLink(value: row) {' \
+        '        let l = NWListener(using: .tcp)' \
+        '        // URLSession is never used here' \
+        '        let fd = socket(AF_INET, SOCK_STREAM, 0)' \
+        '        let kind = "/Subtype /Link"' \
+        '        UIApplication.shared.open(url)' \
+        '        cancellable = publisher.connect()' \
+        'import Network' \
+        '        // import Network would add a dependency' \
+        '        @Environment(\.openURL) private var openURL' \
+        '        let links = document.linkCount' \
+        | m3_tree_scan | cut -d: -f1 | sort -n | uniq)
+    if [ "$actual" = "$expected" ]; then
+        echo "audit-lint --self-test: M-3 whole-tree scanner OK (hits on lines 1, 3, 5, 7, 9 and 11 of 12)"
+    else
+        echo "audit-lint --self-test: M-3 whole-tree scanner DRIFTED — expected hits on lines 1 3 5 7 9 11, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
         exit 1
     fi
     # AL-6 against six synthetic lines: a comment citing a register id (1)
@@ -411,6 +471,36 @@ for path in "${STAGED[@]}"; do
         [ -n "$off" ] && violate "M-3 banned networking symbol: $path:$off"
     done < <(scan_added "$path" "$M3_RE" "Networking:exempt SafariView")
 done
+
+# ── M-3 (whole tree): the call-shaped networking surface of the shipping source ─
+# Every tracked Swift file under Sources/ and Packages/RedactionEngine/, the
+# engine's test tree excluded by name (the app and UI test trees live under
+# Tests/, outside both roots), is scanned with M3_TREE_RE above, in both
+# modes, so the gate holds for the whole tree on every run and not only for
+# the lines a change adds. Each hit must be a pinned site (M3_TREE_PINNED:
+# path, symbol, reason); a hit at any other site is an offence, and a pinned
+# site that no longer matches is reported so the pin is removed.
+m3_tree_hits=""
+while IFS= read -r path; do
+    [ -f "$path" ] || continue
+    while IFS= read -r hit; do
+        [ -n "$hit" ] && m3_tree_hits="$m3_tree_hits$path:$hit"$'\n'
+    done < <(m3_tree_scan < "$path")
+done < <(git ls-files -- 'Sources/*.swift' 'Packages/RedactionEngine/*.swift' ':(exclude)Packages/RedactionEngine/Tests/*')
+while IFS= read -r hit; do
+    [ -n "$hit" ] || continue
+    path="${hit%%:*}"; rest="${hit#*:}"; line="${rest%%:*}"; symbol="${rest#*:}"
+    pinned=0
+    while IFS='|' read -r ppath psymbol preason; do
+        [ "$ppath" = "$path" ] && [ "$psymbol" = "$symbol" ] && pinned=1
+    done <<< "$M3_TREE_PINNED"
+    [ "$pinned" -eq 1 ] || violate "M-3 networking symbol in the shipping source (whole tree): $path:$line: $symbol — not a pinned site"
+done <<< "$m3_tree_hits"
+while IFS='|' read -r ppath psymbol preason; do
+    [ -n "$ppath" ] || continue
+    printf '%s' "$m3_tree_hits" | /usr/bin/grep -F "$ppath:" | /usr/bin/grep -qF ":$psymbol" \
+        || echo "audit-lint: M-3 pinned site no longer matches ($ppath $psymbol) — remove its pin" >&2
+done <<< "$M3_TREE_PINNED"
 
 # ── M-4 @AppStorage inside @Observable (whole-file state machine) ──────
 # Walks each staged .swift file. Tracks @Observable class bodies via brace

@@ -5,6 +5,11 @@
 # Usage:
 #   Scripts/doc-metrics.sh            print the measured numbers
 #   Scripts/doc-metrics.sh --check    also compare them with README.md / ENGINEERING.md
+#   Scripts/doc-metrics.sh --self-test   prove the logging claims move: a scratch
+#                                     copy of the Swift trees and the two documents
+#                                     passes --check; one planted `.public`
+#                                     interpolation reads DRIFT; one planted
+#                                     `print(` reads DRIFT; exit 1 otherwise
 #
 # Measured, from the checkout this script runs in:
 #   - Swift line counts per tree (engine source, engine tests, app source, app
@@ -14,6 +19,9 @@
 #   - assertion counts: `#expect(` + `#require(` (Swift Testing) and `XCTAssert*(`
 #   - the encoding count in `AhoCorasick.encodeForSearch` (the `encodings` array)
 #   - `nonisolated(unsafe)` declarations in app + engine source
+#   - log interpolations marked `privacy: .public` in app + engine source, and
+#     `print(` / `NSLog(` / `debugPrint(` calls there (the shipping source
+#     logs through os.Logger; the documents claim the count and the zero)
 #
 # --check tolerances: line counts within 3 % of the claim (the documents round
 # to the nearest thousand), assertion totals within 3 % (the README says
@@ -27,9 +35,37 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MODE="${1:-print}"
 case "$MODE" in
-    print|--check) ;;
-    *) sed -n '2,25p' "$0"; exit 64 ;;
+    print|--check|--self-test|--check-root) ;;
+    *) sed -n '2,30p' "$0"; exit 64 ;;
 esac
+
+if [ "$MODE" = "--self-test" ]; then
+    # A scratch root with the Swift trees (source files only) and the two
+    # documents; the measured line counts and claims are then the real ones.
+    scratch="$(mktemp -d "${TMPDIR:-/tmp}/doc-metrics-selftest.XXXXXX")"
+    for tree in Packages/RedactionEngine/Sources Packages/RedactionEngine/Tests Sources Tests/ResectaAppTests Tests/ResectaAppUITests; do
+        (cd "$ROOT" && /usr/bin/find "$tree" -name '*.swift' -print0 | while IFS= read -r -d '' f; do
+            mkdir -p "$scratch/$(dirname "$f")"; cp "$f" "$scratch/$f"; done)
+    done
+    cp "$ROOT/README.md" "$ROOT/ENGINEERING.md" "$scratch/"
+    fails=0
+    if "$0" --check-root "$scratch" > /dev/null 2>&1; then echo "self-test: the scratch copy passes --check OK"
+    else echo "self-test: the scratch copy does not pass --check" >&2; fails=1; fi
+    planted="$scratch/Sources/ResectaApp/SelfTestPlanted.swift"
+    printf 'import os\nlet l = Logger()\nfunc f(_ k: String) { l.info("key \\(k, privacy: .public)") }\n' > "$planted"
+    out="$("$0" --check-root "$scratch" 2>&1 || true)"
+    if printf '%s' "$out" | /usr/bin/grep -q 'DRIFT ENGINEERING public log interpolations'; then echo "self-test: one planted public interpolation reads DRIFT OK"
+    else echo "self-test: a planted public interpolation did not read DRIFT" >&2; fails=1; fi
+    printf 'func g() { print("x") }\n' > "$planted"
+    out="$("$0" --check-root "$scratch" 2>&1 || true)"
+    if printf '%s' "$out" | /usr/bin/grep -q 'DRIFT ENGINEERING print calls'; then echo "self-test: one planted print( reads DRIFT OK"
+    else echo "self-test: a planted print( did not read DRIFT" >&2; fails=1; fi
+    rm -rf "$scratch"
+    [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
+    echo "self-test: FAIL" >&2; exit 1
+fi
+# --check-root DIR: --check against another root (the self-test's scratch copy).
+if [ "$MODE" = "--check-root" ]; then ROOT="$2"; MODE="--check"; fi
 
 python3 - "$ROOT" "$MODE" <<'PY'
 import os, re, sys
@@ -98,6 +134,19 @@ for name in ("engine source", "app source"):
     for p in swift_files(TREES[name]):
         unsafe += len(re.findall(r"nonisolated\(unsafe\)\s+(?:static\s+|private\s+|fileprivate\s+|internal\s+|public\s+)*(?:var|let)\b", read(p)))
 
+public_interp = 0
+print_calls = 0
+PRINT_RE = re.compile(r"\b(?:print|NSLog|debugPrint)\(")
+for name in ("engine source", "app source"):
+    for p in swift_files(TREES[name]):
+        for line in read(p).splitlines():
+            code = re.sub(r'"(?:[^"\\]|\\.)*"', '""', line)
+            at = code.find("//")
+            if at >= 0:
+                code = code[:at]
+            public_interp += line.count("privacy: .public")
+            print_calls += len(PRINT_RE.findall(code))
+
 expect_total = counts["engine tests"]["expects"] + counts["app tests"]["expects"] + counts["UI tests"]["expects"]
 xct_total = counts["engine tests"]["xcts"] + counts["app tests"]["xcts"] + counts["UI tests"]["xcts"]
 
@@ -113,11 +162,13 @@ for name in ("engine tests", "app tests", "UI tests"):
 print(f"  assertions: #expect/#require {expect_total:,d} (+ {xct_total} XCTAssert in the UI tests)")
 print(f"Encodings in AhoCorasick.encodeForSearch: {encodings}")
 print(f"nonisolated(unsafe) declarations in app + engine source: {unsafe}")
+print(f"log interpolations marked privacy: .public in app + engine source: {public_interp}")
+print(f"print/NSLog/debugPrint calls in app + engine source: {print_calls}")
 
 if mode != "--check":
     sys.exit(0)
 
-WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+WORDS = {"no": 0, "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
 
 def num(s):
     s = s.strip().lower().replace(",", "")
@@ -170,6 +221,8 @@ claim(readme, "README encodings", r"raw bytes across (\w+) encodings", encodings
 print("Checking ENGINEERING.md")
 claim(eng, "ENGINEERING encodings", r"case variants × (\w+) encodings", encodings, words=True)
 claim(eng, "ENGINEERING nonisolated(unsafe)", r"(\d+) `nonisolated\(unsafe\)` declarations", unsafe)
+claim(eng, "ENGINEERING public log interpolations", r"(\d+) log interpolations are marked `privacy: \.public`", public_interp)
+claim(eng, "ENGINEERING print calls", r"carries (\w+) `print`, `NSLog` or `debugPrint` call", print_calls, words=True)
 claim(eng, "ENGINEERING source lines (concurrency section)", r"declarations across ~([\d,]+) lines of app \+ engine source", source_lines, 0.03)
 claim(eng, "ENGINEERING source lines (reading section)", r"about ([\d,]+) lines of source to about", source_lines, 0.03)
 claim(eng, "ENGINEERING test lines (reading section)", r"lines of source to about ([\d,]+) lines of tests", test_lines, 0.03)
