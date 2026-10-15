@@ -401,7 +401,7 @@ struct VerificationRowModelTests {
              "OCR of Page Images, Passed. Reads page images by OCR against regions."),
             (Self.layer(.pass, identity: .characterCount), [.secureRasterization],
              "Character Count, Nothing to check. No page kept a text layer."),
-            (Self.layer(.info("Fill artifact on page 1."), identity: .ocrCheck), [],
+            (Self.layer(.info("x"), identity: .ocrCheck, short: "Fill artifact on page 1."), [],
              "OCR of Page Images, Note. Fill artifact on page 1."),
             (Self.layer(.warn("x"), identity: .structureCheck, short: "A second %%EOF."), [],
              "Active Content & Structure, Warning. A second %%EOF."),

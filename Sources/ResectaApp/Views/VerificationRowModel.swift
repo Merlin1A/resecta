@@ -167,7 +167,34 @@ nonisolated struct VerificationRowModel: Equatable {
     /// derivation table in `VerificationRowModelTests` pins every cell, so
     /// such a change fails a test first.
     static func outcome(for layer: LayerResult, perPageModes: [PipelineMode]) -> VerificationOutcome {
-        .passed
+        switch layer.status {
+        case .fail:
+            return .failed
+        case .attention:
+            return .needsReview
+        case .warn:
+            return layer.couldNotVerify ? .couldNotVerify : .warning
+        case .skipped:
+            return .couldNotVerify
+        case .info:
+            switch layer.layer {
+            case .binaryStringSearch, .operatorReExtraction:
+                return .nothingToCheck
+            case .searchRecheck, .detectionSweep:
+                return layer.queryLines == nil ? .nothingToCheck : .note
+            default:
+                return .note
+            }
+        case .pass:
+            switch layer.layer {
+            case .characterCount, .fontVerification, .characterLineage:
+                let noTextLayerPage = !perPageModes.isEmpty
+                    && !perPageModes.contains(.searchableRedaction)
+                return noTextLayerPage ? .nothingToCheck : .passed
+            default:
+                return .passed
+            }
+        }
     }
 
     static func hasItemsRemaining(_ layer: LayerResult) -> Bool {
