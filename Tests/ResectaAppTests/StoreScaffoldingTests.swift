@@ -9,7 +9,7 @@ import Foundation
 @Suite("Store scaffolding")
 struct StoreScaffoldingTests {
 
-    private struct Row: Codable, Equatable, Sendable {
+    private nonisolated struct Row: Codable, Equatable, Sendable {
         let name: String
         let count: Int
     }
