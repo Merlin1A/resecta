@@ -7,19 +7,16 @@ import UIKit
 import os
 @testable import RedactionEngine
 
-// Parallel verification base layers.
+// Parallel verification base layers, measured on the engine's own
+// schedule: every test runs `VerificationOrchestrator.run`, the schedule the
+// product and the corpus harness run (parallel base batch on one document
+// instance per layer → the catalog readers in order → the sandwich checks in
+// order → the post-sequential checks). Each layer's interval is read from the
+// engine's dispatch seam (`VerificationEngine.onRunLayerDispatch`, stamped as
+// the layer starts) plus the layer's reported duration; the order assertions
+// read the orchestrator's `VerificationRunEvent` stream.
 //
-// These tests mirror the dispatch contract implemented in
-// `Sources/ResectaApp/State/PipelineCoordinator.swift` (private
-// `runVerification` block). The engine package owns the per-layer logic
-// (`VerificationEngine.runLayer`), but the parallel/sequential dispatch
-// is the coordinator's responsibility. The tests therefore re-run the
-// same dispatch pattern locally (parallel 0/1/2 → sequential 3, 4 →
-// sequential 5..<sandwichEnd) and assert the wall-clock + ordering
-// shape, without coupling to the coordinator type (which lives in the
-// app target and is unreachable from this package's test bundle).
-//
-// The layer numbering is:
+// The layer numbering (zero-based ordinals in `layers(for:)`) is:
 //   - Base layers 0/1/2 = Text Extraction, OCR, Binary Search → parallel
 //   - Layer 9 = Operator Re-Extraction (CGPDFScanner)         → parallel
 //   - Base layers 3, 4  = Structure, Metadata                → sequential
@@ -44,110 +41,130 @@ import os
 @Suite("Parallel Layer Execution", .tags(.performance), .serialized)
 struct ParallelLayerExecutionTests {
 
-    // MARK: - Per-layer wall-clock harness
+    // MARK: - The orchestrated run and its timeline
 
-    /// A single timed run of `runLayer`. The Date stamps come from the
-    /// SAME `Date()` source on both ends so subtraction is meaningful
-    /// across concurrent Tasks (ContinuousClock is also monotonic;
-    /// either works — Date is used here so timestamps are directly
-    /// comparable across the parallel/sequential branches).
+    /// One layer's interval in an orchestrated run: `start` from the
+    /// dispatch seam, `end` = `start` + the layer's reported duration.
     struct TimedLayer: Sendable {
         let layerIndex: Int
         let result: LayerResult
-        let start: Date
-        let end: Date
+        let start: Double
+        let end: Double
     }
 
-    /// Re-implements the coordinator's parallel-dispatch contract for
-    /// the test bundle. The production code path is in
-    /// `PipelineCoordinator.runVerification`.
-    /// Returns timestamped results in layer-index ascending order.
-    ///
-    /// Accepts an arbitrary `[Int]` so callers can dispatch the Searchable
-    /// batch `[0, 1, 2, 9]` in addition to the contiguous `[0, 1, 2]` range.
-    static func runParallelBase(
-        layers: [Int],
-        verifier: VerificationEngine,
-        doc: SendablePDFDocument,
-        sourcePageCount: Int,
-        regions: [Int: [RedactionRegion]],
-        sensitiveTerms: [SensitiveTerm],
+    /// An event as the sink received it, with the time it arrived.
+    struct StampedEvent {
+        let event: VerificationRunEvent
+        let at: Double
+    }
+
+    struct OrchestratedRun {
+        let report: VerificationReport
+        let events: [StampedEvent]
+        /// Keyed by zero-based ordinal in `layers(for:)`.
+        let timeline: [Int: TimedLayer]
+        /// Zero-based ordinals in the order the engine dispatched them.
+        let dispatchOrder: [Int]
+    }
+
+    /// Records the dispatch seam's (ordinal, time) pairs across the
+    /// orchestrator's concurrent layer tasks.
+    final class DispatchLog: @unchecked Sendable {
+        private let lock = NSLock()
+        private var entries: [(ordinal: Int, at: Double)] = []
+        func record(_ ordinal: Int) {
+            let now = CFAbsoluteTimeGetCurrent()
+            lock.lock(); entries.append((ordinal, now)); lock.unlock()
+        }
+        var snapshot: [(ordinal: Int, at: Double)] {
+            lock.lock(); defer { lock.unlock() }; return entries
+        }
+    }
+
+    /// Run the engine's verification schedule over the document at `url`,
+    /// one freshly opened document instance per parallel-batch layer (the
+    /// product's provisioning), and return the report, the stamped events
+    /// and each layer's interval.
+    static func runOrchestrated(
+        url: URL,
+        doc: PDFDocument,
         pipelineMode: PipelineMode,
-        filterDigests: [PageFilterDigest?],
-        perPageModes: [PipelineMode]
-    ) async -> [TimedLayer] {
-        let collected: [TimedLayer] = await withTaskGroup(
-            of: TimedLayer.self
-        ) { group in
-            for layerIndex in layers {
-                group.addTask {
-                    let start = Date()
-                    let result = await verifier.runLayer(
-                        verifier.layers(for: pipelineMode)[layerIndex],
-                        outputDocument: doc,
-                        sourcePageCount: sourcePageCount,
-                        regions: regions,
-                        sensitiveTerms: sensitiveTerms,
-                        pipelineMode: pipelineMode,
-                        filterDigests: filterDigests,
-                        perPageModes: perPageModes
-                    )
-                    let end = Date()
-                    return TimedLayer(
-                        layerIndex: layerIndex, result: result,
-                        start: start, end: end
-                    )
+        sensitiveTerms: [SensitiveTerm],
+        filterDigests: [PageFilterDigest?]
+    ) async throws -> OrchestratedRun {
+        let log = DispatchLog()
+        var verifier = VerificationEngine()
+        verifier.onRunLayerDispatch = { ordinal, _ in log.record(ordinal) }
+        let pageCount = doc.pageCount
+        var events: [StampedEvent] = []
+        let report = try await VerificationOrchestrator(verifier: verifier).run(
+            outputDocument: SendablePDFDocument(doc),
+            sourcePageCount: pageCount,
+            regions: [:],
+            sensitiveTerms: sensitiveTerms,
+            pipelineMode: pipelineMode,
+            filterDigests: filterDigests,
+            perPageModes: Array(repeating: pipelineMode, count: pageCount),
+            perPageFallbackReasons: Array(repeating: nil, count: pageCount),
+            appliedSearches: [],
+            provisionLayerDocuments: { layers in
+                var docs: [VerificationLayer: SendablePDFDocument] = [:]
+                for layer in layers {
+                    guard let d = PDFDocument(url: url) else { return nil }
+                    docs[layer] = SendablePDFDocument(d)
                 }
-            }
-            var collected: [TimedLayer] = []
-            for await timed in group {
-                collected.append(timed)
-            }
-            return collected
+                return docs
+            },
+            events: { events.append(StampedEvent(event: $0, at: CFAbsoluteTimeGetCurrent())) }
+        )
+        let dispatches = log.snapshot
+        var timeline: [Int: TimedLayer] = [:]
+        for (ordinal, start) in dispatches where ordinal < report.layers.count {
+            let result = report.layers[ordinal]
+            timeline[ordinal] = TimedLayer(
+                layerIndex: ordinal, result: result,
+                start: start, end: start + result.durationSeconds)
         }
-        return collected.sorted { $0.layerIndex < $1.layerIndex }
+        return OrchestratedRun(
+            report: report, events: events, timeline: timeline,
+            dispatchOrder: dispatches.map(\.ordinal))
     }
 
-    /// Sequential per-layer runner; mirrors the post-parallel branches
-    /// (layers 3, 4) and the sandwich-layer branch (5–7) in the
-    /// coordinator. Captures the same start/end stamps so callers can
-    /// assert non-overlap.
-    static func runSequential(
-        layers: [Int],
-        verifier: VerificationEngine,
-        doc: SendablePDFDocument,
-        sourcePageCount: Int,
-        regions: [Int: [RedactionRegion]],
-        sensitiveTerms: [SensitiveTerm],
-        pipelineMode: PipelineMode,
-        filterDigests: [PageFilterDigest?],
-        perPageModes: [PipelineMode]
-    ) async -> [TimedLayer] {
-        var collected: [TimedLayer] = []
-        for layerIndex in layers {
-            let start = Date()
-            let result = await verifier.runLayer(
-                verifier.layers(for: pipelineMode)[layerIndex],
-                outputDocument: doc,
-                sourcePageCount: sourcePageCount,
-                regions: regions,
-                sensitiveTerms: sensitiveTerms,
-                pipelineMode: pipelineMode,
-                filterDigests: filterDigests,
-                perPageModes: perPageModes
-            )
-            let end = Date()
-            collected.append(TimedLayer(
-                layerIndex: layerIndex, result: result,
-                start: start, end: end
-            ))
+    /// Pairs among `ordinals` whose intervals intersect (neither finished
+    /// before the other started).
+    static func overlappingPairs(_ ordinals: [Int], in timeline: [Int: TimedLayer]) -> Int {
+        let timed = ordinals.compactMap { timeline[$0] }
+        var pairs = 0
+        for i in 0..<timed.count {
+            for j in (i + 1)..<timed.count {
+                let a = timed[i], b = timed[j]
+                if a.start < b.end && b.start < a.end { pairs += 1 }
+            }
         }
-        return collected
+        return pairs
+    }
+
+    /// The time the sink received `layerFinished` for `ordinal` (zero-based).
+    static func finishedAt(_ ordinal: Int, in events: [StampedEvent]) -> Double? {
+        for stamped in events {
+            if case .layerFinished(_, let o, _) = stamped.event, o == ordinal + 1 {
+                return stamped.at
+            }
+        }
+        return nil
+    }
+
+    /// The ordinals (zero-based) of `mode`'s layers in `phase`.
+    static func ordinals(
+        of phase: VerificationLayer.ExecutionPhase, mode: PipelineMode
+    ) -> [Int] {
+        VerificationEngine().layers(for: mode).enumerated()
+            .filter { $0.element.phase == phase }.map(\.offset)
     }
 
     // MARK: - Test 1 — Parallel base layers overlap
 
-    @Test("Base layers 0/1/2 overlap when dispatched via withTaskGroup")
+    @Test("Base layers 0/1/2 overlap under the verification orchestrator")
     func testBaseLayersRunInParallel() async throws {
         // 4-page fixture: enough to give the OCR layer real per-page
         // work so the parallel timeline is observable, while small
@@ -156,7 +173,6 @@ struct ParallelLayerExecutionTests {
         let (doc, url) = try await makeMultiPagePDF(pageCount: 4)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let verifier = VerificationEngine()
         let signposter = OSSignposter(
             subsystem: "com.resecta.tests", category: "perf6"
         )
@@ -166,48 +182,37 @@ struct ParallelLayerExecutionTests {
         )
         defer { signposter.endInterval("ParallelBaseLayers", interval) }
 
-        let parallel = await Self.runParallelBase(
-            layers: [0, 1, 2],
-            verifier: verifier,
-            doc: SendablePDFDocument(doc),
-            sourcePageCount: doc.pageCount,
-            regions: [:],
-            sensitiveTerms: [],
-            pipelineMode: .secureRasterization,
-            filterDigests: [],
-            perPageModes: Array(repeating: .secureRasterization, count: doc.pageCount)
-        )
+        let parallelOrdinals = Self.ordinals(of: .parallelBase, mode: .secureRasterization)
+        #expect(parallelOrdinals == [0, 1, 2])
 
-        #expect(parallel.count == 3, "Expected three timed results (layers 0, 1, 2)")
+        let run = try await Self.runOrchestrated(
+            url: url, doc: doc, pipelineMode: .secureRasterization,
+            sensitiveTerms: [], filterDigests: Array(repeating: nil, count: doc.pageCount))
+
+        #expect(parallelOrdinals.allSatisfy { run.timeline[$0] != nil },
+                "Expected one timed interval per parallel-base layer (layers 0, 1, 2)")
 
         // Two layers "overlap" when one's [start, end] interval and the
         // other's intersect — i.e., neither finished before the other
         // started. Three layers produce 3 pairs; requiring >= 2 means at
         // least two-thirds of the pairs must overlap, which excludes the
-        // near-serial schedule (exactly one incidental overlap) that the
-        // previous >= 1 floor accepted. If this turns flaky under
-        // full-suite load, that is evidence of a real scheduling
-        // regression rather than justification to widen the floor.
-        var overlappingPairs = 0
-        for i in 0..<parallel.count {
-            for j in (i + 1)..<parallel.count {
-                let a = parallel[i]
-                let b = parallel[j]
-                let overlap = a.start < b.end && b.start < a.end
-                if overlap { overlappingPairs += 1 }
-            }
-        }
+        // near-serial schedule (exactly one incidental overlap). If this
+        // turns flaky under full-suite load, that is evidence of a real
+        // scheduling regression rather than justification to widen the
+        // floor.
+        let overlapping = Self.overlappingPairs(parallelOrdinals, in: run.timeline)
         #expect(
-            overlappingPairs >= 2,
-            "Expected at least two overlapping pairs among layers 0/1/2 under withTaskGroup dispatch (saw \(overlappingPairs); >= 2 of 3 pairs required)"
+            overlapping >= 2,
+            "Expected at least two overlapping pairs among layers 0/1/2 in the orchestrator's parallel batch (saw \(overlapping); >= 2 of 3 pairs required)"
         )
 
-        // Layer-index ordering is preserved by the sort step in
-        // runParallelBase so downstream consumers of `completedLayers`
-        // see ascending indices.
-        #expect(parallel[0].layerIndex == 0)
-        #expect(parallel[1].layerIndex == 1)
-        #expect(parallel[2].layerIndex == 2)
+        // The batch publishes its results in canonical order so the
+        // progress UI's `completedLayers` reads ascending.
+        let finishedOrdinals = run.events.compactMap { stamped -> Int? in
+            if case .layerFinished(_, let ordinal, _) = stamped.event { return ordinal - 1 }
+            return nil
+        }
+        #expect(Array(finishedOrdinals.prefix(3)) == parallelOrdinals)
     }
 
     // MARK: - Test 2 — Layer 4 starts after Layer 3 ends
@@ -217,28 +222,19 @@ struct ParallelLayerExecutionTests {
         let (doc, url) = try await makeMultiPagePDF(pageCount: 2)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let verifier = VerificationEngine()
-        let timed = await Self.runSequential(
-            layers: [3, 4],
-            verifier: verifier,
-            doc: SendablePDFDocument(doc),
-            sourcePageCount: doc.pageCount,
-            regions: [:],
-            sensitiveTerms: [],
-            pipelineMode: .secureRasterization,
-            filterDigests: [],
-            perPageModes: Array(repeating: .secureRasterization, count: doc.pageCount)
-        )
+        #expect(Self.ordinals(of: .catalogSequential, mode: .secureRasterization) == [3, 4])
+        let run = try await Self.runOrchestrated(
+            url: url, doc: doc, pipelineMode: .secureRasterization,
+            sensitiveTerms: [], filterDigests: Array(repeating: nil, count: doc.pageCount))
 
-        #expect(timed.count == 2, "Expected sequential timing entries for layers 3 and 4")
-        let layer3 = timed[0]
-        let layer4 = timed[1]
-        #expect(layer3.layerIndex == 3)
-        #expect(layer4.layerIndex == 4)
+        let layer3Finished = try #require(Self.finishedAt(3, in: run.events))
+        let layer4 = try #require(run.timeline[4])
         #expect(
-            layer4.start >= layer3.end,
+            layer4.start >= layer3Finished,
             "Layer 4 should begin no earlier than Layer 3 ends — concurrent PDFDocument catalog parsing would contend"
         )
+        let order = run.dispatchOrder.filter { [3, 4].contains($0) }
+        #expect(order == [3, 4])
     }
 
     // MARK: - Test 3 — Sandwich layers run sequentially
@@ -254,7 +250,6 @@ struct ParallelLayerExecutionTests {
         let (doc, url) = try await makeMultiPageSandwichPDF(pageCount: 3)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let verifier = VerificationEngine()
         let pageCount = doc.pageCount
         let digests: [PageFilterDigest?] = (0..<pageCount).map { i in
             PageFilterDigest(
@@ -265,30 +260,22 @@ struct ParallelLayerExecutionTests {
                 boundaryCharacters: []
             )
         }
-        let perPageModes = Array(repeating: PipelineMode.searchableRedaction, count: pageCount)
+        let sandwich = Self.ordinals(of: .sandwichSequential, mode: .searchableRedaction)
+        #expect(sandwich == [5, 6, 7, 8])
 
-        let timed = await Self.runSequential(
-            layers: [5, 6, 7, 8],
-            verifier: verifier,
-            doc: SendablePDFDocument(doc),
-            sourcePageCount: pageCount,
-            regions: [:],
-            sensitiveTerms: [],
-            pipelineMode: .searchableRedaction,
-            filterDigests: digests,
-            perPageModes: perPageModes
-        )
+        let run = try await Self.runOrchestrated(
+            url: url, doc: doc, pipelineMode: .searchableRedaction,
+            sensitiveTerms: [], filterDigests: digests)
 
-        #expect(timed.count == 4, "Expected timing entries for layers 5/6/7/8")
-        for i in 0..<(timed.count - 1) {
-            let a = timed[i]
-            let b = timed[i + 1]
+        for (previous, next) in zip(sandwich, sandwich.dropFirst()) {
+            let previousFinished = try #require(Self.finishedAt(previous, in: run.events))
+            let nextStart = try #require(run.timeline[next]).start
             #expect(
-                b.start >= a.end,
-                "Sandwich layer \(b.layerIndex) should start after layer \(a.layerIndex) finishes — inter-layer character-count baselines require sequential ordering"
+                nextStart >= previousFinished,
+                "Sandwich layer \(next) should start after layer \(previous) finishes — inter-layer character-count baselines require sequential ordering"
             )
         }
-        #expect(timed.map { $0.layerIndex } == [5, 6, 7, 8])
+        #expect(run.dispatchOrder.filter { sandwich.contains($0) } == sandwich)
     }
 
     // MARK: - Test 3b — Layer 10 joins the parallel base batch (Searchable, M3)
@@ -296,78 +283,48 @@ struct ParallelLayerExecutionTests {
     @Test("Layer 10 overlaps base parallel batch in Searchable mode")
     func testLayer10ParallelBaseOverlap() async throws {
         // Layer 10 (operator-semantic re-extraction, index 9 in the
-        // zero-indexed dispatcher) joins the base-parallel batch in
+        // zero-indexed order) joins the base-parallel batch in
         // Searchable mode. The layer walks each output page's content
         // stream via CGPDFScanner — no catalog-handle contention with
         // Layers 0/1/2 and no sequencing dependency on the
         // sandwich-sequential layers (5–8).
         //
-        // The test dispatches `[0, 1, 2, 9]` via the same withTaskGroup
-        // shape the coordinator uses (`PipelineCoordinator.runVerification`)
-        // and asserts at least one pair of intervals overlaps. Non-empty
+        // The orchestrator dispatches the batch; the test asserts at
+        // least two pairs of intervals overlap. Non-empty
         // `sensitiveTerms` so Layer 10 does real per-page work via the
         // Aho-Corasick automaton; the token does not appear in the
-        // fixture, so all four layers report PASS and the timing shape
-        // is what's under test, not the result.
+        // fixture, so the timing shape is what's under test, not the
+        // result.
         let (doc, url) = try await makeMultiPageSandwichPDF(pageCount: 4)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let verifier = VerificationEngine()
-        let pageCount = doc.pageCount
-        let digests: [PageFilterDigest?] = (0..<pageCount).map { _ in nil }
-        let perPageModes = Array(repeating: PipelineMode.searchableRedaction, count: pageCount)
-
-        // The coordinator's parallel batch = the ordinals of the
-        // `.parallelBase` layers in the mode's order (identity, not literals).
-        let parallelOrdinals = verifier.layers(for: .searchableRedaction).enumerated()
-            .filter { $0.element.phase == .parallelBase }.map(\.offset)
+        let parallelOrdinals = Self.ordinals(of: .parallelBase, mode: .searchableRedaction)
         #expect(parallelOrdinals == [0, 1, 2, 9])
 
-        let parallel = await Self.runParallelBase(
-            layers: parallelOrdinals,
-            verifier: verifier,
-            doc: SendablePDFDocument(doc),
-            sourcePageCount: pageCount,
-            regions: [:],
+        let run = try await Self.runOrchestrated(
+            url: url, doc: doc, pipelineMode: .searchableRedaction,
             sensitiveTerms: ["NONEXISTENT_SAMPLE_PII_TOKEN_XYZ123"].map { SensitiveTerm(text: $0) },
-            pipelineMode: .searchableRedaction,
-            filterDigests: digests,
-            perPageModes: perPageModes
-        )
+            filterDigests: Array(repeating: nil, count: doc.pageCount))
 
-        #expect(parallel.count == parallelOrdinals.count,
-                "Expected one timed result per parallel-base layer (\(parallelOrdinals))")
+        #expect(parallelOrdinals.allSatisfy { run.timeline[$0] != nil },
+                "Expected one timed interval per parallel-base layer (\(parallelOrdinals))")
 
         // Same overlap predicate the layers-0/1/2 test uses. Four layers
         // produce 6 pairs; requiring >= 2 excludes the near-serial
-        // schedule (exactly one incidental overlap) that the previous
-        // >= 1 floor accepted. If this turns flaky under full-suite
-        // load, that is evidence of a real scheduling regression rather
-        // than justification to widen the floor.
-        var overlappingPairs = 0
-        for i in 0..<parallel.count {
-            for j in (i + 1)..<parallel.count {
-                let a = parallel[i]
-                let b = parallel[j]
-                if a.start < b.end && b.start < a.end {
-                    overlappingPairs += 1
-                }
-            }
-        }
+        // schedule (exactly one incidental overlap). If this turns flaky
+        // under full-suite load, that is evidence of a real scheduling
+        // regression rather than justification to widen the floor.
+        let overlapping = Self.overlappingPairs(parallelOrdinals, in: run.timeline)
         #expect(
-            overlappingPairs >= 2,
-            "Expected at least two overlapping pairs among layers 0/1/2/9 under withTaskGroup dispatch (saw \(overlappingPairs); >= 2 of 6 pairs required)"
+            overlapping >= 2,
+            "Expected at least two overlapping pairs among layers 0/1/2/9 in the orchestrator's parallel batch (saw \(overlapping); >= 2 of 6 pairs required)"
         )
-
-        // Sorted output preserves layer-index-ascending order so
-        // downstream slot-based consumers (UI list rows) read correctly.
-        #expect(parallel.map { $0.layerIndex } == parallelOrdinals)
     }
 
     // MARK: - Test 4 — Wall-clock under 50% of sequential baseline
 
-    // Wall-clock acceptance test. Asserts that the parallel dispatch
-    // reduces verification wall-clock vs. the sequential baseline;
+    // Wall-clock acceptance test. Asserts that the orchestrator's schedule
+    // reduces verification wall-clock vs. running every layer serially;
     // reports the 0.5× strict target as a non-asserting log line.
     // `.disabled` under default green-bar runs because Swift Testing
     // schedules tests across CPU cores by default and parallel-scheduling
@@ -397,20 +354,22 @@ struct ParallelLayerExecutionTests {
         let wrappedDoc = SendablePDFDocument(doc)
         let pageCount = doc.pageCount
         let perPageModes = Array(repeating: PipelineMode.secureRasterization, count: pageCount)
+        let digests: [PageFilterDigest?] = Array(repeating: nil, count: pageCount)
+        let layers = verifier.layers(for: .secureRasterization)
 
         // Warm-up pass — caches CGPDFDocument open, Vision request
         // graph initialisation, and any first-touch image-extraction
         // costs so the measured samples below reflect steady-state
         // dispatch rather than one-off startup overhead.
-        for i in 0..<5 {
+        for layer in layers {
             _ = await verifier.runLayer(
-                verifier.layers(for: .secureRasterization)[i],
+                layer,
                 outputDocument: wrappedDoc,
                 sourcePageCount: pageCount,
                 regions: [:],
                 sensitiveTerms: sensitiveTerms,
                 pipelineMode: .secureRasterization,
-                filterDigests: [],
+                filterDigests: digests,
                 perPageModes: perPageModes
             )
         }
@@ -424,53 +383,32 @@ struct ParallelLayerExecutionTests {
         var parallelSamples: [TimeInterval] = []
 
         for _ in 0..<iterations {
-            // --- Sequential baseline: all 5 base layers serially ---
+            // --- Sequential baseline: every layer serially ---
             let sequentialStart = Date()
-            for i in 0..<5 {
+            for layer in layers {
                 _ = await verifier.runLayer(
-                    verifier.layers(for: .secureRasterization)[i],
+                    layer,
                     outputDocument: wrappedDoc,
                     sourcePageCount: pageCount,
                     regions: [:],
                     sensitiveTerms: sensitiveTerms,
                     pipelineMode: .secureRasterization,
-                    filterDigests: [],
+                    filterDigests: digests,
                     perPageModes: perPageModes
                 )
             }
             sequentialSamples.append(Date().timeIntervalSince(sequentialStart))
 
-            // --- Parallel arrangement: 0/1/2 in task group, then 3, 4 ---
+            // --- The orchestrator's schedule ---
             let parallelStart = Date()
-            _ = await Self.runParallelBase(
-                layers: [0, 1, 2],
-                verifier: verifier,
-                doc: wrappedDoc,
-                sourcePageCount: pageCount,
-                regions: [:],
-                sensitiveTerms: sensitiveTerms,
-                pipelineMode: .secureRasterization,
-                filterDigests: [],
-                perPageModes: perPageModes
-            )
-            _ = await Self.runSequential(
-                layers: [3, 4],
-                verifier: verifier,
-                doc: wrappedDoc,
-                sourcePageCount: pageCount,
-                regions: [:],
-                sensitiveTerms: sensitiveTerms,
-                pipelineMode: .secureRasterization,
-                filterDigests: [],
-                perPageModes: perPageModes
-            )
+            _ = try await Self.runOrchestrated(
+                url: url, doc: doc, pipelineMode: .secureRasterization,
+                sensitiveTerms: sensitiveTerms, filterDigests: digests)
             parallelSamples.append(Date().timeIntervalSince(parallelStart))
         }
 
         // Trim the worst outlier (iter 1 often shows first-touch
-        // Vision warmup overhead even after the warm-up pass — task-
-        // group creation is the first parallel dispatch the
-        // VerificationEngine instance sees).
+        // Vision warmup overhead even after the warm-up pass).
         let trimmedSequential = sequentialSamples.sorted().dropLast()
         let trimmedParallel = parallelSamples.sorted().dropLast()
         let sequentialAvg = trimmedSequential.reduce(0, +) / Double(trimmedSequential.count)
@@ -482,8 +420,7 @@ struct ParallelLayerExecutionTests {
         // reports the 0.5× strict aspirational bar to the test log
         // without asserting on it — the strict ratio depends on the
         // per-layer work balance, which the synthetic fixture does not
-        // provide. Real-world documents with comparable
-        // text-extraction / OCR / byte-scan work tend to hit ≈ 0.5×.
+        // provide.
         let strictTarget = sequentialAvg * 0.5
         #expect(
             parallelAvg < sequentialAvg,
@@ -509,13 +446,11 @@ struct ParallelLayerExecutionTests {
 
     @Test("Layer-result correctness matches sequential dispatch")
     func testCorrectnessInvariantsPreserved() async throws {
-        // Sanity gate: the parallel dispatch must not alter the
-        // per-layer status compared to a strictly sequential run. Per
-        // the plan, the existing engine correctness suite is the
-        // ultimate guard — this test confirms the dispatch wrapper
-        // itself is transparent (same inputs → same per-layer outputs).
-        // Two pages keeps the OCR cost low enough to coexist with the
-        // engine suite's wall-clock-budgeted neighbours.
+        // The orchestrator's schedule must not alter the per-layer
+        // status compared to a strictly sequential run of each layer
+        // (same inputs → same per-layer outputs). Two pages keeps the
+        // OCR cost low enough to coexist with the engine suite's
+        // wall-clock-budgeted neighbours.
         let (doc, url) = try await makeMultiPagePDF(pageCount: 2)
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -523,64 +458,38 @@ struct ParallelLayerExecutionTests {
         let wrappedDoc = SendablePDFDocument(doc)
         let pageCount = doc.pageCount
         let perPageModes = Array(repeating: PipelineMode.secureRasterization, count: pageCount)
+        let digests: [PageFilterDigest?] = Array(repeating: nil, count: pageCount)
+        let layers = verifier.layers(for: .secureRasterization)
 
         // Sequential run (baseline)
         var sequentialResults: [LayerResult] = []
-        for i in 0..<5 {
+        for layer in layers {
             let result = await verifier.runLayer(
-                verifier.layers(for: .secureRasterization)[i],
+                layer,
                 outputDocument: wrappedDoc,
                 sourcePageCount: pageCount,
                 regions: [:],
                 sensitiveTerms: [],
                 pipelineMode: .secureRasterization,
-                filterDigests: [],
+                filterDigests: digests,
                 perPageModes: perPageModes
             )
             sequentialResults.append(result)
         }
 
-        // Parallel-then-sequential run (production shape)
-        let parallel = await Self.runParallelBase(
-            layers: [0, 1, 2],
-            verifier: verifier,
-            doc: wrappedDoc,
-            sourcePageCount: pageCount,
-            regions: [:],
-            sensitiveTerms: [],
-            pipelineMode: .secureRasterization,
-            filterDigests: [],
-            perPageModes: perPageModes
-        )
-        let post = await Self.runSequential(
-            layers: [3, 4],
-            verifier: verifier,
-            doc: wrappedDoc,
-            sourcePageCount: pageCount,
-            regions: [:],
-            sensitiveTerms: [],
-            pipelineMode: .secureRasterization,
-            filterDigests: [],
-            perPageModes: perPageModes
-        )
-        let parallelResults: [LayerResult] = (parallel + post).map { $0.result }
+        // The orchestrator's schedule (production shape)
+        let run = try await Self.runOrchestrated(
+            url: url, doc: doc, pipelineMode: .secureRasterization,
+            sensitiveTerms: [], filterDigests: digests)
+        let orchestrated = run.report.layers
 
-        #expect(parallelResults.count == 5)
-        for i in 0..<5 {
-            #expect(
-                parallelResults[i].name == sequentialResults[i].name,
-                "Layer \(i) name should be stable across dispatch shape"
-            )
-            // .skipped never appears for these layers in
-            // .secureRasterization — confirm the status kind matches.
-            #expect(
-                parallelResults[i].status.isFail == sequentialResults[i].status.isFail,
-                "Layer \(i) FAIL status should be stable across dispatch shape"
-            )
-            #expect(
-                parallelResults[i].status.isWarn == sequentialResults[i].status.isWarn,
-                "Layer \(i) WARN status should be stable across dispatch shape"
-            )
+        #expect(orchestrated.count == layers.count)
+        for (i, (a, b)) in zip(orchestrated, sequentialResults).enumerated() {
+            #expect(a.name == b.name, "Layer \(i) name should be stable across dispatch shape")
+            #expect(a.status.isFail == b.status.isFail,
+                    "Layer \(i) FAIL status should be stable across dispatch shape")
+            #expect(a.status.isWarn == b.status.isWarn,
+                    "Layer \(i) WARN status should be stable across dispatch shape")
         }
     }
 
