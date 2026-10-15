@@ -52,18 +52,15 @@ extension DocumentEditorView {
         report.overallStatus.isSkipped && !acknowledged
     }
 
-    /// Incomplete-WARN share-risk confirm predicate. Two WARN shapes take
-    /// this confirm, both meaning a check did not run in full on the output:
-    /// the digest-less verify-only degrade — zero real WARN layers but at
-    /// least one SKIPPED layer, deliberately the exact gate of
-    /// `VerificationResultsView.mastheadSubtitle`'s "Completed with N of M
-    /// checks skipped — results may be incomplete." branch — and a WARN
-    /// whose layers include a could-not-verify WARN
+    /// Incomplete-WARN share-risk confirm predicate. A WARN takes this
+    /// confirm when a check did not run in full on the output: any SKIPPED
+    /// layer (the digest-less verify-only degrade, with or without routine
+    /// WARN layers beside it) or any could-not-verify WARN layer
     /// (`CouldNotVerifyWarn.matches`). Either way the confirm sheet reuses
-    /// the masthead's own sentence — no new string — and for the second
-    /// shape lists the reporting checks under the existing list header. A
-    /// WARN made only of routine notes (a structural or metadata note, a
-    /// positional graze, an attestation mismatch) stays confirm-free.
+    /// the masthead's own sentence — no new string — and lists the
+    /// could-not-verify checks under the existing list header. A WARN made
+    /// only of routine notes (a structural or metadata note, a positional
+    /// graze, an attestation mismatch) stays confirm-free.
     /// `report` alone can't carry the acknowledgement (`VerificationReport`
     /// lives in the fenced Packages/RedactionEngine), so unlike its two
     /// siblings this predicate takes `acknowledged` as an explicit
@@ -74,9 +71,8 @@ extension DocumentEditorView {
         report: VerificationReport, acknowledged: Bool
     ) -> Bool {
         guard report.overallStatus.isWarn, !acknowledged else { return false }
-        let warnCount = report.layers.filter(\.status.isWarn).count
         let skippedCount = report.layers.filter(\.status.isSkipped).count
-        if warnCount == 0 && skippedCount > 0 { return true }
+        if skippedCount > 0 { return true }
         return report.layers.contains(where: CouldNotVerifyWarn.matches)
     }
 

@@ -159,7 +159,8 @@ struct ResectaApp: App {
                             if launchArguments.contains("--loadTestDocument")
                                 || launchArguments.contains("--seedTriage")
                                 || launchArguments.contains("--openSearchSheet")
-                                || launchArguments.contains("--openSavedSearches") {
+                                || launchArguments.contains("--openSavedSearches")
+                                || launchArguments.contains(where: { $0.hasPrefix("--seedVerifiedReport=") }) {
                                 appCoordinator.openRedact()
                                 if case .redact(let ws) = appCoordinator.activeWorkspace {
                                     // `--multipageDoc` swaps the single-page
@@ -188,6 +189,19 @@ struct ResectaApp: App {
                                     // from the triage era — test plumbing.
                                     if launchArguments.contains("--seedTriage") {
                                         ws.redactionState.seedDebugTriage()
+                                    }
+                                    // `--seedVerifiedReport=<name>`: the results
+                                    // screen on a forged report
+                                    // (`VerificationDebugFixtures`), reached by
+                                    // the phase machine's own legal steps; an
+                                    // unknown name seeds nothing.
+                                    if let name = launchArguments
+                                        .first(where: { $0.hasPrefix("--seedVerifiedReport=") })?
+                                        .split(separator: "=").last,
+                                       let report = VerificationDebugFixtures.all[String(name)] {
+                                        ws.documentState.transition(to: .redacting(progress: .init(
+                                            currentPage: 1, totalPages: 1, currentStep: "Seeded")))
+                                        ws.documentState.transition(to: .verified(report: report))
                                     }
                                     // Sim-verification hook: present the
                                     // Search & Redact sheet on the loaded test

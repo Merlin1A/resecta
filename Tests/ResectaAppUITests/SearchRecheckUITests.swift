@@ -108,13 +108,13 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
             NSPredicate(format: #"label BEGINSWITH "Verification Details""#)
         ).firstMatch
         XCTAssertTrue(details.waitForExistence(timeout: 10), "Verification Details toggle not found.")
-        XCTAssertTrue(details.label.contains("7 of 7 checks passed"),
-                      "Secure Rasterization runs a 7-layer check: \(details.label)")
+        XCTAssertEqual(details.label, "Verification Details, 7 of 7 checks passed",
+                       "Secure Rasterization runs a 7-layer check, every one passing: \(details.label)")
         details.tap()
 
         // The sixth row (zero-indexed identifier) is the Search Re-check in
         // Secure Rasterization. Collapsed, the row is one combined element
-        // whose label is "Layer 6, Search Re-check, Check passed. …".
+        // whose label is "Search Re-check, Passed. …".
         let row = app.descendants(matching: .any)
             .matching(identifier: "layerResult_5")
             .firstMatch
@@ -127,7 +127,7 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         let label = row.label
         XCTAssertTrue(label.contains("Search Re-check"),
                       "Row 6 is not the Search Re-check: \(label)")
-        XCTAssertTrue(label.contains("Check passed."),
+        XCTAssertTrue(label.contains("Passed."),
                       "The Search Re-check did not read as passed: \(label)")
         attachScreenshot(named: "search-recheck-02-details-row")
     }
@@ -180,9 +180,14 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
             NSPredicate(format: #"label BEGINSWITH "Verification Details""#)
         ).firstMatch
         XCTAssertTrue(details.waitForExistence(timeout: 10), "Verification Details toggle not found.")
-        XCTAssertTrue(details.label.contains("7 of 7 checks passed"),
-                      "Secure Rasterization runs a 7-layer check: \(details.label)")
+        XCTAssertTrue(details.label.contains("6 of 7 checks passed · 1\u{00A0}had nothing to check"),
+                      "No typed search: the re-check had nothing to check: \(details.label)")
         details.tap()
+        // The idle re-check sits above the pass cluster, so the cluster
+        // starts collapsed: open it to reach the sweep's row.
+        let cluster = app.buttons["passedChecksCluster"]
+        XCTAssertTrue(cluster.waitForExistence(timeout: 10), "The pass cluster never appeared.")
+        cluster.tap()
 
         let row = app.descendants(matching: .any).matching(identifier: "layerResult_6").firstMatch
         var scrolls = 0

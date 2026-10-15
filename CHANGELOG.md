@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - Search sheet: the recent-search recall chips, the per-term section headers of the results list and the saved-search names are marked privacy-sensitive, matching the result rows and the saved-query previews.
 - Import: a file over the 50 MB cap is refused by its size on disk before any byte is read, from the Files picker and from a drop alike; a dropped file arrives as a file and is read inside its transfer rather than as 50 MB of memory.
+- Verification results: the Verification Details list groups each check by its outcome — findings first, then checks that could not verify part of the output or were skipped (Share asks you to confirm before sending), then notes and checks that had nothing to check, then one line for the checks that passed, which opens to the individual rows. Every row shows the check's glyph, one status mark and one status word; the header counts only passing checks as passed and names failed checks, checks that need review, checks that could not verify, warnings, notes and checks with nothing to check separately. The ten core checks carry plain-language titles, a passing check's row says in one line what the check reads, and the results headline names warnings and checks that could not verify in the list's words.
 
 ### Removed
 
@@ -21,6 +22,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The pre-commit hook and the pull-request gate scan the whole shipping source, on every run, for the call-shaped networking and hand-off symbols (a bare `Link(`, the Network framework's listener and browser, the socket and stream constructors, `openURL`, `UIApplication.shared.open(`, an `import Network` line) against the sites pinned in `Scripts/audit-lint.sh` with their reasons; one site is pinned, the Settings view's `mailto:` feedback link.
 - The shipped-asset fence (`Scripts/verify-shipped-asset-hashes.sh`) verifies the gazetteer manifest's Ed25519 signature with a verifier outside the engine (OpenSSL 3, else CryptoKit through `swift`; no verifier fails the fence), beside the blob and digest pins it already held.
 - `SECURITY.md` says how a security fix is announced: the changelog's `Security` heading of the release that carries it, the App Store availability date, a GitHub security advisory with a CVE through GitHub's CNA where a report warrants one, and that a fix reaches users only as an update. `THREAT-MODEL.md`'s build-and-distribution boundary says that the app repository holds no Actions secret, so no workflow can sign or upload a build, and that the detection-data signing key never enters a repository.
+- Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
 ### Fixed
 
 - Custom terms and saved patterns: a regular expression holding a character whose uppercase form is two letters (such as ß or the ﬁ ligature) no longer stops the app when the pattern is validated.
@@ -33,6 +35,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Custom terms: a literal term typed with a ligature or a compatibility character matches its plain spelling on pages whose text is plain ASCII.
 - Verification: the Character Count and Font Verification checks report the per-page warnings their checks raise — a count excess as a note, a page whose fonts could not be inspected as not verified — where before the check passed.
 - Searchable Redaction: a page whose text layout does not settle within the re-flow limit is written without a text layer instead of with a character placed inside a redacted area.
+- Verification results: the Verification Details summary no longer counts notes or checks with nothing to check as passed, and no longer reports a check that could not verify part of the output as completed.
+- Share: a report with a skipped check asks for confirmation before sharing even when another check reported a routine warning.
+- Verification results: a search line starting 'Scan (' keeps its term formatting.
 
 ### Internal
 
@@ -53,6 +58,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The engine's unsupported-format message names the formats: PDF files and JPEG, PNG and HEIC images.
 - Import lives in `Services/Import/`: a loader protocol with its payload, limits and facts types; a router that reads the leading bytes, never the declared type, and refuses every image signature before any decode; the PDF stages as a pure function of the bytes; and a wrapper that applies the facts to the editor's state in one place and reports whether the import completed. The image decode and image-to-PDF render no door reached, and the Live Photo auxiliary-metadata stripper only they called, are deleted.
 - The run's page-data bridge is a pure function of values (`RunInputs.pageData`); the rasterization steps sit in `PipelineCoordinator+Rasterization.swift`; the stores share one lenient row wrapper and one legacy-defaults move; the regex sentinel is entered through one `PatternAdmission` path; the sidebar's thumbnail cache keys on the document as well as the page.
+- The pre-push hook refuses a stale generated project, runs only the test schemes the pushed change touches (both for an engine change, none for documentation), and accepts the batched runner's passing verdict for the same tree in place of a re-run.
+- The batched runner writes a verdict file beside its logs: the scheme, the counts, the commit and tree it ran on, the simulator and runtime, and the Xcode build.
 
 ## [1.2.0] — 2026-09-29
 
