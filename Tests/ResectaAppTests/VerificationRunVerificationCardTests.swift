@@ -32,13 +32,13 @@ struct VerificationRunVerificationCardTests {
                 == "Verification did not finish — run the checks on this output before sharing.")
     }
 
-    @Test("No outcome-promise language in the card and footnote strings")
+    @Test("No outcome-promise language in the card strings and the skipped row's caption")
     func noOutcomePromiseLanguage() {
         let bannedWords = ["guaranteed", "ensures", "impossible", "guarantee", "ensure"] // LegalPhrases:safe (test data — the ban list itself)
         let allText = [
             VerificationResultsView.runVerificationCardBodyText(reason: .autoVerifyOff),
             VerificationResultsView.runVerificationCardBodyText(reason: .cancelled),
-            VerificationResultsView.skippedChecksFootnoteText,
+            VerificationRowModel.skippedCaption,
         ].joined(separator: " ").lowercased()
         for word in bannedWords {
             #expect(!allText.contains(word),
@@ -91,48 +91,6 @@ struct VerificationRunVerificationCardTests {
         )
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
                 == "Verification completed with 1 note. Review below before sharing.")
-    }
-
-    // MARK: - Skipped-checks footnote gate
-
-    @Test("Footnote shows for a WARN report with a skipped layer")
-    func footnoteShowsForSkipInducedWarn() {
-        let report = VerificationReport(
-            layers: [makeLayer(name: "Check B", status: .skipped)],
-            overallStatus: .warn("skips"),
-            durationSeconds: 0.1
-        )
-        #expect(VerificationResultsView.shouldShowSkippedChecksFootnote(report: report) == true)
-    }
-
-    @Test("Footnote hidden when no layer is skipped")
-    func footnoteHiddenWithoutSkips() {
-        let report = VerificationReport(
-            layers: [makeLayer(name: "Check A", status: .warn("noise"))],
-            overallStatus: .warn("noise"),
-            durationSeconds: 0.1
-        )
-        #expect(VerificationResultsView.shouldShowSkippedChecksFootnote(report: report) == false)
-    }
-
-    @Test("Footnote hidden on a PASS report even with a skipped layer")
-    func footnoteHiddenOnPass() {
-        // Defensive: the aggregate never passes with skips, but
-        // the gate must not rely on that invariant alone.
-        let report = VerificationReport(
-            layers: [makeLayer(name: "Check B", status: .skipped)],
-            overallStatus: .pass,
-            durationSeconds: 0.1
-        )
-        #expect(VerificationResultsView.shouldShowSkippedChecksFootnote(report: report) == false)
-    }
-
-    @Test("Footnote hidden on the empty skipped sentinel")
-    func footnoteHiddenOnSentinel() {
-        // The sentinel has no layers — nothing ran, so there is no
-        // skipped-row copy to correct; the masthead subtitle carries the
-        // reason instead.
-        #expect(VerificationResultsView.shouldShowSkippedChecksFootnote(report: .skipped) == false)
     }
 
     // MARK: - RedactionState retention lifecycle

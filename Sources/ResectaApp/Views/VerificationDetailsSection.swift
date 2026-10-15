@@ -3,13 +3,14 @@ import RedactionEngine
 
 // The Verification Details disclosure of the results screen: the header
 // row and, expanded, the page-modes section, the deselection row and the
-// per-layer rows grouped FINDINGS → clean → NOTES. Moved out of
+// per-layer rows grouped by outcome — FINDINGS → COULD NOT VERIFY → NOTES →
+// the pass cluster. Moved out of
 // `VerificationResultsView` (the page stack stays there): the parent keeps
 // the auto-expand state (`detailsExpanded` + `didAutoExpand` +
 // `shouldAutoExpand`) and threads it in as `isExpanded`; this view owns
-// which layer row is open and whether the page-modes section is open.
-// The static copy builders the display tests pin
-// (`detailsSummaryText(for:)`, the footnote / deselection / fallback-reason
+// which layer row is open, whether the pass cluster is open and whether
+// the page-modes section is open. The static copy builders the display
+// tests pin (`detailsSummaryText(for:)`, the deselection / fallback-reason
 // strings) stay on `VerificationResultsView`, in the extension at the
 // bottom of this file.
 
@@ -31,17 +32,28 @@ struct VerificationDetailsSection: View {
     // page-modes / layer-detail `.move(edge:)` transitions through
     // `Anim.resolvedTransition`.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // At accessibility sizes the header stacks: the tile, then the title
+    // and the chevron, then the summary.
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var expandedLayer: Int?
     @State private var showPageModes = false
+    /// The pass cluster's open state once the user has toggled it; until
+    /// then it is open exactly when nothing sits above it.
+    @State private var clusterExpanded: Bool?
 
-    /// The rows' icon column (`LayerResultRow.iconColumn`, the same
-    /// metric): the hairlines between rows and under the Page Modes
-    /// header inset past it and the icon's gap, so they start where the
-    /// row text starts.
+    /// The Page Modes and deselection rows' icon column: the hairline
+    /// between them insets past it and the icon's gap.
     @ScaledMetric(relativeTo: .title3) private var iconColumn: CGFloat = 30
+    /// Their icon's point size, scaling with the column.
+    @ScaledMetric(relativeTo: .title3) private var iconSize: CGFloat = 20
+    /// The layer rows' glyph and mark columns (`LayerResultRow.column`, the
+    /// same metric): the hairlines between rows inset past both and their
+    /// gaps, so they start where the row titles start.
+    @ScaledMetric(relativeTo: .subheadline) private var rowColumn: CGFloat = 20
 
     private var hairlineInset: CGFloat { iconColumn + ResectaTokens.Spacing.sm }
+    private var rowHairlineInset: CGFloat { 2 * (rowColumn + ResectaTokens.Spacing.sm) }
 
     /// The header's teal tile, scaling with the headline it sits beside.
     /// 36 pt with 12 pt of padding is the measured ceiling that keeps the
@@ -65,148 +77,19 @@ struct VerificationDetailsSection: View {
                     isExpanded.toggle()
                 }
             } label: {
-                HStack(spacing: ResectaTokens.Spacing.md) {
-                    // The brand glyph on the tile wash (the
-                    // HomeChoiceCardContent subtle-tile rule).
-                    Image(systemName: "list.bullet.rectangle")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(ResectaTokens.BrandTeal.text)
-                        .frame(width: headerTile, height: headerTile)
-                        .background(
-                            ResectaTokens.BrandTeal.tint.opacity(
-                                colorScheme == .dark
-                                    ? ResectaTokens.Opacity.tileWashDark
-                                    : ResectaTokens.Opacity.tileWashLight),
-                            in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.medium, style: .continuous))
-
-                    // The text column takes the width a Spacer would have
-                    // taken — a Spacer costs its minimum length plus two
-                    // HStack gaps and wraps the PASS summary onto two lines
-                    // at 402 pt. The summary is caption-sized: at footnote
-                    // size "5 of 5 checks passed · 2 informational notes"
-                    // needs ≈ 270 pt against the 262-pt column and wraps
-                    // (measured on the iPhone 17 simulator, 2026-09-24);
-                    // at caption size it is one line and the header 60 pt.
-                    VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
-                        Text("Verification Details")
-                            .font(.headline)
-                        Text(detailsSummary)
-                            .font(.caption)
-                            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    DisclosureChevron(isExpanded: isExpanded, tint: ResectaTokens.BrandTeal.text)
-                        .frame(width: 16)
-                }
-                // 12 pt: the disclosure's own row pads tighter than the
-                // 16 pt action cards above it; with the 36 pt tile this
-                // keeps the timing line ≈31 pt above the 6.3″ fold.
-                .padding(ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xs)
-                .contentShape(Rectangle())
+                headerLabel
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Verification Details, \(detailsSummary)")
             .accessibilityHint(isExpanded ? "Tap to collapse" : "Tap to expand")
 
             if isExpanded {
-                // Groups, 24 pt apart; inside a group the header hugs its
-                // rows and the rows sit flat, a hairline between them.
-                VStack(alignment: .leading, spacing: ResectaTokens.Spacing.lg) {
-                    // Page Modes and the deselection row are one item.
-                    //
-                    // Deselection visibility at share time: a PASS
-                    // legitimately says "without issues" — the checks ran
-                    // on what was redacted, not on what the user chose to
-                    // leave. When the run started with known scan results
-                    // deliberately un-checked, say so here, at the surface
-                    // where the share decision is made.
-                    let showsDeselection = VerificationResultsView.shouldShowDeselectionRow(
-                        snapshot: deselectionSnapshot)
-                    if report.perPageModes.hasMixedModes || showsDeselection {
-                        VStack(alignment: .leading, spacing: 0) {
-                            if report.perPageModes.hasMixedModes {
-                                pageModesSection
-                            }
-                            if report.perPageModes.hasMixedModes, showsDeselection {
-                                hairline
-                            }
-                            if showsDeselection, let snapshot = deselectionSnapshot {
-                                deselectionRow(snapshot: snapshot)
-                            }
-                        }
-                    }
-
-                    // The layers partitioned into actionable findings vs.
-                    // informational notes vs. clean checks — one enumeration
-                    // (`VerificationLayerPartition`), engine order inside each
-                    // group. `layerIndex` stays engine-position-based
-                    // (1-indexed) so the accessibilityIdentifier
-                    // "layerResult_\(layerIndex - 1)" and spec cross-references
-                    // remain stable across grouping; the rows are keyed by that
-                    // index. .skipped rides under FINDINGS (a skipped check is
-                    // something the user should notice), not silently in the
-                    // passed group.
-                    let partition = VerificationLayerPartition(
-                        layers: report.layers, perPageModes: report.perPageModes)
-
-                    if partition.isWhollyClean {
-                        // Wholly clean doc — one group, no header.
-                        VStack(alignment: .leading, spacing: 0) {
-                            layerRows(partition.cluster)
-                        }
-                    } else {
-                        if !partition.findings.isEmpty || !partition.couldNotVerify.isEmpty {
-                            VStack(alignment: .leading, spacing: 0) {
-                                sectionHeader("FINDINGS")
-                                layerRows(partition.findings + partition.couldNotVerify)
-                                // The full-width break between the
-                                // findings and the clean checks — the
-                                // group boundary.
-                                Divider()
-                                if VerificationResultsView.shouldShowSkippedChecksFootnote(report: report) {
-                                    skippedChecksFootnote
-                                }
-                                // Clean checks ride under FINDINGS so the user
-                                // sees the full surface that was inspected.
-                                layerRows(partition.cluster)
-                            }
-                        } else {
-                            // Notes-only — passed rows lead with no header,
-                            // the NOTES group below.
-                            VStack(alignment: .leading, spacing: 0) {
-                                layerRows(partition.cluster)
-                            }
-                        }
-                        if !partition.notes.isEmpty {
-                            // INFO emitters include OCR/spatial
-                            // observations, not just Layer-5 metadata —
-                            // "NOTES" covers the whole isInfo set.
-                            VStack(alignment: .leading, spacing: 0) {
-                                sectionHeader("NOTES")
-                                layerRows(partition.notes)
-                            }
-                        }
-                    }
-                }
-                // The content column pads like the action cards (16 pt);
-                // the flat rows inside carry no horizontal padding of their
-                // own, so the icon column, the hairlines and the group
-                // headers all measure from this edge.
-                .padding(.horizontal, ResectaTokens.Spacing.md)
-                .padding(.bottom, ResectaTokens.Spacing.md)
-                // Routed
-                // through the resolver so Reduce Motion swaps the slide
-                // for an opacity-only crossfade.
-                .transition(ResectaTokens.Anim.resolvedTransition(
-                    standard: .opacity.combined(with: .move(edge: .top)),
-                    reduceMotion: reduceMotion))
+                groups
             }
         }
         // One material for the whole disclosure (the rows inside are flat).
         // The shadow sits on the background shape itself: a `.shadow` on
-        // the whole view would also be cast by every opaque child — the
-        // badges' knock-out rings drew a grey crescent that way.
+        // the whole view would also be cast by every opaque child.
         .background {
             RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.card, style: .continuous)
                 .fill(.regularMaterial)
@@ -219,12 +102,206 @@ struct VerificationDetailsSection: View {
         .frame(maxWidth: columnMaxWidth)
     }
 
-    private var skippedChecksFootnote: some View {
-        Text(VerificationResultsView.skippedChecksFootnoteText)
+    // MARK: - The header
+
+    /// The brand glyph on the tile wash (the HomeChoiceCardContent
+    /// subtle-tile rule).
+    private var headerTileView: some View {
+        Image(systemName: "list.bullet.rectangle")
+            .font(.body.weight(.semibold))
+            .foregroundStyle(ResectaTokens.BrandTeal.text)
+            .frame(width: headerTile, height: headerTile)
+            .background(
+                ResectaTokens.BrandTeal.tint.opacity(
+                    colorScheme == .dark
+                        ? ResectaTokens.Opacity.tileWashDark
+                        : ResectaTokens.Opacity.tileWashLight),
+                in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.medium, style: .continuous))
+    }
+
+    private var headerSummary: some View {
+        Text(detailsSummary)
             .font(.caption)
             .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, ResectaTokens.Spacing.sm)
+    }
+
+    /// The tile, the title over the summary, one chevron. At accessibility
+    /// sizes "Verification Details" alone is wider than the column beside
+    /// the tile, so the header stacks: the tile, the title and the chevron,
+    /// the summary.
+    @ViewBuilder
+    private var headerLabel: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: ResectaTokens.Spacing.sm) {
+                headerTileView
+                HStack(alignment: .firstTextBaseline, spacing: ResectaTokens.Spacing.sm) {
+                    Text("Verification Details")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    DisclosureChevron(isExpanded: isExpanded, tint: ResectaTokens.BrandTeal.text)
+                }
+                headerSummary
+            }
+            .padding(ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xs)
+            .contentShape(Rectangle())
+        } else {
+            HStack(spacing: ResectaTokens.Spacing.md) {
+                headerTileView
+
+                // The text column takes the width a Spacer would have
+                // taken — a Spacer costs its minimum length plus two
+                // HStack gaps and wraps the PASS summary onto two lines
+                // at 402 pt. The summary is caption-sized: at footnote
+                // size "5 of 5 checks passed · 2 informational notes"
+                // needs ≈ 270 pt against the 262-pt column and wraps
+                // (measured on the iPhone 17 simulator, 2026-09-24);
+                // at caption size it is one line and the header 60 pt.
+                VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
+                    Text("Verification Details")
+                        .font(.headline)
+                    headerSummary
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                DisclosureChevron(isExpanded: isExpanded, tint: ResectaTokens.BrandTeal.text)
+                    .frame(width: 16)
+            }
+            // 12 pt: the disclosure's own row pads tighter than the
+            // 16 pt action cards above it; with the 36 pt tile this
+            // keeps the timing line ≈31 pt above the 6.3″ fold.
+            .padding(ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xs)
+            .contentShape(Rectangle())
+        }
+    }
+
+    // MARK: - The groups
+
+    /// Groups, 24 pt apart; inside a group the header hugs its rows and the
+    /// rows sit flat, a hairline between them.
+    private var groups: some View {
+        VStack(alignment: .leading, spacing: ResectaTokens.Spacing.lg) {
+            // Page Modes and the deselection row are one item.
+            //
+            // Deselection visibility at share time: a PASS
+            // legitimately says "without issues" — the checks ran
+            // on what was redacted, not on what the user chose to
+            // leave. When the run started with known scan results
+            // deliberately un-checked, say so here, at the surface
+            // where the share decision is made.
+            let showsDeselection = VerificationResultsView.shouldShowDeselectionRow(
+                snapshot: deselectionSnapshot)
+            if report.perPageModes.hasMixedModes || showsDeselection {
+                VStack(alignment: .leading, spacing: 0) {
+                    if report.perPageModes.hasMixedModes {
+                        pageModesSection
+                    }
+                    if report.perPageModes.hasMixedModes, showsDeselection {
+                        hairline
+                    }
+                    if showsDeselection, let snapshot = deselectionSnapshot {
+                        deselectionRow(snapshot: snapshot)
+                    }
+                }
+            }
+
+            // The layers grouped by outcome — one enumeration
+            // (`VerificationLayerPartition`), engine order inside each
+            // group: what needs attention first, then the checks that could
+            // not verify part of the output (Share asks before sending),
+            // then the notes and the checks with nothing to check, then one
+            // row for the checks that passed. `layerIndex` stays
+            // engine-position-based (1-indexed) so the identifier
+            // "layerResult_\(layerIndex - 1)" stays stable across grouping;
+            // the rows are keyed by that index.
+            let partition = VerificationLayerPartition(
+                layers: report.layers, perPageModes: report.perPageModes)
+            if !partition.findings.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    sectionHeader("FINDINGS")
+                    layerRows(partition.findings)
+                }
+            }
+            if !partition.couldNotVerify.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    sectionHeader("COULD NOT VERIFY", caption: "Share will ask you to confirm.")
+                    layerRows(partition.couldNotVerify)
+                }
+            }
+            if !partition.notes.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    sectionHeader("NOTES")
+                    layerRows(partition.notes)
+                }
+            }
+            if !partition.cluster.isEmpty {
+                passCluster(partition)
+            }
+        }
+        // The content column pads like the action cards (16 pt);
+        // the flat rows inside carry no horizontal padding of their
+        // own, so the row columns, the hairlines and the group
+        // headers all measure from this edge.
+        .padding(.horizontal, ResectaTokens.Spacing.md)
+        .padding(.bottom, ResectaTokens.Spacing.md)
+        // Routed
+        // through the resolver so Reduce Motion swaps the slide
+        // for an opacity-only crossfade.
+        .transition(ResectaTokens.Anim.resolvedTransition(
+            standard: .opacity.combined(with: .move(edge: .top)),
+            reduceMotion: reduceMotion))
+    }
+
+    /// One row in the layer rows' anatomy — the pass mark, "N checks
+    /// passed", a chevron — that opens to the passing checks (and the notes
+    /// with nothing remaining). Open by default only when nothing sits
+    /// above it; collapsing it closes an open member.
+    @ViewBuilder
+    private func passCluster(_ partition: VerificationLayerPartition) -> some View {
+        let isOpen = clusterExpanded ?? partition.isWhollyClean
+        let clusterTitle = partition.clusterTitle
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(ResectaTokens.Anim.stateChange) {
+                    if isOpen, let open = expandedLayer, partition.cluster.contains(open) {
+                        expandedLayer = nil
+                    }
+                    clusterExpanded = !isOpen
+                }
+            } label: {
+                HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
+                    // The glyph column stays empty: the cluster names no
+                    // single check.
+                    Color.clear.frame(width: rowColumn, height: rowColumn)
+                    Image(systemName: VerificationOutcome.passed.markSymbolName)
+                        .font(.system(size: rowColumn, weight: .semibold))
+                        .foregroundStyle(VerificationOutcome.passed.textColor)
+                        .frame(width: rowColumn, height: rowColumn)
+                    Text(clusterTitle)
+                        .font(.subheadline.weight(.medium))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    DisclosureChevron(isExpanded: isOpen)
+                        .frame(width: 16, height: rowColumn)
+                }
+                .padding(.vertical, ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xxs)
+                .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(clusterTitle)
+            .accessibilityHint(isOpen ? "Tap to collapse" : "Tap to expand")
+            .accessibilityIdentifier("passedChecksCluster")
+
+            if isOpen {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(partition.cluster, id: \.self) { index in
+                        rowHairline
+                        layerRow(layer: report.layers[index], index: index)
+                    }
+                }
+                // Opacity only: the members appear in place.
+                .transition(.opacity)
+            }
+        }
     }
 
     // MARK: - Deselection row
@@ -239,7 +316,7 @@ struct VerificationDetailsSection: View {
             // The glyph on a neutral tile, the rows' icon column wide — a
             // fact about the run, not a status.
             Image(systemName: "checklist.unchecked")
-                .font(.system(size: 20))
+                .font(.system(size: iconSize))
                 .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 .frame(width: iconColumn, height: iconColumn)
                 .background(
@@ -258,21 +335,36 @@ struct VerificationDetailsSection: View {
         .accessibilityIdentifier("deselectionRow")
     }
 
+    /// A group's header; a caption under it joins the header's one
+    /// VoiceOver element.
     @ViewBuilder
-    private func sectionHeader(_ label: String) -> some View {
-        Text(label)
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-            .textCase(.uppercase)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, ResectaTokens.Spacing.xs)
-            .accessibilityAddTraits(.isHeader)
+    private func sectionHeader(_ label: String, caption: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
+            Text(label)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                .textCase(.uppercase)
+            if let caption {
+                Text(caption)
+                    .font(.caption)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, ResectaTokens.Spacing.xs)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
-    /// The hairline between two rows (and between the Page Modes section
-    /// and the deselection row): inset past the icon column.
+    /// The hairline between the Page Modes section and the deselection
+    /// row: inset past their icon column.
     private var hairline: some View {
         Divider().padding(.leading, hairlineInset)
+    }
+
+    /// The hairline between two layer rows: inset to the row titles.
+    private var rowHairline: some View {
+        Divider().padding(.leading, rowHairlineInset)
     }
 
     /// The rows for a group's engine indices, flat, a hairline between
@@ -281,7 +373,7 @@ struct VerificationDetailsSection: View {
     private func layerRows(_ indices: [Int]) -> some View {
         ForEach(Array(indices.enumerated()), id: \.element) { position, index in
             if position > 0 {
-                hairline
+                rowHairline
             }
             layerRow(layer: report.layers[index], index: index)
         }
@@ -302,14 +394,12 @@ struct VerificationDetailsSection: View {
                 documentState.currentPageIndex = pageIndex
                 documentState.transition(to: .editing)
             },
-            // A clean pass is the compact ledger row; every other row is
-            // full (`LayerResultRow.rowStyle(for:)`).
-            style: LayerResultRow.rowStyle(for: layer),
-            chrome: .plain
+            chrome: .plain,
+            perPageModes: report.perPageModes
         )
     }
 
-    /// Closed-state summary line: counts vary by status per the plan lock.
+    /// Closed-state summary line: only passing checks count as passed.
     private var detailsSummary: String { VerificationResultsView.detailsSummaryText(for: report) }
 
     // MARK: - Page Modes Section (verbatim from prior implementation)
@@ -330,7 +420,7 @@ struct VerificationDetailsSection: View {
             } label: {
                 HStack(spacing: ResectaTokens.Spacing.sm) {
                     Image(systemName: "square.2.layers.3d")
-                        .font(.system(size: 20))
+                        .font(.system(size: iconSize))
                         .foregroundStyle(ResectaTokens.SemanticColor.searchableMode)
                         .frame(width: iconColumn)
 
@@ -470,25 +560,6 @@ struct VerificationDetailsSection: View {
 // host; kept on the parent type so no test call site moves with the view.
 
 extension VerificationResultsView {
-    /// At the display surface: the generic skipped-row copy says the
-    /// layer "was not applicable for this pipeline mode", but on the
-    /// digest-less verify-only path the layer applies and merely lacked
-    /// data — the user's actual remedy is a full re-run. One caption under
-    /// the FINDINGS group names that remedy. Rendered only when a skipped
-    /// layer is present on a WARN or skipped report (the layer copy itself
-    /// belongs to the engine and is out of scope here).
-    static let skippedChecksFootnoteText =
-        "Skipped checks need data from a full redaction run — run Redact again to include them."
-
-    /// Footnote visibility. Static so the condition is unit-testable
-    /// without a SwiftUI host (mirrors `shouldAutoExpand`).
-    static func shouldShowSkippedChecksFootnote(report: VerificationReport) -> Bool {
-        report.layers.contains(where: \.status.isSkipped)
-            && (report.overallStatus.isWarn
-                || report.overallStatus.isAttention
-                || report.overallStatus.isSkipped)
-    }
-
     /// Row visibility: a snapshot with at least one deselected item. The
     /// row stands beside the Detection Sweep row on every report: the
     /// sweep's line counts only the deselected items it re-detected in the

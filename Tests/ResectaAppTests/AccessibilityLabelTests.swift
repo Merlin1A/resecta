@@ -221,6 +221,11 @@ struct AccessibilityLabelTests {
         )
     }
 
+    /// The row's spoken label over its display model.
+    private static func rowLabel(_ layer: LayerResult) -> String {
+        LayerResultRow.accessibilityLabel(model: .init(layer: layer, perPageModes: []), layer: layer)
+    }
+
     @Test("Layer-scoped phrases never reuse the overall-run phrasing",
           arguments: [
             (VerificationStatus.pass, "Check passed."),
@@ -244,16 +249,13 @@ struct AccessibilityLabelTests {
     // its own reachable element), so the label ends at the page count.
     @Test("Row label speaks the reported diagnostic and page count, never the duration")
     func testRowLabelWarnWithPagesAndDuration() {
-        let label = LayerResultRow.accessibilityLabel(
-            layerIndex: 2,
-            layer: Self.layer(
-                status: .warn("w"),
-                shortDescription: "OCR could not be run on 1 page.",
-                pageReferences: [3, 7],
-                durationSeconds: 1.34
-            )
-        )
-        #expect(label == "Layer 2, OCR Check, Check found a note. OCR could not be run on 1 page., 2 affected pages")
+        let label = Self.rowLabel(Self.layer(
+            status: .warn("w"),
+            shortDescription: "OCR could not be run on 1 page.",
+            pageReferences: [3, 7],
+            durationSeconds: 1.34
+        ))
+        #expect(label == "OCR Check, Warning. OCR could not be run on 1 page., 2 affected pages")
     }
 
     // The expanded row's last line: "Took under 0.1 s" for every duration
@@ -272,25 +274,20 @@ struct AccessibilityLabelTests {
 
     @Test("Row label singular page suffix")
     func testRowLabelSingularPage() {
-        let label = LayerResultRow.accessibilityLabel(
-            layerIndex: 4,
-            layer: Self.layer(
-                status: .fail("f"),
-                shortDescription: "Text remains on 1 page.",
-                pageReferences: [0]
-            )
-        )
+        let label = Self.rowLabel(Self.layer(
+            status: .fail("f"),
+            shortDescription: "Text remains on 1 page.",
+            pageReferences: [0]
+        ))
         #expect(label.contains("1 affected page,") == false)
         #expect(label.hasSuffix("Text remains on 1 page., 1 affected page"))
     }
 
     @Test("Row label pass: no page suffix, no duration tail at zero")
     func testRowLabelPassNoSuffixes() {
-        let label = LayerResultRow.accessibilityLabel(
-            layerIndex: 1,
-            layer: Self.layer(status: .pass)
-        )
-        #expect(label == "Layer 1, OCR Check, Check passed. No issues found.")
+        let label = Self.rowLabel(Self.layer(status: .pass))
+        // No identity: the title is the engine name, the caption its line.
+        #expect(label == "OCR Check, Passed. No issues found.")
     }
 
     @Test("Expand hint only on expandable rows",
