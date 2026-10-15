@@ -10,7 +10,7 @@ import PDFKit
 @Suite("Fake Redaction Detection", .tags(.security, .critical))
 struct FakeRedactionTests {
 
-    @Test("Text under opaque annotation is destroyed by pipeline")
+    @Test("Searchable: text under an opaque annotation leaves the text layer")
     func detectFakeRedaction() async throws {
         let fixture = TestFixtures.fakeRedaction(text: "TOP SECRET")
         let doc = try #require(PDFDocument(data: fixture))
@@ -20,7 +20,8 @@ struct FakeRedactionTests {
                 "Fixture broken: text must be extractable under annotation")
 
         // Process through redaction pipeline
-        let output = try await TestPipeline.processAndExport(fixture)
+        let output = try await TestPipeline.processAndExport(
+            fixture, mode: .searchableRedaction, regions: [0: []])
         defer { try? FileManager.default.removeItem(at: output) }
 
         // Verify text is gone from text layer
@@ -30,10 +31,11 @@ struct FakeRedactionTests {
                 "Fake-redacted text must not survive pipeline")
     }
 
-    @Test("Fake redaction text absent from raw output bytes")
+    @Test("Searchable: fake redaction text absent from raw output bytes")
     func fakeRedactionBytesAbsent() async throws {
         let fixture = TestFixtures.fakeRedaction(text: "CLASSIFIED SECRET")
-        let output = try await TestPipeline.processAndExport(fixture)
+        let output = try await TestPipeline.processAndExport(
+            fixture, mode: .searchableRedaction, regions: [0: []])
         defer { try? FileManager.default.removeItem(at: output) }
 
         let outputData = try Data(contentsOf: output)
