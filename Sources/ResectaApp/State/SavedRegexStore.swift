@@ -46,7 +46,7 @@ nonisolated struct SavedRegexEnvelope: Codable, Sendable, Equatable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
-        let wrapped = try container.decode([FailableSavedRegex].self, forKey: .userSavedRegexes)
+        let wrapped = try container.decode([FailableRow<SavedRegex>].self, forKey: .userSavedRegexes)
         self.userSavedRegexes = wrapped.compactMap(\.value)
         self.unrecognized = wrapped.compactMap(\.raw)
     }
@@ -59,22 +59,6 @@ nonisolated struct SavedRegexEnvelope: Codable, Sendable, Equatable {
         var rows = container.nestedUnkeyedContainer(forKey: .userSavedRegexes)
         for regex in userSavedRegexes { try rows.encode(regex) }
         for row in unrecognized { try rows.encode(row) }
-    }
-}
-
-/// Never-throwing element wrapper for the lenient envelope decode
-/// (mirrors `FailableSavedSearch`).
-nonisolated private struct FailableSavedRegex: Decodable {
-    let value: SavedRegex?
-    let raw: RetainedJSONValue?
-    init(from decoder: Decoder) {
-        if let decoded = try? SavedRegex(from: decoder) {
-            self.value = decoded
-            self.raw = nil
-        } else {
-            self.value = nil
-            self.raw = try? RetainedJSONValue(from: decoder)
-        }
     }
 }
 
@@ -141,33 +125,10 @@ final class SavedRegexStore {
             schemaVersion: Self.schemaVersion,
             fallback: SavedRegexEnvelope(schemaVersion: 1, userSavedRegexes: [])
         )
-        Self.migrateLegacyDefaultsIfNeeded(from: legacyDefaults, into: blob)
+        blob.migrateLegacyDefaultsIfNeeded(from: legacyDefaults, key: Self.storageKey)
         let envelope = blob.load()
         self.userSavedRegexes = envelope.userSavedRegexes
         self.unrecognizedRows = envelope.unrecognized
-    }
-
-    /// One-shot move of the pre-file `UserDefaults` envelope into the
-    /// protected Application Support file (mirrors
-    /// `UserTermsStore.migrateLegacyDefaultsIfNeeded`). The key is
-    /// removed only after the file is confirmed on disk, so a failed
-    /// write retries next launch. Envelope shape and schema version are
-    /// unchanged on both sides.
-    nonisolated private static func migrateLegacyDefaultsIfNeeded(
-        from defaults: UserDefaults,
-        into storage: FileJSONBlob<SavedRegexEnvelope>
-    ) {
-        guard defaults.data(forKey: storageKey) != nil else { return }
-        let legacy = UserDefaultsJSONBlob<SavedRegexEnvelope>(
-            key: storageKey,
-            schemaVersion: schemaVersion,
-            defaults: defaults,
-            fallback: SavedRegexEnvelope(schemaVersion: 1, userSavedRegexes: [])
-        )
-        storage.save(legacy.load())
-        if FileManager.default.fileExists(atPath: storage.fileURL.path) {
-            defaults.removeObject(forKey: storageKey)
-        }
     }
 
     // MARK: - Mutate

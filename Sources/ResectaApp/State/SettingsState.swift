@@ -92,15 +92,12 @@ class SettingsState {
     }
 
     /// Opt-in paranoid-mode toggle.
-    /// Off by default. When on, the app applies three behavior overrides
-    /// (numbered #1/#2/#4 at their call sites — #3 was retired, numbering
-    /// kept for cross-reference stability): pipeline mode is forced to
+    /// Off by default. When on, the app applies two behavior overrides
+    /// (numbered #1/#2 at their call sites): pipeline mode is forced to
     /// `.secureRasterization`; `autoVerify` is forced to `true` (UI toggle
-    /// disabled while paranoid is on); and Live Photo / Portrait depth
-    /// auxiliary-metadata keys are removed from imported images via
-    /// `LivePhotoAuxStripper`. Mechanism-description language: the bundle
-    /// is designed to reduce the surface area of optional side channels;
-    /// behavior is best-effort.
+    /// disabled while paranoid is on). Mechanism-description language: the
+    /// bundle is designed to reduce the surface area of optional side
+    /// channels; behavior is best-effort.
     var paranoidMode: Bool = false {
         didSet { guard !isInitializing else { return }
                 defaults.set(paranoidMode, forKey: "paranoidMode") }

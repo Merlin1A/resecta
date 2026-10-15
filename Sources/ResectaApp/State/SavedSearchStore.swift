@@ -214,7 +214,7 @@ nonisolated struct SavedSearchEnvelope: Codable, Sendable, Equatable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
-        let wrapped = try container.decode([FailableSavedSearch].self, forKey: .savedSearches)
+        let wrapped = try container.decode([FailableRow<SavedSearch>].self, forKey: .savedSearches)
         let survivors = wrapped.compactMap(\.value)
         #if DEBUG
         let parked = wrapped.count - survivors.count
@@ -236,24 +236,6 @@ nonisolated struct SavedSearchEnvelope: Codable, Sendable, Equatable {
         var rows = container.nestedUnkeyedContainer(forKey: .savedSearches)
         for search in savedSearches { try rows.encode(search) }
         for row in unrecognized { try rows.encode(row) }
-    }
-}
-
-/// Never-throwing element wrapper for the lenient envelope decode. The
-/// wrapper's `init` always succeeds, so the unkeyed container advances
-/// past a failing element instead of aborting the whole array; the
-/// failed element is captured as a raw JSON tree for re-emission.
-nonisolated private struct FailableSavedSearch: Decodable {
-    let value: SavedSearch?
-    let raw: RetainedJSONValue?
-    init(from decoder: Decoder) {
-        if let decoded = try? SavedSearch(from: decoder) {
-            self.value = decoded
-            self.raw = nil
-        } else {
-            self.value = nil
-            self.raw = try? RetainedJSONValue(from: decoder)
-        }
     }
 }
 

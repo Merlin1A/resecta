@@ -99,8 +99,24 @@ struct ImportServiceTests {
         #expect(doc.textLayerStatus.count == doc.pageCount)
     }
 
-    @Test("Image import has no text layer status entries")
-    func imageImportHasNoTextLayerStatus() async {
+    // MARK: - Image bytes are refused
+
+    /// Resecta opens PDF files only: image bytes meet the unsupported-format
+    /// refusal at the data door, before any decode, and nothing is loaded.
+    private func expectUnsupportedFormatRefusal(_ doc: DocumentState) {
+        #expect(doc.phaseKind == .failed)
+        #expect(doc.sourceDocument == nil)
+        if case .failed(let error, _) = doc.phase {
+            if case .importError(.unsupportedFormat) = error {
+                // Expected
+            } else {
+                Issue.record("Expected .importError(.unsupportedFormat), got \(error)")
+            }
+        }
+    }
+
+    @Test("JPEG bytes are refused as an unsupported format")
+    func jpegBytesRefusedAsUnsupportedFormat() async {
         let doc = DocumentState()
         let redaction = RedactionState()
 
@@ -108,27 +124,11 @@ struct ImportServiceTests {
             data: makeJPEGImageData(), suggestedType: "jpg",
             documentState: doc, redactionState: redaction)
 
-        #expect(doc.phaseKind == .editing)
-        #expect(doc.textLayerStatus.isEmpty)
+        expectUnsupportedFormatRefusal(doc)
     }
 
-    // MARK: - Image Import
-
-    @Test("JPEG image data converts to single-page PDF")
-    func jpegImageConvertsToSinglePagePDF() async {
-        let doc = DocumentState()
-        let redaction = RedactionState()
-
-        await ImportService.importDocument(
-            data: makeJPEGImageData(), suggestedType: "jpg",
-            documentState: doc, redactionState: redaction)
-
-        #expect(doc.phaseKind == .editing)
-        #expect(doc.pageCount == 1)
-    }
-
-    @Test("PNG image data converts to single-page PDF")
-    func pngImageConvertsToSinglePagePDF() async {
+    @Test("PNG bytes are refused as an unsupported format")
+    func pngBytesRefusedAsUnsupportedFormat() async {
         let doc = DocumentState()
         let redaction = RedactionState()
 
@@ -136,8 +136,20 @@ struct ImportServiceTests {
             data: makePNGImageData(), suggestedType: "png",
             documentState: doc, redactionState: redaction)
 
-        #expect(doc.phaseKind == .editing)
-        #expect(doc.pageCount == 1)
+        expectUnsupportedFormatRefusal(doc)
+    }
+
+    @Test("Image bytes are refused whatever type the caller declares")
+    func imageBytesRefusedWhateverTheDeclaredType() async {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+
+        // A JPEG handed in under a PDF label: the bytes decide the route.
+        await ImportService.importDocument(
+            data: makeJPEGImageData(), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+
+        expectUnsupportedFormatRefusal(doc)
     }
 
     // MARK: - Validation Failures
@@ -268,11 +280,12 @@ struct ImportServiceTests {
         }
     }
 
-    @Test("Oversized image rejected with invalidPageDimensions")
-    func oversizedImageRejected() async {
+    @Test("An oversized image is refused as an unsupported format, before any decode")
+    func oversizedImageRefusedBeforeDecode() async {
         let doc = DocumentState()
         let redaction = RedactionState()
-        // Create an image with one dimension exceeding 5000
+        // One dimension past the page cap: the refusal is the format's, not
+        // the page-size check's, because the image is never decoded.
         let size = CGSize(width: 5001, height: 100)
         let renderer = UIGraphicsImageRenderer(size: size)
         let data = renderer.jpegData(withCompressionQuality: 0.5) { ctx in
@@ -284,14 +297,7 @@ struct ImportServiceTests {
             data: data, suggestedType: "jpg",
             documentState: doc, redactionState: redaction)
 
-        #expect(doc.phaseKind == .failed)
-        if case .failed(let error, _) = doc.phase {
-            if case .importError(.invalidPageDimensions) = error {
-                // Expected
-            } else {
-                Issue.record("Expected .importError(.invalidPageDimensions), got \(error)")
-            }
-        }
+        expectUnsupportedFormatRefusal(doc)
     }
 
     @Test("Import preserves old document until validation succeeds")
@@ -367,5 +373,68 @@ struct ImportServiceTests {
         redaction.pendingTriage = nil
         doc.phase = .importing
         #expect(doc.canStartImport(with: redaction) == false)
+    }
+
+    // MARK: - The outcome
+
+    @Test("A valid import reports completed; a refused one reports refused")
+    func outcomeReportsCompletedOrRefused() async {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+
+        let completed = await ImportService.importDocument(
+            data: makeTestPDFData(), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+        #expect(completed == .completed)
+        #expect(doc.phaseKind == .editing)
+
+        let refused = await ImportService.importDocument(
+            data: Data([0xDE, 0xAD]), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+        #expect(refused == .refused)
+        #expect(doc.phaseKind == .failed)
+    }
+
+    @Test("A refusal met at the door reaches the failed screen and keeps the open document")
+    func doorRefusalReachesTheFailedScreen() async {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        await ImportService.importDocument(
+            data: makeTestPDFData(), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+        let open = doc.sourceDocument
+        #expect(open != nil)
+
+        ImportService.refuse(.tooLarge(bytesRead: 60 * 1024 * 1024), documentState: doc)
+
+        #expect(doc.phaseKind == .failed)
+        #expect(doc.sourceDocument === open)
+        if case .failed(let error, let returnPhase) = doc.phase {
+            if case .importError(.tooLarge(let bytes)) = error {
+                #expect(bytes == 60 * 1024 * 1024)
+            } else {
+                Issue.record("Expected .importError(.tooLarge), got \(error)")
+            }
+            if case .editing = returnPhase {
+                // Expected: the refusal returns to the open document.
+            } else {
+                Issue.record("Expected .editing return phase, got \(returnPhase)")
+            }
+        }
+    }
+
+    @Test("An import the phase gate refuses reports refused and moves nothing")
+    func gateRefusalReportsRefused() async {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        doc.phase = .importing   // a phase that forbids a new import
+
+        let outcome = await ImportService.importDocument(
+            data: makeTestPDFData(), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+
+        #expect(outcome == .refused)
+        #expect(doc.sourceDocument == nil)
+        #expect(doc.phaseKind == .importing)
     }
 }

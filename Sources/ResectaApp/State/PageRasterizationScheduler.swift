@@ -72,7 +72,7 @@ struct PageRasterizationScheduler {
     /// - `parallelismBound`: the bound for the remaining pages at that cap,
     ///   read per submission.
     /// - `rasterize`: the per-page producer (the coordinator's
-    ///   `rasterizeWithRetry`, so the one half-DPI retry on
+    ///   `rasterizeWithRetry`, so the one retry at the 150 tier on
     ///   `fillVerificationFailed` happens inside the task).
     /// - `onPageReady`: receives every page in 0..<count order, one at a time,
     ///   and releases its full-res CGImage as it returns. An error here is

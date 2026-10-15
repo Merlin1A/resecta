@@ -1,8 +1,5 @@
 import Testing
 import Foundation
-import UIKit
-import ImageIO
-import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
@@ -16,9 +13,6 @@ import CoreGraphics
 //      user's `pipelineMode` setting AND any per-document override.
 //   2. `autoVerify` reads as `true` and the Settings UI toggle is
 //      disabled.
-//   3. Image-import path runs `LivePhotoAuxStripper`, removing
-//      `kCGImagePropertyMakerAppleDictionary` (and peer aux keys) from
-//      the property dictionary.
 //
 // `testParanoidModeOffPreservesNormalBehavior` is the explicit negative
 // counterpart: with paranoid off, none of the remaining overrides apply.
@@ -96,36 +90,9 @@ final class SettingsParanoidModeTests {
         #expect(toggleDisabled == true)
     }
 
-    // MARK: - Override #3 — strip Live Photo aux dict
+    // MARK: - Negative — both overrides off when paranoid is off
 
-    @Test("Paranoid mode runs the LivePhotoAuxStripper on the image-import property dictionary")
-    func testParanoidModeStripsLivePhotoAux() {
-        // Direct unit-level confirmation that the helper drops the
-        // `kCGImagePropertyMakerAppleDictionary` key from the property
-        // dictionary; this is the building block the paranoid-mode import-path
-        // gate consumes when `settingsState.paranoidMode == true`.
-        let stripper = LivePhotoAuxStripper()
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1))
-        let img = renderer.image { _ in }.cgImage!
-
-        let input: [CFString: Any] = [
-            kCGImagePropertyMakerAppleDictionary: ["17": "live-photo-id"] as CFDictionary,
-            kCGImagePropertyAuxiliaryData: ["depth": "placeholder"] as CFDictionary,
-            kCGImagePropertyOrientation: 1 as CFNumber
-        ]
-
-        let (_, output) = stripper.strip(img, properties: input as CFDictionary)
-        let outDict = output as? [CFString: Any] ?? [:]
-
-        #expect(outDict[kCGImagePropertyMakerAppleDictionary] == nil)
-        #expect(outDict[kCGImagePropertyAuxiliaryData] == nil)
-        // Non-aux keys survive — the stripper is targeted, not a wipe.
-        #expect(outDict[kCGImagePropertyOrientation] as? Int == 1)
-    }
-
-    // MARK: - Negative — all three overrides off when paranoid is off
-
-    @Test("With paranoid OFF, none of the remaining overrides apply (mode, autoVerify, aux strip gate)")
+    @Test("With paranoid OFF, neither override applies (mode, autoVerify)")
     func testParanoidModeOffPreservesNormalBehavior() {
         let settings = SettingsState(defaults: defaults)
         settings.paranoidMode = false
@@ -142,12 +109,6 @@ final class SettingsParanoidModeTests {
         #expect(effectiveAutoVerify(settings: settings) == false)
         // UI toggle is not disabled by paranoid.
         #expect(settings.paranoidMode == false)
-
-        // Override #3: the import-path gate value derives from
-        // `settingsState.paranoidMode`. With paranoid off, the gate is
-        // false — the stripper is not engaged on the import path.
-        let gate = settings.paranoidMode
-        #expect(gate == false)
     }
 
     // MARK: - Overrides copy guard
@@ -160,8 +121,8 @@ final class SettingsParanoidModeTests {
     /// `#filePath` loader posture) and pins the corrected copy so a future
     /// string edit cannot re-introduce the phantom fourth override. The
     /// Live Photo auxiliary-metadata strip left the listed behaviors when
-    /// import became PDF-only (no image reaches the branch that runs it),
-    /// so the hint counts two.
+    /// import became PDF-only, and its code has since been deleted, so the
+    /// hint counts two.
     @Test("Paranoid-mode copy describes two overrides, not the parked copy step or the Live Photo strip")
     func testParanoidModeHasTwoOverrides() throws {
         let source = try loadSettingsViewSource()

@@ -3,6 +3,7 @@ import Foundation
 import PDFKit
 import UIKit
 import CoreGraphics
+import ImageIO
 @testable import ResectaApp
 @testable import RedactionEngine
 
@@ -193,6 +194,45 @@ func makePNGImageData() -> Data {
         UIColor.white.setFill()
         ctx.fill(CGRect(origin: .zero, size: size))
     }
+}
+
+/// Build a small JPEG that embeds an EXIF dictionary (the probe string as
+/// its UserComment) and a GPS dictionary through ImageIO, so a no-metadata
+/// assertion on something derived from it has a marker to miss. Returns
+/// nil only if ImageIO fails to construct the image.
+func makeJPEGWithEXIFAndGPS(probe: String) -> Data? {
+    let width = 8, height = 8
+    guard let ctx = CGContext(
+        data: nil, width: width, height: height,
+        bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    ) else { return nil }
+    ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+    ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+    guard let cg = ctx.makeImage() else { return nil }
+
+    let exif: [CFString: Any] = [
+        kCGImagePropertyExifUserComment: probe,
+        kCGImagePropertyExifDateTimeOriginal: "2024:01:01 12:00:00"
+    ]
+    let gps: [CFString: Any] = [
+        kCGImagePropertyGPSLatitude: 41.7658,
+        kCGImagePropertyGPSLatitudeRef: "N",
+        kCGImagePropertyGPSLongitude: 72.6734,
+        kCGImagePropertyGPSLongitudeRef: "W"
+    ]
+    let props: [CFString: Any] = [
+        kCGImagePropertyExifDictionary: exif,
+        kCGImagePropertyGPSDictionary: gps
+    ]
+    let out = NSMutableData()
+    guard let dest = CGImageDestinationCreateWithData(
+        out as CFMutableData, "public.jpeg" as CFString, 1, nil
+    ) else { return nil }
+    CGImageDestinationAddImage(dest, cg, props as CFDictionary)
+    guard CGImageDestinationFinalize(dest) else { return nil }
+    return out as Data
 }
 
 // MARK: - Mock Factories

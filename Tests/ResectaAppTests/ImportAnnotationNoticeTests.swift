@@ -75,13 +75,17 @@ struct ImportAnnotationNoticeTests {
         #expect(doc.sourceAnnotationFindings.isEmpty)
     }
 
-    @Test("Image import stages nothing — a rendered page has no annotations")
-    func imageImportStagesNothing() async {
+    @Test("A clean import after an annotated one resets the staged findings")
+    func cleanImportAfterAnnotatedResetsFindings() async throws {
         let doc = DocumentState()
         let redaction = RedactionState()
+        await ImportService.importDocument(
+            data: try makeAnnotatedPDFData(), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+        #expect(!doc.sourceAnnotationFindings.isEmpty)
 
         await ImportService.importDocument(
-            data: makeJPEGImageData(), suggestedType: "image",
+            data: makeTextPDFData(text: "Plain page"), suggestedType: "pdf",
             documentState: doc, redactionState: redaction)
 
         #expect(doc.phaseKind == .editing)
@@ -269,9 +273,9 @@ struct ImportAnnotationNoticeTests {
             filledFormFieldCount: doc.sourceFilledFormFieldCount, dismissed: false,
             pausedBannerActive: false, detectionBannerActive: false))
 
-        // An image import resets the count: a rendered page has no fields.
+        // A clean import resets the count: the next document has no fields.
         await ImportService.importDocument(
-            data: makeJPEGImageData(), suggestedType: "image",
+            data: makeTextPDFData(text: "No fields"), suggestedType: "pdf",
             documentState: doc, redactionState: redaction)
         #expect(doc.sourceFilledFormFieldCount == 0)
     }

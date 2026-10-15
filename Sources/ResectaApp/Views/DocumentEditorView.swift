@@ -102,7 +102,6 @@ struct DocumentEditorView: View {
     @State var dismissBannerTask: Task<Void, Never>?
 
     /// Bindings to trigger import/settings from parent ContentView
-    @Binding var showFilePicker: Bool
     @Binding var showSettings: Bool
 
     enum DrawingTool {

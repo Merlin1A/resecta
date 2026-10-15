@@ -52,12 +52,10 @@ final class AppCoordinator {
         tearDownCurrentWorkspace()
         let workspace = RedactWorkspace(settingsState: settingsState, userTermsStore: userTermsStore)
         activeWorkspace = .redact(workspace)
-        // Paranoid mode enables the LivePhotoAuxStripper hook on the import path.
         await ImportService.importDocument(
             from: url,
             documentState: workspace.documentState,
-            redactionState: workspace.redactionState,
-            stripAuxData: settingsState.paranoidMode
+            redactionState: workspace.redactionState
         )
     }
 
