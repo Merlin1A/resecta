@@ -108,9 +108,12 @@ Nothing in this policy is legal advice, and nothing here creates an attorney-cli
 
 When a reported issue is resolved, we will:
 
-- Publish a changelog entry referencing the fix (CVE assignment where appropriate).
+- Ship the fix in a release and record it in [`CHANGELOG.md`](./CHANGELOG.md) under that release's `Security` heading, with the version number; the date that version became available on the App Store is the date the fix reached users.
+- Publish a GitHub security advisory for the repository when the report warrants one, and request a CVE through GitHub's CNA for it.
 - Credit the reporter, unless anonymity was requested.
 - Coordinate public disclosure after the fix is available to users.
+
+The App Store offers only the current version, so a fix reaches you as an update; there is no patched older version to install, and an earlier version keeps the issue until you update (see Supported versions above).
 
 ## Advisory history
 
