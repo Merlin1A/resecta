@@ -14,6 +14,8 @@ import RedactionEngine
 // region as that one boundary-required token. Regions on pages whose text
 // layer is not rich are counted, not captured (Layer 3 names them);
 // whole-page regions are skipped (the whole-page rule); every other origin is untouched.
+// The page's words are read once per page and filtered per region by the
+// primitive's rule; the primitive itself is the oracle for that filter.
 
 @Suite("Manual-region term capture")
 struct ManualTermsCaptureTests {
@@ -174,6 +176,82 @@ struct ManualTermsCaptureTests {
         #expect(SensitiveTermSet.empty.terms.isEmpty)
         #expect(SensitiveTermSet.empty.manualRegionsWithoutText == 0)
         #expect(SensitiveTermSet(terms: []) == .empty)
+    }
+
+    /// Region rects over a page: every word's box (padded), every pair of
+    /// neighbouring words, the four quadrants and the whole page.
+    private static func probeRects(on page: PDFPage) -> [CGRect] {
+        let boxes = TextSpan.words(fullyInside: unit, on: page).map(\.normalizedRect)
+        let quadrants = [CGRect(x: 0, y: 0, width: 0.5, height: 0.5), CGRect(x: 0.5, y: 0, width: 0.5, height: 0.5),
+                         CGRect(x: 0, y: 0.5, width: 0.5, height: 0.5), CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5)]
+        return boxes.map(padded) + zip(boxes, boxes.dropFirst()).map { padded($0.union($1)) }
+            + boxes + quadrants + [unit]
+    }
+
+    @Test("The page's words read once give the engine primitive's words for every region, word for word")
+    func pageWordsMatchTheEnginePrimitive() throws {
+        let sampleURL = try #require(Bundle(for: AppCoordinator.self).url(forResource: "SampleDocument", withExtension: "pdf"))
+        let sample = try #require(PDFDocument(url: sampleURL))
+        var compared = 0
+        for doc in [Self.textPDF(), sample] {
+            for pageIndex in 0..<doc.pageCount {
+                let page = try #require(doc.page(at: pageIndex))
+                let words = try #require(ManualCapturePageWords(page: page))
+                for rect in Self.probeRects(on: page) {
+                    #expect(words.words(fullyInside: rect)
+                            == TextSpan.words(fullyInside: rect, on: page).map(\.text))
+                    let triangle = [CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.midX, y: rect.minY),
+                                    CGPoint(x: rect.minX, y: rect.maxY)]
+                    #expect(words.words(fullyInside: rect, polygon: triangle)
+                            == TextSpan.words(fullyInside: rect, polygon: triangle, on: page).map(\.text))
+                    compared += 1
+                }
+            }
+        }
+        #expect(compared > 100)
+        #expect(ManualCapturePageWords(page: PDFDocument(data: makeTestPDFData())!.page(at: 0)!) == nil)
+    }
+
+    @Test("Several manual regions on one page read the page's words once; each page once")
+    func pageWordsAreReadOncePerPage() throws {
+        let doc = Self.textPDF()
+        let rects = try Self.wordRects(doc)
+        let john = try #require(rects["John"]); let smith = try #require(rects["Smith"])
+        let springfield = try #require(rects["Springfield"])
+        var reads = 0
+        let counting: (PDFPage) -> ManualCapturePageWords? = { page in
+            reads += 1
+            return ManualCapturePageWords(page: page)
+        }
+        let regions = [Self.manual(Self.padded(john)), Self.manual(Self.padded(smith)),
+                       Self.manual(Self.padded(springfield))]
+        let set = PipelineCoordinator.sensitiveTermSet(
+            applied: [], manualRegions: [0: regions], in: doc, textLayerStatus: [0: .rich], pageWords: counting)
+        #expect(reads == 1)
+        #expect(Self.table(set) == ["John": true, "Smith": true, "Springfield": true])
+        // A page that is not rich is never read.
+        reads = 0
+        _ = PipelineCoordinator.sensitiveTermSet(
+            applied: [], manualRegions: [0: regions], in: doc, textLayerStatus: [0: .none], pageWords: counting)
+        #expect(reads == 0)
+    }
+
+    @Test("A capture whose task is already cancelled still returns the whole set (a re-verify can continue past it)")
+    func cancelledCaptureCompletes() async throws {
+        let doc = Self.textPDF()
+        let rects = try Self.wordRects(doc)
+        let john = try #require(rects["John"]); let smith = try #require(rects["Smith"])
+        let regions = [0: [Self.manual(Self.padded(john.union(smith))), Self.manual(Self.padded(rects["Springfield"]!))]]
+        let expected = PipelineCoordinator.sensitiveTermSet(
+            applied: [], manualRegions: regions, in: doc, textLayerStatus: [0: .rich])
+        nonisolated(unsafe) let source = doc
+        let task = Task.detached {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return PipelineCoordinator.sensitiveTermSet(
+                applied: [], manualRegions: regions, in: source, textLayerStatus: [0: .rich])
+        }
+        #expect(await task.value == expected)
+        #expect(expected.terms.count == 4)
     }
 
     @Test("The coordinator's run-entry set joins the applied terms and the manual capture")
