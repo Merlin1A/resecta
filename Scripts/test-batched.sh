@@ -22,6 +22,31 @@
 #                          runs on one machine each own their own simulator.
 #   TEST_BATCHED_DD        DerivedData for this run (default <repo>/.dd), so
 #                          a build elsewhere never invalidates a run in flight.
+#   TEST_BATCHED_STALL_SECS  seconds of no output before an invocation is
+#                          killed (default 180). A hosted runner without
+#                          Neural Engine access runs OCR-heavy tests many
+#                          times slower than a Mac and widens this; the
+#                          per-invocation ceiling (--timeout-mins) still
+#                          bounds each batch.
+#   TEST_BATCHED_EXCLUDE   suite names (space-separated) that are NOT run on
+#                          this runtime: a suite that hangs on the hosted
+#                          virtual machine (the verification pass of a full
+#                          pipeline run never returns there, and the test's
+#                          own time limit cannot end a hang inside a system
+#                          framework) is named here by the workflow, left
+#                          out of the batches, listed in the summary and
+#                          counted in the VERDICT line as `excluded=N`, so a
+#                          verdict that skipped a body is never read as one
+#                          that proved it. Empty locally: the pre-push hook
+#                          runs every suite.
+#   TEST_BATCHED_RECOVERY  what the recovery after a wedge does to the
+#                          simulator: `reboot` (default) shuts it down and
+#                          boots it again; `erase` also erases it first. An
+#                          erase wipes the simulator's provisioned assets
+#                          (the name model, the Vision data files) and
+#                          forces a cold boot, which on a hosted runner
+#                          outlasts the stall allowance and wedges the next
+#                          batch in turn.
 #
 # Exit codes:
 #   0  all reds (if any) are on the exclusion list, no incomplete batches
@@ -32,7 +57,9 @@
 #
 # Recovery after a wedge is scoped to this run: the run's own xcodebuild and
 # its descendants are killed, then only $TEST_BATCHED_SIM_UDID is shut down
-# and erased. Nothing here signals another run's processes or simulators.
+# (and erased, with TEST_BATCHED_RECOVERY=erase), booted again and waited
+# for, so the next invocation starts on a booted simulator. Nothing here
+# signals another run's processes or simulators.
 #
 # Logs and .xcresult bundles land under /tmp/test-batched-<scheme>-<stamp>/.
 # Logs are spam-filtered (attributedStringScaled framework noise) and size-
@@ -65,11 +92,60 @@ NON_GATING="ScreenCaptureShieldTests PageParallelRasterizationTests StressCorpus
 
 BATCH_SIZE=28          # ~25-32 suites per batch
 TIMEOUT_MINS=15        # hard per-invocation ceiling
-STALL_SECS=180         # kill if the log stops growing this long
+STALL_SECS="${TEST_BATCHED_STALL_SECS:-180}"   # kill if the log stops growing this long
+RECOVERY="${TEST_BATCHED_RECOVERY:-reboot}"    # reboot | erase (see the header)
+EXCLUDE="${TEST_BATCHED_EXCLUDE:-}"            # suites not run on this runtime (see the header)
+BOOT_WAIT_SECS=300     # how long the recovery waits for the simulator to report booted
 LOAD_WARN=8            # 1-min load average warning threshold
 LOG_CAP_BYTES=20000000 # per-batch filtered-log size bound
 
-usage() { sed -n '3,42p' "$0"; exit 64; }
+usage() { sed -n '3,58p' "$0"; exit 64; }
+
+# ── Suite enumeration (runtime, from Tests sources) ──────────────────────
+# Every top-level (column-0) type whose body carries a `@Test` function — with
+# or without a `@Suite` attribute (Swift Testing runs a bare type holding
+# `@Test` functions as an implicit suite, and `-only-testing:` addresses it by
+# type name) — plus XCTestCase subclasses, plus a column-0 `extension` of such
+# a type whose body carries a `@Test` function (a test file split across
+# several files keeps its functions in extensions of the one suite type; the
+# runner addresses the type, so the extension's tests run with it).
+# Attribute-only detection used to miss implicit suites and the multi-line
+# `@Suite(` form, so their tests never ran under this runner. Validated
+# 2026-08-27 against the live trees: engine 207, app 209.
+enumerate_suites() { # test-source-dir — one suite name per line, sorted
+    python3 - "$1" <<'PYEOF'
+import os, re, sys
+
+ATTRS = re.compile(r'^(?:@\w+(?:\([^)]*\))?\s*)+')
+MODS = r'(?:(?:private|fileprivate|internal|public|final)\s+)*'
+TYPE_DECL = re.compile(r'^' + MODS + r'(?:class|struct|enum|actor|extension)\s+(\w+)')
+XCTEST_DECL = re.compile(r'^' + MODS + r'class\s+(\w+)\s*:\s*[^{]*\bXCTestCase\b')
+TEST_ATTR = re.compile(r'^\s+@Test\b')
+
+suites = set()
+for dirpath, _, files in os.walk(sys.argv[1]):
+    for fn in sorted(files):
+        if not fn.endswith('.swift'):
+            continue
+        lines = open(os.path.join(dirpath, fn), encoding='utf-8',
+                     errors='replace').read().splitlines()
+        current = None   # the column-0 type whose body the scan is inside
+        for line in lines:
+            decl = ATTRS.sub('', line) if line.startswith('@') else line
+            m = XCTEST_DECL.match(decl)
+            if m:
+                suites.add(m.group(1)); current = None; continue
+            m = TYPE_DECL.match(decl)
+            if m:
+                current = m.group(1); continue
+            if line.startswith('}'):
+                current = None; continue
+            if current and TEST_ATTR.match(line):
+                suites.add(current)
+for s in sorted(suites):
+    print(s)
+PYEOF
+}
 
 # --self-test: the lane-safety rules against this file and one dry
 # invocation. Exit 0 = every rule holds; 1 = a rule drifted (named).
@@ -100,12 +176,52 @@ self_test() {
         case " $NON_GATING " in *" $pat "*) ;; *) echo "self-test: $pat is not in NON_GATING" >&2; fails=1 ;; esac
     done
     [ "$fails" -eq 0 ] && echo "self-test: the four wall-clock suites are report-only OK"
+    # 5. The suite enumerator reads `extension` blocks: a @Test inside a
+    #    column-0 extension of a type is enumerated under that type; a type
+    #    with a @Test in its body still is; an extension with no @Test is not.
+    local tdir got
+    tdir="$(mktemp -d "${TMPDIR:-/tmp}/test-batched-selftest.XXXXXX")"
+    printf 'import Testing\nstruct ExtensionOnlyHost {}\n\nextension ExtensionOnlyHost {\n    @Test func inExtension() {}\n}\n' > "$tdir/ExtensionOnly.swift"
+    printf 'import Testing\nstruct PlainType {\n    @Test func inBody() {}\n}\n\nextension PlainType {\n    func helper() {}\n}\n' > "$tdir/Plain.swift"
+    printf 'import Testing\nstruct NoTests {}\n\nextension NoTests {\n    func helper() {}\n}\n' > "$tdir/NoTests.swift"
+    got="$(enumerate_suites "$tdir" | tr '\n' ' ')"
+    rm -rf "$tdir"
+    if [ "$got" = "ExtensionOnlyHost PlainType " ]; then echo "self-test: enumerator reads extension blocks (ExtensionOnlyHost, PlainType; NoTests absent) OK"
+    else echo "self-test: enumerator expected 'ExtensionOnlyHost PlainType', got '$got'" >&2; fails=1; fi
+    # 6. The stall allowance and the recovery shape are read from the
+    #    environment with the local defaults; the recovery boots the
+    #    simulator again and waits for it; the erase is behind the knob.
+    n=0
+    $GREP -qE '^STALL_SECS="\$\{TEST_BATCHED_STALL_SECS:-180\}"' "$me" \
+        || { echo "self-test: STALL_SECS is not read from TEST_BATCHED_STALL_SECS with the default 180" >&2; n=1; }
+    $GREP -qE '^RECOVERY="\$\{TEST_BATCHED_RECOVERY:-reboot\}"' "$me" \
+        || { echo "self-test: RECOVERY is not read from TEST_BATCHED_RECOVERY with the default reboot" >&2; n=1; }
+    body="$(sed -n '/^recover_sim()/,/^}/p' "$me")"
+    printf '%s\n' "$body" | $GREP -q 'xcrun simctl boot "\$SIM_UDID"' \
+        || { echo "self-test: recover_sim does not boot the simulator again" >&2; n=1; }
+    printf '%s\n' "$body" | $GREP -q 'simctl bootstatus "\$SIM_UDID" -b' \
+        || { echo "self-test: recover_sim does not wait for the simulator to boot" >&2; n=1; }
+    printf '%s\n' "$body" | $GREP -B1 'simctl erase "\$SIM_UDID"' | $GREP -q '"\$RECOVERY" = "erase"' \
+        || { echo "self-test: the erase in recover_sim is not behind TEST_BATCHED_RECOVERY=erase" >&2; n=1; }
+    if [ "$n" -eq 0 ]; then echo "self-test: stall allowance + recovery shape from the environment; recovery boots and waits; erase opt-in OK"; else fails=1; fi
+    # 7. The runtime exclusion list is read from the environment, applied
+    #    before batching, and every VERDICT line carries `excluded=`.
+    n=0
+    $GREP -qE '^EXCLUDE="\$\{TEST_BATCHED_EXCLUDE:-\}"' "$me" \
+        || { echo "self-test: EXCLUDE is not read from TEST_BATCHED_EXCLUDE" >&2; n=1; }
+    $GREP -q 'if in_list "\$s" "\$EXCLUDE"; then EXCLUDED+=("\$s")' "$me" \
+        || { echo "self-test: the exclusion is not applied before batching" >&2; n=1; }
+    [ "$($GREP -c 'VERDICT: .* excluded=\${#EXCLUDED\[@\]}' "$me")" -eq 2 ] \
+        || { echo "self-test: a VERDICT line does not carry excluded=" >&2; n=1; }
+    if [ "$n" -eq 0 ]; then echo "self-test: runtime exclusion list from the environment, applied before batching, named in the verdict OK"; else fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
 
 [ $# -ge 1 ] || usage
 [ "$1" = "--self-test" ] && self_test
+case "$RECOVERY" in reboot|erase) ;; *) echo "TEST_BATCHED_RECOVERY must be reboot or erase (got $RECOVERY)" >&2; exit 64 ;; esac
+case "$STALL_SECS" in ''|*[!0-9]*) echo "TEST_BATCHED_STALL_SECS must be a whole number of seconds (got $STALL_SECS)" >&2; exit 64 ;; esac
 SCHEME="$1"; shift
 case "$SCHEME" in
     RedactionEngine)
@@ -171,48 +287,8 @@ fi
 
 echo "simulator: $SIM_UDID (pinned via TEST_BATCHED_SIM_UDID)"
 
-# ── Suite enumeration (runtime, from Tests sources) ──────────────────────
-# Every top-level (column-0) type whose body carries a `@Test` function — with
-# or without a `@Suite` attribute (Swift Testing runs a bare type holding
-# `@Test` functions as an implicit suite, and `-only-testing:` addresses it by
-# type name) — plus XCTestCase subclasses. Attribute-only detection used to
-# miss implicit suites and the multi-line `@Suite(` form, so their tests never
-# ran under this runner. Validated 2026-08-27 against the live trees:
-# engine 207, app 209.
-
 SUITES_FILE="$RUN_DIR/suites.txt"
-python3 - "$TEST_SRC" > "$SUITES_FILE" <<'PYEOF'
-import os, re, sys
-
-ATTRS = re.compile(r'^(?:@\w+(?:\([^)]*\))?\s*)+')
-MODS = r'(?:(?:private|fileprivate|internal|public|final)\s+)*'
-TYPE_DECL = re.compile(r'^' + MODS + r'(?:class|struct|enum|actor)\s+(\w+)')
-XCTEST_DECL = re.compile(r'^' + MODS + r'class\s+(\w+)\s*:\s*[^{]*\bXCTestCase\b')
-TEST_ATTR = re.compile(r'^\s+@Test\b')
-
-suites = set()
-for dirpath, _, files in os.walk(sys.argv[1]):
-    for fn in sorted(files):
-        if not fn.endswith('.swift'):
-            continue
-        lines = open(os.path.join(dirpath, fn), encoding='utf-8',
-                     errors='replace').read().splitlines()
-        current = None   # the column-0 type whose body the scan is inside
-        for line in lines:
-            decl = ATTRS.sub('', line) if line.startswith('@') else line
-            m = XCTEST_DECL.match(decl)
-            if m:
-                suites.add(m.group(1)); current = None; continue
-            m = TYPE_DECL.match(decl)
-            if m:
-                current = m.group(1); continue
-            if line.startswith('}'):
-                current = None; continue
-            if current and TEST_ATTR.match(line):
-                suites.add(current)
-for s in sorted(suites):
-    print(s)
-PYEOF
+enumerate_suites "$TEST_SRC" > "$SUITES_FILE"
 
 TOTAL_SUITES="$(wc -l < "$SUITES_FILE" | tr -d ' ')"
 [ "$TOTAL_SUITES" -gt 0 ] || { echo "suite enumeration produced nothing — check $TEST_SRC" >&2; exit 1; }
@@ -226,10 +302,13 @@ in_list() { # word, space-separated list
 
 BATCHABLE=()
 ALONE=()
+EXCLUDED=()
 while IFS= read -r s; do
-    if in_list "$s" "$PERF_ALONE"; then ALONE+=("$s"); else BATCHABLE+=("$s"); fi
+    if in_list "$s" "$EXCLUDE"; then EXCLUDED+=("$s")
+    elif in_list "$s" "$PERF_ALONE"; then ALONE+=("$s"); else BATCHABLE+=("$s"); fi
 done < "$SUITES_FILE"
-echo "batchable: ${#BATCHABLE[@]}   perf-alone: ${#ALONE[@]}"
+echo "batchable: ${#BATCHABLE[@]}   perf-alone: ${#ALONE[@]}   excluded on this runtime: ${#EXCLUDED[@]}"
+[ "${#EXCLUDED[@]}" -gt 0 ] && echo "excluded (TEST_BATCHED_EXCLUDE; not run here, not verified here): ${EXCLUDED[*]}"
 
 # ── Build once ────────────────────────────────────────────────────────────
 
@@ -251,15 +330,33 @@ descendants() { # pid — every process below it, deepest first
 }
 
 recover_sim() { # xcodebuild-pid — this run's process tree and this run's simulator, nothing else
-    local xcb="$1" tree
+    local xcb="$1" tree t0 bp
     tree="$(descendants "$xcb")"
-    echo "  recovery: killing this run's xcodebuild ($xcb) and its process tree, resetting simulator $SIM_UDID" >&2
+    echo "  recovery: killing this run's xcodebuild ($xcb) and its process tree, resetting simulator $SIM_UDID ($RECOVERY)" >&2
     kill -TERM "$xcb" 2>/dev/null || true
     sleep 5
     kill -KILL "$xcb" $tree 2>/dev/null || true   # the tree is a pid list, unquoted on purpose
     sleep 2
     xcrun simctl shutdown "$SIM_UDID" 2>/dev/null || true
-    xcrun simctl erase "$SIM_UDID" 2>/dev/null || true
+    if [ "$RECOVERY" = "erase" ]; then
+        xcrun simctl erase "$SIM_UDID" 2>/dev/null || true
+    fi
+    # Boot it again here and wait, so the next invocation starts on a booted
+    # simulator instead of booting one silently under the watchdog.
+    xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
+    t0=$SECONDS
+    xcrun simctl bootstatus "$SIM_UDID" -b >/dev/null 2>&1 &
+    bp=$!
+    while kill -0 "$bp" 2>/dev/null; do
+        if [ $((SECONDS - t0)) -ge "$BOOT_WAIT_SECS" ]; then
+            echo "  recovery: simulator $SIM_UDID did not report booted within ${BOOT_WAIT_SECS}s; continuing" >&2
+            kill "$bp" 2>/dev/null || true
+            break
+        fi
+        sleep 5
+    done
+    wait "$bp" 2>/dev/null || true
+    echo "  recovery: simulator $SIM_UDID booted again ($((SECONDS - t0))s)" >&2
 }
 
 # Results accumulated as parallel indexed arrays (bash 3.2 — no assoc arrays).
@@ -440,7 +537,8 @@ if [ -s "$FAILURES_FILE" ]; then
 fi
 
 echo ""
-echo "totals: tests=$TOT_TESTS suites=$TOT_SUITES failed=$TOT_FAILED known-issues=$TOT_KNOWN wedged=$WEDGED"
+echo "totals: tests=$TOT_TESTS suites=$TOT_SUITES failed=$TOT_FAILED known-issues=$TOT_KNOWN wedged=$WEDGED excluded=${#EXCLUDED[@]}"
+[ "${#EXCLUDED[@]}" -gt 0 ] && echo "excluded on this runtime (not verified here; the pre-push hook runs them): ${EXCLUDED[*]}"
 [ -n "$EXCUSED" ] && echo "non-gating reds (perf-alone or on the exclusion list — never gate locally):$EXCUSED"
 [ -s "$FAILURES_FILE" ] && { echo "failure detail:"; sed 's/^/  /' "$FAILURES_FILE"; }
 [ -n "$WEDGED_LABELS" ] && echo "incomplete invocations (suites NOT verified — re-run or salvage):$WEDGED_LABELS"
@@ -450,9 +548,9 @@ if [ -n "$OFFENDERS" ]; then
     echo "VERDICT: FAIL scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES gating-failures-in:$OFFENDERS"
     exit 1
 elif [ "$WEDGED" -gt 0 ]; then
-    echo "VERDICT: INCOMPLETE scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES wedged=$WEDGED (no gating reds in completed batches)"
+    echo "VERDICT: INCOMPLETE scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES wedged=$WEDGED excluded=${#EXCLUDED[@]} (no gating reds in completed batches)"
     exit 2
 else
-    echo "VERDICT: PASS scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES known-issues=$TOT_KNOWN gating-failures=0"
+    echo "VERDICT: PASS scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES known-issues=$TOT_KNOWN gating-failures=0 excluded=${#EXCLUDED[@]}"
     exit 0
 fi

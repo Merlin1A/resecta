@@ -3,12 +3,30 @@
 # an iPhone 17 simulator under a watchdog, perf suites alone and
 # report-only. Both schemes run every Monday and on release tags, one job
 # each; a dispatch runs the scheme it names; ResectaApp alone runs on every
-# pull request to main as a non-required check (about twenty minutes).
+# pull request to main as a non-required check (twenty to forty minutes).
 # RedactionEngine here runs the engine package's suites on the simulator
-# instead of the macOS host, where the whole-package run stalls
-# (engine-suite.yml), and stays off pull requests for its length. The
-# runner takes its simulator by id and its DerivedData path from the
-# environment set below.
+# (the package's one hosted run: a host `swift test` of the whole package
+# never reached a verdict on a hosted runner) and stays off pull requests
+# for its length. The runner takes its simulator by id and its
+# DerivedData path from the environment set below.
+#
+# The account runs at most five macOS jobs at once, and every push to a
+# pull request starts three of them (the ci.yml gate, this workflow's
+# ResectaApp job and code scanning's Swift analysis): a fourth job on the
+# same account waits for a slot. The weekly and tag runs add the engine
+# job and the egress pins step below; a dispatch adds one job.
+#
+# The hosted runner is a three-vCPU virtual machine without Neural Engine
+# access (the engine logs "E5RTNetwork: unable to compile network" there),
+# and a full pipeline run's verification pass over the rasterized output
+# never returns on it, and neither does the engine's OCR sweep or re-check
+# over rasterized pages: 900 seconds of silence with no output, and the
+# test's own time limit cannot end a hang inside a system framework. The
+# five suites that run such a pass are left out on this runtime
+# (TEST_BATCHED_EXCLUDE below; named in every verdict; the pre-push hook
+# runs them on every push), the runner's stall watchdog is widened
+# (TEST_BATCHED_STALL_SECS) for the OCR-heavy tests that merely run slowly
+# here, and a recovery reboots the simulator instead of erasing it.
 name: sim-suite
 
 on:
@@ -56,6 +74,16 @@ jobs:
         scheme: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.scheme || 'ResectaApp')) || github.event_name == 'pull_request' && fromJSON('["ResectaApp"]') || fromJSON('["ResectaApp", "RedactionEngine"]') }}
     env:
       SCHEME: ${{ matrix.scheme }}
+      # Seconds of no output before the batched runner kills an invocation
+      # (the local default is 180). See the header.
+      TEST_BATCHED_STALL_SECS: '900'
+      # Suites not run on this runtime: a full pipeline run's verification
+      # pass, and the engine's OCR sweep and re-check over rasterized pages,
+      # hang on the hosted virtual machine (see the header), and a test's
+      # own time limit cannot end a hang inside a system framework. The
+      # runner leaves them out, names them in the summary and counts them in
+      # the VERDICT line; the pre-push hook runs every suite on every push.
+      TEST_BATCHED_EXCLUDE: ${{ matrix.scheme == 'ResectaApp' && 'PipelineCoordinatorSecurityTests PageParallelRasterizationTests' || 'PacketOCRQualityRoleTests SearchRecheckOCRTests SearchRecheckParallelismTests' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -123,6 +151,33 @@ jobs:
           echo "SUITE_RC=$rc" >> "$GITHUB_ENV"
           exit "$rc"
 
+      # The editor's link-policy pins (Tests/ResectaAppUITests/
+      # DocumentLinkUITests.swift) drive the built app and assert that a
+      # tapped link annotation does not leave the app. The batched runner
+      # never executes the UI-test bundle, so they run here on the weekly
+      # and tag runs only (never on a pull request: a macOS slot), against
+      # the bundles the runner already built and the simulator it used.
+      - name: Egress UI pins
+        if: ${{ !cancelled() && matrix.scheme == 'ResectaApp' && (github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v')) }}
+        run: |
+          t0=$SECONDS
+          rc=0
+          xcodebuild test-without-building -scheme ResectaApp \
+            -destination "id=$TEST_BATCHED_SIM_UDID" -derivedDataPath "$TEST_BATCHED_DD" \
+            -resultBundlePath "$RUNNER_TEMP/egress-ui-pins.xcresult" \
+            -only-testing:ResectaAppUITests/DocumentLinkUITests 2>&1 \
+            | /usr/bin/grep -vE 'attributedStringScaled' | tee egress-ui-pins.log || rc=$?
+          {
+            echo "## egress UI pins (DocumentLinkUITests)"
+            echo
+            echo "- wall: $((SECONDS - t0)) s · rc: $rc"
+            echo
+            echo '```'
+            /usr/bin/grep -E "Test Case '-\[.*\]' (passed|failed)|Executed [0-9]+ tests?" egress-ui-pins.log | tail -n 6 || echo "(no test lines)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
+
       - name: Collect logs and failing result bundles
         if: always()
         run: |
@@ -161,3 +216,35 @@ jobs:
           path: upload
           retention-days: 14
           if-no-files-found: warn
+
+  # A scheduled or tag run that fails leaves an annotation and a step
+  # summary; when the repository variable NTFY_TOPIC is set, the run's URL
+  # is also posted to that ntfy topic. A variable, not a secret: the public
+  # repositories carry no Actions secrets, and the topic is masked in the
+  # log and never printed. The body names the repository, the workflow and
+  # the run; no test name and no finding. Linux runner, no macOS slot.
+  failure-notice:
+    needs: sim-suite
+    if: ${{ failure() && (github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      NTFY_TOPIC: ${{ vars.NTFY_TOPIC }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - run: |
+          echo "::error::sim-suite failed on ${GITHUB_EVENT_NAME} (${GITHUB_REF_NAME}): ${RUN_URL}"
+          {
+            echo "## failure notice"
+            echo
+            echo "- sim-suite failed on ${GITHUB_EVENT_NAME} (${GITHUB_REF_NAME}): ${RUN_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$NTFY_TOPIC" ]; then
+            echo "::add-mask::$NTFY_TOPIC"
+            curl -fsS --max-time 20 \
+              -d "${GITHUB_REPOSITORY} · sim-suite failed on ${GITHUB_EVENT_NAME} · ${RUN_URL}" \
+              "https://ntfy.sh/${NTFY_TOPIC}" || echo '::warning::the notice was not delivered'
+          else
+            echo "NTFY_TOPIC is not set; the annotation and the step summary are the notice"
+          fi

@@ -11,8 +11,8 @@
 # gated by; the change's own copies run once more, report-only. About five
 # minutes on a hosted macos-26 runner. The batched simulator suites
 # (sim-suite.yml) run weekly, on demand and on release tags, and the app
-# suite on every pull request to main as a non-required check; the engine
-# host suite (engine-suite.yml) runs on demand only. Neither runs here.
+# suite on every pull request to main as a non-required check; none of
+# them runs here.
 name: ci
 
 on:

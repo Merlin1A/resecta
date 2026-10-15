@@ -197,7 +197,14 @@ struct AssetTamperMatrixTests {
     }
 
     static func measure(_ bundle: Bundle) -> Outcome {
-        let (detector, diagnostics) = PIIDetector.loadWithDiagnostics(bundle: bundle)
+        // The name model is an OS asset, not one of the bundled assets this
+        // matrix tampers with; a runtime without it (a hosted simulator)
+        // would raise the banner on every cell. The probe reads "present"
+        // here, so the cells measure the bundled assets alone wherever the
+        // suite runs.
+        let (detector, diagnostics) = PIIDetector.$_nerAvailabilityOverride.withValue(true) {
+            PIIDetector.loadWithDiagnostics(bundle: bundle)
+        }
         // The five gated loaders live on the detector and on the families
         // the registry hands them to; `Mirror` reads each once.
         var seen: Set<String> = []
