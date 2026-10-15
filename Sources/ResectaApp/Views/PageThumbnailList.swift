@@ -214,8 +214,9 @@ enum ThumbnailCache {
         cache.object(forKey: key(document, pageIndex))
     }
     static func set(_ image: UIImage, document: PDFDocument, pageIndex: Int) {
+        let key = key(document, pageIndex)
         writeQueue.async {
-            cache.setObject(image, forKey: key(document, pageIndex))
+            cache.setObject(image, forKey: key)
         }
     }
     static func clear() { cache.removeAllObjects() }

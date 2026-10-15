@@ -8,7 +8,7 @@ import RedactionEngine
 /// to a location it may remove once the importing closure returns, so the
 /// closure reads it there and then — by its size on disk first, then the
 /// bytes, mapped when the system allows.
-struct DroppedDocument: Transferable {
+nonisolated struct DroppedDocument: Transferable {
     enum Payload: Sendable {
         case bytes(Data)
         case refused(PipelineError.ImportFailure)

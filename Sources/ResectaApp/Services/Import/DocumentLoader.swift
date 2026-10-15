@@ -8,10 +8,11 @@ import RedactionEngine
 // existing import-failure taxonomy. Nothing here reads app state or SwiftUI,
 // so a loader runs off the main actor and a test drives it with no state
 // object in scope. The wrapper (`ImportService`) applies the facts to the
-// editor's state in one place.
+// editor's state in one place. Every type here is `nonisolated`: the
+// loaders run off the main actor and the values cross that boundary.
 
 /// Where a payload entered the app.
-enum ImportDoor: Sendable, Equatable {
+nonisolated enum ImportDoor: Sendable, Equatable {
     /// The Files picker on Home: a security-scoped URL.
     case files
     /// The workspace's drag-and-drop target.
@@ -22,7 +23,7 @@ enum ImportDoor: Sendable, Equatable {
 
 /// What a door hands a loader. The type a caller declares is recorded with
 /// the bytes and never consulted: the router reads the bytes.
-enum ImportPayload: Sendable {
+nonisolated enum ImportPayload: Sendable {
     case bytes(Data, declaredType: String?, door: ImportDoor)
 
     /// The bytes to parse.
@@ -49,7 +50,7 @@ enum ImportPayload: Sendable {
 
 /// The caps a loader enforces. Production passes `.standard`; a test may
 /// pass smaller ones to reach a cap with a small fixture.
-struct ImportLimits: Sendable, Equatable {
+nonisolated struct ImportLimits: Sendable, Equatable {
     /// The largest payload admitted, in bytes.
     var maxBytes: Int = 50 * 1024 * 1024
     /// The largest page count admitted.
@@ -63,7 +64,7 @@ struct ImportLimits: Sendable, Equatable {
 
 /// What a loader learned about a document. The wrapper applies the whole
 /// record to the editor's state through one function.
-struct ImportFacts: Sendable {
+nonisolated struct ImportFacts: Sendable {
     /// What the pages were parsed from.
     enum Origin: Sendable, Equatable {
         case pdf
@@ -110,13 +111,13 @@ struct ImportFacts: Sendable {
 
 /// A parsed document with its facts, handed across the isolation boundary.
 /// The PDFDocument is wrapped because PDFDocument is not Sendable.
-struct LoadedDocument: Sendable {
+nonisolated struct LoadedDocument: Sendable {
     let document: SendablePDFDocument
     let facts: ImportFacts
 }
 
 /// A loader for one kind of payload.
-protocol DocumentLoader: Sendable {
+nonisolated protocol DocumentLoader: Sendable {
     /// Parse the payload and gather its facts. Throws
     /// `PipelineError.importError(_)` from the existing cases; cancellable
     /// through `Task.checkCancellation()` at every stage.
@@ -124,7 +125,7 @@ protocol DocumentLoader: Sendable {
 }
 
 /// What an import attempt came to.
-enum ImportOutcome: Sendable, Equatable {
+nonisolated enum ImportOutcome: Sendable, Equatable {
     /// The document is open for editing.
     case completed
     /// Nothing was loaded: the phase gate refused the attempt, the loader

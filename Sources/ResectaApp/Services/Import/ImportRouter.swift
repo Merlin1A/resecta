@@ -5,7 +5,7 @@ import RedactionEngine
 /// declares is never consulted. Resecta opens PDF files only: every image
 /// signature meets the unsupported-format refusal before any decode;
 /// `%PDF` and unknown payloads reach the PDF parser, which decides.
-enum ImportRouter {
+nonisolated enum ImportRouter {
 
     /// An image format a later loader may decode. Refused today.
     enum ImageFormat: Sendable, Equatable {

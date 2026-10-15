@@ -5,7 +5,7 @@ import RedactionEngine
 
 /// The PDF loader: the validation stages run in order, off the main actor,
 /// against the bytes alone.
-struct PDFImportLoader: DocumentLoader {
+nonisolated struct PDFImportLoader: DocumentLoader {
     func load(_ payload: ImportPayload, limits: ImportLimits) async throws -> LoadedDocument {
         try await ImportService.validatePDFOffMainActor(data: payload.data, limits: limits)
     }
