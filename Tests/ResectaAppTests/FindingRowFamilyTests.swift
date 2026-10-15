@@ -281,19 +281,4 @@ struct FindingRowFamilyTests {
         #expect(model.accessibilityDescription
                 == "Deselected. \(DetectionResult.Kind.face.fullName). Page 2. Medium confidence.")
     }
-
-    @Test("detection adapter — signature candidate and barcode render their kind names honestly")
-    func nonTextKindAdapterShapes() {
-        for kind: DetectionResult.Kind in [.pii(.signatureCandidate), .pii(.barcode)] {
-            let det = makeDetection(kind: kind, confidence: 0.66, matchedText: nil)
-            let model = FindingRowModel(
-                page: 0, detection: det, isSelected: false, isAmbiguousSurname: false
-            )
-            #expect(model.title == kind.fullName)
-            #expect(!model.titleIsContent)
-            // A qualitative descriptor replaces "N% confidence".
-            // 0.66 is below the absolute medium floor (< 0.7).
-            #expect(model.secondaryText == "Low confidence")
-        }
-    }
 }

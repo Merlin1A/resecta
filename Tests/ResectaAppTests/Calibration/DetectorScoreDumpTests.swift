@@ -140,10 +140,7 @@ struct DetectorScoreDumpTests {
         case .name:          return "name"
         case .creditCard, .email, .phone, .ein, .itin,
              .driversLicense, .passport,
-             .licensePlate, .barcode, .signatureCandidate, .other:
-            // .barcode is detected by Vision; .signatureCandidate
-            // is a heuristic visual detector — neither is on the
-            // calibration path; same shape as `.other`.
+             .licensePlate, .other:
             return nil
         }
     }

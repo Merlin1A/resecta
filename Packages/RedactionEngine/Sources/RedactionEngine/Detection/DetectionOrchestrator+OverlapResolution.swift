@@ -239,11 +239,6 @@ extension DetectionOrchestrator {
         case .routingNumber:  return 12
         case .npi:            return 11
         case .medicalRecord:  return 10
-        // Vision-detected barcode has machine-decoded payload; rank
-        // alongside structural detectors. Sits below medicalRecord (10) and
-        // above licensePlate (8) so a barcode overlap claim is preferred
-        // over the loosely-labeled rect-based detectors below.
-        case .barcode:        return 9
         case .licensePlate:   return 8
         case .email:          return 7
         case .phone:          return 6
@@ -253,10 +248,6 @@ extension DetectionOrchestrator {
         case .passport:       return 2
         case .driversLicense: return 1
         case .account:        return 1
-        // Heuristic-only kind; participates in overlap resolution
-        // (a text PII hit overlapping a signature box should win) but ranks
-        // below any structured match. Same low rank as .other.
-        case .signatureCandidate: return 0
         case .other:          return 0
         }
     }
