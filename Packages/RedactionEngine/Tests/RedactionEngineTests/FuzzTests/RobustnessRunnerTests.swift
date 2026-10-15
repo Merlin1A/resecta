@@ -308,7 +308,7 @@ struct RobustnessRunnerTests {
     @Test("Family-4 robustness outcome table over factories + sd fixtures + T4.3 mutated set")
     func robustnessOutcomeTable() async throws {
         guard let out = Self.robustOut() else {
-            print("[H4.2] RESECTA_ROBUST_OUT not set; robustness runner skipped.")
+            TestGate.skip("RESECTA_ROBUST_OUT not set; the robustness runner skipped")
             return
         }
         let root = Self.docsRoot()

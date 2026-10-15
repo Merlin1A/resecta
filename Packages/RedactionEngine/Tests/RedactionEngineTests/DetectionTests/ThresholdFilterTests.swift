@@ -67,14 +67,14 @@ struct ThresholdFilterTests {
     }
 
     @Test("At-or-above-cutoff match survives with annotated rationale")
-    func survivorGetsAnnotation() {
+    func survivorGetsAnnotation() throws {
         let vector = PresetThresholdVector(thresholdsByWireName: ["name": 0.70])
         let matches = [match(.name, confidence: 0.85,
                              rationale: rationale(ruleID: "name.nltagger", score: 0.85))]
         let filtered = matches.applyingCountingDrops(thresholdVector: vector).survivors
         #expect(filtered.count == 1)
-        let survivor = try! #require(filtered.first)
-        let annotated = try! #require(survivor.rationale)
+        let survivor = try #require(filtered.first)
+        let annotated = try #require(survivor.rationale)
         #expect(annotated.appliedThreshold == 0.70)
         #expect(annotated.signals.contains(.presetThresholdPass(raw: 0.85, cutoff: 0.70)))
         // Original regex signal preserved.
@@ -82,7 +82,7 @@ struct ThresholdFilterTests {
     }
 
     @Test("Category absent from vector passes through untouched")
-    func nonCalibrationIsUntouched() {
+    func nonCalibrationIsUntouched() throws {
         // Vector only has ssn/name; the email threshold is absent from this vector
         // (note: email does have a wire name, but the vector omits it).
         let vector = PresetThresholdVector(
@@ -91,7 +91,7 @@ struct ThresholdFilterTests {
         let matches = [match(.email, confidence: 0.60, rationale: emailRationale)]
         let filtered = matches.applyingCountingDrops(thresholdVector: vector).survivors
         #expect(filtered.count == 1)
-        let survivor = try! #require(filtered.first?.rationale)
+        let survivor = try #require(filtered.first?.rationale)
         #expect(survivor.appliedThreshold == nil)
         #expect(!survivor.signals.contains(where: {
             if case .presetThresholdPass = $0 { return true }

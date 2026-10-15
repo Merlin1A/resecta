@@ -64,11 +64,11 @@ struct PassportDetectorTests {
     // MARK: - Confidence calibration
 
     @Test("Passport confidence is calibrated to 0.80")
-    func passportConfidenceIs80() async {
+    func passportConfidenceIs80() async throws {
         let text = "Passport: AB123456"
         let matches = await detector.detect(in: text, doctype: nil)
             .filter { $0.kind == .passport }
-        let hit = try! #require(matches.first)
+        let hit = try #require(matches.first)
         #expect(abs(hit.confidence - 0.80) < 0.001,
                 "Passport base confidence should be 0.80, got \(hit.confidence)")
     }
@@ -152,7 +152,7 @@ struct PassportDetectorTests {
     // issuer audit-only surface.
 
     @Test("Gate keeps candidate matching one issuer (IN strict 1L+7D)")
-    func testW1KeepsSingleIssuerMatch() async {
+    func testW1KeepsSingleIssuerMatch() async throws {
         let detector = PIIDetector(nameGazetteer: nil)
         // A1234567 — 8-char 1L+7D. IN strict ^[A-PR-WY][1-9][0-9]{5}[1-9]$
         // accepts (A valid prefix; 1 nonzero; 23456 5-digit body; 7 nonzero);
@@ -161,7 +161,7 @@ struct PassportDetectorTests {
         // expect 9 chars; PH expects 1L+7D+1L; SV/DO/GB expect 9 chars.
         let matches = await detector.detect(in: "Passport: A1234567", doctype: nil)
             .filter { $0.kind == .passport }
-        let hit = try! #require(matches.first)
+        let hit = try #require(matches.first)
         #expect(hit.text == "A1234567")
         #expect(abs(hit.confidence - 0.80) < 0.001,
                 "Gate keeps the 0.80 baseline confidence")
@@ -212,14 +212,14 @@ struct PassportDetectorTests {
     }
 
     @Test("Gate keeps multi-issuer ambiguous candidate (PH-legacy + SV)")
-    func testW1KeepsMultiIssuerCandidate() async {
+    func testW1KeepsMultiIssuerCandidate() async throws {
         let detector = PIIDetector(nameGazetteer: nil)
         // AB1234567 — 9-char 2L+7D. Matches PH-legacy ^[A-Z]{2}[0-9]{7}$
         // and SV's permissive ^[A-Z0-9]{9}$. V1 audit-only multi-issuer
         // surface — the gate keeps the candidate without elevation.
         let matches = await detector.detect(in: "Passport: AB1234567", doctype: nil)
             .filter { $0.kind == .passport }
-        let hit = try! #require(matches.first)
+        let hit = try #require(matches.first)
         #expect(hit.text == "AB1234567")
         #expect(abs(hit.confidence - 0.80) < 0.001,
                 "Multi-issuer ambiguity preserves the 0.80 baseline (no haircut)")

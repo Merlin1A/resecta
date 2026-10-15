@@ -56,11 +56,11 @@ struct LicensePlateDetectorTests {
     // MARK: - Rationale
 
     @Test("Emits regexPattern signal")
-    func licensePlateEmitsRationale() async {
+    func licensePlateEmitsRationale() async throws {
         let text = "Vehicle owner License plate: 7XYZ989 on file."
         let matches = await detector.detect(in: text, doctype: .court)
         let plate = matches.first { $0.kind == .licensePlate }
-        let rationale = try! #require(plate?.rationale)
+        let rationale = try #require(plate?.rationale)
         #expect(rationale.signals.contains(.regexPattern(name: "licensePlate.labeled")))
     }
 

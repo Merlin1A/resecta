@@ -94,14 +94,14 @@ struct ComposedSurvivorsAccountLengthTests {
     }
 
     @Test("Floor outcome is preset-invariant: an 8-digit account survives aggressive, balanced, conservative")
-    func accountSurvivesEveryPreset() {
+    func accountSurvivesEveryPreset() throws {
         let calibrated = CalibratedScorer()
         let contextScorer = ContextScorerWeights.loadFromEngineBundle()
         let bundle = PresetThresholdBundle.loadFromEngineBundle()
         let (match, pageText) = Self.accountMatch(digits: Self.digits(8))
 
         for preset in [SettingsPreset.aggressive, .balanced, .conservative] {
-            guard let vector = bundle.presets[preset] else { continue }
+            let vector = try #require(bundle.presets[preset], "the bundled thresholds carry the \(preset) preset")
             let survivors = DocumentSearcher.composedSurvivors(
                 [match], pageText: pageText, thresholdVector: vector,
                 calibratedScorer: calibrated, contextScorer: contextScorer, priors: PerCategoryPriors())

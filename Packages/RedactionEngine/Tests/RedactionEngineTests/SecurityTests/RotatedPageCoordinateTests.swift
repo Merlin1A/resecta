@@ -193,9 +193,9 @@ struct RotatedPageCoordinateTests {
         // standing guard: if a future SDK makes bounds rotation-applied, this
         // flips red and T_rot must be revisited (see KNOWN_ISSUES.md KI-2).
         for (label, byRot) in [("ANCHOR", anchorByRot), ("MARKER", markerByRot)] {
-            guard let b0 = byRot[0] else { continue }
+            let b0 = try #require(byRot[0], "\(label) has a selection at rotation 0")
             for r in [90, 180, 270] {
-                guard let br = byRot[r] else { continue }
+                let br = try #require(byRot[r], "\(label) has a selection at rotation \(r)")
                 let invariant = abs(b0.minX - br.minX) < 1 && abs(b0.minY - br.minY) < 1
                 print("E1-PROBE FRAME \(label) r0-vs-r\(r) invariant=\(invariant) "
                     + "b0=(\(b0.minX),\(b0.minY)) br=(\(br.minX),\(br.minY))")
