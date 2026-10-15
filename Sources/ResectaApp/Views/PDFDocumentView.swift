@@ -224,6 +224,33 @@ final class FitFlooredPDFView: PDFView {
         reassertReadabilityFramingIfNeeded()
     }
 
+    // MARK: - Edit menu
+
+    /// The page text is never copied, cut, selected or handed to a system
+    /// text service from the canvas: the view answers no to the edit
+    /// actions and builds its menu without the edit, look-up, learn and
+    /// share groups. Markup mode already keeps PDFKit's own selection off;
+    /// this closes the keyboard shortcuts and the menu as well.
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if Self.suppressedEditActions.contains(action) { return false }
+        return super.canPerformAction(action, withSender: sender)
+    }
+
+    override func buildMenu(with builder: any UIMenuBuilder) {
+        super.buildMenu(with: builder)
+        for identifier in Self.suppressedMenus { builder.remove(menu: identifier) }
+    }
+
+    static let suppressedEditActions: Set<Selector> = [
+        #selector(UIResponderStandardEditActions.copy(_:)),
+        #selector(UIResponderStandardEditActions.cut(_:)),
+        #selector(UIResponderStandardEditActions.paste(_:)),
+        #selector(UIResponderStandardEditActions.select(_:)),
+        #selector(UIResponderStandardEditActions.selectAll(_:)),
+    ]
+
+    static let suppressedMenus: [UIMenu.Identifier] = [.standardEdit, .lookup, .learn, .share]
+
     // MARK: - Readability framing
 
     /// The re-assert store. PDFKit with `autoScales` re-fits even a
