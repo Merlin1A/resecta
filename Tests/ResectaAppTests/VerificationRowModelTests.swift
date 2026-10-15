@@ -517,6 +517,40 @@ struct VerificationRowModelTests {
                 + " · 2\u{00A0}warnings · 2\u{00A0}notes · 2\u{00A0}had nothing to check")
     }
 
+    // MARK: - The expanded block
+
+    @Test("The expanded block per outcome: the explainer unless the caption is it, the detail unless skipped")
+    func expandedBlockItemsPerOutcome() {
+        typealias Item = LayerResultRow.ExpandedItem
+        func items(_ layer: LayerResult, _ modes: [PipelineMode] = [], pages: Bool = true) -> [Item] {
+            LayerResultRow.expandedItems(model: VerificationRowModel(layer: layer, perPageModes: modes),
+                                         layer: layer, opensPages: pages)
+        }
+        let took = Item.timing("Took under 0.1 s")
+        let ocr = Item.explainer("Reads page images by OCR against regions.")
+        // Passed: the caption already is the explainer — never shown twice.
+        #expect(items(Self.layer(.pass, identity: .ocrCheck)) == [.detail("Engine detail."), took])
+        // Every other outcome opens with the explainer.
+        #expect(items(Self.layer(.warn("x"), identity: .ocrCheck, pages: [1]))
+                == [ocr, .detail("Engine detail."), .pageChips([1]), took])
+        #expect(items(Self.layer(.warn("x"), identity: .ocrCheck, cnv: true)) == [ocr, .detail("Engine detail."), took])
+        #expect(items(Self.layer(.attention("x"), identity: .ocrCheck, pages: [0], terms: ["t"]), pages: false)
+                == [ocr, .detail("Engine detail."), took])
+        #expect(items(Self.layer(.fail("x"), identity: .ocrCheck)) == [ocr, .detail("Engine detail."), took])
+        #expect(items(Self.layer(.info("x"), identity: .ocrCheck)) == [ocr, .detail("Engine detail."), took])
+        #expect(items(Self.layer(.pass, identity: .characterCount), [.secureRasterization])
+                == [.explainer("Compares character counts with the record."), .detail("Engine detail."), took])
+        // Skipped: no engine detail (it names a reason that does not apply).
+        #expect(items(Self.layer(.skipped, identity: .characterLineage))
+                == [.explainer("Recomputes each page's character hash."), took])
+        // The sweep note: its lines and its pages.
+        #expect(items(Self.sweepNote)
+                == [.explainer("Runs the detectors on the output."), .detail("Engine detail."), .queryLines,
+                    .pageChips([0, 2]), took])
+        // No identity: no explainer; the caption is the engine's line.
+        #expect(items(Self.layer(.fail("x"), identity: nil, detail: "")) == [took])
+    }
+
     @Test("Each outcome has its outline mark")
     func markSymbols() {
         #expect(VerificationOutcome.allCases.map(\.markSymbolName) == [

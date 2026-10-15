@@ -18,6 +18,9 @@ struct LayerResultRow: View {
 
     /// One item of the expanded block, in display order.
     nonisolated enum ExpandedItem: Equatable {
+        /// What the check reads — on every row whose caption is not
+        /// already that line.
+        case explainer(String)
         /// The engine's detail sentence, verbatim.
         case detail(String)
         /// The query lines and their per-term sub-lines.
@@ -208,7 +211,7 @@ struct LayerResultRow: View {
             ForEach(Array(Self.expandedItems(model: model, layer: layer, opensPages: onPageTap != nil)
                 .enumerated()), id: \.offset) { _, item in
                 switch item {
-                case .detail(let line):
+                case .explainer(let line), .detail(let line):
                     Text(line)
                         .font(.caption)
                         .foregroundStyle(ResectaTokens.SemanticColor.supportText)
@@ -279,12 +282,18 @@ struct LayerResultRow: View {
         }
     }
 
-    /// The expanded block's items, in order: the engine detail, the query
-    /// lines, the page chips (when the host navigates), the timing.
+    /// The expanded block's items, in order: the explainer (unless the
+    /// caption already is it — a passing row), the engine detail (never on
+    /// a skipped check, whose engine detail names a reason that does not
+    /// apply), the query lines, the page chips (when the host navigates),
+    /// the timing. The engine's short line is never repeated here.
     static func expandedItems(model: VerificationRowModel, layer: LayerResult,
                               opensPages: Bool) -> [ExpandedItem] {
         var items: [ExpandedItem] = []
-        if layer.hasDetail {
+        if let explainer = model.explainer, model.caption != explainer {
+            items.append(.explainer(explainer))
+        }
+        if model.showsEngineDetail, layer.hasDetail {
             items.append(.detail(layer.detailDescription))
         }
         if !(layer.queryLines ?? []).isEmpty {
