@@ -387,10 +387,9 @@ what it does not — is stated for readers in [`THREAT-MODEL.md`](./THREAT-MODEL
 The engine is a separate Swift module, so `public` is exactly what the app
 (or any other client) can see. The surface I keep public on purpose is the
 document-runner surface — what a client needs to import a page, rasterize it,
-detect, search, rebuild, verify and export without the app's view code:
+search, rebuild, verify and export without the app's view code:
 
 - Import and rasterize: `PDFPageData` · `PageRasterizer.rasterize`
-- Detection: `DetectionOrchestrator.detectPage`
 - Search: `DocumentSearcher` (`search` · `previewMatches` · the result,
   diagnostic and configuration setters · `boundingRect` · the regex
   validators · `maxResults` · `sharedLoadDiagnostics`) · `SearchMode` ·
