@@ -47,6 +47,8 @@
 #                          forces a cold boot, which on a hosted runner
 #                          outlasts the stall allowance and wedges the next
 #                          batch in turn.
+#   TEST_BATCHED_VERDICT_DIR  when set, the run's verdict files (below) are
+#                          also copied to <dir>/<run dir name>/.
 #
 # Exit codes:
 #   0  all reds (if any) are on the exclusion list, no incomplete batches
@@ -63,7 +65,10 @@
 #
 # Logs and .xcresult bundles land under /tmp/test-batched-<scheme>-<stamp>/.
 # Logs are spam-filtered (attributedStringScaled framework noise) and size-
-# bounded; the per-batch .xcresult is the forensic source of record.
+# bounded; the per-batch .xcresult is the forensic source of record. Beside
+# them, a run that reaches its verdict (or fails its build) writes
+# verdict.json, summary.txt (the totals and VERDICT lines as printed) and a
+# nonce; the pre-push hook reads them (see write_verdict).
 #
 # Compatible with the stock macOS bash 3.2. Uses /usr/bin/grep throughout
 # (`grep` is shimmed to ugrep on this machine and mangles some flag combos).
@@ -99,7 +104,7 @@ BOOT_WAIT_SECS=300     # how long the recovery waits for the simulator to report
 LOAD_WARN=8            # 1-min load average warning threshold
 LOG_CAP_BYTES=20000000 # per-batch filtered-log size bound
 
-usage() { sed -n '3,58p' "$0"; exit 64; }
+usage() { sed -n '3,60p' "$0"; exit 64; }
 
 # ── Suite enumeration (runtime, from Tests sources) ──────────────────────
 # Every top-level (column-0) type whose body carries a `@Test` function — with
@@ -144,6 +149,116 @@ for dirpath, _, files in os.walk(sys.argv[1]):
                 suites.add(current)
 for s in sorted(suites):
     print(s)
+PYEOF
+}
+
+# ── Verdict file ──────────────────────────────────────────────────────────
+# write_verdict PASS|FAIL|INCOMPLETE|BUILD-FAILED <summary line>... writes,
+# beside the run's logs: `nonce` (uuidgen), `summary.txt` (the summary lines
+# exactly as printed) and `verdict.json` — the scheme, the verdict, the counts,
+# the commit and tree the run started on (START_HEAD / START_TREE, captured
+# before the build) and the commit it ended on, whether tracked files were
+# clean at both ends, the engine package's tree, the simulator with its
+# runtime version and build, the Xcode build, the DerivedData path, the run
+# dir, the nonce, the summary lines and the start and end times. With
+# TEST_BATCHED_VERDICT_DIR set the three files are copied there too. The
+# pre-push hook accepts a PASS for the same tree in place of a re-run and
+# re-reads `nonce` and `summary.txt` from the run dir the verdict names.
+# The writer never changes the exit code: a failure is printed and passed over.
+write_verdict() { # verdict summary-line...
+    TBV_SCHEME="${SCHEME:-}" TBV_RUN_DIR="${RUN_DIR:-}" TBV_DD="${DD:-}" \
+    TBV_SIM_UDID="${SIM_UDID:-}" TBV_HEAD="${START_HEAD:-}" TBV_TREE="${START_TREE:-}" \
+    TBV_CLEAN="${START_CLEAN:-}" TBV_STARTED="${STARTED:-}" \
+    TBV_TESTS="${TOT_TESTS:-}" TBV_SUITES="${TOT_SUITES:-}" TBV_FAILED="${TOT_FAILED:-}" \
+    TBV_KNOWN="${TOT_KNOWN:-}" TBV_WEDGED="${WEDGED:-}" TBV_EXCLUDED="${#EXCLUDED[@]}" \
+    TBV_COPY_DIR="${TEST_BATCHED_VERDICT_DIR:-}" \
+    python3 - "$@" <<'PYEOF' || true
+import datetime, json, os, re, shutil, subprocess, sys, uuid
+
+e = os.environ
+
+def run(*argv):  # (exit code, stdout); a missing tool reads as a failure
+    try:
+        p = subprocess.run(argv, capture_output=True, text=True, timeout=120)
+        return p.returncode, p.stdout
+    except Exception:
+        return 1, ""
+
+def num(key):
+    try:
+        return int(e.get(key, ""))
+    except ValueError:
+        return None
+
+def sim_info(udid):
+    # Two installed runtimes can share one identifier (26.4 and 26.4.1):
+    # every available match is recorded, joined, so a change to either moves it.
+    info = {"udid": udid or None, "runtime_version": None, "runtime_build": None}
+    try:
+        devices = json.loads(run("xcrun", "simctl", "list", "devices", "-j")[1])["devices"]
+        runtimes = json.loads(run("xcrun", "simctl", "list", "runtimes", "-j")[1])["runtimes"]
+    except Exception:
+        return info
+    rid = next((k for k, ds in devices.items() for d in ds if d.get("udid") == udid), None)
+    match = [r for r in runtimes if rid and r.get("identifier") == rid and r.get("isAvailable", True)]
+    if match:
+        info["runtime_version"] = "+".join(sorted(str(r.get("version")) for r in match))
+        info["runtime_build"] = "+".join(sorted(str(r.get("buildversion")) for r in match))
+    return info
+
+try:
+    verdict, lines = sys.argv[1], sys.argv[2:]
+    run_dir = e["TBV_RUN_DIR"]
+    head = e.get("TBV_HEAD") or None
+    rc, out = run("git", "rev-parse", "-q", "--verify", "HEAD")
+    head_end = out.strip() if rc == 0 and out.strip() else None
+    rc, out = run("git", "status", "--porcelain", "--untracked-files=no")
+    clean_end = rc == 0 and out == ""
+    rc, out = run("git", "rev-parse", "-q", "--verify", (head or "HEAD") + ":Packages/RedactionEngine")
+    engine_tree = out.strip() if rc == 0 and out.strip() else None
+    m = re.search(r"Build version (\S+)", run("xcodebuild", "-version")[1])
+    rc, out = run("uuidgen")
+    nonce = out.strip() if rc == 0 and out.strip() else str(uuid.uuid4()).upper()
+    doc = {
+        "source": "test-batched.sh",
+        "scheme": e.get("TBV_SCHEME") or None,
+        "verdict": verdict,
+        "head": head,
+        "head_end": head_end,
+        "tree": e.get("TBV_TREE") or None,
+        "tracked_clean_start": e.get("TBV_CLEAN") == "true",
+        "tracked_clean_end": clean_end,
+        "engine_tree": engine_tree,
+        "counts": {"tests": num("TBV_TESTS"), "suites": num("TBV_SUITES"),
+                   "failed": num("TBV_FAILED"), "known_issues": num("TBV_KNOWN"),
+                   "wedged": num("TBV_WEDGED"), "excluded": num("TBV_EXCLUDED")},
+        "sim": sim_info(e.get("TBV_SIM_UDID", "")),
+        "xcode_build": m.group(1) if m else None,
+        "dd": e.get("TBV_DD") or None,
+        "run_dir": run_dir,
+        "nonce": nonce,
+        "summary_lines": lines,
+        "started": e.get("TBV_STARTED") or None,
+        "ended": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    with open(os.path.join(run_dir, "nonce"), "w") as f:
+        f.write(nonce + "\n")
+    with open(os.path.join(run_dir, "summary.txt"), "w") as f:
+        f.write("".join(l + "\n" for l in lines))
+    tmp = os.path.join(run_dir, "verdict.json.tmp")
+    with open(tmp, "w") as f:
+        json.dump(doc, f, indent=2, sort_keys=True)
+        f.write("\n")
+    os.replace(tmp, os.path.join(run_dir, "verdict.json"))
+    print("verdict file: " + os.path.join(run_dir, "verdict.json"))
+    if e.get("TBV_COPY_DIR"):
+        dest = os.path.join(e["TBV_COPY_DIR"], os.path.basename(run_dir.rstrip("/")))
+        os.makedirs(dest, exist_ok=True)
+        for name in ("verdict.json", "summary.txt", "nonce"):
+            shutil.copy2(os.path.join(run_dir, name), dest)
+        print("verdict file copied to: " + dest)
+except Exception as exc:
+    print("verdict file NOT written (the exit code is unchanged): %s" % exc, file=sys.stderr)
 PYEOF
 }
 
@@ -214,6 +329,41 @@ self_test() {
     [ "$($GREP -c 'VERDICT: .* excluded=\${#EXCLUDED\[@\]}' "$me")" -eq 2 ] \
         || { echo "self-test: a VERDICT line does not carry excluded=" >&2; n=1; }
     if [ "$n" -eq 0 ]; then echo "self-test: runtime exclusion list from the environment, applied before batching, named in the verdict OK"; else fails=1; fi
+    # 8. The verdict file is written right before the build-failure exit and
+    #    each verdict exit (in that order: BUILD-FAILED, FAIL, INCOMPLETE,
+    #    PASS), and a dry call writes every field, the nonce and the summary.
+    n=0
+    got="$(awk '
+        /^if ! xcodebuild build-for-testing/ || /^if \[ -n "\$OFFENDERS" \]/ { on = 1 }
+        on && $1 == "exit" { printf "%s>%s ", prev, $2 }
+        on && NF { prev = ($1 == "write_verdict") ? $2 : "-" }
+        /^echo "build ok"/ { on = 0 }' "$me")"
+    [ "$got" = "BUILD-FAILED>1 FAIL>1 INCOMPLETE>2 PASS>0 " ] \
+        || { echo "self-test: write_verdict does not precede each verdict exit (got '$got')" >&2; n=1; }
+    tdir="$(mktemp -d "${TMPDIR:-/tmp}/test-batched-selftest.XXXXXX")"
+    mkdir -p "$tdir/run" "$tdir/copy"
+    got="$(cd "$(dirname "$me")/.." && EXCLUDED=() && SCHEME=ResectaApp RUN_DIR="$tdir/run" DD="$tdir/dd" \
+        SIM_UDID=SELF-TEST START_HEAD=0 START_TREE=0 START_CLEAN=true STARTED=0 \
+        TOT_TESTS=3 TOT_SUITES=1 TOT_FAILED=0 TOT_KNOWN=0 WEDGED=0 \
+        TEST_BATCHED_VERDICT_DIR="$tdir/copy" write_verdict PASS "totals: dry" "VERDICT: dry" 2>&1)"
+    python3 - "$tdir" <<'PYEOF' || { echo "self-test: the dry verdict file is incomplete (writer said: $got)" >&2; n=1; }
+import json, os, sys
+t = sys.argv[1]
+d = json.load(open(os.path.join(t, "run", "verdict.json")))
+need = ("source scheme verdict head head_end tree tracked_clean_start tracked_clean_end engine_tree "
+        "counts sim xcode_build dd run_dir nonce summary_lines started ended").split()
+missing = [k for k in need if k not in d]
+missing += ["sim." + k for k in ("udid", "runtime_version", "runtime_build") if k not in d.get("sim", {})]
+missing += ["counts." + k for k in ("tests", "suites", "failed", "known_issues", "wedged", "excluded")
+            if k not in d.get("counts", {})]
+assert not missing, missing
+assert d["source"] == "test-batched.sh" and d["verdict"] == "PASS" and d["counts"]["tests"] == 3
+assert open(os.path.join(t, "run", "nonce")).read().strip() == d["nonce"] != ""
+assert open(os.path.join(t, "run", "summary.txt")).read().splitlines() == d["summary_lines"] == ["totals: dry", "VERDICT: dry"]
+assert open(os.path.join(t, "copy", "run", "verdict.json")).read() == open(os.path.join(t, "run", "verdict.json")).read()
+PYEOF
+    rm -rf "$tdir"
+    if [ "$n" -eq 0 ]; then echo "self-test: write_verdict precedes the build-failure and verdict exits; a dry call writes every field OK"; else fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
@@ -251,6 +401,14 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 [ -d "$TEST_SRC" ] || { echo "missing test source dir: $TEST_SRC" >&2; exit 1; }
 command -v python3 >/dev/null || { echo "python3 is required (xcresult parsing + suite enumeration)" >&2; exit 1; }
+
+# What the verdict file records as the run's starting point: the commit, its
+# tree and whether tracked files are clean, read before the build does.
+START_HEAD="$(git rev-parse -q --verify HEAD 2>/dev/null || true)"
+START_TREE="$(git rev-parse -q --verify 'HEAD^{tree}' 2>/dev/null || true)"
+START_CLEAN=false
+[ -z "$(git status --porcelain --untracked-files=no 2>/dev/null || echo unreadable)" ] && START_CLEAN=true
+STARTED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 # The destination simulator is pinned by id, never resolved by name: with two
 # runs on one machine a name match can land on — and the recovery below can
@@ -318,6 +476,7 @@ if ! xcodebuild build-for-testing -scheme "$SCHEME" -destination "$DEST" -derive
         > "$BUILD_LOG" 2>&1; then
     echo "BUILD FAILED — tail of $BUILD_LOG:" >&2
     tail -40 "$BUILD_LOG" >&2
+    write_verdict BUILD-FAILED "BUILD FAILED — tail of $BUILD_LOG:"
     exit 1
 fi
 echo "build ok"
@@ -537,7 +696,8 @@ if [ -s "$FAILURES_FILE" ]; then
 fi
 
 echo ""
-echo "totals: tests=$TOT_TESTS suites=$TOT_SUITES failed=$TOT_FAILED known-issues=$TOT_KNOWN wedged=$WEDGED excluded=${#EXCLUDED[@]}"
+TOTALS_LINE="totals: tests=$TOT_TESTS suites=$TOT_SUITES failed=$TOT_FAILED known-issues=$TOT_KNOWN wedged=$WEDGED excluded=${#EXCLUDED[@]}"
+echo "$TOTALS_LINE"
 [ "${#EXCLUDED[@]}" -gt 0 ] && echo "excluded on this runtime (not verified here; the pre-push hook runs them): ${EXCLUDED[*]}"
 [ -n "$EXCUSED" ] && echo "non-gating reds (perf-alone or on the exclusion list — never gate locally):$EXCUSED"
 [ -s "$FAILURES_FILE" ] && { echo "failure detail:"; sed 's/^/  /' "$FAILURES_FILE"; }
@@ -545,12 +705,18 @@ echo "totals: tests=$TOT_TESTS suites=$TOT_SUITES failed=$TOT_FAILED known-issue
 
 if [ -n "$OFFENDERS" ]; then
     echo "OFFENDERS:$OFFENDERS"
-    echo "VERDICT: FAIL scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES gating-failures-in:$OFFENDERS"
+    VERDICT_LINE="VERDICT: FAIL scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES gating-failures-in:$OFFENDERS"
+    echo "$VERDICT_LINE"
+    write_verdict FAIL "$TOTALS_LINE" "$VERDICT_LINE"
     exit 1
 elif [ "$WEDGED" -gt 0 ]; then
-    echo "VERDICT: INCOMPLETE scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES wedged=$WEDGED excluded=${#EXCLUDED[@]} (no gating reds in completed batches)"
+    VERDICT_LINE="VERDICT: INCOMPLETE scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES wedged=$WEDGED excluded=${#EXCLUDED[@]} (no gating reds in completed batches)"
+    echo "$VERDICT_LINE"
+    write_verdict INCOMPLETE "$TOTALS_LINE" "$VERDICT_LINE"
     exit 2
 else
-    echo "VERDICT: PASS scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES known-issues=$TOT_KNOWN gating-failures=0 excluded=${#EXCLUDED[@]}"
+    VERDICT_LINE="VERDICT: PASS scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES known-issues=$TOT_KNOWN gating-failures=0 excluded=${#EXCLUDED[@]}"
+    echo "$VERDICT_LINE"
+    write_verdict PASS "$TOTALS_LINE" "$VERDICT_LINE"
     exit 0
 fi
