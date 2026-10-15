@@ -38,8 +38,6 @@ public struct BloomFilter: Sendable {
     public let seed: UInt64
     /// Number of entries inserted during construction.
     public let rowCount: UInt64
-    /// SHA-256 of sorted source rows.
-    public let sourceHash: Data
 
     private let bitArray: Data
 
@@ -85,10 +83,6 @@ public struct BloomFilter: Sendable {
 
         // Row count: u64 LE at offset 23
         self.rowCount = data.loadLE(UInt64.self, at: 23)
-
-        // SHA-256: 32 bytes at offset 31
-        let hashStart = data.startIndex + 31
-        self.sourceHash = Data(data[hashStart..<(hashStart + 32)])
 
         // Bit array: offset 63 onward
         let expectedBytes = Int((bitCount + 7) / 8)

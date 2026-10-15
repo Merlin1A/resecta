@@ -21,7 +21,6 @@ struct EnginePublicSurfaceTests {
             PDFPageData.self,
             PageRasterizer.self,
             PDFStreamReconstructor.self,
-            DetectionOrchestrator.self,
             DocumentSearcher.self,
             VerificationEngine.self,
             VerificationOrchestrator.self,
@@ -42,7 +41,7 @@ struct EnginePublicSurfaceTests {
             SearchPreviewResult.self,
             TextSpan.self,
         ]
-        #expect(types.count == 23)
+        #expect(types.count == 22)
         #expect(DocumentSearcher.maxResults > 0)
         #expect(DocumentSearcher.validateRegexPattern("[a-z]+") != nil)
     }
@@ -51,10 +50,6 @@ struct EnginePublicSurfaceTests {
     private func runnerMembers(
         rasterizer: PageRasterizer,
         page: PDFPageData,
-        orchestrator: DetectionOrchestrator,
-        image: CGImage,
-        priors: PerCategoryPriors,
-        surfaceForms: SurfaceFormDictionary,
         searcher: DocumentSearcher,
         document: SendablePDFDocument,
         pdfPage: PDFPage,
@@ -63,10 +58,6 @@ struct EnginePublicSurfaceTests {
         layers: [LayerResult]
     ) async throws {
         _ = try await rasterizer.rasterize(page)
-        _ = try await orchestrator.detectPage(
-            image: image, pageIndex: 0, priors: priors,
-            surfaceForms: surfaceForms, doctypeContext: nil
-        )
         _ = searcher.search(document, mode: mode, progress: { _, _ in })
         _ = await searcher.previewMatches(
             mode: mode, scope: .wholeDocument, currentPageIndex: 0,
