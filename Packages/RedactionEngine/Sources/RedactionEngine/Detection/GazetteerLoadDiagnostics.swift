@@ -72,10 +72,10 @@ public struct GazetteerLoadDiagnostics: Sendable, Equatable {
         .documentTypeClassifier, .nerNameModel,
         .contextScorerWeights, .doctypeTemperature, .presetThresholds,
         .assetIntegrity,
-        // The three JSON reference tables load through ungated process-
+        // The address-component and ZIP tables load through ungated process-
         // lifetime `static let`s (AddressSpatialAssembler.sharedAddressComponents,
-        // ZIPStateTable.loader, OCRCustomWordsBuilder.financialCustomWords);
-        // a false corpus verdict never withholds them. Their digests are
+        // ZIPStateTable.loader); a false corpus verdict never withholds them.
+        // The institution table is listed with them. Their digests are
         // verified with everyone else's and report on the trusted path.
         .institutionGazetteer, .addressComponentsGazetteer, .zipStateTableLoader,
     ]

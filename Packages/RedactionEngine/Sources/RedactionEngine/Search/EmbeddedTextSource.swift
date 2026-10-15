@@ -2,16 +2,14 @@ import CoreGraphics
 import Foundation
 import PDFKit
 
-// MARK: - Embedded text source (used to bypass Vision OCR)
+// MARK: - Embedded text source
 
-/// Sendable carrier for a page's embedded text layer, used to bypass Vision
-/// OCR on pages where the embedded text is authoritative (the fast path below).
+/// Sendable carrier for a page's embedded text layer: its text, per-word
+/// boxes and per-line records, read from the PDF without Vision OCR.
 ///
-/// `PipelineCoordinator` builds an instance from `PDFPage` (which is not
-/// Sendable) via the static `make(from:cropBox:)` factory, then passes the
-/// value into `DetectionOrchestrator.detectPage(...)`. Coordinates are
-/// **normalized, bottom-left origin (0–1)** to match Vision's OCR output and
-/// the downstream coordinate model used by `boundingRect(for:in:)`. The rects
+/// The search path builds an instance from `PDFPage` (which is not
+/// Sendable) via the static `make(from:cropBox:)` factory. Coordinates are
+/// **normalized, bottom-left origin (0–1)**, as Vision's OCR output is. The rects
 /// are in the zero-origin, rotation-applied DISPLAYED output-page frame
 /// (`effectiveSize` basis, W/H swapped for /Rotate 90/270) — the same frame
 /// `TextLayerExtractor.extractCharacters` produces and the burn-in consumes
@@ -20,12 +18,12 @@ public struct EmbeddedTextSource: Sendable {
     /// Full extracted text for the page (newline-separated lines).
     public let text: String
     /// Per-word `(NSRange, normalized CGRect)` entries, in document order.
-    /// Drives `boundingRect(for:in:)` exactly as Vision word bounds would.
+    /// Read by `TextLayerSpans` to place word-level spans.
     public let wordBounds: [WordBound]
     /// Per-line records used by `AddressSpatialAssembler`.
     public let lines: [OCREngine.TextLine]
     /// Selectable-text coverage as a fraction of cropBox area in [0, 1].
-    /// Used by the coordinator gate (locked > 0.95) and surfaced for tests.
+    /// Surfaced for tests; no production path reads it.
     public let coverage: Double
 
     public init(
@@ -57,9 +55,8 @@ public struct EmbeddedTextSource: Sendable {
     /// word's PDF-space bounding box via `PDFSelection.bounds(for:)`.
     ///
     /// Coverage is computed as the sum of word-box areas divided by cropBox
-    /// area. On a typical text page words do not overlap; the small amount
-    /// of letter-spacing whitespace is correctly excluded because the gate
-    /// uses a strict `> 0.95` threshold. Returns `nil` if the page has no
+    /// area. On a typical text page words do not overlap, and letter-spacing
+    /// whitespace is not counted. Returns `nil` if the page has no
     /// extractable text or has a zero-size cropBox.
     public static func make(from page: PDFPage) -> EmbeddedTextSource? {
         let cropBox = page.bounds(for: .cropBox)

@@ -7,8 +7,8 @@ import CoreGraphics
 //
 // Verifies that spatial addresses assembled by AddressSpatialAssembler now
 // participate in resolveOverlaps, posterior scoring, and posterior threshold
-// gating (moved from the post-loop raw append to rawMatches BEFORE resolveOverlaps
-// in DetectionOrchestrator.detectPage). Tests operate at the assembler
+// gating (appended to rawMatches BEFORE resolveOverlaps). Tests operate at
+// the assembler
 // and resolver layers without Vision / OCR.
 @Suite("Spatial Address Gating")
 struct SpatialAddressGatingTests {

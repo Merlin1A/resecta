@@ -57,8 +57,8 @@ extension DetectionOrchestrator {
     /// (`meetsThreshold`) and the floored posterior, rather than by raw
     /// detector confidence — so a sibling that will clear ITS own preset cutoff
     /// is not suppressed by a raw-stronger sibling the preset-threshold gate would then
-    /// reject. The orchestrator builds the key with the SAME posterior+cutoff
-    /// math the preset-threshold gate applies (DetectionOrchestrator.swift), so resolver
+    /// reject. A caller builds the key with the SAME posterior+cutoff
+    /// math its preset-threshold gate applies, so resolver
     /// ranking and gating agree by construction.
     public struct SurvivabilityKey: Sendable, Equatable {
         public let meetsThreshold: Bool
@@ -142,8 +142,8 @@ extension DetectionOrchestrator {
                     // Dead-band so structural `priorityRank` governs a
                     // near-tie (within epsilon), not only an exact tie, in the
                     // RAW-confidence fallback. resolveOverlaps arbitrates on RAW
-                    // confidence BEFORE the posterior/preset layers
-                    // (DetectionOrchestrator.swift:386), so a loosely-validated
+                    // confidence BEFORE the posterior/preset layers,
+                    // so a loosely-validated
                     // generic kind (account, rank 1) must not edge out a
                     // structurally-stronger overlapping kind on a hairline delta.
                     let confidenceEpsilon = 0.02

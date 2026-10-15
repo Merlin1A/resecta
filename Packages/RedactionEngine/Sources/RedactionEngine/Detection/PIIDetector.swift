@@ -62,7 +62,7 @@ public struct PIIDetector: Sendable {
     /// matches when corpus resources are missing or corrupted).
     ///
     /// The diagnostics value is consumed
-    /// by `PipelineCoordinator.runDetectionPipeline` which posts a one-time
+    /// by the app's Scan path, which posts a one-time
     /// warning toast and flips `RedactionState.autoDetectionDegraded = true`
     /// on first failure. The triage sheet renders a persistent top banner
     /// while the flag is set (mechanism-description copy).

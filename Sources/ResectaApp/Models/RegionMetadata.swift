@@ -23,7 +23,7 @@ nonisolated struct RegionMetadata: Sendable {
 
     /// Set to true when this region is part of an ambiguous
     /// bare-surname cluster (≥15 entities, no disambiguating first-initial).
-    /// Populated post-clustering in PipelineCoordinator.runDetectionPipeline.
+    /// Set by the staged-review path's clustering.
     var isAmbiguousSurname: Bool = false
 
     /// Abbreviated label for canvas badge (max 4 characters).

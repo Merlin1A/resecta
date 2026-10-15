@@ -1,23 +1,19 @@
 import Vision
 
-// OCR quality program — shared Vision OCR request configuration.
+// Shared Vision OCR request configuration.
 //
-// One type now owns every VNRecognizeTextRequest the engine builds, so the
-// three OCR call sites (OCREngine.recognizeText — search;
-// DetectionOrchestrator.runOCR — detection; VerificationEngine Layer 2 —
-// output verification) configure Vision through a single, testable surface.
-// The Tier-5 quality program tunes the DETECTION preset step by step, each
-// step measured against the RealDocOCRQualityTests harness before it
-// ships; the VERIFICATION preset is frozen by design.
+// One type owns every VNRecognizeTextRequest the engine builds, so the two
+// OCR call sites (OCREngine.recognizeText — search; VerificationEngine
+// Layer 2 — output verification) configure Vision through a single,
+// testable surface. The VERIFICATION preset is frozen by design.
 
 public struct OCRConfiguration: Sendable {
 
-    /// Vision recognition level (.fast for detection/verification,
-    /// .accurate for search — search DPI/accuracy are out of the program's
-    /// scope).
+    /// Vision recognition level (.fast for verification, .accurate for
+    /// search).
     public var recognitionLevel: VNRequestTextRecognitionLevel
 
-    /// Vision's language-model correction. Detection and search keep the
+    /// Vision's language-model correction. Search keeps the
     /// historical `true`; Layer 2 keeps `false` (prevents hallucinated
     /// corrections re-introducing "text" on redacted rasters).
     public var usesLanguageCorrection: Bool
