@@ -27,12 +27,22 @@ extension SearchToolbarSection {
     static let awaitingOCRResultsCaption: String = "Awaiting OCR results"
 
     /// OCR slider + source filter visibility gate.
-    /// Visible whenever the user has Include OCR on, even pre-scan;
-    /// the previous gate (`hasOCRResults`) hid the controls until
-    /// results materialized, which made the slider feel like it
-    /// appeared and disappeared under the user's hand.
-    static func ocrControlsShouldShow(includeOCR: Bool) -> Bool {
-        includeOCR
+    /// Visible whenever the user has Include OCR on and a page can
+    /// route to OCR, even pre-scan; the previous gate (`hasOCRResults`)
+    /// hid the controls until results materialized, which made the
+    /// slider feel like it appeared and disappeared under the user's
+    /// hand. On a known all-`.rich` map the row would be three inert
+    /// controls, so it hides — unless a source filter is set: a filter
+    /// that hides rows is always reachable from here. Fails open on an
+    /// unknown map, like `piiScanOCRBlockShouldShow`.
+    static func ocrControlsShouldShow(
+        includeOCR: Bool,
+        anyPageAwaitsOCR: Bool,
+        statusKnown: Bool,
+        sourceFilter: SourceFilter
+    ) -> Bool {
+        if sourceFilter != .all { return true }
+        return includeOCR && (statusKnown == false || anyPageAwaitsOCR)
     }
 
     /// When the OCR controls are visible but no
@@ -40,6 +50,17 @@ extension SearchToolbarSection {
     /// `awaitingOCRResultsCaption` underneath.
     static func ocrSliderShouldBeDisabled(hasOCRResults: Bool) -> Bool {
         hasOCRResults == false
+    }
+
+    /// The Source picker's own disabled gate. It waits for OCR results
+    /// like the slider only while the filter is at All: a set filter
+    /// (a persisted OCR filter on a document whose pages read as text
+    /// hides every row) must stay changeable.
+    static func ocrSourcePickerShouldBeDisabled(
+        hasOCRResults: Bool,
+        sourceFilter: SourceFilter
+    ) -> Bool {
+        sourceFilter == .all && hasOCRResults == false
     }
 
     /// Caption under the disabled OCR controls. Two states were
@@ -68,13 +89,15 @@ extension SearchToolbarSection {
     /// behavior-neutral). Fails OPEN: `statusKnown == false` (empty
     /// `textLayerStatus`, e.g. reset/mid-import edge) shows the block so
     /// the controls never vanish on a scannable document. Standard modes
-    /// keep today's ungated behavior. Pinned by
+    /// keep today's ungated behavior. A set source filter always shows
+    /// the block, so the filter stays changeable. Pinned by
     /// `SearchToolbarSectionTests`.
     static func piiScanOCRBlockShouldShow(
         anyPageAwaitsOCR: Bool,
-        statusKnown: Bool
+        statusKnown: Bool,
+        sourceFilter: SourceFilter
     ) -> Bool {
-        statusKnown == false || anyPageAwaitsOCR
+        sourceFilter != .all || statusKnown == false || anyPageAwaitsOCR
     }
 
     // MARK: - Pure-Function Contracts

@@ -59,6 +59,21 @@ struct LastFilterPersistenceTests {
         #expect(second.appliedFilter == .all)
     }
 
+    @Test("Reset to Defaults clears the persisted source filter")
+    func resetToDefaultsClearsTheSourceFilter() async {
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let first = SearchState(defaults: defaults)
+        first.sourceFilter = .ocrOnly
+        try? await Task.sleep(for: .milliseconds(700))
+        #expect(SearchState(defaults: defaults).sourceFilter == .ocrOnly,
+                "the round trip writes the key Reset to Defaults removes")
+
+        SettingsState(defaults: defaults).resetToDefaults()
+        #expect(SearchState(defaults: defaults).sourceFilter == .all)
+    }
+
     // MARK: - Debounce floor
 
     @Test("The debounce auto-run floor counts trimmed characters")

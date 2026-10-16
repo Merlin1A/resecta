@@ -8,8 +8,10 @@ import Foundation
 //
 //  - `optionsExpandedByDefault` pins the disclosure default
 //    (renamed from `optionsCollapsedByDefault`).
-//  - `ocrControlsShouldShow(includeOCR:)` is the new gate (was
-//    `hasOCRResults`) — controls surface as soon as Include OCR is on.
+//  - `ocrControlsShouldShow(includeOCR:anyPageAwaitsOCR:statusKnown:sourceFilter:)`
+//    is the gate (was `hasOCRResults`) — controls surface as soon as
+//    Include OCR is on and a page can route to OCR, or a source filter
+//    is set.
 //  - `ocrSliderShouldBeDisabled(hasOCRResults:)` flips the controls to
 //    disabled state with the "Awaiting OCR results" caption.
 
@@ -29,9 +31,11 @@ struct SearchToolbarSectionTests {
         // Pre-scan or no-OCR-yet: user has Include OCR on but no results
         // have arrived. The gate keeps the controls
         // visible (in disabled state).
-        #expect(SearchToolbarSection.ocrControlsShouldShow(includeOCR: true) == true)
+        #expect(SearchToolbarSection.ocrControlsShouldShow(
+            includeOCR: true, anyPageAwaitsOCR: true, statusKnown: true, sourceFilter: .all) == true)
         // Include OCR off: controls hidden entirely.
-        #expect(SearchToolbarSection.ocrControlsShouldShow(includeOCR: false) == false)
+        #expect(SearchToolbarSection.ocrControlsShouldShow(
+            includeOCR: false, anyPageAwaitsOCR: true, statusKnown: true, sourceFilter: .all) == false)
     }
 
     @Test("OCR slider disabled when Include OCR on AND no OCR results yet")
@@ -80,14 +84,16 @@ struct SearchToolbarSectionTests {
 
         // Pre-scan path: visibility fires; controls render disabled
         // with the awaiting caption.
-        #expect(SearchToolbarSection.ocrControlsShouldShow(includeOCR: true) == true)
+        #expect(SearchToolbarSection.ocrControlsShouldShow(
+            includeOCR: true, anyPageAwaitsOCR: true, statusKnown: true, sourceFilter: .all) == true)
         #expect(SearchToolbarSection.ocrSliderShouldBeDisabled(hasOCRResults: false) == true)
 
         // Post-scan path: visibility fires AND interactive.
         #expect(SearchToolbarSection.ocrSliderShouldBeDisabled(hasOCRResults: true) == false)
 
         // Include OCR off: hide entirely (both modes).
-        #expect(SearchToolbarSection.ocrControlsShouldShow(includeOCR: false) == false)
+        #expect(SearchToolbarSection.ocrControlsShouldShow(
+            includeOCR: false, anyPageAwaitsOCR: true, statusKnown: true, sourceFilter: .all) == false)
     }
 
     @Test("piiScan OCR block hides only on a known all-rich map (fail-open)")
@@ -96,16 +102,67 @@ struct SearchToolbarSectionTests {
         // block must show so a scannable document never loses its
         // controls.
         #expect(SearchToolbarSection.piiScanOCRBlockShouldShow(
-            anyPageAwaitsOCR: false, statusKnown: false) == true)
+            anyPageAwaitsOCR: false, statusKnown: false, sourceFilter: .all) == true)
 
         // Known map, every page `.rich`: the engine routes no page to
         // OCR — the block hides.
         #expect(SearchToolbarSection.piiScanOCRBlockShouldShow(
-            anyPageAwaitsOCR: false, statusKnown: true) == false)
+            anyPageAwaitsOCR: false, statusKnown: true, sourceFilter: .all) == false)
 
         // Known map with any `.sparse`/`.none` page: show.
         #expect(SearchToolbarSection.piiScanOCRBlockShouldShow(
-            anyPageAwaitsOCR: true, statusKnown: true) == true)
+            anyPageAwaitsOCR: true, statusKnown: true, sourceFilter: .all) == true)
+    }
+
+    @Test("A set source filter keeps the Source picker reachable with no OCR results")
+    func sourcePickerReachableWhileFiltered() {
+        // A persisted Source = OCR on a document whose pages read as
+        // text hides every row; the picker that clears it must stay
+        // enabled. Only the confidence slider waits for OCR results.
+        #expect(SearchToolbarSection.ocrSourcePickerShouldBeDisabled(
+            hasOCRResults: false, sourceFilter: .ocrOnly) == false)
+        #expect(SearchToolbarSection.ocrSourcePickerShouldBeDisabled(
+            hasOCRResults: false, sourceFilter: .textOnly) == false)
+        #expect(SearchToolbarSection.ocrSourcePickerShouldBeDisabled(
+            hasOCRResults: false, sourceFilter: .all) == true)
+        #expect(SearchToolbarSection.ocrSourcePickerShouldBeDisabled(
+            hasOCRResults: true, sourceFilter: .all) == false)
+        #expect(SearchToolbarSection.ocrSliderShouldBeDisabled(hasOCRResults: false) == true)
+    }
+
+    @Test("The OCR row shows only when a page routes to OCR or a source filter is set")
+    func ocrRowShowsOnlyWithAnOCRPageOrAFilter() {
+        // Known all-text map, no filter: three inert controls — hidden.
+        #expect(SearchToolbarSection.ocrControlsShouldShow(
+            includeOCR: true, anyPageAwaitsOCR: false, statusKnown: true, sourceFilter: .all) == false)
+        // Unknown map: fail open.
+        #expect(SearchToolbarSection.ocrControlsShouldShow(
+            includeOCR: true, anyPageAwaitsOCR: false, statusKnown: false, sourceFilter: .all) == true)
+        // A set filter is always reachable, whatever the map or toggle.
+        #expect(SearchToolbarSection.ocrControlsShouldShow(
+            includeOCR: true, anyPageAwaitsOCR: false, statusKnown: true, sourceFilter: .ocrOnly) == true)
+        #expect(SearchToolbarSection.ocrControlsShouldShow(
+            includeOCR: false, anyPageAwaitsOCR: false, statusKnown: true, sourceFilter: .ocrOnly) == true)
+        // The Scan side's block follows the same exit.
+        #expect(SearchToolbarSection.piiScanOCRBlockShouldShow(
+            anyPageAwaitsOCR: false, statusKnown: true, sourceFilter: .ocrOnly) == true)
+    }
+
+    @Test("Show All clears every filter that can hide a row")
+    func showAllClearsTheHidingFilters() {
+        withScratchDefaults { defaults in
+            let state = SearchState(defaults: defaults)
+            state.sourceFilter = .ocrOnly
+            state.minimumOCRConfidence = 0.8
+            state.piiCategoryFilter = [.email]
+            state.appliedFilter = .unapplied
+            SearchResultsSection.showAll(on: state)
+            #expect(state.sourceFilter == .all)
+            #expect(state.minimumOCRConfidence == 0)
+            #expect(state.piiCategoryFilter == nil)
+            #expect(state.appliedFilter == .all)
+        }
+        #expect(SearchEmptyStateCopy.showAllButton == "Show All")
     }
 
     @Test("Option changes re-run only sessions with something to make stale")

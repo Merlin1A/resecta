@@ -90,12 +90,22 @@ struct ResectaApp: App {
     ///   gate-links UI tests drive the un-accepted gate itself, the
     ///   inverse of --uitesting. DEBUG-only, and it only ever forces the
     ///   gate ON; it adds no path past it.
+    /// --searchSourceFilter=ocr: Write a persisted Source = OCR filter
+    ///   AFTER the --uitesting clear, so the next search sheet opens
+    ///   filtered to OCR rows — the state a born-digital document must
+    ///   be able to leave from inside the sheet.
     private static func handleUITestLaunchArguments() {
         if CommandLine.arguments.contains("--resetEULA") {
             UserDefaults.standard.set(false, forKey: "disclaimerAccepted_v1")
         } else if CommandLine.arguments.contains("--uitesting") {
             UserDefaults.standard.set(true, forKey: "disclaimerAccepted_v1")
             UserDefaults.standard.removeObject(forKey: "search.lastFilter.v1")
+        }
+        if CommandLine.arguments.contains("--searchSourceFilter=ocr"),
+           let data = try? JSONEncoder().encode(SearchState.LastSearchFilterShape(
+               sourceFilter: .ocrOnly, minimumOCRConfidence: 0, sortOrder: .discoveryOrder
+           )) {
+            UserDefaults.standard.set(data, forKey: "search.lastFilter.v1")
         }
     }
 

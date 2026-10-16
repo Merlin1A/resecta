@@ -601,6 +601,15 @@ struct SearchResultsSection: View {
 
     // MARK: - Filtered Out State
 
+    /// Clears every filter that can hide a result row: the source, the
+    /// OCR confidence floor, the category chips and the applied state.
+    static func showAll(on searchState: SearchState) {
+        searchState.sourceFilter = .all
+        searchState.minimumOCRConfidence = 0
+        searchState.piiCategoryFilter = nil
+        searchState.appliedFilter = .all
+    }
+
     private var filteredOutState: some View {
         ContentUnavailableView {
             Label(
@@ -609,6 +618,10 @@ struct SearchResultsSection: View {
             )
         } description: {
             Text(SearchEmptyStateCopy.filteredOutDescription)
+        } actions: {
+            Button(SearchEmptyStateCopy.showAllButton) {
+                Self.showAll(on: searchState)
+            }
         }
     }
 }
