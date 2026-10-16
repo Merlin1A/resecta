@@ -325,19 +325,23 @@ enum CommitFeedback {
     /// Appended to every non-nil `markedMessage` result —
     /// "Marked" on its own reads as already-redacted, so the suffix
     /// names the step that still has to happen. Its own `static let` so
-    /// the pin below is exact-text. At AX3 the
-    /// 2-line toast cap may truncate this longer message; the length is accepted.
+    /// the pin below is exact-text. The covered form drops "for
+    /// redaction" so the whole message fits the 2-line toast at the
+    /// default text size.
     static let notYetRedactedSuffix = ". Not redacted until you tap Redact."
 
-    /// "Marked 3 for redaction (2 already covered). Not redacted until
-    /// you tap Redact." Returns nil when nothing was created and
+    /// "Marked 3 for redaction. Not redacted until you tap Redact." /
+    /// "Marked 19 (9 already covered). Not redacted until you tap
+    /// Redact." Returns nil when nothing was created and
     /// nothing was skipped — callers suppress the toast rather than
     /// announce a no-op.
     static func markedMessage(applied: Int, alreadyCovered: Int = 0) -> String? {
         guard applied > 0 || alreadyCovered > 0 else { return nil }
-        var message = "Marked \(applied) for redaction"
+        var message = "Marked \(applied)"
         if alreadyCovered > 0 {
             message += " (\(alreadyCovered) already covered)"
+        } else {
+            message += " for redaction"
         }
         message += notYetRedactedSuffix
         return message

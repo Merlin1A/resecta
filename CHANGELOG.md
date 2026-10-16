@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Documentation: the security policy gains a recipe for verifying a signed release tag: `.github/allowed_signers` lists the release-tag signing key under `security@resecta.app`, and `git tag -v` checks a tag against it once `gpg.ssh.allowedSignersFile` points at the file; the threat model's signed-tag row points at the recipe.
 - The Search sheet's OCR source row appears only when a page reads via OCR or an OCR filter is set.
 - The Custom Terms screen states that a literal always-flag term matches inside words and in any case.
+- The "Marked N" notice is shorter so its "Not redacted until you tap Redact" clause fits at the default text size.
 
 ### Removed
 
