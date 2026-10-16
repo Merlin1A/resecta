@@ -398,12 +398,12 @@ struct SavedSearchStoreTests {
         let textState = SearchState()
         textState.searchModeType = .text
         textState.queryText = "John Smith"
-        #expect(SavedSearchListSheet.generatedName(for: textState) == "Text: John Smith")
+        #expect(SavedSearchListSheet.generatedName(for: textState).hasPrefix("Search \u{2013} "))
 
         let multiState = SearchState()
         multiState.searchModeType = .multiTerm
         multiState.searchTerms = ["a", "b", "c", "d"]
-        #expect(SavedSearchListSheet.generatedName(for: multiState) == "Terms: a, b, c")
+        #expect(SavedSearchListSheet.generatedName(for: multiState).hasPrefix("Search \u{2013} "))
 
         let piiState = SearchState()
         piiState.searchModeType = .piiScan

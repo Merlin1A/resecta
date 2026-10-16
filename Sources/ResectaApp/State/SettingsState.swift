@@ -192,6 +192,9 @@ class SettingsState {
         paranoidMode = false
         appearancePreference = .system
         detectionPreset = .balanced
+        // The search sheet's last-used filter shape (the Source filter,
+        // the OCR confidence floor and the sort) — `SearchState`'s key.
+        defaults.removeObject(forKey: "search.lastFilter.v1")
     }
 }
 

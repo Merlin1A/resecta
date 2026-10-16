@@ -14,6 +14,11 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Documentation: the privacy policy describes the detection the app performs (the seventeen text categories a scan reads from the page text layer or from recognized text, with the bundled gazetteers, Bloom filters and context scorer; no face or barcode sentence), says the app makes no network requests of its own and names the two system services that do, drops the detection-priors clause no shipped path stores or reads, and states the failed-state screen, the delete-all controls, the per-session workspace and its sweep, and the in-place metadata patches as they work; the EULA's Searchable Redaction fallback names hidden text. Both effective dates move to 2026-10-15.
 - Documentation: the threat model says the share confirmation lists a line for each check that reported or could not verify, and no longer describes OCR word hints the shipped flow never builds.
 - Documentation: the security policy gains a recipe for verifying a signed release tag: `.github/allowed_signers` lists the release-tag signing key under `security@resecta.app`, and `git tag -v` checks a tag against it once `gpg.ssh.allowedSignersFile` points at the file; the threat model's signed-tag row points at the recipe.
+- The Search sheet's OCR source row appears only when a page reads via OCR or an OCR filter is set.
+- The Custom Terms screen states that a literal always-flag term matches inside words and in any case.
+- The "Marked N" notice is shorter so its "Not redacted until you tap Redact" clause fits at the default text size.
+- A saved search's suggested name no longer carries the query text.
+- The page bar stays while a match walk is parked.
 
 ### Removed
 
@@ -41,6 +46,12 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Verification results: the Verification Details summary no longer counts notes or checks with nothing to check as passed, and no longer reports a check that could not verify part of the output as completed.
 - Share: a report with a skipped check asks for confirmation before sharing even when another check reported a routine warning.
 - Verification results: a search line starting 'Scan (' keeps its term formatting.
+- The Source filter can be changed back from OCR on a document whose pages read as text, Reset to Defaults clears it, and the empty results state offers Show All.
+- An always-flag or never-flag term of one character is refused with the reason.
+- A query of spaces no longer runs via Search Anyway.
+- Save current search is disabled while the session has no query or terms.
+- The footer says how many selected matches a filter hides.
+- The Scan category chips wrap instead of clipping at the right edge.
 
 ### Internal
 

@@ -331,6 +331,7 @@ enum SearchEmptyStateCopy {
     // MARK: Filtered-out state
 
     static let filteredOutHeadline = "No results match current filters"
+    static let showAllButton = "Show All"
     static let filteredOutDescription = "Your active filters hide all candidates. Adjust source, confidence, or category filters to see results."
 }
 

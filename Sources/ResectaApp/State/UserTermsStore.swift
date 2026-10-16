@@ -168,12 +168,20 @@ final class UserTermsStore {
 
     // MARK: - Validation
 
-    /// Accept the term if it passes length + (optional) regex validation.
+    /// Accept the term if it passes length (a literal floor of
+    /// `literalMinimumLength` scalars, the `patternLengthCap` ceiling) +
+    /// (optional) regex validation.
     /// `nonisolated` so the detached-task hydrate path
     /// (via `sanitize`) can call this off-MainActor. Pure function —
     /// reads only its argument and the `nonisolated` constants above.
+    /// The shortest literal term, in Unicode scalars: a one-character
+    /// literal matches inside nearly every word and fills a scan with
+    /// matches before its later pages are read.
+    nonisolated static let literalMinimumLength = 2
+
     nonisolated static func isValidUserTerm(_ term: UserTerm) -> Bool {
         guard !term.pattern.isEmpty else { return false }
+        guard term.isRegex || term.pattern.unicodeScalars.count >= literalMinimumLength else { return false }
         guard term.pattern.count <= patternLengthCap else { return false }
         if term.isRegex {
             return DocumentSearcher.validateRegexPattern(term.pattern) != nil

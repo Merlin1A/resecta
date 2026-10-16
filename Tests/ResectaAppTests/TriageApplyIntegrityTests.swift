@@ -75,11 +75,11 @@ struct TriageApplyIntegrityTests {
         #expect(CommitFeedback.markedMessage(applied: 1)
                 == "Marked 1 for redaction. Not redacted until you tap Redact.")
         #expect(CommitFeedback.markedMessage(applied: 3, alreadyCovered: 2)
-                == "Marked 3 for redaction (2 already covered). Not redacted until you tap Redact.")
+                == "Marked 3 (2 already covered). Not redacted until you tap Redact.")
         // All-overlap apply still reports — the user needs to know why
         // nothing new appeared.
         #expect(CommitFeedback.markedMessage(applied: 0, alreadyCovered: 4)
-                == "Marked 0 for redaction (4 already covered). Not redacted until you tap Redact.")
+                == "Marked 0 (4 already covered). Not redacted until you tap Redact.")
         // True no-op: no toast at all.
         #expect(CommitFeedback.markedMessage(applied: 0) == nil)
     }

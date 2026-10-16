@@ -33,7 +33,8 @@ extension SearchToolbarSection {
             if Self.piiScanOCRBlockShouldShow(
                 anyPageAwaitsOCR: documentState.textLayerStatus.values
                     .contains { $0 != .rich },
-                statusKnown: !documentState.textLayerStatus.isEmpty
+                statusKnown: !documentState.textLayerStatus.isEmpty,
+                sourceFilter: searchState.sourceFilter
             ) {
                 // Include OCR toggle for the scan run
                 HStack {
@@ -60,14 +61,21 @@ extension SearchToolbarSection {
     // MARK: - OCR Controls (shared by standardSearchOptions + piiScanOptions)
 
     /// Shared source filter + OCR confidence slider.
-    /// Visibility gate via `ocrControlsShouldShow(includeOCR:)`; disabled
-    /// state via `ocrSliderShouldBeDisabled(hasOCRResults:)`. Caption
+    /// Visibility gate via `ocrControlsShouldShow`; the slider's disabled
+    /// state via `ocrSliderShouldBeDisabled(hasOCRResults:)`, the
+    /// picker's via `ocrSourcePickerShouldBeDisabled`. Caption
     /// text comes from `awaitingOCRResultsCaption`. Used by both
     /// `standardSearchOptions` (text/regex/multi-term) and
     /// `piiScanOptions` (PII Scan).
     @ViewBuilder
     var ocrControlsRow: some View {
-        if Self.ocrControlsShouldShow(includeOCR: searchState.options.includeOCR) {
+        if Self.ocrControlsShouldShow(
+            includeOCR: searchState.options.includeOCR,
+            anyPageAwaitsOCR: documentState.textLayerStatus.values
+                .contains { $0 != .rich },
+            statusKnown: !documentState.textLayerStatus.isEmpty,
+            sourceFilter: searchState.sourceFilter
+        ) {
             let isDisabled = Self.ocrSliderShouldBeDisabled(
                 hasOCRResults: searchState.hasOCRResults
             )
@@ -79,6 +87,10 @@ extension SearchToolbarSection {
                 }
                 .pickerStyle(.segmented)
                 .accessibilityLabel("Filter by source")
+                .disabled(Self.ocrSourcePickerShouldBeDisabled(
+                    hasOCRResults: searchState.hasOCRResults,
+                    sourceFilter: searchState.sourceFilter
+                ))
 
                 if searchState.sourceFilter != .textOnly {
                     HStack(spacing: 4) {
@@ -91,10 +103,10 @@ extension SearchToolbarSection {
                             .frame(maxWidth: 120)
                             .accessibilityLabel("Minimum OCR confidence")
                     }
+                    .disabled(isDisabled)
                 }
             }
             .padding(.horizontal, ResectaTokens.Spacing.md)
-            .disabled(isDisabled)
 
             if isDisabled {
                 // The caption is conditional: "awaiting" only
