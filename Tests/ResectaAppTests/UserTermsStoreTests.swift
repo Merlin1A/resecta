@@ -108,8 +108,10 @@ struct UserTermFloorTests {
         #expect(blob.neverFlag.isEmpty)
     }
 
-    @Test("The refusal states the literal floor")
+    @Test("The refusal and the Always Flag footer state the literal rules")
     func copy() {
         #expect(CustomTermsView.termTooShortMessage == "Term too short (min 2 characters).")
+        #expect(CustomTermsView.alwaysFlagFooter.hasSuffix(
+            " Literal terms match anywhere inside a word, in any case."))
     }
 }

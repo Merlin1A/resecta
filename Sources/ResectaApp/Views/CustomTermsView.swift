@@ -13,6 +13,7 @@ import RedactionEngine
 
 struct CustomTermsView: View {
     static let termTooShortMessage = "Term too short (min \(UserTermsStore.literalMinimumLength) characters)."
+    static let alwaysFlagFooter = "Added as matches alongside detector hits. Use for names, project codes, or identifiers your detector presets may not recognize. Literal terms match anywhere inside a word, in any case."
 
     @Environment(UserTermsStore.self) private var userTermsStore
 
@@ -143,7 +144,7 @@ struct CustomTermsView: View {
         } header: {
             Label("Always Flag", systemImage: "flag.fill")
         } footer: {
-            Text("Added as matches alongside detector hits. Use for names, project codes, or identifiers your detector presets may not recognize.")
+            Text(Self.alwaysFlagFooter)
         }
     }
 

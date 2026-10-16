@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Documentation: the threat model says the share confirmation lists a line for each check that reported or could not verify, and no longer describes OCR word hints the shipped flow never builds.
 - Documentation: the security policy gains a recipe for verifying a signed release tag: `.github/allowed_signers` lists the release-tag signing key under `security@resecta.app`, and `git tag -v` checks a tag against it once `gpg.ssh.allowedSignersFile` points at the file; the threat model's signed-tag row points at the recipe.
 - The Search sheet's OCR source row appears only when a page reads via OCR or an OCR filter is set.
+- The Custom Terms screen states that a literal always-flag term matches inside words and in any case.
 
 ### Removed
 
