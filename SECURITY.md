@@ -14,6 +14,24 @@ The threat model this policy is written against — what the app protects, whom 
 
 When reproducing a report, please use the synthetic test corpus bundled with the repository (the Hartwell loan-packet and sample bank statement fixtures) rather than real personal documents — reports should never contain real PII.
 
+## Verifying a release tag
+
+Release tags are signed with an SSH key. [`.github/allowed_signers`](./.github/allowed_signers) lists that key under the project's security contact, so `git tag -v` can check a tag against it:
+
+```sh
+git clone https://github.com/Merlin1A/resecta.git && cd resecta
+git config gpg.ssh.allowedSignersFile .github/allowed_signers
+git tag -v v1.2.0
+```
+
+The first line of the output reads:
+
+```
+Good "git" signature for security@resecta.app with ED25519 key SHA256:WVeaeef/Q5rt1Bni6HwZCTpialq2h0FEGeJY4v3aKOg
+```
+
+Release tags from `v1.2.0` on are signed with this key; `v1.0.0` is a signed annotated tag that verifies the same way, and `v1.1.0` is an unsigned lightweight tag. The same key is published at `https://api.github.com/users/Merlin1A/ssh_signing_keys`.
+
 ## Reporting a vulnerability
 
 Please report suspected vulnerabilities through either of the following channels:
