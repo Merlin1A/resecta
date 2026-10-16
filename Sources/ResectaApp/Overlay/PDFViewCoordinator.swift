@@ -269,9 +269,20 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// warning toast are enforced inside `RedactionState` regardless of
     /// caller route. Overlays are refreshed across all pages because the
     /// marquee can cover cross-page regions on multi-page documents.
+    /// With Add to Selection on, the marquee ADDS to the current
+    /// selection (current first, so the cap keeps what was already
+    /// chosen) and an empty marquee — a tap on the page — changes nothing.
     func commitLassoSelection(_ regions: [RedactionRegion], undoManager: UndoManager?) {
         guard let state = redactionState else { return }
-        state.applyBatch(regions, undoManager: undoManager, toastManager: toastManager)
+        var batch = regions
+        if isMultiSelectActive {
+            guard !regions.isEmpty else { return }
+            let current = state.regions.keys.sorted().flatMap { state.regions[$0] ?? [] }
+                .filter { state.selectedRegionIDs.contains($0.id) }
+            let currentIDs = Set(current.map(\.id))
+            batch = current + regions.filter { !currentIDs.contains($0.id) }
+        }
+        state.applyBatch(batch, undoManager: undoManager, toastManager: toastManager)
         refreshAllOverlays()
     }
 
