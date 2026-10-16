@@ -66,6 +66,21 @@ struct SearchFooterCapBannerTests {
     }
 }
 
+// MARK: - Hidden selection
+
+@Suite("Search footer hidden selection")
+@MainActor
+struct SearchFooterHiddenSelectionTests {
+
+    @Test("The footer names selected matches a filter hides")
+    func footerNamesHiddenSelection() {
+        #expect(SearchFooterSection.selectionCountLabel(selected: 3, total: 3, hiddenSelected: 14)
+                == "3 of 3 selected \u{00B7} 14 hidden")
+        #expect(SearchFooterSection.selectionCountLabel(selected: 3, total: 3, hiddenSelected: 0)
+                == "3 of 3 selected")
+    }
+}
+
 // MARK: - Search-leg banner
 
 @Suite("OCR skip banner (search leg)", .tags(.search))

@@ -49,6 +49,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - An always-flag or never-flag term of one character is refused with the reason.
 - A query of spaces no longer runs via Search Anyway.
 - Save current search is disabled while the session has no query or terms.
+- The footer says how many selected matches a filter hides.
 
 ### Internal
 
