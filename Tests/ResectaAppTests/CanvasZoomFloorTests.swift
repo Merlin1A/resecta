@@ -151,4 +151,18 @@ struct CanvasZoomFloorTests {
         view.scaleFactor = fit * 0.5
         #expect(near(view.scaleFactor, fit), "scale \(view.scaleFactor) after a 0.5× request vs fit width \(fit)")
     }
+
+    @Test("a double tap returns a zoomed-in page to fit")
+    func doubleTapReturnsToFit() {
+        let (view, _) = makeView()
+        let fit = view.scaleFactorForSizeToFit
+        view.scaleFactor = fit * 2
+        #expect(near(view.scaleFactor, fit * 2))
+        let doubleTaps = (view.gestureRecognizers ?? []).compactMap { $0 as? UITapGestureRecognizer }
+            .filter { $0.numberOfTapsRequired == 2 && $0.name == FitFlooredPDFView.returnToFitGestureName }
+        #expect(doubleTaps.count == 1, "the view carries one double-tap-to-fit recognizer")
+        #expect(doubleTaps.first?.cancelsTouchesInView == false, "region taps underneath still land")
+        view.returnToFit()
+        #expect(near(view.scaleFactor, fit), "scale \(view.scaleFactor) after a double tap vs fit \(fit)")
+    }
 }

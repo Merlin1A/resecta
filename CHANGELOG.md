@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+
+- Double-tap the page to return to the fit zoom.
+
 ### Changed
 
 - Search sheet: the recent-search recall chips, the per-term section headers of the results list and the saved-search names are marked privacy-sensitive, matching the result rows and the saved-query previews.

@@ -207,11 +207,13 @@ final class FitFlooredPDFView: PDFView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         observePageChanges()
+        addReturnToFitGesture()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         observePageChanges()
+        addReturnToFitGesture()
     }
 
     deinit {
@@ -367,6 +369,27 @@ final class FitFlooredPDFView: PDFView {
             pageBounds: page.bounds(for: displayBox)
         )
         go(to: PDFDestination(page: page, at: point))
+    }
+
+    static let returnToFitGestureName = "returnToFit"
+
+    /// Return a zoomed-in page to the fit scale — the double tap's
+    /// action. At fit it does nothing.
+    @objc func returnToFit() {
+        let fit = scaleFactorForSizeToFit
+        guard fit > 0, scaleFactor > fit * (1 + Self.floorTolerance) else { return }
+        scaleFactor = fit
+    }
+
+    /// The double tap neither cancels nor delays the touches beneath it,
+    /// so a tap on a region still selects it.
+    private func addReturnToFitGesture() {
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(returnToFit))
+        doubleTap.numberOfTapsRequired = 2
+        doubleTap.cancelsTouchesInView = false
+        doubleTap.delaysTouchesEnded = false
+        doubleTap.name = Self.returnToFitGestureName
+        addGestureRecognizer(doubleTap)
     }
 
     /// Pin `minScaleFactor` to the current fit scale. A no-op while the
