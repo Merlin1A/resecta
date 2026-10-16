@@ -165,6 +165,16 @@ struct SearchToolbarSectionTests {
         #expect(SearchEmptyStateCopy.showAllButton == "Show All")
     }
 
+    @Test("The short-term warning counts trimmed characters — a query of spaces offers no Search Anyway")
+    func shortTermWarningCountsTrimmedCharacters() {
+        let blank = SearchToolbarSection.shortTermWarningQueryCount("   ")
+        #expect(blank == 0)
+        #expect(SearchToolbarSection.shortTermWarningShouldShow(
+            queryCount: blank, isMultiTerm: false, hasRegexError: false) == false)
+        #expect(SearchToolbarSection.shortTermWarningQueryCount(" a ") == 1)
+        #expect(SearchToolbarSection.shortTermWarningQueryCount("ab") == 2)
+    }
+
     @Test("Option changes re-run only sessions with something to make stale")
     func bhB04OptionChangeRetriggerGate() {
         // Committed run (even a no-match verdict): re-run — toggling

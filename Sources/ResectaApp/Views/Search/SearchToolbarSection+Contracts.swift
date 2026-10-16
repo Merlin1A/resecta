@@ -196,6 +196,13 @@ extension SearchToolbarSection {
     /// no-op loop (the attempt clears the list, the error persists,
     /// the button re-renders). The error wins. Pinned by
     /// `SearchToolbarSectionTests`.
+    /// The character count the short-term warning reads: trimmed, like
+    /// the auto-run floor and Return, so a query of spaces never offers
+    /// "Search Anyway".
+    static func shortTermWarningQueryCount(_ queryText: String) -> Int {
+        queryText.trimmingCharacters(in: .whitespacesAndNewlines).count
+    }
+
     static func shortTermWarningShouldShow(
         queryCount: Int,
         isMultiTerm: Bool,

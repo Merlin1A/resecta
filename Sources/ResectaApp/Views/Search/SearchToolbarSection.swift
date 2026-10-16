@@ -253,7 +253,7 @@ struct SearchToolbarSection: View {
             // non-compiling pattern invited a no-op loop (the attempt
             // clears the list, the error stays, the button remains).
             if Self.shortTermWarningShouldShow(
-                queryCount: searchState.queryText.count,
+                queryCount: Self.shortTermWarningQueryCount(searchState.queryText),
                 isMultiTerm: searchState.searchModeType == .multiTerm,
                 hasRegexError: searchState.regexError != nil
             ) {
