@@ -90,3 +90,26 @@ struct UserTermsStoreHydrationTests {
                 "the early save must be on disk and visible from init")
     }
 }
+
+@Suite("Custom term floor and copy")
+@MainActor
+struct UserTermFloorTests {
+
+    @Test("A one-character literal is refused; two characters are kept")
+    func literalFloor() {
+        #expect(UserTermsStore.isValidUserTerm(UserTerm(pattern: "e", isRegex: false)) == false)
+        #expect(UserTermsStore.isValidUserTerm(UserTerm(pattern: "\u{00E9}", isRegex: false)) == false)
+        #expect(UserTermsStore.isValidUserTerm(UserTerm(pattern: "ab", isRegex: false)) == true)
+        let blob = UserTermsStore.sanitize(UserTermsBlob(
+            alwaysFlag: [UserTerm(pattern: "e", isRegex: false), UserTerm(pattern: "Ann", isRegex: false)],
+            neverFlag: [UserTerm(pattern: "x", isRegex: false)]
+        ))
+        #expect(blob.alwaysFlag.map(\.pattern) == ["Ann"])
+        #expect(blob.neverFlag.isEmpty)
+    }
+
+    @Test("The refusal states the literal floor")
+    func copy() {
+        #expect(CustomTermsView.termTooShortMessage == "Term too short (min 2 characters).")
+    }
+}

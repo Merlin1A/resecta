@@ -36,13 +36,17 @@ struct PagesWithHitsLineTests {
     @Test("Gate: only a completed run with a non-empty result set shows the line")
     func gatePredicate() {
         #expect(SearchAndRedactSheet.shouldShowPagesWithHitsLine(
-            hasCompletedRun: false, resultCount: 0) == false)
+            hasCompletedRun: false, resultCount: 0, atCap: false) == false)
         #expect(SearchAndRedactSheet.shouldShowPagesWithHitsLine(
-            hasCompletedRun: false, resultCount: 5) == false)
+            hasCompletedRun: false, resultCount: 5, atCap: false) == false)
         #expect(SearchAndRedactSheet.shouldShowPagesWithHitsLine(
-            hasCompletedRun: true, resultCount: 0) == false)
+            hasCompletedRun: true, resultCount: 0, atCap: false) == false)
         #expect(SearchAndRedactSheet.shouldShowPagesWithHitsLine(
-            hasCompletedRun: true, resultCount: 5) == true)
+            hasCompletedRun: true, resultCount: 5, atCap: false) == true)
+        // A capped run never scanned the tail: "M with hits" would read
+        // as a document-wide count, so the line steps aside.
+        #expect(SearchAndRedactSheet.shouldShowPagesWithHitsLine(
+            hasCompletedRun: true, resultCount: 1_000, atCap: true) == false)
     }
 
     @Test("Distinct-page derivation counts unique pages, order-independent")

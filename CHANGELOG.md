@@ -43,6 +43,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Share: a report with a skipped check asks for confirmation before sharing even when another check reported a routine warning.
 - Verification results: a search line starting 'Scan (' keeps its term formatting.
 - The Source filter can be changed back from OCR on a document whose pages read as text, Reset to Defaults clears it, and the empty results state offers Show All.
+- An always-flag or never-flag term of one character is refused with the reason.
 
 ### Internal
 

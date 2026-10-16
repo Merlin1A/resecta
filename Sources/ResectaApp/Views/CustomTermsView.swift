@@ -12,6 +12,8 @@ import RedactionEngine
 // Copy is mechanism-description only.
 
 struct CustomTermsView: View {
+    static let termTooShortMessage = "Term too short (min \(UserTermsStore.literalMinimumLength) characters)."
+
     @Environment(UserTermsStore.self) private var userTermsStore
 
     @State private var newAlwaysPattern: String = ""
@@ -279,6 +281,11 @@ struct AddTermRow: View {
                     .foregroundStyle(.secondary)
             } else if pattern.count > UserTermsStore.patternLengthCap {
                 Text("Pattern too long (max \(UserTermsStore.patternLengthCap) characters).")
+                    .font(.caption)
+                    .foregroundStyle(ResectaTokens.SemanticColor.failText)
+            } else if !isRegex, !pattern.isEmpty,
+                      pattern.unicodeScalars.count < UserTermsStore.literalMinimumLength {
+                Text(CustomTermsView.termTooShortMessage)
                     .font(.caption)
                     .foregroundStyle(ResectaTokens.SemanticColor.failText)
             }
