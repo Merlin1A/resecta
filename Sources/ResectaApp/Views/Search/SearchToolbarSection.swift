@@ -52,9 +52,6 @@ struct SearchToolbarSection: View {
     @State private var optionsExpanded: Bool = SearchToolbarSection.optionsExpandedByDefault
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    // At accessibility type sizes the two chip strips fall back to
-    // the FlowLayout wrap — every chip visible, no panning.
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(spacing: ResectaTokens.Spacing.xs) {
@@ -422,18 +419,13 @@ struct SearchToolbarSection: View {
     /// - Saturation-scope chip (pending)
     /// - Selective PII chips stay in `piiScanOptions` (pre-scan disclosure)
     private var chipRowSubstrate: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                FlowLayout(spacing: ResectaTokens.Spacing.xs) {
-                    chipRowSubstrateItems
-                }
-                .padding(.horizontal, ResectaTokens.Spacing.md)
-            } else {
-                chipStrip {
-                    chipRowSubstrateItems
-                }
-            }
+        // Wraps at every type size (the accessibility sizes always did):
+        // a single scrolling row clipped the chips past the right edge
+        // with no visible cue.
+        FlowLayout(spacing: ResectaTokens.Spacing.xs) {
+            chipRowSubstrateItems
         }
+        .padding(.horizontal, ResectaTokens.Spacing.md)
         // Container id for the XCUI strip-cooperation battery.
         .accessibilityIdentifier("chipRowSubstrate")
     }
@@ -460,45 +452,6 @@ struct SearchToolbarSection: View {
             sortChip
         }
         // Downstream chip groups inserted here.
-    }
-
-    /// The strip chassis of `chipRowSubstrate` — exactly that one
-    /// surface;
-    /// the options rows, multi-term chips, and the review bar keep
-    /// their wraps. Single row, 8pt gap, with a trailing ~44pt fade
-    /// that signals the pan without stealing touches.
-    private func chipStrip<Content: View>(
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: ResectaTokens.Spacing.sm) {
-                content()
-            }
-            .padding(.leading, ResectaTokens.Spacing.md)
-            // Trailing inset matches the fade width so the last chip
-            // sits clear of the faded zone at scroll-end.
-            .padding(.trailing, 44)
-        }
-        .scrollIndicators(.hidden)
-        // Right-edge ~44pt fade, rendered as a MASK so
-        // the fade tracks whatever the inset chrome paints beneath it:
-        // a gradient overlay painted `Color(.systemBackground)` read
-        // as a hard black box over the ELEVATED sheet background in
-        // dark mode (observed in a visual pass, 2026-08-24). Masking
-        // leaves hit-testing untouched, so chips under the fade stay
-        // tappable — the overlay sketch's `.allowsHitTesting(false)`
-        // contract, preserved by construction.
-        .mask {
-            HStack(spacing: 0) {
-                Rectangle()
-                LinearGradient(
-                    colors: [.black, .clear],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .frame(width: 44)
-            }
-        }
     }
 
     // MARK: - Applied Filter Chip
