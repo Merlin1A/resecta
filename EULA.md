@@ -1,6 +1,6 @@
 # End-User License Agreement
 
-**Effective date:** 2026-09-29
+**Effective date:** 2026-10-15
 
 This End-User License Agreement ("Agreement") is between you and Jesse Brookins
 ("Developer") and governs your use of the Resecta application ("the App"). By
@@ -51,9 +51,10 @@ pixel-destruction process for the regions you mark. Secure Rasterization, the
 default, flattens each affected page to an image, which is designed to remove
 the underlying text layer for that page. Searchable Redaction is designed to
 drop the text you mark while keeping a selectable text layer for the content you
-did not redact; for pages where the text cannot be extracted reliably it falls
-back to image-only output. In either mode, the App is designed to remove the
-original text or image data from the regions you select.
+did not redact; for a page whose text cannot be extracted reliably, or whose
+unmarked text does not show on the rendered page, it falls back to image-only
+output. In either mode, the App is designed to remove the original text or
+image data from the regions you select.
 
 **What the App does not represent.** The App assists with redaction; it does not
 promise any particular outcome, makes no representation that any given redaction

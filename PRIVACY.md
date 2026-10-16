@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Effective date:** 2026-09-29
+**Effective date:** 2026-10-15
 
 Resecta is an on-device document-redaction app for iOS. This Privacy Policy
 describes how Resecta handles information. It is written to satisfy Apple's
@@ -9,9 +9,12 @@ applies even to an app that collects no data.
 
 ## Summary
 
-Resecta collects no personal data, makes no network connections, and uses no
-third-party services, analytics, or advertising. Everything the app does
-happens on your device.
+Resecta collects no personal data, makes no network requests of its own, and
+uses no third-party services, analytics, or advertising. Everything the app
+does happens on your device; the two system services that can reach the
+network on their own, Apple's rating prompt and the name-recognition model iOS
+provides, are described under "On-device detection" and "Information Apple may
+receive as the platform".
 
 ## Information Resecta collects
 
@@ -38,11 +41,12 @@ documents.
 
 The only links that leave the app — the Privacy Policy, End-User License
 Agreement, Source Code, Report an Issue, and Send Feedback items in Settings,
-and the Report an Issue link on the export-failure screen — open in a Safari
-view or your mail app, each running in its own process outside Resecta; Resecta
-itself makes no network requests, and links inside a document you import are not
-followed. Once you follow one of those links, the practices of the website or
-mail provider you reach apply, not this policy.
+and the Report an Issue link on the screen shown when an import, a redaction
+run or an export fails — open in a Safari view or your mail app, each running
+in its own process outside Resecta; Resecta itself makes no network requests,
+and links inside a document you import are not followed. Once you follow one
+of those links, the practices of the website or mail provider you reach apply,
+not this policy.
 
 ## On-device storage
 
@@ -55,24 +59,28 @@ computer backups.
 Your remaining preferences — your settings (export resolution, fill colour,
 default redaction mode, detection sensitivity, appearance, the automatic
 verification and Paranoid Mode switches, and a snap-to-text value whose switch
-was removed in 1.1.0), per-category detection
-priors the app maintains and uses when ranking its suggestions, an export
-counter, the last search filter you used (its source, confidence and sort
-order), and your acceptance of the in-app agreement — are stored in the system
-`UserDefaults` store, which participates in your device backups the way
-ordinary app preference data does. None of them holds document content or text
-you typed.
+was removed in 1.1.0), an export counter, the last search filter you used (its
+source, confidence and sort order), and your acceptance of the in-app
+agreement — are stored in the system `UserDefaults` store, which participates
+in your device backups the way ordinary app preference data does. None of them
+holds document content or text you typed.
 
 This data is not transmitted anywhere by the app and is removed when you
-delete the app; Custom Terms and the saved libraries also have their own
-delete-all controls, and each entry can be removed individually. Storing it
-locally on your device is not the same as collecting it: the app sends
-nothing off the device, the developer never receives it, and it is not
-associated with any identity. For that reason the app's App Store privacy
-disclosure reports "Data Not Collected" for every category.
+delete the app; Custom Terms, the saved-regex library, and the saved-search and
+saved-scan lists each have a delete-all control of their own, and each entry
+can be removed individually. Storing it locally on your device is not the same
+as collecting it: the app sends nothing off the device, the developer never
+receives it, and it is not associated with any identity. For that reason the
+app's App Store privacy disclosure reports "Data Not Collected" for every
+category.
 
-Documents you import are held only for the duration of your editing session and
-are not retained by the app after you finish with them.
+Documents you import are held for the duration of your editing session. The
+redacted output is written to a per-session workspace in the app's private
+container as the redaction run proceeds, and that workspace is removed when the
+session closes; if the app is interrupted before then, a sweep at the next
+launch and on each return to the foreground removes what the interrupted
+session left behind once it is more than an hour old. Nothing is retained by
+the app after that.
 
 ## What an exported file contains
 
@@ -86,12 +94,15 @@ version nor the build that wrote the file. The rest depends on the version. In
 versions 1.0.0 and 1.1.0, the timestamps record when the file was written and
 the file identifier is a per-export value the writer assigns, so if a
 timestamp matters for your situation, account for it before you share. From
-version 1.2.0,
-Resecta also replaces both timestamps with a constant date, so they do not
-record the moment the file was written, and rewrites the file identifier to a
-value derived from the file's own contents, so it carries nothing about the
-device, the build or the moment of export, and two exports of identical content
-carry the same identifier. The export therefore carries much less metadata than
+version 1.2.0, Resecta also replaces both timestamps with a constant date, so
+they do not record the moment the file was written, and rewrites the file
+identifier to a value derived from the file's own contents, so it carries
+nothing about the device, the build or the moment of export, and two exports
+of identical content carry the same identifier. These replacements patch the
+finished file in place; if the writer's output is not in the shape a patch
+expects, that value stays as the writer wrote it, the export still completes,
+and the metadata check in the verification pass, when it runs, reports the value
+that was not replaced. The export therefore carries much less metadata than
 a typical PDF, but it is not metadata-free. The file name of a shared copy
 records when you exported it.
 
@@ -105,17 +116,24 @@ that embedded metadata was not carried into the file Resecta produced.
 
 ## On-device detection
 
-Resecta detects candidate sensitive information entirely on your device.
-Detection combines pattern matching with structural validators (for example, a
-checksum test on card numbers), the system Natural Language tagger (`NLTagger`)
-for names, the system Vision framework for optical character recognition of
-pages without a text layer, and Vision to locate faces and barcodes on the page
-so they can be redacted; the app computes no face landmarks or face prints and
-stores nothing about them. Resecta ships no Core ML model and does not use
-Apple Intelligence or the Foundation Models system; detection surfaces
-candidates on your device for you to review and redact. Automated detection can
-miss sensitive content; you are responsible for reviewing each page and
-verifying your redactions before you share a document.
+Resecta detects candidate sensitive information entirely on your device. A scan
+runs the app's search engine over the text of each page — the page's text layer
+where it has one, and otherwise text recognized by the system Vision framework
+(optical character recognition) — for seventeen categories of text: Social
+Security, EIN and ITIN numbers; card, account and routing numbers; driver's
+license, passport, license plate, medical record, NPI and DEA numbers; names,
+dates of birth, phone numbers, email addresses and postal addresses. The engine
+combines pattern matching with structural validators (for example, a checksum
+test on card numbers), the system Natural Language tagger (`NLTagger`) for
+names, and gazetteers, Bloom filters and a context scorer bundled inside the
+app and built by its open-source data pipeline. The name tagger's model is
+provided by iOS, which fetches it on its own; the app never requests that
+download, and reports name detection by the tagger as unavailable until the
+model is present. Resecta ships no Core ML model and does not use Apple
+Intelligence or the Foundation Models system; detection surfaces candidates on
+your device for you to review and redact. Automated detection can miss
+sensitive content; you are responsible for reviewing each page and verifying
+your redactions before you share a document.
 
 No face data, biometric data, or document content is created for, stored by, or
 transmitted to the developer or any third party.
