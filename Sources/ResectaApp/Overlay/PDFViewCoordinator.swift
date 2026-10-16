@@ -237,14 +237,25 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     }
 
     func commitResize(_ id: UUID, page: Int, newRect: CGRect, undoManager: UndoManager?) {
-        redactionState?.resizeRegion(id, page: page, newRect: newRect, undoManager: undoManager)
+        if storedRect(id, page: page) != newRect {
+            redactionState?.resizeRegion(id, page: page, newRect: newRect, undoManager: undoManager)
+        }
         refreshOverlay(for: page)
     }
 
     // Commit region move after drag ends.
     func commitMove(_ id: UUID, page: Int, newRect: CGRect, undoManager: UndoManager?) {
-        redactionState?.moveRegion(id, page: page, newRect: newRect, undoManager: undoManager)
+        if storedRect(id, page: page) != newRect {
+            redactionState?.moveRegion(id, page: page, newRect: newRect, undoManager: undoManager)
+        }
         refreshOverlay(for: page)
+    }
+
+    /// The stored rect of a region. A tap on a selected region ends its
+    /// "drag" where it began; committing that would record a Move or
+    /// Resize step, re-arm Redo and clear the output for no change.
+    private func storedRect(_ id: UUID, page: Int) -> CGRect? {
+        redactionState?.regions[page]?.first(where: { $0.id == id })?.normalizedRect
     }
 
     /// Commit a batch move of multiple regions on the same page.
