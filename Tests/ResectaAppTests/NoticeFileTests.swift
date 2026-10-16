@@ -73,8 +73,9 @@ struct NoticeFileTests {
 
     // License classes relevant to the NOTICE obligation. Public-domain (US §105
     // government works) and CC0 are no-attribution-required; MIT requires the
-    // copyright + permission notice to propagate into this distribution.
-    private enum SourceLicense { case publicDomain, cc0, mit }
+    // copyright + permission notice to propagate into this distribution; CC BY
+    // 4.0 requires the attribution, the license name and a note of the changes.
+    private enum SourceLicense { case publicDomain, cc0, mit, ccBy4 }
 
     @Test("Every gazetteer-manifest source is license-classified; MIT inbound is attributed")
     func testManifestSourcesClassifiedAndAttributed() throws {
@@ -84,10 +85,11 @@ struct NoticeFileTests {
         #expect(!tokens.isEmpty, "gazetteer-manifest.json named no sources — manifest unreadable or empty")
 
         // Explicit token -> license table, verified against
-        // resecta-datapipeline/SOURCES.md (2026-06-23). NOTE: popnames is CC0,
+        // resecta-datapipeline/SOURCES.md (2026-10-15). NOTE: popnames is CC0,
         // not "public-domain" as earlier approximated — CC0 is
         // likewise a no-attribution-required class, so the NOTICE needs no
-        // popnames row. Only the MIT rows (paranames) drive a required substring.
+        // popnames row. The ParaNames rows (CC BY 4.0: the data's license, the
+        // code is MIT) drive the required substrings.
         let sourceLicenses: [String: SourceLicense] = [
             "census_spanish": .publicDomain,
             "census_spanish_full": .publicDomain,
@@ -96,13 +98,14 @@ struct NoticeFileTests {
             "popnames": .cc0,
             "popnames_common_surnames": .cc0,
             "popnames_common_forenames": .cc0,
-            "paranames": .mit,
-            "paranames_full": .mit,
+            "paranames": .ccBy4,
+            "paranames_full": .ccBy4,
         ]
-        // MIT-mapped source token -> the substring its NOTICE attribution carries.
-        let mitNoticeSubstring: [String: String] = [
-            "paranames": "bltlab/paranames",
-            "paranames_full": "bltlab/paranames",
+        // Attribution-bearing source token -> the substrings its NOTICE row
+        // carries: the upstream name and, for CC BY 4.0, the license name.
+        let attributionSubstrings: [String: [String]] = [
+            "paranames": ["bltlab/paranames", "Creative Commons Attribution 4.0"],
+            "paranames_full": ["bltlab/paranames", "Creative Commons Attribution 4.0"],
         ]
 
         for token in tokens.sorted() {
@@ -112,12 +115,19 @@ struct NoticeFileTests {
                 Issue.record("Unclassified gazetteer-manifest source '\(token)' — add it to the license table and, if attribution-bearing, to NOTICE")
                 continue
             }
-            if license == .mit, let required = mitNoticeSubstring[token] {
-                #expect(
-                    contents.contains(required),
-                    "NOTICE missing the MIT attribution for manifest source '\(token)' (expected substring '\(required)')")
+            if license == .mit || license == .ccBy4, let required = attributionSubstrings[token] {
+                for substring in required {
+                    #expect(
+                        contents.contains(substring),
+                        "NOTICE missing the attribution for manifest source '\(token)' (expected substring '\(substring)')")
+                }
             }
         }
+        // The ParaNames row names the data's license, not the code's: the old
+        // MIT row label must not survive.
+        #expect(
+            !contents.contains("bltlab/paranames (MIT)"),
+            "NOTICE still labels ParaNames MIT — its data is CC BY 4.0")
 
         // Faker is an unconditional (non-manifest) MIT input: it generates the
         // synthetic evaluation corpus used to measure the detector — it does not
@@ -132,6 +142,16 @@ struct NoticeFileTests {
         #expect(
             folded.contains("Mondejar"),
             "NOTICE dropped the es_ES Faker contributor co-attribution (Álvaro Mondéjar Rubio)")
+
+        // The bundled sample document embeds subsets of the Inter typeface
+        // (SIL Open Font License 1.1): the copyright holder and the license
+        // name are pinned beside the data rows.
+        #expect(
+            contents.contains("The Inter Project Authors"),
+            "NOTICE missing the Inter typeface copyright holder (The Inter Project Authors)")
+        #expect(
+            contents.contains("SIL Open Font License"),
+            "NOTICE missing the Inter typeface license name (SIL Open Font License)")
     }
 
     @Test("MIT inbound NOTICE rows are authored and discharged")
