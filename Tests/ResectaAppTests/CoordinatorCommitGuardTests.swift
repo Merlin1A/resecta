@@ -10,7 +10,8 @@ import RedactionEngine
 // its "drag" at the start point, and that commit must leave no Move or
 // Resize undo step and no `regionVersion` bump behind. A page change
 // clears the region selection, so a delete or a nudge never reaches a
-// region the user can no longer see.
+// region the user can no longer see. The commit announcements name what
+// happened to the region.
 
 @Suite("Coordinator commit guard")
 @MainActor
@@ -86,5 +87,11 @@ struct CoordinatorCommitGuardTests {
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
         #expect(documentState.currentPageIndex == 1)
         #expect(state.selectedRegionIDs.isEmpty)
+    }
+
+    @Test("Resize and delete commits announce what happened to the region")
+    func commitAnnouncements() {
+        #expect(PDFViewCoordinator.commitAnnouncement(.resized) == "Region resized")
+        #expect(PDFViewCoordinator.commitAnnouncement(.deleted) == "Region deleted")
     }
 }

@@ -243,6 +243,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     func commitResize(_ id: UUID, page: Int, newRect: CGRect, undoManager: UndoManager?) {
         if storedRect(id, page: page) != newRect {
             redactionState?.resizeRegion(id, page: page, newRect: newRect, undoManager: undoManager)
+            UIAccessibility.post(notification: .announcement, argument: Self.commitAnnouncement(.resized))
         }
         refreshOverlay(for: page)
     }
@@ -290,11 +291,25 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         refreshAllOverlays()
     }
 
+    /// What a commit announces to VoiceOver.
+    enum CommitAnnouncement {
+        case resized
+        case deleted
+    }
+
+    static func commitAnnouncement(_ kind: CommitAnnouncement) -> String {
+        switch kind {
+        case .resized: return "Region resized"
+        case .deleted: return "Region deleted"
+        }
+    }
+
     /// Delete a specific region by ID (used by VoiceOver custom action).
     func deleteRegion(_ id: UUID, page: Int) {
         redactionState?.removeRegion(id, page: page, undoManager: nil)
         redactionState?.selectedRegionID = nil
         refreshOverlay(for: page)
+        UIAccessibility.post(notification: .announcement, argument: Self.commitAnnouncement(.deleted))
     }
 
     // MARK: - Overlay Refresh
