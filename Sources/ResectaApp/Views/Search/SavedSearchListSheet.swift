@@ -98,6 +98,7 @@ struct SavedSearchListSheet: View {
                     } label: {
                         Label(Self.saveCurrentLabel(for: activeInterface), systemImage: "plus.circle")
                     }
+                    .disabled(!Self.saveCurrentEnabled(for: activeInterface, searchState: searchState))
                     .accessibilityLabel(Self.saveCurrentLabel(for: activeInterface))
                 }
             }
@@ -473,6 +474,15 @@ struct SavedSearchListSheet: View {
         interface == .scan
             ? "Removes every saved scan on this device."
             : "Removes every saved search on this device."
+    }
+
+    /// Whether the save row is enabled: a saved search needs a query or
+    /// a term to recall; a saved scan stores its category set and is
+    /// always meaningful.
+    static func saveCurrentEnabled(for interface: SearchInterface, searchState: SearchState) -> Bool {
+        if interface == .scan { return true }
+        let query = searchState.queryText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !query.isEmpty || !searchState.searchTerms.isEmpty
     }
 
     /// Pre-filled save-prompt name: the interface and the date, never

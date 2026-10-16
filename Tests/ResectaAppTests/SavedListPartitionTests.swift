@@ -151,4 +151,24 @@ struct SavedListPartitionTests {
             #expect(!SavedSearchListSheet.generatedName(for: state).contains("Hartwell"))
         }
     }
+
+    @Test("Save current search is disabled while the session has no query and no terms")
+    func saveRowNeedsAQueryOrTerms() {
+        withScratchDefaults { defaults in
+            let state = SearchState(defaults: defaults)
+            state.searchModeType = .text
+            state.queryText = "  "
+            #expect(SavedSearchListSheet.saveCurrentEnabled(for: .search, searchState: state) == false)
+            state.queryText = "Boise"
+            #expect(SavedSearchListSheet.saveCurrentEnabled(for: .search, searchState: state) == true)
+            state.queryText = ""
+            state.searchModeType = .multiTerm
+            state.searchTerms = ["Hartwell"]
+            #expect(SavedSearchListSheet.saveCurrentEnabled(for: .search, searchState: state) == true)
+            // A saved scan stores its category set, never a query.
+            state.searchModeType = .piiScan
+            state.searchTerms = []
+            #expect(SavedSearchListSheet.saveCurrentEnabled(for: .scan, searchState: state) == true)
+        }
+    }
 }
