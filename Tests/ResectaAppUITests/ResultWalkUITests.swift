@@ -1,8 +1,8 @@
 import XCTest
 
 /// UI tests for the result walk's chrome on the parked Search sheet:
-/// the page bar steps aside while a walk is live at the compact float
-/// and returns on expand; each step centres the current match's ring
+/// the page bar stays while a walk is live at the compact float and
+/// after expand; each step centres the current match's ring
 /// in the visible canvas (pixel-measured — the ring is not served
 /// through AX); and the parked strip's controls meet the 44-pt
 /// effective floor inside the attached sheet. All three drive the
@@ -31,9 +31,9 @@ nonisolated final class ResultWalkUITests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - The page bar steps aside
+    // MARK: - The page bar stays
 
-    func testWalkStep_hidesPageBarAtCompactAndRestoresOnExpand() {
+    func testWalkStep_keepsPageBarAtCompactAndOnExpand() {
         app.launch()
         let next = app.buttons["resultNavNext"]
         XCTAssertTrue(next.waitForExistence(timeout: 30), "The seeded query returned nothing or the sheet never presented.")
@@ -43,21 +43,21 @@ nonisolated final class ResultWalkUITests: XCTestCase {
         next.tap()
         XCTAssertTrue(compactStrip.waitForExistence(timeout: 10), "The first chevron tap did not park the sheet at the compact float.")
         XCTAssertTrue(
-            pageBar.waitForNonExistence(timeout: 10),
-            "The page bar must step aside while the walk is live at the compact float."
+            pageBar.waitForExistence(timeout: 10),
+            "The page bar must stay while the walk is live at the compact float."
         )
         XCTAssertTrue(
             app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Result 1 of ")).firstMatch.exists,
             "The walk did not land on result 1."
         )
-        attachScreenshot(named: "rw-page-bar-hidden")
+        attachScreenshot(named: "rw-page-bar-parked")
 
         expandCompactStripToMedium()
         XCTAssertTrue(
             pageBar.waitForExistence(timeout: 10),
-            "The page bar must return once the sheet leaves the compact float."
+            "The page bar must stay once the sheet leaves the compact float."
         )
-        attachScreenshot(named: "rw-page-bar-restored")
+        attachScreenshot(named: "rw-page-bar-expanded")
     }
 
     // MARK: - The match is centred
@@ -140,7 +140,11 @@ nonisolated final class ResultWalkUITests: XCTestCase {
     private func canvasBand() -> ClosedRange<CGFloat> {
         let navBar = app.navigationBars.firstMatch
         let top: CGFloat = navBar.exists ? navBar.frame.maxY : 116
-        let bottom = compactStrip.frame.minY - 14
+        // The page bar stays above the parked strip; the visible canvas
+        // ends at the bar (its teal chevron must not join the ring's box).
+        let pageBar = app.descendants(matching: .any).matching(identifier: "pageNav").firstMatch
+        let floor = pageBar.exists ? pageBar.frame.minY : compactStrip.frame.minY
+        let bottom = floor - 14
         return top...bottom
     }
 

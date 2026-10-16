@@ -5,7 +5,7 @@ import XCTest
 /// ‹ › pair, the strip's Select names the current row as its
 /// accessibility value and toggles the row's selection (the footer
 /// count moves), and the page
-/// bar steps aside beneath the parked strip while the walk is live —
+/// bar stays above the parked strip while the walk is live —
 /// on the 23-page fixture with the DEBUG-seeded review (six staged
 /// detections on page 1, none selected on arrival).
 ///
@@ -47,8 +47,8 @@ nonisolated final class ReviewWalkUITests: XCTestCase {
         ssnRow.tap()
         XCTAssertTrue(compactStrip.waitForExistence(timeout: 10), "The row-body tap did not park the review at the compact float.")
         XCTAssertTrue(
-            pageBar.waitForNonExistence(timeout: 10),
-            "The page bar must step aside while the review walk is live at the compact float."
+            pageBar.waitForExistence(timeout: 10),
+            "The page bar must stay while the review walk is live at the compact float."
         )
         // The strip draws no line for the current row; VoiceOver reads
         // it as the Select button's value — kind, page, text.
