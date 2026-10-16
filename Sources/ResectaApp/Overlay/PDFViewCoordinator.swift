@@ -110,6 +110,10 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
                     }
                 }
                 if docState?.currentPageIndex != index {
+                    // The selection stays on the page the user can see:
+                    // a delete or a nudge must never reach regions on a
+                    // page scrolled away from.
+                    self?.redactionState?.selectedRegionIDs = []
                     docState?.currentPageIndex = index
                 }
             }

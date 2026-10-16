@@ -1,13 +1,16 @@
 import Testing
 import Foundation
 import CoreGraphics
+import PDFKit
 import RedactionEngine
 @testable import ResectaApp
 
 // The coordinator's commit seams. A move or resize commit records a step
 // only when the rect changed: a tap on an already-selected region ends
 // its "drag" at the start point, and that commit must leave no Move or
-// Resize undo step and no `regionVersion` bump behind.
+// Resize undo step and no `regionVersion` bump behind. A page change
+// clears the region selection, so a delete or a nudge never reaches a
+// region the user can no longer see.
 
 @Suite("Coordinator commit guard")
 @MainActor
@@ -54,5 +57,34 @@ struct CoordinatorCommitGuardTests {
         coordinator.commitMove(region.id, page: 0, newRect: moved, undoManager: undoManager)
         #expect(undoManager.canUndo)
         #expect(state.regions[0]?.first?.normalizedRect == moved)
+    }
+
+    @Test("A page change clears the region selection")
+    func pageChangeClearsTheSelection() {
+        let (coordinator, state, region) = seeded()
+        let documentState = DocumentState()
+        coordinator.documentState = documentState
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 684))
+        let view = FitFlooredPDFView(frame: window.bounds)
+        view.displayMode = .singlePage
+        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
+        view.document = PDFDocument(data: renderer.pdfData { ctx in
+            ctx.beginPage()
+            ctx.beginPage()
+        })
+        window.addSubview(view)
+        window.isHidden = false
+        view.layoutIfNeeded()
+        coordinator.setupObservers(for: view)
+        state.selectedRegionIDs = [region.id]
+
+        guard let second = view.document?.page(at: 1) else {
+            Issue.record("the two-page fixture lost its second page")
+            return
+        }
+        view.go(to: second)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        #expect(documentState.currentPageIndex == 1)
+        #expect(state.selectedRegionIDs.isEmpty)
     }
 }
