@@ -475,16 +475,16 @@ struct SavedSearchListSheet: View {
             : "Removes every saved search on this device."
     }
 
-    /// Pre-filled save-prompt name.
+    /// Pre-filled save-prompt name: the interface and the date, never
+    /// the query or the terms (document text the user may not want in
+    /// a list that VoiceOver reads and the rename/delete titles echo).
     static func generatedName(for searchState: SearchState) -> String {
+        let date = Date.now.formatted(date: .abbreviated, time: .shortened)
         switch searchState.searchModeType {
         case .piiScan:
-            return "\(SearchModeType.piiScan.displayName) – \(Date.now.formatted(date: .abbreviated, time: .shortened))"
-        case .multiTerm:
-            let terms = searchState.searchTerms.prefix(3).joined(separator: ", ")
-            return "Terms: \(String(terms.prefix(30)))"
-        case .text, .regex:
-            return "\(searchState.searchModeType.displayName): \(String(searchState.queryText.prefix(30)))"
+            return "\(SearchModeType.piiScan.displayName) – \(date)"
+        case .multiTerm, .text, .regex:
+            return "Search – \(date)"
         }
     }
 

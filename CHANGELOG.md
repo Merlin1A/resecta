@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The Search sheet's OCR source row appears only when a page reads via OCR or an OCR filter is set.
 - The Custom Terms screen states that a literal always-flag term matches inside words and in any case.
 - The "Marked N" notice is shorter so its "Not redacted until you tap Redact" clause fits at the default text size.
+- A saved search's suggested name no longer carries the query text.
 
 ### Removed
 

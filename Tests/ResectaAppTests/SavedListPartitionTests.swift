@@ -136,4 +136,19 @@ struct SavedListPartitionTests {
         #expect(SavedSearchListSheet.visibleEntries([captured], interface: .scan).count == 1)
         #expect(SavedSearchListSheet.visibleEntries([captured], interface: .search).isEmpty)
     }
+
+    @Test("The suggested name carries no query text")
+    func suggestedNameCarriesNoQueryText() {
+        withScratchDefaults { defaults in
+            let state = SearchState(defaults: defaults)
+            state.searchModeType = .text
+            state.queryText = "Boise"
+            let name = SavedSearchListSheet.generatedName(for: state)
+            #expect(name.hasPrefix("Search \u{2013} "))
+            #expect(!name.contains("Boise"))
+            state.searchModeType = .multiTerm
+            state.searchTerms = ["Hartwell", "Delia"]
+            #expect(!SavedSearchListSheet.generatedName(for: state).contains("Hartwell"))
+        }
+    }
 }
