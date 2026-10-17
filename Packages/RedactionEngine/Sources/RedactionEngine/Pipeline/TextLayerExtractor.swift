@@ -274,8 +274,11 @@ public struct TextLayerExtractor: Sendable {
     ) -> Bool {
         guard hasHiddenOCG else { return false }
 
+        // A page whose dictionary cannot be read is not known to be free of
+        // hidden content: it reads as referencing one, and takes the secure
+        // path through the fallback the caller already has.
         guard let pageRef = page.pageRef,
-              let dict = pageRef.dictionary else { return false }
+              let dict = pageRef.dictionary else { return true }
 
         // Check if the page's resources reference /Properties (OCG markers)
         var resources: CGPDFDictionaryRef?
@@ -292,19 +295,23 @@ public struct TextLayerExtractor: Sendable {
     /// Doc-level OCG check intended to run once at import time, when raw bytes
     /// are still available to build a `CGPDFDocument`. Walks the catalog for
     /// `/OCProperties → /D → /OFF` and reports whether any OCGs are marked
-    /// hidden by the default config. The page-level companion
+    /// hidden by the default config. A catalog the reader cannot give, or an
+    /// `/OCProperties` without its `/D`, answers true: the document is not
+    /// known to be free of hidden content. The page-level companion
     /// `pageReferencesHiddenOCG(_:hasHiddenOCG:)` consumes this flag and adds
     /// the cheap per-page `/Resources /Properties` check.
     public static func documentHasHiddenOCG(_ document: CGPDFDocument) -> Bool {
-        guard let catalog = document.catalog else { return false }
+        guard let catalog = document.catalog else { return true }
 
         var ocProps: CGPDFDictionaryRef?
         guard CGPDFDictionaryGetDictionary(catalog, "OCProperties", &ocProps),
               let ocProperties = ocProps else { return false }
 
+        // /D is required beside /OCGs (ISO 32000-1 §8.11.4.2): its absence is
+        // a malformed dictionary, not a document with no hidden layer.
         var defaultConfig: CGPDFDictionaryRef?
         guard CGPDFDictionaryGetDictionary(ocProperties, "D", &defaultConfig),
-              let config = defaultConfig else { return false }
+              let config = defaultConfig else { return true }
 
         var offArray: CGPDFArrayRef?
         if CGPDFDictionaryGetArray(config, "OFF", &offArray), let off = offArray {

@@ -86,16 +86,29 @@ struct RobustnessRunnerTests {
             }
             if let pageError { return .reject(errorClass: pageError) }
         }
-        var hasHiddenOCG = false
-        if let provider = CGDataProvider(data: data as CFData),
-           let cgDoc = CGPDFDocument(provider) {
-            // The app's guard and this mirror call the same engine walk, so
-            // this stage cannot drift; the class is the refusal's own case.
-            if ActiveContentScan.firstLocation(in: cgDoc) != nil {
-                return .reject(errorClass: "activeContent")
-            }
-            hasHiddenOCG = TextLayerExtractor.documentHasHiddenOCG(cgDoc)
+        // The walk reader, in the app's order: a reader that cannot open,
+        // cannot unlock, reads no catalog or disagrees with PDFKit on the page
+        // count is corrupt; the walk's could-not-scan is corrupt too; active
+        // content keeps its own class. The app and this mirror call the same
+        // engine walk, so that stage cannot drift.
+        guard let provider = CGDataProvider(data: data as CFData),
+              let cgDoc = CGPDFDocument(provider) else {
+            return .reject(errorClass: "corrupt")
         }
+        if !cgDoc.isUnlocked {
+            _ = cgDoc.unlockWithPassword("")
+        }
+        guard cgDoc.isUnlocked, cgDoc.catalog != nil,
+              cgDoc.numberOfPages == doc.pageCount else {
+            return .reject(errorClass: "corrupt")
+        }
+        if let location = ActiveContentScan.firstLocation(in: cgDoc) {
+            if case .couldNotScan = location {
+                return .reject(errorClass: "corrupt")
+            }
+            return .reject(errorClass: "activeContent")
+        }
+        let hasHiddenOCG = TextLayerExtractor.documentHasHiddenOCG(cgDoc)
         var status: [Int: TextLayerStatus] = [:]
         for i in 0..<doc.pageCount {
             autoreleasepool {

@@ -67,27 +67,10 @@ extension ImportService {
             }
         }
 
-        // Early rejection of PDFs with active content. Also checked in
-        // verification Layer 4 on the output, but PDFKit parses the document
-        // during import so we reject upfront to avoid loading malicious
-        // payloads. The engine's walk covers the catalog-top keys and the
-        // ISO-canonical carriers (/Names → /JavaScript, /OpenAction, page
-        // /AA, annotation /A); the refusal carries its own case so the
-        // failed screen names active content, not a damaged file.
-        //
-        // While we have a CGPDFDocument open, also walk
-        // /OCProperties/D/OFF for hidden Optional Content Groups. The engine
-        // cannot do this later because PDFDocument(data:) leaves
-        // documentURL == nil; computing it here once threads through into
-        // every PDFPageData via DocumentState.sourceHasHiddenOCG.
-        var hasHiddenOCG = false
-        if let provider = CGDataProvider(data: data as CFData),
-           let cgDoc = CGPDFDocument(provider) {
-            if let location = ActiveContentScan.firstLocation(in: cgDoc) {
-                throw PipelineError.importError(.activeContent(location: location))
-            }
-            hasHiddenOCG = TextLayerExtractor.documentHasHiddenOCG(cgDoc)
-        }
+        // The walk reader: the same bytes through CoreGraphics, the reader
+        // the active-content and hidden-layer walks inspect (stage by stage
+        // in `inspectWalkReader`).
+        let hasHiddenOCG = try inspectWalkReader(data: data, expectedPageCount: doc.pageCount)
 
         // Detect text layers per page — can be slow for complex PDFs,
         // which is why this runs off MainActor.
@@ -137,5 +120,46 @@ extension ImportService {
             hadRestrictions: hadRestrictions
         )
         return LoadedDocument(document: SendablePDFDocument(doc), facts: facts)
+    }
+
+    // MARK: - The walk reader
+
+    /// The second reader: the raw bytes opened through CoreGraphics, which
+    /// the active-content walk and the hidden-layer walk inspect. A pure
+    /// function of the bytes so the stage can be driven by a test on its own.
+    ///
+    /// Active content is refused with its own case so the failed screen names
+    /// it, not a damaged file. The hidden-layer fact (`/OCProperties → /D →
+    /// /OFF`) is read here, once, because `PDFDocument(data:)` leaves
+    /// `documentURL` nil and the engine cannot walk it later; it threads into
+    /// every `PDFPageData` through `DocumentState.sourceHasHiddenOCG`.
+    /// `expectedPageCount` is PDFKit's page count for the same bytes.
+    ///
+    /// The reader must open, be unlocked, read a catalog and agree with
+    /// PDFKit on the page count, and the walk must read every page and every
+    /// action chain to its bound; otherwise the walks would answer "clean"
+    /// for what they could not see, so the document is refused as one the
+    /// app cannot read. An owner-password-only file opens with no prompt in
+    /// PDFKit; CoreGraphics may report it locked until the empty user
+    /// password is tried, so that is tried first.
+    nonisolated static func inspectWalkReader(data: Data, expectedPageCount: Int) throws -> Bool {
+        guard let provider = CGDataProvider(data: data as CFData),
+              let cgDoc = CGPDFDocument(provider) else {
+            throw PipelineError.importError(.corrupt)
+        }
+        if !cgDoc.isUnlocked {
+            _ = cgDoc.unlockWithPassword("")
+        }
+        guard cgDoc.isUnlocked, cgDoc.catalog != nil,
+              cgDoc.numberOfPages == expectedPageCount else {
+            throw PipelineError.importError(.corrupt)
+        }
+        if let location = ActiveContentScan.firstLocation(in: cgDoc) {
+            if case .couldNotScan = location {
+                throw PipelineError.importError(.corrupt)
+            }
+            throw PipelineError.importError(.activeContent(location: location))
+        }
+        return TextLayerExtractor.documentHasHiddenOCG(cgDoc)
     }
 }
