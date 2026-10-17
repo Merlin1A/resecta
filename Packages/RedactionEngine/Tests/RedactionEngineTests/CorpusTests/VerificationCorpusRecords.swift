@@ -77,6 +77,11 @@ extension VerificationCorpusRunnerTests {
         /// writer's shape.
         let file_id_hex: String?
         let file_id_matches_digest: Bool?
+        /// The source was a locked document opened with the cell's password.
+        let source_unlocked_with_password: Bool
+        /// The plain cell this locked twin must match byte for byte (its
+        /// `output_sha256`); absent on every other cell.
+        let plain_twin_id: String?
     }
 
     /// The Detection Sweep row of a cell's report and the requests behind
@@ -321,7 +326,61 @@ extension VerificationCorpusRunnerTests {
                                w: 300.0 / 612, h: 40.0 / 792)],
                   terms: [("CLASSIFIED SECRET", false)],
                   notes: "black square annotation over live text; the real region burn must remove the text the annotation only covered"),
-        ]
+        ] + encryptedInputs()
+    }
+
+    /// The committed encrypted set (`Fixtures/TestResources/Encrypted/`,
+    /// generated once by qpdf; the README there carries the recipe and the
+    /// hashes): two plain seeds and three locked twins opened with the
+    /// throwaway user password. A twin's output must equal its seed's byte
+    /// for byte — the compare's `twin_identity`. Read by repository path so
+    /// an instrument proof laid over a parent without the directory yields
+    /// no cell; a missing file yields no cell either.
+    static func encryptedInputs() -> [CellInput] {
+        let dir = URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent()   // CorpusTests
+            .deletingLastPathComponent()   // RedactionEngineTests
+            .appendingPathComponent("Fixtures/TestResources/Encrypted", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: dir.path) else { return [] }
+        let fullPage = [seed("full-page", page: 0, x: 0, y: 0, w: 1, h: 1)]
+        func input(
+            _ id: String, file: String, terms: [String], password: String?, twinOf: String?,
+            notes: String
+        ) -> CellInput? {
+            guard let data = try? Data(contentsOf: dir.appendingPathComponent(file)), !data.isEmpty else {
+                return nil
+            }
+            var cell = CellInput(
+                docId: id, data: data, docSHA: sha256Hex(data),
+                regionSet: fixedSet("factory", seeds: fullPage),
+                regionSource: "factory",
+                expectedVisible: [],
+                notes: notes,
+                verifyOnly: false,
+                termsOverride: terms.map { SensitiveTerm(text: $0, requiresTokenBoundary: false) })
+            cell.password = password
+            cell.plainTwinId = twinOf
+            return cell
+        }
+        let textTerms = ["ENCRYPTED SEED 7731"]
+        let ocgTerms = ["HIDDENLAYER 4410", "VISIBLE WORD 2210"]
+        return [
+            input("encrypted-seed-text", file: "seed-text.pdf", terms: textTerms,
+                  password: nil, twinOf: nil,
+                  notes: "plain seed of the locked twins; one text line; full-page region"),
+            input("encrypted-seed-hidden-ocg", file: "seed-hidden-ocg.pdf", terms: ocgTerms,
+                  password: nil, twinOf: nil,
+                  notes: "plain seed with an OCG-off hidden text layer; full-page region"),
+            input("encrypted-r4-aes-128", file: "r4-aes-128.pdf", terms: textTerms,
+                  password: "user", twinOf: "encrypted-seed-text",
+                  notes: "the text seed, AES-128 (R4) with a user password; opened with it; output must equal the seed's"),
+            input("encrypted-r6-aes-256", file: "r6-aes-256.pdf", terms: textTerms,
+                  password: "user", twinOf: "encrypted-seed-text",
+                  notes: "the text seed, AES-256 (R6) with a user password; opened with it; output must equal the seed's"),
+            input("encrypted-locked-hidden-ocg-r6", file: "locked-hidden-ocg-r6.pdf", terms: ocgTerms,
+                  password: "user", twinOf: "encrypted-seed-hidden-ocg",
+                  notes: "the hidden-layer seed, AES-256 (R6) with object streams and a user password; the hidden layer must be read on the unlocked reader; output must equal the seed's"),
+        ].compactMap { $0 }
     }
 
     /// The Layer-10 normalization-parity cell (C12-108; searchable only): the
