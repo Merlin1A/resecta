@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+
+- Import: a password-protected PDF can be opened by entering its password; the import checks run on the unlocked document, and the redacted copy is not password-protected. The password is held in memory while the document is open and released when the session closes; the failed-state card beneath the password sheet reads as locked rather than damaged. A document that was encrypted — one opened with a password, or one carrying only an owner password — shows a notice at import and a caption on the Share card saying the redacted copy carries neither the password nor the original's usage restrictions.
+
 ### Changed
 
 - Search sheet: the recent-search recall chips, the per-term section headers of the results list and the saved-search names are marked privacy-sensitive, matching the result rows and the saved-query previews.
@@ -44,6 +48,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Verification results: a search line starting 'Scan (' keeps its term formatting.
 
 ### Internal
+
+- The engine's password message names the missing password rather than unsupported encryption; the import checks read one parser's view of the document (the walks inspect the parsed document's own reader, unlocked with the same password, instead of a second parse of the bytes). The robustness mirror and the verification corpus runner take the same password; the runner gains two plain seed documents and three locked twins whose outputs must match their seeds byte for byte.
 
 - `Scripts/release-flag-check.sh` censuses the remaining debug-only launch argument, the saved-searches sim-drive hook, as its positive control.
 - The search sheet's row display contracts, copy catalogs, banners and Scan options sit in their own files (`SearchResultRow+Contracts.swift`, `SearchResultsCopy.swift`, `SearchResultsBanners.swift`, `SearchToolbarSection+Scan.swift`), the copy catalogs under names that say what they hold; one detection-kind label table serves the canvas badge and the review surfaces; the two search-preparation guards share one failure path.
