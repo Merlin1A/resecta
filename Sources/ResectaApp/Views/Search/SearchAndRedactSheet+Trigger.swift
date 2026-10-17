@@ -219,8 +219,8 @@ extension SearchAndRedactSheet {
         // (mirrors `firstPageText`). A nil copy ⇒ no shared-instance
         // fallback — surface a mechanism toast and stop.
         let liveDocBox = SendablePDFDocument(liveDoc)
-        guard let searchDoc = await Task.detached(priority: .utility, operation: {
-            DocumentState.makeSearchCopy(of: liveDocBox)
+        guard let searchDoc = await Task.detached(priority: .utility, operation: { [holder = documentState.documentPassword] in
+            SearchCopy.make(of: liveDocBox, unlockingWith: holder)
         }).value else {
             failSearchPreparation()
             return nil

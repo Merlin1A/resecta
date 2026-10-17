@@ -535,6 +535,14 @@ struct VerificationResultsView: View {
         return nil
     }
 
+    /// The Share-card caption for a source that was encrypted. Static so the
+    /// copy is pinned without a SwiftUI host.
+    static func notProtectedCaption(hadRestrictions: Bool) -> String {
+        hadRestrictions
+            ? "The redacted copy is not password-protected. It carries none of the original's usage restrictions."
+            : "The redacted copy is not password-protected."
+    }
+
     private var shareCard: some View {
         // One control per card: a real Button whose label is non-interactive
         // chrome (`HomeChoiceCardContent`). The prior structure nested a
@@ -576,6 +584,16 @@ struct VerificationResultsView: View {
                     .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("shareDisabledReason")
+            }
+
+            // The source was encrypted: say what the redacted copy carries,
+            // at the moment the user decides to share it.
+            if documentState.sourceFacts.wasEncrypted {
+                Text(Self.notProtectedCaption(hadRestrictions: documentState.sourceFacts.hadRestrictions))
+                    .font(.footnote)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("shareNotProtectedCaption")
             }
         }
     }

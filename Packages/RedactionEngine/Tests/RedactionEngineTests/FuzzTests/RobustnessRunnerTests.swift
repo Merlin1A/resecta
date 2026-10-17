@@ -57,12 +57,19 @@ struct RobustnessRunnerTests {
 
     /// Data-level gates in the app's exact order. The app's earlier 50 MB
     /// byte-size cap lives in the caller and never fires on this set.
-    static func importMirror(_ data: Data) -> ImportMirrorResult {
+    /// `password` is the one the app's sheet would supply for a locked
+    /// document; nil on a first attempt.
+    static func importMirror(_ data: Data, password: String? = nil) -> ImportMirrorResult {
         guard let doc = PDFDocument(data: data) else {
             return .reject(errorClass: "corrupt")
         }
-        guard !doc.isLocked else {
-            return .reject(errorClass: "passwordProtected")
+        if doc.isLocked {
+            guard let password else {
+                return .reject(errorClass: "passwordProtected")
+            }
+            guard doc.unlock(withPassword: password) else {
+                return .reject(errorClass: "passwordProtected")
+            }
         }
         guard doc.pageCount > 0 else {
             return .reject(errorClass: "corrupt")
@@ -86,13 +93,14 @@ struct RobustnessRunnerTests {
             }
             if let pageError { return .reject(errorClass: pageError) }
         }
-        // The walk reader, in the app's order: a reader that cannot open,
-        // cannot unlock, reads no catalog or disagrees with PDFKit on the page
-        // count is corrupt; the walk's could-not-scan is corrupt too; active
-        // content keeps its own class. The app and this mirror call the same
-        // engine walk, so that stage cannot drift.
-        guard let provider = CGDataProvider(data: data as CFData),
-              let cgDoc = CGPDFDocument(provider) else {
+        // The walk reader, in the app's order: the parser's own document
+        // behind the parsed one (`documentRef`, unlocked with the same
+        // password); a reader that is missing, cannot unlock, reads no
+        // catalog or disagrees with PDFKit on the page count is corrupt; the
+        // walk's could-not-scan is corrupt too; active content keeps its own
+        // class. The app and this mirror call the same engine walk, so that
+        // stage cannot drift.
+        guard let cgDoc = doc.documentRef else {
             return .reject(errorClass: "corrupt")
         }
         if !cgDoc.isUnlocked {
