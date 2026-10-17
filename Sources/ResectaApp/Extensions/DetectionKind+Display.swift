@@ -29,9 +29,6 @@ extension DetectionResult.Kind {
             case .account: "Acct"
             case .routingNumber: "RTN"
             case .licensePlate: "LP"
-            case .barcode: "Code"
-            // Short label for triage filter chip + canvas badge.
-            case .signatureCandidate: "Sig"
             case .other: "PII"
             }
         case .face: "Face"
@@ -62,10 +59,6 @@ extension DetectionResult.Kind {
             case .account: "Account Number"
             case .routingNumber: "ABA Routing Number"
             case .licensePlate: "License Plate"
-            case .barcode: "Barcode / QR"
-            // Mechanism-description copy: the detector
-            // suggests; the user confirms in triage.
-            case .signatureCandidate: "Possible Signature"
             case .other: "Personal Information"
             }
         case .face: "Detected Face"
@@ -96,9 +89,6 @@ extension DetectionResult.Kind {
             // Financial cluster: chip sits beside Account.
             case .routingNumber: 15
             case .licensePlate: 16
-            case .barcode: 17
-            // Distinct chip slot between barcode and .other.
-            case .signatureCandidate: 18
             case .other: 19
             }
         case .face: 20

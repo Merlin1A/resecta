@@ -115,7 +115,7 @@ struct SortTieCensusTests {
     @Test("Tie census over the H1.2 corpus (skips when the env is unset)")
     func census() async throws {
         guard let out = Self.tieOut() else {
-            print("[tie-census] RESECTA_TIE_OUT unset; skipped")
+            TestGate.skip("RESECTA_TIE_OUT not set; the tie census skipped")
             return
         }
         let outURL = URL(fileURLWithPath: out)

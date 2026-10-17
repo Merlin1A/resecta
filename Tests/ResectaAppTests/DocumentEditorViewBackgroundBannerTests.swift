@@ -152,34 +152,6 @@ struct DocumentEditorViewBackgroundBannerTests {
         #expect(doc.canStartPipeline(with: redaction) == true)   // guard now passes
     }
 
-    // MARK: - Editing-phase resume banner picks the matching pipeline
-
-    /// A detect-pause must offer the detect-only resume — partial detection
-    /// results were discarded on cancel, and the user intends to resume
-    /// Auto-Detect, not run a full redact (the wrong-pipeline bug).
-    @Test("Resume banner offers detect-only for a detect-pause")
-    func testBannerActionIsDetectForDetectPause() {
-        #expect(
-            DocumentEditorView.resumeAction(forPausedFrom: .detecting) == .detect
-        )
-    }
-
-    /// A redact-pause (or any non-detect / unknown origin) re-runs the full
-    /// pipeline — the existing, correct behavior.
-    @Test("Resume banner offers full pipeline for a redact-pause")
-    func testBannerActionIsFullPipelineForRedactPause() {
-        #expect(
-            DocumentEditorView.resumeAction(forPausedFrom: .redacting) == .fullPipeline
-        )
-        // Defensive fallbacks: unknown origin and a verify-pause both re-run full.
-        #expect(
-            DocumentEditorView.resumeAction(forPausedFrom: nil) == .fullPipeline
-        )
-        #expect(
-            DocumentEditorView.resumeAction(forPausedFrom: .verifying) == .fullPipeline
-        )
-    }
-
     /// The primary action clears the pause state before it launches the
     /// run it offers, so when the resumed detection returns to `.editing`
     /// the banner's guard (`wasPausedByBackground && phaseKind == .editing`)

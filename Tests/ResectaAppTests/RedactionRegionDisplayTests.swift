@@ -91,13 +91,13 @@ struct RedactionRegionDisplayTests {
         let pii: [RedactionRegion.PIIKind] = [
             .ssn, .creditCard, .name, .address, .email, .phone, .ein, .itin,
             .driversLicense, .passport, .medicalRecord, .dateOfBirth, .npi, .dea,
-            .account, .routingNumber, .licensePlate, .barcode, .signatureCandidate, .other,
+            .account, .routingNumber, .licensePlate, .other,
         ]
         for kind in pii {
             switch kind {
             case .ssn, .creditCard, .name, .address, .email, .phone, .ein, .itin,
                  .driversLicense, .passport, .medicalRecord, .dateOfBirth, .npi, .dea,
-                 .account, .routingNumber, .licensePlate, .barcode, .signatureCandidate, .other:
+                 .account, .routingNumber, .licensePlate, .other:
                 break
             }
         }

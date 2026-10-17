@@ -4,11 +4,10 @@ import Foundation
 @testable import RedactionEngine
 
 // The recovery table behind `PipelineCoordinator.launch(_:)`: one row per
-// run kind × end, reproducing the transitions the three run scaffolds'
+// run kind × end, reproducing the transitions the two run scaffolds'
 // error handlers drove. The end-to-end pins stay in `CancellationTests`,
-// `ErrorRecoveryTests`, `PipelineFailureStageTests` and
-// `DetectionErrorRecoveryTests`; these pin the table itself, without a
-// live run.
+// `ErrorRecoveryTests` and `PipelineFailureStageTests`; these pin the
+// table itself, without a live run.
 
 @Suite("Pipeline run recovery table")
 struct PipelineRunRecoveryTests {
@@ -27,10 +26,6 @@ struct PipelineRunRecoveryTests {
         .verifyOnly(outputURL: URL(fileURLWithPath: "/tmp/recovery-table.pdf"),
                     effectiveMode: .secureRasterization)
     }
-    private var detection: PipelineRunKind {
-        .detection(recognitionLevel: .fast, runSettings: settings)
-    }
-
     // MARK: - Cancel
 
     @Test("Full run cancelled mid-flight: discard the output and return to editing; a settled phase is left alone")
@@ -62,18 +57,6 @@ struct PipelineRunRecoveryTests {
                 for: verifyOnly, after: .cancelled, phaseKind: phase) else {
                 Issue.record("expected none from \(phase)"); return
             }
-        }
-    }
-
-    @Test("Detection cancelled mid-flight: return to editing without touching the output; editing is left alone")
-    func detectionCancel() {
-        guard case .returnToEditing(clearOutput: false) = PipelineCoordinator.recovery(
-            for: detection, after: .cancelled, phaseKind: .detecting) else {
-            Issue.record("expected returnToEditing(clearOutput: false) from detecting"); return
-        }
-        guard case .none = PipelineCoordinator.recovery(
-            for: detection, after: .cancelled, phaseKind: .editing) else {
-            Issue.record("expected none from editing"); return
         }
     }
 
@@ -132,14 +115,6 @@ struct PipelineRunRecoveryTests {
             guard case .verified = returnPhase else {
                 Issue.record("expected returnPhase .verified"); return
             }
-        }
-    }
-
-    @Test("Detection failing: degrade to editing (the toast + the run record), never a .failed transition")
-    func detectionError() {
-        guard case .degradeDetection = PipelineCoordinator.recovery(
-            for: detection, after: .failed(Boom(), stage: .redaction), phaseKind: .detecting) else {
-            Issue.record("expected degradeDetection"); return
         }
     }
 }

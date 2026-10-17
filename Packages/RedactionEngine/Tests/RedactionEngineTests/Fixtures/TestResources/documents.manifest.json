@@ -397,7 +397,7 @@
   {
     "id": "capture-masters-2026-08",
     "path": "capture-masters-2026-08.pdf",
-    "sha256": "96de0cb8c2cc00cf90e9a3a2969b1b3adc20e71501fd0fab101fa1e05b73a1b3",
+    "sha256": "be57ff2bcbd7cba72f37e84af1d224e659927ae389563cc675477c6ec599bf53",
     "pages": 16,
     "class": null,
     "capture": "K0",
@@ -416,7 +416,7 @@
       "seed": null,
       "variant": "capture-masters-2026-08",
       "gt_sha256": "12a6a87efa54a2f32a7015451c21dbd519461959e2b585f3c9c2c0ca4840ddbb",
-      "marks_sha256": "915d1c3ceef1f6fc5c570cbbb26a3f6f52aa97c79c656a6f4ccbfdb9ead7c2ea",
+      "marks_sha256": "df32d08023d4984c2494e4c444f42f6a9ea26a79d8a0ec558c83eefbf6df4ef0",
       "page_classes": {
         "0": "C1",
         "1": "C1",

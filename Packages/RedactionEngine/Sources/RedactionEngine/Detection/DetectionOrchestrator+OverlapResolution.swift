@@ -57,8 +57,8 @@ extension DetectionOrchestrator {
     /// (`meetsThreshold`) and the floored posterior, rather than by raw
     /// detector confidence — so a sibling that will clear ITS own preset cutoff
     /// is not suppressed by a raw-stronger sibling the preset-threshold gate would then
-    /// reject. The orchestrator builds the key with the SAME posterior+cutoff
-    /// math the preset-threshold gate applies (DetectionOrchestrator.swift), so resolver
+    /// reject. A caller builds the key with the SAME posterior+cutoff
+    /// math its preset-threshold gate applies, so resolver
     /// ranking and gating agree by construction.
     public struct SurvivabilityKey: Sendable, Equatable {
         public let meetsThreshold: Bool
@@ -142,8 +142,8 @@ extension DetectionOrchestrator {
                     // Dead-band so structural `priorityRank` governs a
                     // near-tie (within epsilon), not only an exact tie, in the
                     // RAW-confidence fallback. resolveOverlaps arbitrates on RAW
-                    // confidence BEFORE the posterior/preset layers
-                    // (DetectionOrchestrator.swift:386), so a loosely-validated
+                    // confidence BEFORE the posterior/preset layers,
+                    // so a loosely-validated
                     // generic kind (account, rank 1) must not edge out a
                     // structurally-stronger overlapping kind on a hairline delta.
                     let confidenceEpsilon = 0.02
@@ -239,11 +239,6 @@ extension DetectionOrchestrator {
         case .routingNumber:  return 12
         case .npi:            return 11
         case .medicalRecord:  return 10
-        // Vision-detected barcode has machine-decoded payload; rank
-        // alongside structural detectors. Sits below medicalRecord (10) and
-        // above licensePlate (8) so a barcode overlap claim is preferred
-        // over the loosely-labeled rect-based detectors below.
-        case .barcode:        return 9
         case .licensePlate:   return 8
         case .email:          return 7
         case .phone:          return 6
@@ -253,10 +248,6 @@ extension DetectionOrchestrator {
         case .passport:       return 2
         case .driversLicense: return 1
         case .account:        return 1
-        // Heuristic-only kind; participates in overlap resolution
-        // (a text PII hit overlapping a signature box should win) but ranks
-        // below any structured match. Same low rank as .other.
-        case .signatureCandidate: return 0
         case .other:          return 0
         }
     }

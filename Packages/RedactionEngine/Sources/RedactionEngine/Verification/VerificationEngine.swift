@@ -53,9 +53,8 @@ public struct VerificationEngine: Sendable {
     /// longer multiplies concurrent Vision sync-waits.
     nonisolated(unsafe) static var ocrParallelism = 3
 
-    /// Layer-2 OCR downsample cap (largest pixel dimension). Matches
-    /// detection rasterization's 4096-px ceiling (`DetectionRenderPolicy
-    /// .maxDetectionPixels`): the OCR check looks for READABLE
+    /// Layer-2 OCR downsample cap (largest pixel dimension), a 4096-px
+    /// ceiling: the OCR check looks for READABLE
     /// leaked text, not pixel fidelity, so a page rendered far above this is
     /// downsampled before Vision. Vision's normalized observation coordinates are
     /// scale-invariant, so the Layer-2 identity contract is unaffected.

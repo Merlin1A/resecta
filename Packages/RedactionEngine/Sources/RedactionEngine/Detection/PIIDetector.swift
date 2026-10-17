@@ -62,7 +62,7 @@ public struct PIIDetector: Sendable {
     /// matches when corpus resources are missing or corrupted).
     ///
     /// The diagnostics value is consumed
-    /// by `PipelineCoordinator.runDetectionPipeline` which posts a one-time
+    /// by the app's Scan path, which posts a one-time
     /// warning toast and flips `RedactionState.autoDetectionDegraded = true`
     /// on first failure. The triage sheet renders a persistent top banner
     /// while the flag is set (mechanism-description copy).
@@ -492,10 +492,6 @@ public struct PIIDetector: Sendable {
         case .routingNumber:  "routingNumber.aba-checksum"
         case .name:           "name.nltagger"
         case .licensePlate:   "licensePlate.labeled"
-        case .barcode:        "barcode.vision"  // Produced by BarcodeDetector via Vision.
-        // Heuristic visual detector; never emitted via PIIDetector
-        // but the switch is exhaustive over PIIKind.
-        case .signatureCandidate: "signature.heuristic"
         case .other:          "pii.other"
         }
     }

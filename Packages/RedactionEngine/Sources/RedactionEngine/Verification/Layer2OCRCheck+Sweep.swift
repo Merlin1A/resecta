@@ -15,8 +15,8 @@ import AppKit
 
 extension VerificationEngine {
 
-    /// Per-word normalized boxes for a recognized line, mirroring
-    /// `DetectionOrchestrator.extractWordBounds` (`.byWords` + `boundingBox(for:)`).
+    /// Per-word normalized boxes for a recognized line (`.byWords` +
+    /// `boundingBox(for:)`).
     /// Returns `[]` when no word box is obtainable — the caller then falls back
     /// to the conservative line-level box.
     private static func wordBoxes(from candidate: VNRecognizedText) -> [CGRect] {
@@ -105,9 +105,7 @@ extension VerificationEngine {
     /// (they await a continuation instead of blocking) and Vision sees at most
     /// one verifier request at a time. Page extraction and classification still
     /// overlap under the task group; Vision parallelizes internally within a
-    /// request. (The same pattern applies in `DetectionOrchestrator.runOCR` — acceptable
-    /// there because detection's page loop is sequential; the Layer-2 group is
-    /// not.) The queue declares NO QoS of its own: each block runs at the
+    /// request. The queue declares NO QoS of its own: each block runs at the
     /// submitting task's propagated QoS, matching the pre-queue semantics where
     /// perform() ran on the caller's thread — an explicit elevation here would
     /// preempt sibling default-QoS work under load.

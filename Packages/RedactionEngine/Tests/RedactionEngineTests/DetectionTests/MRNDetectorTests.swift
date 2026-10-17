@@ -18,13 +18,13 @@ struct MRNDetectorTests {
     // MARK: - Pattern coverage
 
     @Test("Labeled MRN pattern fires on chart note")
-    func mrnLabeledPatternFiresOnChartNote() async {
+    func mrnLabeledPatternFiresOnChartNote() async throws {
         let text = "Chart number MRN: 12345678 reviewed by physician."
         let matches = await detector.detect(in: text, doctype: .medical)
         let mrn = matches.first { $0.kind == .medicalRecord }
         #expect(mrn != nil)
         #expect(mrn?.rationale?.ruleID == "mrn.labeled")
-        let confidence = try! #require(mrn?.confidence)
+        let confidence = try #require(mrn?.confidence)
         #expect(confidence >= 0.85,
                 "positive medical context should push into the boosted band (got \(confidence))")
     }
@@ -66,12 +66,12 @@ struct MRNDetectorTests {
     // MARK: - Context scoring
 
     @Test("Negative context (receipt/order) suppresses confidence")
-    func mrnNegativeContextSuppresses() async {
+    func mrnNegativeContextSuppresses() async throws {
         let text = "Order receipt MRN: 12345678 shipping tracking number."
         let matches = await detector.detect(in: text, doctype: nil)
         let mrn = matches.first { $0.kind == .medicalRecord }
         #expect(mrn != nil)
-        let conf = try! #require(mrn?.confidence)
+        let conf = try #require(mrn?.confidence)
         // Negative context dampens below the base 0.55 but not below the
         // floor 0.15.
         #expect(conf < 0.55)
@@ -79,20 +79,20 @@ struct MRNDetectorTests {
     }
 
     @Test("MRN rationale carries regexPattern signal")
-    func mrnEmitsRegexPatternSignal() async {
+    func mrnEmitsRegexPatternSignal() async throws {
         let text = "Patient MRN: 00012345 admitted."
         let matches = await detector.detect(in: text, doctype: .medical)
         let mrn = matches.first { $0.kind == .medicalRecord }
-        let rationale = try! #require(mrn?.rationale)
+        let rationale = try #require(mrn?.rationale)
         #expect(rationale.signals.contains(.regexPattern(name: "mrn.labeled")))
     }
 
     @Test("Boosted context yields a contextPositive signal")
-    func mrnEmitsContextPositiveWhenBoosted() async {
+    func mrnEmitsContextPositiveWhenBoosted() async throws {
         let text = "Hospital discharge summary. Patient chart MRN: 98765432 reviewed by physician."
         let matches = await detector.detect(in: text, doctype: .medical)
         let mrn = matches.first { $0.kind == .medicalRecord }
-        let rationale = try! #require(mrn?.rationale)
+        let rationale = try #require(mrn?.rationale)
         let hasPositive = rationale.signals.contains { signal in
             if case .contextPositive = signal { return true }
             return false
