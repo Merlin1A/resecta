@@ -28,10 +28,10 @@ and pass the shared `Models/` types between them.
 - **Audit** — Loads and translates the rule catalog from bundled JSON,
   mapping engine-generated rule IDs to catalog version-stable
   identifiers for audit-export record binding.
-- **Detection** — Orchestrates the multi-stage PII detection pipeline
-  (OCR, document-type classification, regex / NLTagger PII matching,
-  spatial address assembly, and face, barcode and signature-candidate
-  detection) to produce per-page detection results with confidence scores.
+- **Detection** — The PII detectors the search path runs (regex and
+  NLTagger matching, spatial address assembly, calibrated scoring and
+  cross-category overlap resolution) and the document-type classifier
+  that explains a match.
 - **Export** — Serializes search results and applied redactions into
   CSV and JSON audit artifacts with consistent schema versioning; matched
   text is reduced to its first and last two characters unless the caller

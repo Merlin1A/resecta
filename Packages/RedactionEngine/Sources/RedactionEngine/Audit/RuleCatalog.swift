@@ -75,8 +75,7 @@ public struct RuleCatalog: Sendable {
         // Routing number — emitted by
         // RoutingNumberDetector and defaultRuleID(for: .routingNumber).
         "routingNumber.aba-checksum": "pii.routing_number.v1",
-        // Barcode / signature — defaultRuleID(for: .barcode /
-        // .signatureCandidate) arms; aliases bundled with the
+        // Barcode / signature — aliases bundled with the
         // 21-row catalog.
         "barcode.vision":       "pii.barcode.vision.v1",
         "signature.heuristic":  "pii.signature.heuristic.v1",

@@ -68,12 +68,6 @@ public enum PIICategory: String, CaseIterable, Sendable, Equatable, Hashable, Co
         case .account: self = .account
         case .routingNumber: self = .routingNumber
         case .licensePlate: self = .licensePlate
-        case .barcode: return nil  // Barcodes are detected via Vision, not text search.
-        // `.signatureCandidate` is a heuristic visual suggestion, not
-        // a text-search category, so it has no PIICategory. The triage sheet
-        // still surfaces it; calibrated scoring / preset thresholds / search
-        // are intentionally out of scope.
-        case .signatureCandidate: return nil
         case .other: return nil
         }
     }

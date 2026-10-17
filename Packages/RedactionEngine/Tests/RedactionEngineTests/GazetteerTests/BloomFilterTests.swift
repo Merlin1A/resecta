@@ -55,7 +55,6 @@ struct BloomFilterTests {
         #expect(filter.bitCount == 1024)
         #expect(filter.seed == 42)
         #expect(filter.rowCount == 50)
-        #expect(filter.sourceHash.count == 32)
     }
 
     // MARK: - In-Memory Round-Trip

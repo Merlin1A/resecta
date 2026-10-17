@@ -4,7 +4,7 @@ import Foundation
 //
 // This file exposes the production `contextFeatures(...)` builder that the
 // context-scorer augment will consume at the posterior seam
-// (DetectionOrchestrator.swift:423-424). It is ADDITIVE in this PR: nothing in
+// (`DocumentSearcher.composedSurvivors`). It is ADDITIVE in this PR: nothing in
 // the live detection path calls it yet (the seam is wired at w=0). The
 // measurement harness (@testable) calls it so the per-fire dump's features are
 // LITERALLY what the seam will compute — closing the projection's count-only gap

@@ -31,7 +31,7 @@ struct AccountDetector: FamilyDetector {
         baseConfidence: 0.0,      // strict: no signal without context
         // The boosted RAW confidence dropped below the unstructured peers
         // it would otherwise suppress in resolveOverlaps. Raw arbitration runs
-        // at DetectionOrchestrator.swift:386, BEFORE the posterior seam and the
+        // BEFORE the posterior seam and the
         // preset gate. account is the lowest-priority generic kind
         // (priorityRank 1, DetectionOrchestrator+OverlapResolution.swift:180); a
         // bare 6–15 digit run next to "account" must not out-confidence address

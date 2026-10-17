@@ -34,11 +34,6 @@ let package = Package(
             dependencies: ["RedactionEngine"],
             resources: [
                 .copy("Fixtures/TestResources"),
-                // Committed Stage-1 detection snapshot of the shipped packet
-                // (`snapshots/packet-stage1.json`, produced by
-                // `PacketSnapshotTests`) — bundled so `PacketPRHarnessTests`
-                // can load it.
-                .copy("Fixtures/snapshots"),
                 // DataPipeline-produced fixtures. `corpus` is populated by the
                 // datapipeline's `make install-assets` (an empty placeholder
                 // README ships meanwhile).
