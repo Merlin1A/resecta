@@ -81,12 +81,14 @@ struct ActiveContentScanTests {
         }
     }
 
-    @Test("A /Next chain longer than the walk's bound is not followed to its end")
+    @Test("A /Next chain longer than the walk's bound answers could-not-scan, not clean")
     func nextChainIsBounded() throws {
         // Ten GoTo hops and JavaScript at the eleventh: beyond the bound,
-        // so the walk stops and reports nothing. The verification pass's
-        // structural check covers the output regardless.
-        #expect(try scan(TestFixtures.withOpenActionDeepChain(hops: 10)) == nil)
+        // so the walk stops and says it could not read the chain to its
+        // end, and the import refuses the document as one it cannot read.
+        // The verification pass's structural check covers the output
+        // regardless.
+        #expect(try scan(TestFixtures.withOpenActionDeepChain(hops: 10)) == .couldNotScan)
         // Three hops sit inside the bound and are reported.
         #expect(try scan(TestFixtures.withOpenActionDeepChain(hops: 3)) == .openAction)
     }

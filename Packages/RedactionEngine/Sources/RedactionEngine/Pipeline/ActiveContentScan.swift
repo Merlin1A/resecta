@@ -20,6 +20,11 @@ public enum ActiveContentLocation: Sendable, Equatable {
     /// An annotation on the page carries a `/A` action that is (or chains
     /// to) a JavaScript or launch action.
     case annotationAction(pageIndex: Int)
+    /// The walk could not read the structure it inspects — no catalog, a
+    /// page with no dictionary, an action chain past the depth bound — so
+    /// the document is not known to be clean. The app refuses it as a file
+    /// it cannot read, never as active content.
+    case couldNotScan
 }
 
 /// The import-time active-content walk. Runs once at import over the raw
@@ -47,11 +52,14 @@ public enum ActiveContentScan {
     /// chain cannot stall the import.
     static let maxActionChainDepth = 8
 
-    /// The first location of active content, or nil when the walk sees
-    /// none. Order: catalog-top keys → `/Names → /JavaScript` →
-    /// `/OpenAction` → per page: `/AA`, then each annotation's `/A`.
+    /// The first location of active content; nil when the walk sees none;
+    /// `.couldNotScan` when the walk could not read the catalog, a page's
+    /// dictionary or an action chain to its depth bound — a document that
+    /// is not known to be clean. Order: catalog-top keys → `/Names →
+    /// /JavaScript` → `/OpenAction` → per page: `/AA`, then each
+    /// annotation's `/A`.
     public static func firstLocation(in document: CGPDFDocument) -> ActiveContentLocation? {
-        guard let catalog = document.catalog else { return nil }
+        guard let catalog = document.catalog else { return .couldNotScan }
 
         for key in catalogKeys {
             var object: CGPDFObjectRef?
@@ -69,21 +77,27 @@ public enum ActiveContentScan {
         }
 
         var openAction: CGPDFObjectRef?
-        if CGPDFDictionaryGetObject(catalog, "OpenAction", &openAction),
-           let openAction, actionChainIsActive(openAction) {
-            return .openAction
+        if CGPDFDictionaryGetObject(catalog, "OpenAction", &openAction), let openAction {
+            switch actionChainIsActive(openAction) {
+            case true: return .openAction
+            case nil: return .couldNotScan
+            case false: break
+            }
         }
 
         let pageCount = document.numberOfPages
         guard pageCount > 0 else { return nil }
         for number in 1...pageCount {
-            guard let page = document.page(at: number)?.dictionary else { continue }
+            guard let page = document.page(at: number)?.dictionary else { return .couldNotScan }
             let pageIndex = number - 1
 
             var additionalActions: CGPDFDictionaryRef?
-            if CGPDFDictionaryGetDictionary(page, "AA", &additionalActions),
-               let additionalActions, additionalActionsAreActive(additionalActions) {
-                return .pageAdditionalAction(pageIndex: pageIndex)
+            if CGPDFDictionaryGetDictionary(page, "AA", &additionalActions), let additionalActions {
+                switch additionalActionsAreActive(additionalActions) {
+                case true: return .pageAdditionalAction(pageIndex: pageIndex)
+                case nil: return .couldNotScan
+                case false: break
+                }
             }
 
             var annotations: CGPDFArrayRef?
@@ -93,9 +107,12 @@ public enum ActiveContentScan {
                     guard CGPDFArrayGetDictionary(annotations, slot, &annotation),
                           let annotation else { continue }
                     var action: CGPDFObjectRef?
-                    if CGPDFDictionaryGetObject(annotation, "A", &action),
-                       let action, actionChainIsActive(action) {
-                        return .annotationAction(pageIndex: pageIndex)
+                    if CGPDFDictionaryGetObject(annotation, "A", &action), let action {
+                        switch actionChainIsActive(action) {
+                        case true: return .annotationAction(pageIndex: pageIndex)
+                        case nil: return .couldNotScan
+                        case false: break
+                        }
                     }
                 }
             }
@@ -105,10 +122,11 @@ public enum ActiveContentScan {
 
     /// True when the action dictionary's `/S` is JavaScript or Launch, or
     /// when any action in its `/Next` chain (a dictionary or an array of
-    /// them) is, to `maxActionChainDepth`. A non-dictionary object — an
+    /// them) is; nil when the chain runs past `maxActionChainDepth`, so the
+    /// walk could not read it to the end. A non-dictionary object — an
     /// `/OpenAction` destination array, say — is not an action.
-    static func actionChainIsActive(_ object: CGPDFObjectRef, depth: Int = 0) -> Bool {
-        guard depth < maxActionChainDepth else { return false }
+    static func actionChainIsActive(_ object: CGPDFObjectRef, depth: Int = 0) -> Bool? {
+        guard depth < maxActionChainDepth else { return nil }
         var dictionary: CGPDFDictionaryRef?
         guard CGPDFObjectGetValue(object, .dictionary, &dictionary),
               let dictionary else { return false }
@@ -125,9 +143,11 @@ public enum ActiveContentScan {
         if CGPDFObjectGetValue(next, .array, &chain), let chain {
             for slot in 0..<CGPDFArrayGetCount(chain) {
                 var item: CGPDFObjectRef?
-                if CGPDFArrayGetObject(chain, slot, &item), let item,
-                   actionChainIsActive(item, depth: depth + 1) {
-                    return true
+                guard CGPDFArrayGetObject(chain, slot, &item), let item else { continue }
+                switch actionChainIsActive(item, depth: depth + 1) {
+                case true: return true
+                case nil: return nil
+                case false: continue
                 }
             }
             return false
@@ -136,16 +156,22 @@ public enum ActiveContentScan {
     }
 
     /// Every value in an additional-actions dictionary is an action keyed by
-    /// its trigger (`/O` open, `/C` close, and so on); any active one counts.
-    static func additionalActionsAreActive(_ additionalActions: CGPDFDictionaryRef) -> Bool {
-        var active = false
+    /// its trigger (`/O` open, `/C` close, and so on); any active one counts,
+    /// and a chain the walk could not read to the end answers nil.
+    static func additionalActionsAreActive(_ additionalActions: CGPDFDictionaryRef) -> Bool? {
+        var verdict: Bool? = false
         CGPDFDictionaryApplyBlock(additionalActions, { _, value, _ in
-            if actionChainIsActive(value) {
-                active = true
+            switch actionChainIsActive(value) {
+            case true:
+                verdict = true
                 return false
+            case nil:
+                verdict = nil
+                return false
+            case false:
+                return true
             }
-            return true
         }, nil)
-        return active
+        return verdict
     }
 }

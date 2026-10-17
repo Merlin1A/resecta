@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Documentation: the privacy policy describes the detection the app performs (the seventeen text categories a scan reads from the page text layer or from recognized text, with the bundled gazetteers, Bloom filters and context scorer; no face or barcode sentence), says the app makes no network requests of its own and names the two system services that do, drops the detection-priors clause no shipped path stores or reads, and states the failed-state screen, the delete-all controls, the per-session workspace and its sweep, and the in-place metadata patches as they work; the EULA's Searchable Redaction fallback names hidden text. Both effective dates move to 2026-10-15.
 - Documentation: the threat model says the share confirmation lists a line for each check that reported or could not verify, and no longer describes OCR word hints the shipped flow never builds.
 - Documentation: the security policy gains a recipe for verifying a signed release tag: `.github/allowed_signers` lists the release-tag signing key under `security@resecta.app`, and `git tag -v` checks a tag against it once `gpg.ssh.allowedSignersFile` points at the file; the threat model's signed-tag row points at the recipe.
+- Import: a document whose structure the app cannot read in full is refused rather than opened unscanned. The reader the active-content and hidden-layer walks inspect must open, be unlocked, read a catalog and agree with PDFKit on the page count; a walk that cannot read a page or follow an action chain to its bound refuses instead of answering clean; an `/OCProperties` entry without its default configuration reads as a hidden layer. An owner-password-only document still opens.
 
 ### Removed
 
@@ -64,6 +65,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The pre-push hook refuses a stale generated project, runs only the test schemes the pushed change touches (both for an engine change, none for documentation), and accepts the batched runner's passing verdict for the same tree in place of a re-run.
 - The batched runner writes a verdict file beside its logs: the scheme, the counts, the commit and tree it ran on, the simulator and runtime, and the Xcode build.
 - Release: `Scripts/release-identity.sh --archive` writes an identity record of the archived release build (the main executable's UUID and SHA-256, its linked libraries, its imported symbols counted against a list of networking interfaces, its entitlements, the security-relevant Info.plist keys, the privacy manifest and the SHA-256 of every other bundled file), and `--check` compares a published record with a fresh derivation from the archive. `RELEASES/1.2.0-identity.md` is the 1.2.0 record, made from the submitted build's archive after submission.
+- A page whose hidden-text check cannot run — no bitmap to read, no page dictionary to inspect — takes the secure path and records that the check could not run, instead of reading as clean; the first-render bitmap is wiped when the render releases it, the image handed on being a copy. The robustness runner's import mirror and the verification corpus mirror follow the same reader rules.
+- The reconstruction sweep test no longer races its siblings for the shared temporary directory.
 
 ## [1.2.0] — 2026-09-29
 

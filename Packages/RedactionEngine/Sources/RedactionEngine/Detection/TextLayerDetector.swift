@@ -55,9 +55,13 @@ public enum TextLayerDetector {
             return .rtlText
         }
 
-        // Vertical text mode: WMode=1 in page fonts
-        if hasVerticalWritingMode(page) {
-            return .verticalText
+        // Vertical text mode: WMode=1 in page fonts. A page whose structure
+        // cannot be read leaves the check unrun: the page takes the secure
+        // path, with the reason that reads true for it.
+        switch hasVerticalWritingMode(page) {
+        case true: return .verticalText
+        case nil: return .extractionFailed
+        case false: break
         }
 
         // Zero-size bounds: all PDFSelection.bounds return .zero
@@ -82,8 +86,10 @@ public enum TextLayerDetector {
         case verticalText
         case zeroSizeBounds
         case unresolvedEncoding
-        /// Runtime text extraction threw (e.g., the OCG defense) — recorded
-        /// by PageRasterizer, never returned by the pre-flight trigger check.
+        /// The page's text or structure could not be read: runtime text
+        /// extraction threw (e.g., the OCG defense), the ink test could not
+        /// run, or the pre-flight check could not read the page's dictionary
+        /// — in each case the page takes the secure path.
         case extractionFailed
         /// The rendered page shows no ink under a surviving text-layer
         /// glyph (white-on-white text, an invisible render mode, a box
@@ -114,9 +120,11 @@ public enum TextLayerDetector {
 
     /// Check for vertical writing mode (WMode=1) in page fonts.
     /// Horizontal Td positioning model does not apply to vertical text.
-    private static func hasVerticalWritingMode(_ page: PDFPage) -> Bool {
+    /// Nil when the page's dictionary cannot be read, so the check could not
+    /// run. Internal so that arm can be driven by a test.
+    static func hasVerticalWritingMode(_ page: PDFPage) -> Bool? {
         guard let pageRef = page.pageRef,
-              let dict = pageRef.dictionary else { return false }
+              let dict = pageRef.dictionary else { return nil }
 
         var resources: CGPDFDictionaryRef?
         guard CGPDFDictionaryGetDictionary(dict, "Resources", &resources),

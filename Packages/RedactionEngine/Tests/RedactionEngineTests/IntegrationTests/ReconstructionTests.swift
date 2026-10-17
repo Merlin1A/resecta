@@ -6,7 +6,7 @@ import PDFKit
 
 // PDF reconstruction tests.
 
-@Suite("PDF Stream Reconstruction")
+@Suite("PDF Stream Reconstruction", .serialized)
 struct ReconstructionTests {
 
     // MARK: - Basic Output
