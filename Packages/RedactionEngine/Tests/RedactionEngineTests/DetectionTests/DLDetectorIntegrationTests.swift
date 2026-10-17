@@ -16,21 +16,21 @@ struct DLDetectorIntegrationTests {
     // MARK: - Acceptance
 
     @Test("Keeps candidate matching exactly one jurisdiction-shape arm")
-    func testW1KeepsSingleArmMatch() async {
+    func testW1KeepsSingleArmMatch() async throws {
         let detector = PIIDetector(nameGazetteer: nil)
         // A + 7 digits — matches CA `^[A-Z][0-9]{7}$` (and the AAMVA
         // envelope rows, since 8 alphanumerics qualify); the gate keeps
         // the candidate as long as ≥1 state matches.
         let matches = await detector.detect(in: "DL: A1234567", doctype: nil)
             .filter { $0.kind == .driversLicense }
-        let hit = try! #require(matches.first)
+        let hit = try #require(matches.first)
         #expect(hit.text == "A1234567")
         #expect(abs(hit.confidence - 0.80) < 0.001,
                 "Keeps the 0.80 baseline confidence")
     }
 
     @Test("Keeps 9-digit candidate (multi-state ambiguity preserved)")
-    func testW1KeepsF35Ambiguity() async {
+    func testW1KeepsF35Ambiguity() async throws {
         let detector = PIIDetector(nameGazetteer: nil)
         // 9 digits — the SSN/DLN ambiguity surface. AR/HI/ID/LA/MS all
         // accept this shape; so do envelope rows and several other
@@ -38,7 +38,7 @@ struct DLDetectorIntegrationTests {
         // mitigation routes through separate anchors.
         let matches = await detector.detect(in: "Driver's License: 123456789", doctype: nil)
             .filter { $0.kind == .driversLicense }
-        let hit = try! #require(matches.first)
+        let hit = try #require(matches.first)
         #expect(hit.text == "123456789")
         #expect(abs(hit.confidence - 0.80) < 0.001)
     }

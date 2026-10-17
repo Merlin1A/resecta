@@ -216,21 +216,23 @@ enum TestPipeline {
 
     enum TestPipelineError: Error {
         case invalidFixture
-        case rasterizationFailed(pageIndex: Int)
     }
 
-    /// Process fixture PDF data through the redaction pipeline and return output URL.
+    /// Process fixture PDF data through the production page loop and return
+    /// the output URL: every page through `PageRasterizer.rasterize(_:dpiCap:)`
+    /// (its memory gate passes on the simulator) and `PDFStreamReconstructor`,
+    /// via `ProductionPageLoop.runRedaction`.
     ///
-    /// Bypasses `os_proc_available_memory()` check in `rasterize()` since simulator
-    /// memory is unpredictable. Uses `renderPage()` directly + manual fill/verify
-    /// to replicate the core pipeline path without the memory gate.
+    /// Every page takes the caller's `mode`, except that a page with no text
+    /// layer is rasterized in Secure mode: the rasterizer accepts a Searchable
+    /// page only when it carries text.
     ///
     /// - Parameters:
     ///   - fixtureData: Raw PDF bytes from a TestFixtures generator.
     ///   - mode: Pipeline mode (default: secureRasterization).
     ///   - regions: Per-page regions. If nil, a default center-strip region is created per page.
     ///   - fillColor: Fill color for redaction (default: black).
-    ///   - dpi: Render DPI (default: 150 for test speed).
+    ///   - dpi: The page's target DPI and the loop's DPI cap (default: 150 for test speed).
     /// - Returns: URL to the output PDF. Caller must clean up with `defer`.
     static func processAndExport(
         _ fixtureData: Data,
@@ -239,20 +241,28 @@ enum TestPipeline {
         fillColor: FillColor = .black,
         dpi: Int = 150
     ) async throws -> URL {
+        try await productionRun(
+            fixtureData, mode: mode, regions: regions, fillColor: fillColor, dpi: dpi).url
+    }
+
+    /// The run behind `processAndExport`: the output URL and the production
+    /// loop's outcome (its per-page filter digests and modes).
+    static func productionRun(
+        _ fixtureData: Data,
+        mode: PipelineMode,
+        regions: [Int: [RedactionRegion]]?,
+        fillColor: FillColor = .black,
+        dpi: Int = 150
+    ) async throws -> (url: URL, outcome: ProductionPageLoop.RedactionOutcome) {
         guard let doc = PDFDocument(data: fixtureData) else {
             throw TestPipelineError.invalidFixture
         }
+        let hasHiddenOCG = CGDataProvider(data: fixtureData as CFData)
+            .flatMap { CGPDFDocument($0) }
+            .map { TextLayerExtractor.documentHasHiddenOCG($0) } ?? false
 
-        let pageCount = doc.pageCount
-        let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("test_pipeline_\(UUID().uuidString).pdf")
-
-        let rasterizer = PageRasterizer()
-        let reconstructor = PDFStreamReconstructor(tempURL: tempURL)
-
-        var firstPage = true
-        for pageIndex in 0..<pageCount {
-            guard let page = doc.page(at: pageIndex) else { continue }
+        let pages: [PDFPageData] = (0..<doc.pageCount).compactMap { pageIndex in
+            guard let page = doc.page(at: pageIndex) else { return nil }
 
             // Use provided regions or create a default center-strip per page
             let pageRegions: [RedactionRegion]
@@ -268,180 +278,37 @@ enum TestPipeline {
                 ]
             }
 
-            // Render page directly (bypasses os_proc_available_memory check)
-            let renderedImage = try await rasterizer.renderPage(
-                page, pageIndex: pageIndex, dpi: CGFloat(dpi)
-            )
-
-            // Create mutable context, draw rendered image, apply fills
-            let width = renderedImage.width
-            let height = renderedImage.height
-            guard let ctx = createBitmapContext(width: width, height: height) else {
-                throw TestPipelineError.rasterizationFailed(pageIndex: pageIndex)
-            }
-            ctx.draw(renderedImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-
-            // Apply and verify fills
-            try applyRedactionFills(context: ctx, regions: pageRegions, fillColor: fillColor)
-
-            for region in pageRegions {
-                let pixelRect = normalizedToFillPixels(
-                    region.normalizedRect, bitmapWidth: width, bitmapHeight: height
-                )
-                let clamped = pixelRect.intersection(
-                    CGRect(x: 0, y: 0, width: width, height: height)
-                )
-                guard !clamped.isEmpty, try verifyFill(
-                    context: ctx, rect: clamped,
-                    expectedColor: fillColor.expectedPixel
-                ) else {
-                    throw TestPipelineError.rasterizationFailed(pageIndex: pageIndex)
-                }
-            }
-
-            guard let redactedImage = ctx.makeImage() else {
-                throw TestPipelineError.rasterizationFailed(pageIndex: pageIndex)
-            }
-
-            // For searchable redaction, extract and filter characters
-            var textLayerEntries: [CharacterInfo]? = nil
-            if mode == .searchableRedaction {
-                let extractor = TextLayerExtractor()
-                if let characters = try? await extractor.extractCharacters(from: page),
-                   !characters.isEmpty {
-                    // Region basis is the zero-origin
-                    // DISPLAYED output page (effectiveSize), matching the
-                    // rotation-applied cropBox-local character bounds
-                    // extractCharacters now produces — mirrors production
-                    // PageRasterizer. Identical to the raw cropBox for a
-                    // zero-origin unrotated page; correct for rotated/offset.
-                    let regionBasis = CGRect(
-                        origin: .zero,
-                        size: effectiveBounds(page.bounds(for: .cropBox), rotation: page.rotation).size
-                    )
-                    let redactionRectsInPoints = pageRegions.map {
-                        normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: regionBasis)
-                    }
-                    let filterResult = try await filterCharacters(
-                        characters: characters,
-                        redactionRects: redactionRectsInPoints
-                    )
-                    // The writer-side drawn-cell rule, as production runs it
-                    // before the digest is taken — in the page's source frame;
-                    // a set the re-flow limit leaves unsettled gives the page
-                    // no text layer, as in production.
-                    let validated = TextLayerReconstructor.validateSurvivors(
-                        filterResult,
-                        regionShapes: TestPipeline.rectShapes(redactionRectsInPoints),
-                        frame: PageFrame(rotation: page.rotation, displayedSize: regionBasis.size)
-                    )
-                    textLayerEntries = validated.settled ? validated.result.surviving : nil
-                }
-            }
-
-            // Use point dimensions (not pixel) for the PDF media box,
-            // matching the production PageRasterizer behavior.
-            let pageBounds = page.bounds(for: .cropBox)
-            let pointSize = effectiveBounds(pageBounds, rotation: page.rotation).size
-            let pageOutput = PageOutput(
-                image: redactedImage,
-                size: pointSize,
-                textLayerEntries: textLayerEntries,
-                rotation: page.rotation
-            )
-
-            if firstPage {
-                try await reconstructor.begin(firstPageSize: pointSize)
-                firstPage = false
-            }
-            try await reconstructor.appendPage(pageOutput)
+            let hasText = page.string?.isEmpty == false
+            let pageMode: PipelineMode =
+                mode == .searchableRedaction && hasText ? .searchableRedaction : .secureRasterization
+            return PDFPageData(
+                page: page, pageIndex: pageIndex, regions: pageRegions,
+                fillColor: fillColor, targetDPI: dpi, pipelineMode: pageMode,
+                rotation: page.rotation, hasHiddenOCG: hasHiddenOCG,
+                cropBoxBounds: page.bounds(for: .cropBox), cgPage: page.pageRef,
+                hasText: pageMode == .searchableRedaction)
         }
 
-        await reconstructor.finalize()
-        return tempURL
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test_pipeline_\(UUID().uuidString).pdf")
+        let outcome = try await ProductionPageLoop.runRedaction(
+            pages: pages, outputURL: outputURL, dpiCap: dpi)
+        return (outputURL, outcome)
     }
 
-    /// Compute the per-page `PageFilterDigest` array for a fixture under the
-    /// SAME extraction + filtering `processAndExport` performs in
-    /// `.searchableRedaction` mode. Filtering is deterministic, so the digests
-    /// returned here match the exported invisible text layer whenever this is
-    /// called with the same `regions` as the `processAndExport` run.
-    ///
-    /// `processAndExport` returns only the output URL and discards the filter
-    /// digests; Layers 7 (Character Count) and 9 (Character Lineage) require
-    /// the per-page `PageFilterDigest`, so the measurement harness surfaces
-    /// them here via `FilterResult.toDigest(pageIndex:redactionRects:safetyMargin:)`.
-    /// Test-only and purely additive — the production helper is unchanged.
+    /// The per-page `PageFilterDigest` array the production page loop
+    /// reports for a fixture in `.searchableRedaction` mode with these
+    /// `regions` (nil = the default strip, as in `processAndExport`): the
+    /// digests behind the text layer `processAndExport` writes for the same
+    /// call, nil for a page written without a text layer. Layers 7
+    /// (Character Count) and 9 (Character Lineage) read them.
     static func searchableDigests(
         _ fixtureData: Data,
         regions: [Int: [RedactionRegion]]? = nil
     ) async throws -> [PageFilterDigest?] {
-        guard let doc = PDFDocument(data: fixtureData) else {
-            throw TestPipelineError.invalidFixture
-        }
-        let pageCount = doc.pageCount
-        var digests: [PageFilterDigest?] = Array(repeating: nil, count: pageCount)
-        let extractor = TextLayerExtractor()
-        for pageIndex in 0..<pageCount {
-            guard let page = doc.page(at: pageIndex) else { continue }
-            // Mirror processAndExport's region defaulting exactly so a nil
-            // `regions` argument produces digests consistent with that helper.
-            let pageRegions: [RedactionRegion]
-            if let regions {
-                pageRegions = regions[pageIndex] ?? []
-            } else {
-                pageRegions = [
-                    RedactionRegion(
-                        id: UUID(),
-                        normalizedRect: CGRect(x: 0.1, y: 0.8, width: 0.8, height: 0.05),
-                        source: .manual
-                    )
-                ]
-            }
-            guard let characters = try? await extractor.extractCharacters(from: page),
-                  !characters.isEmpty else { continue }
-            // Zero-origin DISPLAYED region basis, mirroring
-            // processAndExport and production PageRasterizer (see above).
-            let regionBasis = CGRect(
-                origin: .zero,
-                size: effectiveBounds(page.bounds(for: .cropBox), rotation: page.rotation).size
-            )
-            let redactionRectsInPoints = pageRegions.map {
-                normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: regionBasis)
-            }
-            let filterResult = try await filterCharacters(
-                characters: characters,
-                redactionRects: redactionRectsInPoints
-            )
-            // The writer-side drawn-cell rule, as production runs it — in
-            // the page's source frame, which the digest records for Layer 9.
-            let frame = PageFrame(rotation: page.rotation, displayedSize: regionBasis.size)
-            let validated = TextLayerReconstructor.validateSurvivors(
-                filterResult,
-                regionShapes: TestPipeline.rectShapes(redactionRectsInPoints),
-                frame: frame
-            )
-            // An unsettled set gives the page no text layer and no digest.
-            guard validated.settled else { continue }
-            digests[pageIndex] = validated.result.toDigest(
-                pageIndex: pageIndex,
-                redactionRects: redactionRectsInPoints,
-                safetyMargin: safetyMarginPoints,
-                drawnCellRuleExcludedCount: validated.dropped,
-                frame: frame
-            )
-        }
-        return digests
-    }
-
-    /// Rect regions as the engine's `RegionShape` (un-expanded `bounds`, the
-    /// safety-margin halo in `expandedBounds`), mirroring `PageRasterizer`.
-    static func rectShapes(_ rects: [CGRect]) -> [RegionShape] {
-        rects.map {
-            RegionShape(
-                expandedBounds: $0.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-                polygonVertices: nil, bounds: $0)
-        }
+        let run = try await productionRun(fixtureData, mode: .searchableRedaction, regions: regions)
+        try? FileManager.default.removeItem(at: run.url)
+        return run.outcome.filterDigests
     }
 }
 

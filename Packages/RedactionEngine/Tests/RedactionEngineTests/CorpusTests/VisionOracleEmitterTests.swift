@@ -49,7 +49,7 @@ struct VisionOracleEmitterTests {
     func emitVisionText() throws {
         guard let inDir = Self.env("RESECTA_VISION_IN"),
               let outDir = Self.env("RESECTA_VISION_OUT") else {
-            print("[H2.3-Vision] RESECTA_VISION_IN/OUT not set; emitter skipped.")
+            TestGate.skip("RESECTA_VISION_IN and RESECTA_VISION_OUT not set; the Vision text emitter skipped")
             return
         }
         try FileManager.default.createDirectory(

@@ -85,11 +85,11 @@ struct DriversLicenseDetectorTests {
     // MARK: - Confidence calibration
 
     @Test("DL confidence is calibrated to 0.80")
-    func dlConfidenceIs80() async {
+    func dlConfidenceIs80() async throws {
         let text = "DL: A1234567"
         let matches = await detector.detect(in: text, doctype: nil)
             .filter { $0.kind == .driversLicense }
-        let hit = try! #require(matches.first)
+        let hit = try #require(matches.first)
         #expect(abs(hit.confidence - 0.80) < 0.001,
                 "DL base confidence should be 0.80, got \(hit.confidence)")
     }
