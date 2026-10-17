@@ -1,0 +1,114 @@
+# CodeQL code scanning from a workflow in the repository (advanced setup).
+# The Swift job generates the Xcode project with XcodeGen and builds the
+# app for the iOS simulator under CodeQL's build tracer, so the app target
+# (Sources/ResectaApp) and the engine package it links are both in the
+# Swift database; the default setup's autobuild ran `swift build` on the
+# engine package alone. The build turns off compilation caching and the
+# integrated Swift driver, as CodeQL's own Xcode autobuilder does, and
+# builds one architecture. The Actions and Python analyses run on a Linux
+# runner without a build. The categories are the default setup's
+# (`/language:<language>`) and the query suite is the default one. Runs on
+# pull requests to main, on every push to main (the baseline a pull
+# request's results are compared with) and weekly; about one macOS job per
+# pull request. An analysis from this workflow is rejected while the
+# repository's CodeQL default setup is enabled (Settings → Code security).
+name: codeql
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  # GitHub disables a scheduled workflow after sixty days without
+  # repository activity; a disabled workflow is re-enabled by hand in the
+  # Actions tab.
+  schedule:
+    - cron: '27 4 * * 3' # Wednesday 04:27 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  XCODEGEN_VERSION: 2.45.3
+  XCODEGEN_SHA256: 0c90f4d28ca57335f9fa78cf5bf6dabfe20a232036dabe36de2eef79cb7c0878
+
+jobs:
+  analyze-swift:
+    name: Analyze (swift)
+    runs-on: macos-26
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: XcodeGen (pinned release, digest-checked)
+        run: |
+          curl -fsSL -o xcodegen.zip \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
+          echo "${XCODEGEN_SHA256}  xcodegen.zip" | shasum -a 256 -c -
+          unzip -q xcodegen.zip -d "${RUNNER_TEMP}/xcodegen"
+          echo "${RUNNER_TEMP}/xcodegen/xcodegen/bin" >> "$GITHUB_PATH"
+          "${RUNNER_TEMP}/xcodegen/xcodegen/bin/xcodegen" --version
+
+      - name: Generate the project
+        run: ./regenerate.sh
+
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: swift
+          build-mode: manual
+
+      # A fresh DerivedData directory, so every Swift file is compiled under
+      # the tracer in this run.
+      - name: Build the app
+        run: |
+          xcodebuild build \
+            -project ResectaApp.xcodeproj -scheme ResectaApp \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "${RUNNER_TEMP}/dd" \
+            ARCHS=arm64 \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            COMPILATION_CACHE_ENABLE_CACHING=NO SWIFT_ENABLE_COMPILE_CACHE=NO \
+            SWIFT_USE_INTEGRATED_DRIVER=NO -quiet
+
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: "/language:swift"
+
+  analyze-no-build:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, python]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: "/language:${{ matrix.language }}"

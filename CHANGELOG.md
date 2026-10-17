@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Documentation: the threat model says the share confirmation lists a line for each check that reported or could not verify, and no longer describes OCR word hints the shipped flow never builds.
 - Documentation: the security policy gains a recipe for verifying a signed release tag: `.github/allowed_signers` lists the release-tag signing key under `security@resecta.app`, and `git tag -v` checks a tag against it once `gpg.ssh.allowedSignersFile` points at the file; the threat model's signed-tag row points at the recipe.
 - Import: a document whose structure the app cannot read in full is refused rather than opened unscanned. The reader the active-content and hidden-layer walks inspect must open, be unlocked, read a catalog and agree with PDFKit on the page count; a walk that cannot read a page or follow an action chain to its bound refuses instead of answering clean; an `/OCProperties` entry without its default configuration reads as a hidden layer. An owner-password-only document still opens.
+- Documentation: the licence notices name ParaNames' data licence (CC BY 4.0) with its attribution and the changes made, state the OpenStreetMap and OpenAddresses rows as provenance acknowledgements for inputs no build reads, and attribute the Inter typeface embedded in the bundled sample document.
 
 ### Removed
 
@@ -67,6 +68,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Release: `Scripts/release-identity.sh --archive` writes an identity record of the archived release build (the main executable's UUID and SHA-256, its linked libraries, its imported symbols counted against a list of networking interfaces, its entitlements, the security-relevant Info.plist keys, the privacy manifest and the SHA-256 of every other bundled file), and `--check` compares a published record with a fresh derivation from the archive. `RELEASES/1.2.0-identity.md` is the 1.2.0 record, made from the submitted build's archive after submission.
 - A page whose hidden-text check cannot run — no bitmap to read, no page dictionary to inspect — takes the secure path and records that the check could not run, instead of reading as clean; the first-render bitmap is wiped when the render releases it, the image handed on being a copy. The robustness runner's import mirror and the verification corpus mirror follow the same reader rules.
 - The reconstruction sweep test no longer races its siblings for the shared temporary directory.
+- CI: CodeQL runs from a workflow in the repository (`.github/workflows/codeql.yml`) instead of the default setup; the Swift job builds the Xcode project, so the app target and the engine package are both in the Swift database, and the Actions and Python analyses run without a build.
 
 ## [1.2.0] — 2026-09-29
 

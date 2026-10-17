@@ -80,7 +80,7 @@ Each line names how a reader can check the state without trusting this document.
 | Push protection | On | The same page |
 | Dependabot alerts and security updates | On | The same page; `.github/dependabot.yml` lists the ecosystems that receive version updates |
 | Private vulnerability reporting | On | Each repository's Security tab shows "Report a vulnerability" |
-| CodeQL code scanning | On; in the app repository the Swift analysis covers the engine package, and the app target is not yet in its database | Each repository's Security tab → Code scanning; the Swift database's file list, through the code-scanning API |
+| CodeQL code scanning | On; in the app repository the analysis runs from a workflow in the repository that builds the Xcode project, so the app target and the engine package are both in the Swift database; the data-pipeline and sample-document repositories stay on the default setup (Actions and Python) | Each repository's Security tab → Code scanning; the Swift database's file list, through the code-scanning API; `.github/workflows/codeql.yml` in the app repository |
 | GitHub Actions allow-listed and pinned to full commit SHAs (the repository setting requires the pins) | On | Each repository's Settings → Actions → General; read any workflow file under `.github/workflows` |
 | Branch rules on `main`: pull requests only; the CI check must pass | On | Each repository's Settings → Rules |
 | The app's pull-request gate builds the app and runs the documented lints from the base branch | On | The job list in `.github/workflows/ci.yml` |
