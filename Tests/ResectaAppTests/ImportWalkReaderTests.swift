@@ -78,6 +78,13 @@ struct ImportWalkReaderTests {
         }
     }
 
+    /// The reader the stage inspects, built from the bytes the way the loader
+    /// reads them through `PDFDocument.documentRef` after its own parse.
+    private func reader(_ data: Data) -> CGPDFDocument? {
+        guard let provider = CGDataProvider(data: data as CFData) else { return nil }
+        return CGPDFDocument(provider)
+    }
+
     private func readerFacts(_ data: Data) -> String {
         guard let provider = CGDataProvider(data: data as CFData),
               let document = CGPDFDocument(provider) else { return "no document" }
@@ -90,7 +97,7 @@ struct ImportWalkReaderTests {
     func unopenableBytesRefused() {
         #expect(refusalName {
             try ImportService.inspectWalkReader(
-                data: Data([0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01, 0x02, 0x03]), expectedPageCount: 1)
+                reader(Data([0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01, 0x02, 0x03])), expectedPageCount: 1)
         } == "corrupt")
     }
 
@@ -98,23 +105,23 @@ struct ImportWalkReaderTests {
     func userPasswordDocumentRefusedAtTheReader() {
         let data = Self.encryptedPDF(Self.userAndOwner)
         print("[walk reader] user+owner: \(readerFacts(data))")
-        #expect(refusalName { try ImportService.inspectWalkReader(data: data, expectedPageCount: 1) } == "corrupt")
+        #expect(refusalName { try ImportService.inspectWalkReader(reader(data), expectedPageCount: 1) } == "corrupt")
     }
 
     @Test("A catalog-less document is refused at the reader as corrupt")
     func cataloglessDocumentRefusedAtTheReader() {
         let data = Self.catalogless()
         print("[walk reader] catalog-less: \(readerFacts(data))")
-        #expect(refusalName { try ImportService.inspectWalkReader(data: data, expectedPageCount: 1) } == "corrupt")
+        #expect(refusalName { try ImportService.inspectWalkReader(reader(data), expectedPageCount: 1) } == "corrupt")
     }
 
     @Test("A page count the reader disagrees on is refused as corrupt")
     func pageCountDisagreementRefused() {
         #expect(refusalName {
-            try ImportService.inspectWalkReader(data: makeTestPDFData(), expectedPageCount: 2)
+            try ImportService.inspectWalkReader(reader(makeTestPDFData()), expectedPageCount: 2)
         } == "corrupt")
         #expect(refusalName {
-            try ImportService.inspectWalkReader(data: makeTestPDFData(), expectedPageCount: 1)
+            try ImportService.inspectWalkReader(reader(makeTestPDFData()), expectedPageCount: 1)
         } == "none")
     }
 
@@ -125,7 +132,7 @@ struct ImportWalkReaderTests {
         let data = Self.encryptedPDF(Self.ownerOnly)
         print("[walk reader] owner-only: \(readerFacts(data))")
         let loaded = try await PDFImportLoader().load(
-            .bytes(data, declaredType: "pdf", door: .files), limits: .standard)
+            .bytes(data, declaredType: "pdf", door: .files), password: nil, limits: .standard)
         #expect(loaded.facts.wasEncrypted == true)
         #expect(loaded.document.document.pageCount == 1)
 
@@ -144,7 +151,9 @@ struct ImportWalkReaderTests {
         let outcome = await ImportService.importDocument(
             data: Self.encryptedPDF(Self.userAndOwner), suggestedType: "pdf",
             documentState: doc, redactionState: redaction)
-        #expect(outcome == .refused)
+        // The lock gate fires first and the import holds the document for
+        // its password instead of ending.
+        if case .needsPassword = outcome {} else { Issue.record("expected the hold, got \(outcome)") }
         if case .failed(let error, _) = doc.phase {
             if case .importError(.passwordProtected) = error {
                 // Expected: PDFKit's lock gate fires first.

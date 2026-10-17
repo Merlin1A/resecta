@@ -1,5 +1,6 @@
 import SwiftUI
 import PDFKit
+import RedactionEngine
 
 // Redact workspace container — extracted from ContentView.
 // Owns the navigation container, the drop door and its import state.
@@ -33,6 +34,9 @@ struct RedactWorkspaceView: View {
     // Settings sheet
     @State private var showSettings = false
 
+    /// True while a password the sheet submitted is being tried.
+    @State private var passwordSubmitInFlight = false
+
     var body: some View {
         navigationContainer
             // Fire the text-layer toast on import completion for EVERY
@@ -42,7 +46,7 @@ struct RedactWorkspaceView: View {
             // .importing -> .editing transition covers all paths uniformly.
             .onChange(of: workspace.documentState.phaseKind) { oldPhase, newPhase in
                 if Self.shouldCheckTextLayerOnImportCompletion(from: oldPhase, to: newPhase) {
-                    checkTextLayerToast()
+                    checkImportToasts()
                 }
             }
             // Drag and drop (iPad). The dropped file is read inside its
@@ -86,11 +90,17 @@ struct RedactWorkspaceView: View {
                 activeImportDispatch = Task {
                     switch dropped.payload {
                     case .bytes(let data):
-                        _ = await ImportService.importDocument(
+                        let outcome = await ImportService.importDocument(
                             data: data, door: .drop,
                             documentState: workspace.documentState,
                             redactionState: workspace.redactionState
                         )
+                        // A locked document waits for its password; the
+                        // sheet presents over the failed state, the prior
+                        // document intact beneath it.
+                        if case .needsPassword(let hold) = outcome {
+                            workspace.lockedImport = hold
+                        }
                     case .refused(let failure):
                         // The door met the refusal before any byte was read
                         // (a file over the size cap); it reaches the failed
@@ -99,6 +109,19 @@ struct RedactWorkspaceView: View {
                     }
                 }
                 return true
+            }
+            // The password sheet for a locked import, over the failed state
+            // the refusal left. A swipe-dismiss is Cancel.
+            .sheet(item: Binding(
+                get: { workspace.lockedImport },
+                set: { if $0 == nil { cancelLockedImport() } }
+            )) { hold in
+                ImportPasswordSheet(
+                    hold: hold,
+                    onSubmit: { submitPassword($0, for: hold) },
+                    onCancel: cancelLockedImport,
+                    isSubmitting: passwordSubmitInFlight
+                )
             }
             // Settings sheet
             .sheet(isPresented: $showSettings) {
@@ -177,6 +200,13 @@ struct RedactWorkspaceView: View {
         oldPhase == .importing && newPhase == .editing
     }
 
+    /// The import-completion toasts: the text-layer notice, and for a
+    /// source that was encrypted, what the redacted copy will carry.
+    private func checkImportToasts() {
+        checkTextLayerToast()
+        checkEncryptedSourceToast()
+    }
+
     /// Notify user when text layer detected after import.
     private func checkTextLayerToast() {
         if workspace.documentState.hasAnyTextLayer,
@@ -185,6 +215,66 @@ struct RedactWorkspaceView: View {
                 ToastItem(message: "Text layer detected \u{2014} Scan and Search can match text in this document.",
                           severity: .info)
             )
+        }
+    }
+
+    /// The copy for an encrypted source at import: the restrictions line
+    /// when the owner withheld a permission, else the plain line; nil when
+    /// the source was not encrypted. Static so the strings are pinned.
+    static func encryptedSourceToast(facts: ImportFacts.Summary) -> String? {
+        guard facts.wasEncrypted else { return nil }
+        return facts.hadRestrictions
+            ? "This PDF carries usage restrictions set with an owner password. The redacted copy is built without a password and without those restrictions."
+            : "This PDF was password-protected. The redacted copy is built without a password."
+    }
+
+    private func checkEncryptedSourceToast() {
+        guard workspace.documentState.phaseKind == .editing,
+              let message = Self.encryptedSourceToast(facts: workspace.documentState.sourceFacts) else { return }
+        toastManager.enqueue(message, severity: .warning)
+    }
+
+    // MARK: - The locked import
+
+    /// Try the typed password: the held bytes go back through the import
+    /// with it; the outcome updates or releases the hold.
+    private func submitPassword(_ password: String, for hold: LockedImportHold) {
+        guard !passwordSubmitInFlight else { return }
+        passwordSubmitInFlight = true
+        activeImportDispatch?.cancel()
+        activeImportDispatch = Task {
+            defer { passwordSubmitInFlight = false }
+            // The import starts from the phase Cancel would return to (the
+            // failed state admits no import directly); the editor's
+            // empty-phase return to Home waits out the transition, and the
+            // import's own `.importing` lands first.
+            if workspace.documentState.phaseKind == .failed {
+                workspace.documentState.transition(to: ImportPasswordFlow.cancelPhase(returnPhase: hold.returnPhase))
+            }
+            let outcome = await ImportService.importDocument(
+                data: hold.bytes, suggestedType: hold.declaredType, door: hold.door,
+                password: password,
+                documentState: workspace.documentState,
+                redactionState: workspace.redactionState
+            )
+            var phaseError: PipelineError?
+            if case .failed(let error, _) = workspace.documentState.phase { phaseError = error }
+            switch ImportPasswordFlow.step(after: outcome, phaseError: phaseError, hold: hold) {
+            case .opened, .refusedForAnotherReason:
+                workspace.lockedImport = nil
+            case .wrongPassword(let next), .cannotOpen(let next):
+                workspace.lockedImport = next
+            }
+        }
+    }
+
+    /// Cancel, the swipe and the terminal OK: release the hold, then the
+    /// transition the failed card's own action would make.
+    private func cancelLockedImport() {
+        guard let hold = workspace.lockedImport else { return }
+        workspace.lockedImport = nil
+        if workspace.documentState.phaseKind == .failed {
+            workspace.documentState.transition(to: ImportPasswordFlow.cancelPhase(returnPhase: hold.returnPhase))
         }
     }
 

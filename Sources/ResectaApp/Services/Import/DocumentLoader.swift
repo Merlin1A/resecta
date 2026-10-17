@@ -120,8 +120,44 @@ nonisolated struct LoadedDocument: Sendable {
 nonisolated protocol DocumentLoader: Sendable {
     /// Parse the payload and gather its facts. Throws
     /// `PipelineError.importError(_)` from the existing cases; cancellable
-    /// through `Task.checkCancellation()` at every stage.
-    func load(_ payload: ImportPayload, limits: ImportLimits) async throws -> LoadedDocument
+    /// through `Task.checkCancellation()` at every stage. `password` is the
+    /// one the user typed for a locked document, nil on a first attempt.
+    func load(_ payload: ImportPayload, password: String?, limits: ImportLimits) async throws -> LoadedDocument
+}
+
+/// A locked document the import is holding while the password sheet is up:
+/// the payload's bytes (the Files scope has ended and a dropped file belongs
+/// to the system, so a re-read is not possible), where the phase returns on
+/// Cancel, and the attempts so far. Released on every exit but a wrong
+/// password.
+nonisolated struct LockedImportHold: Sendable, Identifiable, Equatable {
+    /// How the last attempt ended.
+    enum Outcome: Sendable, Equatable {
+        /// No password has been tried.
+        case awaiting
+        /// The password did not unlock the document; the sheet asks again.
+        case wrongPassword
+        /// The password unlocked the document, but it could not be read in
+        /// full: the terminal line.
+        case cannotOpen
+    }
+
+    let id = UUID()
+    let bytes: Data
+    let declaredType: String?
+    let door: ImportDoor
+    let returnPhase: DocumentState.ReturnPhase
+    var attempts: Int = 0
+    var lastOutcome: Outcome = .awaiting
+
+    init(bytes: Data, declaredType: String?, door: ImportDoor, returnPhase: DocumentState.ReturnPhase) {
+        self.bytes = bytes
+        self.declaredType = declaredType
+        self.door = door
+        self.returnPhase = returnPhase
+    }
+
+    static func == (lhs: LockedImportHold, rhs: LockedImportHold) -> Bool { lhs.id == rhs.id }
 }
 
 /// What an import attempt came to.
@@ -131,4 +167,7 @@ nonisolated enum ImportOutcome: Sendable, Equatable {
     /// Nothing was loaded: the phase gate refused the attempt, the loader
     /// threw, or the attempt was cancelled.
     case refused
+    /// The document needs a password that was not supplied, or the supplied
+    /// one did not unlock it; the hold carries the bytes for the next attempt.
+    case needsPassword(LockedImportHold)
 }
