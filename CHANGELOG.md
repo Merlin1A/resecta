@@ -68,6 +68,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Release: `Scripts/release-identity.sh --archive` writes an identity record of the archived release build (the main executable's UUID and SHA-256, its linked libraries, its imported symbols counted against a list of networking interfaces, its entitlements, the security-relevant Info.plist keys, the privacy manifest and the SHA-256 of every other bundled file), and `--check` compares a published record with a fresh derivation from the archive. `RELEASES/1.2.0-identity.md` is the 1.2.0 record, made from the submitted build's archive after submission.
 - A page whose hidden-text check cannot run — no bitmap to read, no page dictionary to inspect — takes the secure path and records that the check could not run, instead of reading as clean; the first-render bitmap is wiped when the render releases it, the image handed on being a copy. The robustness runner's import mirror and the verification corpus mirror follow the same reader rules.
 - The reconstruction sweep test no longer races its siblings for the shared temporary directory.
+- CI: CodeQL runs from a workflow in the repository (`.github/workflows/codeql.yml`) instead of the default setup; the Swift job builds the Xcode project, so the app target and the engine package are both in the Swift database, and the Actions and Python analyses run without a build.
 
 ## [1.2.0] — 2026-09-29
 
