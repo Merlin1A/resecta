@@ -454,7 +454,6 @@ struct CouldNotVerifyFlagTests {
                 Marker(text: "Could not verify /AcroForm absence", family: true, sites: 1, lines: 1),
                 Marker(text: "could not be read for this check", family: true, sites: 1, lines: 2),
                 Marker(text: "return .warn(msg)", family: false, sites: 0, lines: 1),
-                Marker(text: "Verification produced warnings", family: false, sites: 0, lines: 1),
                 Marker(text: "Some verification checks were skipped", family: false, sites: 0, lines: 1),
             ],
             // The dispatch of the four text-layer checks (Layers 6–9) and the
@@ -521,7 +520,7 @@ struct CouldNotVerifyFlagTests {
         ]
         // Pinned `.warn(` construction counts (pattern matches excluded).
         let constructionCounts = [
-            "VerificationEngine.swift": 6, "VerificationEngine+Structural.swift": 7,
+            "VerificationEngine.swift": 5, "VerificationEngine+Structural.swift": 7,
             "VerificationEngine+SandwichDispatch.swift": 4,
             "VerificationEngine+CouldNotVerify.swift": 1,
             "VerificationEngine+Layer3.swift": 5,

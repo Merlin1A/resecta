@@ -376,37 +376,41 @@ public struct VerificationEngine: Sendable {
     }
 
     /// Aggregate per-layer results into overall status.
-    /// Any FAIL → overall FAIL. Else any ATTENTION → overall ATTENTION
+    /// The ranking over every status: any FAIL → overall FAIL, with the
+    /// first FAIL's own message. Else any ATTENTION → overall ATTENTION
     /// (un-redacted residual text — user-recoverable, so it outranks notes
     /// but never masks an output defect). Else any WARN → overall WARN.
-    /// All PASS → overall PASS.
-    /// Uses .isFail/.isWarn helpers instead of Equatable (which ignores associated values)
-    /// to avoid fragile matching and preserve the actual diagnostic message.
+    /// Else the skipped accounting below. INFO rows and PASS rows rank
+    /// alike: all of them → overall PASS. One exhaustive switch classifies
+    /// each layer, so a new status case is a compile error here, not a
+    /// silent PASS.
     public func aggregateStatus(_ layers: [LayerResult]) -> VerificationStatus {
-        if let firstFail = layers.first(where: { $0.status.isFail }) {
-            if case .fail(let msg) = firstFail.status {
-                return .fail(msg)
+        var firstFail: String?
+        var firstAttention: String?
+        var firstWarn: String?
+        var skippedCount = 0
+        for layer in layers {
+            switch layer.status {
+            case .fail(let msg):
+                if firstFail == nil { firstFail = msg }
+            case .attention(let msg):
+                if firstAttention == nil { firstAttention = msg }
+            case .warn(let msg):
+                if firstWarn == nil { firstWarn = msg }
+            case .skipped:
+                skippedCount += 1
+            case .info, .pass:
+                break
             }
-            return .fail("Verification failed")
         }
-        if let firstAttention = layers.first(where: { $0.status.isAttention }) {
-            if case .attention(let msg) = firstAttention.status {
-                return .attention(msg)
-            }
-            return .attention("Verification reported items to review")
-        }
-        if let firstWarn = layers.first(where: { $0.status.isWarn }) {
-            if case .warn(let msg) = firstWarn.status {
-                return .warn(msg)
-            }
-            return .warn("Verification produced warnings")
-        }
+        if let msg = firstFail { return .fail(msg) }
+        if let msg = firstAttention { return .attention(msg) }
+        if let msg = firstWarn { return .warn(msg) }
         // Account for .skipped layers so a
         // partially- or wholly-skipped verdict is not reported as PASS. All
         // layers skipped → .skipped (preserves the VerificationReport.skipped
         // sentinel); some but not all skipped → .warn. Count-agnostic — never
         // assumes a 5- or 10-layer total.
-        let skippedCount = layers.filter { $0.status.isSkipped }.count
         if skippedCount > 0 {
             if skippedCount == layers.count {
                 return .skipped
