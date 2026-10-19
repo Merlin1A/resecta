@@ -237,6 +237,16 @@ class DocumentState {
     /// `PDFPageData` via `PipelineCoordinator.buildPDFPageData`.
     var sourceHasHiddenOCG: Bool = false
 
+    /// The import's encryption record for the session: the source was
+    /// encrypted (owner-only or user-unlocked) and whether its owner withheld
+    /// a permission. Drives the import toast and the Share-card caption.
+    var sourceFacts = ImportFacts.Summary()
+
+    /// The password that unlocked the source, held in memory only while the
+    /// document is open; wiped at Start Over, Done, Home and the workspace's
+    /// teardown. Empty when the source needed none.
+    let documentPassword = DocumentPasswordHolder()
+
     /// Non-Widget annotations present in the imported source, one entry
     /// per annotation subtype, computed at import time by the engine's
     /// `AnnotationAnalyzer`. Annotations are drawn by the on-screen
@@ -622,7 +632,9 @@ class DocumentState {
     func resetForStartOver(redactionState: RedactionState, coordinator: PipelineCoordinator) {
         coordinator.downgradeTempProtectionOnSessionClose()
         redactionState.clearAll()
+        documentPassword.wipe()
         sourceDocument = nil
+        sourceFacts = ImportFacts.Summary()
         textLayerStatus = [:]
         sourceAnnotationFindings = []
         sourceFilledFormFieldCount = 0

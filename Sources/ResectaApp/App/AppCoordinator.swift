@@ -52,11 +52,16 @@ final class AppCoordinator {
         tearDownCurrentWorkspace()
         let workspace = RedactWorkspace(settingsState: settingsState, userTermsStore: userTermsStore)
         activeWorkspace = .redact(workspace)
-        await ImportService.importDocument(
+        let outcome = await ImportService.importDocument(
             from: url,
             documentState: workspace.documentState,
             redactionState: workspace.redactionState
         )
+        // A locked document waits in the workspace for its password; the
+        // sheet presents over the failed state the import left.
+        if case .needsPassword(let hold) = outcome {
+            workspace.lockedImport = hold
+        }
     }
 
     func returnHome() {
