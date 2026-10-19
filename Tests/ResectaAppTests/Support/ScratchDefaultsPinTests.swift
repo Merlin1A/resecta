@@ -5,10 +5,8 @@ import Testing
 // defaults suite (`Support/ScratchDefaults.swift`): a bare `SettingsState()`
 // or a `UserDefaults.standard` read in a test touches the simulator's shared
 // domain and carries state from one test into the next. This suite scans
-// the two app test trees for either shape, comments stripped, and lists
-// every site. Until `RESECTA_PIN_SCRATCH_DEFAULTS` is `1` (plain, or with
-// the `TEST_RUNNER_` prefix xcodebuild forwards) it records the sites as a
-// warning-severity issue and passes; at `1` it fails on any site.
+// the two app test trees for either shape, comments stripped, and
+// fails on any site it lists.
 
 @Suite("Scratch-defaults pin")
 struct ScratchDefaultsPinTests {
@@ -40,24 +38,10 @@ struct ScratchDefaultsPinTests {
                 }
             }
         }
-        let enforcing = Self.env("RESECTA_PIN_SCRATCH_DEFAULTS") == "1"
-        if !enforcing && !offences.isEmpty {
-            TestGate.skip("scratch-defaults pin (report-only): \(offences.count) test site(s) build on the shared defaults domain; first: \(offences.prefix(3).joined(separator: ", ")). Set RESECTA_PIN_SCRATCH_DEFAULTS=1 to fail on them.")
-            return
-        }
         #expect(offences.isEmpty, "test sites on the shared defaults domain: \(offences.joined(separator: ", "))")
     }
 
     // MARK: - Helpers
-
-    /// The variable as the test process sees it, or as xcodebuild forwards it
-    /// with the `TEST_RUNNER_` prefix.
-    private static func env(_ key: String) -> String? {
-        let environment = ProcessInfo.processInfo.environment
-        if let value = environment[key], !value.isEmpty { return value }
-        if let value = environment["TEST_RUNNER_" + key], !value.isEmpty { return value }
-        return nil
-    }
 
     private static func repoRoot(file: StaticString = #filePath) -> URL {
         URL(fileURLWithPath: "\(file)")
