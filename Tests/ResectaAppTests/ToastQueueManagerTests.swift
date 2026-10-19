@@ -172,4 +172,12 @@ struct ToastQueueManagerTests {
             contentsOf: repoRoot.appendingPathComponent(relativePath),
             encoding: .utf8)
     }
+
+    @Test("The Marked notice with a covered count keeps its Redact clause short")
+    func markedMessageCoveredFormIsShort() {
+        #expect(CommitFeedback.markedMessage(applied: 19, alreadyCovered: 9)
+                == "Marked 19 (9 already covered). Not redacted until you tap Redact.")
+        #expect(CommitFeedback.markedMessage(applied: 3)
+                == "Marked 3 for redaction. Not redacted until you tap Redact.")
+    }
 }

@@ -60,7 +60,9 @@ struct SearchFooterSection: View {
                 // below, which already compared filtered-to-filtered).
                 Text(Self.selectionCountLabel(
                     selected: review?.selectedCount ?? searchState.selectedFilteredCount,
-                    total: review?.visibleCount ?? searchState.filteredCount
+                    total: review?.visibleCount ?? searchState.filteredCount,
+                    hiddenSelected: review == nil
+                        ? max(0, searchState.selectedCount - searchState.selectedFilteredCount) : 0
                 ))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -154,9 +156,12 @@ struct SearchFooterSection: View {
     /// selected"). The footer is the one selection
     /// authority and states the count plainly; the former "N found —
     /// none selected yet" arrival phrasing retired with the standalone
-    /// predicate rows. One rule for both origins. Pure function pinned
-    /// by `SelectionDefaultLabelTests`.
-    static func selectionCountLabel(selected: Int, total: Int) -> String {
-        "\(selected) of \(total) selected"
+    /// predicate rows. One rule for both origins. Selected matches a
+    /// filter hides still go to Apply, so the label names them
+    /// ("3 of 3 selected · 14 hidden"). Pure function pinned by
+    /// `SelectionDefaultLabelTests` and `SearchFooterHiddenSelectionTests`.
+    static func selectionCountLabel(selected: Int, total: Int, hiddenSelected: Int = 0) -> String {
+        let label = "\(selected) of \(total) selected"
+        return hiddenSelected > 0 ? label + " \u{00B7} \(hiddenSelected) hidden" : label
     }
 }
