@@ -28,6 +28,25 @@ settings:
 
 targets:
   ResectaApp:
+    # Enhanced Security, reporting mode (Xcode 26's hardened-process family; the key names
+    # read from the Xcode 26.6 capability definition on this Mac). XcodeGen writes the file
+    # below from `properties:` on every generate and points CODE_SIGN_ENTITLEMENTS at it.
+    entitlements:
+      path: Sources/ResectaApp/ResectaApp.entitlements
+      properties:
+        # Marks the process as hardened: the runtime's memory-safety checks apply to it.
+        # Reports now; the checks below decide what is enforced.
+        com.apple.security.hardened-process: true
+        # Checked allocations: typed and bounds-checked heap allocation. Enforcing when
+        # on alone; the soft-mode key below keeps it reporting.
+        com.apple.security.hardened-process.checked-allocations: true
+        # Soft mode for checked allocations: a violation is reported, the process is not
+        # terminated. Memory tagging behind this check acts on A19 devices and later; the
+        # simulator reports nothing.
+        com.apple.security.hardened-process.checked-allocations.soft-mode: true
+        # dyld read-only: the dynamic loader's data stays read-only after launch. Reporting
+        # under the hardened-process family's soft posture; not observable on the simulator.
+        com.apple.security.hardened-process.dyld-ro: true
     type: application
     platform: iOS
     sources:
