@@ -200,13 +200,80 @@ public struct SandwichVerification: Sendable {
         // more pairs validated). The nil-`string` guard above still covers a
         // page with no text layer.
         guard count > 0 else { return (.pass, false, false) }
+        var scan = SpatialExclusionScan()
+        try Self.collectSpatialUnits(outputPage: outputPage, nsText: nsText, count: count, into: &scan)
 
+        scan.axis = Self.readBackAxis(scan.exclusionUnits.map(\.bounds))
+
+        // The region-overlap tiers, then the advance lattice; a lattice FAIL
+        // is never masked by an edge graze, which is held for the exit.
+        try Task.checkCancellation()
+        if let failure = Self.spatialOverlapFailure(
+            regionShapes: regionShapes, scan: &scan, pageIndex: pageIndex) {
+            return (failure, false, false)
+        }
+        try Task.checkCancellation()
+        if let failure = Self.advanceLatticeFailure(
+            regionShapes: regionShapes, scan: scan, pageIndex: pageIndex) {
+            return (failure, false, false)
+        }
+        if scan.zeroBoundsUnits > 0 {
+            // Characters the check could not place — it did not fully run.
+            return (Self.zeroBoundsWarning(count: scan.zeroBoundsUnits, pageIndex: pageIndex), true, false)
+        }
+        if scan.grazed {
+            // A positional note (the content is outside the region; the check
+            // ran), below the unplaced characters on the same page.
+            return (Self.grazeWarning(pages: [pageIndex]), false, true)
+        }
+        return (.pass, false, false)
+    }
+
+    /// The scan state the three spatial-exclusion techniques share: what
+    /// the unit collection gathered, the reading axis derived from it, and
+    /// the edge graze the overlap tiers hold for the exit.
+    struct SpatialExclusionScan {
+        /// Non-whitespace units whose read-back selection is missing or has
+        /// no measurable bounds. They cannot be position-checked; counted here
+        /// and reported as a WARN on the otherwise-PASS exit instead of being
+        /// dropped.
+        var zeroBoundsUnits = 0
+        /// Non-whitespace units for the exclusion pass, in string order (the
+        /// band gate needs the whole page's Y structure before any verdict,
+        /// so collection precedes checking; failure order stays first-offset).
+        var exclusionUnits: [(bounds: CGRect, utf16Offset: Int,
+                              family: String?, pointSize: CGFloat)] = []
+        /// Units collected for the origin-delta lattice pass.
+        var latticeUnits: [(string: String, bounds: CGRect,
+                            family: String, pointSize: CGFloat,
+                            utf16Offset: Int)] = []
+        /// The axis the text layer's lines run along (a page written from
+        /// a `/Rotate 90`/`270` source is drawn along its source lines, so
+        /// its lines are vertical runs here). The line bands of both passes
+        /// and the lattice's advance direction follow it; on a horizontal
+        /// page every step is the unchanged walk.
+        var axis: TextAxis = .horizontal
+        /// Set on the first edge graze; the graze is held (never returned
+        /// from inside the overlap loop) so a later in-region hit on this
+        /// page is never masked by it.
+        var grazed = false
+
+        /// The band coordinate: a line's position ACROSS the reading axis.
+        func across(_ b: CGRect) -> CGFloat { axis.isVertical ? b.minX : b.minY }
+    }
+
+    /// Technique 1 — unit collection: one walk over the page text gathering
+    /// every non-whitespace unit's read-back bounds and font for the two
+    /// passes, and counting the units it could not place.
+    static func collectSpatialUnits(
+        outputPage: PDFPage, nsText: NSString, count: Int,
+        into scan: inout SpatialExclusionScan
+    ) throws {
         // 256-iteration band counter in the per-character
         // walk. A 10k-character page would otherwise exceed the 50 ms p95
         // cancel→surrender budget; bitmask check is amortized constant time.
         var bandCounter = 0
         var utf16Offset = 0
-        var scan = SpatialExclusionScan()
         while utf16Offset < count {
             if bandCounter & 0xFF == 0 { try Task.checkCancellation() }
             bandCounter += 1
@@ -266,15 +333,19 @@ public struct SandwichVerification: Sendable {
 
             utf16Offset += composedRange.length
         }
+    }
 
-        scan.axis = Self.readBackAxis(scan.exclusionUnits.map(\.bounds))
-
+    /// Technique 2 — the region-overlap tiers over the collected units'
+    /// glyph-core boxes. A core centre inside a region is the FAIL returned;
+    /// an edge graze is held on the scan for the exit.
+    static func spatialOverlapFailure(
+        regionShapes: [RegionShape], scan: inout SpatialExclusionScan, pageIndex: Int
+    ) -> VerificationStatus? {
         // Exclusion pass: two tiers over the non-whitespace
         // units' glyph-core boxes. An edge graze (core box crossing a region
         // edge with its center outside) is held as a positional note and
         // returned WARN after the lattice pass below, so a lattice FAIL is
         // never masked by it.
-        try Task.checkCancellation()
         if !regionShapes.isEmpty, !scan.exclusionUnits.isEmpty {
             var fractionCache: [String: CGFloat] = [:]
             let coreBoxes: [CGRect] = scan.exclusionUnits.map { unit in
@@ -354,9 +425,9 @@ public struct SandwichVerification: Sendable {
                             centerInRegion = shape.bounds.contains(center)
                         }
                         if centerInRegion {
-                            return (.fail(
+                            return .fail(
                                 "A character overlaps a redacted area on page \(pageIndex + 1)"
-                            ), false, false)
+                            )
                         }
                         scan.grazed = true
                         continue unitLoop
@@ -364,7 +435,15 @@ public struct SandwichVerification: Sendable {
                 }
             }
         }
+        return nil
+    }
 
+    /// Technique 3 — the origin-delta advance lattice over the collected
+    /// units, per band in reading order. An off-lattice advance or an
+    /// off-pitch size flip is the FAIL returned.
+    static func advanceLatticeFailure(
+        regionShapes: [RegionShape], scan: SpatialExclusionScan, pageIndex: Int
+    ) -> VerificationStatus? {
         // Origin-delta
         // lattice crosscheck, replacing the M1 selection-WIDTH check. The
         // Bland et al. kerning channel displaces glyph ORIGINS, so the
@@ -388,7 +467,6 @@ public struct SandwichVerification: Sendable {
         // not produce. Pairs whose gap interval intersects a redaction
         // shape are skipped — the layout hole at a region is the region's
         // own geometry, already visible in the raster.
-        try Task.checkCancellation()
         if !scan.latticeUnits.isEmpty {
             let bands = SandwichMetrics.yBands(scan.latticeUnits.map { scan.across($0.bounds) })
             // The origin's coordinate ALONG the reading axis, signed so
@@ -438,9 +516,9 @@ public struct SandwichVerification: Sendable {
                        SandwichMetrics.isWriterQuantizedPitch(curr.pointSize) {
                         continue
                     }
-                    return (.fail(
+                    return .fail(
                         "Non-uniform glyph advance on page \(pageIndex + 1)"
-                    ), false, false)
+                    )
                 }
                 let delta = along(curr.bounds) - along(prev.bounds)
                 guard delta > 0 else { continue }
@@ -472,55 +550,13 @@ public struct SandwichVerification: Sendable {
                     pointSize: prev.pointSize) ?? cell
                 let j = max(0, ((delta - natural) / cell).rounded())
                 if abs(delta - (natural + j * cell)) > tolerance {
-                    return (.fail(
+                    return .fail(
                         "Non-uniform glyph advance on page \(pageIndex + 1)"
-                    ), false, false)
+                    )
                 }
             }
         }
-        if scan.zeroBoundsUnits > 0 {
-            // Characters the check could not place — it did not fully run.
-            return (Self.zeroBoundsWarning(count: scan.zeroBoundsUnits, pageIndex: pageIndex), true, false)
-        }
-        if scan.grazed {
-            // A positional note (the content is outside the region; the check
-            // ran), below the unplaced characters on the same page.
-            return (Self.grazeWarning(pages: [pageIndex]), false, true)
-        }
-        return (.pass, false, false)
-    }
-
-    /// The scan state the three spatial-exclusion techniques share: what
-    /// the unit collection gathered, the reading axis derived from it, and
-    /// the edge graze the overlap tiers hold for the exit.
-    struct SpatialExclusionScan {
-        /// Non-whitespace units whose read-back selection is missing or has
-        /// no measurable bounds. They cannot be position-checked; counted here
-        /// and reported as a WARN on the otherwise-PASS exit instead of being
-        /// dropped.
-        var zeroBoundsUnits = 0
-        /// Non-whitespace units for the exclusion pass, in string order (the
-        /// band gate needs the whole page's Y structure before any verdict,
-        /// so collection precedes checking; failure order stays first-offset).
-        var exclusionUnits: [(bounds: CGRect, utf16Offset: Int,
-                              family: String?, pointSize: CGFloat)] = []
-        /// Units collected for the origin-delta lattice pass.
-        var latticeUnits: [(string: String, bounds: CGRect,
-                            family: String, pointSize: CGFloat,
-                            utf16Offset: Int)] = []
-        /// The axis the text layer's lines run along (a page written from
-        /// a `/Rotate 90`/`270` source is drawn along its source lines, so
-        /// its lines are vertical runs here). The line bands of both passes
-        /// and the lattice's advance direction follow it; on a horizontal
-        /// page every step is the unchanged walk.
-        var axis: TextAxis = .horizontal
-        /// Set on the first edge graze; the graze is held (never returned
-        /// from inside the overlap loop) so a later in-region hit on this
-        /// page is never masked by it.
-        var grazed = false
-
-        /// The band coordinate: a line's position ACROSS the reading axis.
-        func across(_ b: CGRect) -> CGFloat { axis.isVertical ? b.minX : b.minY }
+        return nil
     }
 
     /// WARN copy for the edge-graze class, composed once over every grazed
