@@ -61,13 +61,13 @@ nonisolated final class DetectionTriageDismissUITests: XCTestCase {
     /// Direct dismiss — untouched review, no confirmation dialog, single sample.
     func testDismissUntouchedReviewSheet() {
         launchSeededReview(multipage: false)
-        performDirectDismiss()
+        assertSurvivedDismiss(performDirectDismiss())
     }
 
     /// Direct dismiss with a real 23-page document loaded behind the sheet.
     func testDismissUntouchedReviewSheet_multipageDocument() {
         launchSeededReview(multipage: true)
-        performDirectDismiss()
+        assertSurvivedDismiss(performDirectDismiss())
     }
 
     /// Dialog dismiss — routed through the conditional confirmation dialog.
@@ -118,13 +118,14 @@ nonisolated final class DetectionTriageDismissUITests: XCTestCase {
 
     // MARK: - Dismiss paths
 
-    /// Tap Dismiss on an untouched review (direct one-tap close).
-    private func performDirectDismiss() {
+    /// Tap Dismiss on an untouched review (direct one-tap close); the
+    /// caller checks that the sheet went and the app survived.
+    private func performDirectDismiss() -> XCUIElement {
         let dismissButton = awaitSeededReview()
 
         dismissButton.tap()
 
-        assertSurvivedDismiss(dismissButton)
+        return dismissButton
     }
 
     /// Select a review row, tap Dismiss, confirm the destructive dialog.
