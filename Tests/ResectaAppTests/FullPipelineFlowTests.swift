@@ -78,16 +78,6 @@ struct FullPipelineFlowTests {
 
     // MARK: - Helpers
 
-    private func makeLoadedCoordinator() -> PipelineCoordinator {
-        let coord = PipelineCoordinator(
-            documentState: DocumentState(),
-            redactionState: RedactionState(),
-            settingsState: SettingsState())
-        coord.documentState.sourceDocument = makeTestPDFDocument()
-        coord.documentState.phase = .editing
-        return coord
-    }
-
     private func addRegion(to coord: PipelineCoordinator) {
         let region = RedactionRegion(
             id: UUID(),
@@ -97,13 +87,7 @@ struct FullPipelineFlowTests {
     }
 
     private func makeOversizedCoordinator() -> PipelineCoordinator {
-        let coord = PipelineCoordinator(
-            documentState: DocumentState(),
-            redactionState: RedactionState(),
-            settingsState: SettingsState())
-        coord.documentState.sourceDocument = makeOversizedPDFDocument()
-        coord.documentState.phase = .editing
-        return coord
+        makeLoadedCoordinator(document: makeOversizedPDFDocument())
     }
 
     /// A 1-page PDF whose page is 5,200 × 300 pt — past the 5,000-pt

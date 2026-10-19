@@ -385,14 +385,6 @@ struct PipelineCoordinatorTests {
 
     // MARK: - Helpers
 
-    private func makeCoordinator() -> PipelineCoordinator {
-        PipelineCoordinator(
-            documentState: DocumentState(),
-            redactionState: RedactionState(),
-            settingsState: SettingsState()
-        )
-    }
-
     /// Create a minimal 1-page PDFDocument for testing.
     private func makeTestPDFDocument() -> PDFDocument {
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))

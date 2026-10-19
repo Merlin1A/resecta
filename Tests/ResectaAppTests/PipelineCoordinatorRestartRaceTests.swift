@@ -253,17 +253,6 @@ struct PipelineCoordinatorRestartRaceTests {
 
     // MARK: - Helpers
 
-    private func makeLoadedCoordinator() -> PipelineCoordinator {
-        let coord = PipelineCoordinator(
-            documentState: DocumentState(),
-            redactionState: RedactionState(),
-            settingsState: SettingsState()
-        )
-        coord.documentState.sourceDocument = makeTestPDFDocument()
-        coord.documentState.phase = .editing
-        return coord
-    }
-
     private func addRegion(to coord: PipelineCoordinator) {
         let region = RedactionRegion(
             id: UUID(),

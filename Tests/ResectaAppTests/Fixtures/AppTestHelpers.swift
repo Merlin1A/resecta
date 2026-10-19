@@ -27,16 +27,32 @@ extension Tag {
 
 // MARK: - Coordinator Factory
 
-/// Create a PipelineCoordinator with fresh state objects. Pass a
-/// `SettingsState(defaults:)` built on a scratch suite to keep the test off
-/// `UserDefaults.standard`.
+/// Create a PipelineCoordinator with fresh state objects. Without an argument
+/// the settings are built on a fresh scratch defaults suite (one UUID-named
+/// domain per call), so the test never reads or writes the app's own defaults
+/// domain; pass a `SettingsState(defaults:)` of your own to share a suite.
 @MainActor
 func makeCoordinator(settingsState: SettingsState? = nil) -> PipelineCoordinator {
     PipelineCoordinator(
         documentState: DocumentState(),
         redactionState: RedactionState(),
-        settingsState: settingsState ?? SettingsState()
+        settingsState: settingsState ?? SettingsState(defaults: makeScratchDefaults().0)
     )
+}
+
+/// A coordinator with a source document loaded and parked in the `.editing`
+/// phase, so a run can be driven forward. `document` defaults to a blank
+/// one-page PDF; `defaults` is the suite the settings read, a fresh scratch
+/// suite when nil.
+@MainActor
+func makeLoadedCoordinator(
+    document: PDFDocument = makeTestPDFDocument(),
+    defaults: UserDefaults? = nil
+) -> PipelineCoordinator {
+    let coord = makeCoordinator(settingsState: defaults.map { SettingsState(defaults: $0) })
+    coord.documentState.sourceDocument = document
+    coord.documentState.phase = .editing
+    return coord
 }
 
 // MARK: - PDF Fixture Factories

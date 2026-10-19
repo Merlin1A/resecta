@@ -454,17 +454,6 @@ struct PageParallelRasterizationTests {
 
     // MARK: - Helpers (private)
 
-    private func makeLoadedCoordinator(document: PDFDocument) -> PipelineCoordinator {
-        let coord = PipelineCoordinator(
-            documentState: DocumentState(),
-            redactionState: RedactionState(),
-            settingsState: SettingsState()
-        )
-        coord.documentState.sourceDocument = document
-        coord.documentState.phase = .editing
-        return coord
-    }
-
     private func addRegionToAllPages(_ coord: PipelineCoordinator, pageCount: Int) {
         let region = RedactionRegion(
             id: UUID(),
