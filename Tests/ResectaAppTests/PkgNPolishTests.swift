@@ -293,39 +293,46 @@ struct ApplyTriggersToastTests {
     }
 }
 
-// MARK: - Cancellation gate suppresses progress flicker
+// MARK: - A late progress tick after Stop is dropped
 
 @Suite("Cancellation gate", .tags(.search))
 @MainActor
 struct CancellationGateTests {
 
-    @Test("transition() rejects active-pipeline phases while isCancelling is true")
-    func testTransitionRejectsActivePhasesWhileCancelling() {
-        let docState = DocumentState()
-        let redactState = RedactionState()
-        // Drive into an active pipeline phase so the cancel path has
-        // something to leave.
-        _ = docState.transition(to: .importing)
-        _ = docState.transition(to: .editing)
-        _ = docState.transition(to: .redacting(progress: .init(
-            currentPage: 1, totalPages: 5, currentStep: "Page 1"
-        )))
-        // Flip the gate. We don't drive cancelActivePipeline here
-        // because that internally clears the gate via `defer`; we test
-        // the gate predicate directly.
-        docState.isCancelling = true
-        // Re-entry into the active-pipeline phases is rejected.
-        let progressTick = docState.transition(to: .redacting(progress: .init(
-            currentPage: 2, totalPages: 5, currentStep: "Page 2"
-        )))
-        #expect(progressTick == false)
-        // Exit transitions are still allowed — the gate covers only the
-        // active-pipeline re-entry case.
-        let exit = docState.transition(to: .editing)
-        #expect(exit == true)
-        // Reset for downstream test isolation (defensive — fresh state
-        // per test in any case).
-        docState.isCancelling = false
-        _ = redactState // silence unused
+    @Test("Stop invalidates the active run; a progress tick from that run no longer re-enters the pipeline phases")
+    func lateTickAfterStopIsDropped() async throws {
+        let coord = makeCoordinator()
+        coord.documentState.sourceDocument = makeTestPDFDocument()
+        coord.documentState.phase = .editing
+        coord.redactionState.addRegion(
+            RedactionRegion(
+                id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.8, width: 0.8, height: 0.05),
+                source: .manual),
+            page: 0, undoManager: nil)
+        coord.runFullPipeline(documentOverride: .secureRasterization)
+        let runId = try #require(coord.documentState.activeRunId)
+        let task = coord.documentState.activePipelineTask
+
+        coord.documentState.cancelActivePipeline(redactionState: coord.redactionState)
+        #expect(coord.documentState.activeRunId == nil,
+                "Stop invalidates the run in its synchronous step")
+        #expect(coord.documentState.phaseKind == .editing)
+
+        // The cancelled run's tick, reported through the production sink.
+        let tick = DocumentState.RedactionProgress(
+            currentPage: 2, totalPages: 5, currentStep: "Page 2")
+        coord.apply(.phase(.redacting(progress: tick)), from: runId)
+        #expect(coord.documentState.phaseKind == .editing,
+                "a tick from a run that is no longer active is dropped")
+
+        // A later run's events still land.
+        coord.runFullPipeline(documentOverride: .secureRasterization)
+        let runId2 = try #require(coord.documentState.activeRunId)
+        let task2 = coord.documentState.activePipelineTask
+        coord.apply(.phase(.redacting(progress: tick)), from: runId2)
+        #expect(coord.documentState.phaseKind == .redacting)
+        coord.documentState.cancelActivePipeline(redactionState: coord.redactionState)
+        _ = await task?.value
+        _ = await task2?.value
     }
 }
