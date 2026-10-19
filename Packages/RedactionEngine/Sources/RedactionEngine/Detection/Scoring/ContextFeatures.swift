@@ -71,39 +71,38 @@ private enum ContextFeatureKeywords {
     /// lowercased for case-insensitive whole-token testing (KeywordMatch),
     /// mirroring the live scorer which lowercases the window first (ContextWindowScorer.swift:103/106).
     static func sets(for family: String) -> (positive: [String], negative: [String]) {
-        switch family {
-        case "account":
+        guard let scored = ScoredFamily(wire: family) else { return ([], []) }
+        switch scored {
+        case .account:
             // AccountDetector.positiveKeywords (negative set empty — profile :26).
             return (AccountDetector.positiveKeywords.map { $0.lowercased() }, [])
-        case "phone":
+        case .phone:
             // PhoneDetector phone keyword sets.
             return (
                 PhoneDetector.phoneContextKeywords.map { $0.lowercased() },
                 PhoneDetector.phoneNegativeKeywords.map { $0.lowercased() }
             )
-        case "mrn":
+        case .mrn:
             // MRNContextKeywords.profile (positive + negative; MRNContextKeywords.swift:16/31).
             let p = MRNContextKeywords.profile
             return (
                 p.positiveKeywords.map { $0.lowercased() },
                 p.negativeKeywords.map { $0.lowercased() }
             )
-        case "ein":
+        case .ein:
             // EINDetector.einProfile (negative set empty).
             let p = EINDetector.einProfile
             return (
                 p.positiveKeywords.map { $0.lowercased() },
                 p.negativeKeywords.map { $0.lowercased() }
             )
-        case "itin":
+        case .itin:
             // ITINDetector.itinProfile (negative set empty).
             let p = ITINDetector.itinProfile
             return (
                 p.positiveKeywords.map { $0.lowercased() },
                 p.negativeKeywords.map { $0.lowercased() }
             )
-        default:
-            return ([], [])
         }
     }
 }
