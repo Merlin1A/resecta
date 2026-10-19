@@ -86,4 +86,33 @@ struct RegexTimeoutBannerTests {
         // Sanity — page indices DO appear, 1-based.
         #expect(banner.contains("page 8"))
     }
+
+    @Test("The custom-term time-limit sink interpolates neither the term nor the page (source pin)")
+    func customTermTimeoutSinkIsContentFree() throws {
+        let source = try loadRepoFile(
+            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift")
+        guard let start = source.range(of: "setUserTermsTimeoutSink("),
+              let end = source.range(of: "setScannedRegionNotAnalyzedSink(",
+                                     range: start.upperBound..<source.endIndex)
+        else {
+            Issue.record("Could not locate the custom-term timeout sink")
+            return
+        }
+        let sink = source[start.upperBound..<end.lowerBound]
+        #expect(!sink.contains("\\("), "the sink interpolates nothing — no term, no page number")
+        #expect(sink.contains("customTermTimeoutMessage"))
+    }
+
+    /// Mirrors `HonestySurfacesTests.loadRepoFile`.
+    private func loadRepoFile(
+        _ relativePath: String, from file: StaticString = #filePath
+    ) throws -> String {
+        let repoRoot = URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+        return try String(
+            contentsOf: repoRoot.appendingPathComponent(relativePath),
+            encoding: .utf8)
+    }
 }
