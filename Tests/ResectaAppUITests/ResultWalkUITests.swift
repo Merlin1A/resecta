@@ -193,10 +193,4 @@ nonisolated final class ResultWalkUITests: XCTestCase {
         return CGPoint(x: CGFloat(minX + maxX) / 2 / scale, y: CGFloat(minY + maxY) / 2 / scale)
     }
 
-    private func attachScreenshot(named name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
-    }
 }

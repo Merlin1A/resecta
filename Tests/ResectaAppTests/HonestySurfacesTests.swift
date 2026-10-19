@@ -41,7 +41,7 @@ struct HonestyDisclaimerMountTests {
     @Test("Disclaimer shows on every verdict state — no dismissal, no gating")
     func showsOnEveryStatus() {
         let statuses: [VerificationStatus] =
-            [.pass, .warn("w"), .info("i"), .fail("x"), .skipped]
+            [.pass, .warn("w"), .info("i"), .fail("x"), .attention("a"), .skipped]
         for status in statuses {
             let shown = VerificationResultsView.shouldShowHonestyDisclaimer(
                 overallStatus: status)

@@ -206,10 +206,4 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
 
     // MARK: - Evidence
 
-    private func attachScreenshot(named name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
-    }
 }

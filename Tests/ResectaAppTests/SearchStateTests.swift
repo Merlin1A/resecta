@@ -428,7 +428,3 @@ struct SearchStateTriggerSingleFlightTests {
         #expect(state.results.count == 1)
     }
 }
-
-extension Tag {
-    @Tag static var search: Self
-}

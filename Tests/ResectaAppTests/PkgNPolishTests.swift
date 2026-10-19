@@ -235,7 +235,7 @@ struct HomeViewFailureRoutingTests {
         // shape under test is the sequence: openRedact → .importing →
         // .failed. We invoke the same operations against a fresh
         // AppCoordinator and assert the terminal phase.
-        let settings = SettingsState()
+        let settings = SettingsState(defaults: makeScratchDefaults().0)
         let coordinator = AppCoordinator(settingsState: settings, userTermsStore: UserTermsStore())
         coordinator.openRedact()
         guard case .redact(let workspace) = coordinator.activeWorkspace else {

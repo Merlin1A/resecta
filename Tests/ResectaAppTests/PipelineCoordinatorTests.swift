@@ -347,6 +347,30 @@ struct PipelineCoordinatorTests {
         #expect(pages.first?.fallbackReason == .rtlText)
     }
 
+    @Test("Searchable mode keeps every page of the bundled sample on the text-layer path")
+    func bundledSamplePagesAllTakeSearchable() async throws {
+        // The three-page statement the app ships is born digital. The import
+        // classifies its pages itself (the loader's per-page text-layer
+        // detection), so the gate below reads the production status of each
+        // page, never a hand-set `.rich`. A page routed to the visual path
+        // here would mean the gate misreads a plain text layer.
+        let sampleURL = try #require(
+            Bundle(for: AppCoordinator.self).url(forResource: "SampleDocument", withExtension: "pdf"))
+        let data = try Data(contentsOf: sampleURL)
+        let coord = makeCoordinator()
+        let outcome = await ImportService.importDocument(
+            data: data, suggestedType: "pdf",
+            documentState: coord.documentState, redactionState: coord.redactionState)
+        #expect(outcome == .completed)
+
+        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction)
+        #expect(pages.count == 3)
+        for page in pages {
+            #expect(page.pipelineMode == .searchableRedaction, "page \(page.pageIndex)")
+            #expect(page.fallbackReason == nil, "page \(page.pageIndex)")
+        }
+    }
+
     @Test("Secure mode stays secure regardless of rotation or text layer")
     func secureModeUnaffectedByGateInputs() throws {
         let coord = makeCoordinator()
@@ -360,14 +384,6 @@ struct PipelineCoordinatorTests {
     }
 
     // MARK: - Helpers
-
-    private func makeCoordinator() -> PipelineCoordinator {
-        PipelineCoordinator(
-            documentState: DocumentState(),
-            redactionState: RedactionState(),
-            settingsState: SettingsState()
-        )
-    }
 
     /// Create a minimal 1-page PDFDocument for testing.
     private func makeTestPDFDocument() -> PDFDocument {

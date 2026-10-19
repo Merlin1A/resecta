@@ -22,34 +22,43 @@ import SwiftUI
 @Suite("Transition resolver adoption")
 struct TransitionResolverTests {
 
-    @Test("resolvedTransition with Reduce Motion off returns the standard transition (reachable)")
+    // `AnyTransition` is not `Equatable`; its description names the
+    // transition it wraps, so two transitions built the same way describe
+    // the same and a move and an opacity fade describe differently.
+    private func describe(_ transition: AnyTransition) -> String {
+        String(describing: transition)
+    }
+
+    @Test("resolvedTransition with Reduce Motion off returns the standard transition")
     func resolvedTransitionReduceMotionOff() {
         let resolved = ResectaTokens.Anim.resolvedTransition(
             standard: .move(edge: .top),
             reduceMotion: false
         )
-        // AnyTransition is not Equatable — pin reachability, mirroring
-        // ToastReduceMotionTests's posture for `Anim.resolved`.
-        _ = resolved
+        #expect(describe(resolved) == describe(.move(edge: .top)))
+        #expect(describe(resolved) != describe(.opacity))
     }
 
-    @Test("resolvedTransition with Reduce Motion on returns a transition (reachable)")
+    @Test("resolvedTransition with Reduce Motion on returns the opacity fade")
     func resolvedTransitionReduceMotionOn() {
         let resolved = ResectaTokens.Anim.resolvedTransition(
             standard: .move(edge: .top),
             reduceMotion: true
         )
-        _ = resolved
+        #expect(describe(resolved) == describe(.opacity))
+        #expect(describe(resolved) != describe(.move(edge: .top)))
     }
 
-    @Test("resolvedTransition is reachable with an asymmetric standard transition (both flags)")
+    @Test("resolvedTransition keeps an asymmetric standard transition unless Reduce Motion is on")
     func resolvedTransitionAsymmetricReachable() {
         let standard = AnyTransition.asymmetric(
             insertion: .move(edge: .trailing).combined(with: .opacity),
             removal: .opacity
         )
-        _ = ResectaTokens.Anim.resolvedTransition(standard: standard, reduceMotion: false)
-        _ = ResectaTokens.Anim.resolvedTransition(standard: standard, reduceMotion: true)
+        let kept = ResectaTokens.Anim.resolvedTransition(standard: standard, reduceMotion: false)
+        let faded = ResectaTokens.Anim.resolvedTransition(standard: standard, reduceMotion: true)
+        #expect(describe(kept) == describe(standard))
+        #expect(describe(faded) == describe(.opacity))
     }
 
     // MARK: - Source-scanning pin

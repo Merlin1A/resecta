@@ -6,8 +6,8 @@ import Foundation
 // Last-Used Filter Settings persistence, plus
 // pins for the launch sweep that purges the excised
 // persisted-recents feature's retired storage keys.
-// All tests use a scratch UserDefaults suite so they don't pollute
-// UserDefaults.standard and can run in isolation without shared-state
+// All tests use a scratch UserDefaults suite so they never touch the
+// app's own defaults domain and can run in isolation without shared-state
 // hazards. Suite name is cleaned up in a defer block per test (the shared
 // `makeScratchDefaults()` in `Support/ScratchDefaults.swift`).
 

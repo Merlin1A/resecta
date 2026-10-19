@@ -177,24 +177,29 @@ struct ShieldedSheetContentTests {
         #expect(ShieldedSheetContent.shouldShield(monitor) == false)
     }
 
-    @Test("Modifier hosts without crashing in both states (let-injection)")
+    @Test("Modifier hosts to a sized view in both states (let-injection)")
     func testModifierHostsInBothStates() {
         // The monitor arrives as a `let`, not an @Environment read inside
-        // body (37b56c9 precedent) — so hosting the modifier with NO
-        // environment values must not assert, in either shield state.
+        // body — so hosting the modifier with NO environment values must
+        // resolve to a laid-out view in either shield state. The hosted
+        // size is the observable: a body that failed to resolve lays out
+        // to nothing.
+        let proposal = CGSize(width: 320, height: 480)
         let monitor = ScreenCaptureMonitor()
 
         monitor._setForTesting(isCaptured: true, isMirroring: false)
         let shielded = UIHostingController(
             rootView: Text("probe").shieldedSheetContent(monitor: monitor)
         )
-        shielded.view.layoutIfNeeded()
+        let shieldedSize = shielded.sizeThatFits(in: proposal)
+        #expect(shieldedSize.width > 0 && shieldedSize.height > 0)
 
         monitor._setForTesting(isCaptured: false, isMirroring: false)
         let unshielded = UIHostingController(
             rootView: Text("probe").shieldedSheetContent(monitor: monitor)
         )
-        unshielded.view.layoutIfNeeded()
+        let unshieldedSize = unshielded.sizeThatFits(in: proposal)
+        #expect(unshieldedSize.width > 0 && unshieldedSize.height > 0)
     }
 }
 
@@ -202,18 +207,16 @@ struct ShieldedSheetContentTests {
 @MainActor
 struct PrivacyShieldViewStructureTests {
 
-    @Test("Shield view instantiates without document state")
+    @Test("Shield view lays out without document state")
     func testShieldHidesCanvas() {
         // The shield deliberately takes no document state. If a future
-        // refactor accidentally injects document content, this test
-        // stays green only by virtue of the shield resolving without
-        // environment values. The visual property (uniform fill, no
-        // leakage) is structural: the view body is an opaque `Color` +
-        // an SF Symbol + a label.
-        let view = PrivacyShieldView()
-        // Force the body to evaluate. SwiftUI body evaluation here just
-        // confirms the view type compiles + resolves; the visual
-        // property is asserted structurally above.
-        _ = view.body
+        // refactor injected document content through the environment, the
+        // shield would no longer resolve without environment values. The
+        // visual property (uniform fill, no leakage) is structural: the
+        // view body is an opaque `Color` + an SF Symbol + a label; the
+        // check here is that the view hosts to a laid-out size on its own.
+        let host = UIHostingController(rootView: PrivacyShieldView())
+        let size = host.sizeThatFits(in: CGSize(width: 320, height: 480))
+        #expect(size.width > 0 && size.height > 0)
     }
 }
