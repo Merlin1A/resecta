@@ -9,7 +9,7 @@ import OSLog
 // the pipeline's.
 //
 // Two classes of entry:
-//   - TRUST-GATED: the files the five signature-gated loaders read (the two
+//   - Trust-gated: the files the five signature-gated loaders read (the two
 //     Bloom filters and their sidecars, the DL and passport pattern tables,
 //     the context keywords, the negative-context gazetteer). A failure on one
 //     of these makes the corpus verdict false — exactly what a bad signature

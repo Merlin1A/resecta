@@ -72,6 +72,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The app's unit tests build their settings on a scratch defaults suite: the shared coordinator helpers take a fresh suite by default, and the source check that lists tests reading the shared defaults domain now fails on any such site.
 - The engine package's test copy of the app's per-page mode choice is removed; the app's tests check the production choice through the coordinator, on a right-to-left page and on every page of the bundled sample.
 - App tests: the six trapping requires in the mode-switch toast tests are throwing requires, and the hosting and transition smoke tests assert what they name; the two review-dismiss UI tests call their survival check from the test body.
+- Context-scored pattern matches build their explanation through one factory; the signal order is unchanged.
+- Decoded fields nothing reads are dropped: the per-filter manifest entries and the unapplied document-type temperature; the temperature file is read only for the startup diagnostics.
+- Detection loaders: the context keyword sets switch over the typed scored families; the context keyword loader and the driver's-licence and passport pattern tables share one version check and one loading path; the state-code pattern is compiled once.
 - `Scripts/release-flag-check.sh` censuses the remaining debug-only launch argument, the saved-searches sim-drive hook, as its positive control.
 - The search sheet's row display contracts, copy catalogs, banners and Scan options sit in their own files (`SearchResultRow+Contracts.swift`, `SearchResultsCopy.swift`, `SearchResultsBanners.swift`, `SearchToolbarSection+Scan.swift`), the copy catalogs under names that say what they hold; one detection-kind label table serves the canvas badge and the review surfaces; the two search-preparation guards share one failure path.
 - The pull-request gate counts the engine package's `public` and `open` declaration lines and fails a change whose count exceeds the cap the script carries, printing the count, the headroom under the cap and the release line caps on the largest source files (`Scripts/engine-public-surface-check.sh`); a change that adds to the count names the declarations in its description.
@@ -96,6 +99,14 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The reconstruction sweep test no longer races its siblings for the shared temporary directory.
 - CI: CodeQL runs from a workflow in the repository (`.github/workflows/codeql.yml`) instead of the default setup; the Swift job builds the Xcode project, so the app target and the engine package are both in the Swift database, and the Actions and Python analyses run without a build.
 - The engine's verification tests are organised by layer, and the security suites run through the production page pipeline.
+- The polygon containment test the text-layer writer uses lives with the other polygon geometry; the writer no longer reaches into the verification code.
+- The stale temporary-file sweep lives beside the per-session temporary directory it cleans up after.
+- Resolution selection and the pre-render page checks live in one page memory policy file.
+- The structural and metadata verification layers, and the dispatch of the text-layer checks, live in their own files.
+- The text-layer position check is split into its three techniques over one shared scan state.
+- The verification status ranking is an exhaustive switch over every status; the test-only tuning values are bound per task.
+- Rendering a page from a PDFKit page and from its Core Graphics page runs one render body.
+- The rectangle and polygon character filters share one sort, search and cancellation skeleton.
 
 ## [1.2.0] — 2026-09-29
 

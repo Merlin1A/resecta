@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 // RF: one memoized corpus verdict for every signature-gated consumer.
 //
@@ -66,8 +67,10 @@ public enum GazetteerTrust {
     @TaskLocal static var verdictOverrideForTesting: Bool?
 
     /// Test observability — how many times the shipped bundle's verdict
-    /// has been computed this process (0 before first use, then 1).
-    nonisolated(unsafe) static var moduleVerificationCountForTesting = 0
+    /// has been computed this process (0 before first use, then 1). An
+    /// atomic counter: the once-initializer below increments it from
+    /// whichever task first touches the verdict.
+    static let moduleVerificationCountForTesting = Atomic<Int>(0)
     #endif
 
     /// The shipped bundle's verdict, computed at most once per process.
@@ -76,7 +79,7 @@ public enum GazetteerTrust {
     /// concurrent first access.
     private static let moduleVerdict: CorpusVerdict = {
         #if DEBUG
-        moduleVerificationCountForTesting += 1
+        moduleVerificationCountForTesting.add(1, ordering: .relaxed)
         #endif
         return computeVerdict(bundle: .module)
     }()

@@ -179,9 +179,6 @@ struct Layer2OCRParallelismTests {
                 filterDigests: [], perPageModes: modes).status
         }
 
-        // Production never mutates ocrParallelism; restore it whatever happens.
-        defer { VerificationEngine.ocrParallelism = 3 }
-
         func measure(_ runs: Int) async -> [Double] {
             var samples: [Double] = []
             for _ in 0..<runs {
@@ -195,17 +192,19 @@ struct Layer2OCRParallelismTests {
             return samples.sorted()
         }
 
+        // The width is task-local: each binding covers its own calls only.
         // Warm-up: Vision graph init + first-touch image extraction.
-        VerificationEngine.ocrParallelism = 1
-        _ = await runLayer2()
+        await VerificationEngine.$ocrParallelism.withValue(1) {
+            _ = await runLayer2()
+        }
 
-        VerificationEngine.ocrParallelism = 1
-        let serialStatus = await runLayer2()
-        let serial = await measure(5)
+        let (serialStatus, serial) = await VerificationEngine.$ocrParallelism.withValue(1) {
+            (await runLayer2(), await measure(5))
+        }
 
-        VerificationEngine.ocrParallelism = 3
-        let parallelStatus = await runLayer2()
-        let parallel = await measure(5)
+        let (parallelStatus, parallel) = await VerificationEngine.$ocrParallelism.withValue(3) {
+            (await runLayer2(), await measure(5))
+        }
 
         func p50(_ s: [Double]) -> Double { s[s.count / 2] }
         let sP50 = p50(serial), pP50 = p50(parallel)

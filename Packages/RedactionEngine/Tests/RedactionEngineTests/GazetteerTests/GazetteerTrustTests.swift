@@ -16,10 +16,10 @@ struct GazetteerTrustTests {
         // so the shipped-bundle path must go through the public wrapper,
         // which resolves the engine's bundle inside the engine module.
         let first = GazetteerTrust.isShippedCorpusTrusted()
-        let countAfterFirst = GazetteerTrust.moduleVerificationCountForTesting
+        let countAfterFirst = GazetteerTrust.moduleVerificationCountForTesting.load(ordering: .relaxed)
         let second = GazetteerTrust.isShippedCorpusTrusted()
         #expect(first == second)
-        #expect(GazetteerTrust.moduleVerificationCountForTesting == countAfterFirst,
+        #expect(GazetteerTrust.moduleVerificationCountForTesting.load(ordering: .relaxed) == countAfterFirst,
                 "a second lookup must not re-verify the shipped bundle")
         #expect(countAfterFirst == 1,
                 "the underlying verification runs exactly once per process")

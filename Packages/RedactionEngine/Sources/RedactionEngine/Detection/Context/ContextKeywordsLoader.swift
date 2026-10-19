@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 // A21 (`Resources/Gazetteers/context-keywords.json`) loader.
 // Replaces the positive-keyword arrays in the four hardcoded
@@ -69,11 +70,13 @@ public struct ContextKeywordsLoader: Sendable {
         } catch {
             throw LoaderError.decodingFailed(underlying: error)
         }
-        guard Self.supportedVersions.contains(wire.version) else {
-            throw LoaderError.unsupportedVersion(
-                actual: wire.version, supported: Self.supportedVersions
-            )
-        }
+        try LoaderVersionFence.assert(
+            actual: wire.version,
+            supported: Self.supportedVersions,
+            assetName: "context-keywords",
+            logger: logger,
+            throwing: { LoaderError.unsupportedVersion(actual: $0, supported: $1) }
+        )
 
         var grouped: [PIICategory: [Entry]] = [:]
         for entry in wire.entries {
@@ -171,3 +174,5 @@ private struct WireFormat: Decodable {
         case generatedBy = "generated_by"
     }
 }
+
+private let logger = Logger(subsystem: "app.resecta.engine", category: "ContextKeywordsLoader")

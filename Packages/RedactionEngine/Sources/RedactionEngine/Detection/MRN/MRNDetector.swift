@@ -108,27 +108,28 @@ struct MRNDetector: FamilyDetector {
                     category: .medicalRecord, doctype: doctype, gazetteer: gazetteer,
                     documentHeader: documentHeader
                 )
-                var rationale = MatchRationale.Builder(
-                    ruleID: ruleID, preThresholdScore: profile.baseConfidence,
-                    signals: [.regexPattern(name: ruleID)]
-                )
-                rationale.append(contextScorer.signal(
+                let contextSignal = contextScorer.signal(
                     text: fullText, matchRange: match.range, profile: profile,
                     category: .medicalRecord, doctype: doctype, gazetteer: gazetteer,
                     documentHeader: documentHeader
-                ))
+                )
                 // Attach negativeContextSuppressed signal when gazetteer fired.
+                var gazetteerSignal: MatchRationale.Signal?
                 if let gaz = gazetteer, let dt = doctype {
-                    rationale.append(contextScorer.gazetteerSignal(
+                    gazetteerSignal = contextScorer.gazetteerSignal(
                         text: fullText, matchRange: match.range,
-                        category: .medicalRecord, doctype: dt, gazetteer: gaz))
+                        category: .medicalRecord, doctype: dt, gazetteer: gaz)
                 }
                 out.append(PIIMatch(
                     text: text.substring(with: match.range),
                     range: match.range,
                     kind: .medicalRecord,
                     confidence: confidence,
-                    rationale: rationale.build(finalScore: confidence)
+                    rationale: .contextScored(
+                        ruleID: ruleID, preThresholdScore: profile.baseConfidence,
+                        contextSignal: contextSignal, gazetteerSignal: gazetteerSignal,
+                        finalScore: confidence
+                    )
                 ))
             }
         }

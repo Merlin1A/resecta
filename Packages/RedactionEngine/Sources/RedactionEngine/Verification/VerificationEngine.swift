@@ -42,16 +42,16 @@ public struct VerificationEngine: Sendable {
     static let inRegionCoverageThreshold: CGFloat = 0.5
 
     /// Bounded width for the Layer-2 OCR task group. Vision's own
-    /// internal concurrency bounds the realized speed-up; a private constant so
-    /// tuning needs no source-logic change. It is a `nonisolated(unsafe) static
-    /// var` purely so the wall-clock acceptance gate can measure width-1 (serial)
-    /// against width-3 on the one production code path — production never mutates
-    /// it (the perf test is `.serialized` + `.disabled`, run on demand alone).
+    /// internal concurrency bounds the realized speed-up; a constant so
+    /// tuning needs no source-logic change. It is task-local purely so the
+    /// wall-clock acceptance gate can bind width-1 (serial) against width-3
+    /// on the one production code path for its own task tree — production
+    /// never binds it, and a bound value never leaks into another test.
     /// The width bounds pages-resident memory and the overlap of
     /// extraction/sampling/classification; the Vision perform itself is
     /// serialized on `visionPerformQueue` (see `layer2OCRHits`), so width no
     /// longer multiplies concurrent Vision sync-waits.
-    nonisolated(unsafe) static var ocrParallelism = 3
+    @TaskLocal static var ocrParallelism = 3
 
     /// Layer-2 OCR downsample cap (largest pixel dimension), a 4096-px
     /// ceiling: the OCR check looks for READABLE
@@ -376,37 +376,41 @@ public struct VerificationEngine: Sendable {
     }
 
     /// Aggregate per-layer results into overall status.
-    /// Any FAIL → overall FAIL. Else any ATTENTION → overall ATTENTION
+    /// The ranking over every status: any FAIL → overall FAIL, with the
+    /// first FAIL's own message. Else any ATTENTION → overall ATTENTION
     /// (un-redacted residual text — user-recoverable, so it outranks notes
     /// but never masks an output defect). Else any WARN → overall WARN.
-    /// All PASS → overall PASS.
-    /// Uses .isFail/.isWarn helpers instead of Equatable (which ignores associated values)
-    /// to avoid fragile matching and preserve the actual diagnostic message.
+    /// Else the skipped accounting below. INFO rows and PASS rows rank
+    /// alike: all of them → overall PASS. One exhaustive switch classifies
+    /// each layer, so a new status case is a compile error here, not a
+    /// silent PASS.
     public func aggregateStatus(_ layers: [LayerResult]) -> VerificationStatus {
-        if let firstFail = layers.first(where: { $0.status.isFail }) {
-            if case .fail(let msg) = firstFail.status {
-                return .fail(msg)
+        var firstFail: String?
+        var firstAttention: String?
+        var firstWarn: String?
+        var skippedCount = 0
+        for layer in layers {
+            switch layer.status {
+            case .fail(let msg):
+                if firstFail == nil { firstFail = msg }
+            case .attention(let msg):
+                if firstAttention == nil { firstAttention = msg }
+            case .warn(let msg):
+                if firstWarn == nil { firstWarn = msg }
+            case .skipped:
+                skippedCount += 1
+            case .info, .pass:
+                break
             }
-            return .fail("Verification failed")
         }
-        if let firstAttention = layers.first(where: { $0.status.isAttention }) {
-            if case .attention(let msg) = firstAttention.status {
-                return .attention(msg)
-            }
-            return .attention("Verification reported items to review")
-        }
-        if let firstWarn = layers.first(where: { $0.status.isWarn }) {
-            if case .warn(let msg) = firstWarn.status {
-                return .warn(msg)
-            }
-            return .warn("Verification produced warnings")
-        }
+        if let msg = firstFail { return .fail(msg) }
+        if let msg = firstAttention { return .attention(msg) }
+        if let msg = firstWarn { return .warn(msg) }
         // Account for .skipped layers so a
         // partially- or wholly-skipped verdict is not reported as PASS. All
         // layers skipped → .skipped (preserves the VerificationReport.skipped
         // sentinel); some but not all skipped → .warn. Count-agnostic — never
         // assumes a 5- or 10-layer total.
-        let skippedCount = layers.filter { $0.status.isSkipped }.count
         if skippedCount > 0 {
             if skippedCount == layers.count {
                 return .skipped
@@ -504,278 +508,6 @@ public struct VerificationEngine: Sendable {
         return (.pass, nil, false)
     }
 
-    // MARK: - Layer 4: Structural Verification
-
-    /// Returns (status, affectedPages) where affectedPages is non-nil
-    /// only for per-page /AA findings (enables tappable page chips in UI).
-    private func runLayer4Structural(_ doc: PDFDocument) throws -> (VerificationStatus, [Int]?, Bool) {
-        // Entry-level cooperative cancellation.
-        try Task.checkCancellation()
-        let loaded = loadPDFData(doc)
-        // /Encrypt is a trailer key, never the catalog's: an encrypted output FAILs, locked or not.
-        if let cgDoc = loaded?.1, cgDoc.isEncrypted { return (.fail("Encrypt found in document"), nil, false) }
-        guard let (pdfData, cgDoc) = loaded, let catalog = cgDoc.catalog else {
-            return (.warn("Could not inspect document structure"), nil, true)
-        }
-
-        // FAIL-triggering keys: active content in the document catalog. /AA
-        // triggers automatic actions (can execute JS on open/close/print);
-        // /RichMedia and /Flash can embed content containing PII.
-        let failKeys = ["JavaScript", "JS", "OpenAction", "Launch",
-                        "EmbeddedFiles", "SubmitForm", "ResetForm", "AcroForm",
-                        "AA", "RichMedia", "Flash"]
-        for key in failKeys {
-            var obj: CGPDFObjectRef?
-            if CGPDFDictionaryGetObject(catalog, key, &obj) {
-                return (.fail("\(key) found in document catalog"), nil, false)
-            }
-        }
-
-        // The standard real-world carrier for embedded files and
-        // document-level JavaScript is the catalog's /Names name-dictionary
-        // (/Names → /EmbeddedFiles, /Names → /JavaScript), not the catalog top
-        // level the loop above covers. Resecta's writer never emits /Names, so
-        // these subtrees are active-content carriers wherever they appear; a
-        // plain /Names without them stays on the generic WARN path below.
-        var namesDict: CGPDFDictionaryRef?
-        if CGPDFDictionaryGetDictionary(catalog, "Names", &namesDict), let namesDict {
-            for key in ["EmbeddedFiles", "JavaScript"] {
-                var subtree: CGPDFDictionaryRef?
-                if CGPDFDictionaryGetDictionary(namesDict, key, &subtree) {
-                    return (.fail("\(key) found under /Names in document catalog"), nil, false)
-                }
-            }
-        }
-
-        // Check per-page /AA entries. Page-level automatic actions
-        // can trigger JavaScript or URI opens that leak document content.
-        // Collects all affected pages for tappable navigation in the UI.
-        let pageCount = cgDoc.numberOfPages
-        var aaPages: [Int] = []
-        for pageIdx in 1...max(1, pageCount) {
-            try Task.checkCancellation()
-            guard let pageDictRef = cgDoc.page(at: pageIdx)?.dictionary else { continue }
-            var aaObj: CGPDFObjectRef?
-            if CGPDFDictionaryGetObject(pageDictRef, "AA", &aaObj) {
-                aaPages.append(pageIdx - 1)  // 0-indexed for UI (LayerResultRow shows pageRef + 1)
-            }
-        }
-        if !aaPages.isEmpty {
-            return (.fail("Per-page /AA (automatic action) found on \(pageCountPhrase(aaPages.count))"), aaPages, false)
-        }
-
-        // WARN-triggering keys
-        let warnKeys = ["URI", "Metadata", "Names",
-                        "OCProperties", "PieceInfo"]
-        var warnings: [String] = []
-        for key in warnKeys {
-            var obj: CGPDFObjectRef?
-            if CGPDFDictionaryGetObject(catalog, key, &obj) {
-                warnings.append(key)
-            }
-        }
-
-        // Check for multiple %%EOF markers (incremental updates).
-        // pdfData already read into memory by loadPDFData.
-        let eofMarker = "%%EOF".data(using: .ascii)!
-        var eofCount = 0
-        var searchRange = pdfData.startIndex..<pdfData.endIndex
-        while let range = pdfData.range(of: eofMarker, options: [], in: searchRange) {
-            eofCount += 1
-            searchRange = range.upperBound..<pdfData.endIndex
-        }
-        if eofCount > 1 {
-            // Incremental updates can append original content
-            // after redaction. Resecta's reconstructor writes a single clean
-            // PDF stream — multiple markers indicate tampering or corruption.
-            return (.fail("Multiple %%EOF markers (\(eofCount)) — incremental update may contain original content"), nil, false)
-        }
-
-        if !warnings.isEmpty {
-            return (.warn("Structural findings: \(warnings.joined(separator: ", "))"), nil, false)  // LegalPhrases:safe (the shipped message; a list of structural notes)
-        }
-        return (.pass, nil, false)
-    }
-
-    // MARK: - Layer 5: Metadata Verification
-
-    /// The fixed-fields PASS detail: the writer's own values, nothing of the
-    /// file's, are what the /Info dictionary carries.
-    static let layer5FixedFieldsDetail =
-        "Producer and timestamps carry the writer's fixed values; no file-specific metadata is present."
-
-    private func runLayer5Metadata(_ doc: PDFDocument) throws -> (VerificationStatus, Bool, LayerCopy?) {
-        // Entry-level cooperative cancellation.
-        try Task.checkCancellation()
-        guard let (pdfData, cgDoc) = loadPDFData(doc) else {
-            return (.warn("Could not inspect metadata"), true, nil)
-        }
-
-        // Scan for XMP metadata BEFORE the /Info guard. XMP lives in
-        // the document's /Metadata stream, independent of /Info; the prior
-        // early `return .pass` on a nil /Info dictionary skipped the XMP scan
-        // entirely, so a document carrying XMP but no /Info passed silently.
-        // pdfData already read into memory by loadPDFData.
-        let hasXMP = pdfData.range(of: "<?xpacket".data(using: .ascii)!) != nil
-            || pdfData.range(of: "<x:xmpmeta>".data(using: .ascii)!) != nil
-            || pdfData.range(of: "<rdf:RDF".data(using: .ascii)!) != nil
-
-        // Check /Info dictionary. When absent, the XMP scan above is still
-        // authoritative — surface it rather than passing blind.
-        guard let infoDict = cgDoc.info else {
-            return (hasXMP
-                ? .warn("Auto-injected metadata present: XMP metadata")
-                : .pass, false, nil)
-        }
-
-        // Standard metadata keys to check. FAIL on key presence regardless of
-        // value type or decode success. The prior GetString/GetName pair
-        // silently passed keys whose value was an integer, array, or boolean
-        // (e.g. `/Title 42`), contradicting the documented intent. A single
-        // CGPDFDictionaryGetObject presence check fires on ANY value type
-        // (string, name, integer, array, boolean) — bytes that don't decode under
-        // PDFDocEncoding / UTF-16BE-BOM / UTF-8-BOM no longer fall through as
-        // "absent," and Name-object values are covered without a second call.
-        // CGPDFContext (Apple's writer) never emits these keys, so any presence
-        // is suspicious.
-        // Never include metadata values in status messages.
-        let sensitiveKeys = ["Title", "Author", "Subject", "Keywords", "Creator"]
-        for key in sensitiveKeys {
-            var obj: CGPDFObjectRef?
-            if CGPDFDictionaryGetObject(infoDict, key, &obj) {
-                return (.fail("Metadata key /\(key) present"), false, nil)
-            }
-        }
-
-        // /Producer, /CreationDate, /ModDate are Apple auto-injected and
-        // rewritten to the writer's fixed values (attested below); they
-        // ride in `infoFindings` so a clean doc with only these is a PASS
-        // whose detail says so.
-        var infoFindings: [String] = []
-        var warnings: [String] = []
-        let expectedKeys = ["Producer", "CreationDate", "ModDate"]
-        for key in expectedKeys {
-            var str: CGPDFStringRef?
-            if CGPDFDictionaryGetString(infoDict, key, &str) {
-                infoFindings.append("/\(key)")
-            }
-        }
-
-        // Check for /Trapped (can reveal document workflow)
-        var trappedStr: CGPDFStringRef?
-        if CGPDFDictionaryGetString(infoDict, "Trapped", &trappedStr) {
-            warnings.append("/Trapped")
-        }
-        // Also check as name object (PDF spec allows /Trapped as name)
-        var trappedName: UnsafePointer<CChar>?
-        if CGPDFDictionaryGetName(infoDict, "Trapped", &trappedName) {
-            if !warnings.contains("/Trapped") {
-                warnings.append("/Trapped")
-            }
-        }
-
-        // Enumerate all /Info keys — FAIL on non-standard keys with content.
-        // Custom metadata entries could contain PII transferred from the source
-        // document (e.g., app-specific classification, document routing).
-        let standardKeys: Set<String> = [
-            "Title", "Author", "Subject", "Keywords", "Creator",
-            "Producer", "CreationDate", "ModDate", "Trapped"
-        ]
-        var nonStandardKeys: [String] = []
-        CGPDFDictionaryApplyBlock(infoDict, { key, _, _ in
-            let keyName = String(cString: key)
-            if !standardKeys.contains(keyName) {
-                nonStandardKeys.append(keyName)
-            }
-            return true
-        }, nil)
-        if !nonStandardKeys.isEmpty {
-            // Do not include key values — just names
-            return (.fail("Non-standard /Info key(s): \(nonStandardKeys.joined(separator: ", "))"), false, nil)
-        }
-
-        // Writer-field attestation. The writer rewrites the auto-injected
-        // /Producer literal to `PDFStreamReconstructor.fixedProducerValue`
-        // and the /CreationDate and /ModDate literals to
-        // `PDFStreamReconstructor.fixedDateValue` after the context closes;
-        // that rewrite leaves a literal untouched on any anomaly and only
-        // logs. Read the three values back here so a silent no-op (or a
-        // future writer change) is reported instead of passing as
-        // auto-injected metadata. The producer rewrite pads with spaces
-        // after the closing paren, so the decoded literal is the bare fixed
-        // value; trailing spaces inside a literal are tolerated. A value
-        // that does not decode counts as not rewritten. An absent key stays
-        // on the paths below. One message covers all three fields; never
-        // echo a value in it.
-        let fixedWriterFields = [
-            ("Producer", PDFStreamReconstructor.fixedProducerValue),
-            ("CreationDate", PDFStreamReconstructor.fixedDateValue),
-            ("ModDate", PDFStreamReconstructor.fixedDateValue),
-        ]
-        for (key, fixedValue) in fixedWriterFields {
-            var ref: CGPDFStringRef?
-            guard CGPDFDictionaryGetString(infoDict, key, &ref), let ref else { continue }
-            var value = (CGPDFStringCopyTextString(ref) as String?) ?? ""
-            while value.hasSuffix(" ") { value.removeLast() }
-            if value != fixedValue {
-                return (.warn("Producer or timestamp fields were not rewritten to the fixed values"), false, nil)
-            }
-        }
-
-        // File-identifier attestation. The writer rewrites both halves of
-        // the trailer's `/ID` pair to the identifier derived from the
-        // file's own bytes (`PDFFileIdentifier`); recompute it here and
-        // report a pair that was not derived that way — after the fixed
-        // fields, ahead of /Trapped and XMP, one message that never carries
-        // a value. An absent pair stays on the paths below.
-        if let idArray = cgDoc.fileIdentifier,
-           !Self.fileIdentifierMatchesContents(idArray, pdfData: pdfData) {
-            return (.warn("File identifier was not derived from the file contents"), false, nil)
-        }
-
-        // XMP metadata — scanned above the /Info guard; fold the
-        // result into the warnings here for the /Info-present message path.
-        if hasXMP {
-            warnings.append("XMP metadata")
-        }
-
-        if !warnings.isEmpty {
-            // Mixed case: real concern present. Drop infoFindings from the
-            // message — auto-injected metadata is implicit when /Trapped or
-            // XMP exists, so surfacing only the actionable subset keeps the
-            // user focused on what matters. /Trapped is workflow-set, not
-            // auto-injected, so the message only claims auto-injection when
-            // XMP is the sole entry.
-            let onlyXMP = warnings.allSatisfy { $0 == "XMP metadata" }
-            let prefix = onlyXMP ? "Auto-injected metadata present" : "Metadata present"
-            return (.warn("\(prefix): \(warnings.joined(separator: ", "))"), false, nil)
-        }
-        if !infoFindings.isEmpty {
-            // The three keys are always present by construction and were
-            // attested above: a PASS that says what it read, never a note.
-            return (.pass, false, LayerCopy(short: "No issues found.", detail: Self.layer5FixedFieldsDetail))
-        }
-        return (.pass, false, nil)
-    }
-
-    /// True when the two strings of a trailer `/ID` array both equal the
-    /// identifier recomputed from `pdfData`. An array that is not two
-    /// strings, or a pair the locator cannot read from the file's tail in
-    /// the writer's shape, is by construction not the writer's derived
-    /// value.
-    static func fileIdentifierMatchesContents(_ idArray: CGPDFArrayRef, pdfData: Data) -> Bool {
-        guard CGPDFArrayGetCount(idArray) == 2 else { return false }
-        var halves: [Data] = []
-        for index in 0..<2 {
-            var ref: CGPDFStringRef?
-            guard CGPDFArrayGetString(idArray, index, &ref), let ref,
-                  let bytes = CGPDFStringGetBytePtr(ref) else { return false }
-            halves.append(Data(bytes: bytes, count: CGPDFStringGetLength(ref)))
-        }
-        guard let expected = PDFFileIdentifier.recomputedIdentifier(for: pdfData) else { return false }
-        return halves[0] == expected && halves[1] == expected
-    }
-
     // MARK: - PDF Data Loading Helper
 
     /// Load raw PDF bytes and a CGPDFDocument from a PDFDocument.
@@ -795,383 +527,6 @@ public struct VerificationEngine: Sendable {
         }
         return (data, cgDoc)
     }
-
-    // MARK: - Per-page mode coverage (Layers 6–9)
-
-    /// The 0-based pages `perPageModes` does not describe — every index at
-    /// or beyond `perPageModes.count` — or nil when the array covers the
-    /// whole document. The Searchable-layer dispatchers (Layers 6–9) pick
-    /// their pages through `perPageModes[i]`, so a short array silently
-    /// leaves the tail of the document out of the check; each dispatcher
-    /// reports that tail as a WARN on its otherwise-PASS exit instead of
-    /// passing pages it never looked at. FAIL, `.skipped` and the layer's
-    /// own WARNs keep precedence. The coordinator always supplies one mode
-    /// per page, so on the product's own paths this returns nil.
-    private func perPageModeCoverageGap(
-        perPageModes: [PipelineMode], pageCount: Int
-    ) -> [Int]? {
-        guard perPageModes.count < pageCount else { return nil }
-        return Array(perPageModes.count..<pageCount)
-    }
-
-    /// WARN copy for a per-page mode coverage gap — the mechanism only.
-    private func perPageModeCoverageWarn(
-        uncovered: [Int], pageCount: Int
-    ) -> VerificationStatus {
-        let covered = pageCount - uncovered.count
-        let unchecked = uncovered.count == 1
-            ? "1 page was" : "\(uncovered.count) pages were"
-        return .warn(
-            "Per-page mode data covered \(covered) of \(pageCount) "
-            + "\(pageCount == 1 ? "page" : "pages") — \(unchecked) not checked"
-        )
-    }
-
-    // MARK: - Layer 6: Spatial Verification
-
-    /// Dispatch spatial verification across all Searchable Redaction pages.
-    /// Collects all failing pages for tappable navigation chips.
-    /// A page declared Secure Rasterization is not position-checked, but it
-    /// is probed for a text layer: image-only output must carry none (the
-    /// writer draws no text on such a page), so a text layer there FAILs
-    /// the layer outright — a tampered or foreign output, never a skip.
-    ///
-    /// When any region on the page carries `vertices`, the spatial
-    /// exclusion check uses polygon-or-rect intersection (rect for
-    /// vertex-less regions, even-odd polygon for vertex-bearing). The
-    /// helper accepts `regionShapes` so the verifier can choose per-region.
-    private func runLayer6SpatialVerification(
-        _ doc: PDFDocument,
-        regions: [Int: [RedactionRegion]],
-        perPageModes: [PipelineMode],
-        verifier: SandwichVerification
-    ) async throws -> (VerificationStatus, [Int]?, Bool) {
-        // Entry-level cooperative cancellation.
-        try Task.checkCancellation()
-        var failingPages: [Int] = []
-        var firstFailMessage: String?
-        // Pages declared Secure Rasterization that still carry a text
-        // layer. Image-only output must carry none, so this FAIL outranks
-        // every other outcome of the layer.
-        var secureDeclaredTextPages: [Int] = []
-        // Per-page WARNs from the exclusion pass, in two classes: a
-        // positional edge graze (the check ran; a note) and characters whose
-        // position could not be measured (the check did not fully run).
-        // They fold below FAIL and above the unreadable-page WARN; an
-        // unmeasured page outranks every graze (its message names the first
-        // such page; the grazed pages join the references), else the graze
-        // sentence is composed ONCE over the grazed pages.
-        var grazePages: [Int] = []
-        var unmeasuredPages: [Int] = []
-        var firstUnmeasuredMessage: String?
-        // Eligible pages PDFKit cannot open surface as a WARN when the
-        // layer would otherwise PASS — see runLayer1TextExtraction.
-        var unreadablePages: [Int] = []
-
-        for i in 0..<doc.pageCount {
-            try Task.checkCancellation()
-            // Pages beyond `perPageModes` are reported by the coverage arm
-            // below. A page declared Secure Rasterization is probed for a
-            // text layer — an image-only page must carry none — and is not
-            // position-checked; the switch is exhaustive so a new mode
-            // cannot be skipped silently.
-            guard i < perPageModes.count else { continue }
-            switch perPageModes[i] {
-            case .secureRasterization:
-                if let text = doc.page(at: i)?.string,
-                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    secureDeclaredTextPages.append(i)
-                }
-                continue
-            case .searchableRedaction:
-                break
-            }
-            guard let page = doc.page(at: i) else {
-                unreadablePages.append(i)
-                continue
-            }
-            let pageRegions = regions[i] ?? []
-            // Do NOT skip region-less pages. The empty pageRegions
-            // flows through the maps below as regionShapes == [] into
-            // verifySpatialExclusion, which (count-only guard) still runs the
-            // origin-delta lattice — closing the glyph-position-tamper gap
-            // on region-less searchable pages. Cost is bounded by the existing
-            // 256-iteration cancellation cadence in the lattice walk.
-
-            // Convert regions to output page coordinates (output pages
-            // always have zero-origin bounds)
-            let outputBounds = page.bounds(for: .cropBox)
-            let rectsInPoints = pageRegions.map {
-                normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: outputBounds)
-            }
-            // Build polygon-aware shapes. Polygon vertices are
-            // converted into PDF-point-space via the same conversion the
-            // rect path uses. Rect-only regions carry `polygonVertices ==
-            // nil`. `bounds` carries the un-expanded rect (the
-            // unconditional 0pt floor + the band gate) and `expandedBounds`
-            // the filter's safety-margin halo, so Layer 6 enforces the
-            // same two-tier contract the character filter excludes by.
-            let regionShapes: [RegionShape] = zip(pageRegions, rectsInPoints)
-                .map { region, rect in
-                    let expanded = rect.insetBy(
-                        dx: -safetyMarginPoints, dy: -safetyMarginPoints
-                    )
-                    guard let normalized = region.vertices,
-                          normalized.count >= 3 else {
-                        return RegionShape(
-                            expandedBounds: expanded, polygonVertices: nil,
-                            bounds: rect
-                        )
-                    }
-                    let inPoints = normalized.map { v in
-                        normalizedToPDFPageCoordinates(
-                            CGRect(x: v.x, y: v.y, width: 0, height: 0),
-                            pageRect: outputBounds
-                        ).origin
-                    }
-                    return RegionShape(
-                        expandedBounds: expanded, polygonVertices: inPoints,
-                        bounds: rect
-                    )
-                }
-
-            let outcome = try await verifier.spatialExclusionOutcome(
-                outputPage: page,
-                regionShapes: regionShapes,
-                pageIndex: i
-            )
-            if case .fail(let msg) = outcome.status {
-                failingPages.append(i)
-                if firstFailMessage == nil { firstFailMessage = msg }
-            } else if case .warn(let msg) = outcome.status {
-                if outcome.grazed {
-                    grazePages.append(i)
-                } else {
-                    unmeasuredPages.append(i)
-                    if firstUnmeasuredMessage == nil { firstUnmeasuredMessage = msg }
-                }
-            }
-        }
-        // A text layer on a page written as image-only outranks every other
-        // outcome: the page was declared to carry none.
-        if !secureDeclaredTextPages.isEmpty {
-            let list = secureDeclaredTextPages.map { String($0 + 1) }.joined(separator: ", ")
-            return (.fail("A page written as image-only still carries a text layer on \(pagePhrase(secureDeclaredTextPages, list: list))"),
-                    secureDeclaredTextPages, false)
-        }
-        if let msg = firstFailMessage {
-            return (.fail(msg), failingPages, false)
-        }
-        // The exclusion pass's WARN outranks the unreadable-page WARN
-        // (mirror of FAIL's masking above; the combined case is rare and the
-        // exclusion message is the more actionable of the two). An
-        // unmeasured position (the check did not fully run) outranks a graze
-        // (a positional note; the check ran); the grazed pages ride along
-        // as references.
-        if let msg = firstUnmeasuredMessage {
-            return (.warn(msg), (unmeasuredPages + grazePages).sorted(), true)
-        }
-        if !grazePages.isEmpty {
-            return (SandwichVerification.grazeWarning(pages: grazePages), grazePages, false)
-        }
-        if !unreadablePages.isEmpty {
-            return (unreadablePagesWarn(unreadablePages), unreadablePages, true)
-        }
-        // Pages beyond `perPageModes` were never selected above — report
-        // them rather than pass them (see perPageModeCoverageGap).
-        if let uncovered = perPageModeCoverageGap(
-            perPageModes: perPageModes, pageCount: doc.pageCount
-        ) {
-            return (perPageModeCoverageWarn(
-                uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
-        }
-        return (.pass, nil, false)
-    }
-
-    // MARK: - Layer 7: Character Count Cross-Check
-
-    /// Dispatch character count verification across all Searchable Redaction pages.
-    /// Collects every failing page, else every warned page, for the chips.
-    private func runLayer7CharacterCount(
-        _ doc: PDFDocument,
-        filterDigests: [PageFilterDigest?],
-        perPageModes: [PipelineMode],
-        verifier: SandwichVerification
-    ) async throws -> (VerificationStatus, [Int]?, Bool) {
-        // Entry-level cooperative cancellation.
-        try Task.checkCancellation()
-        var outcomes = PerPageOutcomes()
-        // Track how many pages this
-        // digest-consuming layer was eligible to cross-check vs how many it
-        // actually checked, so a layer that ran no comparisons reports the
-        // truth (.skipped) instead of a silent .pass.
-        var eligible = 0
-        var checked = 0
-
-        for i in 0..<doc.pageCount {
-            try Task.checkCancellation()
-            guard i < perPageModes.count, perPageModes[i] == .searchableRedaction else {
-                continue
-            }
-            eligible += 1
-            guard i < filterDigests.count, let digest = filterDigests[i] else {
-                continue
-            }
-            guard let page = doc.page(at: i) else { continue }
-
-            checked += 1
-            let result = try await verifier.verifyCharacterCount(
-                outputPage: page, digest: digest
-            )
-            outcomes.record(result, page: i)
-        }
-        if let failure = outcomes.failure { return failure }
-        // Eligible-but-unchecked → honest .skipped (the verify-only
-        // resume path rebuilds all-nil digests). Partial coverage → .warn
-        // (defensive; unreachable today since digests are all-present or
-        // all-nil). eligible == 0 stays .pass when `perPageModes` covers the
-        // document — skipped by design (every page is per-page Secure
-        // Rasterization); promoting it would WARN-flag valid docs (the
-        // false-positive trap one layer up). Pages beyond `perPageModes`
-        // never counted as eligible, so they are reported last, on the
-        // otherwise-PASS exit (see perPageModeCoverageGap).
-        if eligible > 0 && checked == 0 {
-            return (.skipped, nil, false)
-        }
-        if checked < eligible {
-            return (.warn("Cross-checked \(checked) of \(eligible) \(eligible == 1 ? "page" : "pages") — remaining pages lacked rasterization data"), nil, true)
-        }
-        if let uncovered = perPageModeCoverageGap(
-            perPageModes: perPageModes, pageCount: doc.pageCount
-        ) {
-            return (perPageModeCoverageWarn(
-                uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
-        }
-        // The verifier's per-page count-excess warnings: a note (the check
-        // ran), ranked below the could-not-verify warnings above.
-        if let warning = outcomes.warning(couldNotVerify: false) { return warning }
-        return (.pass, nil, false)
-    }
-
-    // MARK: - Layer 8: Font Verification
-
-    /// Dispatch font verification across all Searchable Redaction pages.
-    /// Collects every failing page, else every warned page, for the chips.
-    private func runLayer8FontVerification(
-        _ doc: PDFDocument,
-        perPageModes: [PipelineMode],
-        verifier: SandwichVerification
-    ) async throws -> (VerificationStatus, [Int]?, Bool) {
-        // Entry-level cooperative cancellation.
-        try Task.checkCancellation()
-        var outcomes = PerPageOutcomes()
-        // See runLayer1TextExtraction — unreadable eligible pages WARN
-        // on the otherwise-PASS path.
-        var unreadablePages: [Int] = []
-
-        for i in 0..<doc.pageCount {
-            try Task.checkCancellation()
-            guard i < perPageModes.count, perPageModes[i] == .searchableRedaction else {
-                continue
-            }
-            guard let page = doc.page(at: i) else {
-                unreadablePages.append(i)
-                continue
-            }
-
-            let result = try await verifier.verifyFontsAreMonospace(
-                outputPage: page, pageIndex: i)
-            outcomes.record(result, page: i)
-        }
-        if let failure = outcomes.failure { return failure }
-        if !unreadablePages.isEmpty {
-            return (unreadablePagesWarn(unreadablePages), unreadablePages, true)
-        }
-        // Pages beyond `perPageModes` were never selected above — report
-        // them rather than pass them (see perPageModeCoverageGap).
-        if let uncovered = perPageModeCoverageGap(
-            perPageModes: perPageModes, pageCount: doc.pageCount
-        ) {
-            return (perPageModeCoverageWarn(
-                uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
-        }
-        // The verifier's per-page warnings — a font it could not inspect,
-        // a page with no page-level resources: the check did not run there.
-        if let warning = outcomes.warning(couldNotVerify: true) { return warning }
-        return (.pass, nil, false)
-    }
-
-    // MARK: - Layer 9: Character Lineage
-
-    /// Dispatch character-lineage verification across all Searchable Redaction
-    /// pages. Re-computes the SHA-256 over output composed-character iteration
-    /// and reports mismatch against `PageFilterDigest.lineageHash`. Reorderings,
-    /// insertions, deletions, and replacements of non-zero-bounds composed
-    /// characters between filter and final PDF flip the hash. Zero-width
-    /// insertions do NOT — both sides iterate non-zero-bounds composed
-    /// characters only (pinned M4 residual; term-bearing injections are
-    /// covered by Layers 3 and 10). See
-    /// `SandwichVerification.verifyCharacterLineage`.
-    private func runLayer9CharacterLineage(
-        _ doc: PDFDocument,
-        filterDigests: [PageFilterDigest?],
-        perPageModes: [PipelineMode],
-        verifier: SandwichVerification
-    ) async throws -> (VerificationStatus, [Int]?, Bool) {
-        // Entry-level cooperative cancellation +
-        // a per-page check, matching every other layer dispatcher; the
-        // composed-character walk inside the verifier carries the banded
-        // 256-cadence checks. `runLayer` converts the CancellationError to
-        // `.skipped` exactly as for Layers 1–8.
-        try Task.checkCancellation()
-        var failingPages: [Int] = []
-        var firstFailMessage: String?
-        // See runLayer7CharacterCount — same
-        // eligible/checked accounting so an unchecked digest-consuming layer
-        // reports .skipped rather than a silent .pass.
-        var eligible = 0
-        var checked = 0
-
-        for i in 0..<doc.pageCount {
-            try Task.checkCancellation()
-            guard i < perPageModes.count, perPageModes[i] == .searchableRedaction else {
-                continue
-            }
-            eligible += 1
-            guard i < filterDigests.count, let digest = filterDigests[i] else {
-                continue
-            }
-            guard let page = doc.page(at: i) else { continue }
-
-            checked += 1
-            let result = try await verifier.verifyCharacterLineage(
-                outputPage: page, digest: digest
-            )
-            if case .fail(let msg) = result {
-                failingPages.append(i)
-                if firstFailMessage == nil { firstFailMessage = msg }
-            }
-        }
-        if let msg = firstFailMessage {
-            return (.fail(msg), failingPages, false)
-        }
-        // Eligible-but-unchecked → .skipped; partial → .warn;
-        // eligible == 0 stays .pass (skipped by design); pages beyond
-        // `perPageModes` are reported last. See Layer 7.
-        if eligible > 0 && checked == 0 {
-            return (.skipped, nil, false)
-        }
-        if checked < eligible {
-            return (.warn("Cross-checked \(checked) of \(eligible) \(eligible == 1 ? "page" : "pages") — remaining pages lacked rasterization data"), nil, true)
-        }
-        if let uncovered = perPageModeCoverageGap(
-            perPageModes: perPageModes, pageCount: doc.pageCount
-        ) {
-            return (perPageModeCoverageWarn(
-                uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
-        }
-        return (.pass, nil, false)
-    }
 }
 
 // Grammatical page phrases, wording only. The prior
@@ -1190,7 +545,7 @@ func pageCountPhrase(_ count: Int) -> String {
 /// (Layers 1/6/8), mirroring Layer 10's per-page unavailability shape.
 /// `pages` are 0-based (the UI chip convention); the copy prints 1-based
 /// numbers — a single page by number, multiple as count + list.
-private func unreadablePagesWarn(_ pages: [Int]) -> VerificationStatus {
+func unreadablePagesWarn(_ pages: [Int]) -> VerificationStatus {
     let list = pages.map { String($0 + 1) }.joined(separator: ", ")
     return pages.count == 1
         ? .warn("Page \(list) could not be read for this check")

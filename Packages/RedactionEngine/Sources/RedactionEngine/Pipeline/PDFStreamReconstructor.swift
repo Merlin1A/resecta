@@ -14,13 +14,12 @@ import OSLog
 /// O(pages × JPEG). The context is opened lazily on the first appended page
 /// (its media box pinned to `firstPageSize`); `finalize` only closes it and
 /// applies file protection. This supersedes the earlier buffer-then-
-/// write model, whose sole reason to retain every encoded page was the
-/// now-removed `replacePage(at:with:)` swap. The production per-page
-/// verification retry re-rasterizes and re-appends *before* a page is drawn,
-/// so it never needed post-hoc replacement. The output bytes do not change:
-/// `CGPDFContext` re-encodes each drawn image independently of when it is
-/// drawn, and pages are still drawn in 0..<count append order, so the PDF, its
-/// metadata, and the atomic-rename pattern match the prior model byte-for-byte.
+/// write model. The per-page verification retry re-rasterizes and re-appends
+/// *before* a page is drawn, so no page is ever replaced after the fact. The
+/// output bytes do not depend on when a page is drawn: `CGPDFContext`
+/// re-encodes each drawn image independently, and pages are drawn in
+/// 0..<count append order, so the PDF, its metadata, and the atomic-rename
+/// pattern are the same whether pages are buffered or drawn as they arrive.
 ///
 /// Atomicity: the temp file at `tempURL` is created on the first `appendPage`
 /// and completed by `finalize`. The caller performs an atomic rename via
@@ -150,10 +149,9 @@ public actor PDFStreamReconstructor {
         let didWrite: Bool = autoreleasepool {
             // Decode the buffered JPEG. CGPDFContext
             // re-encodes any drawn image, so passthrough is not preserved in
-            // the output stream — but the output bytes do not depend on when a
-            // page is drawn, so draw-on-append matches the prior buffer-then-
-            // write model. The ~3.4ms decode overhead is paid once per page
-            // either way.
+            // the output stream; the output bytes do not depend on when a
+            // page is drawn. The decode cost (a few milliseconds) is paid
+            // once per page.
             guard let provider = CGDataProvider(data: page.jpegData as CFData),
                   let jpegImage = CGImage(
                       jpegDataProviderSource: provider,
@@ -466,55 +464,5 @@ public actor PDFStreamReconstructor {
             redactionRectsInPoints: output.redactionRectsInPoints,
             rotation: output.rotation
         )
-    }
-}
-
-// MARK: - Temp File Cleanup
-
-/// Clean orphaned temp files from prior sessions. Called at app launch and on
-/// every return to the foreground; idempotent, so repeated calls repeat the
-/// same bounded work.
-/// Crash-loop scenarios can accumulate large temp files before iOS purges them.
-///
-/// Known temp entry prefixes (keep in sync with producers):
-/// - `recon_`              : intermediate reconstruction temp (legacy path; still
-///                             created until routing is fully migrated)
-/// - `redacted_`           : pipeline output + export copies (legacy flat path)
-/// - `redacted_session_`   : per-session subdirectory (entire subtree
-///                             removed on session end; this sweep handles the
-///                             crash-orphaned remainder)
-/// - `resecta_`            : broadened sweep — also matches all
-///                             `resecta_*` temp writes (e.g.
-///                             `resecta_audit_*`, `resecta_coverage_*` from
-///                             `MatchExportService`, and any future
-///                             `resecta_verification_*` writes). Applies the
-///                             same 1-hour TTL and cleanup contract
-///                             uniformly so app-kill during a share-sheet
-///                             dismiss does not leak orphans.
-///
-/// `liveSessionURLs` names the session directories still in use — the open
-/// document's `redacted_session_<UUID>/`, handed in by the app's workspace
-/// coordinator. They are skipped whatever their age: a document left open
-/// past the TTL keeps its session and its output.
-public func cleanOrphanedTempFiles(excluding liveSessionURLs: Set<URL> = []) {
-    let tmp = FileManager.default.temporaryDirectory
-    guard let contents = try? FileManager.default.contentsOfDirectory(
-        at: tmp, includingPropertiesForKeys: [.creationDateKey]
-    ) else { return }
-    let staleThreshold = Date().addingTimeInterval(-3600) // 1 hour
-    let livePaths = Set(liveSessionURLs.map { $0.resolvingSymlinksInPath().standardizedFileURL.path })
-    for url in contents where url.lastPathComponent.hasPrefix("recon_")
-                            || url.lastPathComponent.hasPrefix("redacted_")
-                            || url.lastPathComponent.hasPrefix("resecta_") {
-        if livePaths.contains(url.resolvingSymlinksInPath().standardizedFileURL.path) { continue }
-        // `redacted_session_<UUID>` directories are caught by the
-        // `redacted_` prefix match above; removeItem handles both files
-        // and directories recursively. The `resecta_` arm covers
-        // `resecta_audit_*` and `resecta_coverage_*` share-sheet temp
-        // files written by `MatchExportService`.
-        if let date = try? url.resourceValues(forKeys: [.creationDateKey]).creationDate,
-           date < staleThreshold {
-            try? FileManager.default.removeItem(at: url)
-        }
     }
 }

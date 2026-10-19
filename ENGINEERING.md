@@ -270,7 +270,7 @@ concurrent entry points. The working rules, checkable by grep:
 - The app target contains **one** `DispatchQueue` reference (a labeled serial
   queue for writes to the in-memory thumbnail cache) and **zero** `.main.async`
   calls — main-thread work is expressed through actor isolation, not queue hops.
-- Isolation opt-outs are rare and deliberate: 21 `nonisolated(unsafe)`
+- Isolation opt-outs are rare and deliberate: 18 `nonisolated(unsafe)`
   declarations across ~63,000 lines of app + engine source, and the working
   convention is a written rationale at the declaration site saying why the
   access is safe.
