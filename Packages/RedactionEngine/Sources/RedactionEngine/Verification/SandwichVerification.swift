@@ -206,20 +206,7 @@ public struct SandwichVerification: Sendable {
         // cancel→surrender budget; bitmask check is amortized constant time.
         var bandCounter = 0
         var utf16Offset = 0
-        // Non-whitespace units whose read-back selection is missing or has
-        // no measurable bounds. They cannot be position-checked; counted here
-        // and reported as a WARN on the otherwise-PASS exit instead of being
-        // dropped.
-        var zeroBoundsUnits = 0
-        // Non-whitespace units for the exclusion pass, in string order (the
-        // band gate needs the whole page's Y structure before any verdict,
-        // so collection precedes checking; failure order stays first-offset).
-        var exclusionUnits: [(bounds: CGRect, utf16Offset: Int,
-                              family: String?, pointSize: CGFloat)] = []
-        // Units collected for the origin-delta lattice pass below.
-        var latticeUnits: [(string: String, bounds: CGRect,
-                            family: String, pointSize: CGFloat,
-                            utf16Offset: Int)] = []
+        var scan = SpatialExclusionScan()
         while utf16Offset < count {
             if bandCounter & 0xFF == 0 { try Task.checkCancellation() }
             bandCounter += 1
@@ -228,7 +215,7 @@ public struct SandwichVerification: Sendable {
                 // No read-back selection at all: as unmeasurable as an empty
                 // bounds box — counted, never silently skipped.
                 if !SandwichMetrics.isLineageWhitespace(nsText.substring(with: composedRange)) {
-                    zeroBoundsUnits += 1
+                    scan.zeroBoundsUnits += 1
                 }
                 utf16Offset += max(composedRange.length, 1)
                 continue
@@ -236,7 +223,7 @@ public struct SandwichVerification: Sendable {
             let bounds = sel.bounds(for: outputPage)
             guard bounds.width > 0, bounds.height > 0 else {
                 if !SandwichMetrics.isLineageWhitespace(nsText.substring(with: composedRange)) {
-                    zeroBoundsUnits += 1
+                    scan.zeroBoundsUnits += 1
                 }
                 utf16Offset += max(composedRange.length, 1)
                 continue
@@ -270,9 +257,9 @@ public struct SandwichVerification: Sendable {
                     pointSize = font.pointSize
                 }
                 #endif
-                exclusionUnits.append((bounds, utf16Offset, family, pointSize))
+                scan.exclusionUnits.append((bounds, utf16Offset, family, pointSize))
                 if let family {
-                    latticeUnits.append((charString, bounds, family,
+                    scan.latticeUnits.append((charString, bounds, family,
                                          pointSize, utf16Offset))
                 }
             }
@@ -280,28 +267,17 @@ public struct SandwichVerification: Sendable {
             utf16Offset += composedRange.length
         }
 
-        // The axis the text layer's lines run along (a page written from
-        // a `/Rotate 90`/`270` source is drawn along its source lines, so
-        // its lines are vertical runs here). The line bands of both passes
-        // below and the lattice's advance direction follow it; on a
-        // horizontal page every step is the unchanged walk.
-        let axis = Self.readBackAxis(exclusionUnits.map(\.bounds))
-        // The band coordinate: a line's position ACROSS the reading axis.
-        func across(_ b: CGRect) -> CGFloat { axis.isVertical ? b.minX : b.minY }
+        scan.axis = Self.readBackAxis(scan.exclusionUnits.map(\.bounds))
 
         // Exclusion pass: two tiers over the non-whitespace
         // units' glyph-core boxes. An edge graze (core box crossing a region
         // edge with its center outside) is held as a positional note and
         // returned WARN after the lattice pass below, so a lattice FAIL is
         // never masked by it.
-        // Set on the first edge graze; the graze is held (never returned
-        // from inside the loop) so a later in-region hit on this page is
-        // never masked by it.
-        var grazed = false
         try Task.checkCancellation()
-        if !regionShapes.isEmpty, !exclusionUnits.isEmpty {
+        if !regionShapes.isEmpty, !scan.exclusionUnits.isEmpty {
             var fractionCache: [String: CGFloat] = [:]
-            let coreBoxes: [CGRect] = exclusionUnits.map { unit in
+            let coreBoxes: [CGRect] = scan.exclusionUnits.map { unit in
                 let key = "\(unit.family ?? "-")|\(unit.pointSize)"
                 let fraction = fractionCache[key] ?? {
                     let f = SandwichMetrics.descentFraction(
@@ -312,11 +288,11 @@ public struct SandwichVerification: Sendable {
                 // The core shrinks the box along the FONT's vertical axis —
                 // the page's X on a vertical run. Symmetric, so the centre
                 // the FAIL test reads is the same in either frame.
-                return axis.isVertical
+                return scan.axis.isVertical
                     ? unit.bounds.insetBy(dx: fraction * unit.bounds.width, dy: 0)
                     : unit.bounds.insetBy(dx: 0, dy: fraction * unit.bounds.height)
             }
-            let unitBands = SandwichMetrics.yBands(coreBoxes.map(across))
+            let unitBands = SandwichMetrics.yBands(coreBoxes.map(scan.across))
             // Union rect per read-back band — the line-band the halo tier
             // gates on (mirror of the filter's per-lineIndex bands).
             var bandRects: [Int: CGRect] = [:]
@@ -324,7 +300,7 @@ public struct SandwichVerification: Sendable {
                 bandRects[unitBands[k]] =
                     bandRects[unitBands[k]].map { $0.union(core) } ?? core
             }
-            unitLoop: for (k, unit) in exclusionUnits.enumerated() {
+            unitLoop: for (k, unit) in scan.exclusionUnits.enumerated() {
                 let core = coreBoxes[k]
                 let band = bandRects[unitBands[k]] ?? core
                 for shape in regionShapes {
@@ -382,7 +358,7 @@ public struct SandwichVerification: Sendable {
                                 "A character overlaps a redacted area on page \(pageIndex + 1)"
                             ), false, false)
                         }
-                        grazed = true
+                        scan.grazed = true
                         continue unitLoop
                     }
                 }
@@ -413,8 +389,8 @@ public struct SandwichVerification: Sendable {
         // shape are skipped — the layout hole at a region is the region's
         // own geometry, already visible in the raster.
         try Task.checkCancellation()
-        if !latticeUnits.isEmpty {
-            let bands = SandwichMetrics.yBands(latticeUnits.map { across($0.bounds) })
+        if !scan.latticeUnits.isEmpty {
+            let bands = SandwichMetrics.yBands(scan.latticeUnits.map { scan.across($0.bounds) })
             // The origin's coordinate ALONG the reading axis, signed so
             // reading order ascends: X on a horizontal line; on a vertical
             // run −Y when the run reads down the page, +Y when up. The
@@ -422,19 +398,19 @@ public struct SandwichVerification: Sendable {
             // checks, and `prev` is the earlier glyph in reading order
             // whose natural advance the delta is measured against.
             func along(_ b: CGRect) -> CGFloat {
-                switch axis {
+                switch scan.axis {
                 case .horizontal: return b.minX
                 case .vertical(let downward): return downward ? -b.minY : b.minY
                 }
             }
-            let order = latticeUnits.indices.sorted {
+            let order = scan.latticeUnits.indices.sorted {
                 bands[$0] != bands[$1]
                     ? bands[$0] < bands[$1]
-                    : along(latticeUnits[$0].bounds) < along(latticeUnits[$1].bounds)
+                    : along(scan.latticeUnits[$0].bounds) < along(scan.latticeUnits[$1].bounds)
             }
             for k in 1..<order.count {
-                let prev = latticeUnits[order[k - 1]]
-                let curr = latticeUnits[order[k]]
+                let prev = scan.latticeUnits[order[k - 1]]
+                let curr = scan.latticeUnits[order[k]]
                 guard bands[order[k - 1]] == bands[order[k]],
                       Self.isCourierMonospaceFamily(prev.family),
                       Self.isCourierMonospaceFamily(curr.family),
@@ -470,7 +446,7 @@ public struct SandwichVerification: Sendable {
                 guard delta > 0 else { continue }
                 // The interval between the two origins along the axis,
                 // spanning the boxes' union across it.
-                let gapRect = axis.isVertical
+                let gapRect = scan.axis.isVertical
                     ? CGRect(
                         x: min(prev.bounds.minX, curr.bounds.minX),
                         y: min(prev.bounds.minY, curr.bounds.minY),
@@ -502,16 +478,49 @@ public struct SandwichVerification: Sendable {
                 }
             }
         }
-        if zeroBoundsUnits > 0 {
+        if scan.zeroBoundsUnits > 0 {
             // Characters the check could not place — it did not fully run.
-            return (Self.zeroBoundsWarning(count: zeroBoundsUnits, pageIndex: pageIndex), true, false)
+            return (Self.zeroBoundsWarning(count: scan.zeroBoundsUnits, pageIndex: pageIndex), true, false)
         }
-        if grazed {
+        if scan.grazed {
             // A positional note (the content is outside the region; the check
             // ran), below the unplaced characters on the same page.
             return (Self.grazeWarning(pages: [pageIndex]), false, true)
         }
         return (.pass, false, false)
+    }
+
+    /// The scan state the three spatial-exclusion techniques share: what
+    /// the unit collection gathered, the reading axis derived from it, and
+    /// the edge graze the overlap tiers hold for the exit.
+    struct SpatialExclusionScan {
+        /// Non-whitespace units whose read-back selection is missing or has
+        /// no measurable bounds. They cannot be position-checked; counted here
+        /// and reported as a WARN on the otherwise-PASS exit instead of being
+        /// dropped.
+        var zeroBoundsUnits = 0
+        /// Non-whitespace units for the exclusion pass, in string order (the
+        /// band gate needs the whole page's Y structure before any verdict,
+        /// so collection precedes checking; failure order stays first-offset).
+        var exclusionUnits: [(bounds: CGRect, utf16Offset: Int,
+                              family: String?, pointSize: CGFloat)] = []
+        /// Units collected for the origin-delta lattice pass.
+        var latticeUnits: [(string: String, bounds: CGRect,
+                            family: String, pointSize: CGFloat,
+                            utf16Offset: Int)] = []
+        /// The axis the text layer's lines run along (a page written from
+        /// a `/Rotate 90`/`270` source is drawn along its source lines, so
+        /// its lines are vertical runs here). The line bands of both passes
+        /// and the lattice's advance direction follow it; on a horizontal
+        /// page every step is the unchanged walk.
+        var axis: TextAxis = .horizontal
+        /// Set on the first edge graze; the graze is held (never returned
+        /// from inside the overlap loop) so a later in-region hit on this
+        /// page is never masked by it.
+        var grazed = false
+
+        /// The band coordinate: a line's position ACROSS the reading axis.
+        func across(_ b: CGRect) -> CGFloat { axis.isVertical ? b.minX : b.minY }
     }
 
     /// WARN copy for the edge-graze class, composed once over every grazed
