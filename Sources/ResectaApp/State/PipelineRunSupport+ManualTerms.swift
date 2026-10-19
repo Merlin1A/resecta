@@ -32,7 +32,7 @@ extension PipelineCoordinator {
 
     /// A region covering this fraction of the page or more is a whole-page
     /// redaction: it adds no term and is not counted (the page-bar action's
-    /// "Redact Whole Page" and any hand-drawn equivalent).
+    /// "Mark Whole Page" and any hand-drawn equivalent).
     nonisolated static let wholePageRegionArea: CGFloat = 0.95
 
     /// The run's term set: the applied-region terms plus the manual capture.
