@@ -119,9 +119,11 @@ extension VerificationEngine {
 
     /// Guard seam for the Vision perform error path (no fixture
     /// can make `VNImageRequestHandler.perform` throw deterministically).
-    /// Production-inert: nil outside tests. When set, an image the closure
+    /// Production-inert: nil outside tests. Task-local: a test binds it for
+    /// its own task tree, and the read below happens on the calling task
+    /// before the hop to the Vision queue. While bound, an image the closure
     /// flags takes the same nil return the real perform error takes.
-    nonisolated(unsafe) static var onLayer2OCRSimulateError: (@Sendable (CGImage) -> Bool)?
+    @TaskLocal static var onLayer2OCRSimulateError: (@Sendable (CGImage) -> Bool)?
 
     /// One image's Layer-2 OCR pass on the dedicated Vision queue: build the
     /// frozen `verificationLayer2` request, perform it, and map the observations

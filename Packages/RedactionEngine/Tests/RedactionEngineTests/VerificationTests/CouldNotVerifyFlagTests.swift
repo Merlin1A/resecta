@@ -452,19 +452,15 @@ struct CouldNotVerifyFlagTests {
         let markers: [String: [Marker]] = [
             "VerificationEngine.swift": [
                 Marker(text: "Could not verify /AcroForm absence", family: true, sites: 1, lines: 1),
-                Marker(text: "Could not inspect document structure", family: true, sites: 1, lines: 1),
-                Marker(text: "Could not inspect metadata", family: true, sites: 1, lines: 1),
-                Marker(text: "Per-page mode data covered", family: true, sites: 1, lines: 1),
-                Marker(text: "Cross-checked \\(checked) of \\(eligible)", family: true, sites: 2, lines: 2),
                 Marker(text: "could not be read for this check", family: true, sites: 1, lines: 2),
                 Marker(text: "return .warn(msg)", family: false, sites: 0, lines: 1),
-                Marker(text: "Verification produced warnings", family: false, sites: 0, lines: 1),
                 Marker(text: "Some verification checks were skipped", family: false, sites: 0, lines: 1),
-                Marker(text: "Structural findings:", family: false, sites: 0, lines: 1),  // LegalPhrases:safe (the engine message)
-                Marker(text: "Auto-injected metadata present: XMP metadata", family: false, sites: 0, lines: 1),
-                Marker(text: "Producer or timestamp fields were not rewritten", family: false, sites: 0, lines: 1),
-                Marker(text: "File identifier was not derived from the file contents", family: false, sites: 0, lines: 1),
-                Marker(text: "\\(prefix): \\(warnings.joined", family: false, sites: 0, lines: 1),
+            ],
+            // The dispatch of the four text-layer checks (Layers 6–9) and the
+            // per-page mode coverage, in their own file.
+            "VerificationEngine+SandwichDispatch.swift": [
+                Marker(text: "Per-page mode data covered", family: true, sites: 1, lines: 1),
+                Marker(text: "Cross-checked \\(checked) of \\(eligible)", family: true, sites: 2, lines: 2),
                 // Layer 6's unmeasured-position class, passed through from
                 // `zeroBoundsWarning` (the classifying site); the graze class
                 // returns `grazeWarning`, a note.
@@ -473,6 +469,16 @@ struct CouldNotVerifyFlagTests {
             // The Layer 7/8 per-page fold: passes the verifier's WARN through
             // (the classifying sites are the verifier's, in
             // `SandwichVerification.swift` below).
+            // Layers 4 and 5, in their own file.
+            "VerificationEngine+Structural.swift": [
+                Marker(text: "Could not inspect document structure", family: true, sites: 1, lines: 1),
+                Marker(text: "Could not inspect metadata", family: true, sites: 1, lines: 1),
+                Marker(text: "Structural findings:", family: false, sites: 0, lines: 1),  // LegalPhrases:safe (the engine message)
+                Marker(text: "Auto-injected metadata present: XMP metadata", family: false, sites: 0, lines: 1),
+                Marker(text: "Producer or timestamp fields were not rewritten", family: false, sites: 0, lines: 1),
+                Marker(text: "File identifier was not derived from the file contents", family: false, sites: 0, lines: 1),
+                Marker(text: "\\(prefix): \\(warnings.joined", family: false, sites: 0, lines: 1),
+            ],
             "VerificationEngine+CouldNotVerify.swift": [
                 Marker(text: "firstWarnMessage.map { (.warn($0), warnedPages, couldNotVerify) }", family: false, sites: 0, lines: 1),
             ],
@@ -514,7 +520,9 @@ struct CouldNotVerifyFlagTests {
         ]
         // Pinned `.warn(` construction counts (pattern matches excluded).
         let constructionCounts = [
-            "VerificationEngine.swift": 17, "VerificationEngine+CouldNotVerify.swift": 1,
+            "VerificationEngine.swift": 5, "VerificationEngine+Structural.swift": 7,
+            "VerificationEngine+SandwichDispatch.swift": 4,
+            "VerificationEngine+CouldNotVerify.swift": 1,
             "VerificationEngine+Layer3.swift": 5,
             "Layer2OCRCheck+Sweep.swift": 3, "SandwichVerification.swift": 5,
             "SandwichVerification+Layer10.swift": 5,

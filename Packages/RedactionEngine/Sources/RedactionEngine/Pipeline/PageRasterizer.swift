@@ -610,83 +610,24 @@ public final class PageRasterizer: @unchecked Sendable {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
         }
 
-        // 1. Get raw cropBox and rotation
-        let rawRect = page.bounds(for: box)
-        let rotation = page.rotation
-
-        // 2. Compute post-rotation visual dimensions
-        let effectiveSize: CGSize = (rotation == 90 || rotation == 270)
-            ? CGSize(width: rawRect.height, height: rawRect.width)
-            : rawRect.size
-
-        // 3. Compute pixel dimensions at target DPI
-        let scale = dpi / 72.0
-        let pw = Int(ceil(effectiveSize.width * scale))
-        let ph = Int(ceil(effectiveSize.height * scale))
-
-        guard let ctx = createBitmapContext(width: pw, height: ph) else {
-            throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
-        }
-        defer { FirstRenderBitmap.release(ctx) } // the first-render bitmap is wiped at its release
-
-        // 4. White background (UIColor on iOS)
-        #if canImport(UIKit)
-        ctx.setFillColor(UIColor.white.cgColor)
-        #else
-        ctx.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
-        #endif
-        ctx.fill(CGRect(x: 0, y: 0, width: pw, height: ph))
-
-        // 5. Security: disable font smoothing (Bland et al. defense)
-        ctx.setShouldSmoothFonts(false)
-        ctx.setShouldSubpixelQuantizeFonts(false)
-        ctx.setAllowsFontSubpixelPositioning(false)
-
-        // 6. The drawing transform in PDFKit's rotation frame (cropBox
-        // origin + rotation; see `drawingTransform`).
-        let targetRect = CGRect(x: 0, y: 0, width: effectiveSize.width, height: effectiveSize.height)
-        let transform = Self.drawingTransform(
-            for: cgPage, box: box == .cropBox ? .cropBox : .mediaBox,
-            rotation: rotation, targetRect: targetRect
+        // The box and rotation as PDFKit reads them, handed to the one render
+        // body; it never reads the live `PDFPage` itself.
+        return try await renderPageFromCGPage(
+            cgPage, bounds: page.bounds(for: box), rotation: page.rotation,
+            pageIndex: pageIndex, dpi: dpi, box: box
         )
-
-        // 7. DPI scale first, then drawing transform
-        ctx.scaleBy(x: scale, y: scale)
-        ctx.concatenate(transform)
-
-        // 8. Clip to cropBox
-        let cropBox = cgPage.getBoxRect(box == .cropBox ? .cropBox : .mediaBox)
-        ctx.addRect(cropBox)
-        ctx.clip()
-
-        // 9. Render using CoreGraphics (NOT PDFKit's draw()).
-        // Wrap the synchronous C call in a signpost interval so
-        // Instruments can sample wall-clock without code changes. See the
-        // top-of-file note for why chunking is deliberately deferred.
-        let signpostID = pageRasterizerSignposter.makeSignpostID()
-        let signpostState = pageRasterizerSignposter.beginInterval(
-            "drawPDFPage", id: signpostID, "page=\(pageIndex) dpi=\(Int(dpi))"
-        )
-        ctx.drawPDFPage(cgPage)
-        pageRasterizerSignposter.endInterval("drawPDFPage", signpostState)
-
-        guard let image = ctx.makeImage() else {
-            throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
-        }
-        return image
     }
 
-    /// The body of `renderPage(PDFPage,…)` rewritten to consume a
-    /// pre-extracted `CGPDFPage` + PDFKit-sourced `bounds`/`rotation` directly,
-    /// so the concurrent render path never reads the live `PDFPage`. The box is
-    /// always `.cropBox` (the production call site). Pixel output is identical
-    /// to the PDFPage overload — the same `bounds`/`rotation` feed the
-    /// pixel-dimension math and `selectDPI` already consumed them. Rendering is
-    /// via CoreGraphics (`drawPDFPage`), never the PDFKit page-level draw API.
+    /// The one render body, over a pre-extracted `CGPDFPage` + PDFKit-sourced
+    /// `bounds`/`rotation`, so the concurrent render path never reads the live
+    /// `PDFPage`. The box defaults to `.cropBox` (the production call site);
+    /// `renderPage(PDFPage,…)` passes its caller's. Handles the box origin,
+    /// /Rotate, DPI scaling and the anti-aliasing defense. Rendering is via
+    /// CoreGraphics (`drawPDFPage`), never the PDFKit page-level draw API.
     @concurrent
     func renderPageFromCGPage(
         _ cgPage: CGPDFPage, bounds: CGRect, rotation: Int,
-        pageIndex: Int, dpi: CGFloat
+        pageIndex: Int, dpi: CGFloat, box: PDFDisplayBox = .cropBox
     ) async throws -> CGImage {
         try Task.checkCancellation()
 
@@ -720,18 +661,20 @@ public final class PageRasterizer: @unchecked Sendable {
         ctx.setShouldSubpixelQuantizeFonts(false)
         ctx.setAllowsFontSubpixelPositioning(false)
 
-        // The drawing transform in PDFKit's rotation frame (see `drawingTransform`).
+        // The drawing transform in PDFKit's rotation frame (box origin +
+        // rotation; see `drawingTransform`).
         let targetRect = CGRect(x: 0, y: 0, width: effectiveSize.width, height: effectiveSize.height)
         let transform = Self.drawingTransform(
-            for: cgPage, box: .cropBox, rotation: rotation, targetRect: targetRect
+            for: cgPage, box: box == .cropBox ? .cropBox : .mediaBox,
+            rotation: rotation, targetRect: targetRect
         )
 
         // DPI scale first, then drawing transform
         ctx.scaleBy(x: scale, y: scale)
         ctx.concatenate(transform)
 
-        // Clip to cropBox
-        let cropBox = cgPage.getBoxRect(.cropBox)
+        // Clip to the box
+        let cropBox = cgPage.getBoxRect(box == .cropBox ? .cropBox : .mediaBox)
         ctx.addRect(cropBox)
         ctx.clip()
 
