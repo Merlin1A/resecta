@@ -170,24 +170,6 @@ struct PipelineCoordinatorSecurityTests {
 
     // MARK: - Helpers (private)
 
-    // Replicated from PageParallelRasterizationTests (those helpers are private
-    // to that suite). A coordinator with a loaded source document, parked in the
-    // .editing phase so runFullPipeline can drive it forward.
-    private func makeLoadedCoordinator(document: PDFDocument) -> PipelineCoordinator {
-        let coord = PipelineCoordinator(
-            documentState: DocumentState(),
-            redactionState: RedactionState(),
-            settingsState: SettingsState()
-        )
-        coord.documentState.sourceDocument = document
-        coord.documentState.phase = .editing
-        // Pin the fill color deterministically: SettingsState reads `fillColor`
-        // from UserDefaults at init, so a persisted "white" from an earlier run
-        // in the same process would make a black-on-white pixel check invisible.
-        coord.settingsState.fillColor = .black
-        return coord
-    }
-
     private func addRegionToAllPages(_ coord: PipelineCoordinator, pageCount: Int) {
         let region = RedactionRegion(
             id: UUID(),

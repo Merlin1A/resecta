@@ -67,9 +67,12 @@ struct SnapshotOverlayTests {
         // @Environment dependency, the overlay would fail at runtime when
         // rendered at the root before environment injection — this test
         // pins the no-dependency contract at construction time.
-        let overlay = SnapshotPrivacyOverlay()
-        // Smoke-construct the body to confirm no construction-time crash.
-        _ = overlay.body
+        // The overlay is hosted with no environment objects; the hosted
+        // size is the observable — a body that failed to resolve lays out
+        // to nothing.
+        let host = UIHostingController(rootView: SnapshotPrivacyOverlay())
+        let size = host.sizeThatFits(in: CGSize(width: 320, height: 480))
+        #expect(size.width > 0 && size.height > 0)
     }
 
     // MARK: - testRevealPathRetainsExistingAnimation

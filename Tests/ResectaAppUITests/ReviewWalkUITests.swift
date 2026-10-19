@@ -153,10 +153,4 @@ nonisolated final class ReviewWalkUITests: XCTestCase {
         return condition()
     }
 
-    private func attachScreenshot(named name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
-    }
 }

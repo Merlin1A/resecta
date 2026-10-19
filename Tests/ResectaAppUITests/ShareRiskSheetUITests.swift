@@ -254,10 +254,4 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
 
     // MARK: - Screenshots
 
-    private func attachScreenshot(named name: String) {
-        let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = name
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
 }

@@ -181,13 +181,6 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
         return headerY
     }
 
-    private func attachScreenshot(named name: String) {
-        let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = name
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
-
     // MARK: - Expanded detent: top controls must win the tap (seq 134)
 
     // Premise updated for the two-entry model: interface choice lives

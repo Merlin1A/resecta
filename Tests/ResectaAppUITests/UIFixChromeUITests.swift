@@ -101,13 +101,6 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         )
     }
 
-    private func attachScreenshot(named name: String) {
-        let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = name
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
-
     // MARK: - Geometry: Search surface
 
     func testExpandedDetent_searchChromeDrawsRuledCompactGeometry() {

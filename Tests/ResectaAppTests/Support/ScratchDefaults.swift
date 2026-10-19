@@ -2,8 +2,8 @@ import Foundation
 
 // A UserDefaults suite that exists for one test: a UUID-named domain the
 // test owns, removed again when the test is done. A test that goes through
-// here never reads or writes the app's own domain (`UserDefaults.standard`
-// on the simulator); the product type takes the suite through its
+// here never reads or writes the app's own defaults domain on the
+// simulator; the product type takes the suite through its
 // `defaults:` seam (`SettingsState(defaults:)`, `SearchState(defaults:)`,
 // `UserDefaultsJSONBlob(defaults:)`, …).
 

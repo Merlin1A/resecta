@@ -172,18 +172,12 @@ struct PipelineCoordinatorParityEmitterTests {
         return (seed, nil)
     }
 
-    /// A coordinator with a loaded source document, parked in `.editing`
-    /// (the S4-H3 `makeLoadedCoordinator(document:)` shape) plus the two
-    /// document facts the app's import path records and the mirror computes
-    /// the same way: the per-page text-layer status and the hidden-OCG flag.
-    static func makeLoadedCoordinator(document: PDFDocument, data: Data) -> PipelineCoordinator {
-        let coord = PipelineCoordinator(
-            documentState: DocumentState(),
-            redactionState: RedactionState(),
-            settingsState: SettingsState()
-        )
-        coord.documentState.sourceDocument = document
-        coord.documentState.phase = .editing
+    /// The shared loaded coordinator (a source document, parked in `.editing`,
+    /// settings on a scratch suite) plus the two document facts the app's
+    /// import path records and the mirror computes the same way: the per-page
+    /// text-layer status and the hidden-OCG flag.
+    static func makeSeededCoordinator(document: PDFDocument, data: Data) -> PipelineCoordinator {
+        let coord = makeLoadedCoordinator(document: document)
         for i in 0..<document.pageCount {
             guard let page = document.page(at: i) else { continue }
             coord.documentState.textLayerStatus[i] = TextLayerDetector.detectTextLayer(page)
@@ -328,7 +322,7 @@ struct PipelineCoordinatorParityEmitterTests {
     ) async throws -> String? {
         guard let document = PDFDocument(data: data) else { return "PDFDocument(data:) failed" }
         guard let mode = PipelineMode(rawValue: cell.mode) else { return "unknown mode \(cell.mode)" }
-        let coord = makeLoadedCoordinator(document: document, data: data)
+        let coord = makeSeededCoordinator(document: document, data: data)
         defer { coord.tearDownTempDirectory() }
 
         // Cross-check the two document facts against the mirror's record.

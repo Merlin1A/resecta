@@ -55,11 +55,7 @@ struct PipelineCoordinatorSessionCloseTests {
 
     @Test("downgradeTempProtectionOnSessionClose removes a recon_ file from the live session directory and keeps the output")
     func sessionCloseRemovesReconFromLiveDirectory() throws {
-        let coord = PipelineCoordinator(
-            documentState: DocumentState(),
-            redactionState: RedactionState(),
-            settingsState: SettingsState()
-        )
+        let coord = makeCoordinator()
         defer { coord.tearDownTempDirectory() }
         let recon = try coord.tempExportDirectory.childURL(
             named: "recon_\(UUID().uuidString).pdf")

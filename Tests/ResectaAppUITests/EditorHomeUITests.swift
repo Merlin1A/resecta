@@ -168,13 +168,6 @@ nonisolated final class EditorHomeUITests: XCTestCase {
         sleep(1)
     }
 
-    private func attachScreenshot(named name: String) {
-        let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = name
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
-
     private func awaitEditor() {
         XCTAssertTrue(
             app.buttons["OverflowBarButtonItem"].waitForExistence(timeout: 30),

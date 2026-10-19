@@ -141,7 +141,7 @@ struct ModeSwitchToastTests {
     // MARK: - Undo restore
 
     @Test("Undo restores mode, results, applied markers, filter, and sort order")
-    func undoRestoresSession() async {
+    func undoRestoresSession() async throws {
         let manager = ToastQueueManager()
         let rs = RedactionState()
         let state = SearchState()
@@ -178,7 +178,7 @@ struct ModeSwitchToastTests {
         // deferred one runloop turn.
         // The target resolves through the LIVE activeSearch.
         rs.activeSearch = state
-        let toast = try! #require(manager.activeToasts.first)
+        let toast = try #require(manager.activeToasts.first)
         toast.actionHandler?()
         await Task.yield()
 
@@ -196,7 +196,7 @@ struct ModeSwitchToastTests {
     // MARK: - Restore-target resolution
 
     @Test("Undo after sheet reopen restores into the NEW live SearchState")
-    func undoRestoresIntoReopenedSession() async {
+    func undoRestoresIntoReopenedSession() async throws {
         let manager = ToastQueueManager()
         let rs = RedactionState()
         let original = SearchState()
@@ -219,7 +219,7 @@ struct ModeSwitchToastTests {
         let reopened = SearchState()
         rs.activeSearch = reopened
 
-        let toast = try! #require(manager.activeToasts.first)
+        let toast = try #require(manager.activeToasts.first)
         toast.actionHandler?()
         await Task.yield()
 
@@ -228,7 +228,7 @@ struct ModeSwitchToastTests {
     }
 
     @Test("Undo with no live sheet mints a session and presents it")
-    func undoMintsAndPresentsWhenNoSheetIsUp() async {
+    func undoMintsAndPresentsWhenNoSheetIsUp() async throws {
         let manager = ToastQueueManager()
         let rs = RedactionState()
         let original = SearchState()
@@ -246,18 +246,18 @@ struct ModeSwitchToastTests {
         // Sheet fully closed: no live session at tap time.
         #expect(rs.activeSearch == nil)
 
-        let toast = try! #require(manager.activeToasts.first)
+        let toast = try #require(manager.activeToasts.first)
         toast.actionHandler?()
         await Task.yield()
 
         // Assigning activeSearch IS the presentation trigger.
-        let presented = try! #require(rs.activeSearch)
+        let presented = try #require(rs.activeSearch)
         #expect(presented.searchModeType == .text)
         #expect(presented.results.map(\.id) == [r1.id])
     }
 
     @Test("Undo no-ops while a detection review is pending")
-    func undoNoOpsDuringPendingReview() async {
+    func undoNoOpsDuringPendingReview() async throws {
         let manager = ToastQueueManager()
         let rs = RedactionState()
         let original = SearchState()
@@ -274,7 +274,7 @@ struct ModeSwitchToastTests {
         // A pending review owns the surface.
         rs.pendingTriage = [:]
 
-        let toast = try! #require(manager.activeToasts.first)
+        let toast = try #require(manager.activeToasts.first)
         toast.actionHandler?()
         await Task.yield()
 
@@ -283,7 +283,7 @@ struct ModeSwitchToastTests {
     }
 
     @Test("Undo no-ops gracefully after the RedactionState is gone")
-    func undoNoOpsAfterRedactionStateDeallocated() async {
+    func undoNoOpsAfterRedactionStateDeallocated() async throws {
         let manager = ToastQueueManager()
         var rs: RedactionState? = RedactionState()
         let state = SearchState()
@@ -302,7 +302,7 @@ struct ModeSwitchToastTests {
         // The closure holds [weak redactionState]; the structural
         // assertion is that the (deferred) restore no-ops without
         // crashing.
-        let toast = try! #require(manager.activeToasts.first)
+        let toast = try #require(manager.activeToasts.first)
         toast.actionHandler?()
         await Task.yield()
         #expect(manager.activeToasts.count == 1)

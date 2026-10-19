@@ -71,14 +71,13 @@ struct CompactDetentPulseTests {
         #expect(result == false)
     }
 
-    @Test("attentionPulse animation token is reachable")
+    @Test("attentionPulse is one ease-in-out pass of 0.45 s that reverses")
     func attentionPulseTokenExists() {
-        // Smoke test — confirms the static token is reachable and typed
-        // as a SwiftUI `Animation`. The internal value
-        // `.easeInOut(duration: 0.45).repeatCount(1, autoreverses: true)`
-        // is opaque (no Equatable / property accessors) so we can only
-        // assert reachability + type, not equality with a literal.
-        let _: Animation = ResectaTokens.Anim.attentionPulse
+        // `Animation` is `Equatable`: the token is compared with the
+        // one-shot curve the pulse is meant to be, so a change to its
+        // duration, curve or repeat shape fails here.
+        #expect(ResectaTokens.Anim.attentionPulse
+                == Animation.easeInOut(duration: 0.45).repeatCount(1, autoreverses: true))
     }
 
     @Test("Per-sheet-session reset re-enables the pulse")
