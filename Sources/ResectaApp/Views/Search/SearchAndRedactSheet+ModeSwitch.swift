@@ -21,15 +21,16 @@ import RedactionEngine
 
 extension SearchAndRedactSheet {
 
-    /// Number of search results that have NOT been applied as
-    /// `RedactionRegion`s. Pure-data; safe to call from any actor since
-    /// it reads only `searchState.results.count` and
-    /// `searchState.appliedResultIDs.count`. Negative differences clamp
-    /// to zero in case applied IDs ever outpace results (e.g. between
-    /// region-version `.onChange` resets).
+    /// Number of search results that are neither applied as
+    /// `RedactionRegion`s nor already covered by one (the overlap guard's
+    /// set) — the matches a clear actually loses. Pure-data; it reads only
+    /// `results`, `appliedResultIDs` and `coveredResultIDs`. Negative
+    /// differences clamp to zero in case the id sets ever outpace results
+    /// (e.g. between region-version `.onChange` resets).
     @MainActor
     static func unappliedMatchCount(in searchState: SearchState) -> Int {
-        max(0, searchState.results.count - searchState.appliedResultIDs.count)
+        max(0, searchState.results.count
+               - searchState.appliedResultIDs.union(searchState.coveredResultIDs).count)
     }
 
     /// The slice of session state a mode-switch clear destroys
