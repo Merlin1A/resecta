@@ -98,6 +98,7 @@ struct SavedSearchListSheet: View {
                     } label: {
                         Label(Self.saveCurrentLabel(for: activeInterface), systemImage: "plus.circle")
                     }
+                    .disabled(!Self.saveCurrentEnabled(for: activeInterface, searchState: searchState))
                     .accessibilityLabel(Self.saveCurrentLabel(for: activeInterface))
                 }
             }
@@ -475,16 +476,25 @@ struct SavedSearchListSheet: View {
             : "Removes every saved search on this device."
     }
 
-    /// Pre-filled save-prompt name.
+    /// Whether the save row is enabled: a saved search needs a query or
+    /// a term to recall; a saved scan stores its category set and is
+    /// always meaningful.
+    static func saveCurrentEnabled(for interface: SearchInterface, searchState: SearchState) -> Bool {
+        if interface == .scan { return true }
+        let query = searchState.queryText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !query.isEmpty || !searchState.searchTerms.isEmpty
+    }
+
+    /// Pre-filled save-prompt name: the interface and the date, never
+    /// the query or the terms (document text the user may not want in
+    /// a list that VoiceOver reads and the rename/delete titles echo).
     static func generatedName(for searchState: SearchState) -> String {
+        let date = Date.now.formatted(date: .abbreviated, time: .shortened)
         switch searchState.searchModeType {
         case .piiScan:
-            return "\(SearchModeType.piiScan.displayName) – \(Date.now.formatted(date: .abbreviated, time: .shortened))"
-        case .multiTerm:
-            let terms = searchState.searchTerms.prefix(3).joined(separator: ", ")
-            return "Terms: \(String(terms.prefix(30)))"
-        case .text, .regex:
-            return "\(searchState.searchModeType.displayName): \(String(searchState.queryText.prefix(30)))"
+            return "\(SearchModeType.piiScan.displayName) – \(date)"
+        case .multiTerm, .text, .regex:
+            return "Search – \(date)"
         }
     }
 

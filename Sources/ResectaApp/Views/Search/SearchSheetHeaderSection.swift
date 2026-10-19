@@ -181,13 +181,15 @@ extension SearchAndRedactSheet {
                 ).map(\.page)
                 if Self.shouldShowPagesWithHitsLine(
                     hasCompletedRun: true,
-                    resultCount: reviewPages.count
+                    resultCount: reviewPages.count,
+                    atCap: false
                 ) {
                     pagesWithHitsLineView(pagesWithHits: Self.distinctPageCount(reviewPages))
                 }
             } else if Self.shouldShowPagesWithHitsLine(
                 hasCompletedRun: searchState.hasCompletedRunSinceClear,
-                resultCount: searchState.results.count
+                resultCount: searchState.results.count,
+                atCap: searchState.resultsAtCap
             ) {
                 pagesWithHitsLineView(
                     pagesWithHits: Self.distinctPageCount(searchState.results.map(\.pageIndex))
@@ -224,11 +226,15 @@ extension SearchAndRedactSheet {
 
     /// Gate: the line mounts only after a completed run that actually
     /// produced results — an empty or not-yet-run state shows nothing.
+    /// A run stopped at the result cap never read its later pages, so
+    /// "M with hits" would read as a document-wide count: the line
+    /// steps aside and the footer's cap banner speaks instead.
     static func shouldShowPagesWithHitsLine(
         hasCompletedRun: Bool,
-        resultCount: Int
+        resultCount: Int,
+        atCap: Bool
     ) -> Bool {
-        hasCompletedRun && resultCount > 0
+        hasCompletedRun && resultCount > 0 && !atCap
     }
 
     /// Distinct-page count for a list of page indices — the same

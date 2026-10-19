@@ -16,6 +16,11 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Documentation: the security policy gains a recipe for verifying a signed release tag: `.github/allowed_signers` lists the release-tag signing key under `security@resecta.app`, and `git tag -v` checks a tag against it once `gpg.ssh.allowedSignersFile` points at the file; the threat model's signed-tag row points at the recipe.
 - Import: a document whose structure the app cannot read in full is refused rather than opened unscanned. The reader the active-content and hidden-layer walks inspect must open, be unlocked, read a catalog and agree with PDFKit on the page count; a walk that cannot read a page or follow an action chain to its bound refuses instead of answering clean; an `/OCProperties` entry without its default configuration reads as a hidden layer. An owner-password-only document still opens.
 - Documentation: the licence notices name ParaNames' data licence (CC BY 4.0) with its attribution and the changes made, state the OpenStreetMap and OpenAddresses rows as provenance acknowledgements for inputs no build reads, and attribute the Inter typeface embedded in the bundled sample document.
+- The Search sheet's OCR source row appears only when a page reads via OCR or an OCR filter is set.
+- The Custom Terms screen states that a literal always-flag term matches inside words and in any case.
+- The "Marked N" notice is shorter so its "Not redacted until you tap Redact" clause fits at the default text size.
+- A saved search's suggested name no longer carries the query text.
+- The page bar stays while a match walk is parked.
 
 ### Removed
 
@@ -45,6 +50,12 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Verification results: the Verification Details summary no longer counts notes or checks with nothing to check as passed, and no longer reports a check that could not verify part of the output as completed.
 - Share: a report with a skipped check asks for confirmation before sharing even when another check reported a routine warning.
 - Verification results: a search line starting 'Scan (' keeps its term formatting.
+- The Source filter can be changed back from OCR on a document whose pages read as text, Reset to Defaults clears it, and the empty results state offers Show All.
+- An always-flag or never-flag term of one character is refused with the reason.
+- A query of spaces no longer runs via Search Anyway.
+- Save current search is disabled while the session has no query or terms.
+- The footer says how many selected matches a filter hides.
+- The Scan category chips wrap instead of clipping at the right edge.
 
 ### Internal
 
