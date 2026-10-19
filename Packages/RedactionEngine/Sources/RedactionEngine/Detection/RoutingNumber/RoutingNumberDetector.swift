@@ -86,33 +86,24 @@ struct RoutingNumberDetector: FamilyDetector {
                 profile: Self.profile,
                 category: .routingNumber
             )
-            var rationale = MatchRationale.Builder(
-                ruleID: ruleID, preThresholdScore: Self.profile.baseConfidence,
-                signals: [
-                    .regexPattern(name: ruleID),
-                    .structuralValidator(name: "routingNumber.aba-prefix"),
-                    .structuralValidator(name: "routingNumber.aba-mod10"),
-                ]
-            )
-            rationale.append(scorer.signal(
-                text: fullText,
-                matchRange: match.range,
-                profile: Self.profile,
-                category: .routingNumber
-            ))
-            // Per-keyword breakdown alongside the scalar
-            // (mirrors DEADetector).
-            rationale.append(scorer.signalDetail(
-                text: fullText,
-                matchRange: match.range,
-                profile: Self.profile
-            ))
             return PIIDetector.PIIMatch(
                 text: matchedText,
                 range: match.range,
                 kind: .routingNumber,
                 confidence: confidence,
-                rationale: rationale.build(finalScore: confidence)
+                rationale: .contextScored(
+                    ruleID: ruleID, preThresholdScore: Self.profile.baseConfidence,
+                    validators: ["routingNumber.aba-prefix", "routingNumber.aba-mod10"],
+                    contextSignal: scorer.signal(
+                        text: fullText, matchRange: match.range,
+                        profile: Self.profile, category: .routingNumber
+                    ),
+                    // Per-keyword breakdown alongside the scalar.
+                    keywordDetail: scorer.signalDetail(
+                        text: fullText, matchRange: match.range, profile: Self.profile
+                    ),
+                    finalScore: confidence
+                )
             )
         }
     }

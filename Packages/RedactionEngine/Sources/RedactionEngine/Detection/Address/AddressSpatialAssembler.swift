@@ -63,6 +63,10 @@ struct AddressSpatialAssembler: Sendable {
         options: [.caseInsensitive]
     )
 
+    /// A two-letter, upper-case, word-bounded token: a state code candidate
+    /// in a line that names no state in full.
+    static let stateCodePattern = try! NSRegularExpression(pattern: #"\b([A-Z]{2})\b"#)
+
     /// Abbreviation → canonical full word for the gazetteer lookup. The
     /// pipeline `street_types` list ships full words only ("Street",
     /// "Avenue", …), while `streetLinePattern` also accepts the common
@@ -255,9 +259,9 @@ struct AddressSpatialAssembler: Sendable {
         for (name, code) in stateNameToCode where lower.contains(name) {
             return code
         }
-        // Two-letter state codes must be uppercase and word-bounded.
-        // Regex: \b[A-Z]{2}\b — search through the original text.
-        let pattern = try! NSRegularExpression(pattern: #"\b([A-Z]{2})\b"#)
+        // Two-letter state codes must be uppercase and word-bounded —
+        // searched through the original text.
+        let pattern = Self.stateCodePattern
         let ns = text as NSString
         let matches = pattern.matches(in: text, range: NSRange(location: 0, length: ns.length))
         for match in matches {

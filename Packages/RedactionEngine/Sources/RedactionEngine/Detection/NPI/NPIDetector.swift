@@ -51,31 +51,24 @@ struct NPIDetector: FamilyDetector {
                 profile: Self.profile,
                 category: .npi
             )
-            var rationale = MatchRationale.Builder(
-                ruleID: ruleID, preThresholdScore: Self.profile.baseConfidence,
-                signals: [
-                    .regexPattern(name: ruleID),
-                    .structuralValidator(name: ruleID),
-                ]
-            )
-            rationale.append(scorer.signal(
-                text: fullText,
-                matchRange: match.range,
-                profile: Self.profile,
-                category: .npi
-            ))
-            // Per-keyword breakdown alongside the scalar.
-            rationale.append(scorer.signalDetail(
-                text: fullText,
-                matchRange: match.range,
-                profile: Self.profile
-            ))
             return PIIDetector.PIIMatch(
                 text: matchedText,
                 range: match.range,
                 kind: .npi,
                 confidence: confidence,
-                rationale: rationale.build(finalScore: confidence)
+                rationale: .contextScored(
+                    ruleID: ruleID, preThresholdScore: Self.profile.baseConfidence,
+                    validators: [ruleID],
+                    contextSignal: scorer.signal(
+                        text: fullText, matchRange: match.range,
+                        profile: Self.profile, category: .npi
+                    ),
+                    // Per-keyword breakdown alongside the scalar.
+                    keywordDetail: scorer.signalDetail(
+                        text: fullText, matchRange: match.range, profile: Self.profile
+                    ),
+                    finalScore: confidence
+                )
             )
         }
     }
