@@ -86,6 +86,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The polygon containment test the text-layer writer uses lives with the other polygon geometry; the writer no longer reaches into the verification code.
 - The stale temporary-file sweep lives beside the per-session temporary directory it cleans up after.
 - Resolution selection and the pre-render page checks live in one page memory policy file.
+- The structural and metadata verification layers, and the dispatch of the text-layer checks, live in their own files.
 
 ## [1.2.0] — 2026-09-29
 
