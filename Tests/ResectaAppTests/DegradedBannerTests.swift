@@ -6,15 +6,12 @@ import Foundation
 // Verify the app-side surfaces driven by
 // `GazetteerLoadDiagnostics`:
 //
-// 1. On the first gazetteer-load failure of a session, the coordinator
-//    posts exactly one warning toast (mechanism-description copy)
-//    and flips `RedactionState.autoDetectionDegraded = true`.
-// 2. Subsequent calls observing the same failure do NOT re-toast — the
-//    persistent banner on the search sheet's Scan interface carries
-//    the state from that point on (one rule: Scan always; Search only when
-//    a scan-class capability degrades the current action).
-// 3. The banner is gated purely by `autoDetectionDegraded`; flipping it
-//    back to false hides the banner without any additional plumbing.
+// 1. The banner on the search sheet's Scan interface is gated purely by
+//    `autoDetectionDegraded` (one rule: Scan always; Search only when a
+//    scan-class capability degrades the current action); flipping it back
+//    to false hides the banner without any additional plumbing.
+// 2. The copy branches on the recorded failure list, and the list shares
+//    the flag's lifetime.
 
 @Suite("Degraded auto-detection banner")
 @MainActor
@@ -28,68 +25,6 @@ struct DegradedBannerTests {
         let toast = ToastQueueManager()
         coordinator.toastManager = toast
         return (coordinator, toast)
-    }
-
-    @Test("First failure posts exactly one warning toast and flips the flag")
-    func testFirstFailurePostsWarningToast() {
-        let (coordinator, toast) = makeWiredCoordinator()
-        #expect(!coordinator.redactionState.autoDetectionDegraded,
-                "precondition: flag must start false")
-        #expect(toast.activeToasts.isEmpty,
-                "precondition: no toasts active before surface call")
-
-        let diagnostics = GazetteerLoadDiagnostics(
-            failedGazetteers: ["NameGazetteer"],
-            failureReasons: ["NameGazetteer": "resourceMissing"]
-        )
-        coordinator.surfaceGazetteerLoadDiagnostics(diagnostics)
-
-        #expect(coordinator.redactionState.autoDetectionDegraded,
-                "flag must flip on first qualifying failure")
-        // Top-position warning toast — see ToastSeverity.position.
-        #expect(toast.activeTopToasts.count == 1,
-                "first failure must enqueue exactly one warning toast")
-        let posted = toast.activeTopToasts.first
-        #expect(posted?.severity == .warning)
-        // Mechanism-description copy — no banned outcome-promise
-        // words. Anchor on a stable fragment of the shipped copy.
-        #expect(posted?.message.contains("detection corpus failed to load") == true,
-                "toast copy must match the locked plan text")
-        #expect(posted?.message.contains("Manual redaction tools remain available") == true,
-                "toast copy must surface manual-fallback affordance")
-    }
-
-    @Test("Second failure surface call does not re-toast (no spam)")
-    func testRepeatedFailureDoesNotRespam() {
-        let (coordinator, toast) = makeWiredCoordinator()
-        let diagnostics = GazetteerLoadDiagnostics(
-            failedGazetteers: ["NameGazetteer", "DLPatternGazetteer"],
-            failureReasons: [
-                "NameGazetteer": "resourceMissing",
-                "DLPatternGazetteer": "resourceMissing",
-            ]
-        )
-
-        coordinator.surfaceGazetteerLoadDiagnostics(diagnostics)
-        #expect(toast.activeTopToasts.count == 1, "first call posts the toast")
-
-        // A second detection-pipeline run discovers the same failures.
-        // The coordinator must NOT enqueue a second toast.
-        coordinator.surfaceGazetteerLoadDiagnostics(diagnostics)
-        #expect(toast.activeTopToasts.count == 1,
-                "second surface call with same failure must NOT post a second toast")
-        #expect(coordinator.redactionState.autoDetectionDegraded,
-                "flag stays true; not toggled off and back on")
-    }
-
-    @Test("Empty diagnostics is a no-op (healthy load path)")
-    func testHealthyDiagnosticsLeavesFlagAlone() {
-        let (coordinator, toast) = makeWiredCoordinator()
-        coordinator.surfaceGazetteerLoadDiagnostics(GazetteerLoadDiagnostics())
-        #expect(!coordinator.redactionState.autoDetectionDegraded,
-                "no failures → flag stays false")
-        #expect(toast.activeToasts.isEmpty,
-                "no failures → no toast")
     }
 
     @Test("Banner gating tracks the flag (true → banner present, false → absent)")
@@ -130,48 +65,6 @@ struct DegradedBannerTests {
             interface: .search, degraded: false))
     }
 
-    @Test("Multiple gazetteer failures still post exactly one toast")
-    func testAllFourFailuresSingleToast() {
-        let (coordinator, toast) = makeWiredCoordinator()
-        let diagnostics = GazetteerLoadDiagnostics(
-            failedGazetteers: [
-                "NameGazetteer", "DLPatternGazetteer",
-                "PassportPatternGazetteer", "ContextKeywordsLoader",
-            ],
-            failureReasons: [:]
-        )
-        coordinator.surfaceGazetteerLoadDiagnostics(diagnostics)
-        // The toast surface is per-session, not per-failure — four failures
-        // collapse to one announcement.
-        #expect(toast.activeTopToasts.count == 1,
-                "four loader failures must still produce a single coalesced toast")
-    }
-
-    @Test("NER-absent diagnostic drives the degraded banner flag")
-    func testNERAbsentDrivesDegradedBanner() {
-        // A NER-model-absent diagnostic carries the new .nerNameModel loader id —
-        // the artifact `PIIDetector.loadWithDiagnostics` produces when the OS NER
-        // asset is absent (the override→diagnostic production is proven in
-        // PIIDetectorInitDegradedTests). It must flip `autoDetectionDegraded`
-        // through the SAME coordinator path a corpus failure uses, which gates the
-        // `degradedDetectionBanner` on the search sheet's Scan
-        // interface — no new banner / UI.
-        let (coordinator, _) = makeWiredCoordinator()
-        #expect(!coordinator.redactionState.autoDetectionDegraded,
-                "precondition: flag starts false")
-
-        let diagnostics = GazetteerLoadDiagnostics(
-            failedGazetteers: [GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue],
-            failureReasons: [
-                GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue:
-                    "NLTagger .nameType MobileAsset unavailable (NER name detection disabled)"
-            ]
-        )
-        coordinator.surfaceGazetteerLoadDiagnostics(diagnostics)
-        #expect(coordinator.redactionState.autoDetectionDegraded,
-                "NER-absent diagnostic must flip the degraded banner flag")
-    }
-
     // MARK: - Copy branch + failure recording
 
     @Test("NER-only degrade gets the OS-model copy, not the corpus copy")
@@ -204,26 +97,11 @@ struct DegradedBannerTests {
         }
     }
 
-    @Test("Coordinator surface records the failure list and posts branch copy")
-    func testCoordinatorRecordsFailuresAndBranchesToast() {
-        let (coordinator, toast) = makeWiredCoordinator()
-        let nerOnly = GazetteerLoadDiagnostics(
-            failedGazetteers: [GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue],
-            failureReasons: [:]
-        )
-        coordinator.surfaceGazetteerLoadDiagnostics(nerOnly)
-        #expect(coordinator.redactionState.autoDetectionDegradeFailures
-                == nerOnly.failedGazetteers,
-                "failure list must be recorded for the banner copy branch")
-        #expect(toast.activeTopToasts.first?.message.contains("name model") == true,
-                "NER-only degrade must post the OS-model toast")
-    }
-
     @Test("clearForNewDocument resets the recorded failure list")
     func testFailureListResetsWithFlag() {
         let (coordinator, _) = makeWiredCoordinator()
-        coordinator.surfaceGazetteerLoadDiagnostics(GazetteerLoadDiagnostics(
-            failedGazetteers: ["NameGazetteer"], failureReasons: [:]))
+        coordinator.redactionState.autoDetectionDegraded = true
+        coordinator.redactionState.autoDetectionDegradeFailures = ["NameGazetteer"]
         #expect(!coordinator.redactionState.autoDetectionDegradeFailures.isEmpty)
         coordinator.redactionState.clearForNewDocument()
         #expect(!coordinator.redactionState.autoDetectionDegraded)

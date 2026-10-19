@@ -12,7 +12,7 @@ import UIKit
 // scenario, an older pipeline Task's error-recovery (or `defer`) could
 // fire AFTER the user started a fresh run, clearing the new run's
 // `outputURL` and nilling its `activePipelineTask`. Each `runFullPipeline`
-// / `runDetectionPipeline` now stamps a UUID into
+// now stamps a UUID into
 // `DocumentState.activeRunId`; the defer / error-recovery blocks only
 // mutate state when the stamp still matches, so a superseded Task is a
 // no-op.
@@ -50,14 +50,8 @@ struct PipelineCoordinatorRestartRaceTests {
         _ = await coord.documentState.activePipelineTask?.value
     }
 
-    /// Detection-pipeline stamp parity check. We don't exercise the real
-    /// `runDetectionPipeline` here because its bootstrap path can throw
-    /// before transitioning to `.detecting`, exposing a pre-existing
-    /// `editing → failed` transition issue outside this test's scope. Instead,
-    /// we pin the stamping contract symmetrically: the field is settable
-    /// and clearable on `DocumentState` exactly like `activePipelineTask`,
-    /// so the detection-pipeline guard pattern (mirrors the full-pipeline
-    /// guard verified above) inherits the same protection.
+    /// The stamping contract: the field is settable and clearable on
+    /// `DocumentState` exactly like `activePipelineTask`.
     @Test("activeRunId field is observable on DocumentState")
     func activeRunIdFieldExists() {
         let doc = DocumentState()
@@ -152,7 +146,7 @@ struct PipelineCoordinatorRestartRaceTests {
     /// Deterministic and race-free: drive the real `runVerifyOnly`, capture its
     /// Task, cancel it, then install a *controlled* long-lived successor (a
     /// fresh runId + a sleeping Task) — exactly the synchronous state-claim a
-    /// real `runFullPipeline` / `runDetectionPipeline` dispatch performs (see
+    /// real `runFullPipeline` dispatch performs (see
     /// `runFullPipelineStampsRunId` / `testCancelThenRestartPreservesNewRunState`
     /// for the real-dispatch stamp mechanism). A real successor Task could
     /// complete during the await below and nil `activePipelineTask` through its
