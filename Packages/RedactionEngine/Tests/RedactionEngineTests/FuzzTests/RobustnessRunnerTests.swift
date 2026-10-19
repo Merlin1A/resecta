@@ -93,6 +93,23 @@ struct RobustnessRunnerTests {
             }
             if let pageError { return .reject(errorClass: pageError) }
         }
+        // The geometry stage, in the app's order: an unreadable page
+        // dictionary is corrupt; a page the render would refuse is refused
+        // with the render's class.
+        for i in 0..<doc.pageCount {
+            var pageError: String? = nil
+            autoreleasepool {
+                guard let page = doc.page(at: i), let pageRef = page.pageRef,
+                      pageRef.dictionary != nil else {
+                    pageError = "corrupt"
+                    return
+                }
+                if !validatePageGeometry(page) {
+                    pageError = "unsupportedPageGeometry"
+                }
+            }
+            if let pageError { return .reject(errorClass: pageError) }
+        }
         // The walk reader, in the app's order: the parser's own document
         // behind the parsed one (`documentRef`, unlocked with the same
         // password); a reader that is missing, cannot unlock, reads no
