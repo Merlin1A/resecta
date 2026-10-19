@@ -270,12 +270,12 @@ concurrent entry points. The working rules, checkable by grep:
 - The app target contains **one** `DispatchQueue` reference (a labeled serial
   queue for writes to the in-memory thumbnail cache) and **zero** `.main.async`
   calls — main-thread work is expressed through actor isolation, not queue hops.
-- Isolation opt-outs are rare and deliberate: 22 `nonisolated(unsafe)`
-  declarations across ~66,000 lines of app + engine source, and the working
+- Isolation opt-outs are rare and deliberate: 21 `nonisolated(unsafe)`
+  declarations across ~63,000 lines of app + engine source, and the working
   convention is a written rationale at the declaration site saying why the
   access is safe.
 - Logging goes through `os.Logger`, and what a log line may carry is
-  counted: 61 log interpolations are marked `privacy: .public` across the
+  counted: 59 log interpolations are marked `privacy: .public` across the
   app and engine source, each one a mechanism value — an asset, file or
   preference-key name, a metadata key name, a pipeline phase, a page index,
   a count or a pixel size, a detector or table name, an issuer or state code
@@ -387,10 +387,9 @@ what it does not — is stated for readers in [`THREAT-MODEL.md`](./THREAT-MODEL
 The engine is a separate Swift module, so `public` is exactly what the app
 (or any other client) can see. The surface I keep public on purpose is the
 document-runner surface — what a client needs to import a page, rasterize it,
-detect, search, rebuild, verify and export without the app's view code:
+search, rebuild, verify and export without the app's view code:
 
 - Import and rasterize: `PDFPageData` · `PageRasterizer.rasterize`
-- Detection: `DetectionOrchestrator.detectPage`
 - Search: `DocumentSearcher` (`search` · `previewMatches` · the result,
   diagnostic and configuration setters · `boundingRect` · the regex
   validators · `maxResults` · `sharedLoadDiagnostics`) · `SearchMode` ·
@@ -429,8 +428,8 @@ If you review one path end-to-end, make it this one:
 `Pipeline/PDFStreamReconstructor.swift` (rebuild) →
 `Verification/VerificationEngine.swift` (the layered pass over the output) →
 `SecurityTests/FakeRedactionTests.swift` (the named attack, pinned). The test
-tree is larger than the source tree — about 66,000 lines of source to about
-102,000 lines of tests; counts and structure are in the README's Testing
+tree is larger than the source tree — about 63,000 lines of source to about
+97,000 lines of tests; counts and structure are in the README's Testing
 section — and the suites above are the reason I trust my own output enough to
 ship it.
 

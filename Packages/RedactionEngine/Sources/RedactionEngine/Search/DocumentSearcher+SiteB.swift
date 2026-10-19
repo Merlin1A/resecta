@@ -8,9 +8,9 @@ extension DocumentSearcher {
 
     // MARK: - Site-B posterior composition
 
-    /// Site-B gate for the five scored families, composing the SAME
-    /// posterior + learned-context term the detection path applies at
-    /// DetectionOrchestrator.swift:432-446 + the posterior threshold gate at :455-460.
+    /// Site-B gate for the five scored families, composing the
+    /// floored-prior posterior + learned-context term, then the posterior
+    /// threshold gate.
     ///
     /// For each match whose category resolves to a vector cutoff:
     ///   finalConfidence = posterior(raw, priorMean, contextLogit)

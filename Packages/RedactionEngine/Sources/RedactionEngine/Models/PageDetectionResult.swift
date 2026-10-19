@@ -1,43 +1,5 @@
 import Foundation
 
-// The wrapper a single page's detection output threads through.
-// Carries raw detections + the doctype that gated them + an optional
-// classification diagnostic for the G5 triage panel.
-
-public struct PageDetectionResult: Sendable {
-    public let detections: [DetectionResult]
-    public let doctype: DoctypeResult
-    public let classificationDiagnostic: ClassificationDiagnostic?
-    /// Per-category count of pre-threshold detections that lost
-    /// an overlap group inside `DetectionOrchestrator.resolveOverlaps`.
-    /// Populated per page by the detection orchestrator; the app's scan-path
-    /// coordinator does not read or aggregate this field today (the search
-    /// path's `CoverageReport.overlapSuppressedCountByCategory` is computed
-    /// independently). Consumed by engine snapshot tests for parity checks.
-    public let overlapSuppressedCountByCategory: [PIICategory: Int]
-    /// PAGE-level OCR provenance. Per-detection provenance cannot
-    /// carry the oversized-page skip on a page that produced zero
-    /// detections (nothing to attach it to), so the page result records
-    /// it directly. The coordinator reads `.pixelCapExceeded` pages and
-    /// surfaces them on the triage banner. Defaulted so existing
-    /// constructors stay valid.
-    public let ocrProvenance: DetectionResult.Provenance
-
-    public init(
-        detections: [DetectionResult],
-        doctype: DoctypeResult,
-        classificationDiagnostic: ClassificationDiagnostic?,
-        overlapSuppressedCountByCategory: [PIICategory: Int] = [:],
-        ocrProvenance: DetectionResult.Provenance = .ocrRan
-    ) {
-        self.detections = detections
-        self.doctype = doctype
-        self.classificationDiagnostic = classificationDiagnostic
-        self.overlapSuppressedCountByCategory = overlapSuppressedCountByCategory
-        self.ocrProvenance = ocrProvenance
-    }
-}
-
 // G5 "Why this classification?" diagnostic. In-memory only — never logged,
 // never persisted. Released on `clearAll()`.
 

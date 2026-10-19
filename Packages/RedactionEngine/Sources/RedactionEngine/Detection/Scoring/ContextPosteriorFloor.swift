@@ -3,8 +3,7 @@ import Foundation
 // SRCH-S2 — D02-scorer-posterior-F1 (account, P1) + D02-scorer-posterior-F2 (phone, P2).
 //
 // The learned context scorer (context-scorer.json `fecd89b6`) composes a
-// standardized log-odds term into the detection posterior at two seams:
-//   • DetectionOrchestrator.detectPage (Auto-Detect)
+// standardized log-odds term into the detection posterior at one seam:
 //   • DocumentSearcher.composedSurvivors (Search)
 // For the two keyword-only families (account, phone) a single length/separator
 // feature can drive a structurally-valid, keyword-confirmed match far below the

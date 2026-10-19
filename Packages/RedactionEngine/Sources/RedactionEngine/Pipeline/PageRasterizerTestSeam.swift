@@ -19,8 +19,8 @@ import Foundation
 //
 // Concurrency: rasterize runs as `@concurrent`, so the recorder must be
 // safely reachable from any cooperative actor. `final class @unchecked
-// Sendable` with `NSLock` mirrors the codebase's existing pattern (see
-// `ColdStartTimer`). Task-local lookups inherit naturally across Task
+// Sendable` with `NSLock` is the codebase's existing pattern. Task-local
+// lookups inherit naturally across Task
 // detached/group boundaries spawned inside the test's `withActivated`
 // scope.
 

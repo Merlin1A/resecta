@@ -8,17 +8,11 @@ import Foundation
 // annotated with the applied cutoff so the MatchRationaleSheet can show
 // which threshold the hit cleared.
 //
-// The orchestrator path (`DetectionOrchestrator.detectPage`) runs a
-// posterior-composition step after PIIDetector returns, so it applies
-// the threshold inline against `finalConfidence` rather than reusing this
-// helper. Keeping the two paths visually distinct is deliberate — the
-// searcher filters raw, the orchestrator filters post-posterior.
-//
 // Site-B / Search parity: the five scored families
 // {account, phone, mrn, ein, itin} no longer reach this raw gate at the
 // `DocumentSearcher` call sites. `DocumentSearcher.composedSurvivors(...)`
-// composes the SAME posterior + learned-context term the orchestrator applies
-// (DetectionOrchestrator.swift:432-446) for those families BEFORE the threshold
+// composes the posterior + learned-context term for those families BEFORE
+// the threshold
 // comparison; every OTHER category still flows through `applyingCountingDrops(...)`
 // below unchanged. `partitionedByScoredFamily()` is the split that routes them.
 

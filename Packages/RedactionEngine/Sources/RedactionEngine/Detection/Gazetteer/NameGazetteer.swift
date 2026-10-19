@@ -7,7 +7,7 @@ import OSLog
 
 /// Bloom-filter-backed name gazetteer for surname and given-name membership queries.
 ///
-/// Filters are pre-built by `Scripts/gazetteer/build_bloom.py` at dev time
+/// Filters are pre-built by the data pipeline (`resecta_data.bloom`)
 /// and shipped as compiled resources in `Resources/Gazetteers/`.
 /// All inputs are NFKC-normalized and lowercased before lookup,
 /// matching the build pipeline's preprocessing.

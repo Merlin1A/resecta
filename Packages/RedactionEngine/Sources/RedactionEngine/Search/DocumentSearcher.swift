@@ -98,11 +98,11 @@ public actor DocumentSearcher {
     }
 
     // Site-B / Search parity. The five scored families
-    // {account, phone, mrn, ein, itin} now gate at Search on the SAME composed
-    // posterior the detection path uses (DetectionOrchestrator.swift:432-446),
+    // {account, phone, mrn, ein, itin} gate at Search on the composed
+    // posterior (prior floor, context term, calibrated scorer),
     // rather than on raw match.confidence. Both are `Sendable` value types,
-    // constructed once at actor init and shared across pages — mirroring
-    // DetectionOrchestrator.swift:176 / :180. `contextScorer` is whole-scorer
+    // constructed once at actor init and shared across pages.
+    // `contextScorer` is whole-scorer
     // identity on any load problem (so an absent/garbled artifact reverts Search
     // to the raw-gated behavior); the installed artifact ships account/phone at
     // w_family 1 and mrn/ein/itin at w_family 0.
@@ -115,9 +115,9 @@ public actor DocumentSearcher {
     // Held as a stored value for parity with the orchestrator's `priors` local.
     private let searchPriors = PerCategoryPriors()
 
-    // Spatial address assembly on the Search legs. The orchestrator
-    // has run `AddressSpatialAssembler` over per-line records
-    // (DetectionOrchestrator.detectPage Step 3a); both Search legs ran
+    // Spatial address assembly on the Search legs. Without
+    // `AddressSpatialAssembler` over per-line records,
+    // both Search legs ran
     // only the flat single-line regex arms, so a multi-line address block
     // never became a Search candidate on either leg. The assembler is a
     // Sendable value whose gazetteer load is cached statically
@@ -253,8 +253,8 @@ public actor DocumentSearcher {
     // MARK: - Spatial address assembly (both PII-scan legs)
 
     /// Run spatial address assembly over per-line records and convert
-    /// each `Assembled` into a `PIIDetector.PIIMatch`, mirroring
-    /// `DetectionOrchestrator.detectPage` Step 3a: callers append the matches
+    /// each `Assembled` into a `PIIDetector.PIIMatch`; callers append
+    /// the matches
     /// BEFORE `resolveOverlaps` so assembled candidates participate in overlap
     /// dedup and threshold gating exactly like the regex-arm matches (address
     /// is a non-scored family, so an assembled candidate rides the same raw
@@ -1178,7 +1178,7 @@ public actor DocumentSearcher {
                     rawMatches.append(contentsOf: assembly.matches)
                     spatialRectByText = assembly.spatialRectByText
                 }
-                // Cross-category overlap resolution before the threshold filter (mirrors DetectionOrchestrator.detectPage).
+                // Cross-category overlap resolution before the threshold filter.
                 let resolution = DetectionOrchestrator.resolveOverlaps(rawMatches)
                 if !resolution.suppressedCountByCategory.isEmpty {
                     overlapSink?(resolution.suppressedCountByCategory)
@@ -1354,8 +1354,8 @@ public actor DocumentSearcher {
         // Spatial address assembly on the OCR leg, over the SAME
         // normalized per-line records the detector text was built from (the
         // assembler header's long-documented Search-leg rewire). Injected
-        // before resolveOverlaps, mirroring the text leg and detectPage
-        // Step 3a; the haystack is the normalized concatenation so a located
+        // before resolveOverlaps, mirroring the text leg; the haystack is
+        // the normalized concatenation so a located
         // range stays consistent with `lineOffsets`.
         var spatialRectByText: [String: CGRect] = [:]
         if categories.contains(.address) {
