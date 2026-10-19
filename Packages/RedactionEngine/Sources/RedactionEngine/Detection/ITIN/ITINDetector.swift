@@ -69,18 +69,18 @@ struct ITINDetector: FamilyDetector {
                 text: fullText, matchRange: match.range,
                 profile: Self.itinProfile, category: .itin
             )
-            // Build rationale signals matching DEADetector pattern.
-            var rationale = MatchRationale.Builder(
-                ruleID: "itin.yy-bucket", preThresholdScore: Self.itinProfile.baseConfidence,
-                signals: [
-                    .regexPattern(name: "itin.yy-bucket"),
-                    .structuralValidator(name: "itin.irs-yy-ranges"),
-                ]
+            return PIIMatch(
+                text: matchedText, range: match.range, kind: .itin, confidence: confidence,
+                rationale: .contextScored(
+                    ruleID: "itin.yy-bucket", preThresholdScore: Self.itinProfile.baseConfidence,
+                    validators: ["itin.irs-yy-ranges"],
+                    contextSignal: itinScorer.signal(
+                        text: fullText, matchRange: match.range,
+                        profile: Self.itinProfile, category: .itin
+                    ),
+                    finalScore: confidence
+                )
             )
-            rationale.append(itinScorer.signal(text: fullText, matchRange: match.range,
-                                               profile: Self.itinProfile, category: .itin))
-            return PIIMatch(text: matchedText, range: match.range, kind: .itin,
-                           confidence: confidence, rationale: rationale.build(finalScore: confidence))
         }
     }
 }

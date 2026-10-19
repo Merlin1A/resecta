@@ -77,14 +77,7 @@ struct SSNDetector: FamilyDetector {
                 documentHeader: documentHeader
             )
 
-            var rationale = MatchRationale.Builder(
-                ruleID: "ssn.state-machine", preThresholdScore: profile.baseConfidence,
-                signals: [
-                    .regexPattern(name: "ssn.state-machine"),
-                    .structuralValidator(name: "ssn.area-group-serial"),
-                ]
-            )
-            rationale.append(contextScorer.signal(
+            let contextSignal = contextScorer.signal(
                 text: fullText,
                 matchRange: candidate.range,
                 profile: profile,
@@ -92,14 +85,15 @@ struct SSNDetector: FamilyDetector {
                 doctype: doctype,
                 gazetteer: gazetteer,
                 documentHeader: documentHeader
-            ))
+            )
             // Attach negativeContextSuppressed signal when gazetteer fired.
             // Note: header-anchor suppression has no keyword to attach here;
             // it is reflected only in the final score.
+            var gazetteerSignal: MatchRationale.Signal?
             if let gaz = gazetteer, let dt = doctype {
-                rationale.append(contextScorer.gazetteerSignal(
+                gazetteerSignal = contextScorer.gazetteerSignal(
                     text: fullText, matchRange: candidate.range,
-                    category: .ssn, doctype: dt, gazetteer: gaz))
+                    category: .ssn, doctype: dt, gazetteer: gaz)
             }
 
             return PIIMatch(
@@ -107,7 +101,12 @@ struct SSNDetector: FamilyDetector {
                 range: candidate.range,
                 kind: .ssn,
                 confidence: confidence,
-                rationale: rationale.build(finalScore: confidence)
+                rationale: .contextScored(
+                    ruleID: "ssn.state-machine", preThresholdScore: profile.baseConfidence,
+                    validators: ["ssn.area-group-serial"],
+                    contextSignal: contextSignal, gazetteerSignal: gazetteerSignal,
+                    finalScore: confidence
+                )
             )
         }
     }

@@ -59,6 +59,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Internal
 
+- Context-scored pattern matches build their explanation through one factory; the signal order is unchanged.
 - Decoded fields nothing reads are dropped: the per-filter manifest entries and the unapplied document-type temperature; the temperature file is read only for the startup diagnostics.
 - Detection loaders: the context keyword sets switch over the typed scored families; the context keyword loader and the driver's-licence and passport pattern tables share one version check and one loading path; the state-code pattern is compiled once.
 - `Scripts/release-flag-check.sh` censuses the remaining debug-only launch argument, the saved-searches sim-drive hook, as its positive control.

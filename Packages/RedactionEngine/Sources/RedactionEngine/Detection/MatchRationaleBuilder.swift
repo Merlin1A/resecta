@@ -34,6 +34,30 @@ extension MatchRationale {
         }
     }
 
+    /// The explanation of a context-scored pattern match, assembled in the
+    /// order every family detector emits: the rule's own pattern signal,
+    /// its structural validators, the scorer's context signal, then the
+    /// per-keyword detail and the gazetteer signal where the detector has
+    /// one (a nil is skipped).
+    static func contextScored(
+        ruleID: String,
+        preThresholdScore: Double,
+        validators: [String] = [],
+        contextSignal: Signal?,
+        keywordDetail: Signal? = nil,
+        gazetteerSignal: Signal? = nil,
+        finalScore: Double
+    ) -> MatchRationale {
+        var builder = Builder(
+            ruleID: ruleID, preThresholdScore: preThresholdScore,
+            signals: [.regexPattern(name: ruleID)] + validators.map { .structuralValidator(name: $0) }
+        )
+        builder.append(contextSignal)
+        builder.append(keywordDetail)
+        builder.append(gazetteerSignal)
+        return builder.build(finalScore: finalScore)
+    }
+
     /// A copy with `signal` appended; every other field is kept.
     func appending(_ signal: Signal) -> MatchRationale {
         MatchRationale(
