@@ -23,6 +23,8 @@ extension Tag {
     @Tag static var critical: Self
     /// Pipeline coordination and orchestration tests.
     @Tag static var coordination: Self
+    /// Search state, persistence and results tests.
+    @Tag static var search: Self
 }
 
 // MARK: - Coordinator Factory
