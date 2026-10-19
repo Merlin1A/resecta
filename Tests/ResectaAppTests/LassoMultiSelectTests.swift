@@ -231,4 +231,36 @@ struct LassoMultiSelectTests {
         let restoredIDs = Set(restored.map(\.id))
         #expect(restoredIDs.isSuperset(of: Set(regions.prefix(4).map(\.id))))
     }
+
+    // MARK: - Add to Selection through the coordinator
+
+    @Test("With Add to Selection on, a marquee adds and an empty marquee keeps the selection")
+    func addToSelectionMarqueeAdds() {
+        let state = RedactionState()
+        let regions = seedRegions(state, count: 3)
+        let coordinator = PDFViewCoordinator()
+        coordinator.redactionState = state
+        coordinator.isMultiSelectActive = true
+        state.selectedRegionIDs = [regions[0].id]
+
+        coordinator.commitLassoSelection([], undoManager: nil)
+        #expect(state.selectedRegionIDs == [regions[0].id], "a stray tap on the page must not clear an accumulated selection")
+
+        coordinator.commitLassoSelection([regions[1]], undoManager: nil)
+        #expect(state.selectedRegionIDs == [regions[0].id, regions[1].id])
+    }
+
+    @Test("With Add to Selection off, a marquee replaces and an empty one clears")
+    func marqueeReplacesWithoutAdd() {
+        let state = RedactionState()
+        let regions = seedRegions(state, count: 3)
+        let coordinator = PDFViewCoordinator()
+        coordinator.redactionState = state
+        state.selectedRegionIDs = [regions[0].id]
+
+        coordinator.commitLassoSelection([regions[1]], undoManager: nil)
+        #expect(state.selectedRegionIDs == [regions[1].id])
+        coordinator.commitLassoSelection([], undoManager: nil)
+        #expect(state.selectedRegionIDs.isEmpty)
+    }
 }
