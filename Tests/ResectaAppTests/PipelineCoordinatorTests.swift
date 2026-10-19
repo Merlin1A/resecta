@@ -359,6 +359,31 @@ struct PipelineCoordinatorTests {
         #expect(pages.first?.fallbackReason == nil)
     }
 
+    // MARK: - The Apply seam
+
+    @Test("Redact clears the undo history at the Apply seam, as the results card says")
+    func runFullPipelineClearsUndoHistory() async {
+        let coord = makeCoordinator()
+        coord.documentState.sourceDocument = makeTestPDFDocument()
+        coord.documentState.phase = .editing
+        coord.redactionState.regions[0] = [RedactionRegion(id: UUID(),
+            normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
+            source: .manual)]
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        undo.beginUndoGrouping()
+        undo.registerUndo(withTarget: coord.redactionState) { _ in }
+        undo.endUndoGrouping()
+        #expect(undo.canUndo)
+        coord.undoManager = undo
+
+        coord.runFullPipeline(documentOverride: .secureRasterization)
+        #expect(!undo.canUndo, "the stack is cleared before the run")
+        let task = coord.documentState.activePipelineTask
+        coord.documentState.cancelActivePipeline(redactionState: coord.redactionState)
+        _ = await task?.value
+    }
+
     // MARK: - Helpers
 
     private func makeCoordinator() -> PipelineCoordinator {
