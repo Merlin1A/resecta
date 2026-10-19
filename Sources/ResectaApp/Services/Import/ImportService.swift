@@ -62,9 +62,11 @@ enum ImportService {
         let declaredType = url.pathExtension
         nonisolated(unsafe) let docState = documentState
         nonisolated(unsafe) let redactState = redactionState
+        let outcome = ImportOutcomeBox()
         let workTask = Task<Void, Never> { @MainActor in
-            _ = await runImport(
+            outcome.value = await runImport(
                 source: .file(url, declaredType: declaredType),
+                password: nil,
                 returnPhase: returnPhase,
                 documentState: docState,
                 redactionState: redactState
@@ -82,7 +84,7 @@ enum ImportService {
         if documentState.activeImportTask == workTask {
             documentState.activeImportTask = nil
         }
-        return documentState.phaseKind == .editing ? .completed : .refused
+        return outcome.value
     }
 
     // MARK: - Import from Raw Data (the drop door, the sample)
@@ -91,12 +93,15 @@ enum ImportService {
     /// Async for consistency with URL-based import; validation runs on MainActor.
     /// Same Task-registration pattern as the URL variant. `suggestedType` is
     /// the type the caller declares, recorded on the payload; the bytes
-    /// decide the route.
+    /// decide the route. `password` is the one the sheet collected for a
+    /// locked document; the password sheet re-runs a held import through
+    /// this door with the bytes it kept.
     @discardableResult
     static func importDocument(
         data: Data,
         suggestedType: String? = nil,
         door: ImportDoor = .drop,
+        password: String? = nil,
         documentState: DocumentState,
         redactionState: RedactionState
     ) async -> ImportOutcome {
@@ -112,9 +117,11 @@ enum ImportService {
         // nonisolated(unsafe): see comment in the URL variant above.
         nonisolated(unsafe) let docState = documentState
         nonisolated(unsafe) let redactState = redactionState
+        let outcome = ImportOutcomeBox()
         let workTask = Task<Void, Never> { @MainActor in
-            _ = await runImport(
+            outcome.value = await runImport(
                 source: .bytes(data, declaredType: suggestedType, door: door),
+                password: password,
                 returnPhase: returnPhase,
                 documentState: docState,
                 redactionState: redactState
@@ -129,7 +136,13 @@ enum ImportService {
         if documentState.activeImportTask == workTask {
             documentState.activeImportTask = nil
         }
-        return documentState.phaseKind == .editing ? .completed : .refused
+        return outcome.value
+    }
+
+    /// The outcome an import task hands back to its caller; the task stored
+    /// on `activeImportTask` stays the one cancellation reaches.
+    private final class ImportOutcomeBox {
+        var value: ImportOutcome = .refused
     }
 
     // MARK: - Inner Work (Cancellation-aware)
@@ -148,11 +161,15 @@ enum ImportService {
     @MainActor
     private static func runImport(
         source: ImportSource,
+        password: String?,
         returnPhase: DocumentState.ReturnPhase,
         documentState: DocumentState,
         redactionState: RedactionState
     ) async -> ImportOutcome {
         let limits = ImportLimits.standard
+        // The bytes a locked document is held by while the sheet asks for
+        // its password; set once the payload exists, read when the loader throws.
+        var heldPayload: ImportPayload?
         do {
             let payload: ImportPayload
             switch source {
@@ -174,6 +191,7 @@ enum ImportService {
             guard payload.data.count <= limits.maxBytes else {
                 throw PipelineError.importError(.tooLarge(bytesRead: payload.data.count))
             }
+            heldPayload = payload
 
             // The bytes decide the route; an image is refused here, before
             // any decode.
@@ -185,7 +203,7 @@ enum ImportService {
             // which observes it through the loader's
             // `Task.checkCancellation()` calls.
             let detached = Task.detached {
-                try await loader.load(payload, limits: limits)
+                try await loader.load(payload, password: password, limits: limits)
             }
             let loaded = try await withTaskCancellationHandler {
                 try await detached.value
@@ -198,7 +216,7 @@ enum ImportService {
             // this point should not produce a half-loaded document.
             try Task.checkCancellation()
 
-            apply(loaded, documentState: documentState, redactionState: redactionState)
+            apply(loaded, password: password, documentState: documentState, redactionState: redactionState)
             return .completed
         } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
             // Cooperative cancellation surrenders silently —
@@ -211,6 +229,15 @@ enum ImportService {
             // on rare timing before the cancellation propagates back.
             guard documentState.phaseKind == .importing else { return .refused }
             documentState.transition(to: .failed(error: error, returnPhase: returnPhase))
+            // A locked document is held with its bytes so the password sheet
+            // can re-run the import; the phase beneath the sheet is the
+            // failed state the refusal produced. Any other refusal of a
+            // supplied password releases nothing: there is no hold.
+            if case .importError(.passwordProtected) = error, let heldPayload {
+                return .needsPassword(LockedImportHold(
+                    bytes: heldPayload.data, declaredType: heldPayload.declaredType,
+                    door: heldPayload.door, returnPhase: returnPhase))
+            }
             return .refused
         } catch { // LegalPhrases:safe (Swift keyword)
             if error is CancellationError { return .refused }
@@ -262,11 +289,21 @@ enum ImportService {
     @MainActor
     private static func apply(
         _ loaded: LoadedDocument,
+        password: String?,
         documentState: DocumentState,
         redactionState: RedactionState
     ) {
         redactionState.clearForNewDocument()
         documentState.sourceDocument = loaded.document.document
+        documentState.sourceFacts = loaded.facts.summary
+        // The password that unlocked the source stays with the session: the
+        // search copy is rebuilt from the document's bytes, which keep their
+        // encryption, and opens with it (`SearchCopy`).
+        if let password {
+            documentState.documentPassword.set(password)
+        } else {
+            documentState.documentPassword.wipe()
+        }
         documentState.currentPageIndex = 0
         documentState.textLayerStatus = loaded.facts.textLayerStatus
         documentState.sourceHasHiddenOCG = loaded.facts.hasHiddenOCG

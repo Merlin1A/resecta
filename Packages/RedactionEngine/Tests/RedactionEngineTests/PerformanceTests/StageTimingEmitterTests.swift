@@ -269,7 +269,7 @@ struct StageTimingEmitterTests {
         let status = mirroredStatus(doc.data)
         let anyRich = status.values.contains(.rich)
         let mode: PipelineMode = anyRich ? .searchableRedaction : .secureRasterization
-        let hasOCG = VerificationCorpusRunnerTests.documentHasHiddenOCG(doc.data)
+        let hasOCG = PDFDocument(data: doc.data).map { VerificationCorpusRunnerTests.documentHasHiddenOCG($0) } ?? true
 
         for sweep in 0..<nRuns {
             guard let pdf = PDFDocument(data: doc.data) else { continue }

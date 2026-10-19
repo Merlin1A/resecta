@@ -18,7 +18,7 @@ struct PDFImportLoaderTests {
         door: ImportDoor = .files
     ) async throws -> LoadedDocument {
         try await PDFImportLoader().load(
-            .bytes(data, declaredType: "pdf", door: door), limits: limits)
+            .bytes(data, declaredType: "pdf", door: door), password: nil, limits: limits)
     }
 
     /// The import failure a load threw, spelled the way the cases are, or
