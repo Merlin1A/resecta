@@ -51,7 +51,7 @@ public struct SandwichVerification: Sendable {
     /// on an unrotated or `/Rotate 180` page they advance in X. The
     /// spatial check bands and walks along this axis: banding a vertical
     /// run on Y put every glyph in a band of its own and the origin-delta
-    /// lattice adjudicated no pair of it.
+    /// lattice checked no pair of it.
     enum TextAxis: Equatable {
         /// Lines run along X — an unrotated page, or one stored with
         /// `/Rotate 180` (mirrored, still horizontal).
@@ -74,7 +74,7 @@ public struct SandwichVerification: Sendable {
     /// a line break moves a whole line width back in X, so an unrotated
     /// page reads horizontal by a wide margin; within a vertical run the
     /// glyphs share an X column and advance in Y by the cell. Fewer than
-    /// two boxes read horizontal (nothing to adjudicate either way).
+    /// two boxes read horizontal (nothing to check either way).
     static func readBackAxis(_ boundsInReadBackOrder: [CGRect]) -> TextAxis {
         let n = boundsInReadBackOrder.count
         guard n >= 2 else { return .horizontal }
@@ -419,7 +419,7 @@ public struct SandwichVerification: Sendable {
             // reading order ascends: X on a horizontal line; on a vertical
             // run −Y when the run reads down the page, +Y when up. The
             // consecutive delta along it is the glyph advance the lattice
-            // adjudicates, and `prev` is the earlier glyph in reading order
+            // checks, and `prev` is the earlier glyph in reading order
             // whose natural advance the delta is measured against.
             func along(_ b: CGRect) -> CGFloat {
                 switch axis {

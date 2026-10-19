@@ -744,7 +744,7 @@ public func validatePageGeometry(_ page: PDFPage) -> Bool {
             }
         }
         // A /Rotate that is not a right angle (invalid per ISO 32000
-        // §7.7.3.3, still opened) is rounded by PDFKit — the frame of the
+        // section 7.7.3.3, still opened) is rounded by PDFKit — the frame of the
         // editor, text extraction, search and every region — while
         // CoreGraphics keeps the raw value, so a render would place every
         // fill on the wrong pixels. Refuse unless both read the same

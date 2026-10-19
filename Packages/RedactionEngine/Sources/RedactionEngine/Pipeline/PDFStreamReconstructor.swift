@@ -14,13 +14,12 @@ import OSLog
 /// O(pages × JPEG). The context is opened lazily on the first appended page
 /// (its media box pinned to `firstPageSize`); `finalize` only closes it and
 /// applies file protection. This supersedes the earlier buffer-then-
-/// write model, whose sole reason to retain every encoded page was the
-/// now-removed `replacePage(at:with:)` swap. The production per-page
-/// verification retry re-rasterizes and re-appends *before* a page is drawn,
-/// so it never needed post-hoc replacement. The output bytes do not change:
-/// `CGPDFContext` re-encodes each drawn image independently of when it is
-/// drawn, and pages are still drawn in 0..<count append order, so the PDF, its
-/// metadata, and the atomic-rename pattern match the prior model byte-for-byte.
+/// write model. The per-page verification retry re-rasterizes and re-appends
+/// *before* a page is drawn, so no page is ever replaced after the fact. The
+/// output bytes do not depend on when a page is drawn: `CGPDFContext`
+/// re-encodes each drawn image independently, and pages are drawn in
+/// 0..<count append order, so the PDF, its metadata, and the atomic-rename
+/// pattern are the same whether pages are buffered or drawn as they arrive.
 ///
 /// Atomicity: the temp file at `tempURL` is created on the first `appendPage`
 /// and completed by `finalize`. The caller performs an atomic rename via
@@ -150,10 +149,9 @@ public actor PDFStreamReconstructor {
         let didWrite: Bool = autoreleasepool {
             // Decode the buffered JPEG. CGPDFContext
             // re-encodes any drawn image, so passthrough is not preserved in
-            // the output stream — but the output bytes do not depend on when a
-            // page is drawn, so draw-on-append matches the prior buffer-then-
-            // write model. The ~3.4ms decode overhead is paid once per page
-            // either way.
+            // the output stream; the output bytes do not depend on when a
+            // page is drawn. The decode cost (a few milliseconds) is paid
+            // once per page.
             guard let provider = CGDataProvider(data: page.jpegData as CFData),
                   let jpegImage = CGImage(
                       jpegDataProviderSource: provider,
