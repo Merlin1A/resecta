@@ -372,7 +372,7 @@ public struct SandwichVerification: Sendable {
                         let center = CGPoint(x: core.midX, y: core.midY)
                         let centerInRegion: Bool
                         if let vertices = shape.polygonVertices {
-                            centerInRegion = Self.polygonContainsPoint(
+                            centerInRegion = polygonContainsPoint(
                                 center, vertices: vertices)
                         } else {
                             centerInRegion = shape.bounds.contains(center)
@@ -534,26 +534,6 @@ public struct SandwichVerification: Sendable {
             "\(count) character\(count == 1 ? "" : "s") on page \(pageIndex + 1) "
             + "had no measurable position and \(count == 1 ? "was" : "were") not position-checked"
         )
-    }
-
-    /// Even-odd point-in-polygon test (ray cast), matching the even-odd
-    /// convention `rectIntersectsPolygon` uses for region polygons.
-    static func polygonContainsPoint(
-        _ point: CGPoint, vertices: [CGPoint]
-    ) -> Bool {
-        guard vertices.count >= 3 else { return false }
-        var inside = false
-        var j = vertices.count - 1
-        for i in 0..<vertices.count {
-            let a = vertices[i]
-            let b = vertices[j]
-            if (a.y > point.y) != (b.y > point.y),
-               point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x {
-                inside.toggle()
-            }
-            j = i
-        }
-        return inside
     }
 
     // MARK: - Layer 7: Character Count Cross-Check

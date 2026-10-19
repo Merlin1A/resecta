@@ -139,14 +139,14 @@ struct Layer6GrazeClassificationTests {
     @Test("polygonContainsPoint even-odd matrix")
     func pointInPolygonMatrix() {
         let triangle = [CGPoint(x: 0, y: 0), CGPoint(x: 10, y: 0), CGPoint(x: 5, y: 10)]
-        #expect(SandwichVerification.polygonContainsPoint(
+        #expect(polygonContainsPoint(
             CGPoint(x: 5, y: 3), vertices: triangle))
-        #expect(!SandwichVerification.polygonContainsPoint(
+        #expect(!polygonContainsPoint(
             CGPoint(x: 0, y: 9), vertices: triangle))
-        #expect(!SandwichVerification.polygonContainsPoint(
+        #expect(!polygonContainsPoint(
             CGPoint(x: 12, y: 1), vertices: triangle))
         // Degenerate input: fewer than 3 vertices contains nothing.
-        #expect(!SandwichVerification.polygonContainsPoint(
+        #expect(!polygonContainsPoint(
             CGPoint(x: 1, y: 1),
             vertices: [CGPoint(x: 0, y: 0), CGPoint(x: 2, y: 2)]))
     }

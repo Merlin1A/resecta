@@ -125,6 +125,26 @@ public func pointInPolygon(_ point: CGPoint, vertices: [CGPoint]) -> Bool {
     return inside
 }
 
+/// Even-odd point-in-polygon test (ray cast), matching the even-odd
+/// convention `rectIntersectsPolygon` uses for region polygons.
+func polygonContainsPoint(
+    _ point: CGPoint, vertices: [CGPoint]
+) -> Bool {
+    guard vertices.count >= 3 else { return false }
+    var inside = false
+    var j = vertices.count - 1
+    for i in 0..<vertices.count {
+        let a = vertices[i]
+        let b = vertices[j]
+        if (a.y > point.y) != (b.y > point.y),
+           point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x {
+            inside.toggle()
+        }
+        j = i
+    }
+    return inside
+}
+
 /// Rect-polygon overlap. True iff the rect either contains any polygon
 /// vertex, or any rect corner lies inside the polygon, or any rect edge
 /// intersects any polygon edge. Used for the polygon-aware character
