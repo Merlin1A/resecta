@@ -32,9 +32,6 @@ struct GazetteerManifest: Codable, Sendable, Equatable {
     /// Seed passed to the hash function.
     let seed: Int
 
-    /// Per-filter metadata entries.
-    let filters: [FilterEntry]
-
     /// Every installed asset except the manifest, its signature and the
     /// public key: bundle-relative path, SHA-256 and byte count of the bytes
     /// the pipeline shipped. Optional in the decoder so a pre-1.1.0 manifest
@@ -50,25 +47,5 @@ struct GazetteerManifest: Codable, Sendable, Equatable {
         let sha256: String
         /// Byte count of the installed file.
         let bytes: Int
-    }
-
-    /// Metadata for a single Bloom filter file.
-    struct FilterEntry: Codable, Sendable, Equatable {
-        /// Filter name (e.g. "surnames", "given-names").
-        let name: String
-        /// Filter type — "surname" or "givenName".
-        let type: String
-        /// Number of unique entries inserted.
-        let n: Int
-        /// Number of bits in the filter.
-        let m: Int
-        /// Number of hash functions.
-        let k: Int
-        /// Target false-positive rate (e.g. 0.001 for 0.1%).
-        let fprTarget: Double
-        /// Source dataset identifiers.
-        let sources: [String]
-        /// ISO 8601 build timestamp.
-        let builtAt: String
     }
 }

@@ -1,16 +1,14 @@
 import Foundation
 import OSLog
 
-// Plan Stage 0 + Stage 6 — temperature scaling of doctype softmax and
-// posterior composition of raw detection scores with prior beliefs.
+// Posterior composition of raw detection scores with prior beliefs.
 //
-// Temperature source: `Resources/Classifier/doctype-temperature.json`
-// (Phase-3b output from DataPipeline `make calibrate-temperature`).
-// Missing or malformed JSON → identity (T = 1.0). This is a graceful
-// degradation — Stage 0 rankings are preserved, Stage 6 still composes
-// prior with raw score.
+// The doctype softmax temperature file
+// (`Resources/Classifier/doctype-temperature.json`, written by the data
+// pipeline) is read here only for the startup diagnostics: a missing or
+// malformed file reports a reason; no scoring path reads the value.
 //
-// Schema (minimal, keys are DoctypeClass rawValue):
+// Schema (minimal):
 //   { "version": 1, "temperature": 1.23 }
 // The implementation ignores other fields.
 
@@ -18,13 +16,7 @@ struct CalibratedScorer: Sendable {
 
     private static let logger = Logger(subsystem: "resecta.engine", category: "calibrated-scorer")
 
-    /// Single scalar temperature applied to all five classes. Future work
-    /// may move to per-class vector temperature; schema leaves room.
-    private let temperature: Double
-
-    init() {
-        self.temperature = Self.loadTemperature(from: .module)
-    }
+    init() {}
 
     /// Posterior = σ(logit(raw) + logit(prior) + contextLogit). A calibrated
     /// Bayesian update that preserves the raw detector signal while anchoring
@@ -38,11 +30,7 @@ struct CalibratedScorer: Sendable {
 
     // MARK: - Loader
 
-    private static func loadTemperature(from bundle: Bundle) -> Double {
-        loadTemperatureWithDiagnostics(from: bundle).temperature
-    }
-
-    /// Diagnostics variant: the temperature plus, on any fallback to the
+    /// The temperature file's value plus, on any fallback to the
     /// identity T=1.0, a mechanism-only reason string.
     /// `PIIDetector.loadWithDiagnostics(bundle:)` folds the reason into
     /// `GazetteerLoadDiagnostics` so the fallback surfaces through the existing
