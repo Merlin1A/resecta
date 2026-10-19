@@ -85,6 +85,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The engine's verification tests are organised by layer, and the security suites run through the production page pipeline.
 - The polygon containment test the text-layer writer uses lives with the other polygon geometry; the writer no longer reaches into the verification code.
 - The stale temporary-file sweep lives beside the per-session temporary directory it cleans up after.
+- Resolution selection and the pre-render page checks live in one page memory policy file.
 
 ## [1.2.0] — 2026-09-29
 
