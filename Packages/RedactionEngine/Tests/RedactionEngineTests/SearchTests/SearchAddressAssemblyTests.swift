@@ -6,8 +6,7 @@ import CoreGraphics
 
 // Search-leg spatial address assembly.
 //
-// The detection path (DetectionOrchestrator.detectPage Step 3a) has run
-// AddressSpatialAssembler over per-line records; both
+// Without AddressSpatialAssembler over per-line records, both
 // Search PII-scan legs ran only the flat single-line regex arms, so a
 // multi-line address block never became a Search candidate on either leg.
 // This suite pins the wiring on both legs — text leg over

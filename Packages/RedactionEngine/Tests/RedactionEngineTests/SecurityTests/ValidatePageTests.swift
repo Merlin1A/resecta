@@ -79,10 +79,12 @@ struct ValidatePageTests {
         if at300 { #expect(at150 == true) }
     }
 
-    @Test("5000x5000 at any DPI does not crash")
+    @Test("5000x5000 pt passes the geometry half; the verdict is the two halves together")
     func maxBoundaryNoCrash() throws {
         let page = try makePDFPage(width: 5000, height: 5000)
-        _ = validatePage(page, effectiveDPI: 150)
+        #expect(validatePageGeometry(page), "5,000 pt per side is inside the geometry bound")
+        #expect(validatePage(page, effectiveDPI: 150)
+                == (validatePageGeometry(page) && validatePageMemory(page, effectiveDPI: 150)))
     }
 
     @Test("Rejects page with dimension below 10pt")

@@ -9,17 +9,20 @@ struct NameGazetteerTests {
 
     // MARK: - Failable Init
 
-    @Test("Init returns nil when bundled resources are missing")
-    func nilWhenResourcesMissing() {
-        // In the test target, the production Resources/Gazetteers/ may not have
-        // real .bloom files (only .gitkeep). The init should return nil gracefully.
-        // This test documents the expected behavior — it passes regardless of
-        // whether real filters are bundled because either path is valid.
-        let gazetteer = NameGazetteer()
-        if gazetteer == nil {
-            // Expected in scaffold phase (no real .bloom files bundled)
-        } else {
-            // Valid once production filters are built
+    @Test("Init loads the name filters the engine bundle carries")
+    func loadsFromEngineBundle() {
+        #expect(NameGazetteer() != nil, "the engine bundle carries the surname and given-name filters")
+    }
+
+    @Test("The throwing init reports a bundle without the name filters as missing")
+    func throwsWhenResourcesMissing() throws {
+        let emptyDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("gazetteer_empty_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: emptyDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: emptyDir) }
+        let bundle = try #require(Bundle(url: emptyDir))
+        #expect(throws: NameGazetteer.LoaderError.self) {
+            _ = try NameGazetteer(throwingFromBundle: bundle)
         }
     }
 

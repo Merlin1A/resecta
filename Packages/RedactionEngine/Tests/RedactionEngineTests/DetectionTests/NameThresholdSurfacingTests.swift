@@ -46,7 +46,7 @@ struct NameThresholdSurfacingTests {
         let bundle = PresetThresholdBundle.loadFromEngineBundle()
         let cutoff = try #require(bundle.presets[.balanced]?.threshold(forWireName: "name"))
 
-        // Reproduce DetectionOrchestrator.detectPage's posterior threshold gate exactly: compose
+        // Reproduce the posterior threshold gate exactly: compose
         // the raw score against the fresh-document prior, then compare to cutoff.
         let priorMean = PerCategoryPriors().mean(.name) // 0.5 on a fresh document
         let posterior = CalibratedScorer().posterior(
@@ -64,7 +64,7 @@ struct NameThresholdSurfacingTests {
         let bundle = PresetThresholdBundle.loadFromEngineBundle()
         let cutoff = try #require(bundle.presets[.balanced]?.threshold(forWireName: "name"))
 
-        // Reproduce DetectionOrchestrator.detectPage's posterior threshold gate exactly, but at
+        // Reproduce the posterior threshold gate exactly, but at
         // the TOP of the detector's reachable raw range — no name can score
         // higher than maxNameConfidence (0.70 base + the full 0.15 exact
         // surname+given gazetteer boost), so this posterior is the upper

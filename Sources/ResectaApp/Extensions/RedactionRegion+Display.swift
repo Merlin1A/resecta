@@ -64,9 +64,6 @@ extension RedactionRegion.PIIKind {
         case .account:        "account number"
         case .routingNumber:  "bank routing number"
         case .licensePlate:   "license plate"
-        case .barcode:        "barcode or QR code"
-        // Heuristic visual suggestion; surfaced in VoiceOver labels.
-        case .signatureCandidate: "possible signature"
         case .other:          "sensitive content"
         }
     }

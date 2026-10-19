@@ -117,18 +117,6 @@ public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
         // ABA routing number (financial priority domain).
         case routingNumber
         case licensePlate
-        // Vision-framework barcode / QR detection. Nested under
-        // `Source.detectedPII(kind:)` so the existing triage / accessibility
-        // / display surface picks up the new kind without a new `Source`
-        // case. See `BarcodeDetector.swift`.
-        case barcode
-        // Heuristic signature suggestion (triage-only; never auto-applied).
-        // Confidence is heuristic — derived from ink-density + curvature scores on
-        // the candidate region adjacent to a labeled "Signature:" OCR block. The
-        // detector is designed to suggest plausible signature areas; the user must
-        // accept in the triage sheet before a redaction region is created. See
-        // `SignatureHeuristicDetector`.
-        case signatureCandidate
         case other
     }
 }

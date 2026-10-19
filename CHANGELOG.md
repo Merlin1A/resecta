@@ -21,6 +21,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - The search sheet's disabled audit-export, scan-coverage, doctype-diagnostic and category-strip surfaces, the navigation-scope controls, the custom-terms template picker and the two debug launch arguments that revealed them: each sat behind a flag that was false in every shipped build, so no shipped screen changes. The match rationale's classifier explanation and the coverage counts the verification screen reads stay.
 - The workspace's in-editor file importer and its "Replace the open document?" dialog, which nothing could present (the drop target stays), and the second sample packet bundled with no screen that opened it.
+- The paused-detection resume path.
+- The unreachable face, barcode and signature detection code.
 
 ### Security
 
@@ -69,6 +71,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - A page whose hidden-text check cannot run — no bitmap to read, no page dictionary to inspect — takes the secure path and records that the check could not run, instead of reading as clean; the first-render bitmap is wiped when the render releases it, the image handed on being a copy. The robustness runner's import mirror and the verification corpus mirror follow the same reader rules.
 - The reconstruction sweep test no longer races its siblings for the shared temporary directory.
 - CI: CodeQL runs from a workflow in the repository (`.github/workflows/codeql.yml`) instead of the default setup; the Swift job builds the Xcode project, so the app target and the engine package are both in the Swift database, and the Actions and Python analyses run without a build.
+- The engine's verification tests are organised by layer, and the security suites run through the production page pipeline.
 
 ## [1.2.0] — 2026-09-29
 

@@ -5,14 +5,13 @@ import RedactionEngine
 
 // The pure run helpers of `PipelineCoordinator`, moved out of the class body
 // in their own file: the failure-stage classifier, the off-MainActor output
-// parsers, the abandoned-intermediate sweep, the sensitive-term and
-// applied-search derivations, and the OCR-skip fast-path gate. Every member
+// parsers, the abandoned-intermediate sweep, and the sensitive-term and
+// applied-search derivations. Every member
 // reads only its parameters (or an immutable constant) — no coordinator
 // state — which is what made them the unit-testable seams the app suites
 // pin. Same module, same type (an extension), same access: nothing here
 // crosses into the engine package, and the app's `RunSettings` /
-// `RegionMetadata` / `MatchAuditSnapshot` types and the one float compare
-// (`buildOCRSkipHint`'s coverage threshold) stay in the app target.
+// `RegionMetadata` / `MatchAuditSnapshot` types stay in the app target.
 
 extension PipelineCoordinator {
 
@@ -317,71 +316,5 @@ extension PipelineCoordinator {
             thresholdVector: settingsState.activeThresholdVector,
             userTerms: userTermsStore.blob,
             deselected: deselected)
-    }
-
-    // MARK: - OCR skip fast path
-
-    /// Locked coverage threshold. Selectable-text bounding-box area
-    /// as a fraction of cropBox area must strictly exceed this value before
-    /// Vision OCR is skipped for the page. Not tunable.
-    /// `nonisolated` so the now-`nonisolated`
-    /// `buildOCRSkipHint` can read it off the MainActor (mirrors
-    /// `retryDPIFloor`); an immutable Sendable constant is safe to share.
-    nonisolated static let ocrSkipCoverageThreshold: Double = 0.95
-
-    /// Decide whether Vision OCR can be skipped for `page` and, if
-    /// so, build the `EmbeddedTextSource` the orchestrator will consume in
-    /// place of running OCR. Returns `(nil, nil)` when the page must take
-    /// the OCR path.
-    ///
-    /// Locked gate (do not tune):
-    ///   * Effective mode == `.searchableRedaction`
-    ///   * Per-page text layer == `.rich`
-    ///   * Selectable-text coverage > 0.95
-    ///
-    /// In `.secureRasterization` mode the embedded text is not used by the
-    /// pipeline, so OCR always runs there regardless of settings.
-    ///
-    /// `runSettings` is the run-entry snapshot used by
-    /// `runDetectionPipeline`.
-    ///
-    /// `nonisolated`, and both MainActor
-    /// inputs are passed in as Sendable snapshots — `runSettings` (required)
-    /// and `textLayerStatus` (the per-page status dict captured once pre-loop).
-    /// The body reads no MainActor-isolated state, so `runDetectionPipeline`
-    /// runs it off the MainActor via `Task.detached`; the per-word
-    /// `EmbeddedTextSource.make` enumeration no longer occupies the UI thread.
-    nonisolated func buildOCRSkipHint(
-        for page: PDFPage, pageIndex: Int,
-        runSettings: RunSettings,
-        textLayerStatus: [Int: TextLayerStatus]
-    ) -> (EmbeddedTextSource?, DetectionResult.Provenance.OCRSkipReason?) {
-        // Condition 2 — mode gate. The user's current preference is what
-        // would drive the next pipeline run; in `.secureRasterization` we
-        // never trust embedded text, by design.
-        guard runSettings.pipelineMode == .searchableRedaction else {
-            return (nil, nil)
-        }
-        // Per-page text layer must be rich. Sparse/none layers go through
-        // OCR even when the document is mostly text — the embedded text
-        // is by definition not authoritative for those pages.
-        if let status = textLayerStatus[pageIndex],
-           status != .rich {
-            return (nil, nil)
-        }
-        // Cheap pre-filter (task body): pages with <10 characters cannot
-        // plausibly cover > 95% of the cropBox.
-        guard let pageText = page.string, pageText.count >= 10 else {
-            return (nil, nil)
-        }
-
-        // Condition 1 — coverage. The engine builder computes the union of
-        // selectable-text word bounding boxes as a fraction of cropBox area.
-        guard let source = EmbeddedTextSource.make(from: page),
-              source.coverage > Self.ocrSkipCoverageThreshold else {
-            return (nil, nil)
-        }
-
-        return (source, .coverageHighEnough)
     }
 }

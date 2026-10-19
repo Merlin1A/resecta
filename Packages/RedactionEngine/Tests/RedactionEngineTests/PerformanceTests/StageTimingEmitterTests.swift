@@ -496,7 +496,7 @@ struct StageTimingEmitterTests {
     @Test("Emit stage-timing p50/p95 + footprint over the Family-4 doc set")
     func emitStageTimings() async throws {
         guard let out = Self.perfOut() else {
-            print("[H4.1] RESECTA_PERF_OUT not set; stage-timing emitter skipped.")
+            TestGate.skip("RESECTA_PERF_OUT not set; the stage-timing emitter skipped")
             return
         }
         let (docs, skipped) = try Self.loadDocs()

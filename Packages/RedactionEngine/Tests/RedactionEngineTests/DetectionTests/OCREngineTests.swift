@@ -16,9 +16,8 @@ struct OCREngineTests {
         let image = try renderTextImage("Hello World", width: 400, height: 100)
         let engine = OCREngine()
         let lines = try await engine.recognizeText(in: image)
-        // Vision may or may not detect text depending on rendering quality
-        // At minimum, the function should not crash
-        _ = lines
+        let text = lines.map(\.text).joined(separator: " ").lowercased()
+        #expect(text.contains("hello"), "Vision reads the rendered words; got \(lines.map(\.text))")
     }
 
     @Test("recognizeText returns empty for blank image")
@@ -40,7 +39,7 @@ struct OCREngineTests {
         #expect(lines.isEmpty, "Blank image should return no text lines")
     }
 
-    @Test("recognizeText does not crash on small image")
+    @Test("recognizeText returns no lines for a 10-pixel image")
     func smallImageNoCrash() async throws {
         guard let ctx = createBitmapContext(width: 10, height: 10),
               let image = ctx.makeImage() else {
@@ -49,7 +48,7 @@ struct OCREngineTests {
         }
         let engine = OCREngine()
         let lines = try await engine.recognizeText(in: image)
-        _ = lines // Just verify no crash
+        #expect(lines.isEmpty, "a 10×10 image carries no text; got \(lines.map(\.text))")
     }
 
     // MARK: - Helpers
@@ -92,8 +91,11 @@ struct OCREngineTests {
                                          width: 400, height: 300)
         let engine = OCREngine()
         let lines = try await engine.recognizeText(in: image)
-        // Vision may merge or split lines — just verify no crash and non-negative count
-        #expect(lines.count >= 0)
+        // Vision may merge or split lines; the words of the first and last
+        // line are read either way.
+        let text = lines.map(\.text).joined(separator: " ").lowercased()
+        #expect(text.contains("one") && text.contains("three"),
+                "Vision reads the first and last rendered lines; got \(lines.map(\.text))")
     }
 
     private enum TestError: Error { case imageCreationFailed }

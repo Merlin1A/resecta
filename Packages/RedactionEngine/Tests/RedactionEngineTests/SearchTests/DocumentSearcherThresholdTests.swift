@@ -62,7 +62,7 @@ struct DocumentSearcherThresholdTests {
     }
 
     @Test("Surviving match carries appliedThreshold + presetThresholdPass signal")
-    func survivorCarriesAnnotation() async {
+    func survivorCarriesAnnotation() async throws {
         // SSN detector routinely scores ≥ 0.80 for a valid 123-45-6789 with
         // an "SSN" keyword in context. Cutoff 0.50 guarantees survival.
         let vector = PresetThresholdVector(thresholdsByWireName: ["ssn": 0.50])
@@ -74,7 +74,7 @@ struct DocumentSearcherThresholdTests {
             Issue.record("expected at least one SSN hit")
             return
         }
-        let rationale = try! #require(ssn.rationale)
+        let rationale = try #require(ssn.rationale)
         #expect(rationale.appliedThreshold == 0.50)
         #expect(rationale.signals.contains(where: {
             if case .presetThresholdPass(_, let cutoff) = $0 { return cutoff == 0.50 }

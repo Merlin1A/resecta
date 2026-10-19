@@ -11,7 +11,7 @@ import RedactionEngine
 // whose text layer is not rich cannot be captured and are counted for
 // Layer 3's detail line; whole-page regions are skipped. Pure statics in
 // the `sensitiveTerms(fromAppliedRegions:metadata:audit:)` shape, run off
-// the MainActor like `buildOCRSkipHint`; the value lives only in the run's
+// the MainActor; the value lives only in the run's
 // inputs and is cleared with the output.
 
 /// The verifier's term input for one run: the terms and the count of manual
@@ -98,8 +98,8 @@ extension PipelineCoordinator {
     /// (`collectSensitiveTerms`) joined with the manual capture over the
     /// source document as it stands at entry. The regions and the per-page
     /// text-layer status are read on the MainActor; the capture — PDFKit's
-    /// per-word selection over every manual region's page — runs detached,
-    /// the `buildOCRSkipHint` shape. Without a document the applied terms
+    /// per-word selection over every manual region's page — runs detached.
+    /// Without a document the applied terms
     /// are the whole set.
     func collectSensitiveTermSet() async -> SensitiveTermSet {
         let applied = collectSensitiveTerms()

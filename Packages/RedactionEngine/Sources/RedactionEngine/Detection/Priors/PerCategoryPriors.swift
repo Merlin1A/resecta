@@ -2,7 +2,7 @@ import Foundation
 
 // Per-category Beta priors threaded into detection scoring.
 // Sendable value type. Priors update on triage accept/reject (never during
-// detection). Passed by value into @concurrent `detectPage`.
+// detection). Passed by value.
 //
 // G10 hardening invariants (defend against prior poisoning on adversarial
 // streams):
