@@ -15,9 +15,8 @@ import PDFKit
 // property into a test-pinned one: it feeds a real EXIF/GPS-bearing JPEG
 // through the ACTUAL pipeline (PageRasterizer.rasterize — rasterize + fill +
 // verify — then PDFStreamReconstructor) and asserts the OUTPUT's embedded
-// image streams carry no GPS/Exif property dictionaries. The import side has
-// its own pin (LivePhotoAuxStripperTests); this is the export
-// side, which previously had none.
+// image streams carry no GPS/Exif property dictionaries. The import side is
+// pinned separately; this is the export side.
 
 @Suite("Export image metadata pin (redraw boundary)")
 struct ExportImageMetadataPinTests {

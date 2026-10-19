@@ -435,7 +435,7 @@ public enum TextLayerReconstructor {
                 let centre = CGPoint(x: core.midX, y: core.midY)
                 let inside = regionShapes.contains { shape in
                     if let vertices = shape.polygonVertices {
-                        return SandwichVerification.polygonContainsPoint(
+                        return polygonContainsPoint(
                             centre, vertices: vertices)
                     }
                     return shape.bounds.contains(centre)
