@@ -439,27 +439,69 @@ struct SandwichVerificationTests {
                 "a page with no text layer must hash as zero survivors recorded, not as 'no lineage recorded'")
     }
 
-    @Test("A fully-redacted searchable page verifies: Layer 9 PASS and Layer 7 PASS",
-          .timeLimit(.minutes(1)))
+    /// The layers that report INFO on a run with no applied search and no
+    /// applied scan: the Search Re-check and the Detection Sweep re-run what
+    /// was applied, so with nothing applied each is a note, not a verdict.
+    /// Every other layer must PASS outright — the fixture's own text is
+    /// handed in as the run's sensitive term, so the string, OCR and
+    /// re-extraction checks read the output for it and must read none.
+    static let layersWithNothingToCheckOnAFullPage: Set<VerificationLayer> = [.searchRecheck, .detectionSweep]
+
+    @Test("A fully-redacted page verifies on every layer in both modes: overall PASS, no FAIL or WARN, nothing left unverified",
+          .timeLimit(.minutes(2)))
     func fullyRedactedSearchablePageVerifies() async throws {
-        let fixture = TestFixtures.fakeRedaction()
+        let secret = "CLASSIFIED SECRET"
+        let fixture = TestFixtures.fakeRedaction(text: secret)
         let fullPage = RedactionRegion(
             id: UUID(), normalizedRect: CGRect(x: 0, y: 0, width: 1, height: 1),
             source: .manual)
-        let url = try await TestPipeline.processAndExport(
-            fixture, mode: .searchableRedaction, regions: [0: [fullPage]])
-        defer { try? FileManager.default.removeItem(at: url) }
-        let digests = try await TestPipeline.searchableDigests(fixture, regions: [0: [fullPage]])
-        let digest = try #require(digests[0])
-        #expect(digest.survivingCount == 0, "the full-page region empties the survivor set")
-        let outDoc = try #require(PDFDocument(url: url))
-        let outPage = try #require(outDoc.page(at: 0))
-
-        let lineage = try await verifier.verifyCharacterLineage(outputPage: outPage, digest: digest)
-        #expect(lineage == .pass,
-                "zero survivors recorded and zero output characters must agree; got \(lineage)")
-        let count = try await verifier.verifyCharacterCount(outputPage: outPage, digest: digest)
-        #expect(count == .pass, "got \(count)")
+        let regions = [0: [fullPage]]
+        let terms = [SensitiveTerm(text: secret, requiresTokenBoundary: false)]
+        for mode in [PipelineMode.searchableRedaction, .secureRasterization] {
+            let url = try await TestPipeline.processAndExport(fixture, mode: mode, regions: regions)
+            defer { try? FileManager.default.removeItem(at: url) }
+            var digests: [PageFilterDigest?] = [nil]
+            if mode == .searchableRedaction {
+                digests = try await TestPipeline.searchableDigests(fixture, regions: regions)
+                let digest = try #require(digests[0])
+                #expect(digest.survivingCount == 0, "the full-page region empties the survivor set")
+            }
+            let outDoc = try #require(PDFDocument(url: url))
+            let report = try await VerificationOrchestrator().run(
+                outputDocument: SendablePDFDocument(outDoc),
+                sourcePageCount: 1,
+                regions: regions,
+                sensitiveTerms: terms,
+                pipelineMode: mode,
+                filterDigests: digests,
+                perPageModes: [mode],
+                perPageFallbackReasons: [nil],
+                appliedSearches: [],
+                provisionLayerDocuments: { layers in
+                    var docs: [VerificationLayer: SendablePDFDocument] = [:]
+                    for layer in layers {
+                        guard let d = PDFDocument(url: url) else { return nil }
+                        docs[layer] = SendablePDFDocument(d)
+                    }
+                    return docs
+                },
+                events: { _ in })
+            #expect(report.overallStatus == .pass, "\(mode): overall \(report.overallStatus)")
+            #expect(report.layers.count == VerificationEngine().layers(for: mode).count,
+                    "\(mode): every layer of the mode reports")
+            for result in report.layers {
+                switch result.status {
+                case .pass:
+                    break
+                case .info:
+                    #expect(result.layer.map(Self.layersWithNothingToCheckOnAFullPage.contains) == true,
+                            "\(mode) \(result.name): INFO is allowed only for a layer with nothing to read; got \(result.status)")
+                default:
+                    Issue.record("\(mode) \(result.name): \(result.status)")
+                }
+                #expect(!result.couldNotVerify, "\(mode) \(result.name): the check did not fully run")
+            }
+        }
     }
 
     @Test("The empty-set digest against an output page carrying a glyph FAILs (an injection)")
