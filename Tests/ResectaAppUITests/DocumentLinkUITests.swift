@@ -131,10 +131,4 @@ nonisolated final class DocumentLinkUITests: XCTestCase {
         return (tool.value as? String) == expected
     }
 
-    private func attachScreenshot(named name: String) {
-        let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = name
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
 }
