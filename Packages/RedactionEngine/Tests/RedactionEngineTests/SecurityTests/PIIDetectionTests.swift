@@ -528,7 +528,7 @@ struct PIIDetectionTests {
     }
 
     @Test("MRN detector via full pipeline")
-    func mrnFullPipeline() async {
+    func mrnFullPipeline() async throws {
         let detector = PIIDetector()
         let text = "Patient MRN: 87654321 scheduled for follow-up"
         let results = await detector.detect(in: text, doctype: .medical)
@@ -536,7 +536,7 @@ struct PIIDetectionTests {
         #expect(!mrnResults.isEmpty, "Should detect medical record number")
         // Context-scored confidence; the `patient` keyword pushes it
         // into the boosted band (no more flat 0.75).
-        let conf = try! #require(mrnResults.first?.confidence)
+        let conf = try #require(mrnResults.first?.confidence)
         #expect(conf >= 0.85)
     }
 
@@ -601,17 +601,21 @@ struct PIIDetectionTests {
         // Validates the try! safety documented in PIIDetector.swift.
         // These are hardcoded constant patterns that cannot fail at runtime,
         // but this test makes that guarantee explicit and CI-enforced.
-        _ = CreditCardDetector.ccPattern
-        _ = EmailDetector.emailPattern
-        _ = PhoneDetector.phonePattern
-        _ = AddressDetector.addressPattern
-        _ = DOBDetector.dobPattern
-        _ = ITINDetector.itinPattern
-        _ = DriversLicenseDetector.driversLicensePattern
-        _ = PassportDetector.passportPattern
-        _ = MRNDetector.mrnPatternLabeled
-        _ = MRNDetector.mrnPatternPatientID
-        _ = MRNDetector.mrnPatternInstitution
-        _ = LicensePlateDetector.licensePlateLabeled
+        let patterns: [NSRegularExpression] = [
+            CreditCardDetector.ccPattern,
+            EmailDetector.emailPattern,
+            PhoneDetector.phonePattern,
+            AddressDetector.addressPattern,
+            DOBDetector.dobPattern,
+            ITINDetector.itinPattern,
+            DriversLicenseDetector.driversLicensePattern,
+            PassportDetector.passportPattern,
+            MRNDetector.mrnPatternLabeled,
+            MRNDetector.mrnPatternPatientID,
+            MRNDetector.mrnPatternInstitution,
+            LicensePlateDetector.licensePlateLabeled,
+        ]
+        #expect(patterns.allSatisfy { !$0.pattern.isEmpty },
+                "every detector pattern compiles to an expression carrying its source")
     }
 }

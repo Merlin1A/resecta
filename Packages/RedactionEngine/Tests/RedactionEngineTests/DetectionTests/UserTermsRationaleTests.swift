@@ -35,7 +35,7 @@ struct UserTermsRationaleTests {
     }
 
     @Test("Always-flag literal hit carries userAlwaysFlag signal with pattern")
-    func alwaysFlagLiteralCarriesSignal() async {
+    func alwaysFlagLiteralCarriesSignal() async throws {
         let matcher = UserTermMatcher.compile(
             alwaysFlag: [UserTerm(pattern: "Acme Corp", isRegex: false)],
             neverFlag: []
@@ -45,7 +45,7 @@ struct UserTermsRationaleTests {
             matcher: matcher
         )
         let acme = results.first { $0.term == "Custom" }
-        let rationale = try! #require(acme?.rationale)
+        let rationale = try #require(acme?.rationale)
         #expect(rationale.ruleID == "user.alwaysFlag")
         #expect(rationale.signals.contains(.userAlwaysFlag(pattern: "Acme Corp")))
         #expect(rationale.preThresholdScore == 1.0)
@@ -54,7 +54,7 @@ struct UserTermsRationaleTests {
     }
 
     @Test("Always-flag regex hit carries userAlwaysFlag signal with source pattern")
-    func alwaysFlagRegexCarriesSignal() async {
+    func alwaysFlagRegexCarriesSignal() async throws {
         let pattern = "PROJ-[0-9]{4}"
         let matcher = UserTermMatcher.compile(
             alwaysFlag: [UserTerm(pattern: pattern, isRegex: true)],
@@ -70,7 +70,7 @@ struct UserTermsRationaleTests {
         // the duplicate in the UI layer; here we assert the rationale the
         // always-flag path emits.
         let proj = results.first { $0.term == "Custom" && $0.matchedText == "PROJ-4821" }
-        let rationale = try! #require(proj?.rationale)
+        let rationale = try #require(proj?.rationale)
         #expect(rationale.signals.contains(.userAlwaysFlag(pattern: pattern)),
                 "signal pattern must echo the user-authored regex, not the matched text")
     }

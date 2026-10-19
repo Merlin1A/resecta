@@ -12,13 +12,13 @@ import Foundation
 struct RationaleEmissionTests {
 
     @Test("SSN emits structural validator + regex signals")
-    func ssnRationaleIsStructured() async {
+    func ssnRationaleIsStructured() async throws {
         let detector = PIIDetector()
         let text = "SSN: 123-45-6789 on file."
         let matches = await detector.detect(in: text)
         let ssn = matches.first { $0.kind == .ssn }
         #expect(ssn != nil)
-        let rationale = try! #require(ssn?.rationale)
+        let rationale = try #require(ssn?.rationale)
         #expect(rationale.ruleID == "ssn.state-machine")
 
         let signalTags = rationale.signals.map(Self.tag)
@@ -31,7 +31,7 @@ struct RationaleEmissionTests {
     }
 
     @Test("Name (NLTagger) emits regex signal with pre-threshold baseline")
-    func nameRationaleIsPopulated() async {
+    func nameRationaleIsPopulated() async throws {
         // Inject nil gazetteer so this test stays focused on the base rationale
         // wiring and doesn't observe the per-candidate gazetteer boosts (which can make
         // finalScore > preThresholdScore).
@@ -40,33 +40,33 @@ struct RationaleEmissionTests {
         let matches = await detector.detect(in: text)
         let name = matches.first { $0.kind == .name }
         #expect(name != nil)
-        let rationale = try! #require(name?.rationale)
+        let rationale = try #require(name?.rationale)
         #expect(rationale.ruleID == "name.nltagger")
         #expect(rationale.signals.contains(.regexPattern(name: "name.nltagger")))
         #expect(rationale.preThresholdScore == rationale.finalScore)
     }
 
     @Test("Simple regex detectors get fallback rationale")
-    func emailFallsBackToGenericRationale() async {
+    func emailFallsBackToGenericRationale() async throws {
         let detector = PIIDetector()
         let text = "Contact: jane@example.com for scheduling."
         let matches = await detector.detect(in: text)
         let email = matches.first { $0.kind == .email }
         #expect(email != nil)
-        let rationale = try! #require(email?.rationale)
+        let rationale = try #require(email?.rationale)
         #expect(rationale.ruleID == "email.regex")
         #expect(rationale.signals.contains(.regexPattern(name: "email.regex")))
         #expect(rationale.finalScore == email?.confidence)
     }
 
     @Test("Doctype gate signal appears when doctype is supplied")
-    func doctypeGateSignalPresent() async {
+    func doctypeGateSignalPresent() async throws {
         let detector = PIIDetector()
         let text = "DEA Number: AB1234563"
         let matches = await detector.detect(in: text, doctype: .medical)
         let dea = matches.first { $0.kind == .dea }
         #expect(dea != nil)
-        let rationale = try! #require(dea?.rationale)
+        let rationale = try #require(dea?.rationale)
         #expect(rationale.signals.contains(.doctypeGate(doctype: .medical)))
     }
 
