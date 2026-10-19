@@ -89,31 +89,24 @@ struct DEADetector: FamilyDetector {
                 profile: Self.profile,
                 category: .dea
             )
-            var rationale = MatchRationale.Builder(
-                ruleID: ruleID, preThresholdScore: Self.profile.baseConfidence,
-                signals: [
-                    .regexPattern(name: ruleID),
-                    .structuralValidator(name: "dea.checksum"),
-                ]
-            )
-            rationale.append(scorer.signal(
-                text: fullText,
-                matchRange: match.range,
-                profile: Self.profile,
-                category: .dea
-            ))
-            // Per-keyword breakdown alongside the scalar.
-            rationale.append(scorer.signalDetail(
-                text: fullText,
-                matchRange: match.range,
-                profile: Self.profile
-            ))
             return PIIDetector.PIIMatch(
                 text: matchedText,
                 range: match.range,
                 kind: .dea,
                 confidence: confidence,
-                rationale: rationale.build(finalScore: confidence)
+                rationale: .contextScored(
+                    ruleID: ruleID, preThresholdScore: Self.profile.baseConfidence,
+                    validators: ["dea.checksum"],
+                    contextSignal: scorer.signal(
+                        text: fullText, matchRange: match.range,
+                        profile: Self.profile, category: .dea
+                    ),
+                    // Per-keyword breakdown alongside the scalar.
+                    keywordDetail: scorer.signalDetail(
+                        text: fullText, matchRange: match.range, profile: Self.profile
+                    ),
+                    finalScore: confidence
+                )
             )
         }
     }
