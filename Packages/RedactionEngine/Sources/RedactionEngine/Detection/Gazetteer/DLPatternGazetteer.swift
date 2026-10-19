@@ -68,30 +68,21 @@ public struct DLPatternGazetteer: @unchecked Sendable {
 
     /// Testing / composition init — inject a custom bundle.
     init(bundle: Bundle) throws {
-        guard let url = bundle.url(
-            forResource: "dl_patterns",
-            withExtension: "json",
-            subdirectory: "Gazetteers"
-        ) else {
-            logger.info("dl_patterns.json not bundled; DL pattern gazetteer inert")
-            throw LoaderError.resourceMissing
-        }
-
-        let wire: WireFormat
-        do {
-            let bytes = try Data(contentsOf: url)
-            wire = try JSONDecoder().decode(WireFormat.self, from: bytes)
-        } catch {
-            logger.warning("dl_patterns.json decode failed: \(String(describing: error), privacy: .public)")
-            throw LoaderError.decodingFailed(underlying: error)
-        }
-
-        try LoaderVersionFence.assert(
-            actual: wire.version,
-            supported: Self.supportedVersions,
-            assetName: "dl_patterns",
+        let wire = try PatternTableLoader.load(
+            WireFormat.self,
+            resource: "dl_patterns",
+            bundle: bundle,
+            supportedVersions: Self.supportedVersions,
             logger: logger,
-            throwing: { LoaderError.unsupportedVersion(actual: $0, supported: $1) }
+            missing: {
+                logger.info("dl_patterns.json not bundled; DL pattern gazetteer inert")
+                return LoaderError.resourceMissing
+            },
+            decodeFailure: { error in
+                logger.warning("dl_patterns.json decode failed: \(String(describing: error), privacy: .public)")
+                return LoaderError.decodingFailed(underlying: error)
+            },
+            unsupportedVersion: { LoaderError.unsupportedVersion(actual: $0, supported: $1) }
         )
 
         var patterns: [String: [NSRegularExpression]] = [:]
@@ -199,7 +190,7 @@ public struct DLPatternGazetteer: @unchecked Sendable {
 
 // MARK: - Wire format
 
-private struct WireFormat: Decodable {
+private struct WireFormat: VersionedWireTable {
     let version: Int
     let generatedBy: String
     let generatedDate: String
