@@ -1097,13 +1097,11 @@ class RedactionState {
             return nil
         }
 
-        let termDescription = selected.first?.term ?? "search"
-        let count = selected.count
         commitApply(
             createdRegions: prepared.createdRegions,
             createdMetadata: prepared.createdMetadata,
             createdAudit: prepared.createdAudit,
-            actionName: Self.searchApplyActionName(count: count, term: termDescription),
+            actionName: Self.searchApplyActionName(count: selected.count),
             priorsRestore: nil,
             recordsSearchApplyVersion: true,
             undoManager: undoManager
@@ -1136,14 +1134,11 @@ class RedactionState {
         )
     }
 
-    /// The search origins' undo action name — "Redact N Instances of
-    /// 'term'", singular at one. One construction for both origins
-    /// (the singular grammar branch; the bulk origin reads the
-    /// singular for a single selected result too).
-    private static func searchApplyActionName(count: Int, term: String) -> String {
-        count == 1
-            ? "Redact 1 Instance of '\(term)'"
-            : "Redact \(count) Instances of '\(term)'"
+    /// The search origins' undo action name — the toast's verb, no document
+    /// text: "Mark N Instances", singular at one. One construction for both
+    /// origins (the bulk origin reads the singular for one result too).
+    private static func searchApplyActionName(count: Int) -> String {
+        count == 1 ? "Mark 1 Instance" : "Mark \(count) Instances"
     }
 
     /// Single-result search origin: the
@@ -1202,7 +1197,7 @@ class RedactionState {
             createdRegions: prepared.createdRegions,
             createdMetadata: prepared.createdMetadata,
             createdAudit: prepared.createdAudit,
-            actionName: Self.searchApplyActionName(count: 1, term: result.term),
+            actionName: Self.searchApplyActionName(count: 1),
             priorsRestore: nil,
             recordsSearchApplyVersion: true,
             undoManager: undoManager
