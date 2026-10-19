@@ -33,20 +33,21 @@ struct SearchRecheckParallelismTests {
         let wrapped = SendablePDFDocument(doc)
         let requests = [TestFixtures.textRequest("CONFIDENTIAL")]
 
-        // Production never mutates ocrParallelism; restore it whatever happens.
-        defer { VerificationEngine.ocrParallelism = 3 }
+        // The width is task-local: each binding covers its own calls only.
         let clock = ContinuousClock()
 
-        VerificationEngine.ocrParallelism = 1
-        _ = await TestFixtures.recheck(wrapped, requests: requests, mode: .secureRasterization)  // warm-up
-        let t1 = clock.now
-        let serial = await TestFixtures.recheck(wrapped, requests: requests, mode: .secureRasterization)
-        let serialWall = Self.seconds(clock.now - t1)
+        let (serial, serialWall) = await VerificationEngine.$ocrParallelism.withValue(1) {
+            _ = await TestFixtures.recheck(wrapped, requests: requests, mode: .secureRasterization)  // warm-up
+            let t1 = clock.now
+            let serial = await TestFixtures.recheck(wrapped, requests: requests, mode: .secureRasterization)
+            return (serial, Self.seconds(clock.now - t1))
+        }
 
-        VerificationEngine.ocrParallelism = 3
-        let t3 = clock.now
-        let parallel = await TestFixtures.recheck(wrapped, requests: requests, mode: .secureRasterization)
-        let parallelWall = Self.seconds(clock.now - t3)
+        let (parallel, parallelWall) = await VerificationEngine.$ocrParallelism.withValue(3) {
+            let t3 = clock.now
+            let parallel = await TestFixtures.recheck(wrapped, requests: requests, mode: .secureRasterization)
+            return (parallel, Self.seconds(clock.now - t3))
+        }
 
         // Layer-2 OCR wall on the same fixture at the production width, with a
         // covering region on every page so Layer 2 runs its full per-page OCR

@@ -42,16 +42,16 @@ public struct VerificationEngine: Sendable {
     static let inRegionCoverageThreshold: CGFloat = 0.5
 
     /// Bounded width for the Layer-2 OCR task group. Vision's own
-    /// internal concurrency bounds the realized speed-up; a private constant so
-    /// tuning needs no source-logic change. It is a `nonisolated(unsafe) static
-    /// var` purely so the wall-clock acceptance gate can measure width-1 (serial)
-    /// against width-3 on the one production code path — production never mutates
-    /// it (the perf test is `.serialized` + `.disabled`, run on demand alone).
+    /// internal concurrency bounds the realized speed-up; a constant so
+    /// tuning needs no source-logic change. It is task-local purely so the
+    /// wall-clock acceptance gate can bind width-1 (serial) against width-3
+    /// on the one production code path for its own task tree — production
+    /// never binds it, and a bound value never leaks into another test.
     /// The width bounds pages-resident memory and the overlap of
     /// extraction/sampling/classification; the Vision perform itself is
     /// serialized on `visionPerformQueue` (see `layer2OCRHits`), so width no
     /// longer multiplies concurrent Vision sync-waits.
-    nonisolated(unsafe) static var ocrParallelism = 3
+    @TaskLocal static var ocrParallelism = 3
 
     /// Layer-2 OCR downsample cap (largest pixel dimension), a 4096-px
     /// ceiling: the OCR check looks for READABLE

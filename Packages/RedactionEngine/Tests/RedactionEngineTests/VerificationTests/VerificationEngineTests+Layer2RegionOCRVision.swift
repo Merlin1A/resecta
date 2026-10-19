@@ -306,17 +306,17 @@ extension VerificationEngineTests {
             pages: [errorPage, cleanPage], size: errorSize)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        VerificationEngine.onLayer2OCRSimulateError = { $0.width == 597 }
-        defer { VerificationEngine.onLayer2OCRSimulateError = nil }
-
         let region = manualRegion(CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5))
         let engine = VerificationEngine()
-        let result = await engine.runLayer(
-            .ocrCheck, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 2, regions: [0: [region], 1: [region]],
-            sensitiveTerms: [], pipelineMode: .secureRasterization,
-            filterDigests: [],
-            perPageModes: [.secureRasterization, .secureRasterization])
+        // The seam is task-local: bound for this run's task tree only.
+        let result = await VerificationEngine.$onLayer2OCRSimulateError.withValue({ $0.width == 597 }) {
+            await engine.runLayer(
+                .ocrCheck, outputDocument: SendablePDFDocument(doc),
+                sourcePageCount: 2, regions: [0: [region], 1: [region]],
+                sensitiveTerms: [], pipelineMode: .secureRasterization,
+                filterDigests: [],
+                perPageModes: [.secureRasterization, .secureRasterization])
+        }
         // "Could not check" must not read as "checked, found nothing": the
         // errored page folds to the unchecked WARN instead of a clean PASS,
         // while the sibling page classifies normally (nothing above the
