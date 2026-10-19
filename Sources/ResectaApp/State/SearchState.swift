@@ -1210,18 +1210,14 @@ final class SearchState: Identifiable {
 
     /// Whether this session actually received results that
     /// arrived pre-selected (the magic-wand `preselectIncomingResults`
-    /// flow, `appendResult` below) and the user has not yet resolved
-    /// them one way or another. Deliberately a SEPARATE fact from
+    /// flow, `appendResult` below) not yet resolved. A SEPARATE fact from
     /// `userModifiedSelections`: that tracker means "the user touched
     /// selections," and a magic-wand session that arrives with
     /// everything auto-selected and is dismissed untouched would
     /// otherwise read as untouched — a stray swipe or Dismiss silently
     /// discards the whole auto-selected set with no confirmation. Written
-    /// `true` only when `appendResult` actually consumes
-    /// `preselectIncomingResults` for a streamed result — never by the
-    /// mode-switch undo restore (`restoreModeSwitchSnapshot` assigns
-    /// `results` directly, bypassing `appendResult`, so it cannot set
-    /// this by construction). Reset rules mirror `userModifiedSelections`:
+    /// `true` only when `appendResult` consumes `preselectIncomingResults`
+    /// for a streamed result. Reset rules mirror `userModifiedSelections`:
     /// a successful apply resets it (the preselected set was committed —
     /// see `RedactionState.applySelectedSearchResultsOrigin` /
     /// `applyFindings(.stagedDetections)`), the review-arrival re-target
@@ -1229,6 +1225,10 @@ final class SearchState: Identifiable {
     /// fresh all-deselected context), and `clear()` resets it on session
     /// teardown. See `requiresDismissConfirmation`.
     var hasUnreviewedPreselection: Bool = false
+
+    /// True while the Home close dialog holds this session parked: the
+    /// sheet's teardown then spares it, so Cancel re-presents it whole.
+    var parkedForHomeClose: Bool = false
 
     /// The single predicate both dismiss-gate sites
     /// (`DocumentEditorView`'s `.interactiveDismissDisabled` and

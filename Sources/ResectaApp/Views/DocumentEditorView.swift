@@ -73,10 +73,12 @@ struct DocumentEditorView: View {
     /// sheet goes down, not the work); backing out of the dialog
     /// re-presents it through the review bridge
     /// (`restoreParkedReviewIfNeeded()`), Close tears it down with the
-    /// session. A parked plain search session is not restored — its
-    /// results are transient and the sheet clears them on disappearance,
-    /// the same outcome as its own Dismiss.
+    /// session.
     @State var homeCloseParkedReview = false
+
+    /// A search session parked for the close dialog, kept whole for Cancel
+    /// (`restoreParkedSearchIfNeeded()`); Close drops it with the session.
+    @State var parkedEditorSearch: SearchState?
 
     // Drives the bespoke share-risk confirm sheet shown when a
     // Share tap reaches handleExportTap while the report is FAIL/ATTENTION

@@ -138,7 +138,7 @@ struct DocumentEditorHomeCloseTests {
         // the hub's dialog and the extension's Home route both call it).
         let home = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView+Home.swift")
         guard let close = home.range(of: "func performDoneCloseSession() {"),
-              let sec1 = home.range(of: "coordinator.downgradeTempProtectionOnSessionClose()",
+              let sec1 = home.range(of: "documentState.resetForStartOver(",
                                     range: close.upperBound..<home.endIndex)
         else {
             Issue.record("Could not locate performDoneCloseSession")
@@ -147,6 +147,79 @@ struct DocumentEditorHomeCloseTests {
         let prologue = home[close.upperBound..<sec1.lowerBound]
         #expect(prologue.contains("homeCloseAwaitsSheetDismissal = false"))
         #expect(prologue.contains("homeCloseParkedReview = false"))
+    }
+
+    // MARK: - Done / Home close through the one reset
+
+    @Test("The Done/Home teardown cancels first, then runs the one reset and hand-copies no field (source pin)")
+    func doneCloseUsesTheOneReset() throws {
+        let home = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView+Home.swift")
+        guard let close = home.range(of: "func performDoneCloseSession() {"),
+              let end = home.range(of: "\n    }\n", range: close.upperBound..<home.endIndex)
+        else {
+            Issue.record("Could not locate performDoneCloseSession")
+            return
+        }
+        let body = home[close.upperBound..<end.lowerBound]
+        let cancel = try #require(body.range(of: "documentState.cancelActivePipeline(redactionState: redactionState)"))
+        let reset = try #require(body.range(of:
+            "documentState.resetForStartOver(redactionState: redactionState, coordinator: coordinator)"))
+        #expect(cancel.lowerBound < reset.lowerBound, "cancel comes first")
+        #expect(!body.contains("documentState.sourceDocument = nil"), "no hand copy of the reset")
+        #expect(!body.contains("transition(to: .empty)"), "the reset makes the exit transition")
+    }
+
+    @Test("The one reset clears the import notice's form-field count with the rest")
+    func resetClearsFormFieldCount() {
+        let coord = makeCoordinator()
+        coord.documentState.sourceDocument = makeTestPDFDocument()
+        coord.documentState.phase = .editing
+        coord.documentState.sourceFilledFormFieldCount = 3
+        coord.documentState.resetForStartOver(
+            redactionState: coord.redactionState, coordinator: coord)
+        #expect(coord.documentState.sourceFilledFormFieldCount == 0)
+        #expect(coord.documentState.phaseKind == .empty)
+    }
+
+    // MARK: - A parked search session comes back on Cancel
+
+    @Test("A presented sheet parks as the review when one is pending, else as the search session")
+    func parkTarget() {
+        #expect(!DocumentEditorView.homeCloseParksSearch(hasPendingTriage: true))
+        #expect(DocumentEditorView.homeCloseParksSearch(hasPendingTriage: false))
+    }
+
+    @Test("A parked search session re-presents only with the slot idle in an editing session")
+    func parkedSearchRestoreGate() {
+        #expect(DocumentEditorView.homeCloseShouldRestoreSearch(sheetPresented: false, phaseKind: .editing))
+        #expect(!DocumentEditorView.homeCloseShouldRestoreSearch(sheetPresented: true, phaseKind: .editing),
+                "a sheet is already up")
+        let notEditing: [DocumentState.PhaseKind] = [
+            .empty, .importing, .detecting, .redacting,
+            .verifying, .verified, .exporting, .failed,
+        ]
+        for phase in notEditing {
+            #expect(!DocumentEditorView.homeCloseShouldRestoreSearch(sheetPresented: false, phaseKind: phase),
+                    "phase \(phase) is not an editing session")
+        }
+    }
+
+    @Test("Wiring: the park keeps the session whole, Cancel's binding restores it, Close drops it, the sheet's teardown spares it (source pin)")
+    func parkedSearchWiringSourcePin() throws {
+        let home = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView+Home.swift")
+        #expect(home.contains("parkedEditorSearch = search"), "the park keeps the session")
+        #expect(home.contains("func restoreParkedSearchIfNeeded()"))
+        #expect(home.contains("redactionState.activeSearch = parked"), "Cancel re-presents the same session")
+        let binding = try #require(home.range(of: "var doneConfirmationPresented: Binding<Bool> {"))
+        #expect(home[binding.upperBound...].contains("restoreParkedSearchIfNeeded()"),
+                "the dialog's binding restores it")
+        let close = try #require(home.range(of: "func performDoneCloseSession() {"))
+        let reset = try #require(home.range(of: "documentState.resetForStartOver(", range: close.upperBound..<home.endIndex))
+        #expect(home[close.upperBound..<reset.lowerBound].contains("parkedEditorSearch = nil"), "Close drops it")
+        let hub = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        #expect(hub.contains("@State var parkedEditorSearch: SearchState?"))
+        let sheet = try loadRepoFile("Sources/ResectaApp/Views/SearchAndRedactSheet.swift")
+        #expect(sheet.contains("parkedForHomeClose"), "the sheet's teardown spares a parked session")
     }
 
     /// Mirrors `HonestySurfacesTests.loadRepoFile`.
