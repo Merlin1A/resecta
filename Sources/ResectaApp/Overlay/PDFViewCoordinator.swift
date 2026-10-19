@@ -110,6 +110,10 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
                     }
                 }
                 if docState?.currentPageIndex != index {
+                    // The selection stays on the page the user can see:
+                    // a delete or a nudge must never reach regions on a
+                    // page scrolled away from.
+                    self?.redactionState?.selectedRegionIDs = []
                     docState?.currentPageIndex = index
                 }
             }
@@ -237,14 +241,26 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     }
 
     func commitResize(_ id: UUID, page: Int, newRect: CGRect, undoManager: UndoManager?) {
-        redactionState?.resizeRegion(id, page: page, newRect: newRect, undoManager: undoManager)
+        if storedRect(id, page: page) != newRect {
+            redactionState?.resizeRegion(id, page: page, newRect: newRect, undoManager: undoManager)
+            UIAccessibility.post(notification: .announcement, argument: Self.commitAnnouncement(.resized))
+        }
         refreshOverlay(for: page)
     }
 
     // Commit region move after drag ends.
     func commitMove(_ id: UUID, page: Int, newRect: CGRect, undoManager: UndoManager?) {
-        redactionState?.moveRegion(id, page: page, newRect: newRect, undoManager: undoManager)
+        if storedRect(id, page: page) != newRect {
+            redactionState?.moveRegion(id, page: page, newRect: newRect, undoManager: undoManager)
+        }
         refreshOverlay(for: page)
+    }
+
+    /// The stored rect of a region. A tap on a selected region ends its
+    /// "drag" where it began; committing that would record a Move or
+    /// Resize step, re-arm Redo and clear the output for no change.
+    private func storedRect(_ id: UUID, page: Int) -> CGRect? {
+        redactionState?.regions[page]?.first(where: { $0.id == id })?.normalizedRect
     }
 
     /// Commit a batch move of multiple regions on the same page.
@@ -258,10 +274,34 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// warning toast are enforced inside `RedactionState` regardless of
     /// caller route. Overlays are refreshed across all pages because the
     /// marquee can cover cross-page regions on multi-page documents.
+    /// With Add to Selection on, the marquee ADDS to the current
+    /// selection (current first, so the cap keeps what was already
+    /// chosen) and an empty marquee — a tap on the page — changes nothing.
     func commitLassoSelection(_ regions: [RedactionRegion], undoManager: UndoManager?) {
         guard let state = redactionState else { return }
-        state.applyBatch(regions, undoManager: undoManager, toastManager: toastManager)
+        var batch = regions
+        if isMultiSelectActive {
+            guard !regions.isEmpty else { return }
+            let current = state.regions.keys.sorted().flatMap { state.regions[$0] ?? [] }
+                .filter { state.selectedRegionIDs.contains($0.id) }
+            let currentIDs = Set(current.map(\.id))
+            batch = current + regions.filter { !currentIDs.contains($0.id) }
+        }
+        state.applyBatch(batch, undoManager: undoManager, toastManager: toastManager)
         refreshAllOverlays()
+    }
+
+    /// What a commit announces to VoiceOver.
+    enum CommitAnnouncement {
+        case resized
+        case deleted
+    }
+
+    static func commitAnnouncement(_ kind: CommitAnnouncement) -> String {
+        switch kind {
+        case .resized: return "Region resized"
+        case .deleted: return "Region deleted"
+        }
     }
 
     /// Delete a specific region by ID (used by VoiceOver custom action).
@@ -269,6 +309,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         redactionState?.removeRegion(id, page: page, undoManager: nil)
         redactionState?.selectedRegionID = nil
         refreshOverlay(for: page)
+        UIAccessibility.post(notification: .announcement, argument: Self.commitAnnouncement(.deleted))
     }
 
     // MARK: - Overlay Refresh
