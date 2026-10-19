@@ -87,6 +87,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The stale temporary-file sweep lives beside the per-session temporary directory it cleans up after.
 - Resolution selection and the pre-render page checks live in one page memory policy file.
 - The structural and metadata verification layers, and the dispatch of the text-layer checks, live in their own files.
+- The text-layer position check is split into its three techniques over one shared scan state.
 
 ## [1.2.0] — 2026-09-29
 
