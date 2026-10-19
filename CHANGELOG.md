@@ -90,6 +90,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The text-layer position check is split into its three techniques over one shared scan state.
 - The verification status ranking is an exhaustive switch over every status; the test-only tuning values are bound per task.
 - Rendering a page from a PDFKit page and from its Core Graphics page runs one render body.
+- The rectangle and polygon character filters share one sort, search and cancellation skeleton.
 
 ## [1.2.0] — 2026-09-29
 

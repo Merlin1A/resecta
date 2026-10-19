@@ -341,78 +341,23 @@ public func filterCharacters(
 ) async throws -> FilterResult {
     // Expand all redaction rectangles by the safety margin, keeping each
     // paired with its un-expanded source rect (floor + band gate). A uniform
-    // margin preserves minY order, so one sort serves both arrays.
-    let order = redactionRects.indices.sorted {
-        redactionRects[$0].minY < redactionRects[$1].minY
+    // margin preserves minY order, so the sort by the un-expanded minY
+    // orders the expanded rects the same way.
+    let regions = redactionRects.map {
+        (expanded: $0.insetBy(dx: -safetyMargin, dy: -safetyMargin), unexpanded: $0)
     }
-    let sortedExpanded = order.map {
-        redactionRects[$0].insetBy(dx: -safetyMargin, dy: -safetyMargin)
+    return try filterCharactersWalk(
+        characters: characters, regions: regions,
+        sortKey: { $0.unexpanded.minY },
+        expandedBounds: { $0.expanded }, unexpandedBounds: { $0.unexpanded }
+    ) { char, region, haloApplies in
+        guard char.bounds.intersects(region.expanded) else { return false }
+        // Tier (a) — unconditional floor at the un-expanded rect.
+        if char.bounds.intersects(region.unexpanded) { return true }
+        // Tier (b) — halo, gated on the region touching this
+        // character's line band.
+        return haloApplies
     }
-    let sortedUnexpanded = order.map { redactionRects[$0] }
-    // Pre-compute minY values for upper-bound search
-    let minYValues = sortedExpanded.map(\.minY)
-
-    let lineBands = lineBandRects(characters)
-    var surviving: [CharacterInfo] = []
-    var excludedCount = 0
-
-    // Per-character cooperative cancellation. The inner body is
-    // binary-search bounded (O(log m + k)), so a check on every iteration is
-    // negligible overhead here. The sibling per-character walks
-    // (`verifySpatialExclusion`, `TextLayerExtractor`) check once per
-    // 256-character band instead, because their per-character bodies cost
-    // more.
-    for char in characters {
-        try Task.checkCancellation()
-        let charMinY = char.bounds.minY
-        let charMaxY = char.bounds.maxY
-
-        // Binary search: find last rect whose minY <= charMaxY.
-        // Any rect with minY > charMaxY cannot overlap this character vertically.
-        var lo = 0
-        var hi = sortedExpanded.count
-        while lo < hi {
-            let mid = (lo + hi) / 2
-            if minYValues[mid] <= charMaxY {
-                lo = mid + 1
-            } else {
-                hi = mid
-            }
-        }
-        // lo = first index where minY > charMaxY; only check 0..<lo
-
-        var excluded = false
-        for j in 0..<lo {
-            let expanded = sortedExpanded[j]
-            // Skip rects whose maxY is below charMinY (no vertical overlap)
-            guard expanded.maxY >= charMinY else { continue }
-            guard char.bounds.intersects(expanded) else { continue }
-            // Tier (a) — unconditional floor at the un-expanded rect.
-            if char.bounds.intersects(sortedUnexpanded[j]) {
-                excluded = true
-                break
-            }
-            // Tier (b) — halo, gated on the region touching this
-            // character's line band. A character always contributes to its
-            // own band; a missing band degrades to exclusion (fail-safe).
-            let band = lineBands[char.lineIndex]
-            if band == nil || sortedUnexpanded[j].intersects(band!) {
-                excluded = true
-                break
-            }
-        }
-        if excluded {
-            excludedCount += 1
-        } else {
-            surviving.append(char)
-        }
-    }
-
-    return FilterResult(
-        surviving: surviving,
-        totalCharacters: characters.count,
-        excludedCount: excludedCount
-    )
 }
 
 /// Polygon-aware filter. Same security contract as the rectangle
@@ -434,22 +379,88 @@ public func filterCharacters(
     regionShapes: [RegionShape]
 ) async throws -> FilterResult {
     // Sort by expandedBounds.minY for the binary-search pre-filter.
-    let sorted = regionShapes.sorted {
-        $0.expandedBounds.minY < $1.expandedBounds.minY
+    return try filterCharactersWalk(
+        characters: characters, regions: regionShapes,
+        sortKey: { $0.expandedBounds.minY },
+        expandedBounds: { $0.expandedBounds }, unexpandedBounds: { $0.bounds }
+    ) { char, shape, haloApplies in
+        if let vertices = shape.polygonVertices {
+            // Tier (a) — 0pt floor: un-expanded char vs un-expanded
+            // polygon (the expanded bounding rect is a cheap pre-gate,
+            // a superset of the polygon).
+            if char.bounds.intersects(shape.expandedBounds),
+               rectIntersectsPolygon(char.bounds, vertices: vertices) {
+                return true
+            }
+            // Tier (b) — halo. Expand the character bounds by
+            // safetyMarginPoints (instead of expanding the polygon
+            // vertices) so the boundary halo applies uniformly.
+            // Minkowski-sum identity: `char ∩ (P ⊕ disk) ≡ (char ⊕ disk) ∩ P`
+            // for a symmetric disk (here, the L∞ square of radius
+            // safetyMarginPoints). Vertices come UN-expanded
+            // from PageRasterizer; expanding the char produces the same
+            // set of excluded characters a vertex offset would, without
+            // the edge-normal / concave-corner pitfalls.
+            guard haloApplies else { return false }
+            let expandedChar = char.bounds.insetBy(
+                dx: -safetyMarginPoints, dy: -safetyMarginPoints
+            )
+            guard expandedChar.intersects(shape.expandedBounds) else { return false }
+            return rectIntersectsPolygon(expandedChar, vertices: vertices)
+        } else {
+            // Rect-only regions have safetyMarginPoints baked into
+            // expandedBounds, so both tiers test the un-expanded char
+            // (no double halo).
+            guard char.bounds.intersects(shape.expandedBounds) else { return false }
+            // Tier (a) — unconditional floor at the un-expanded rect.
+            if char.bounds.intersects(shape.bounds) { return true }
+            // Tier (b) — halo within band-intersecting lines.
+            return haloApplies
+        }
     }
-    let minYValues = sorted.map(\.expandedBounds.minY)
+}
+
+// MARK: - The shared filter walk
+
+/// The walk both `filterCharacters` overloads share: the regions sorted by
+/// the caller's key, the Y-range pre-filter (a binary search over the sorted
+/// regions' expanded minY against each character's maxY, so the inner loop
+/// is O(log m + k) for the k Y-overlapping regions), the per-character
+/// cooperative cancellation and the line-band halo gate. Only the innermost
+/// tier test differs between the overloads and is passed in: it reads the
+/// character, the candidate region and whether the halo applies on this
+/// character's line, and says whether the character is excluded. Survivors
+/// keep their input order; the security invariant (any-overlap exclusion)
+/// is the closure's — the walk only narrows the candidate set.
+///
+/// Per-character cooperative cancellation: the inner body is binary-search
+/// bounded, so a check on every iteration is negligible overhead here. The
+/// sibling per-character walks (`verifySpatialExclusion`,
+/// `TextLayerExtractor`) check once per 256-character band instead, because
+/// their per-character bodies cost more.
+func filterCharactersWalk<Region>(
+    characters: [CharacterInfo],
+    regions: [Region],
+    sortKey: (Region) -> CGFloat,
+    expandedBounds: (Region) -> CGRect,
+    unexpandedBounds: (Region) -> CGRect,
+    excludes: (_ char: CharacterInfo, _ region: Region, _ haloApplies: Bool) -> Bool
+) throws -> FilterResult {
+    let sorted = regions.sorted { sortKey($0) < sortKey($1) }
+    // Pre-compute minY values for upper-bound search
+    let minYValues = sorted.map { expandedBounds($0).minY }
 
     let lineBands = lineBandRects(characters)
     var surviving: [CharacterInfo] = []
     var excludedCount = 0
 
-    // Per-character cooperative cancellation. See sibling
-    // overload above for cadence rationale (binary-search bounded inner body).
     for char in characters {
         try Task.checkCancellation()
         let charMinY = char.bounds.minY
         let charMaxY = char.bounds.maxY
 
+        // Binary search: the last region whose expanded minY <= charMaxY.
+        // Any region with minY > charMaxY cannot overlap this character vertically.
         var lo = 0
         var hi = sorted.count
         while lo < hi {
@@ -460,60 +471,23 @@ public func filterCharacters(
                 hi = mid
             }
         }
+        // lo = first index where minY > charMaxY; only check 0..<lo
 
         var excluded = false
         for j in 0..<lo {
-            let shape = sorted[j]
-            guard shape.expandedBounds.maxY >= charMinY else { continue }
+            let region = sorted[j]
+            // Skip regions whose maxY is below charMinY (no vertical overlap)
+            guard expandedBounds(region).maxY >= charMinY else { continue }
             // Halo gate: the halo tier applies only when the region's
             // un-expanded rect touches this character's line band. The 0pt
             // floor is unconditional. A character always contributes to
             // its own band; a missing band degrades to the halo applying
             // (fail-safe).
             let band = lineBands[char.lineIndex]
-            let haloApplies = band == nil || shape.bounds.intersects(band!)
-            if let vertices = shape.polygonVertices {
-                // Tier (a) — 0pt floor: un-expanded char vs un-expanded
-                // polygon (the expanded bounding rect is a cheap pre-gate,
-                // a superset of the polygon).
-                if char.bounds.intersects(shape.expandedBounds),
-                   rectIntersectsPolygon(char.bounds, vertices: vertices) {
-                    excluded = true
-                    break
-                }
-                // Tier (b) — halo. Expand the character bounds by
-                // safetyMarginPoints (instead of expanding the polygon
-                // vertices) so the boundary halo applies uniformly.
-                // Minkowski-sum identity: `char ∩ (P ⊕ disk) ≡ (char ⊕ disk) ∩ P`
-                // for a symmetric disk (here, the L∞ square of radius
-                // safetyMarginPoints). H2 fix — vertices come UN-expanded
-                // from PageRasterizer; expanding the char produces the same
-                // set of excluded characters a vertex offset would, without
-                // the edge-normal / concave-corner pitfalls.
-                guard haloApplies else { continue }
-                let expandedChar = char.bounds.insetBy(
-                    dx: -safetyMarginPoints, dy: -safetyMarginPoints
-                )
-                guard expandedChar.intersects(shape.expandedBounds) else { continue }
-                if rectIntersectsPolygon(expandedChar, vertices: vertices) {
-                    excluded = true
-                    break
-                }
-            } else {
-                // Rect-only regions have safetyMarginPoints baked into
-                // expandedBounds, so both tiers test the un-expanded char
-                // (no double halo).
-                guard char.bounds.intersects(shape.expandedBounds) else { continue }
-                // Tier (a) — unconditional floor at the un-expanded rect.
-                if char.bounds.intersects(shape.bounds) {
-                    excluded = true
-                    break
-                }
-                // Tier (b) — halo within band-intersecting lines.
-                if haloApplies {
-                    excluded = true
-                    break
-                }
+            let haloApplies = band == nil || unexpandedBounds(region).intersects(band!)
+            if excludes(char, region, haloApplies) {
+                excluded = true
+                break
             }
         }
         if excluded {
