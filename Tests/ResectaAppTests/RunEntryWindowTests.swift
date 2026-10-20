@@ -82,7 +82,10 @@ struct RunEntryPendingRunGateTests {
         let body = try #require(source.range(of: "func performDoneCloseSession() {"))
         let tail = source[body.upperBound...]
         let cancel = tail.range(of: "documentState.cancelActivePipeline(redactionState: redactionState)")
-        let clear = try #require(tail.range(of: "redactionState.clearAll()"))
+        // The clear runs inside the one reset the teardown calls
+        // (`DocumentState.resetForStartOver`: the protection downgrade,
+        // then `redactionState.clearAll()`, then the session fields).
+        let clear = try #require(tail.range(of: "documentState.resetForStartOver(redactionState: redactionState, coordinator: coordinator)"))
         #expect(cancel != nil, "the teardown must cancel a run pending in the capture window")
         if let cancel {
             #expect(cancel.lowerBound < clear.lowerBound,

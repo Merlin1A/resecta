@@ -10,7 +10,7 @@ import Foundation
 //
 // **Isolation model.** Earlier drafts used process-wide globals, which
 // raced when Swift Testing scheduled tests in parallel:
-// `testRetryAtHalfDPISucceeds` and `testHalfDPIFloor96` would
+// `testRetryAtHalfDPISucceeds` and `testRetryRendersAtTheLowestTier` would
 // double-increment one another's `rasterizeCallCount`. The seam now keys
 // its state on a task-local activation handle so each test can install
 // its own `Recorder` via `withActivated(_:body:)`; calls outside that
@@ -31,12 +31,17 @@ enum PageRasterizerTestSeam {
     /// rasterizer do not contend for the same counters.
     final class Recorder: @unchecked Sendable {
         private let lock = NSLock()
-        private var _simulatedVerifyFailures: Set<Int>
+        /// The attempts still to fail, per page index.
+        private var _remainingFailures: [Int: Int]
         private var _rasterizeCallCount: Int = 0
         private var _dpiCapHistory: [(pageIndex: Int, dpiCap: Int)] = []
 
-        init(simulatedVerifyFailures: Set<Int> = []) {
-            self._simulatedVerifyFailures = simulatedVerifyFailures
+        /// Each listed page fails its first `failingAttempts` rasterize
+        /// calls (one by default — the retry then succeeds; two drives the
+        /// production wrapper's second-failure branch).
+        init(simulatedVerifyFailures: Set<Int> = [], failingAttempts: Int = 1) {
+            self._remainingFailures = Dictionary(
+                uniqueKeysWithValues: simulatedVerifyFailures.map { ($0, failingAttempts) })
         }
 
         /// Total rasterize calls observed during the activation.
@@ -49,28 +54,16 @@ enum PageRasterizerTestSeam {
             lock.lock(); defer { lock.unlock() }; return _dpiCapHistory
         }
 
-        /// Re-prime a page index for the NEXT rasterize call. Used by the
-        /// "second-failure propagates" test which needs both attempts to
-        /// throw — between them it inserts the index again so the retry
-        /// also sees a simulated failure.
-        func insertSimulatedFailure(_ pageIndex: Int) {
-            lock.lock(); defer { lock.unlock() }
-            _simulatedVerifyFailures.insert(pageIndex)
-        }
-
-        /// Record the call entry. Returns true if the configured failure
-        /// set includes `pageIndex`, in which case the caller should throw
-        /// `fillVerificationFailed`; the page index is consumed atomically
-        /// so only the first attempt for that page fails.
+        /// Record the call entry. Returns true while the page still has a
+        /// failing attempt left, in which case the caller should throw
+        /// `fillVerificationFailed`; the count is consumed atomically.
         func recordCallAndShouldFail(pageIndex: Int, dpiCap: Int) -> Bool {
             lock.lock(); defer { lock.unlock() }
             _rasterizeCallCount += 1
             _dpiCapHistory.append((pageIndex: pageIndex, dpiCap: dpiCap))
-            if _simulatedVerifyFailures.contains(pageIndex) {
-                _simulatedVerifyFailures.remove(pageIndex)
-                return true
-            }
-            return false
+            guard let remaining = _remainingFailures[pageIndex], remaining > 0 else { return false }
+            _remainingFailures[pageIndex] = remaining - 1
+            return true
         }
     }
 
@@ -104,10 +97,12 @@ enum PageRasterizerTestSeam {
     /// Release-build no-op shim. The recorder retains the surface
     /// for binary compatibility with debug callers but holds no state.
     final class Recorder: @unchecked Sendable {
-        init(simulatedVerifyFailures: Set<Int> = []) { _ = simulatedVerifyFailures }
+        init(simulatedVerifyFailures: Set<Int> = [], failingAttempts: Int = 1) {
+            _ = simulatedVerifyFailures
+            _ = failingAttempts
+        }
         var rasterizeCallCount: Int { 0 }
         var dpiCapHistory: [(pageIndex: Int, dpiCap: Int)] { [] }
-        func insertSimulatedFailure(_ pageIndex: Int) {}
         func recordCallAndShouldFail(pageIndex: Int, dpiCap: Int) -> Bool { false }
     }
 

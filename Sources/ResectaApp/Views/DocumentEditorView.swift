@@ -73,10 +73,12 @@ struct DocumentEditorView: View {
     /// sheet goes down, not the work); backing out of the dialog
     /// re-presents it through the review bridge
     /// (`restoreParkedReviewIfNeeded()`), Close tears it down with the
-    /// session. A parked plain search session is not restored — its
-    /// results are transient and the sheet clears them on disappearance,
-    /// the same outcome as its own Dismiss.
+    /// session.
     @State var homeCloseParkedReview = false
+
+    /// A search session parked for the close dialog, kept whole for Cancel
+    /// (`restoreParkedSearchIfNeeded()`); Close drops it with the session.
+    @State var parkedEditorSearch: SearchState?
 
     // Drives the bespoke share-risk confirm sheet shown when a
     // Share tap reaches handleExportTap while the report is FAIL/ATTENTION
@@ -944,17 +946,13 @@ struct DocumentEditorView: View {
                 coordinator.runFullPipeline(documentOverride: documentOverride)
             }
             .tint(ResectaTokens.BrandTeal.tint)
-            // Gate on the full pipeline-start predicate
-            // (phase + triage + active task) in addition to the existing
-            // effective-regions check. `keyboardShortcut` on a Button
-            // inherits the `.disabled` modifier, so Cmd-Shift-R is
-            // covered without a separate guard.
-            .disabled(!redactionState.hasEffectiveRegions
-                      || !documentState.canStartPipeline(with: redactionState))
+            // The gate (`+RedactGate`): effective regions, the pipeline-start
+            // predicate, no selected-but-unapplied matches. The shortcut
+            // inherits `.disabled`.
+            .disabled(redactButtonDisabled)
             .keyboardShortcut("r", modifiers: [.command, .shift])
             .accessibilityIdentifier("redactButton")
-            .accessibilityHint(redactionState.hasEffectiveRegions
-                               ? "" : "Draw regions or apply Scan or Search results first")
+            .accessibilityHint(redactButtonHint)
 
             settingsButton
 

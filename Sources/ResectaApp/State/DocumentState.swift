@@ -202,18 +202,6 @@ class DocumentState {
     /// activePipelineTask.
     var activeRunId: UUID?
 
-    /// Cancellation-in-progress sentinel. Set true while
-    /// `cancelActivePipeline` is unwinding the active pipeline / import
-    /// Task; cleared once cancellation has propagated to the chosen exit
-    /// phase. While true, `transition()` refuses to re-enter the active
-    /// pipeline phases (`.detecting`, `.redacting`, `.verifying`); this
-    /// suppresses the progress-card flicker that the cancelled Task's
-    /// in-flight progress tick can otherwise produce between the user's
-    /// Stop tap and the Task's `Task.checkCancellation()` surrender. The
-    /// guard is in addition to the legal-transition table, not in place
-    /// of it.
-    var isCancelling: Bool = false
-
     /// Set when pipeline was paused by app backgrounding.
     var wasPausedByBackground: Bool = false
 
@@ -515,23 +503,6 @@ class DocumentState {
         let newKind = kindOf(newPhase)
         let pair = TransitionPair(phaseKind, newKind)
 
-        // Drop progress-tick (self-transition) and re-entry
-        // attempts into the active pipeline phases while a cancel is in
-        // flight. The cancelled Task's `Task.checkCancellation()` surrender
-        // can race the user's Stop tap; without this guard a final progress
-        // tick from the dying Task flips the card back to `.redacting /
-        // .detecting / .verifying` for one frame before the exit transition
-        // lands. Legal-transition check still runs below for the unguarded
-        // exit transitions (e.g., `.detecting → .editing`).
-        if isCancelling {
-            switch newKind {
-            case .detecting, .redacting, .verifying:
-                return false
-            default:
-                break
-            }
-        }
-
         guard Self.legalTransitions.contains(pair) else {
             logger.error(
                 "Illegal phase transition: \(self.phaseKind, privacy: .public) → \(newKind, privacy: .public)"
@@ -657,13 +628,14 @@ class DocumentState {
     /// through the `Task.checkCancellation()` calls at the top of
     /// `ImportService.validatePDFOffMainActor`'s per-page loops.
     ///
-    /// `isCancelling = true` for the duration of the
-    /// transition so the cancelled Task's racing progress-tick is dropped
-    /// by `transition()`. A detached MainActor awaiter waits on each
-    /// cancelled Task's `.value` so the Task's `defer` block — which
-    /// nils `activePipelineTask` / `activeRunId` only when the run still
-    /// matches — observably completes before the next pipeline kicks off
-    /// from the same workspace. The sync signature is preserved; callers
+    /// The run is invalidated here, synchronously: `activeRunId` is nilled,
+    /// so every later event the cancelled Task reports — its racing
+    /// progress tick first of all — is dropped by the coordinator's sink
+    /// (`PipelineCoordinator.apply(_:from:)`) and its `defer`, which nils
+    /// the task only when the run still matches, has nothing to clear. A
+    /// detached MainActor awaiter waits on each cancelled Task's `.value`
+    /// so that `defer` observably completes before the next pipeline kicks
+    /// off from the same workspace. The sync signature is preserved; callers
     /// from button-tap and `RedactWorkspace.tearDown()` need no change.
     func cancelActivePipeline(redactionState: RedactionState) {
         // Capture references before nilling so the awaiter
@@ -675,13 +647,7 @@ class DocumentState {
         activePipelineTask = nil
         activeImportTask?.cancel()
         activeImportTask = nil
-
-        // Gate the cancelled Task's racing progress-tick out of
-        // the active pipeline phases. Cleared at the end of this function
-        // — once `transition()` has driven phase to the chosen safe state
-        // the gate is no longer required.
-        isCancelling = true
-        defer { isCancelling = false }
+        activeRunId = nil
 
         switch phaseKind {
         case .importing:

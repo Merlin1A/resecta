@@ -46,7 +46,7 @@ is no threshold: one wrong pixel fails that render; the page is re-rendered
 once at the lowest resolution tier (150 DPI) and re-verified, and a second
 failure fails the whole export with an error rather than shipping (the retry
 is the app's: `rasterizeWithRetry` in
-`Sources/ResectaApp/State/PipelineCoordinator.swift`). Polygon
+`Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift`). Polygon
 regions — a path the editor does not offer in this release — get the same
 readback, with the mask built by a scanline rasteriser written independently
 of the Core Graphics fill, so the check shares no code with the thing it
@@ -429,7 +429,7 @@ If you review one path end-to-end, make it this one:
 `Verification/VerificationEngine.swift` (the layered pass over the output) →
 `SecurityTests/FakeRedactionTests.swift` (the named attack, pinned). The test
 tree is larger than the source tree — about 63,000 lines of source to about
-97,000 lines of tests; counts and structure are in the README's Testing
+100,000 lines of tests; counts and structure are in the README's Testing
 section — and the suites above are the reason I trust my own output enough to
 ship it.
 

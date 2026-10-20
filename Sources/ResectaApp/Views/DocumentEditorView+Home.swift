@@ -41,20 +41,11 @@ extension DocumentEditorView {
         // session — nothing is re-presented after the teardown.
         homeCloseAwaitsSheetDismissal = false
         homeCloseParkedReview = false
-        // Downgrade temp-file protection before tearing down
-        // the session state. Done before clearAll() so the path
-        // walked still matches the live session's outputURL.
-        coordinator.downgradeTempProtectionOnSessionClose()
-        redactionState.clearAll()
-        documentState.sourceDocument = nil
-        documentState.textLayerStatus = [:]
-        documentState.sourceAnnotationFindings = []
-        documentState.annotationNoticeDismissed = false
-        documentState.currentPageIndex = 0
-        documentState.lastUsedPipelineMode = nil
-        documentState.wasPausedByBackground = false
-        documentState.pausedFromPhase = nil
-        documentState.transition(to: .empty)
+        parkedEditorSearch?.cancelSearchWithoutAwait()
+        parkedEditorSearch = nil
+        // The one reset Start Over runs — the same fields in the same
+        // order, nothing hand-copied; it ends in `.empty`.
+        documentState.resetForStartOver(redactionState: redactionState, coordinator: coordinator)
     }
 
     // MARK: - Home (1.1.0 Home swap — shares the Done close path)
@@ -105,6 +96,21 @@ extension DocumentEditorView {
         return sheetPresented ? .parkSheetThenDialog : .presentDialog
     }
 
+    /// Pure split of what a presented sheet parks as: the staged review when
+    /// one is pending (its own bridge re-presents it), else the search
+    /// session itself.
+    static func homeCloseParksSearch(hasPendingTriage: Bool) -> Bool {
+        !hasPendingTriage
+    }
+
+    /// Pure gate for re-presenting a parked search session after the close
+    /// dialog went down without Close: the slot idle, the session editing.
+    static func homeCloseShouldRestoreSearch(
+        sheetPresented: Bool, phaseKind: DocumentState.PhaseKind
+    ) -> Bool {
+        !sheetPresented && phaseKind == .editing
+    }
+
     /// Pure gate for re-presenting a parked review after the close dialog
     /// went down without Close: only when a review was parked, the staged
     /// set is still pending, the sheet slot is idle and the session is
@@ -126,15 +132,36 @@ extension DocumentEditorView {
     /// Take the presenting sheet down without touching the work behind it.
     /// Only `activeSearch` is cleared — a staged review stays in
     /// `pendingTriage` (the presentation bridge observes the pending set's
-    /// arrival, not its persistence, so nothing re-presents meanwhile); a
-    /// rationale sheet is simply dropped.
+    /// arrival, not its persistence, so nothing re-presents meanwhile); any
+    /// other search session is kept whole in `parkedEditorSearch`, its
+    /// results and selections intact, flagged so the sheet's teardown
+    /// spares it; a rationale sheet is simply dropped.
     private func parkEditorSheetForHomeClose() {
-        if redactionState.activeSearch != nil {
-            homeCloseParkedReview = redactionState.pendingTriage != nil
+        if let search = redactionState.activeSearch {
+            if Self.homeCloseParksSearch(hasPendingTriage: redactionState.pendingTriage != nil) {
+                search.parkedForHomeClose = true
+                parkedEditorSearch = search
+            } else {
+                homeCloseParkedReview = true
+            }
             redactionState.activeSearch = nil
         } else if redactionState.pendingCanvasRationaleRequest != nil {
             redactionState.pendingCanvasRationaleRequest = nil
         }
+    }
+
+    /// Re-present a search session parked for the dialog when it went down
+    /// without Close: the same `SearchState` back in the sheet slot. Nothing
+    /// when Close already tore the session down (it drops the parked
+    /// session) or the slot is busy.
+    private func restoreParkedSearchIfNeeded() {
+        guard let parked = parkedEditorSearch else { return }
+        parkedEditorSearch = nil
+        parked.parkedForHomeClose = false
+        guard Self.homeCloseShouldRestoreSearch(
+            sheetPresented: editorSheetIsPresented, phaseKind: documentState.phaseKind
+        ) else { return }
+        redactionState.activeSearch = parked
     }
 
     /// Re-present a parked review after the dialog went down without
@@ -155,7 +182,7 @@ extension DocumentEditorView {
 
     /// `$showDoneConfirmation` with one hook: when the dialog goes
     /// down without Close — the Cancel row, or the tap-outside dismissal
-    /// of the iOS 26 popover — a parked review comes back. Deferred one
+    /// of the iOS 26 popover — a parked review or search comes back. Deferred one
     /// runloop turn: the setter runs inside SwiftUI's dismiss transaction,
     /// where re-presenting a sheet is the re-entrant write class the sheet
     /// slot's own setter defers (see its comment). Close clears the parked
@@ -166,7 +193,10 @@ extension DocumentEditorView {
             set: { presented in
                 showDoneConfirmation = presented
                 guard !presented else { return }
-                Task { @MainActor in restoreParkedReviewIfNeeded() }
+                Task { @MainActor in
+                    restoreParkedReviewIfNeeded()
+                    restoreParkedSearchIfNeeded()
+                }
             }
         )
     }

@@ -18,7 +18,7 @@ struct ImportMirrorParityTests {
         let mirror = try #require(
             functionText(from: "static func importMirror(", upTo: "// MARK: - Fixture table", in: runner))
 
-        let appClasses = try matches(of: #"\.importError\(\.(\w+)"#, in: loader)
+        let appClasses = try matches(of: #"\.(?:importError|redactionError)\(\.(\w+)"#, in: loader)
         let mirrorClasses = try matches(of: #"(?:errorClass: "|pageError = ")(\w+)""#, in: mirror)
 
         #expect(appClasses.count >= 6, "the loader's stages were not read: \(appClasses)")
