@@ -5,11 +5,11 @@ import Foundation
 // Overlapping match support via output links.
 
 /// A match found by the Aho-Corasick automaton.
-public struct AhoCorasickMatch: Sendable {
+struct AhoCorasickMatch: Sendable {
     /// Byte offset in the input where the match starts.
     public let position: Int
     /// Index of the pattern that matched (in the order added).
-    public let patternIndex: Int
+    let patternIndex: Int
     /// Length of the matched pattern in bytes.
     public let length: Int
 }
@@ -17,7 +17,7 @@ public struct AhoCorasickMatch: Sendable {
 /// Byte-oriented Aho-Corasick automaton for multi-pattern string search.
 /// Operates on raw bytes, not Swift Strings. Each pattern is a `[UInt8]`
 /// array (length-prefixed, null-byte safe for UTF-16 encodings).
-public struct AhoCorasick: Sendable {
+struct AhoCorasick: Sendable {
     private let goto: [[UInt8: Int]]     // goto function: state × byte → state
     private let fail: [Int]               // failure function
     private let output: [[Int]]           // output function: state → pattern indices
@@ -26,7 +26,7 @@ public struct AhoCorasick: Sendable {
     /// True when total pattern bytes exceeded maxTotalPatternBytes and the
     /// automaton was constructed as a no-op. Callers should treat matches
     /// as incomplete when this is set.
-    public let isDegraded: Bool
+    let isDegraded: Bool
 
     /// Maximum total pattern bytes before the automaton degrades to a no-op.
     /// 2 MB: the largest realistic term set — 250 distinct 40-character
@@ -188,7 +188,7 @@ public struct AhoCorasick: Sendable {
     /// character AND a ligature site (its normalized form and the composed
     /// form both differ from the variant). The 2 MB memory bound counts the
     /// emitted bytes of every form. Order-stable.
-    public static func encodeForSearch(_ term: String) -> [[UInt8]] {
+    static func encodeForSearch(_ term: String) -> [[UInt8]] {
         let nfc = term.precomposedStringWithCanonicalMapping
         // lowercased()/uppercased() are the locale-independent String methods
         // (not localizedLowercase); Title Case pinned to en_US_POSIX.
@@ -244,7 +244,7 @@ public struct AhoCorasick: Sendable {
     /// NFC-normalized term so composed and decomposed spellings of the same
     /// text get the same verdict. Shared by Layer 3, Layer 10, and Layer 2's
     /// `classifyPageOCR`.
-    public static func isSearchableTerm(_ term: String) -> Bool {
+    static func isSearchableTerm(_ term: String) -> Bool {
         let scalars = term.precomposedStringWithCanonicalMapping.unicodeScalars
         if scalars.count >= 3 { return true }
         return scalars.count == 2 && scalars.allSatisfy { $0.value >= 0x2E80 }
@@ -256,7 +256,7 @@ public struct AhoCorasick: Sendable {
     /// this guards the counting surface independently so user-facing
     /// "(N match(es))" counts stay physical. Genuine overlaps (different
     /// position or length) still count separately.
-    public static func uniqueOccurrenceCount(_ matches: [AhoCorasickMatch]) -> Int {
+    static func uniqueOccurrenceCount(_ matches: [AhoCorasickMatch]) -> Int {
         struct Occurrence: Hashable {
             let position: Int
             let length: Int

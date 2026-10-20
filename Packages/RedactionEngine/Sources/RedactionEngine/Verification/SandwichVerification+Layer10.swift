@@ -39,7 +39,7 @@ extension SandwichVerification {
     /// itself stays content-free). Both nil for every other status.
     /// `couldNotVerify` is true for the WARNs that say the scan did not
     /// fully run (terms it could not search, pages it could not traverse).
-    public func verifyTextOperatorSemantics(
+    func verifyTextOperatorSemantics(
         outputDocument: SendablePDFDocument,
         sensitiveTerms: [SensitiveTerm]
     ) async -> (status: VerificationStatus, pageReferences: [Int]?, reviewTermTexts: [String]?,
