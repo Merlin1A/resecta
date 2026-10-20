@@ -156,18 +156,25 @@ struct SearchResultRow: View {
                         }
                     }
                     .padding(.leading, ResectaTokens.Spacing.xs)
-                    // ONE merged element that names the page (and the
-                    // spoken tier where the row is graded — the bar's
-                    // non-visual twin) — never the matched text, never
-                    // the window.
+                    // ONE merged element that names the category, the
+                    // page, the spoken tier where the row is graded (the
+                    // bar's non-visual twin) and the applied state —
+                    // never the matched text, never the window.
                     // The `.ignore` merge hides the inner selection
-                    // circle; the named action keeps non-visual
-                    // selection first-class.
+                    // circle; the DEFAULT action toggles selection (it
+                    // never parks the sheet the way the sighted tap's
+                    // navigation does), and the named action keeps
+                    // non-visual selection first-class in the rotor.
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(Self.accessibilityLabel(
-                        for: result, tier: tier, showsTier: showsTier
+                        for: result, tier: tier, showsTier: showsTier,
+                        isApplied: isApplied
                     ))
+                    .accessibilityIdentifier(Self.accessibilityIdentifier(for: result))
                     .accessibilityAddTraits(result.isSelected ? .isSelected : [])
+                    .accessibilityAction {
+                        result.isSelected.toggle()
+                    }
                     .accessibilityAction(named: "Toggle selection") {
                         result.isSelected.toggle()
                     }
