@@ -22,7 +22,7 @@ private let zeroizeSignposter = OSSignposter(
 
 /// Create a bitmap context with sRGB color space and BGRA pixel layout.
 /// Returns nil if non-premultiplied alpha is requested (iOS restriction).
-public func createBitmapContext(width: Int, height: Int) -> CGContext? {
+func createBitmapContext(width: Int, height: Int) -> CGContext? {
     guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
     let bitmapInfo = CGBitmapInfo.byteOrder32Little.rawValue
                    | CGImageAlphaInfo.premultipliedFirst.rawValue
@@ -55,7 +55,7 @@ public enum PixelOperations {
     /// pixel data persisting in heap memory after fill/verify
     /// completes; it does not address copies CoreGraphics may have
     /// made into image caches during `makeImage()`.
-    public static func zeroizeBitmapBuffer(_ context: CGContext) {
+    static func zeroizeBitmapBuffer(_ context: CGContext) {
         guard let data = context.data else { return }
         let byteCount = context.bytesPerRow * context.height
         guard byteCount > 0 else { return }
@@ -96,7 +96,7 @@ public func effectiveBounds(_ rawBounds: CGRect, rotation: Int) -> CGRect {
 ///
 /// SECURITY NOTE: Correctness depends entirely on renderPage() producing
 /// a bitmap where visual content fills the full width and height.
-public func normalizedToFillPixels(
+func normalizedToFillPixels(
     _ normalized: CGRect,
     bitmapWidth: Int,
     bitmapHeight: Int
@@ -125,7 +125,7 @@ public func normalizedToFillPixels(
 extension CGRect {
     /// Expand to integer pixel boundaries. Prevents partial-pixel fills
     /// that could leak original content through anti-aliased edges.
-    public func pixelAligned() -> CGRect {
+    func pixelAligned() -> CGRect {
         CGRect(x: floor(minX), y: floor(minY),
                width: ceil(maxX) - floor(minX),
                height: ceil(maxY) - floor(minY))
@@ -157,7 +157,7 @@ internal let cancellationBandRows: Int = 256
 /// fast scanline-band fill route. Anti-aliasing is disabled across both
 /// paths so polygon edges are pixel-exact and verify can use the same
 /// mask-equality check.
-public func applyRedactionFills(
+func applyRedactionFills(
     context: CGContext,
     regions: [RedactionRegion],
     fillColor: FillColor
@@ -369,7 +369,7 @@ internal func fillPolygonRegion(
 /// surrenders within the 50 ms p95 cancellation budget. Throws
 /// `CancellationError` on cancel; returns `Bool` for the verification result
 /// itself.
-public func verifyFill(
+func verifyFill(
     context: CGContext,
     rect: CGRect,
     expectedColor: ExpectedPixelBGRA
@@ -578,7 +578,7 @@ internal func buildPolygonMask(
 /// `pixelVertices` are in the same coordinate system as the bitmap context
 /// (bottom-left origin, pixel units). Convert from normalized using
 /// `normalizedVertexToPixels` upstream.
-public func verifyPolygonFill(
+func verifyPolygonFill(
     context: CGContext,
     pixelVertices: [CGPoint],
     expectedColor: ExpectedPixelBGRA
