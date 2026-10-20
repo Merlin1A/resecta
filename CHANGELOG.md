@@ -51,6 +51,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - Search: on a page whose text layer carries a ligature or another character that normalization expands, a match's rect now covers the matched glyphs; before, the rect sat as many characters to the right as the expansions before the match had added.
 - In Regex mode the Case-sensitive option now governs the pattern; with it off, "smith" matches "Smith".
+- A PDF whose document-information dictionary holds a key PDFKit cannot read no longer ends the app when it is searched or verified: the write PDFKit performs on the way to the search copy and to the verification reader runs behind an exception boundary, and such a document reads as "could not read" on the paths that already handle it.
 - Redact: a page that finishes after Stop no longer brings the progress card back for a frame — Stop invalidates the run, and the run's later reports are dropped.
 - Redact: the per-page retry's memory check estimates the 150-DPI render it performs, instead of a 96-DPI render the rasterizer never makes.
 - Done and Home reset the session through the one Start Over path, so a re-imported document no longer shows the previous document's form-field notice.
