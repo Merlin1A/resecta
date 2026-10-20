@@ -74,8 +74,8 @@ extension SearchAndRedactSheet {
     /// the chrome — the hit area is the drawn frame, never an expansion.
     /// Identifier BEFORE `.disabled` so it stays on the AX surface while
     /// disabled (the detent-layout leg reads the disabled → enabled
-    /// round-trip through it); the a11y label stays "Apply" in both
-    /// states. The label's inset is `Spacing.md`; the strip adds the
+    /// round-trip through it); the a11y label reads "Apply" then
+    /// "Applied". The label's inset is the medium spacing token; the strip adds the
     /// leading inset. On the review origin the slot mounts
     /// `reviewSelectButton` instead.
     func applyCurrentResultButton() -> some View {
@@ -115,11 +115,20 @@ extension SearchAndRedactSheet {
                 .buttonStyle(.capsulePress)
             }
         }
-        .accessibilityLabel("Apply")
+        // The spoken name follows the drawn state — "Applied" once the
+        // match is marked (the dimmed "Apply" read as a broken
+        // control) — and the value keeps the position.
+        .accessibilityLabel(Self.applyAccessibilityLabel(applied: applyCurrentResultApplied))
         .accessibilityValue(walkAccessibilityValue)
         .accessibilityHint("Marks the current match for redaction.")
         .accessibilityIdentifier("applyCurrentResultButton")
         .disabled(applyCurrentResultDisabled)
+    }
+
+    /// The per-item Apply capsule's spoken name in its two states: the
+    /// applied-filter chip's word once the match is marked.
+    nonisolated static func applyAccessibilityLabel(applied: Bool) -> String {
+        applied ? AppliedFilter.applied.rawValue : "Apply"
     }
 
     // MARK: - Per-item Select (the review origin)

@@ -58,6 +58,12 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Redact clears the undo history at the Apply seam, as the results card says; an Undo after Keep Editing no longer unlinks the built output.
 - Search sheet: the "unapplied matches cleared" toasts no longer count matches a region already covers.
 - Search sheet: the custom-term time-limit toast names neither the term nor the page, and is shown once for a scan instead of once per page.
+- Accessibility: the search sheet's header stacks Dismiss, the title and Apply on lines of their own at accessibility text sizes, so no button hyphenates and the title keeps its words.
+- Accessibility: a toast's icon scales with its message and sits beside the first character instead of on it at accessibility text sizes.
+- Accessibility: a search result row speaks its category (an address, a Social Security number), its page, its confidence and whether it is applied — never the matched text; the row's default action toggles its selection instead of parking the sheet.
+- Accessibility: a staged search term's remove control is named "Remove" with the term and meets the 46-point target; the Custom Terms add row's Regex toggle and add button meet it too.
+- Accessibility: the parked strip's Apply capsule is named "Applied" once the match is marked, with the match's position as its value, and every element of the strip offers a "Show full sheet" action.
+- Accessibility: the page bar's counter is one spoken element, "Page k of N, n regions"; filter chips report when they are selected.
 - Custom terms and saved patterns: a regular expression holding a character whose uppercase form is two letters (such as ß or the ﬁ ligature) no longer stops the app when the pattern is validated.
 - Verification: the search re-check and the detection sweep list a page as not checked when a custom regular-expression term ran out of time on it, instead of counting the page as read.
 - Verification: the detection sweep reports a custom term added after a scan was applied as a possible item instead of discarding it as the scan's.

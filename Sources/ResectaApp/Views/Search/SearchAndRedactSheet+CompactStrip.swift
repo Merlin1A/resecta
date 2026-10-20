@@ -90,11 +90,22 @@ extension SearchAndRedactSheet {
                 }
             }
             .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+            // On the Group, so EVERY element the parked strip serves
+            // (the title, the Apply capsule, the chevrons) offers the
+            // action: the sighted raise is the grabber drag, which has
+            // no non-visual twin.
+            .accessibilityAction(named: Self.showFullSheetActionName) {
+                selectedDetent = .medium
+            }
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("compactFloatStrip")
     }
+
+    /// The parked strip's custom action that raises the sheet to the
+    /// medium detent.
+    nonisolated static let showFullSheetActionName = "Show full sheet"
 
     /// The compact handle's title — the centred headline, unchanged.
     var compactStripTitle: some View {

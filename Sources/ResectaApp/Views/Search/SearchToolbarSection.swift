@@ -607,14 +607,22 @@ struct SearchToolbarSection: View {
                         .font(.caption)
                         .monospacedDigit()
                         .privacySensitive()
+                    // The remove control at the 46-pt LAYOUT floor
+                    // (the glyph stays caption-sized; the frame is the
+                    // hit area, never an expansion past it) with its
+                    // own spoken name — the bare xmark read as nothing.
                     Button {
                         searchState.searchTerms.removeAll { $0 == term }
                         onTriggerSearch()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.caption2)
+                            .frame(minWidth: ResectaTokens.TouchTarget.minimum,
+                                   minHeight: ResectaTokens.TouchTarget.minimum)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(Self.removeTermAccessibilityLabel(term))
                     .disabled(searchState.isSearching)
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.sm)
@@ -625,6 +633,11 @@ struct SearchToolbarSection: View {
             }
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
+    }
+
+    /// The staged term chip's remove control: "Remove ⟨term⟩".
+    nonisolated static func removeTermAccessibilityLabel(_ term: String) -> String {
+        "Remove \(term)"
     }
 
     // MARK: - Saved Regex Menu (Regex mode)

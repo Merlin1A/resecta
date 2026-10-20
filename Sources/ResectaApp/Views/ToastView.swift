@@ -29,10 +29,16 @@ struct ToastView: View {
     let toastManager: ToastQueueManager
 
     var body: some View {
-        HStack(spacing: ResectaTokens.Spacing.sm) {
+        // The icon scales with the message (the same text style) and
+        // sits on the text's first baseline inside a MINIMUM frame:
+        // the former fixed 20-pt box let the glyph grow over its own
+        // edge onto the first character at accessibility sizes.
+        HStack(alignment: .firstTextBaseline, spacing: ResectaTokens.Spacing.sm) {
             Image(systemName: item.severity.sfSymbol)
+                .font(Self.toastIconFont)
                 .foregroundStyle(item.severity.tintColor)
-                .frame(width: 20, height: 20)
+                .frame(minWidth: Self.toastIconMinimumSide,
+                       minHeight: Self.toastIconMinimumSide)
 
             Text(item.message)
                 .font(.callout.weight(.medium))
@@ -89,6 +95,13 @@ struct ToastView: View {
     /// assertable. Exposed as a `static` so the contract can be
     /// unit-tested without rendering the view (mirrors
     /// `InlineWarningBanner.lineLimit(for:)`).
+    /// The icon's text style — the message's own, so both scale
+    /// together — and the floor its frame never shrinks under (the
+    /// former fixed box, now a minimum). Pinned by
+    /// `AccessibilityLabelTests`.
+    static let toastIconFont: Font = .callout.weight(.medium)
+    static let toastIconMinimumSide: CGFloat = 20
+
     static func toastLineLimit(
         severity: ToastSeverity,
         dynamicTypeSize: DynamicTypeSize

@@ -37,12 +37,14 @@ struct PageNavigationBar: View {
             .accessibilityIdentifier("pageNavPrevious")
             .disabled(documentState.currentPageIndex <= 0)
 
-            // Page position + region count for iPhone
+            // Page position + region count for iPhone — ONE spoken
+            // element ("Page k of N, n regions"); the drawn pieces
+            // (the counter, the dot, the count) stay separate views.
+            let count = redactionState.regions[documentState.currentPageIndex]?.count ?? 0
             HStack(spacing: ResectaTokens.Spacing.xs) {
                 Text("\(documentState.currentPageIndex + 1) of \(documentState.pageCount)")
                     .font(.subheadline.monospacedDigit())
 
-                let count = redactionState.regions[documentState.currentPageIndex]?.count ?? 0
                 if let countLabel = PageNavigationBar.regionCountLabel(count) {
                     Text("\u{B7}")
                         .foregroundStyle(.quaternary)
@@ -52,6 +54,13 @@ struct PageNavigationBar: View {
                         .foregroundStyle(ResectaTokens.SemanticColor.regionCountAccent)
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(PageNavigationBar.pageAccessibilityLabel(
+                page: documentState.currentPageIndex + 1,
+                pageCount: documentState.pageCount,
+                regionCount: count
+            ))
+            .accessibilityIdentifier("pageNavCounter")
 
             Button {
                 documentState.currentPageIndex = min(
@@ -139,5 +148,13 @@ extension PageNavigationBar {
     /// page has none, "1 region", else "N regions".
     static func regionCountLabel(_ count: Int) -> String? {
         count > 0 ? "\(count) region\(count == 1 ? "" : "s")" : nil
+    }
+
+    /// The counter's one spoken label: "Page k of N" plus ", n regions"
+    /// where the page has any (the drawn counter dropped the word
+    /// "Page"; the spoken form keeps it).
+    static func pageAccessibilityLabel(page: Int, pageCount: Int, regionCount: Int) -> String {
+        let base = "Page \(page) of \(pageCount)"
+        return regionCountLabel(regionCount).map { "\(base), \($0)" } ?? base
     }
 }

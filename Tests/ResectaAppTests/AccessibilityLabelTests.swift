@@ -337,4 +337,103 @@ struct AccessibilityLabelTests {
             == "Layer 9, OCR Check, Could not verify."
         )
     }
+
+    // MARK: - The accessibility rows (the P3 review's ten)
+
+    @Test("Search sheet header stacks Dismiss, the title and Apply from the first accessibility size",
+          arguments: [DynamicTypeSize.accessibility1, .accessibility3, .accessibility5])
+    func testHeaderStacksAtAccessibilitySizes(size: DynamicTypeSize) {
+        #expect(SearchSheetHeaderSection.stacksAtAccessibilitySizes(size))
+    }
+
+    @Test("Search sheet header keeps its single row below the accessibility sizes",
+          arguments: [DynamicTypeSize.xSmall, .large, .xxxLarge])
+    func testHeaderRowBelowAccessibilitySizes(size: DynamicTypeSize) {
+        #expect(!SearchSheetHeaderSection.stacksAtAccessibilitySizes(size))
+    }
+
+    @Test("Toast icon scales with the message and keeps a 20-pt floor, never a fixed box")
+    func testToastIconScalesWithItsText() {
+        #expect(ToastView.toastIconFont == .callout.weight(.medium))
+        #expect(ToastView.toastIconMinimumSide == 20)
+    }
+
+    @Test("Search result row speaks the category, the page, the tier and 'applied' — the shape 'Address, page 1, medium confidence, applied'")
+    func testSearchRowLabelShape() {
+        let address = SearchResult(
+            pageIndex: 0,
+            normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+            matchedText: "12 Elm Street",
+            contextSnippet: "lives at 12 Elm Street since",
+            source: .textLayer,
+            term: "Address",
+            piiCategory: .address,
+            piiConfidence: 0.6
+        )
+        #expect(SearchResultRow.spokenCategory(for: address) == "Address")
+        let spoken = SearchResultRow.accessibilityLabel(
+            for: address, tier: .medium, showsTier: true, isApplied: true
+        )
+        #expect(spoken == "Address, page 1, medium confidence, applied")
+        #expect(!spoken.contains("Elm"))
+
+        let literal = SearchResult(
+            pageIndex: 4,
+            normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+            matchedText: "Amount",
+            contextSnippet: "the Amount due",
+            source: .textLayer,
+            term: "Amount"
+        )
+        #expect(SearchResultRow.spokenCategory(for: literal) == nil)
+        #expect(SearchResultRow.accessibilityLabel(for: literal, tier: .high, showsTier: false)
+                == "Search match, page 5")
+    }
+
+    @Test("Search result rows carry a per-row identifier keyed by the result's id")
+    func testSearchRowIdentifier() {
+        let result = SearchResult(
+            pageIndex: 0,
+            normalizedRect: .zero,
+            matchedText: "a",
+            contextSnippet: "a",
+            source: .textLayer,
+            term: "a"
+        )
+        #expect(SearchResultRow.accessibilityIdentifier(for: result)
+                == "searchResultRow-\(result.id.uuidString)")
+    }
+
+    @Test("A staged term's remove control is named 'Remove ⟨term⟩'")
+    func testRemoveTermLabel() {
+        #expect(SearchToolbarSection.removeTermAccessibilityLabel("Amount") == "Remove Amount")
+    }
+
+    @Test("The Custom Terms add row's controls sit on the 46-pt effective floor")
+    func testAddRowControlFloor() {
+        #expect(CustomTermsView.addRowControlMinimumSide == 46)
+        #expect(CustomTermsView.addRowControlMinimumSide == ResectaTokens.TouchTarget.minimum)
+    }
+
+    @Test("The parked strip's Apply capsule is named 'Applied' once the match is marked")
+    func testApplyCapsuleLabelFollowsItsState() {
+        #expect(SearchAndRedactSheet.applyAccessibilityLabel(applied: false) == "Apply")
+        #expect(SearchAndRedactSheet.applyAccessibilityLabel(applied: true) == "Applied")
+        #expect(SearchAndRedactSheet.applyAccessibilityLabel(applied: true) == AppliedFilter.applied.rawValue)
+    }
+
+    @Test("The page bar's counter is one spoken element: 'Page k of N, n regions'")
+    func testPageBarCounterLabel() {
+        #expect(PageNavigationBar.pageAccessibilityLabel(page: 1, pageCount: 23, regionCount: 28)
+                == "Page 1 of 23, 28 regions")
+        #expect(PageNavigationBar.pageAccessibilityLabel(page: 3, pageCount: 5, regionCount: 1)
+                == "Page 3 of 5, 1 region")
+        #expect(PageNavigationBar.pageAccessibilityLabel(page: 2, pageCount: 5, regionCount: 0)
+                == "Page 2 of 5")
+    }
+
+    @Test("The parked strip offers the 'Show full sheet' action")
+    func testShowFullSheetActionName() {
+        #expect(SearchAndRedactSheet.showFullSheetActionName == "Show full sheet")
+    }
 }
