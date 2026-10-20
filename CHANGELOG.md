@@ -69,6 +69,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Accessibility: a staged search term's remove control is named "Remove" with the term and meets the 46-point target; the Custom Terms add row's Regex toggle and add button meet it too.
 - Accessibility: the parked strip's Apply capsule is named "Applied" once the match is marked, with the match's position as its value, and every element of the strip offers a "Show full sheet" action.
 - Accessibility: the page bar's counter is one spoken element, "Page k of N, n regions"; filter chips report when they are selected.
+- Scan: the keywords listed under 'Why this classification?' no longer change between launches.
 - Scan: on scanned pages, an address whose ZIP code belongs to a different state than its first three digits suggest is proposed.
 - Scan: a label line such as 'Reg # on file' is no longer proposed as a license plate.
 - Scan: a phone number whose opening parenthesis was lost in text recognition is proposed.
