@@ -1,5 +1,6 @@
 import Foundation
 import PDFKit
+import PDFKitGuard
 import os
 import RedactionEngine
 import Vision  // VNRequestTextRecognitionLevel for lastUsedRecognitionLevel
@@ -175,9 +176,14 @@ class DocumentState {
     // caller can build the copy inside `Task.detached` off MainActor without a
     // non-Sendable capture (mirrors `firstPageText`). `nil` ⇒ the data
     // roundtrip failed; the caller surfaces a mechanism toast / clears the
-    // preview and does NOT fall back to a shared-instance read.
+    // preview and does NOT fall back to a shared-instance read. The
+    // roundtrip's write runs through `RSGuardedDataRepresentation`: PDFKit
+    // raises an Objective-C exception, which Swift cannot intercept, while
+    // writing a document whose `/Info` dictionary holds an unreadable key
+    // (a damaged or crafted file that opened and passed import); the guard
+    // turns that into the same nil.
     nonisolated static func makeSearchCopy(of source: SendablePDFDocument) -> SendablePDFDocument? {
-        guard let data = source.document.dataRepresentation(),
+        guard let data = RSGuardedDataRepresentation(source.document),
               let copy = PDFDocument(data: data) else { return nil }
         return SendablePDFDocument(copy)
     }

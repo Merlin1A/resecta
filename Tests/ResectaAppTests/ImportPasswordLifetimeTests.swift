@@ -106,7 +106,9 @@ struct ImportPasswordLifetimeTests {
         var sites: [String] = []
         for file in try swiftFiles(under: root) {
             let text = try String(contentsOf: file, encoding: .utf8)
-            if text.contains("dataRepresentation(") {
+            // The write itself, or the engine's exception-guarded form of
+            // it (`RSGuardedDataRepresentation`, the search copy's call).
+            if text.contains("dataRepresentation(") || text.contains("RSGuardedDataRepresentation(") {
                 sites.append(file.lastPathComponent)
             }
         }
