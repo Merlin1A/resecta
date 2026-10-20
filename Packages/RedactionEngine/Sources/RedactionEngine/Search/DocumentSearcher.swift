@@ -1896,8 +1896,8 @@ public actor DocumentSearcher {
             let baseStartOffset = span.base?.lowerBound ?? matchStartOffset
             let baseLength = span.base?.count ?? matchLength
 
-            // Get bounding rect via PDFKit selection — base coordinates.
-            let nsRange = NSRange(location: baseStartOffset, length: baseLength)
+            // The rect's range on the RAW page text (`PreparedPage.rawNSRange`).
+            guard let nsRange = prepared.rawNSRange(baseStart: baseStartOffset, length: baseLength) else { continue }
             if let normalizedRect = boundingRect(for: nsRange, page: page) {
                 // Display span re-slices from the case-preserved
                 // analog at the already-mapped base offsets; matching stays
