@@ -27,7 +27,7 @@ public final class BitmapContextPool: @unchecked Sendable {
     /// The pool holds 4 same-size contexts with LRU eviction, by design.
     /// Cap is intentionally not configurable — the value
     /// is part of the pool's zeroize contract.
-    public static let capacity: Int = 4
+    static let capacity: Int = 4
 
     /// One pool entry. Order in `entries` is LRU-ordered (oldest first,
     /// newest last). `checkOut` returns the most-recent same-size entry
@@ -80,7 +80,7 @@ public final class BitmapContextPool: @unchecked Sendable {
     /// sits in the pool). If the pool is at capacity and no existing
     /// entry matches the size, the oldest LRU entry is evicted to
     /// make room.
-    public func checkIn(_ context: CGContext) {
+    func checkIn(_ context: CGContext) {
         // Invariant: zeroize first, every time, no flag.
         // Performed outside the lock — the buffer is exclusively owned by
         // the caller until appended, and zeroizeBitmapBuffer touches only

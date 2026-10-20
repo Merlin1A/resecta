@@ -312,7 +312,7 @@ public struct PIIDetector: Sendable {
     /// telemetry, not a pre-emptive guard. A detector that moves to
     /// `pattern.enumerateMatches(...)` can compare `ContinuousClock.now`
     /// against this value inside the stop block, as the search path does.
-    public static let perPageRegexTimeout: Duration = .seconds(5)
+    static let perPageRegexTimeout: Duration = .seconds(5)
 
     /// Wrap a detector body with elapsed-time measurement. The body runs
     /// synchronously to completion; the elapsed time is recorded via
@@ -377,7 +377,7 @@ public struct PIIDetector: Sendable {
         /// redaction region. `text`/`kind`/`confidence`/`rationale` are copied
         /// unchanged — the `.address` spatial path keys `spatialRectByText` on
         /// `text`, so text must not move.
-        public func withRange(_ newRange: NSRange) -> PIIMatch {
+        func withRange(_ newRange: NSRange) -> PIIMatch {
             PIIMatch(text: text, range: newRange, kind: kind,
                      confidence: confidence, rationale: rationale)
         }
@@ -438,7 +438,7 @@ public struct PIIDetector: Sendable {
 
     /// Luhn checksum validation (the credit-card family's; kept here as the
     /// public entry point).
-    public static func luhnCheck(_ number: String) -> Bool {
+    static func luhnCheck(_ number: String) -> Bool {
         CreditCardDetector.luhnCheck(number)
     }
 

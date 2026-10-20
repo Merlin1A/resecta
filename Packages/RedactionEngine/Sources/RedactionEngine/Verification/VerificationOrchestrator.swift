@@ -255,11 +255,13 @@ public struct VerificationOrchestrator: Sendable {
     }
 
     /// The one output pass the post-sequential checks share: every request
-    /// on every page through the shared runner. Nil when nothing was
+    /// on every page through the shared runner, off the caller's actor (the
+    /// page extraction reads the output document, which has one reader at
+    /// a time — this pass, between the sequential layers). Nil when nothing was
     /// requested (each layer then reports its idle INFO without a pass) or
     /// when the pass was cancelled (each layer's own pass then folds the
     /// cancellation into its `.skipped` row, as before).
-    static func observeOutput(
+    @concurrent static func observeOutput(
         _ outputDocument: SendablePDFDocument, requests: [SearchRecheckRequest]
     ) async -> PostSequentialBatch? {
         guard !requests.isEmpty else { return nil }

@@ -16,10 +16,15 @@ import SwiftUI
 /// Nav-bar-parity header for `SearchAndRedactSheet`'s full-chrome
 /// composition: Dismiss (leading) · inline title · "Apply N"
 /// (trailing, semibold). VoiceOver reads leading → title → trailing
-/// (the retired bar's rotor order), header before content. At
-/// accessibility type sizes the single row holds and the title
-/// truncates — the buttons never do (system nav-bar behavior).
+/// (the retired bar's rotor order), header before content. Below the
+/// accessibility sizes the single row holds and the title truncates —
+/// the buttons never do (system nav-bar behavior). At accessibility
+/// sizes the row becomes a leading-aligned stack — Dismiss, the title
+/// and "Apply N" each on one line of their own — so neither button
+/// hyphenates and the title keeps more than two letters
+/// (`stacksAtAccessibilitySizes`).
 struct SearchSheetHeaderSection: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// Inline title — `interface.displayName`: per-interface titles
     /// under the one chassis, carried from the retired
     /// `navigationTitle` (the former "Search & Redact" umbrella
@@ -36,58 +41,85 @@ struct SearchSheetHeaderSection: View {
     let onApply: () -> Void
 
     var body: some View {
-        // `.buttonStyle(.plain)` + explicit tint on BOTH buttons is
-        // load-bearing, not cosmetic: default-styled buttons in the
-        // sheet's fixed chrome join the arbitration-poison class —
-        // every button proven innocent in the COOP probe runs (chips,
-        // footer) is plain-styled.
-        HStack(spacing: ResectaTokens.Spacing.sm) {
-            // 57-61×19.5 measured — height only, width already
-            // clears the floor. Restructured from the `Button(_:action:)`
-            // string initializer to a closure-label form so a
-            // `.frame(minHeight:)` can sit on the label without
-            // touching `.buttonStyle(.plain)` (load-bearing — see the
-            // comment above). `Text("Dismiss")` is the exact same
-            // label SwiftUI derives from the string initializer, so
-            // the accessibility name stays byte-identical.
-            Button(action: onDismiss) {
-                Text("Dismiss")
-                    .frame(minHeight: ResectaTokens.TouchTarget.minimum)
-                    .contentShape(Rectangle())
+        Group {
+            if Self.stacksAtAccessibilitySizes(dynamicTypeSize) {
+                // Each piece on a line of its own: the row's reading
+                // order (Dismiss → title → Apply) is the stack's order.
+                VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
+                    dismissButton
+                    titleText
+                    applyButton
+                }
+            } else {
+                HStack(spacing: ResectaTokens.Spacing.sm) {
+                    dismissButton
+                    Spacer(minLength: ResectaTokens.Spacing.xs)
+                    titleText
+                    Spacer(minLength: ResectaTokens.Spacing.xs)
+                    applyButton
+                }
             }
-                .buttonStyle(.plain)
-                .foregroundStyle(.tint)
-                .accessibilityIdentifier("searchDismissButton")
-
-            Spacer(minLength: ResectaTokens.Spacing.xs)
-
-            Text(title)
-                .font(.headline)
-                .lineLimit(1)
-
-            Spacer(minLength: ResectaTokens.Spacing.xs)
-
-            // Semibold, no destructive role, disabled at zero — the
-            // live count carries the scale, and the undoable mark
-            // plus the "Marked N" toast carry the confirmation.
-            // Identifier BEFORE `.disabled` — the retired toolbar's
-            // modifier order, which keeps the identifier on the AX
-            // surface in the disabled state too.
-            Button(action: onApply) {
-                Text("Apply \(applyCount)")
-                    .frame(minHeight: ResectaTokens.TouchTarget.minimum)
-                    .contentShape(Rectangle())
-            }
-                .buttonStyle(.plain)
-                .fontWeight(.semibold)
-                .foregroundStyle(applyDisabled
-                    ? AnyShapeStyle(.tertiary)
-                    : AnyShapeStyle(.tint))
-                .accessibilityIdentifier("searchApplyButton")
-                .disabled(applyDisabled)
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .padding(.vertical, ResectaTokens.Spacing.sm)
+    }
+
+    /// The header stacks its three pieces from the first accessibility
+    /// size (`isAccessibilitySize`): the single row hyphenated "Dismiss"
+    /// and "Apply" and cut the title to two letters at AX5.
+    nonisolated static func stacksAtAccessibilitySizes(_ size: DynamicTypeSize) -> Bool {
+        size.isAccessibilitySize
+    }
+
+    // `.buttonStyle(.plain)` + explicit tint on BOTH buttons is
+    // load-bearing, not cosmetic: default-styled buttons in the
+    // sheet's fixed chrome join the arbitration-poison class —
+    // every button proven innocent in the COOP probe runs (chips,
+    // footer) is plain-styled.
+
+    /// 57-61×19.5 measured — height only, width already clears the
+    /// floor. A closure-label form so a `.frame(minHeight:)` can sit
+    /// on the label without touching `.buttonStyle(.plain)`
+    /// (load-bearing — see above). `Text("Dismiss")` is the exact
+    /// label SwiftUI derives from the string initializer, so the
+    /// accessibility name stays byte-identical.
+    private var dismissButton: some View {
+        Button(action: onDismiss) {
+            Text("Dismiss")
+                .lineLimit(1)
+                .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                .contentShape(Rectangle())
+        }
+            .buttonStyle(.plain)
+            .foregroundStyle(.tint)
+            .accessibilityIdentifier("searchDismissButton")
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .font(.headline)
+            .lineLimit(1)
+    }
+
+    /// Semibold, no destructive role, disabled at zero — the live
+    /// count carries the scale, and the undoable mark plus the
+    /// "Marked N" toast carry the confirmation. Identifier BEFORE
+    /// `.disabled` — the retired toolbar's modifier order, which keeps
+    /// the identifier on the AX surface in the disabled state too.
+    private var applyButton: some View {
+        Button(action: onApply) {
+            Text("Apply \(applyCount)")
+                .lineLimit(1)
+                .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                .contentShape(Rectangle())
+        }
+            .buttonStyle(.plain)
+            .fontWeight(.semibold)
+            .foregroundStyle(applyDisabled
+                ? AnyShapeStyle(.tertiary)
+                : AnyShapeStyle(.tint))
+            .accessibilityIdentifier("searchApplyButton")
+            .disabled(applyDisabled)
     }
 }
 

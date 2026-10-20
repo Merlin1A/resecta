@@ -728,7 +728,7 @@ struct ApplySeamSingleResultOriginTests {
         undo.beginUndoGrouping()
         _ = await state.applyFindings(.searchResult(id: result.id), undoManager: undo)
         undo.endUndoGrouping()
-        #expect(undo.undoActionName == "Redact 1 Instance of 'PII Scan'",
+        #expect(undo.undoActionName == "Mark 1 Instance",
                 "the singular form of the search origins' one action-name construction")
 
         guard let regionID = state.regions[0]?.first?.id else {
@@ -767,7 +767,7 @@ struct ApplySeamSingleResultOriginTests {
         pluralUndo.beginUndoGrouping()
         _ = await plural.applyFindings(.selectedSearchResults, undoManager: pluralUndo)
         pluralUndo.endUndoGrouping()
-        #expect(pluralUndo.undoActionName == "Redact 2 Instances of 'PII Scan'")
+        #expect(pluralUndo.undoActionName == "Mark 2 Instances", "the toast's verb, no document text")
 
         let singular = RedactionState()
         let singularUndo = UndoManager()
@@ -778,7 +778,7 @@ struct ApplySeamSingleResultOriginTests {
         singularUndo.beginUndoGrouping()
         _ = await singular.applyFindings(.selectedSearchResults, undoManager: singularUndo)
         singularUndo.endUndoGrouping()
-        #expect(singularUndo.undoActionName == "Redact 1 Instance of 'PII Scan'")
+        #expect(singularUndo.undoActionName == "Mark 1 Instance")
     }
 
     @Test("Refuses while the pipeline owns regions, with zero mutations")

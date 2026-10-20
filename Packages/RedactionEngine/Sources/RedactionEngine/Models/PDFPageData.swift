@@ -96,7 +96,7 @@ public struct SendablePDFDocument: @unchecked Sendable {
 /// (`renderPageFromCGPage`), not a live `PDFPage`; other callers (search,
 /// verification) wrap their own `PDFPage` instances with this type to cross
 /// isolation boundaries.
-public struct SendablePDFPage: @unchecked Sendable {
+struct SendablePDFPage: @unchecked Sendable {
     public let page: PDFPage
     public init(_ page: PDFPage) { self.page = page }
 }

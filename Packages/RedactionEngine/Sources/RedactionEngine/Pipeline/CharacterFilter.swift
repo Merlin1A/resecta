@@ -43,14 +43,14 @@ public func normalizedToPDFPageCoordinates(
 /// Safety margin in PDF points applied to each edge of every redaction rectangle.
 /// Absorbs bounding-box imprecision, font descender/ascender overflow, and
 /// the PDFSelection workaround's reduced accuracy on iOS 18+.
-public let safetyMarginPoints: CGFloat = 3.0
+let safetyMarginPoints: CGFloat = 3.0
 
 /// Result of character filtering. Records counts for testing without
 /// logging sensitive data.
-public struct FilterResult: Sendable {
+struct FilterResult: Sendable {
     public let surviving: [CharacterInfo]
-    public let totalCharacters: Int
-    public let excludedCount: Int
+    let totalCharacters: Int
+    let excludedCount: Int
 
     public init(surviving: [CharacterInfo], totalCharacters: Int, excludedCount: Int) {
         self.surviving = surviving
@@ -79,8 +79,8 @@ public struct FilterResult: Sendable {
 /// `expandedBounds` carries the halo tier. A caller that omits `bounds`
 /// gets `bounds == expandedBounds`, under which both tiers coincide and
 /// the shape behaves as it did before the line-aware split.
-public struct RegionShape: Sendable {
-    public let expandedBounds: CGRect
+struct RegionShape: Sendable {
+    let expandedBounds: CGRect
     public let polygonVertices: [CGPoint]?
     /// The region's un-expanded bounding rect (no safety margin). For
     /// polygon regions this is the polygon's bounding rect.
@@ -159,7 +159,7 @@ func polygonContainsPoint(
 /// corner; pathological zero-area characters degrade safely to centre
 /// inclusion.
 @inlinable
-public func rectIntersectsPolygon(_ rect: CGRect, vertices: [CGPoint]) -> Bool {
+func rectIntersectsPolygon(_ rect: CGRect, vertices: [CGPoint]) -> Bool {
     guard vertices.count >= 3 else { return false }
     // Fast reject on disjoint bounding rects of the polygon and the rect.
     var minX = CGFloat.greatestFiniteMagnitude
@@ -220,7 +220,7 @@ public func rectIntersectsPolygon(_ rect: CGRect, vertices: [CGPoint]) -> Bool {
 /// back to a bounding-rect probe whose wrong calibration stays fail-safe
 /// (the verifier's outlier/recall floors keep readable ink regardless).
 @inlinable
-public func rectFullyInsidePolygon(_ rect: CGRect, vertices: [CGPoint]) -> Bool {
+func rectFullyInsidePolygon(_ rect: CGRect, vertices: [CGPoint]) -> Bool {
     guard vertices.count >= 3 else { return false }
     let corners = [
         CGPoint(x: rect.minX, y: rect.minY),
@@ -262,7 +262,7 @@ public func rectFullyInsidePolygon(_ rect: CGRect, vertices: [CGPoint]) -> Bool 
 /// centroid can fall OUTSIDE the interior (a U-shape's notch); callers must
 /// pair it with an interior test such as `rectFullyInsidePolygon`.
 @inlinable
-public func polygonCentroid(_ vertices: [CGPoint]) -> CGPoint? {
+func polygonCentroid(_ vertices: [CGPoint]) -> CGPoint? {
     guard vertices.count >= 3 else { return nil }
     var area2: CGFloat = 0
     var cx: CGFloat = 0
@@ -334,7 +334,7 @@ private func lineBandRects(_ characters: [CharacterInfo]) -> [Int: CGRect] {
 ///
 /// Deterministic, conservative, boundary-safe.
 @concurrent
-public func filterCharacters(
+func filterCharacters(
     characters: [CharacterInfo],
     redactionRects: [CGRect],
     safetyMargin: CGFloat = safetyMarginPoints
@@ -374,7 +374,7 @@ public func filterCharacters(
 /// behaviour change; polygon regions consult `vertices` for the final
 /// intersection. Conservative — when in doubt, exclude.
 @concurrent
-public func filterCharacters(
+func filterCharacters(
     characters: [CharacterInfo],
     regionShapes: [RegionShape]
 ) async throws -> FilterResult {
@@ -509,7 +509,7 @@ func filterCharactersWalk<Region>(
 /// Minimum distance from a character bounding box edge to the nearest
 /// redaction rectangle edge, in PDF points. Used for boundary character
 /// identification in PageFilterDigest.
-public func minEdgeDistance(_ charBounds: CGRect, to rect: CGRect) -> CGFloat {
+func minEdgeDistance(_ charBounds: CGRect, to rect: CGRect) -> CGFloat {
     // Compute distance from each edge of charBounds to nearest edge of rect.
     // If they overlap, distance is 0.
     let dx: CGFloat

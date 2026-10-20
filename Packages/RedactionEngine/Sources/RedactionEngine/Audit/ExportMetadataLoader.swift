@@ -14,10 +14,10 @@ import os
 // happens between app invocations. Missing-file → `nil`; decode-error →
 // log + `nil` (do NOT hard-fail the audit-export surface).
 
-public enum ExportMetadataLoader {
+enum ExportMetadataLoader {
 
-    public struct Manifest: Sendable {
-        public let manifestVersion: String?
+    struct Manifest: Sendable {
+        let manifestVersion: String?
     }
 
     public static let shared: Manifest = Manifest(manifestVersion: load())

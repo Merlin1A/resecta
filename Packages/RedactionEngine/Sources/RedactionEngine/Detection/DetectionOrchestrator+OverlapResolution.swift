@@ -14,10 +14,10 @@ extension DetectionOrchestrator {
     /// matches with `suppressedByOverlap(winnerCategory:)` appended to
     /// their rationale. The exporter reads `suppressedMatches` to populate
     /// the `suppressedByOverlap` audit column for each loser.
-    public struct OverlapResolution: Sendable, Equatable {
+    struct OverlapResolution: Sendable, Equatable {
         public let surviving: [PIIDetector.PIIMatch]
-        public let suppressedCountByCategory: [PIICategory: Int]
-        public let suppressedMatches: [PIIDetector.PIIMatch]
+        let suppressedCountByCategory: [PIICategory: Int]
+        let suppressedMatches: [PIIDetector.PIIMatch]
 
         public init(
             surviving: [PIIDetector.PIIMatch],
@@ -29,7 +29,7 @@ extension DetectionOrchestrator {
             self.suppressedMatches = suppressedMatches
         }
 
-        public static func == (lhs: OverlapResolution, rhs: OverlapResolution) -> Bool {
+        static func == (lhs: OverlapResolution, rhs: OverlapResolution) -> Bool {
             guard lhs.suppressedCountByCategory == rhs.suppressedCountByCategory,
                   lhs.surviving.count == rhs.surviving.count,
                   lhs.suppressedMatches.count == rhs.suppressedMatches.count
@@ -60,9 +60,9 @@ extension DetectionOrchestrator {
     /// reject. A caller builds the key with the SAME posterior+cutoff
     /// math its preset-threshold gate applies, so resolver
     /// ranking and gating agree by construction.
-    public struct SurvivabilityKey: Sendable, Equatable {
-        public let meetsThreshold: Bool
-        public let posterior: Double
+    struct SurvivabilityKey: Sendable, Equatable {
+        let meetsThreshold: Bool
+        let posterior: Double
         public init(meetsThreshold: Bool, posterior: Double) {
             self.meetsThreshold = meetsThreshold
             self.posterior = posterior
@@ -88,7 +88,7 @@ extension DetectionOrchestrator {
     ///   → higher `priorityRank`), so a raw-weaker but better-surviving sibling
     ///   is not discarded before the preset-threshold gate runs. `nil` → legacy
     ///   raw-confidence ordering (with a near-tie dead-band).
-    public static func resolveOverlaps(
+    static func resolveOverlaps(
         _ matches: [PIIDetector.PIIMatch],
         survivability: (@Sendable (PIIDetector.PIIMatch) -> SurvivabilityKey)? = nil
     ) -> OverlapResolution {

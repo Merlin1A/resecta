@@ -62,20 +62,12 @@ struct PerPageRetryTests {
                 "Page 27 should have exactly two rasterize calls (1 fail + 1 retry)")
     }
 
-    // MARK: - testHalfDPIFloor96
+    // MARK: - testRetryRendersAtTheLowestTier
 
-    @Test("Half-DPI floor is 96 (not 75) when primary cap = 150",
-          .timeLimit(.minutes(1)))
-    func testHalfDPIFloor96() async throws {
+    @Test("The one retry renders at the lowest DPI tier whatever the primary cap",
+          .timeLimit(.minutes(1)), arguments: [150, 200, 300])
+    func testRetryRendersAtTheLowestTier(primaryCap: Int) async throws {
         let coord = makeCoordinatorWithMultiPagePDF(pages: 1, regions: true)
-        // Drive the coordinator's primary cap down so half would be 75 (below
-        // floor). With the floor at 96 the retry call must use 96, not 75.
-        coord.dpiCap = 150
-        // Capture so the assertions match the value the rasterize call saw,
-        // not a value a sibling test may push afterward via a memory-warning
-        // notification.
-        let primaryCap = 150
-
         let rasterizer = PageRasterizer()
         let pageDataList = coord.buildPDFPageData(effectiveMode: .secureRasterization)
         let pageData = try #require(pageDataList.first)
@@ -93,10 +85,10 @@ struct PerPageRetryTests {
         let dpiHistory = recorder.dpiCapHistory
         #expect(dpiHistory.count == 2,
                 "One primary + one retry — got \(dpiHistory.count) entries")
-        #expect(dpiHistory.first?.dpiCap == 150,
-                "First call should use the primary cap (150)")
-        #expect(dpiHistory.last?.dpiCap == 96,
-                "Retry call should clamp to the floor (96), not primary/2 (75); got \(String(describing: dpiHistory.last?.dpiCap))")
+        #expect(dpiHistory.first?.dpiCap == primaryCap,
+                "First call should use the primary cap")
+        #expect(dpiHistory.last?.dpiCap == 150,
+                "The retry's cap is the 150 tier — the raster it renders is the raster its memory check estimates; got \(String(describing: dpiHistory.last?.dpiCap))")
     }
 
     // MARK: - testSecondFailurePropagates
@@ -110,8 +102,10 @@ struct PerPageRetryTests {
         let pageDataList = coord.buildPDFPageData(effectiveMode: .secureRasterization)
         let target = try #require(pageDataList.first(where: { $0.pageIndex == 27 }))
 
+        // The page fails BOTH attempts: the production wrapper's
+        // "propagate after second failure" branch is what we exercise.
         let recorder = PageRasterizerTestSeam.Recorder(
-            simulatedVerifyFailures: [target.pageIndex]
+            simulatedVerifyFailures: [target.pageIndex], failingAttempts: 2
         )
 
         // Capture the primary cap up front. `coord.dpiCap` can be lowered
@@ -121,57 +115,23 @@ struct PerPageRetryTests {
         // one the rasterize call actually used.
         let capturedDPICap = coord.dpiCap
 
-        // The production wrapper consumes the seam after the primary call,
-        // so the retry succeeds — that's the wrong shape for this test.
-        // The helper below mirrors `rasterizeWithRetry`'s contract but
-        // re-arms the recorder between attempts, forcing BOTH the primary
-        // and retry calls to throw. The wrapper's "propagate after second
-        // failure" branch is what we exercise.
         await #expect(throws: PipelineError.self) {
             try await PageRasterizerTestSeam.withActivated(recorder) {
-                try await rasterizeFailingBothAttempts(
-                    target, rasterizer: rasterizer,
-                    primaryDPICap: capturedDPICap,
-                    recorder: recorder
+                try await coord.rasterizeWithRetry(
+                    target, rasterizer: rasterizer, primaryDPICap: capturedDPICap
                 )
             }
         }
 
-        // Confirm both attempts were observed and the second-attempt DPI
-        // honoured the half-with-floor rule.
+        // Confirm both attempts were observed and the second ran at the
+        // lowest tier.
         let history = recorder.dpiCapHistory
         #expect(history.count == 2, "Both attempts must run before propagation")
         #expect(history.first?.dpiCap == capturedDPICap)
-        #expect(history.last?.dpiCap == max(96, capturedDPICap / 2))
+        #expect(history.last?.dpiCap == 150)
     }
 
     // MARK: - Helpers
-
-    /// Mirrors `PipelineCoordinator.rasterizeWithRetry` but re-arms the
-    /// recorder between attempts so BOTH the primary and retry calls see
-    /// the failure injection. Used by `testSecondFailurePropagates` only —
-    /// production code never re-arms a consumed recorder.
-    private func rasterizeFailingBothAttempts(
-        _ page: PDFPageData,
-        rasterizer: PageRasterizer,
-        primaryDPICap: Int,
-        recorder: PageRasterizerTestSeam.Recorder
-    ) async throws -> RasterizeResult {
-        do {
-            return try await rasterizer.rasterize(page, dpiCap: primaryDPICap)
-        } catch let error as PipelineError { // LegalPhrases:safe (Swift keyword)
-            guard case .redactionError(.fillVerificationFailed(let idx)) = error,
-                  idx == page.pageIndex else {
-                throw error
-            }
-            // Re-arm so the retry also fails. Production rasterize calls do
-            // not do this — the seam consumes the index after the first
-            // failure.
-            recorder.insertSimulatedFailure(idx)
-            let retryDPICap = max(PipelineCoordinator.retryDPIFloor, primaryDPICap / 2)
-            return try await rasterizer.rasterize(page, dpiCap: retryDPICap)
-        }
-    }
 
     /// Build a coordinator backed by a multi-page PDF with a small redaction
     /// region on every page (so sub-threshold filtering keeps the

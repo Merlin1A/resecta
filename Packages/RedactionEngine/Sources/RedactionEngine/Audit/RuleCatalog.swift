@@ -39,7 +39,7 @@ public struct RuleCatalog: Sendable {
         }
     }
 
-    public static let supportedVersions: ClosedRange<Int> = 1...1
+    static let supportedVersions: ClosedRange<Int> = 1...1
 
     /// Engine-ruleID → catalog rule_id. V1 alias map.
     /// Update alongside any new engine-ruleID emission. Coverage is

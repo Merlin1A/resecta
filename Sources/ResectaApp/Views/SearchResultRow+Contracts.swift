@@ -179,17 +179,38 @@ extension SearchResultRow {
         return false
     }
 
-    /// The merged row element's spoken label: the family adapter's
-    /// page-only string (never matched text, never the window) plus
-    /// the tier descriptor where the row is graded (spoken for parity
-    /// with the bar, no longer mirrored by a visible word).
+    /// The merged row element's spoken label — the shape "Address,
+    /// page 1, medium confidence, applied": the category word where
+    /// the row has one (a PII hit's category; a literal / regex /
+    /// custom hit keeps the adapter's "Search match"), the page, the
+    /// tier descriptor where the row is graded (spoken for parity with
+    /// the bar, no longer mirrored by a visible word), and "applied"
+    /// once the match is marked (the visual marker's non-visual twin).
+    /// Never the matched text, never the window.
     static func accessibilityLabel(
         for result: SearchResult,
         tier: ConfidenceTier,
-        showsTier: Bool
+        showsTier: Bool,
+        isApplied: Bool = false
     ) -> String {
-        let base = FindingRowModel(result: result).accessibilityDescription
-        return showsTier ? "\(base), \(tier.descriptor)" : base
+        var parts = [Self.spokenCategory(for: result).map { "\($0), page \(result.pageIndex + 1)" }
+                     ?? FindingRowModel(result: result).accessibilityDescription]
+        if showsTier { parts.append(tier.descriptor) }
+        if isApplied { parts.append("applied") }
+        return parts.joined(separator: ", ")
+    }
+
+    /// The category word a row speaks in place of its text: the PII
+    /// category's name ("Address", "SSN", …) for a PII hit; nil for a
+    /// literal / regex / custom hit, whose adapter string stands.
+    nonisolated static func spokenCategory(for result: SearchResult) -> String? {
+        result.piiCategory?.rawValue
+    }
+
+    /// The per-row XCUI / VoiceOver identifier — stable across the
+    /// list's re-sorts (the result's id, not its position).
+    nonisolated static func accessibilityIdentifier(for result: SearchResult) -> String {
+        "searchResultRow-\(result.id.uuidString)"
     }
 
     /// The collapsed window's line clamp: two lines through XXL, three

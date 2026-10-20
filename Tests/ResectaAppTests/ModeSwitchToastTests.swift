@@ -339,6 +339,19 @@ struct ModeSwitchToastTests {
         #expect(SearchAndRedactSheet.unappliedMatchCount(in: state) == 0)
     }
 
+    @Test("unappliedMatchCount leaves out matches a region already covers")
+    func unappliedCountExcludesCovered() {
+        let state = SearchState()
+        let a = makeResult(page: 0), b = makeResult(page: 0), c = makeResult(page: 1)
+        state.results = [a, b, c]
+        state.appliedResultIDs = [a.id]
+        state.coveredResultIDs = [b.id]
+        #expect(SearchAndRedactSheet.unappliedMatchCount(in: state) == 1)
+        state.coveredResultIDs = [a.id, b.id]
+        #expect(SearchAndRedactSheet.unappliedMatchCount(in: state) == 1,
+                "an id in both sets counts once")
+    }
+
     // The KI-4 purge re-run toast's
     // actionHandler defers `activeSearch = nil` + the pipeline kick-off one
     // runloop turn via `Task { @MainActor }`, so the @Observable teardown does

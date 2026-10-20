@@ -20,6 +20,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Documentation: the privacy policy describes the detection the app performs (the seventeen text categories a scan reads from the page text layer or from recognized text, with the bundled gazetteers, Bloom filters and context scorer; no face or barcode sentence), says the app makes no network requests of its own and names the two system services that do, drops the detection-priors clause no shipped path stores or reads, and states the failed-state screen, the delete-all controls, the per-session workspace and its sweep, and the in-place metadata patches as they work; the EULA's Searchable Redaction fallback names hidden text. Both effective dates move to 2026-10-15.
 - Documentation: the threat model says the share confirmation lists a line for each check that reported or could not verify, and no longer describes OCR word hints the shipped flow never builds.
 - Documentation: the security policy gains a recipe for verifying a signed release tag: `.github/allowed_signers` lists the release-tag signing key under `security@resecta.app`, and `git tag -v` checks a tag against it once `gpg.ssh.allowedSignersFile` points at the file; the threat model's signed-tag row points at the recipe.
+- Import: a page the app could not render — a side under 10 points, a page-scale entry (`/UserUnit`) other than the default, or a rotation PDFKit and Core Graphics read apart — is refused at import with the error the render would raise, instead of opening and failing at Redact.
+- Verification: a hand-drawn region captures the words the Searchable filter would touch, line by line, and checks each line as the page text reads it ("123-45-6789", "j.doe@example.com", "Account Number 1234" whole); a region over one word keeps that word; a single word of a longer run is checked on its own only when it carries a digit, or has four characters or more and is not one of about 150 common English words (articles, prepositions, pronouns, auxiliaries, the nouns of forms and statements).
+- Search sheet: the undo action for an applied search reads "Mark N Instances", the verb the toast uses, with no document text.
 - Import: a document whose structure the app cannot read in full is refused rather than opened unscanned. The reader the active-content and hidden-layer walks inspect must open, be unlocked, read a catalog and agree with PDFKit on the page count; a walk that cannot read a page or follow an action chain to its bound refuses instead of answering clean; an `/OCProperties` entry without its default configuration reads as a hidden layer. An owner-password-only document still opens.
 - Documentation: the licence notices name ParaNames' data licence (CC BY 4.0) with its attribution and the changes made, state the OpenStreetMap and OpenAddresses rows as provenance acknowledgements for inputs no build reads, and attribute the Inter typeface embedded in the bundled sample document.
 - The Search sheet's OCR source row appears only when a page reads via OCR or an OCR filter is set.
@@ -48,6 +51,20 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - Search: on a page whose text layer carries a ligature or another character that normalization expands, a match's rect now covers the matched glyphs; before, the rect sat as many characters to the right as the expansions before the match had added.
 - In Regex mode the Case-sensitive option now governs the pattern; with it off, "smith" matches "Smith".
+- Redact: a page that finishes after Stop no longer brings the progress card back for a frame — Stop invalidates the run, and the run's later reports are dropped.
+- Redact: the per-page retry's memory check estimates the 150-DPI render it performs, instead of a 96-DPI render the rasterizer never makes.
+- Done and Home reset the session through the one Start Over path, so a re-imported document no longer shows the previous document's form-field notice.
+- Home at the compact width: Cancel on the close dialog brings a presented search session back whole — its results and selections — instead of dropping it.
+- Redact and ⇧⌘R are unavailable while the search sheet holds selected matches that are not applied, with the hint "Apply or clear the selected matches first", instead of tearing the session down and dropping them.
+- Redact clears the undo history at the Apply seam, as the results card says; an Undo after Keep Editing no longer unlinks the built output.
+- Search sheet: the "unapplied matches cleared" toasts no longer count matches a region already covers.
+- Search sheet: the custom-term time-limit toast names neither the term nor the page, and is shown once for a scan instead of once per page.
+- Accessibility: the search sheet's header stacks Dismiss, the title and Apply on lines of their own at accessibility text sizes, so no button hyphenates and the title keeps its words.
+- Accessibility: a toast's icon scales with its message and sits beside the first character instead of on it at accessibility text sizes.
+- Accessibility: a search result row speaks its category (an address, a Social Security number), its page, its confidence and whether it is applied — never the matched text; the row's default action toggles its selection instead of parking the sheet.
+- Accessibility: a staged search term's remove control is named "Remove" with the term and meets the 46-point target; the Custom Terms add row's Regex toggle and add button meet it too.
+- Accessibility: the parked strip's Apply capsule is named "Applied" once the match is marked, with the match's position as its value, and every element of the strip offers a "Show full sheet" action.
+- Accessibility: the page bar's counter is one spoken element, "Page k of N, n regions"; filter chips report when they are selected.
 - Custom terms and saved patterns: a regular expression holding a character whose uppercase form is two letters (such as ß or the ﬁ ligature) no longer stops the app when the pattern is validated.
 - Verification: the search re-check and the detection sweep list a page as not checked when a custom regular-expression term ran out of time on it, instead of counting the page as read.
 - Verification: the detection sweep reports a custom term added after a scan was applied as a possible item instead of discarding it as the scan's.
@@ -79,6 +96,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Context-scored pattern matches build their explanation through one factory; the signal order is unchanged.
 - Decoded fields nothing reads are dropped: the per-filter manifest entries and the unapplied document-type temperature; the temperature file is read only for the startup diagnostics.
 - Detection loaders: the context keyword sets switch over the typed scored families; the context keyword loader and the driver's-licence and passport pattern tables share one version check and one loading path; the state-code pattern is compiled once.
+- The output re-check's page extraction runs off the main actor (`@concurrent`), one reader on the output document at a time; the rasterizer's test seam keeps a page failing for a given number of attempts, so the per-page retry's second-failure branch is driven through the production wrapper.
 - The engine's password message names the missing password rather than unsupported encryption; the import checks read one parser's view of the document (the walks inspect the parsed document's own reader, unlocked with the same password, instead of a second parse of the bytes). The robustness mirror and the verification corpus runner take the same password; the runner gains two plain seed documents and three locked twins whose outputs must match their seeds byte for byte.
 
 - `Scripts/release-flag-check.sh` censuses the remaining debug-only launch argument, the saved-searches sim-drive hook, as its positive control.
@@ -113,6 +131,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The verification status ranking is an exhaustive switch over every status; the test-only tuning values are bound per task.
 - Rendering a page from a PDFKit page and from its Core Graphics page runs one render body.
 - The rectangle and polygon character filters share one sort, search and cancellation skeleton.
+- Engine: the public surface is reduced to the document-runner API and what the app and its tests name; 103 more declarations become `internal` (access level only).
 
 ## [1.2.0] — 2026-09-29
 

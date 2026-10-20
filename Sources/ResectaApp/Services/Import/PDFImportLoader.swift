@@ -89,6 +89,25 @@ extension ImportService {
             }
         }
 
+        // The geometry stage, on the unlocked document: a page whose
+        // dictionary cannot be read is refused as damaged (the render's
+        // `/UserUnit` and `/Rotate` arms would skip it), and a page the
+        // render would refuse — a side under 10 pt, a non-default
+        // `/UserUnit`, a `/Rotate` PDFKit and CoreGraphics read apart — is
+        // refused here with the error the render raises.
+        for i in 0..<doc.pageCount {
+            try Task.checkCancellation()
+            try autoreleasepool {
+                guard let page = doc.page(at: i), let pageRef = page.pageRef,
+                      pageRef.dictionary != nil else {
+                    throw PipelineError.importError(.corrupt)
+                }
+                guard validatePageGeometry(page) else {
+                    throw PipelineError.redactionError(.unsupportedPageGeometry(pageIndex: i))
+                }
+            }
+        }
+
         // The walk reader: the parser's own view of the document — unlocked
         // with the same password PDFKit took — which the active-content and
         // hidden-layer walks inspect (stage by stage in `inspectWalkReader`).

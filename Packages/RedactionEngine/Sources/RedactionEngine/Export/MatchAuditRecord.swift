@@ -23,9 +23,9 @@ public struct MatchAuditRecord: Codable, Sendable, Equatable {
     public let appliedThreshold: Double?
     /// Human-readable one-line summary of `rationale.signals`. Built via
     /// `MatchAuditExporter.rationaleSummary(_:)` so CSV + JSON stay aligned.
-    public let rationaleSummary: String
+    let rationaleSummary: String
     public let isSelected: Bool
-    public let wasApplied: Bool
+    let wasApplied: Bool
     /// True when the overlap resolver dropped this record in favor
     /// of a higher-confidence sibling. Losers are threaded through the
     /// export boundary; this column is infrastructure and always
@@ -33,21 +33,21 @@ public struct MatchAuditRecord: Codable, Sendable, Equatable {
     public let suppressedByOverlap: Bool
     /// FOIA exemption `shortCode` (e.g. `"(b)(6)"`, `"custom"`) set
     /// by the reviewer on the underlying region. Nil when untagged.
-    public let foiaExemption: String?
+    let foiaExemption: String?
     /// Free-text statutory citation. Only populated when the
     /// underlying exemption is `.custom`; nil otherwise.
-    public let foiaCitation: String?
+    let foiaCitation: String?
     /// Optional reviewer note captured alongside the exemption tag.
-    public let foiaNote: String?
+    let foiaNote: String?
     /// The rule catalog's `version` for the rule that fired (e.g. "1.0").
     /// Nil when the engine emits a ruleID without a catalog alias
     /// (synthetic `user.alwaysFlag`, fallback `pii.other`). Resolved via
     /// `RuleCatalog.shared.entry(forEngineRuleID:)`.
-    public let ruleVersion: String?
+    let ruleVersion: String?
     /// `version` field from `gazetteer-manifest.json` (e.g.
     /// "1.0.0"). Nil when the manifest is absent (test contexts) or
     /// when a decode error occurred (logged in `ExportMetadataLoader`).
-    public let gazetteerManifestVersion: String?
+    let gazetteerManifestVersion: String?
 
     public init(
         id: UUID,

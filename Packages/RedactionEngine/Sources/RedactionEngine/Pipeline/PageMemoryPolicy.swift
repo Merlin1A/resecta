@@ -45,7 +45,7 @@ public func selectDPI(
 /// together. Kept as the one-call form for callers and tests that only
 /// need the combined verdict; `PageRasterizer.rasterize` calls the two
 /// halves separately so each refusal carries its own error case.
-public func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
+func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
     validatePageGeometry(page) && validatePageMemory(page, effectiveDPI: effectiveDPI)
 }
 
@@ -87,7 +87,7 @@ public func validatePageGeometry(_ page: PDFPage) -> Bool {
 /// rasterizer runs the geometry half first, so an out-of-range page never
 /// reaches this estimate; called alone, an oversized page's estimate is
 /// simply large.
-public func validatePageMemory(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
+func validatePageMemory(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
     let box = page.bounds(for: .cropBox)
 
     // Use effective DPI for memory budget check.
