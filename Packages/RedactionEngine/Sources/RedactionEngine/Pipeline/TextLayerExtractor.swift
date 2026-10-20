@@ -263,12 +263,15 @@ public struct TextLayerExtractor: Sendable {
     /// If hidden text exists, the character filter could miss it (text is in
     /// page.string but not visually positioned), creating a leakage path.
     ///
-    /// The doc-level walk (`/OCProperties → /D → /OFF`) is precomputed at
-    /// import time and supplied via `hasHiddenOCG`. The previous in-engine
-    /// walk went through `page.document?.documentURL`, which is nil for
+    /// The doc-level walk (`/OCProperties → /D`) is precomputed at import
+    /// time and supplied via `hasHiddenOCG`. The previous in-engine walk went
+    /// through `page.document?.documentURL`, which is nil for
     /// `PDFDocument(data:)` — i.e. every production import path — so the
-    /// defense silently failed open. The page-level `/Resources /Properties`
-    /// check stays here because it varies per page.
+    /// defense silently failed open. The page-level check stays here because
+    /// it varies per page: it reads the page's own resource dictionary or the
+    /// one it inherits from the page tree, and every form XObject reachable
+    /// from it, for a `/Properties` entry (how content names a group) or an
+    /// `/OC` entry on the XObject itself.
     static func pageReferencesHiddenOCG(
         _ page: PDFPage, hasHiddenOCG: Bool
     ) -> Bool {
@@ -280,26 +283,112 @@ public struct TextLayerExtractor: Sendable {
         guard let pageRef = page.pageRef,
               let dict = pageRef.dictionary else { return true }
 
-        // Check if the page's resources reference /Properties (OCG markers)
-        var resources: CGPDFDictionaryRef?
-        guard CGPDFDictionaryGetDictionary(dict, "Resources", &resources),
-              let res = resources else { return false }
+        switch inheritedResources(of: dict) {
+        case .none:
+            return false
+        case .unreadable:
+            return true
+        case .found(let resources):
+            var visited: Set<CGPDFStreamRef> = []
+            return resourcesNameOptionalContent(resources, depth: 0, visited: &visited)
+        }
+    }
 
+    /// Bound on the `/Parent` chain walked for an inherited `/Resources`.
+    static let maxPageTreeDepth = 32
+    /// Bound on form XObjects nested inside one another.
+    static let maxFormXObjectDepth = 8
+
+    /// What the page-tree walk found: the resource dictionary in force, none
+    /// anywhere on the chain, or a chain the walk could not follow to its end.
+    enum ResourceLookup {
+        case found(CGPDFDictionaryRef)
+        case none
+        case unreadable
+    }
+
+    /// The page's own `/Resources`, or the nearest ancestor's through the
+    /// `/Parent` chain (the entry is inheritable; ISO 32000-1 §7.7.3.4). A
+    /// chain longer than `maxPageTreeDepth` is not read to its end.
+    static func inheritedResources(of page: CGPDFDictionaryRef) -> ResourceLookup {
+        var node = page
+        for _ in 0..<maxPageTreeDepth {
+            var resources: CGPDFDictionaryRef?
+            if CGPDFDictionaryGetDictionary(node, "Resources", &resources), let resources {
+                return .found(resources)
+            }
+            var parent: CGPDFDictionaryRef?
+            guard CGPDFDictionaryGetDictionary(node, "Parent", &parent), let parent else {
+                return .none
+            }
+            node = parent
+        }
+        return .unreadable
+    }
+
+    /// True when a resource dictionary names optional content — a
+    /// `/Properties` entry — or when a form XObject reachable through its
+    /// `/XObject` entries carries `/OC` or names optional content through
+    /// its own resources. A nesting past `maxFormXObjectDepth`, or an
+    /// XObject whose dictionary cannot be read, is not known to be clean and
+    /// reads as naming it. `visited` keeps a self-referencing XObject from
+    /// being walked twice.
+    static func resourcesNameOptionalContent(
+        _ resources: CGPDFDictionaryRef, depth: Int, visited: inout Set<CGPDFStreamRef>
+    ) -> Bool {
         var properties: CGPDFDictionaryRef?
-        guard CGPDFDictionaryGetDictionary(res, "Properties", &properties),
-              properties != nil else { return false }
+        if CGPDFDictionaryGetDictionary(resources, "Properties", &properties),
+           properties != nil {
+            return true
+        }
+        var xobjects: CGPDFDictionaryRef?
+        guard CGPDFDictionaryGetDictionary(resources, "XObject", &xobjects),
+              let xobjects else { return false }
+        guard depth < maxFormXObjectDepth else { return true }
 
-        return true
+        var streams: [CGPDFStreamRef] = []
+        var unreadable = false
+        CGPDFDictionaryApplyBlock(xobjects, { _, value, _ in
+            var stream: CGPDFStreamRef?
+            if CGPDFObjectGetValue(value, .stream, &stream), let stream {
+                streams.append(stream)
+            } else {
+                unreadable = true
+            }
+            return true
+        }, nil)
+        if unreadable { return true }
+
+        for stream in streams {
+            if visited.contains(stream) { continue }
+            visited.insert(stream)
+            guard let dictionary = CGPDFStreamGetDictionary(stream) else { return true }
+            var subtype: UnsafePointer<CChar>?
+            guard CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype,
+                  String(cString: subtype) == "Form" else { continue }
+            var optionalContent: CGPDFObjectRef?
+            if CGPDFDictionaryGetObject(dictionary, "OC", &optionalContent) {
+                return true
+            }
+            var inner: CGPDFDictionaryRef?
+            if CGPDFDictionaryGetDictionary(dictionary, "Resources", &inner), let inner,
+               resourcesNameOptionalContent(inner, depth: depth + 1, visited: &visited) {
+                return true
+            }
+        }
+        return false
     }
 
     /// Doc-level OCG check intended to run once at import time, when raw bytes
     /// are still available to build a `CGPDFDocument`. Walks the catalog for
-    /// `/OCProperties → /D → /OFF` and reports whether any OCGs are marked
-    /// hidden by the default config. A catalog the reader cannot give, or an
-    /// `/OCProperties` without its `/D`, answers true: the document is not
-    /// known to be free of hidden content. The page-level companion
-    /// `pageReferencesHiddenOCG(_:hasHiddenOCG:)` consumes this flag and adds
-    /// the cheap per-page `/Resources /Properties` check.
+    /// `/OCProperties → /D` and reports whether the default configuration
+    /// hides any group: a non-empty `/OFF` array, or a `/BaseState` of `OFF`
+    /// with a group in `/OCGs` that the `/ON` array does not name (no `/ON`
+    /// at all turns every group off). A catalog the reader cannot give, an
+    /// `/OCProperties` without its `/D`, or an OFF base state with no readable
+    /// group list answers true: the document is not known to be free of hidden
+    /// content. The page-level companion `pageReferencesHiddenOCG(_:hasHiddenOCG:)`
+    /// consumes this flag and adds the per-page resource check.
     public static func documentHasHiddenOCG(_ document: CGPDFDocument) -> Bool {
         guard let catalog = document.catalog else { return true }
 
@@ -314,9 +403,26 @@ public struct TextLayerExtractor: Sendable {
               let config = defaultConfig else { return true }
 
         var offArray: CGPDFArrayRef?
-        if CGPDFDictionaryGetArray(config, "OFF", &offArray), let off = offArray {
-            return CGPDFArrayGetCount(off) > 0
+        if CGPDFDictionaryGetArray(config, "OFF", &offArray), let off = offArray,
+           CGPDFArrayGetCount(off) > 0 {
+            return true
         }
-        return false
+
+        // A base state of OFF hides every group the `/ON` array does not
+        // name (ISO 32000-1 §8.11.4.3).
+        var baseState: UnsafePointer<CChar>?
+        guard CGPDFDictionaryGetName(config, "BaseState", &baseState), let baseState,
+              String(cString: baseState) == "OFF" else { return false }
+        var groups: CGPDFArrayRef?
+        guard CGPDFDictionaryGetArray(ocProperties, "OCGs", &groups), let groups else {
+            return true
+        }
+        let groupCount = CGPDFArrayGetCount(groups)
+        guard groupCount > 0 else { return false }
+        var onArray: CGPDFArrayRef?
+        guard CGPDFDictionaryGetArray(config, "ON", &onArray), let on = onArray else {
+            return true
+        }
+        return CGPDFArrayGetCount(on) < groupCount
     }
 }

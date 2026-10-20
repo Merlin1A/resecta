@@ -506,8 +506,9 @@ public final class PageRasterizer: @unchecked Sendable {
     /// own mapping (`normalizedToFillPixels`: pixel-aligned, a 1-px halo)
     /// and the fills' own reader (`verifyFill`, against the box's first
     /// pixel), so the test sees exactly the pixels the fills and the verify
-    /// loop see. Whitespace-lineage glyphs, off-bitmap boxes and boxes under
-    /// `hiddenTextMinimumBoxArea` are exempt. Cooperative cancellation every
+    /// loop see. A box wholly outside the visible page shows no ink to the
+    /// reader and answers true before any pixel is read; whitespace-lineage
+    /// glyphs and boxes under `hiddenTextMinimumBoxArea` are exempt. Cooperative cancellation every
     /// 256 glyphs. A test that cannot run — no bitmap data to read, no page
     /// size to map onto — also answers true: a page that could not be
     /// checked is not known to be clean (`inkTestCanRun` tells the two
@@ -521,6 +522,7 @@ public final class PageRasterizer: @unchecked Sendable {
         }
         let buffer = data.assumingMemoryBound(to: UInt8.self)
         let bitmap = CGRect(x: 0, y: 0, width: context.width, height: context.height)
+        let visiblePage = CGRect(x: 0, y: 0, width: 1, height: 1)
         var band = 0
         for entry in entries {
             band += 1
@@ -531,6 +533,9 @@ public final class PageRasterizer: @unchecked Sendable {
                 x: b.minX / pageSize.width, y: b.minY / pageSize.height,
                 width: b.width / pageSize.width, height: b.height / pageSize.height
             )
+            if normalized.width > 0, normalized.height > 0, !normalized.intersects(visiblePage) {
+                return true
+            }
             let box = normalizedToFillPixels(
                 normalized, bitmapWidth: context.width, bitmapHeight: context.height
             ).intersection(bitmap)
