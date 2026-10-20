@@ -98,6 +98,10 @@ struct FilterChip: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // The drawn selection (the fill + the semibold label) gets its
+        // spoken twin — the selected trait — so VoiceOver reads which
+        // chips are on.
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .sensoryFeedback(.selection, trigger: isSelected) // Haptic on filter toggle
     }
 }
