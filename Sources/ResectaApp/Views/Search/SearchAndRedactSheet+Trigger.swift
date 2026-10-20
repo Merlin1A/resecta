@@ -12,6 +12,11 @@ import RedactionEngine
 
 extension SearchAndRedactSheet {
 
+    /// The custom-term time-limit toast: one content-free, page-free
+    /// message, so the queue shows it once however many pages ran out.
+    static let customTermTimeoutMessage =
+        "A custom term was not fully checked on some pages — time limit reached."
+
     // MARK: - Search Trigger
 
     func debounceSearch(query: String) {
@@ -386,20 +391,12 @@ extension SearchAndRedactSheet {
         // sink. `DocumentSearcher` calls this once per (page, user-
         // authored pattern) when `UserTermMatcher.alwaysFlagHits`
         // reports a term the page's time budget did not let it check
-        // in full. Per-term-per-page semantics: the term
-        // stays active on subsequent pages within the same scan,
-        // so each affected (page, pattern) emits its own toast.
-        // Truncated to 24 user-facing chars so a long pasted pattern
-        // can't dominate the message; trailing "…" disambiguates a
-        // truncated tail.
-        await searcher.setUserTermsTimeoutSink({ [weak toastManager] page, pattern in
+        // in full. The message names neither the term nor the page, so
+        // the queue coalesces a multi-page storm to one toast (the
+        // OCR-off sink below takes the same shape).
+        await searcher.setUserTermsTimeoutSink({ [weak toastManager] _, _ in
             Task { @MainActor in
-                let truncated: String = pattern.count > 24
-                    ? "\(String(pattern.prefix(24)))…"
-                    : pattern
-                let message =
-                    "Custom term '\(truncated)' was not fully checked on page \(page + 1) — time limit reached."
-                toastManager?.enqueue(message, severity: .warning)
+                toastManager?.enqueue(SearchAndRedactSheet.customTermTimeoutMessage, severity: .warning)
             }
         })
         // Surface the "scanned region not analyzed"

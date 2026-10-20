@@ -46,7 +46,7 @@ is no threshold: one wrong pixel fails that render; the page is re-rendered
 once at the lowest resolution tier (150 DPI) and re-verified, and a second
 failure fails the whole export with an error rather than shipping (the retry
 is the app's: `rasterizeWithRetry` in
-`Sources/ResectaApp/State/PipelineCoordinator.swift`). Polygon
+`Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift`). Polygon
 regions — a path the editor does not offer in this release — get the same
 readback, with the mask built by a scanline rasteriser written independently
 of the Core Graphics fill, so the check shares no code with the thing it
