@@ -10,5 +10,5 @@ public enum DetectionOrchestrator: Sendable {
     /// floored prior, still clears every preset threshold:
     /// posterior(0.75, 0.35) ≈ 0.618 > 0.60 balanced. Public so tests
     /// and the Settings reset affordance can reference the shipped value.
-    public static let absorbingStateFloor = 0.35
+    static let absorbingStateFloor = 0.35
 }

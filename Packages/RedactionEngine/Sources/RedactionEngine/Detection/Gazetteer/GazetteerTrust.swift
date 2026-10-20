@@ -23,7 +23,7 @@ public enum GazetteerTrust {
 
     /// The full answer for a bundle. `Bool` consumers read `isTrusted`; the
     /// diagnostics loader reads the report to name what failed.
-    public enum CorpusVerdict: Equatable, Sendable {
+    enum CorpusVerdict: Equatable, Sendable {
         /// Signature valid, every trust-gated asset matches its entry. The
         /// report may still carry UNGATED failures to surface.
         case trusted(AssetIntegrity.Report)
@@ -32,7 +32,7 @@ public enum GazetteerTrust {
         /// Signature valid, but the manifest or a trust-gated asset failed.
         case assetsCompromised(AssetIntegrity.Report)
 
-        public var isTrusted: Bool {
+        var isTrusted: Bool {
             if case .trusted = self { return true }
             return false
         }
@@ -47,7 +47,7 @@ public enum GazetteerTrust {
 
         /// Mechanism-only reason for a false verdict (asset names, never
         /// document content); nil when trusted.
-        public var failureReason: String? {
+        var failureReason: String? {
             switch self {
             case .trusted: return nil
             case .signatureInvalid:
@@ -101,7 +101,7 @@ public enum GazetteerTrust {
     }
 
     /// The shipped bundle's full verdict (memoized).
-    public static func shippedCorpusVerdict() -> CorpusVerdict {
+    static func shippedCorpusVerdict() -> CorpusVerdict {
         corpusVerdict(bundle: .module)
     }
 
@@ -109,12 +109,12 @@ public enum GazetteerTrust {
     /// every trust-gated asset matches the digest the manifest records. The
     /// production bundle instance's answer is memoized; any other bundle is
     /// verified live.
-    public static func isCorpusTrusted(bundle: Bundle) -> Bool {
+    static func isCorpusTrusted(bundle: Bundle) -> Bool {
         corpusVerdict(bundle: bundle).isTrusted
     }
 
     /// The full verdict for `bundle` (see `isCorpusTrusted(bundle:)`).
-    public static func corpusVerdict(bundle: Bundle) -> CorpusVerdict {
+    static func corpusVerdict(bundle: Bundle) -> CorpusVerdict {
         #if DEBUG
         if let forced = verdictOverrideForTesting {
             return forced ? .trusted(.empty) : .signatureInvalid
