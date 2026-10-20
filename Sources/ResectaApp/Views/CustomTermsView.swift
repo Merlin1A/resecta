@@ -12,6 +12,10 @@ import RedactionEngine
 // Copy is mechanism-description only.
 
 struct CustomTermsView: View {
+    /// The add row's Regex toggle and add button never draw a hit area
+    /// under the HIG effective minimum (the token, pinned).
+    static let addRowControlMinimumSide: CGFloat = ResectaTokens.TouchTarget.minimum
+
     static let termTooShortMessage = "Term too short (min \(UserTermsStore.literalMinimumLength) characters)."
     static let alwaysFlagFooter = "Added as matches alongside detector hits. Use for names, project codes, or identifiers your detector presets may not recognize. Literal terms match anywhere inside a word, in any case."
 
@@ -252,9 +256,14 @@ struct AddTermRow: View {
                     .disabled(isAtCap || submitInFlight)
                     .onSubmit { Task { await submit() } }
                     .accessibilityLabel("\(listName) term input")
+                // Both controls at the 46-pt LAYOUT floor (the drawn
+                // small controls stay; the frame is the hit area).
                 Toggle("Regex", isOn: $isRegex)
                     .toggleStyle(.button)
                     .controlSize(.small)
+                    .frame(minWidth: CustomTermsView.addRowControlMinimumSide,
+                           minHeight: CustomTermsView.addRowControlMinimumSide)
+                    .contentShape(Rectangle())
                     .disabled(isAtCap || submitInFlight)
                     .accessibilityLabel("Treat as regular expression")
                 if submitInFlight {
@@ -265,6 +274,9 @@ struct AddTermRow: View {
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title3)
+                            .frame(minWidth: CustomTermsView.addRowControlMinimumSide,
+                                   minHeight: CustomTermsView.addRowControlMinimumSide)
+                            .contentShape(Rectangle())
                     }
                     .disabled(pattern.trimmingCharacters(in: .whitespaces).isEmpty || isAtCap)
                     .accessibilityLabel("Add term to \(listName) list")

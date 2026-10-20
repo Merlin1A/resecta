@@ -99,15 +99,19 @@ struct FindingRowFamilyTests {
         )
     }
 
-    @Test("Search row a11y label: the adapter's page-only string, plus the spoken tier where the row is graded (spoken, never written)")
+    @Test("Search row a11y label: the category word (or the adapter's page-only string), the page, the spoken tier where the row is graded, and 'applied' once marked — never the text")
     func searchRowAccessibilityLabel() {
         let literal = makeSearchResult(matchedText: "123-45-6789")
         #expect(SearchResultRow.accessibilityLabel(for: literal, tier: .high, showsTier: false)
                 == "Search match, page 3")
+        #expect(SearchResultRow.accessibilityLabel(for: literal, tier: .high, showsTier: false, isApplied: true)
+                == "Search match, page 3, applied")
 
         let pii = makePIIResult()
         let spoken = SearchResultRow.accessibilityLabel(for: pii, tier: .high, showsTier: true)
-        #expect(spoken == "Search match, page 1, high confidence")
+        #expect(spoken == "SSN, page 1, high confidence")
+        #expect(SearchResultRow.accessibilityLabel(for: pii, tier: .high, showsTier: true, isApplied: true)
+                == "SSN, page 1, high confidence, applied")
         // Never the matched text, never the window.
         #expect(!spoken.contains("123-45-6789"))
         #expect(!spoken.contains("Taxpayer"))
