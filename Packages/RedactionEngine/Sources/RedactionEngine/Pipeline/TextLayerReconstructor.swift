@@ -42,7 +42,7 @@ struct SourcedTextLayerLine {
 
 /// Reconstructs the invisible text layer for Searchable Redaction output.
 /// Must be called AFTER the page image has been drawn into the CGContext.
-public enum TextLayerReconstructor {
+enum TextLayerReconstructor {
 
     /// Reference font size. The J-12 layout derives per-band sizes from
     /// source metrics; this constant anchors the verifier's
@@ -90,7 +90,7 @@ public enum TextLayerReconstructor {
     /// the layout works purely in page space: Y stays source-aligned
     /// (per-line origins) and nothing here consumes the page height on an
     /// unrotated page.
-    public static func drawInvisibleTextLayer(
+    static func drawInvisibleTextLayer(
         context: CGContext,
         entries: [CharacterInfo],
         pageSize: CGSize,
