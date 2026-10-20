@@ -55,7 +55,7 @@ func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
 /// CoreGraphics. Independent of DPI and of available memory. A page that
 /// fails here is reported as `.unsupportedPageGeometry`, never as a memory
 /// failure.
-func validatePageGeometry(_ page: PDFPage) -> Bool {
+public func validatePageGeometry(_ page: PDFPage) -> Bool {
     let box = page.bounds(for: .cropBox)
     guard box.width >= 10, box.height >= 10,
           box.width <= 5000, box.height <= 5000 else { return false }
