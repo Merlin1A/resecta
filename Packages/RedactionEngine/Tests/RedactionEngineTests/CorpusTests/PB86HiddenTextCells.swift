@@ -56,7 +56,9 @@ extension VerificationCorpusRunnerTests {
         "\(docId)/\(PipelineMode.searchableRedaction.rawValue)/\(set)"
     }
 
-    /// The engine-factory PB-86 grid: 4 hidden classes × covered/uncovered.
+    /// The engine-factory hidden-text probe grid: the four original hidden classes ×
+    /// covered/uncovered, the three optional-content forms × covered/uncovered,
+    /// and the crop-box page (uncovered only: the hidden line is off the page).
     /// Regions are fixed normalized boxes over the factories' known geometry
     /// (RawPDFBuilder anchor/hidden Td positions; ctLineDraw NATO column;
     /// ocgHiddenLayerPDF's 72,720 line).
@@ -101,6 +103,15 @@ extension VerificationCorpusRunnerTests {
         let box = TestFixtures.opaqueBoxCoveredTextPDF()
         let tr3 = TestFixtures.ctLineDrawCourierPDF()
         let ocg = TestFixtures.ocgHiddenLayerPDF()
+        let bso = TestFixtures.ocgBaseStateOffPDF()
+        let inh = TestFixtures.ocgInheritedResourcesPDF()
+        let xob = TestFixtures.ocgFormXObjectPDF()
+        let crop = TestFixtures.offCropBoxTextPDF()
+        // The crop-box page is 600 pt tall: its anchor line at y 400 sits at
+        // 0.667 of the visible page; the hidden line is outside the box, so
+        // no region can cover it.
+        let cropAnchorRegion = [seed("anchor-line", page: 0,
+                                     x: 0.08, y: 0.65, w: 0.62, h: 0.06)]
         let natoCovered = ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO"]
         let natoUncovered = ["FOXTROT", "GOLF", "HOTEL", "INDIA", "JULIET"]
 
@@ -144,6 +155,45 @@ extension VerificationCorpusRunnerTests {
                   notes: "dummy corner region; the OCG line is untouched by any region"),
              rows("pb86-ocg-hidden", set: "pb86-uncovered",
                   cls: "ocg_off", covered: [], uncovered: ["HIDDEN SECRET"])),
+            // The three forms optional content takes beside a page's own
+            // /Properties entry, and a page whose text sits outside its crop
+            // box: each hidden line is extractor-visible; the searchable
+            // path must keep it out of the output text layer.
+            (cell("pb86-ocg-base-state-off", bso, set: "pb86-covered",
+                  seeds: hiddenRegion, terms: ["PLANT-ENGBSO-01"],
+                  notes: "region over the line a /BaseState /OFF default configuration hides"),
+             rows("pb86-ocg-base-state-off", set: "pb86-covered",
+                  cls: "ocg_base_state_off", covered: ["PLANT-ENGBSO-01"], uncovered: [])),
+            (cell("pb86-ocg-base-state-off", bso, set: "pb86-uncovered",
+                  seeds: anchorRegion, terms: ["BSO VISIBLE ANCHOR LINE"],
+                  notes: "region over the visible anchor only; the base-state-hidden line is untouched"),
+             rows("pb86-ocg-base-state-off", set: "pb86-uncovered",
+                  cls: "ocg_base_state_off", covered: [], uncovered: ["PLANT-ENGBSO-01"])),
+            (cell("pb86-ocg-inherited-resources", inh, set: "pb86-covered",
+                  seeds: hiddenRegion, terms: ["PLANT-ENGINH-01"],
+                  notes: "region over the hidden line of a page that inherits the resources naming the group"),
+             rows("pb86-ocg-inherited-resources", set: "pb86-covered",
+                  cls: "ocg_inherited_resources", covered: ["PLANT-ENGINH-01"], uncovered: [])),
+            (cell("pb86-ocg-inherited-resources", inh, set: "pb86-uncovered",
+                  seeds: anchorRegion, terms: ["INH VISIBLE ANCHOR LINE"],
+                  notes: "region over the visible anchor only; the inherited-resources line is untouched"),
+             rows("pb86-ocg-inherited-resources", set: "pb86-uncovered",
+                  cls: "ocg_inherited_resources", covered: [], uncovered: ["PLANT-ENGINH-01"])),
+            (cell("pb86-ocg-form-xobject", xob, set: "pb86-covered",
+                  seeds: hiddenRegion, terms: ["PLANT-ENGXOB-01"],
+                  notes: "region over the hidden line a form XObject carrying /OC draws"),
+             rows("pb86-ocg-form-xobject", set: "pb86-covered",
+                  cls: "ocg_form_xobject", covered: ["PLANT-ENGXOB-01"], uncovered: [])),
+            (cell("pb86-ocg-form-xobject", xob, set: "pb86-uncovered",
+                  seeds: anchorRegion, terms: ["XOB VISIBLE ANCHOR LINE"],
+                  notes: "region over the visible anchor only; the form XObject's line is untouched"),
+             rows("pb86-ocg-form-xobject", set: "pb86-uncovered",
+                  cls: "ocg_form_xobject", covered: [], uncovered: ["PLANT-ENGXOB-01"])),
+            (cell("pb86-off-crop", crop, set: "pb86-uncovered",
+                  seeds: cropAnchorRegion, terms: ["CROP VISIBLE ANCHOR LINE"],
+                  notes: "region over the visible anchor; the line outside the crop box cannot be covered by any region — the pure re-exposure probe"),
+             rows("pb86-off-crop", set: "pb86-uncovered",
+                  cls: "off_crop", covered: [], uncovered: ["PLANT-ENGCROP-01"])),
         ]
     }
 

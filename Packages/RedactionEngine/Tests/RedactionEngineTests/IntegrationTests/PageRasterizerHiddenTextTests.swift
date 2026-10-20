@@ -94,4 +94,45 @@ struct PageRasterizerHiddenTextTests {
         #expect((result.pageOutput.textLayerEntries?.count ?? 0) > 0, "\(name)")
         #expect(result.filterDigest != nil, "\(name)")
     }
+
+    // MARK: - The visible page
+
+    @Test("a glyph box wholly outside the visible page reads as showing no ink")
+    func offPageGlyphReadsInkless() throws {
+        let context = try #require(createBitmapContext(width: 64, height: 64))
+        // A white page with one black mark inside the in-page glyph's box.
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
+        context.setFillColor(CGColor(gray: 0, alpha: 1))
+        context.fill(CGRect(x: 12, y: 12, width: 4, height: 4))
+        let pageSize = CGSize(width: 64, height: 64)
+        let inked = CharacterInfo(
+            character: "A", bounds: CGRect(x: 10, y: 10, width: 10, height: 10), stringIndex: 0)
+        let offPage = CharacterInfo(
+            character: "A", bounds: CGRect(x: 10, y: 80, width: 10, height: 10), stringIndex: 1)
+        #expect(try PageRasterizer.hasInklessGlyph(
+            context: context, entries: [inked], pageSize: pageSize) == false)
+        #expect(try PageRasterizer.hasInklessGlyph(
+            context: context, entries: [offPage], pageSize: pageSize) == true)
+        // A glyph the crop clips partly is read on its visible part.
+        let clipped = CharacterInfo(
+            character: "A", bounds: CGRect(x: 10, y: 58, width: 10, height: 10), stringIndex: 2)
+        #expect(try PageRasterizer.hasInklessGlyph(
+            context: context, entries: [clipped], pageSize: pageSize) == true)
+    }
+
+    @Test("text outside the crop box never reaches the output text layer")
+    func offCropBoxTextStaysOut() async throws {
+        let data = TestFixtures.offCropBoxTextPDF()
+        let (doc, pageData) = try Self.load(data)
+        defer { withExtendedLifetime(doc) {} }
+        let page = try #require(doc.page(at: 0))
+        let planted = page.string?.contains("PLANT-ENGCROP-01") == true
+        let extracted = try await TextLayerExtractor().extractCharacters(from: page)
+        let extractedText = extracted.map(\.character).joined()
+        let result = try await PageRasterizer().rasterize(pageData)
+        let survivors = (result.pageOutput.textLayerEntries ?? []).map(\.character).joined()
+        print("off-crop probe: plant in page.string=\(planted) · in extracted entries=\(extractedText.contains("ENGCROP")) · reason=\(String(describing: result.fallbackReason))")
+        #expect(!survivors.contains("ENGCROP"))
+    }
 }
