@@ -237,18 +237,17 @@ final class PipelineCoordinator: @unchecked Sendable {
         // the triage-sheet check and phase-must-be-`.editing` rule.
         guard documentState.canStartPipeline(with: redactionState) else { return }
 
-        // At the Apply seam, the Search &
-        // Redact sheet mutates `redactionState.regions` and is incompatible
-        // with the `.redacting` / `.verifying` phases this run enters, and
-        // the editor's ONE `.sheet(item:)` slot sits above its phase
-        // switch — a live session rode the compact float over the progress
-        // card, the results screen and its Preview / Details pushes, and
-        // Keep Editing came back with Scan / Search still disabled. Tear it
-        // down here, the single funnel for Redact, ⇧⌘R, the resume banner's
-        // Restart and the purge re-run — exactly what `prepareForPurgeRerun`
-        // already did for its path. A staged review cannot be pending here
-        // (`canStartPipeline(with:)`), so nothing needs parking.
+        // At the Apply seam, the Search & Redact sheet mutates
+        // `redactionState.regions` and is incompatible with the phases this
+        // run enters, and the editor's ONE `.sheet(item:)` slot sits above
+        // its phase switch. Tear it down here, the single funnel for Redact,
+        // ⇧⌘R, the resume banner's Restart and the purge re-run. A staged
+        // review cannot be pending here (`canStartPipeline(with:)`).
         redactionState.dismissActiveSearch()
+        // The results card says Redact cleared the undo history; a stack
+        // that survived would let Undo unlink the built output after Keep
+        // Editing. Cleared here, the same funnel.
+        undoManager?.removeAllActions()
 
         // Snapshot pipeline-affecting settings once at run
         // entry. Subsequent reads (verify-for-run, fillColor, exportDPI,
@@ -392,10 +391,9 @@ final class PipelineCoordinator: @unchecked Sendable {
         // nonisolated(unsafe): @Observable prevents Sendable; Task captures self
         // implicitly. Safe because all access is on MainActor (UndoManager pattern).
         nonisolated(unsafe) let coordinator = self
-        // Stamp this run with a UUID owned by the Task.
-        // The defer / error-recovery guards below only mutate state when
-        // the active run still matches — so an older Task's late error
-        // recovery cannot clear a newer run's outputURL / activePipelineTask.
+        // Stamp this run with a UUID owned by the Task: the sink, the defer
+        // and the error-recovery guards below only act while the active run
+        // still matches.
         let runId = UUID()
         documentState.activeRunId = runId
         documentState.activePipelineTask = Task {
@@ -411,24 +409,19 @@ final class PipelineCoordinator: @unchecked Sendable {
             }
             do {
                 let runner = PipelineRunner(
-                    coordinator: coordinator, sink: { coordinator.apply($0) })
+                    coordinator: coordinator, sink: { coordinator.apply($0, from: runId) })
                 _ = try await runner.run(kind: kind)
             } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
-                // Hop to the MainActor before touching @Observable state. A
+                // Hop to the MainActor before touching @Observable state: a
                 // thrown CancellationError can resume this handler OFF the
                 // MainActor (a Task.detached intermediate breaks the
-                // actor-inheritance chain — see the general handler's
-                // real-doc crash backtrace). The run-ownership guard moves
-                // inside the hop so it, too, reads MainActor state on the
-                // MainActor. `MainActor.assertIsolated()` is the canary — a
-                // CI trap if the hop is ever removed. Transition table
-                // unchanged (threading context only).
+                // actor-inheritance chain). The run-ownership guard reads
+                // MainActor state inside the hop; `assertIsolated()` is the
+                // canary if the hop is ever removed.
                 await MainActor.run {
                     MainActor.assertIsolated()
-                    // Only mutate cancellation state if this Task still owns
-                    // the active run. After Stop → restart, the older Task's
-                    // CancellationError must NOT clear the newer run's
-                    // outputURL or override its phase transition.
+                    // Only this Task's own run: after Stop → restart (or
+                    // Stop alone) the run is no longer the active one.
                     guard coordinator.documentState.activeRunId == runId else { return }
                     coordinator.apply(recovery: Self.recovery(
                         for: kind, after: .cancelled,
@@ -440,15 +433,11 @@ final class PipelineCoordinator: @unchecked Sendable {
                 let stage = Self.classifyPipelineFailure(
                     underlying, redactionSucceeded: failure?.redactionSucceeded ?? false)
                 // MainActor.run: a thrown error can resume this handler OFF the
-                // MainActor — the real-doc crash backtrace shows it on
-                // com.apple.root.user-initiated-qos.cooperative — so hop back
-                // before touching MainActor-isolated state or the toast queue.
-                // The run-ownership guard moves inside the hop so it, too,
-                // reads MainActor state on the MainActor.
+                // MainActor (the real-doc crash backtrace showed it on the
+                // cooperative pool), so hop back before touching
+                // MainActor-isolated state or the toast queue.
                 await MainActor.run {
-                    // Same UUID guard as the cancellation path — a late
-                    // recovery from a superseded run must not stomp the
-                    // newer run's state.
+                    // The same ownership guard as the cancellation path.
                     guard coordinator.documentState.activeRunId == runId else { return }
                     coordinator.apply(recovery: Self.recovery(
                         for: kind, after: .failed(underlying, stage: stage),
@@ -481,6 +470,15 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// and announcements a run causes, in the order the runner reports
     /// them. Synchronous and MainActor-isolated, so the runner's next
     /// statement observes the write.
+    /// The run's sink: an event lands only while `runId` is still the
+    /// active run. Stop invalidates the run in its synchronous step and a
+    /// restart mints a new id, so a cancelled or superseded Task's late
+    /// events — its progress tick first of all — are dropped here.
+    func apply(_ event: PipelineRunEvent, from runId: UUID) {
+        guard documentState.activeRunId == runId else { return }
+        apply(event)
+    }
+
     func apply(_ event: PipelineRunEvent) {
         switch event {
         case .phase(let phase):

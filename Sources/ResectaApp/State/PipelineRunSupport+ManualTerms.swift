@@ -3,9 +3,9 @@ import Foundation
 import PDFKit
 import RedactionEngine
 
-// The manual-region text identity: at run entry the words fully inside
-// every `.manual` region on a page with a rich text layer are captured
-// by the engine's word-span rule and join the verifier's
+// The manual-region text identity: at run entry the words the Searchable
+// filter would touch under every `.manual` region on a page with a rich
+// text layer are captured, line by line, and join the verifier's
 // sensitive-term set, so a manual region is checked by the term layers
 // exactly as a typed search or a detected region is. Regions on pages
 // whose text layer is not rich cannot be captured and are counted for
@@ -39,16 +39,20 @@ extension PipelineCoordinator {
     ///
     /// Per `.manual` region (page by page, in region order): a whole-page
     /// region is skipped; on a page whose text layer is `.rich` the words
-    /// fully inside the region (its polygon honoured) are captured — a
-    /// multi-word run joins as ONE substring term plus each token of three
-    /// or more scalars with token-boundary matching (the single-token rule
-    /// of `sensitiveTerms(fromAppliedRegions:metadata:audit:)`), a single
-    /// word as that one bounded token; on any other page (`.sparse`,
-    /// `.none`, or no entry) the region is counted, never captured — a
-    /// header over a scanned body has no words under a rect on the body.
-    /// Every other origin is untouched. Dedup with the applied terms keeps
-    /// the least restrictive discipline any contributor asked for; the
-    /// result is sorted by text like the applied set.
+    /// the Searchable filter would touch (`ManualCapturePageWords.lines`;
+    /// its polygon honoured) are captured — a region over exactly one word
+    /// keeps that word as one bounded token (the user's intent); otherwise
+    /// every captured LINE of two or more words joins as ONE substring
+    /// term, the page text's verbatim span from its first word to its last
+    /// ("123-45-6789" whole, never "123 45 6789"), and each captured word
+    /// the admission rule keeps (`ManualTermStopWords.admits`: a digit, or
+    /// four scalars or more outside the stop list) joins with token-boundary
+    /// matching; lines never join across (no hyphen join). On any other
+    /// page (`.sparse`, `.none`, or no entry) the region is counted, never
+    /// captured — a header over a scanned body has no words under a rect on
+    /// the body. Every other origin is untouched. Dedup with the applied
+    /// terms keeps the least restrictive discipline any contributor asked
+    /// for; the result is sorted by text like the applied set.
     nonisolated static func sensitiveTermSet(
         applied: [SensitiveTerm],
         manualRegions regions: [Int: [RedactionRegion]],
@@ -77,13 +81,18 @@ extension PipelineCoordinator {
                     continue
                 }
                 if words == nil { words = .some(pageWords(page)) }
-                let captured = words??.words(fullyInside: rect, polygon: region.vertices) ?? []
+                let lines = words??.lines(touching: rect, polygon: region.vertices) ?? []
+                let captured = lines.flatMap(\.words)
                 if captured.count == 1 {
                     insert(captured[0], requiresTokenBoundary: true)
                 } else if captured.count > 1 {
-                    insert(captured.joined(separator: " "), requiresTokenBoundary: false)
-                    for word in captured where word.unicodeScalars.count >= 3 {
-                        insert(word, requiresTokenBoundary: true)
+                    for line in lines {
+                        if line.words.count > 1 {
+                            insert(line.text, requiresTokenBoundary: false)
+                        }
+                        for word in line.words where ManualTermStopWords.admits(word) {
+                            insert(word, requiresTokenBoundary: true)
+                        }
                     }
                 }
             }
@@ -122,11 +131,19 @@ extension PipelineCoordinator {
     }
 }
 
+/// One captured line: consecutive words (reading order) on one baseline
+/// band, with the page text's verbatim span from the first to the last.
+nonisolated struct CapturedLine: Equatable, Sendable {
+    let text: String
+    let words: [String]
+}
+
 /// One page's text-layer words, read once for every manual region on the
 /// page: the engine's word source (`EmbeddedTextSource`) with the words'
-/// text, filtered per region by the rule of the engine's word-span
-/// primitive (`TextSpan.words(fullyInside:polygon:on:)`, which reads the
-/// page again on every call).
+/// text and ranges, filtered per region either by the rule of the engine's
+/// word-span primitive (`TextSpan.words(fullyInside:polygon:on:)`, which
+/// reads the page again on every call) or by the Searchable filter's
+/// removal rule (`lines(touching:polygon:)`).
 nonisolated struct ManualCapturePageWords {
 
     /// `TextSpan.edgeTolerancePoints` (internal to the engine), in PDF
@@ -134,7 +151,12 @@ nonisolated struct ManualCapturePageWords {
     /// this is inside.
     static let edgeTolerancePoints: CGFloat = 0.5
 
-    private let entries: [(text: String, box: CGRect)]
+    /// `CharacterFilter.safetyMarginPoints`: the removal's halo, in PDF
+    /// points, on a line the region itself touches.
+    static let removalHaloPoints: CGFloat = 3.0
+
+    private let entries: [(text: String, box: CGRect, range: NSRange)]
+    private let pageText: NSString
     private let displayedSize: CGSize
 
     init?(page: PDFPage) {
@@ -145,9 +167,54 @@ nonisolated struct ManualCapturePageWords {
         let text = pageText as NSString
         entries = source.wordBounds.compactMap { word in
             NSMaxRange(word.range) <= text.length
-                ? (text.substring(with: word.range), word.normalizedRect) : nil
+                ? (text.substring(with: word.range), word.normalizedRect, word.range) : nil
         }
+        self.pageText = text
         displayedSize = size
+    }
+
+    /// The lines the Searchable filter would touch under `rect`: a word is
+    /// taken when its box meets the region (the filter's tier (a)), or meets
+    /// the region's 3-pt halo while the region meets the word's own line
+    /// band (tier (b)); with `polygon` a word's centre must also lie inside
+    /// it. Consecutive taken words whose boxes overlap vertically form one
+    /// line; its text is the page text's verbatim span from the first word
+    /// to the last when their ranges read in order on one line, else the
+    /// words space-joined. Lines never join across.
+    func lines(touching rect: CGRect, polygon: [CGPoint]? = nil) -> [CapturedLine] {
+        guard rect.width > 0, rect.height > 0 else { return [] }
+        let halo = rect.insetBy(dx: -Self.removalHaloPoints / displayedSize.width,
+                                dy: -Self.removalHaloPoints / displayedSize.height)
+        var lines: [[(text: String, box: CGRect, range: NSRange)]] = []
+        var previousIndex = -1
+        for (index, word) in entries.enumerated() {
+            let onBand = rect.minY < word.box.maxY && word.box.minY < rect.maxY
+            guard word.box.intersects(rect) || (onBand && word.box.intersects(halo)) else { continue }
+            if let polygon, polygon.count >= 3,
+               !pointInPolygon(CGPoint(x: word.box.midX, y: word.box.midY), vertices: polygon) {
+                continue
+            }
+            if index == previousIndex + 1, let last = lines.last?.last,
+               last.box.minY < word.box.maxY && word.box.minY < last.box.maxY {
+                lines[lines.count - 1].append(word)
+            } else {
+                lines.append([word])
+            }
+            previousIndex = index
+        }
+        return lines.map { line in
+            let words = line.map(\.text)
+            guard let first = line.first, let last = line.last, line.count > 1,
+                  first.range.location < last.range.location,
+                  NSMaxRange(last.range) <= pageText.length else {
+                return CapturedLine(text: words.joined(separator: " "), words: words)
+            }
+            let span = pageText.substring(
+                with: NSRange(location: first.range.location,
+                              length: NSMaxRange(last.range) - first.range.location))
+            let joined = span.rangeOfCharacter(from: .newlines) == nil ? span : words.joined(separator: " ")
+            return CapturedLine(text: joined, words: words)
+        }
     }
 
     /// The words fully inside `rect` (page-normalized, displayed frame), in
