@@ -19,6 +19,33 @@ import Foundation
 @MainActor
 struct SearchToolbarSectionTests {
 
+    @Test("The Case-sensitive chip is offered in Regex mode")
+    func caseSensitiveChipShowsInRegexMode() throws {
+        // The two chips the toolbar hides in Regex mode sit under an
+        // `if searchState.searchModeType != .regex` guard; the Case-sensitive
+        // chip must not — the engine honours the option there. Read from the
+        // view source, the way `PatternAdmissionTests` reads the app sources.
+        let file = repoRoot().appendingPathComponent("Sources/ResectaApp/Views/Search/SearchToolbarSection.swift")
+        let lines = try String(contentsOf: file, encoding: .utf8)
+            .split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let chip = try #require(lines.firstIndex { $0.contains("optionChip(\"Case-sensitive\"") })
+        let whitespace = CharacterSet.whitespaces
+        let openers = lines[..<chip].filter { line in
+            let t = line.trimmingCharacters(in: whitespace)
+            return t.hasPrefix("if ") || t.hasPrefix("FlowLayout(")
+        }
+        let opener = try #require(openers.last)
+        #expect(opener.trimmingCharacters(in: whitespace).hasPrefix("FlowLayout("),
+                "the Case-sensitive chip sits under a mode guard: \(opener)")
+    }
+
+    private func repoRoot(file: StaticString = #filePath) -> URL {
+        URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+    }
+
     @Test("Options disclosure starts collapsed by default")
     func optionsDisclosureStartsCollapsed() {
         // The constant is named for what it stores: expanded-
