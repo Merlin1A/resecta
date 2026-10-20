@@ -134,9 +134,9 @@ Tests and gates: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Testing
 
-The test tree is larger than the source tree: roughly 63,000 lines of Swift source to roughly 97,000 lines of test code, about 1.6×. Counted from the current tree:
+The test tree is larger than the source tree: roughly 63,000 lines of Swift source to roughly 100,000 lines of test code, about 1.6×. Counted from the current tree:
 
-- **Engine package** (`Packages/RedactionEngine/Tests`) — 1,947 Swift Testing `@Test` functions across 267 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
+- **Engine package** (`Packages/RedactionEngine/Tests`) — 1,952 Swift Testing `@Test` functions across 267 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
 - **App target** (`Tests/ResectaAppTests`) — 1,732 `@Test` functions across 251 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
 - **UI / end-to-end** (`Tests/ResectaAppUITests`) — 47 XCUITest methods that drive the built app on a simulator (run from Xcode; the batched runner and CI build them without running them): the first-launch legal gate, search-to-redaction flows, the search re-check on the results screen, and the editor's handling of links inside a document.
 

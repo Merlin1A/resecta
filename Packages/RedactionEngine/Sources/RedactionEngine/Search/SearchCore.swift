@@ -70,22 +70,69 @@ enum SearchCore {
         return effective
     }
 
-    /// The page-side text the regex tiers enumerate over: NFKC when
-    /// `normalizeUnicode` is on, then the 1:1 (UTF-16 length-preserving)
-    /// smart-punctuation fold, so emitted NSRanges stay valid on the page.
-    /// The pattern itself is never transformed, and the length-changing
+    /// The page-side text the regex tiers enumerate over (`regexPage`'s
+    /// text): NFKC when `normalizeUnicode` is on, then the smart-punctuation
+    /// fold. The pattern itself is never transformed, and the length-changing
     /// extensions are excluded from the regex paths; see `SearchOptions`.
     static func regexSearchText(_ pageText: String, options: SearchOptions) -> String {
-        var searchText: String
-        if options.normalizeUnicode {
-            searchText = TextNormalizer.normalize(pageText)
-        } else {
-            searchText = pageText
+        regexPage(pageText, options: options).text
+    }
+
+    /// The regex tiers' page with its route back to the raw page text. NFKC
+    /// is not UTF-16 length-preserving (a ligature expands, a compatibility
+    /// character or a decomposed accent contracts), so a match range in the
+    /// normalized text is not a range on the raw page: `rawNSRange` maps it
+    /// unit by unit. A page of single-unit ASCII is normalized whole with no
+    /// map (every step is the identity on it).
+    struct RegexPage {
+        let text: String
+        /// Per UTF-16 unit of `text`: the raw Character it came from; nil
+        /// when `text`'s units are the raw page's.
+        let rawCharacterOfUnit: [Int]?
+        /// `rawUTF16Offsets[i]` is the UTF-16 offset of raw Character i;
+        /// one entry more than the raw Character count (the end).
+        let rawUTF16Offsets: [Int]
+
+        /// The raw page range of a match range in `text`; nil when the map
+        /// cannot cover it (a match the caller refuses rather than risk a
+        /// bad rect).
+        func rawNSRange(_ range: NSRange) -> NSRange? {
+            guard let rawCharacterOfUnit else { return range.length > 0 ? range : nil }
+            guard range.length > 0, range.location >= 0,
+                  range.location + range.length - 1 < rawCharacterOfUnit.count else { return nil }
+            let first = rawCharacterOfUnit[range.location]
+            let last = rawCharacterOfUnit[range.location + range.length - 1]
+            let location = rawUTF16Offsets[first]
+            return NSRange(location: location, length: rawUTF16Offsets[last + 1] - location)
         }
-        if options.normalizeSmartPunctuation {
-            searchText = TextNormalizer.normalizeSmartPunctuation(searchText)
+    }
+
+    static func regexPage(_ pageText: String, options: SearchOptions) -> RegexPage {
+        if isSingleUnitASCII(pageText) {
+            return RegexPage(text: pageText, rawCharacterOfUnit: nil, rawUTF16Offsets: [])
         }
-        return searchText
+        var text = ""
+        text.reserveCapacity(pageText.utf8.count)
+        var units: [Int] = []
+        units.reserveCapacity(pageText.utf16.count)
+        var utf16: [Int] = [0]
+        utf16.reserveCapacity(pageText.count + 1)
+        for (i, character) in pageText.enumerated() {
+            var piece = String(character)
+            if options.normalizeUnicode { piece = TextNormalizer.normalize(piece) }
+            if options.normalizeSmartPunctuation { piece = TextNormalizer.normalizeSmartPunctuation(piece) }
+            text.append(piece)
+            units.append(contentsOf: repeatElement(i, count: piece.utf16.count))
+            utf16.append(utf16[utf16.count - 1] + character.utf16.count)
+        }
+        return RegexPage(text: text, rawCharacterOfUnit: units, rawUTF16Offsets: utf16)
+    }
+
+    /// A page on which Character offsets ARE UTF-16 offsets and no
+    /// normalization step changes a length: every scalar ASCII (one unit
+    /// each) and no CR LF cluster (one Character, two units).
+    static func isSingleUnitASCII(_ text: String) -> Bool {
+        text.utf8.count == text.utf16.count && text.count == text.utf16.count
     }
 
     // MARK: - The literal tier's prepared page
@@ -106,8 +153,9 @@ enum SearchCore {
         let rawMap: RawTextMap?
 
         /// The `NSRange` in the RAW page text (`page.string`) of a base span:
-        /// through `rawMap` when the normalization changed the Character count,
-        /// the base offsets themselves otherwise; nil when the map cannot
+        /// through `rawMap` on every page that has one (every page that is
+        /// not single-unit ASCII), the base offsets themselves otherwise —
+        /// they ARE UTF-16 offsets on such a page; nil when the map cannot
         /// cover the span (a match the caller refuses rather than risk a bad
         /// rect — the rule the offset map already applies).
         func rawNSRange(baseStart: Int, length: Int) -> NSRange? {
@@ -117,65 +165,95 @@ enum SearchCore {
     }
 
     /// The route from the normalized page back to the raw page text, built
-    /// when the normalization changed the Character count: for each
-    /// normalized Character the raw Character it came from, and the raw
-    /// text's UTF-16 offsets per Character. A ligature expansion before a
-    /// match otherwise shifts its rect by as many characters as the
-    /// expansion added.
+    /// for every page that is not single-unit ASCII: for each normalized
+    /// Character the first and the last raw Character it came from (the
+    /// same one, except where a cluster re-forms across a raw boundary), and
+    /// the raw text's UTF-16 offsets per Character. Without it a ligature
+    /// expansion before a match shifts its rect by as many characters as the
+    /// expansion added, and a Character wider than one UTF-16 unit (an
+    /// emoji, a surrogate pair, a base letter with a combining mark) shifts
+    /// and shortens it by the extra units.
     struct RawTextMap: Sendable {
-        /// One entry per normalized Character: the raw Character index.
-        let rawCharacterIndex: [Int]
+        /// One entry per normalized Character: the first raw Character index.
+        let rawFirst: [Int]
+        /// One entry per normalized Character: the last raw Character index.
+        let rawLast: [Int]
         /// `rawUTF16Offsets[i]` is the UTF-16 offset of raw Character i;
         /// one entry more than the raw Character count (the end).
         let rawUTF16Offsets: [Int]
 
         func nsRange(baseStart: Int, length: Int) -> NSRange? {
             guard length > 0, baseStart >= 0,
-                  baseStart + length - 1 < rawCharacterIndex.count else { return nil }
-            let first = rawCharacterIndex[baseStart]
-            let last = rawCharacterIndex[baseStart + length - 1]
+                  baseStart + length - 1 < rawFirst.count else { return nil }
+            let first = rawFirst[baseStart]
+            let last = rawLast[baseStart + length - 1]
             let location = rawUTF16Offsets[first]
             return NSRange(location: location, length: rawUTF16Offsets[last + 1] - location)
         }
     }
 
-    /// The page side of `normalizedText` with its route back to the raw
-    /// text. When the normalization keeps the Character count the offsets
-    /// coincide and no map is built. Otherwise the page is normalized one
-    /// Character at a time; when the pieces joined are not scalar-identical
-    /// to the whole-string normalization (a cluster that re-forms across a
-    /// boundary), the whole-string text stands with no map, as before.
+    /// The page side of `normalizedText` (plus the smart-punctuation fold,
+    /// which re-clusters at a soft hyphen before a combining mark and so
+    /// belongs under the map) with its route back to the raw text. A page of
+    /// single-unit ASCII is normalized whole and carries no map: its
+    /// Character offsets are UTF-16 offsets and every step is 1:1 on it.
+    /// Every other page is normalized one Character at a time — the searched
+    /// text is the pieces joined, which differs from the whole-string
+    /// normalization only where a cluster re-forms across a raw boundary (a
+    /// compatibility jamo pair) — and the map is built from the pieces'
+    /// scalars, so such a seam keeps one entry per final Character instead
+    /// of desynchronizing the map or dropping it. A rect is never placed
+    /// from unmapped offsets on a page that needs the map.
     static func normalizedPage(
         _ pageText: String, options: SearchOptions
     ) -> (text: String, rawMap: RawTextMap?) {
-        let whole = normalizedText(pageText, options: options)
-        guard whole.count != pageText.count else { return (whole, nil) }
+        if isSingleUnitASCII(pageText) {
+            let whole = normalizedText(pageText, options: options)
+            if whole.count == pageText.count, isSingleUnitASCII(whole) { return (whole, nil) }
+        }
         var text = ""
-        text.reserveCapacity(whole.utf8.count)
-        var index: [Int] = []
-        index.reserveCapacity(whole.count)
+        text.reserveCapacity(pageText.utf8.count)
+        var scalarRaw: [Int] = []   // per scalar of `text`: the raw Character index
+        scalarRaw.reserveCapacity(pageText.unicodeScalars.count)
         var utf16: [Int] = [0]
         utf16.reserveCapacity(pageText.count + 1)
         for (i, character) in pageText.enumerated() {
-            let piece = normalizedText(String(character), options: options)
+            var piece = normalizedText(String(character), options: options)
+            if options.normalizeSmartPunctuation { piece = TextNormalizer.normalizeSmartPunctuation(piece) }
             text.append(piece)
-            for _ in piece { index.append(i) }
+            scalarRaw.append(contentsOf: repeatElement(i, count: piece.unicodeScalars.count))
             utf16.append(utf16[utf16.count - 1] + character.utf16.count)
         }
-        guard text.unicodeScalars.elementsEqual(whole.unicodeScalars) else { return (whole, nil) }
-        return (text, RawTextMap(rawCharacterIndex: index, rawUTF16Offsets: utf16))
+        // Appending never changes scalars, only Character boundaries: walk
+        // the joined text's Characters over the per-scalar raw indices.
+        var first: [Int] = []
+        var last: [Int] = []
+        first.reserveCapacity(text.count)
+        last.reserveCapacity(text.count)
+        var scalar = 0
+        for character in text {
+            let count = character.unicodeScalars.count
+            first.append(scalarRaw[scalar])
+            last.append(scalarRaw[scalar + count - 1])
+            scalar += count
+        }
+        return (text, RawTextMap(rawFirst: first, rawLast: last, rawUTF16Offsets: utf16))
     }
 
     /// The literal tier's page preparation: `normalizedPage` then the
     /// extension pipeline (`TextNormalizer.applySearchExtensions`) on the page
-    /// side. The page and query transforms of that pipeline are independent,
+    /// side — minus the smart-punctuation fold, which `normalizedPage`
+    /// applied under the map (on a single-unit ASCII page it has nothing to
+    /// fold). The page and query transforms of that pipeline are independent,
     /// so preparing them apart yields the pair a single call would.
     static func preparePage(_ pageText: String, options: SearchOptions) -> PreparedPage {
         let normalized = normalizedPage(pageText, options: options)
+        var pageSide = options
+        pageSide.normalizeSmartPunctuation = false
         let ext = TextNormalizer.applySearchExtensions(
             pageText: normalized.text,
             query: "",
-            options: options
+            options: pageSide
         )
         return PreparedPage(
             searchText: ext.pageText,

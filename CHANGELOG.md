@@ -45,7 +45,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
 ### Fixed
 
-- Search: on a page whose text layer carries a ligature or another character that normalization expands, a match's rect now covers the matched glyphs; before, the rect sat as many characters to the right as the expansions before the match had added.
+- Search: a match's rect now covers the matched glyphs on every page, in Text mode and in Regex mode. Before, on a page whose text layer carries a ligature or another character that normalization expands, the rect sat as many characters to the right as the expansions before the match had added (and Regex mode still placed it there); and on a page with an emoji, a letter written with a separate accent mark or another character wider than one text unit before the match, the rect sat to the left of the match and short by those units.
 - In Regex mode the Case-sensitive option now governs the pattern; with it off, "smith" matches "Smith".
 - Custom terms and saved patterns: a regular expression holding a character whose uppercase form is two letters (such as ß or the ﬁ ligature) no longer stops the app when the pattern is validated.
 - Verification: the search re-check and the detection sweep list a page as not checked when a custom regular-expression term ran out of time on it, instead of counting the page as read.

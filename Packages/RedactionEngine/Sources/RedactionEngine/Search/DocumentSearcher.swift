@@ -922,14 +922,12 @@ public actor DocumentSearcher {
 
             pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
 
-            // PDFPage isn't Sendable; the per-match closure below captures
-            // the page reference and the compiler (Swift 6.2 / Xcode 26.3 on
-            // CI) flags it. The enumeration invokes the closure synchronously
-            // per match on the current thread, so the capture is treated as
-            // @unchecked Sendable via the wrapper.
+            // PDFPage isn't Sendable; the per-match closure below captures the
+            // page (the enumeration invokes it synchronously), via the wrapper.
             let sendablePage = SendablePDFPage(page)
-
-            let searchText = SearchCore.regexSearchText(pageText, options: options)
+            // The page with its route back to the raw text (`rawNSRange`).
+            let regexPage = SearchCore.regexPage(pageText, options: options)
+            let searchText = regexPage.text
             let nsString = searchText as NSString
 
             // The shared enumeration with the per-match time check — bails
@@ -948,7 +946,8 @@ public actor DocumentSearcher {
                     timeoutSink?(pageIndex)
                 }
             ) { matchRange in
-                guard let normalizedRect = boundingRect(for: matchRange, page: sendablePage.page) else {
+                guard let rawRange = regexPage.rawNSRange(matchRange),
+                      let normalizedRect = boundingRect(for: rawRange, page: sendablePage.page) else {
                     return false
                 }
                 let matchedText = nsString.substring(with: matchRange)
