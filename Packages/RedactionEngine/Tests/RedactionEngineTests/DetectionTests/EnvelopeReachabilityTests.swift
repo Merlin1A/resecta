@@ -42,7 +42,7 @@ struct EnvelopeReachabilityTests {
         ("npi",     0.90, "NPIDetector.swift boostedConfidence=0.90"),
         ("dea",     0.90, "DEADetector.swift boostedConfidence=0.90"),
         ("dob",     0.85, "DOBDetector.detectLabelAnchored() fixed 0.85 (label-anchored path, D4)"),
-        ("account", 0.75, "AccountDetector.swift boostedConfidence=0.75"),
+        ("account", AccountDetector.keywordConfirmedConfidence, "AccountDetector.swift boostedConfidence"),
         ("address", 0.80, "AddressSpatialAssembler.swift max 0.80 (item 1.6 gated)"),
         ("routingNumber", 0.88, "RoutingNumberDetector.swift boostedConfidence=0.88"),
         // Eight newly-wired categories (hand-set ceilings):
@@ -108,8 +108,12 @@ struct EnvelopeReachabilityTests {
             let posterior = Self.maxPosterior(
                 forWireName: entry.wireName, maxAchievable: entry.maxAchievable
             )
+            // A floored family's peak equals the conservative cutoff by design
+            // (its raw sits on the posterior floor's bar); the production gate
+            // admits equality, so the check is >= there and strict elsewhere.
+            let floored = ContextPosteriorFloor.flooredFamilies.contains { $0.rawValue == entry.wireName }
             #expect(
-                posterior > cutoff,
+                floored ? posterior >= cutoff : posterior > cutoff,
                 """
                 \(preset.rawValue) preset threshold \(cutoff) for '\(entry.wireName)' \
                 meets or exceeds the maximum achievable posterior \(posterior) \
