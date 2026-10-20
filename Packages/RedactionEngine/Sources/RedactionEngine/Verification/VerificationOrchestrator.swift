@@ -99,6 +99,9 @@ public struct VerificationOrchestrator: Sendable {
     /// the output (`OutputRecheck`: page-parallel at Layer 2's width, never
     /// overlapped with Layer 2's own Vision pass), each folding its own
     /// requests from that pass; the two results publish in canonical order.
+    /// With `sourceDocument` (the original, the caller's own copy) the
+    /// Search Re-check also re-runs each applied request on the original
+    /// pages and fails a box that leaves part of its match uncovered.
     ///
     /// The report lists every layer in canonical order: the results UI
     /// labels rows by ordinal position. A cancellation checkpoint precedes
@@ -116,6 +119,7 @@ public struct VerificationOrchestrator: Sendable {
         perPageFallbackReasons: [TextLayerDetector.FallbackReason?],
         appliedSearches: [SearchRecheckRequest],
         manualRegionsWithoutText: Int = 0,
+        sourceDocument: SendablePDFDocument? = nil,
         provisionLayerDocuments: ([VerificationLayer]) async -> [VerificationLayer: SendablePDFDocument]?,
         events: (VerificationRunEvent) -> Void
     ) async throws -> VerificationReport {
@@ -232,7 +236,8 @@ public struct VerificationOrchestrator: Sendable {
                     // The pass's wall-clock rides the first row's duration so
                     // the post rows sum to the batch.
                     batch: batch.map { PostSequentialBatch(
-                        observations: $0.observations, seconds: position == 0 ? $0.seconds : 0) }
+                        observations: $0.observations, seconds: position == 0 ? $0.seconds : 0) },
+                    sourceDocument: sourceDocument
                 )
                 resultsByLayer[layer] = result
                 completedLayers.append(result)

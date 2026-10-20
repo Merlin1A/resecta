@@ -98,12 +98,21 @@ extension VerificationEngine {
     /// one page: the page's mode picks the stronger one (a rasterized page's
     /// in-region text FAILs; on a Searchable page the term's ATTENTION
     /// outranks the in-region WARN).
+    /// `sensitiveTermFragmentBesideRegion` marks a page where a FRAGMENT of
+    /// a sensitive term — at least three characters that begin or end the
+    /// term, never the whole of it — is read at the edge of a redaction
+    /// box: a line of text ending with the start of the term right before a
+    /// box, or beginning with its end right after one. That is the shape a
+    /// box placed short of its glyphs leaves (the uncovered glyphs stay
+    /// printed beside the fill). ATTENTION with the term texts; the Search
+    /// Re-check's coverage check is the geometric FAIL for the same box.
     enum PageOCRFinding: Sendable, Equatable {
         case sensitiveTermInRegion
         case textInRegion
         case textInRegionAndSensitiveTermOutsideRegions
         case fillArtifactInRegion
         case sensitiveTermOutsideRegions
+        case sensitiveTermFragmentBesideRegion
         case textOutsideRegionsOnly
         case none
     }
@@ -160,6 +169,7 @@ extension VerificationEngine {
         var sawTextInRegion = false
         var sawFillArtifactInRegion = false
         var sawSensitiveTermOutsideRegions = false
+        var sawSensitiveTermFragmentBesideRegion = false
         var sawTextOutsideRegions = false
 
         for hit in hits {
@@ -215,6 +225,15 @@ extension VerificationEngine {
                validTerms.contains(where: { containsTerm(text, $0) }) {
                 sawSensitiveTermOutsideRegions = true
             }
+            // The same hit read at a box's edge with a fragment of a term:
+            // the start of the term ending the line before a box, or its end
+            // beginning the line after one.
+            if hitHasOutOfRegionBox,
+               hit.confidence >= sensitiveTermFailConfidenceThreshold,
+               let text = hit.text,
+               validTerms.contains(where: { fragmentBesideRegion(text: text, box: hit.box, term: $0, pageRegions: pageRegions) }) {
+                sawSensitiveTermFragmentBesideRegion = true
+            }
 
             if hitHasReadableInRegionBox {
                 sawTextInRegion = true
@@ -238,8 +257,73 @@ extension VerificationEngine {
         }
         if sawFillArtifactInRegion { return .fillArtifactInRegion }
         if sawSensitiveTermOutsideRegions { return .sensitiveTermOutsideRegions }
+        if sawSensitiveTermFragmentBesideRegion { return .sensitiveTermFragmentBesideRegion }
         if sawTextOutsideRegions { return .textOutsideRegionsOnly }
         return .none
+    }
+
+    /// The shortest fragment of a term the edge rule reads: three
+    /// characters (the shared searchable-term floor), and never the whole
+    /// term (that is `containsTerm`'s case).
+    static let fragmentMinimumLength = 3
+
+    /// A fragment of `term` at the edge of a box: `text` (the OCR line, in
+    /// the search path's normalized form, case-insensitive) ENDS with a
+    /// prefix of the term and the line's box ends within one line height
+    /// before a region it overlaps vertically, or BEGINS with a suffix of
+    /// the term and the box begins within one line height after such a
+    /// region. Boxes and regions share the normalized bottom-left space.
+    static func fragmentBesideRegion(
+        text: String, box: CGRect, term: SensitiveTerm, pageRegions: [RedactionRegion]
+    ) -> Bool {
+        let line = Array(TextNormalizer.normalize(text).lowercased().trimmingCharacters(in: .whitespacesAndNewlines))
+        let whole = Array(TextNormalizer.normalize(term.text).lowercased())
+        guard whole.count > fragmentMinimumLength, line.count >= fragmentMinimumLength else { return false }
+        let longest = min(line.count, whole.count - 1)
+        var endsWithPrefix = false
+        var beginsWithSuffix = false
+        if longest >= fragmentMinimumLength {
+            for length in stride(from: longest, through: fragmentMinimumLength, by: -1) {
+                if !endsWithPrefix, line.suffix(length).elementsEqual(whole.prefix(length)) { endsWithPrefix = true }
+                if !beginsWithSuffix, line.prefix(length).elementsEqual(whole.suffix(length)) { beginsWithSuffix = true }
+                if endsWithPrefix && beginsWithSuffix { break }
+            }
+        }
+        guard endsWithPrefix || beginsWithSuffix, box.height > 0 else { return false }
+        let reach = box.height
+        return pageRegions.contains { region in
+            let rect = region.normalizedRect
+            let verticalOverlap = min(box.maxY, rect.maxY) - max(box.minY, rect.minY)
+            guard verticalOverlap >= box.height * 0.5 else { return false }
+            let before = endsWithPrefix && rect.minX - box.maxX <= reach && rect.minX - box.maxX >= -reach
+            let after = beginsWithSuffix && box.minX - rect.maxX <= reach && box.minX - rect.maxX >= -reach
+            return before || after
+        }
+    }
+
+    /// Display-only companion for a page classified
+    /// `.sensitiveTermFragmentBesideRegion`: the terms whose fragment the
+    /// edge rule read, under the same hits, regions, gate and filter.
+    static func fragmentTermTexts(
+        hits: [OCRHit],
+        pageRegions: [RedactionRegion],
+        sensitiveTerms: [SensitiveTerm]
+    ) -> [String] {
+        let validTerms = sensitiveTerms.filter { AhoCorasick.isSearchableTerm($0.text) }
+        var seen = Set<String>()
+        var texts: [String] = []
+        for hit in hits {
+            guard hit.confidence >= sensitiveTermFailConfidenceThreshold,
+                  let text = hit.text else { continue }
+            let boxes = inRegionCandidateBoxes(of: hit)
+            guard boxes.contains(where: { !boxLiesInRegion($0, of: pageRegions) }) else { continue }
+            for term in validTerms
+            where fragmentBesideRegion(text: text, box: hit.box, term: term, pageRegions: pageRegions)
+                && seen.insert(term.text).inserted {
+                texts.append(term.text)
+            }
+        }
+        return texts
     }
 
     /// The one in-region predicate for a Layer-2 OCR box: MEANINGFUL

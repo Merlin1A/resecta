@@ -50,16 +50,32 @@ struct SearchRecheck: Sendable {
     /// Fold the typed requests among `requests`. `observations` are the
     /// shared runner's, keyed by index into the FULL request list; nil runs
     /// the page loop here for the typed requests alone (the public
-    /// `runLayer` contract).
+    /// `runLayer` contract). With `sourceDocument`, every applied request
+    /// (typed or scan) is also re-run on the ORIGINAL pages and each match
+    /// compared with the boxes applied over it (`RegionCoverage`): a box
+    /// that leaves part of its match uncovered fails the layer, whatever
+    /// placed the box. Without a source the coverage check does not run.
     func run(
         outputDocument: SendablePDFDocument,
         requests: [SearchRecheckRequest],
-        observations: [RecheckObservation]? = nil
+        observations: [RecheckObservation]? = nil,
+        sourceDocument: SendablePDFDocument? = nil,
+        regions: [Int: [RedactionRegion]] = [:]
     ) async throws -> Outcome {
         try Task.checkCancellation()
+        var shortfalls: [Shortfall] = []
+        if let sourceDocument {
+            shortfalls = await RegionCoverage.shortfalls(
+                source: sourceDocument, requests: requests, regions: regions
+            ).map { Shortfall(page: $0.pageIndex, displayText: requests[$0.requestIndex].record.query.displayText) }
+            try Task.checkCancellation()
+        }
         let typed = requests.enumerated().filter { !$0.element.record.query.isScan }
         let typedRequests = typed.map(\.element)
         guard !typedRequests.isEmpty else {
+            if !shortfalls.isEmpty {
+                return Self.shortfallOutcome(shortfalls, queryLines: nil)
+            }
             return Outcome(
                 status: .info(Self.infoMessage), copyOverride: nil,
                 pageReferences: nil, reviewTermTexts: nil, queryLines: nil)
@@ -74,8 +90,37 @@ struct SearchRecheck: Sendable {
                 outputDocument: outputDocument, requests: typedRequests)
         }
         try Task.checkCancellation()
-        return Self.fold(requests: typedRequests, observations: observed, pageCount: pageCount)
+        return Self.fold(requests: typedRequests, observations: observed, pageCount: pageCount,
+                         shortfalls: shortfalls)
     }
+
+    /// One partly covered match, as the fold reports it: its 0-based page
+    /// and the display text of the request that produced it.
+    struct Shortfall: Sendable, Equatable {
+        let page: Int
+        let displayText: String
+    }
+
+    /// The coverage FAIL: the only FAIL this layer reports. Content-free
+    /// message; the request texts ride `reviewTermTexts`.
+    static func shortfallOutcome(_ shortfalls: [Shortfall], queryLines: [SearchRecheckQueryLine]?) -> Outcome {
+        let pages = Array(Set(shortfalls.map(\.page))).sorted()
+        let m = shortfalls.count
+        let list = pages.map { String($0 + 1) }.joined(separator: ", ")
+        let message = "\(m) \(m == 1 ? "match is" : "matches are") only partly covered by \(m == 1 ? "its" : "their") redaction \(m == 1 ? "box" : "boxes") on \(pagePhrase(pages, list: list))"
+        let detail = "\(Self.detailLead) \(Self.coverageLead) \(message)."
+        var seen = Set<String>()
+        let terms = shortfalls.map(\.displayText).filter { seen.insert($0).inserted }
+        return Outcome(
+            status: .fail(message),
+            copyOverride: LayerCopy(short: message, detail: detail),
+            pageReferences: pages,
+            reviewTermTexts: terms,
+            queryLines: queryLines)
+    }
+
+    /// The coverage sentence of the detail copy.
+    static let coverageLead = "Each applied search and scan was also re-run on the original page and every match compared with the boxes applied over it; a box that leaves part of its match uncovered is reported here, whatever placed it."
 
     // MARK: - Fold (pure)
 
@@ -84,7 +129,8 @@ struct SearchRecheck: Sendable {
     static func fold(
         requests: [SearchRecheckRequest],
         observations: [PageObservation],
-        pageCount: Int
+        pageCount: Int,
+        shortfalls: [Shortfall] = []
     ) -> Outcome {
         let requestCount = requests.count
         var remainingByRequest = [Int](repeating: 0, count: requestCount)
@@ -205,6 +251,12 @@ struct SearchRecheck: Sendable {
                 optionBadges: query.optionBadges,
                 perTerm: perTerm,
                 unchecked: uncheckedByRequest[index])
+        }
+
+        // A partly covered match outranks every other outcome: the box the
+        // user applied does not cover what it was applied to.
+        if !shortfalls.isEmpty {
+            return shortfallOutcome(shortfalls, queryLines: queryLines)
         }
 
         if totalRemaining > 0 {
