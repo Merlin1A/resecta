@@ -50,6 +50,12 @@ struct SSNStateMachine: Sendable {
 
         var candidates: [SSNCandidate] = []
         var state = State.idle
+        // The index of the first digit after the first separator: when a third
+        // digit follows a separated group with no second separator, the scan
+        // resumes at that digit instead of at the mismatching one, so a
+        // three-digit token before the real area ("555 123-45-6789") does not
+        // hide the number that follows it.
+        var groupStart: String.Index?
 
         for index in text.indices {
             let char = text[index]
@@ -91,6 +97,7 @@ struct SSNStateMachine: Sendable {
 
             case .separator1(let area, let sep, let start):
                 if isDigit {
+                    groupStart = index
                     state = .group(digits: String(char), area: area, sep: sep, start: start)
                 } else {
                     // Expected a digit after separator
@@ -118,9 +125,13 @@ struct SSNStateMachine: Sendable {
                     // No second separator (must match first: both nil for unseparated)
                     if sep == nil {
                         state = .serial(digits: String(char), area: area, group: group, sep: sep, start: start)
+                    } else if let groupStart {
+                        // Had a first separator but no second. The separated
+                        // group's two digits and this one are a complete area
+                        // that begins at the group's first digit; the scan
+                        // continues from there with no separator read yet.
+                        state = .group(digits: "", area: group + String(char), sep: nil, start: groupStart)
                     } else {
-                        // Had a first separator but no second — separator mismatch
-                        // Restart: this digit might be the start of a new area
                         state = .area(digits: String(char), start: index)
                     }
                 } else if Self.separators.contains(char) {

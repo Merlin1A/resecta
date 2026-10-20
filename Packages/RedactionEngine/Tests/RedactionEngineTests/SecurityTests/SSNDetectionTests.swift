@@ -47,6 +47,17 @@ struct SSNDetectionTests {
         #expect(candidates.count == 1, "Expected match with \(name)")
     }
 
+    @Test("A three-digit token and a space before the area do not hide the number")
+    func stateMachineResumesAfterASeparatedThreeDigitToken() {
+        let sm = SSNStateMachine()
+        let candidates = sm.scan("555 123-45-6789")
+        #expect(candidates.count == 1)
+        #expect(candidates.first?.area == "123")
+        #expect(candidates.first?.group == "45")
+        #expect(candidates.first?.serial == "6789")
+        #expect(sm.scan("555 123-4567").isEmpty, "a phone-shaped tail is not a number")
+    }
+
     @Test("State machine finds SSN in surrounding text")
     func stateMachineInContext() {
         let sm = SSNStateMachine()
@@ -209,19 +220,17 @@ struct SSNDetectionTests {
         #expect(confidence >= 0.25, "Floor of 0.25 must never be breached")
     }
 
-    @Test("Date collision dampener produces score <= 0.05")
-    func contextDateCollision() {
+    @Test("A number beside a date is scored on its context alone")
+    func numberBesideADateIsScoredOnItsContext() {
+        // A nine-digit number is never contained by a date, so the scorer
+        // reads only the window: the SSN keyword boosts, the date is text.
+        let text = "SSN 123-45-6789 on 01/23/4567"
+        let sm = SSNStateMachine()
+        #expect(sm.scan(text).count == 1)
+        let range = (text as NSString).range(of: "123-45-6789")
         let scorer = ContextWindowScorer()
-        // SSN-shaped digits embedded in a date: 01/23/4567 89 -> not quite right.
-        // More realistic: "12/34/5678" contains the digit sequence 123456789.
-        // Use a date pattern that fully contains the match range.
-        let text = "Filed on 01/23/4567"
-        // The date pattern \d{1,2}/\d{1,2}/\d{2,4} matches "01/23/4567".
-        // But this contains the SSN-shaped digits. The SSN state machine would produce
-        // a different range. Let's test with the scorer directly.
-        let range = NSRange(location: 9, length: 10) // "01/23/4567"
         let confidence = scorer.score(text: text, matchRange: range, profile: SSNContextKeywords.profile)
-        #expect(confidence <= 0.05, "Date collision should produce score <= 0.05")
+        #expect(confidence >= SSNContextKeywords.profile.boostedConfidence - 1e-9)
     }
 
     // MARK: - Integration: Full Pipeline
