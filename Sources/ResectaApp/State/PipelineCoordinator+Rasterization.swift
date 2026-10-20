@@ -116,22 +116,18 @@ extension PipelineCoordinator {
 
     // MARK: - Per-Page Retry
 
-    /// The floor under the one retry's DPI cap, `max(retryDPIFloor,
-    /// primaryDPICap / 2)`. The rasterizer picks its DPI from the tiers 150,
-    /// 200 and 300 and has no lower tier, so the retry lands at the 150 tier
-    /// whatever the halved cap reads (or the rasterizer declines the page
-    /// for memory); the floor only bounds the arithmetic.
+    /// The one retry's DPI cap: the lowest tier `selectDPI` returns (150),
+    /// so the raster the retry renders is the raster its memory pre-flight
+    /// estimates. Never a number the tiers cannot return.
     // nonisolated: read by the `nonisolated rasterizeWithRetry` parallel TaskGroup body
     // (a @Sendable closure). A plain Int constant — opted out of the SE-0466
     // MainActor default so the off-actor retry path can read it directly.
-    nonisolated static let retryDPIFloor: Int = 96
+    nonisolated static let retryDPICap: Int = 150
 
     /// Rasterize a single page; on `fillVerificationFailed`,
-    /// re-rasterize once with the cap halved and floored by `retryDPIFloor`,
-    /// which the rasterizer's DPI tiers turn into the 150 tier: at most one
-    /// retry, at 150 DPI. A second
-    /// failure propagates the original error type so the caller surfaces the
-    /// page index unchanged.
+    /// re-rasterize once at `retryDPICap`: at most one retry, at the 150
+    /// tier. A second failure propagates the original error type so the
+    /// caller surfaces the page index unchanged.
     ///
     /// Placement note: the retry sits in the
     /// per-page loop, NOT in `runVerification`'s layer loop. `runVerification`
@@ -159,10 +155,9 @@ extension PipelineCoordinator {
                   failedIndex == page.pageIndex else {
                 throw error
             }
-            let retryDPICap = max(Self.retryDPIFloor, primaryDPICap / 2)
             // At most one retry. A second failure throws the same error type
             // (carrying the page index) up the stack.
-            return try await rasterizer.rasterize(page, dpiCap: retryDPICap)
+            return try await rasterizer.rasterize(page, dpiCap: Self.retryDPICap)
         }
     }
 
