@@ -21,8 +21,12 @@ public enum RegexSentinelCheck {
         return String(s.prefix(10_240))
     }()
 
+    /// `options` is the session's search options when the caller has them:
+    /// the probe then compiles the pattern with the same options the search
+    /// legs use (`DocumentSearcher.regexCompileOptions`), so its verdict is
+    /// read on the regex the run will execute.
     @concurrent
-    public static func validate(_ pattern: String) async -> Bool {
+    public static func validate(_ pattern: String, options: SearchOptions? = nil) async -> Bool {
         // Pre-compile heuristic — reject obvious catastrophic shapes
         // synchronously, before detaching the enumerateMatches task whose
         // regex engine spins inside a non-cancellable C call. Also covers
@@ -32,6 +36,7 @@ public enum RegexSentinelCheck {
         guard DocumentSearcher.validateRegexPattern(pattern) != nil else { return false }
 
         let capturedPattern = pattern
+        let compileOptions = DocumentSearcher.regexCompileOptions(options)
         return await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
             let resolver = ResumedFlag()
 
@@ -43,7 +48,7 @@ public enum RegexSentinelCheck {
             // engine returns; the losing task ends within a progress
             // interval of the budget.
             Task.detached {
-                guard let regex = try? NSRegularExpression(pattern: capturedPattern) else {
+                guard let regex = try? NSRegularExpression(pattern: capturedPattern, options: compileOptions) else {
                     if resolver.setIfUnset() { cont.resume(returning: false) }
                     return
                 }

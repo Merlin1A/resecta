@@ -46,6 +46,45 @@ struct DocumentSearcherLigatureTests {
                 "normalizedRect from PDFKit selection must be non-empty")
     }
 
+    /// Pages whose text layer may keep a code point that normalization
+    /// expands: the ffi and fl ligatures and a compatibility character
+    /// (ROMAN NUMERAL TWELVE → "XII"). Whether PDFKit keeps the code point
+    /// in `page.string` is font-dependent; the rect contract holds either
+    /// way, and the probe prints which it was.
+    static let expandingPages: [(String, String, Unicode.Scalar)] = [
+        ("ffi ligature", "\u{FB03}le \u{FB03}le 123-45-6789", "\u{FB03}"),
+        ("fl ligature", "\u{FB02}y \u{FB02}y 123-45-6789", "\u{FB02}"),
+        ("roman numeral twelve", "\u{216B} \u{216B} 123-45-6789", "\u{216B}"),
+    ]
+
+    @Test("The match rect on a page with expanding code points is the raw range's rect",
+          arguments: expandingPages)
+    func rectFollowsRawOffsets(name: String, text: String, scalar: Unicode.Scalar) async throws {
+        let data = TestFixtures.textLayerPDF(text: text)
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+        let raw = try #require(page.string)
+        let kept = raw.unicodeScalars.contains(scalar)
+        let rawRange = (raw as NSString).range(of: "123-45-6789")
+        #expect(rawRange.location != NSNotFound, "\(name): the SSN is on the page")
+
+        let searcher = DocumentSearcher()
+        let expected = try #require(searcher.boundingRect(for: rawRange, page: page))
+        let stream = searcher.search(
+            SendablePDFDocument(doc), mode: .text("123-45-6789", options: SearchOptions()),
+            progress: { _, _ in }
+        )
+        var results: [SearchResult] = []
+        for await result in stream { results.append(result) }
+        let rect = try #require(results.first?.normalizedRect)
+        print("expanding-page probe \(name): code point kept in page.string=\(kept) · drift x=\(rect.minX - expected.minX)")
+        #expect(results.count == 1, "\(name)")
+        #expect(abs(rect.minX - expected.minX) < 1e-6 && abs(rect.minY - expected.minY) < 1e-6
+                && abs(rect.width - expected.width) < 1e-6 && abs(rect.height - expected.height) < 1e-6,
+                "\(name): the search rect must equal the raw range's rect")
+        #expect(results.first?.matchedText == "123-45-6789")
+    }
+
     @Test("Ligature query returns normalized matchedText")
     func ligatureQueryReturnsNormalized() async {
         let data = TestFixtures.textLayerPDF(text: "ﬁle ﬁle 123-45-6789")
