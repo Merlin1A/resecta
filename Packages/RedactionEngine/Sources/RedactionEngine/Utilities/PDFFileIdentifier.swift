@@ -15,23 +15,23 @@ import Foundation
 /// independent of what the pair held). Layer 5 recomputes the same digest
 /// and reports a pair that does not match. The shared home for both sides,
 /// so Verification never depends on Pipeline for it.
-public enum PDFFileIdentifier {
+enum PDFFileIdentifier {
     /// Hex characters per payload: 16 bytes.
-    public static let hexLength = 32
+    static let hexLength = 32
 
     /// Bytes of the identifier: the digest's leading bytes.
-    public static let identifierLength = 16
+    static let identifierLength = 16
 
     /// How far from the end of the file the pair is looked for — the same
     /// window as the `/Info` literal rewrite (the writer places both in the
     /// file's tail; Searchable mode's subset font can land between them and
     /// the cross-reference table).
-    public static let tailWindowLength = 262_144
+    static let tailWindowLength = 262_144
 
     /// The two payload ranges, in the indices of the `Data` they were
     /// located in (a slice keeps its parent's indices, so a tail slice of a
     /// whole-file `Data` yields whole-file offsets).
-    public struct Location: Equatable, Sendable {
+    struct Location: Equatable, Sendable {
         public let first: Range<Int>
         public let second: Range<Int>
     }
@@ -94,7 +94,7 @@ public enum PDFFileIdentifier {
 
     /// The 32 lowercase hex characters that spell `identifier` inside a hex
     /// string, as the bytes to write.
-    public static func hexPayload(for identifier: Data) -> Data {
+    static func hexPayload(for identifier: Data) -> Data {
         Data(identifier.map { String(format: "%02x", $0) }.joined().utf8)
     }
 
@@ -113,7 +113,7 @@ public enum PDFFileIdentifier {
 
     /// The identifier recomputed from a whole file, or nil when the file
     /// carries no pair in the writer's shape.
-    public static func recomputedIdentifier(for fileData: Data) -> Data? {
+    static func recomputedIdentifier(for fileData: Data) -> Data? {
         let tailStart = max(fileData.startIndex, fileData.endIndex - tailWindowLength)
         guard let location = locate(in: fileData[tailStart...]) else { return nil }
         return identifier(from: digest(of: fileData, zeroing: location))

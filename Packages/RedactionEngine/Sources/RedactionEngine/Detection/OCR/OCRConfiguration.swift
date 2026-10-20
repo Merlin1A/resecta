@@ -7,7 +7,7 @@ import Vision
 // Layer 2 — output verification) configure Vision through a single,
 // testable surface. The VERIFICATION preset is frozen by design.
 
-public struct OCRConfiguration: Sendable {
+struct OCRConfiguration: Sendable {
 
     /// Vision recognition level (.fast for verification, .accurate for
     /// search).
@@ -16,18 +16,18 @@ public struct OCRConfiguration: Sendable {
     /// Vision's language-model correction. Search keeps the
     /// historical `true`; Layer 2 keeps `false` (prevents hallucinated
     /// corrections re-introducing "text" on redacted rasters).
-    public var usesLanguageCorrection: Bool
+    var usesLanguageCorrection: Bool
 
     /// Pinned Vision revision. `nil` = Vision's "latest installed"
     /// default — which can silently change OCR output across OS updates.
-    public var revision: Int?
+    var revision: Int?
 
     /// Minimum text height as a fraction of image height.
     /// `nil` = Vision default.
-    public var minimumTextHeight: Float?
+    var minimumTextHeight: Float?
 
     /// Domain vocabulary passed to Vision. Empty = not set.
-    public var customWords: [String]
+    var customWords: [String]
 
     public init(
         recognitionLevel: VNRequestTextRecognitionLevel,
@@ -47,7 +47,7 @@ public struct OCRConfiguration: Sendable {
     /// Optional knobs are applied only when set, so a preset that leaves
     /// a knob `nil` keeps the request's Vision default for it (load-bearing
     /// for the Layer-2 pin's unset knobs).
-    public func makeRequest() -> VNRecognizeTextRequest {
+    func makeRequest() -> VNRecognizeTextRequest {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = recognitionLevel
         request.usesLanguageCorrection = usesLanguageCorrection
@@ -77,7 +77,7 @@ public struct OCRConfiguration: Sendable {
     /// RealDocOCRQualityTests fixture probes on it, (3) bump only if recall
     /// improves ≥ 2 pp on a category AND precision does not decrease,
     /// (4) log the bump in resecta-datapipeline/SOURCES.md with iOS version, date, test delta.
-    public static let pinnedTextRecognitionRevision = VNRecognizeTextRequestRevision3
+    static let pinnedTextRecognitionRevision = VNRecognizeTextRequestRevision3
 
     /// Search-path OCR (OCREngine.recognizeText, used by DocumentSearcher
     /// at .accurate / 300 DPI). DPI and accuracy are charter-protected;
@@ -104,7 +104,7 @@ public struct OCRConfiguration: Sendable {
     /// (revision 3 == current latest there); upgrades follow the
     /// policy on `pinnedTextRecognitionRevision`. Region-scoping and any
     /// retune are a backlog item.
-    public static let verificationLayer2 = OCRConfiguration(
+    static let verificationLayer2 = OCRConfiguration(
         recognitionLevel: .fast,
         usesLanguageCorrection: false,
         revision: pinnedTextRecognitionRevision

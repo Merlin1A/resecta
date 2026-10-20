@@ -28,7 +28,7 @@ public enum TempFileProtection: Sendable {
     /// but the write side goes through `FileAttributeKey.protectionKey`
     /// with a `FileProtectionType` — the URL setter is read-only in the
     /// public API.
-    public var fileProtectionType: FileProtectionType {
+    var fileProtectionType: FileProtectionType {
         switch self {
         case .complete:
             return .complete

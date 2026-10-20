@@ -473,9 +473,9 @@ public struct KeywordContribution: Sendable, Equatable, Hashable, Codable {
 /// scoring.
 public struct ReverseRationale: Sendable, Equatable {
     public let snippet: String
-    public let contextRange: NSRange
+    let contextRange: NSRange
     public let considered: [ConsiderationResult]
-    public let doctypeGatedOut: [PIICategory]
+    let doctypeGatedOut: [PIICategory]
 
     public init(
         snippet: String,
