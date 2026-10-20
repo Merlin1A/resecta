@@ -6,8 +6,8 @@ import RedactionEngine
 /// The PDF loader: the validation stages run in order, off the main actor,
 /// against the bytes alone.
 nonisolated struct PDFImportLoader: DocumentLoader {
-    func load(_ payload: ImportPayload, limits: ImportLimits) async throws -> LoadedDocument {
-        try await ImportService.validatePDFOffMainActor(data: payload.data, limits: limits)
+    func load(_ payload: ImportPayload, password: String?, limits: ImportLimits) async throws -> LoadedDocument {
+        try await ImportService.validatePDFOffMainActor(data: payload.data, password: password, limits: limits)
     }
 }
 
@@ -20,17 +20,39 @@ extension ImportService {
     /// async: the annotation walk below rides the engine's `@concurrent`
     /// `AnnotationAnalyzer.analyze`; every other stage is synchronous.
     /// `PDFImportLoader` forwards here; the hub comments that cite this
-    /// qualified name keep pointing at the stages.
+    /// qualified name keep pointing at the stages. `password` is the one
+    /// the user typed for a locked document; nil on a first attempt.
     nonisolated static func validatePDFOffMainActor(
         data: Data,
+        password: String? = nil,
         limits: ImportLimits = .standard
     ) async throws -> LoadedDocument {
         guard let doc = PDFDocument(data: data) else {
             throw PipelineError.importError(.corrupt)
         }
-        guard !doc.isLocked else {
-            throw PipelineError.importError(.passwordProtected)
+        // The lock gate. A locked document with no password is refused so
+        // the wrapper can ask for one; a password that does not unlock it is
+        // refused the same way so the sheet asks again. Every stage below
+        // reads the unlocked document.
+        if doc.isLocked {
+            guard let password else {
+                throw PipelineError.importError(.passwordProtected)
+            }
+            guard doc.unlock(withPassword: password) else {
+                throw PipelineError.importError(.passwordProtected)
+            }
         }
+        // The encryption record, read before any page. An owner-password-only
+        // file opens with no prompt and still reads encrypted; a withheld
+        // permission marks the restrictions. Nothing refuses on these — they
+        // are facts.
+        let wasEncrypted = doc.isEncrypted
+        let hadRestrictions = wasEncrypted
+            && doc.permissionsStatus != .owner
+            && !(doc.allowsCopying && doc.allowsPrinting && doc.allowsDocumentChanges
+                 && doc.allowsDocumentAssembly && doc.allowsCommenting
+                 && doc.allowsFormFieldEntry && doc.allowsContentAccessibility)
+
         guard doc.pageCount > 0 else {
             throw PipelineError.importError(.corrupt)
         }
@@ -67,10 +89,10 @@ extension ImportService {
             }
         }
 
-        // The walk reader: the same bytes through CoreGraphics, the reader
-        // the active-content and hidden-layer walks inspect (stage by stage
-        // in `inspectWalkReader`).
-        let hasHiddenOCG = try inspectWalkReader(data: data, expectedPageCount: doc.pageCount)
+        // The walk reader: the parser's own view of the document — unlocked
+        // with the same password PDFKit took — which the active-content and
+        // hidden-layer walks inspect (stage by stage in `inspectWalkReader`).
+        let hasHiddenOCG = try inspectWalkReader(doc.documentRef, expectedPageCount: doc.pageCount)
 
         // Detect text layers per page — can be slow for complex PDFs,
         // which is why this runs off MainActor.
@@ -100,16 +122,6 @@ extension ImportService {
         let annotationResult = await AnnotationAnalyzer().analyze(document: doc)
         let filledFormFieldCount = ImportAnnotationNoticeBanner.filledFormFieldCount(in: doc)
 
-        // The encryption record. An owner-password-only file opens with no
-        // prompt and still reads encrypted; a withheld permission marks the
-        // restrictions. Nothing refuses on these — they are facts.
-        let wasEncrypted = doc.isEncrypted
-        let hadRestrictions = wasEncrypted
-            && doc.permissionsStatus != .owner
-            && !(doc.allowsCopying && doc.allowsPrinting && doc.allowsDocumentChanges
-                 && doc.allowsDocumentAssembly && doc.allowsCommenting
-                 && doc.allowsFormFieldEntry && doc.allowsContentAccessibility)
-
         let facts = ImportFacts(
             origin: .pdf,
             textLayerStatus: textLayerStatus,
@@ -124,9 +136,11 @@ extension ImportService {
 
     // MARK: - The walk reader
 
-    /// The second reader: the raw bytes opened through CoreGraphics, which
-    /// the active-content walk and the hidden-layer walk inspect. A pure
-    /// function of the bytes so the stage can be driven by a test on its own.
+    /// The reader the active-content walk and the hidden-layer walk inspect:
+    /// the Core Graphics document behind the parsed PDFKit document
+    /// (`PDFDocument.documentRef`), so one parse and one unlock serve every
+    /// stage. A pure function of the reader so the stage can be driven by a
+    /// test on its own.
     ///
     /// Active content is refused with its own case so the failed screen names
     /// it, not a damaged file. The hidden-layer fact (`/OCProperties → /D →
@@ -135,16 +149,15 @@ extension ImportService {
     /// every `PDFPageData` through `DocumentState.sourceHasHiddenOCG`.
     /// `expectedPageCount` is PDFKit's page count for the same bytes.
     ///
-    /// The reader must open, be unlocked, read a catalog and agree with
+    /// The reader must exist, be unlocked, read a catalog and agree with
     /// PDFKit on the page count, and the walk must read every page and every
     /// action chain to its bound; otherwise the walks would answer "clean"
     /// for what they could not see, so the document is refused as one the
     /// app cannot read. An owner-password-only file opens with no prompt in
     /// PDFKit; CoreGraphics may report it locked until the empty user
     /// password is tried, so that is tried first.
-    nonisolated static func inspectWalkReader(data: Data, expectedPageCount: Int) throws -> Bool {
-        guard let provider = CGDataProvider(data: data as CFData),
-              let cgDoc = CGPDFDocument(provider) else {
+    nonisolated static func inspectWalkReader(_ reader: CGPDFDocument?, expectedPageCount: Int) throws -> Bool {
+        guard let cgDoc = reader else {
             throw PipelineError.importError(.corrupt)
         }
         if !cgDoc.isUnlocked {

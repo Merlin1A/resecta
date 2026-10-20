@@ -100,6 +100,11 @@ struct VerificationCorpusRunnerTests {
         let termsOverride: [SensitiveTerm]?
         /// The full-apply set: the source scan's results, all applied.
         var appliedScan: [SearchResult]? = nil
+        /// The user password of a locked document; nil for a plain one.
+        var password: String? = nil
+        /// For a locked twin of a plain document: the plain cell's doc id.
+        /// The compare asserts the twin's output bytes equal the plain cell's.
+        var plainTwinId: String? = nil
     }
 
     /// Run one (doc × mode × region set) cell end-to-end and write its
@@ -115,7 +120,15 @@ struct VerificationCorpusRunnerTests {
         guard let doc = PDFDocument(data: input.data) else {
             return "PDFDocument(data:) failed"
         }
-        let hasHiddenOCG = documentHasHiddenOCG(input.data)
+        // Import mirror: the lock gate. A locked document opens with the
+        // cell's password; one that does not unlock is skipped, as the app
+        // refuses it.
+        if doc.isLocked {
+            guard let password = input.password, doc.unlock(withPassword: password) else {
+                return "unlock failed"
+            }
+        }
+        let hasHiddenOCG = documentHasHiddenOCG(doc)
 
         // Import mirror: per-page text-layer classification.
         var status: [Int: TextLayerStatus] = [:]
@@ -305,7 +318,9 @@ struct VerificationCorpusRunnerTests {
                 },
                 spatial_lattice_axes: Self.readBackAxes(outputURL),
                 file_id_hex: fileID.hex,
-                file_id_matches_digest: fileID.matches),
+                file_id_matches_digest: fileID.matches,
+                source_unlocked_with_password: input.password != nil,
+                plain_twin_id: input.plainTwinId),
             to: "\(cellDir)/cell.json")
         return nil
     }

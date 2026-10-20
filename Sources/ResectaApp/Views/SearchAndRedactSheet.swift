@@ -1021,7 +1021,7 @@ struct SearchAndRedactSheet: View {
         // stays on the LIVE page on MainActor. A nil copy ⇒ clear the preview
         // rather than read the shared instance the PDFView renders. The engine
         // path never invokes OCR for live preview.
-        guard let previewDoc = DocumentState.makeSearchCopy(of: SendablePDFDocument(liveDoc)) else {
+        guard let previewDoc = SearchCopy.make(of: SendablePDFDocument(liveDoc), unlockingWith: documentState.documentPassword) else {
             searchState.clearLivePreview()
             return
         }

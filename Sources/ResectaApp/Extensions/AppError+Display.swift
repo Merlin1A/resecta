@@ -89,7 +89,7 @@ extension PipelineError {
                 // addition, not a change here.
                 "The file could not be read. It may be damaged, locked by another app, or temporarily unavailable."
             case .passwordProtected:
-                "Resecta does not support encrypted PDFs. Remove the password in another app, then import the file."
+                "The document was not opened because its password was not entered. Choose the file again to enter the password."
             case .tooLarge(let bytes):
                 "This file is approximately \(bytes / (1024 * 1024)) MB. Try a smaller document or reduce the page count."
             case .unsupportedFormat:
@@ -158,6 +158,8 @@ extension PipelineError {
         switch self {
         case .detectionError(.timeout), .detectionError(.ocrUnavailable):
             "exclamationmark.triangle.fill"  // Warning-level (recoverable, non-critical)
+        case .importError(.passwordProtected):
+            "lock.fill"  // The card beneath the password sheet reads locked, not damaged
         default:
             "xmark.circle.fill"  // Error-level
         }
@@ -168,7 +170,8 @@ extension PipelineError {
     /// site; AA text-tier shades since the symbol renders beside text copy).
     var severityColor: Color {
         switch self {
-        case .detectionError(.timeout), .detectionError(.ocrUnavailable):
+        case .detectionError(.timeout), .detectionError(.ocrUnavailable),
+             .importError(.passwordProtected):
             ResectaTokens.SemanticColor.warnText
         default:
             ResectaTokens.SemanticColor.failText

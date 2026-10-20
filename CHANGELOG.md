@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - Double-tap the page to return to the fit zoom.
 - Page bar: a Mark Whole Page control beside the page chevrons adds one redaction region covering the page on screen, through the same path a drawn region takes — the counter reads "1 region", Undo removes it in one step, and no search term is captured from it.
+- Import: a password-protected PDF can be opened by entering its password; the import checks run on the unlocked document, and the redacted copy is not password-protected. The password is held in memory while the document is open and released when the session closes; the failed-state card beneath the password sheet reads as locked rather than damaged. A document that was encrypted — one opened with a password, or one carrying only an owner password — shows a notice at import and a caption on the Share card saying the redacted copy carries neither the password nor the original's usage restrictions.
 
 ### Changed
 
@@ -75,6 +76,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Context-scored pattern matches build their explanation through one factory; the signal order is unchanged.
 - Decoded fields nothing reads are dropped: the per-filter manifest entries and the unapplied document-type temperature; the temperature file is read only for the startup diagnostics.
 - Detection loaders: the context keyword sets switch over the typed scored families; the context keyword loader and the driver's-licence and passport pattern tables share one version check and one loading path; the state-code pattern is compiled once.
+- The engine's password message names the missing password rather than unsupported encryption; the import checks read one parser's view of the document (the walks inspect the parsed document's own reader, unlocked with the same password, instead of a second parse of the bytes). The robustness mirror and the verification corpus runner take the same password; the runner gains two plain seed documents and three locked twins whose outputs must match their seeds byte for byte.
+
 - `Scripts/release-flag-check.sh` censuses the remaining debug-only launch argument, the saved-searches sim-drive hook, as its positive control.
 - The search sheet's row display contracts, copy catalogs, banners and Scan options sit in their own files (`SearchResultRow+Contracts.swift`, `SearchResultsCopy.swift`, `SearchResultsBanners.swift`, `SearchToolbarSection+Scan.swift`), the copy catalogs under names that say what they hold; one detection-kind label table serves the canvas badge and the review surfaces; the two search-preparation guards share one failure path.
 - The pull-request gate counts the engine package's `public` and `open` declaration lines and fails a change whose count exceeds the cap the script carries, printing the count, the headroom under the cap and the release line caps on the largest source files (`Scripts/engine-public-surface-check.sh`); a change that adds to the count names the declarations in its description.
