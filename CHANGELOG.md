@@ -124,6 +124,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The verification status ranking is an exhaustive switch over every status; the test-only tuning values are bound per task.
 - Rendering a page from a PDFKit page and from its Core Graphics page runs one render body.
 - The rectangle and polygon character filters share one sort, search and cancellation skeleton.
+- Engine: the public surface is reduced to the document-runner API and what the app and its tests name; 103 more declarations become `internal` (access level only).
 
 ## [1.2.0] — 2026-09-29
 

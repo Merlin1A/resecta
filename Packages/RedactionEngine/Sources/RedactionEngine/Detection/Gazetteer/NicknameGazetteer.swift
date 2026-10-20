@@ -20,7 +20,7 @@ import OSLog
 /// tagged the token as `.personalName`; common English homophones of nickname
 /// forms ("bob" as a verb, "bill" as a noun) are filtered before the bloom
 /// query.  The FPR increase is small.
-public struct NicknameGazetteer: Sendable {
+struct NicknameGazetteer: Sendable {
 
     public enum LoaderError: Error {
         case resourceMissing
@@ -89,7 +89,7 @@ public struct NicknameGazetteer: Sendable {
     ///
     /// Input is NFKC-normalized and lowercased before lookup, matching the build
     /// pipeline's preprocessing.  Returns `[]` if the alias is not in the table.
-    public func canonicals(for alias: String) -> [String] {
+    func canonicals(for alias: String) -> [String] {
         entries[Self.normalize(alias)] ?? []
     }
 

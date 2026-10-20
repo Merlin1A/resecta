@@ -15,7 +15,7 @@ import AppKit  // macOS tooling destination: NSFont carries the .font attribute
 /// Sandwich-specific verification layers for the Searchable Redaction pipeline.
 /// These layers verify that the invisible text layer is correctly constructed
 /// and does not leak redacted content.
-public struct SandwichVerification: Sendable {
+struct SandwichVerification: Sendable {
 
     /// Natural CoreText advance of one composed grapheme in the accepted
     /// family's own font at `pointSize`.
@@ -166,7 +166,7 @@ public struct SandwichVerification: Sendable {
     /// uses, over the core boxes. For a shape whose
     /// `bounds == expandedBounds` (the legacy construction) the two tiers
     /// coincide and the check reduces to its previous single-rect form.
-    public func verifySpatialExclusion(
+    func verifySpatialExclusion(
         outputPage: PDFPage,
         regionShapes: [RegionShape],
         pageIndex: Int = 0
@@ -277,7 +277,7 @@ public struct SandwichVerification: Sendable {
     /// in the other.
     ///
     /// A mismatch indicates characters were added or dropped during reconstruction.
-    public func verifyCharacterCount(
+    func verifyCharacterCount(
         outputPage: PDFPage,
         digest: PageFilterDigest
     ) async throws -> VerificationStatus {
@@ -374,7 +374,7 @@ public struct SandwichVerification: Sendable {
     /// CGPDFContext embeds fonts as TrueType with a random
     /// 6-letter subset prefix (e.g., "AAAAAB+Courier"). Layer 8 matches
     /// against /BaseFont using suffix check.
-    public func verifyFontsAreMonospace(
+    func verifyFontsAreMonospace(
         outputPage: PDFPage,
         pageIndex: Int
     ) async throws -> VerificationStatus {
@@ -491,7 +491,7 @@ public struct SandwichVerification: Sendable {
     ///
     /// Receives PDFPage (non-Sendable). Safety: verification runner
     /// calls layers sequentially; output PDFDocument is distinct from source.
-    public func verifyCharacterLineage(
+    func verifyCharacterLineage(
         outputPage: PDFPage,
         digest: PageFilterDigest
     ) async throws -> VerificationStatus {

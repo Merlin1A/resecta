@@ -11,7 +11,7 @@ import Foundation
 /// the shared set keeps `Pipeline/` and `Verification/` from reaching into
 /// each other for a constant: the writer-local values (`baseFontSize`,
 /// `cellWidth`) stay with the reconstructor.
-public enum SandwichMetrics {
+enum SandwichMetrics {
 
     // MARK: - Courier geometry
 
@@ -20,7 +20,7 @@ public enum SandwichMetrics {
     /// Courier advance (600/1000 = 0.6). Probed against
     /// `CTFontGetAdvancesForGlyphs` for sizes {1, 6, 12, 24, 100}pt — the
     /// advance is exactly `0.60009765625 × fontSize` for every probed size.
-    public static let courierAdvancePerPoint: CGFloat = 0.60009765625
+    static let courierAdvancePerPoint: CGFloat = 0.60009765625
 
     /// Tolerance for the Layer 6 advance crosscheck at the 12pt REFERENCE
     /// size (M1 tightening). The reconstructor derives line pitches from
@@ -28,11 +28,11 @@ public enum SandwichMetrics {
     /// glyph's own point size via `advanceWidthTolerancePerPoint`; this
     /// constant remains the 12pt anchor (and the value probe/test code
     /// built against the 12pt-era geometry still reads).
-    public static let advanceWidthTolerance: CGFloat = 0.25
+    static let advanceWidthTolerance: CGFloat = 0.25
 
     /// Linear scaling of the advance tolerance: `0.25pt at 12pt`, applied
     /// as `advanceWidthTolerancePerPoint × pointSize`.
-    public static let advanceWidthTolerancePerPoint: CGFloat = 0.25 / 12.0
+    static let advanceWidthTolerancePerPoint: CGFloat = 0.25 / 12.0
 
     // MARK: - Line banding
 
@@ -44,7 +44,7 @@ public enum SandwichMetrics {
     /// points; sub-baseline offsets (superscripts, ordinals) sit well
     /// under 1pt — measured on the committed real-document fixture
     /// (RealDocProbeTests, 2026-06-09).
-    public static let lineBandTolerance: CGFloat = 1.5
+    static let lineBandTolerance: CGFloat = 1.5
 
     /// Single-linkage sweep over Y values: returns each input index's band
     /// ordinal (0 = topmost). Deterministic in the input values only.
@@ -121,7 +121,7 @@ public enum SandwichMetrics {
     /// equal on both sides. It is NOT `Data()`: `verifyCharacterLineage`
     /// reads an empty `Data()` as "no lineage recorded" (legacy digests,
     /// hand-built test digests) and passes without comparing.
-    public static let emptyLineageDigest = Data(SHA256().finalize())
+    static let emptyLineageDigest = Data(SHA256().finalize())
 
     /// Whitespace skip predicate shared by the filter-side lineage walk
     /// (`FilterResult.computeLineageHash`) and the verifier's output walk

@@ -22,7 +22,7 @@ public struct OCREngine: Sendable {
     /// Request parameters route through `OCRConfiguration.search` (OCR
     /// quality program) — one config type per call site.
     @concurrent
-    public func recognizeText(
+    func recognizeText(
         in image: CGImage,
         recognitionLevel: VNRequestTextRecognitionLevel = .fast
     ) async throws -> [TextLine] {

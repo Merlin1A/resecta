@@ -32,7 +32,7 @@ public struct TextNormalizer: Sendable {
     }
 
     /// Normalize for search comparison: ligature expansion + NFKC + optional case folding.
-    public static func normalizeForSearch(
+    static func normalizeForSearch(
         _ text: String,
         caseSensitive: Bool
     ) -> String {
@@ -84,7 +84,7 @@ public struct TextNormalizer: Sendable {
     /// `text` of `normalized[i]`. Length-changing — callers MUST route
     /// match ranges through the map before computing rects (the
     /// offset-mapping strategy; leak-class if skipped).
-    public static func stripSeparators(_ text: String) -> (normalized: String, offsetMap: [Int]) {
+    static func stripSeparators(_ text: String) -> (normalized: String, offsetMap: [Int]) {
         var result = ""
         var map: [Int] = []
         map.reserveCapacity(text.count)
@@ -131,7 +131,7 @@ public struct TextNormalizer: Sendable {
     /// Compose offset maps from chained length-changing normalizations:
     /// `inner` maps newest → intermediate, `outer` maps intermediate →
     /// oldest. nil `outer` means `inner` already targets the oldest space.
-    public static func composeOffsetMaps(outer: [Int]?, inner: [Int]) -> [Int] {
+    static func composeOffsetMaps(outer: [Int]?, inner: [Int]) -> [Int] {
         guard let outer else { return inner }
         return inner.map { outer[$0] }
     }
@@ -140,11 +140,11 @@ public struct TextNormalizer: Sendable {
     /// the pre-fold/strip base text (the coordinate space rect NSRanges
     /// are expressed in), and the offset map back to that space (nil when
     /// every applied step was 1:1).
-    public struct SearchNormalization: Sendable {
+    struct SearchNormalization: Sendable {
         public let pageText: String
         public let query: String
-        public let baseText: String
-        public let offsetMap: [Int]?
+        let baseText: String
+        let offsetMap: [Int]?
     }
 
     /// Apply the recall extensions on top of an already
@@ -152,7 +152,7 @@ public struct TextNormalizer: Sendable {
     /// flags. Order matters: smart punctuation first (1:1, folds dashes
     /// so the separator set sees plain "-"), then diacritic fold, then
     /// separator strip, with maps composed back to the input space.
-    public static func applySearchExtensions(
+    static func applySearchExtensions(
         pageText: String,
         query: String,
         options: SearchOptions
