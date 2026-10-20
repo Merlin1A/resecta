@@ -531,7 +531,7 @@ public actor DocumentSearcher {
         case .regex(let pattern, let options):
             let regex: NSRegularExpression
             do {
-                regex = try Self.validateRegexPatternWithError(pattern)
+                regex = try Self.validateRegexPatternWithError(pattern, options: options)
             } catch { // LegalPhrases:safe (Swift keyword)
                 // The reason rides the result so the caller need not
                 // re-validate to learn why the count is empty.
@@ -866,7 +866,7 @@ public actor DocumentSearcher {
     ) async {
         let regex: NSRegularExpression
         do {
-            regex = try Self.validateRegexPatternWithError(pattern)
+            regex = try Self.validateRegexPatternWithError(pattern, options: options)
         } catch { // LegalPhrases:safe (Swift keyword)
             // The gate refused the pattern: say so once, then finish empty.
             // A silent empty stream reads as "0 results" to every consumer,

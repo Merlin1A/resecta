@@ -18,6 +18,10 @@ extension DocumentSearcher {
     /// pattern was rejected, so the sheet can surface the engine's
     /// `NSRegularExpression` NSError verbatim
     /// (`SearchToolbarSection+Contracts.swift` already promises it).
+    /// `options` is the session's search options: the search legs pass
+    /// theirs so the pattern compiles case-insensitively when Case-sensitive
+    /// is off (`regexCompileOptions`); a validation-only caller passes none
+    /// and the pattern compiles as written.
     ///
     /// Sync entry point gates ad-hoc trigger, compose
     /// sub-mode, custom-terms editor, and saved-regex compile via a
@@ -32,7 +36,9 @@ extension DocumentSearcher {
     /// backtrack catastrophically. The async `RegexSentinelCheck.validate`
     /// adds a sentinel-string runtime probe at compose-execution
     /// and profile-import time on top of this.
-    public static func validateRegexPatternWithError(_ pattern: String) throws -> NSRegularExpression {
+    public static func validateRegexPatternWithError(
+        _ pattern: String, options: SearchOptions? = nil
+    ) throws -> NSRegularExpression {
         // Pattern length cap
         guard pattern.count <= maxRegexPatternLength else {
             throw RegexValidationError.patternTooLong(maxLength: maxRegexPatternLength)
@@ -62,8 +68,17 @@ extension DocumentSearcher {
 
         // Attempt compilation; an engine rejection propagates as the
         // system NSError whose localizedDescription the sheet surfaces.
-        // Note: case sensitivity handled via text normalization, not regex flags
-        return try NSRegularExpression(pattern: pattern)
+        // The page text is never case-folded on the regex path, so the
+        // Case-sensitive option reaches the engine as a compile option.
+        return try NSRegularExpression(pattern: pattern, options: regexCompileOptions(options))
+    }
+
+    /// The compile options the session's search options call for: the
+    /// case-insensitive flag when Case-sensitive is off; none without
+    /// options (the validation-only callers) or with it on.
+    static func regexCompileOptions(_ options: SearchOptions?) -> NSRegularExpression.Options {
+        guard let options, !options.caseSensitive else { return [] }
+        return [.caseInsensitive]
     }
 }
 
