@@ -103,15 +103,77 @@ enum SearchCore {
         let baseText: String
         let offsetMap: [Int]?
         let baseChars: [Character]?
+        let rawMap: RawTextMap?
+
+        /// The `NSRange` in the RAW page text (`page.string`) of a base span:
+        /// through `rawMap` when the normalization changed the Character count,
+        /// the base offsets themselves otherwise; nil when the map cannot
+        /// cover the span (a match the caller refuses rather than risk a bad
+        /// rect — the rule the offset map already applies).
+        func rawNSRange(baseStart: Int, length: Int) -> NSRange? {
+            guard let rawMap else { return NSRange(location: baseStart, length: length) }
+            return rawMap.nsRange(baseStart: baseStart, length: length)
+        }
     }
 
-    /// The literal tier's page preparation: `normalizedText` then the
+    /// The route from the normalized page back to the raw page text, built
+    /// when the normalization changed the Character count: for each
+    /// normalized Character the raw Character it came from, and the raw
+    /// text's UTF-16 offsets per Character. A ligature expansion before a
+    /// match otherwise shifts its rect by as many characters as the
+    /// expansion added.
+    struct RawTextMap: Sendable {
+        /// One entry per normalized Character: the raw Character index.
+        let rawCharacterIndex: [Int]
+        /// `rawUTF16Offsets[i]` is the UTF-16 offset of raw Character i;
+        /// one entry more than the raw Character count (the end).
+        let rawUTF16Offsets: [Int]
+
+        func nsRange(baseStart: Int, length: Int) -> NSRange? {
+            guard length > 0, baseStart >= 0,
+                  baseStart + length - 1 < rawCharacterIndex.count else { return nil }
+            let first = rawCharacterIndex[baseStart]
+            let last = rawCharacterIndex[baseStart + length - 1]
+            let location = rawUTF16Offsets[first]
+            return NSRange(location: location, length: rawUTF16Offsets[last + 1] - location)
+        }
+    }
+
+    /// The page side of `normalizedText` with its route back to the raw
+    /// text. When the normalization keeps the Character count the offsets
+    /// coincide and no map is built. Otherwise the page is normalized one
+    /// Character at a time; when the pieces joined are not scalar-identical
+    /// to the whole-string normalization (a cluster that re-forms across a
+    /// boundary), the whole-string text stands with no map, as before.
+    static func normalizedPage(
+        _ pageText: String, options: SearchOptions
+    ) -> (text: String, rawMap: RawTextMap?) {
+        let whole = normalizedText(pageText, options: options)
+        guard whole.count != pageText.count else { return (whole, nil) }
+        var text = ""
+        text.reserveCapacity(whole.utf8.count)
+        var index: [Int] = []
+        index.reserveCapacity(whole.count)
+        var utf16: [Int] = [0]
+        utf16.reserveCapacity(pageText.count + 1)
+        for (i, character) in pageText.enumerated() {
+            let piece = normalizedText(String(character), options: options)
+            text.append(piece)
+            for _ in piece { index.append(i) }
+            utf16.append(utf16[utf16.count - 1] + character.utf16.count)
+        }
+        guard text.unicodeScalars.elementsEqual(whole.unicodeScalars) else { return (whole, nil) }
+        return (text, RawTextMap(rawCharacterIndex: index, rawUTF16Offsets: utf16))
+    }
+
+    /// The literal tier's page preparation: `normalizedPage` then the
     /// extension pipeline (`TextNormalizer.applySearchExtensions`) on the page
     /// side. The page and query transforms of that pipeline are independent,
     /// so preparing them apart yields the pair a single call would.
     static func preparePage(_ pageText: String, options: SearchOptions) -> PreparedPage {
+        let normalized = normalizedPage(pageText, options: options)
         let ext = TextNormalizer.applySearchExtensions(
-            pageText: normalizedText(pageText, options: options),
+            pageText: normalized.text,
             query: "",
             options: options
         )
@@ -120,7 +182,8 @@ enum SearchCore {
             nsString: ext.pageText as NSString,
             baseText: ext.baseText,
             offsetMap: ext.offsetMap,
-            baseChars: ext.offsetMap != nil ? Array(ext.baseText) : nil
+            baseChars: ext.offsetMap != nil ? Array(ext.baseText) : nil,
+            rawMap: normalized.rawMap
         )
     }
 
