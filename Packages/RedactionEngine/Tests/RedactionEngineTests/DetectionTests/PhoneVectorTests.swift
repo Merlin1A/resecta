@@ -60,6 +60,16 @@ struct PhoneVectorTests {
         return PIIDetector().families.phone.detect(in: ns, range: NSRange(location: 0, length: ns.length)).first?.confidence
     }
 
+    @Test("a number whose opening parenthesis was lost in text recognition is a phone; a lost closing parenthesis keeps the opening one outside")
+    func droppedOpeningParenthesisIsAPhone() {
+        let ns = "Call 208) 555-0163 for the office." as NSString
+        let hits = PIIDetector().families.phone.detect(in: ns, range: NSRange(location: 0, length: ns.length))
+        #expect(hits.map(\.text) == ["208) 555-0163"])
+        let open = "Call (555 123-4567 for the office." as NSString
+        let openHits = PIIDetector().families.phone.detect(in: open, range: NSRange(location: 0, length: open.length))
+        #expect(openHits.map(\.text) == ["555 123-4567"])
+    }
+
     @Test("a context keyword inside another word does not boost: Patel ∌ tel, next ∌ ext")
     func keywordInsideAnotherWordDoesNotBoost() {
         #expect(phoneConfidence("Priya Patel (312) 621-4862") == 0.60)

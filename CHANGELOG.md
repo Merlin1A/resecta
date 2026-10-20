@@ -44,6 +44,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
 ### Fixed
 
+- Scan: on scanned pages, an address whose ZIP code belongs to a different state than its first three digits suggest is proposed.
+- Scan: a label line such as 'Reg # on file' is no longer proposed as a license plate.
+- Scan: a phone number whose opening parenthesis was lost in text recognition is proposed.
 - Scan: American Express numbers printed in spaced or hyphenated 4-6-5 groups are proposed.
 - Scan: a Social Security number written after a three-digit number and a space is proposed.
 - Custom terms and saved patterns: a regular expression holding a character whose uppercase form is two letters (such as ß or the ﬁ ligature) no longer stops the app when the pattern is validated.

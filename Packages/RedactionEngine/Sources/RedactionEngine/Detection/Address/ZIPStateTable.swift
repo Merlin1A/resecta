@@ -27,6 +27,15 @@ enum ZIPStateTable {
         return state(forPrefixCode: n)
     }
 
+    /// Map a full ZIP to a 2-letter state code through the loader's
+    /// five-digit overrides, then its prefix table, then the fallback switch.
+    static func state(forZIP zip: String) -> String? {
+        if let loader, let hit = loader.state(forZIP: zip) {
+            return hit
+        }
+        return state(forZIPPrefix: String(zip.prefix(3)))
+    }
+
     // swiftlint:disable cyclomatic_complexity function_body_length
     private static func state(forPrefixCode n: Int) -> String? {
         switch n {
