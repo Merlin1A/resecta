@@ -69,6 +69,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Accessibility: a staged search term's remove control is named "Remove" with the term and meets the 46-point target; the Custom Terms add row's Regex toggle and add button meet it too.
 - Accessibility: the parked strip's Apply capsule is named "Applied" once the match is marked, with the match's position as its value, and every element of the strip offers a "Show full sheet" action.
 - Accessibility: the page bar's counter is one spoken element, "Page k of N, n regions"; filter chips report when they are selected.
+- Scan: a Social Security number written after a three-digit number and a space is proposed.
 - Custom terms and saved patterns: a regular expression holding a character whose uppercase form is two letters (such as ß or the ﬁ ligature) no longer stops the app when the pattern is validated.
 - Verification: the search re-check and the detection sweep list a page as not checked when a custom regular-expression term ran out of time on it, instead of counting the page as read.
 - Verification: the detection sweep reports a custom term added after a scan was applied as a possible item instead of discarding it as the scan's.
