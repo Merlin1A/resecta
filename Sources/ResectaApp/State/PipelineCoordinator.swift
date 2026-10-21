@@ -612,6 +612,16 @@ final class PipelineCoordinator: @unchecked Sendable {
         toastManager?.enqueue(message, severity: severity)
     }
 
+    /// The one document boundary: a new document (a drop over an open one,
+    /// the Home open, the password re-run) starts with an empty undo
+    /// history and no notices from the previous document. The window's
+    /// undo manager and toast queue outlive the document, and the editor
+    /// stays mounted across a drop, so its close-time clear never runs.
+    func documentDidChange() {
+        undoManager?.removeAllActions()
+        toastManager?.clearAll()
+    }
+
     // MARK: - Session-close protection downgrade
 
     /// Hook invoked when the user closes the active document (the Done

@@ -46,6 +46,7 @@ struct RedactWorkspaceView: View {
             // it — keying off the document swap covers all paths uniformly.
             .onChange(of: workspace.documentState.sourceDocument) { oldDocument, newDocument in
                 if Self.isDocumentSwap(from: oldDocument, to: newDocument) {
+                    workspace.coordinator.documentDidChange()
                     checkImportToasts()
                 }
             }
@@ -64,21 +65,18 @@ struct RedactWorkspaceView: View {
                     enqueueImportRefusedNotPDFToast()
                     return true
                 }
-                // Reject drops while the pipeline is
-                // active OR a detection review is open. A drop replaces an
-                // open document with no confirmation, so it consults the
-                // composed `canStartImport(with:)` gate directly — a stranded
-                // triage sheet over a replacement document could stamp the prior
-                // document's page-coordinate regions onto the new one. The drop
-                // handler returns true on accept; on reject we still return true
-                // so the system snaps the payload back rather than leaving it
-                // dangling, and we surface the precise reason via toast.
-                guard workspace.documentState.canStartImport(with: workspace.redactionState) else {
-                    if workspace.documentState.canStartImport {
-                        enqueueImportBlockedDuringTriageToast()
-                    } else {
-                        enqueueImportBlockedToast()
-                    }
+                // Reject drops while the pipeline is active, a detection
+                // review is open, or the results or error screen is up. A
+                // drop replaces an open document with no confirmation, so it
+                // consults the composed `canStartImport(with:)` gate directly
+                // — a stranded triage sheet over a replacement document could
+                // stamp the prior document's page-coordinate regions onto the
+                // new one. The drop handler returns true on accept; on reject
+                // we still return true so the system snaps the payload back
+                // rather than leaving it dangling, and we surface the precise
+                // reason via toast.
+                if let refusal = workspace.documentState.importRefusalMessage(with: workspace.redactionState) {
+                    toastManager.enqueue(refusal, severity: .warning)
                     return true
                 }
                 // Phase admission has already passed by this point; the
@@ -272,34 +270,12 @@ struct RedactWorkspaceView: View {
         }
     }
 
-    /// Surface the rejection when a drop arrives while the pipeline owns
-    /// in-flight state. Mechanism-description copy lives on
-    /// `DocumentState.importBlockedDuringPipelineMessage` so unit tests
-    /// can assert on the exact string without crossing the View boundary.
-    private func enqueueImportBlockedToast() {
-        toastManager.enqueue(
-            DocumentState.importBlockedDuringPipelineMessage,
-            severity: .warning
-        )
-    }
-
     /// Surface the refusal when a dropped payload is not a PDF (an image,
     /// refused at the drop door). The copy is the unsupported-format
     /// message, held on `DocumentState.importRefusedNotPDFMessage`.
     private func enqueueImportRefusedNotPDFToast() {
         toastManager.enqueue(
             DocumentState.importRefusedNotPDFMessage,
-            severity: .warning
-        )
-    }
-
-    /// Surface the rejection when a drop arrives while a detection
-    /// review (triage) is open for the current document. Mechanism-description
-    /// copy lives on `DocumentState.importBlockedDuringTriageMessage` so unit
-    /// tests can assert on the exact string without crossing the View boundary.
-    private func enqueueImportBlockedDuringTriageToast() {
-        toastManager.enqueue(
-            DocumentState.importBlockedDuringTriageMessage,
             severity: .warning
         )
     }

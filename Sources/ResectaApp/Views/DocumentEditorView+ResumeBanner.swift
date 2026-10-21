@@ -5,9 +5,9 @@ import RedactionEngine
 // `DocumentEditorView.swift` (the hub) along its `// InlineWarningBanner
 // for background resume` seam: the overlay content.
 // The hub's `body` mounts `resumeBannerOverlay` in the same overlay slot
-// it always held; the hub's `@State dismissBannerTask` and
-// `documentOverride` stay stored on the hub (an extension adds no
-// storage) and are read from here.
+// it always held; the hub's `@State dismissBannerTask` stays stored on the
+// hub (an extension adds no storage) and `documentOverride` forwards to
+// the document's state (`+ModeOverride`); both are read from here.
 
 extension DocumentEditorView {
 

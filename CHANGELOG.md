@@ -93,6 +93,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Cancel on the Importing card, or leaving the app, while a dropped document imports over an open one returns to that document instead of a blank editor.
 - Keep Editing after verification was interrupted by leaving the app no longer shows the Processing was paused banner over a finished redaction.
 - Home asks before closing when the search sheet holds selected matches that are not applied; Redact and the sheet's own Dismiss already guard them.
+- A document dropped over an open one starts with an empty undo history, the redaction mode set in Settings and no notices from the previous document; a drop on the results or error screen is refused with a notice instead of doing nothing.
 
 ### Internal
 

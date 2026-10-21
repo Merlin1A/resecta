@@ -40,8 +40,6 @@ struct DocumentEditorView: View {
     /// Shift+tap continues to work whether the toggle is on or off.
     @State private var isMultiSelectActive: Bool = false
 
-    // Per-document pipeline mode override (nil = use global setting)
-    @State var documentOverride: PipelineMode?
 
     // Brief status flash state for .verifying → .verified transition
     @State private var showBriefStatus = false

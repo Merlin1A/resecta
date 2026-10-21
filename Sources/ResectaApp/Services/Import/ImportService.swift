@@ -311,6 +311,7 @@ enum ImportService {
         documentState.sourceFilledFormFieldCount = loaded.facts.filledFormFieldCount
         documentState.annotationNoticeDismissed = false
         documentState.lastUsedPipelineMode = nil
+        documentState.documentOverride = nil
         documentState.wasPausedByBackground = false
         documentState.pausedFromPhase = nil  // clear alongside wasPausedByBackground
         documentState.transition(to: .editing)
