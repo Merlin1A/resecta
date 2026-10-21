@@ -16,10 +16,12 @@ struct PhoneDetector: FamilyDetector {
     // Hardcoded constant pattern — try! safe (validated in PIIDetectionTests)
     // Three alternations: `(###) ###-####`, `### ###-####`, and the shape
     // text recognition leaves when it drops the opening parenthesis,
-    // `###) ###-####`. Bare `+` is dropped (only `+1` leads). A dropped
-    // CLOSING parenthesis (`(555 123-4567`) keeps its `(` outside the match.
+    // `###) ###-####` — that one needs its separator after the `)`, so a
+    // `)` glued to the digits (`555)123-4567`) stays outside any match.
+    // Bare `+` is dropped (only `+1` leads). A dropped CLOSING parenthesis
+    // (`(555 123-4567`) keeps its `(` outside the match.
     static let phonePattern = try! NSRegularExpression(
-        pattern: #"(?<!\d)(?:\+1[\s.-]?)?(?:\(\d{3}\)[\s.-]?\d{3}[\s.-]?\d{4}|\d{3}\)[\s.-]?\d{3}[\s.-]?\d{4}|\d{3}[\s.-]?\d{3}[\s.-]?\d{4})(?!\d)"#
+        pattern: #"(?<!\d)(?:\+1[\s.-]?)?(?:\(\d{3}\)[\s.-]?\d{3}[\s.-]?\d{4}|\d{3}\)[\s.-]\d{3}[\s.-]?\d{4}|\d{3}[\s.-]?\d{3}[\s.-]?\d{4})(?!\d)"#
     )
 
     /// Keywords that, when found near a 10-digit number, indicate a phone number
