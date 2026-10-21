@@ -1,8 +1,8 @@
 import SwiftUI
 import UIKit
 
-// Variant B home screen — wordmark masthead, two equally-weighted choice
-// cards (Open a Document / Try the Sample), trust strip, version footer.
+// Variant B home screen — wordmark masthead, three choice cards (Open a
+// Document / Import Photos / Try the Sample), trust strip, version footer.
 // Mechanism-description language only — no outcome promises.
 // Frozen strings: tagline, card bodies, trust labels.
 
@@ -13,6 +13,7 @@ struct HomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var showFilePicker = false
+    @State private var showPhotoPicker = false
     @State private var showSettings = false
     // The prior `showImportError` state field
     // drove a generic `.alert("Import Error", ...)` on HomeView. Removed —
@@ -61,10 +62,13 @@ struct HomeView: View {
             }
             .fileImporter(
                 isPresented: $showFilePicker,
-                allowedContentTypes: [.pdf],
+                allowedContentTypes: ImportService.acceptedContentTypes,
                 allowsMultipleSelection: false
             ) { result in
                 handleFileImportResult(result)
+            }
+            .photoImport(isPresented: $showPhotoPicker) { images, count in
+                Task { await appCoordinator.openRedactWithImages(images, count: count) }
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView()
@@ -124,10 +128,20 @@ struct HomeView: View {
                 symbol: "doc.badge.plus",
                 style: .primary,
                 title: "Open a Document",
-                bodyText: "Import a PDF from Files. Nothing is uploaded.",
+                bodyText: "Import a PDF or an image from Files. Nothing is uploaded.",
                 affordance: "Choose File →",
                 action: { showFilePicker = true }
             )
+
+            HomeChoiceCard(
+                symbol: "photo.on.rectangle.angled",
+                style: .subtle,
+                title: "Import Photos",
+                bodyText: "Choose photos from your library. Each photo becomes one page; nothing is uploaded.",
+                affordance: "Choose Photos →",
+                action: { showPhotoPicker = true }
+            )
+            .accessibilityIdentifier("homeImportPhotos")
 
             HomeChoiceCard(
                 symbol: "sparkles",

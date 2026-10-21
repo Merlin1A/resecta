@@ -64,6 +64,18 @@ final class AppCoordinator {
         }
     }
 
+    /// The Photos door: tear down the current workspace, create a new one,
+    /// and import the picked images, one page each, in pick order.
+    func openRedactWithImages(_ images: AsyncThrowingStream<Data, any Error>, count: Int) async {
+        tearDownCurrentWorkspace()
+        let workspace = RedactWorkspace(settingsState: settingsState, userTermsStore: userTermsStore)
+        activeWorkspace = .redact(workspace)
+        await ImportService.importImages(
+            images, count: count,
+            documentState: workspace.documentState,
+            redactionState: workspace.redactionState)
+    }
+
     func returnHome() {
         tearDownCurrentWorkspace()
         activeWorkspace = .home

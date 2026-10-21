@@ -388,6 +388,32 @@ enum ImportService {
     // MARK: - Sample Document Loading
 
     /// Load a bundled sample document. Single SampleDocument.pdf in Resources/.
+    #if DEBUG
+    /// A bundled synthetic image (UITestFixtures/, Debug only) through the
+    /// image loader, for the `--loadTestImage` launch hook: the JPEG is
+    /// tried first, then the HEIC. A missing fixture fails the import as
+    /// damaged rather than silently opening nothing.
+    static func loadTestImage(
+        named name: String,
+        documentState: DocumentState,
+        redactionState: RedactionState
+    ) async {
+        let url = ["jpg", "heic"].lazy
+            .compactMap { Bundle.main.url(forResource: name, withExtension: $0) }.first
+        guard let url, let data = try? Data(contentsOf: url) else {
+            assertionFailure("Test image '\(name)' not found in bundle")
+            documentState.transition(to: .importing)
+            documentState.transition(to: .failed(error: .importError(.corrupt), returnPhase: .empty))
+            return
+        }
+        let stream = AsyncThrowingStream<Data, any Error> { continuation in
+            continuation.yield(data)
+            continuation.finish()
+        }
+        await importImages(stream, count: 1, documentState: documentState, redactionState: redactionState)
+    }
+    #endif
+
     static func loadSampleDocument(
         named name: String = "SampleDocument",
         documentState: DocumentState,
