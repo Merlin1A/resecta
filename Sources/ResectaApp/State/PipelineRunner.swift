@@ -410,6 +410,15 @@ struct PipelineRunner {
         // (.verifying,.verified), are legal transitions (no table change).
         let sourcePageCount = coordinator.documentState.pageCount
         let regionsSnapshot = coordinator.redactionState.regions
+        // The Search Re-check's coverage check re-runs each applied search
+        // on the ORIGINAL pages: it reads its own copy of the source (the
+        // per-consumer discipline of the search path — the live instance
+        // stays the view's), built off MainActor. nil ⇒ the check does not
+        // run; the layer then reports as it did without it.
+        let liveSource = coordinator.documentState.sourceDocument.map(SendablePDFDocument.init)
+        let sourceCopy: SendablePDFDocument? = await Task.detached {
+            liveSource.flatMap(DocumentState.makeSearchCopy(of:))
+        }.value
 
         let report = try await VerificationOrchestrator().run(
             outputDocument: wrappedDoc,
@@ -422,6 +431,7 @@ struct PipelineRunner {
             perPageFallbackReasons: runContext.perPageFallbackReasons,
             appliedSearches: runContext.appliedSearches,
             manualRegionsWithoutText: runContext.sensitiveTerms.manualRegionsWithoutText,
+            sourceDocument: sourceCopy,
             provisionLayerDocuments: { layers in
                 // Provision one PDFDocument instance per parallel layer off
                 // MainActor. nil ⇒ at least one re-open failed.

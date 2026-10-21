@@ -97,14 +97,16 @@ public struct VerificationEngine: Sendable {
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode],
         appliedSearches: [SearchRecheckRequest] = [],
-        manualRegionsWithoutText: Int = 0
+        manualRegionsWithoutText: Int = 0,
+        sourceDocument: SendablePDFDocument? = nil
     ) async -> LayerResult {
         await runLayer(
             layer, outputDocument: outputDocument, sourcePageCount: sourcePageCount,
             regions: regions, sensitiveTerms: sensitiveTerms, pipelineMode: pipelineMode,
             filterDigests: filterDigests, perPageModes: perPageModes,
             appliedSearches: appliedSearches, manualRegionsWithoutText: manualRegionsWithoutText,
-            batch: nil)
+            batch: nil,
+            sourceDocument: sourceDocument)
     }
 
     /// The layer template behind `runLayer`: `batch` is the orchestrator's
@@ -122,7 +124,8 @@ public struct VerificationEngine: Sendable {
         perPageModes: [PipelineMode],
         appliedSearches: [SearchRecheckRequest],
         manualRegionsWithoutText: Int,
-        batch: PostSequentialBatch?
+        batch: PostSequentialBatch?,
+        sourceDocument: SendablePDFDocument? = nil
     ) async -> LayerResult {
         // A layer that does not apply to the mode is a caller bug; a silent
         // .pass would masquerade as verification success. Fail fast instead.
@@ -259,7 +262,9 @@ public struct VerificationEngine: Sendable {
                 let outcome = try await SearchRecheck().run(
                     outputDocument: outputDocument,
                     requests: appliedSearches,
-                    observations: batch?.observations
+                    observations: batch?.observations,
+                    sourceDocument: sourceDocument,
+                    regions: regions
                 )
                 status = outcome.status
                 layerPageReferences = outcome.pageReferences

@@ -50,6 +50,10 @@ extension VerificationEngine {
         // `.sensitiveTermOutsideRegions`) on either page mode: the fold
         // reports ATTENTION with the term texts — see `foldLayer2PageOutcomes`.
         case sensitiveTermOutsideRegions
+        // A fragment of a sensitive term read at a box's edge (the
+        // classifier's `.sensitiveTermFragmentBesideRegion`): ATTENTION with
+        // the term texts, below the whole-term arm.
+        case sensitiveTermFragmentBesideRegion
         case fillArtifactInRegion
         case textOutsideRegionsOnly
         case unmappable
@@ -204,6 +208,12 @@ extension VerificationEngine {
             // text layer for them to read, so Layer 2 is the only layer that
             // can see it there). In-region survivors still FAIL above.
             return .sensitiveTermOutsideRegions
+        case .sensitiveTermFragmentBesideRegion:
+            // The start or the end of a redacted term read right beside a
+            // box, on either page mode: the shape a box short of its glyphs
+            // leaves. ATTENTION with the term texts; the geometric FAIL for
+            // the same box is the Search Re-check's coverage check.
+            return .sensitiveTermFragmentBesideRegion
         case .textOutsideRegionsOnly:
             return .textOutsideRegionsOnly
         case .none:
@@ -252,10 +262,15 @@ extension VerificationEngine {
             // the results row shows are exactly the matches behind the
             // verdict.
             let bucket = Self.pageBucket(for: classification, effectiveMode: work.effectiveMode)
-            let reviewTermTexts = bucket == .sensitiveTermOutsideRegions
-                ? Self.outsideRegionTermTexts(
+            let reviewTermTexts: [String] = switch bucket {
+            case .sensitiveTermOutsideRegions:
+                Self.outsideRegionTermTexts(
                     hits: enriched, pageRegions: work.pageRegions, sensitiveTerms: sensitiveTerms)
-                : []
+            case .sensitiveTermFragmentBesideRegion:
+                Self.fragmentTermTexts(
+                    hits: enriched, pageRegions: work.pageRegions, sensitiveTerms: sensitiveTerms)
+            default: []
+            }
             return PageOCRResult(work.page, bucket, reviewTermTexts: reviewTermTexts)
         } else if !work.pageRegions.isEmpty,
                   hits.contains(where: { !($0.text ?? "").isEmpty }) {
@@ -481,6 +496,7 @@ extension VerificationEngine {
         let pagesWithTextInRegionSecureRaster = pages(in: .textInRegionSecureRaster)
         let pagesWithTextInRegionSearchable = pages(in: .textInRegionSearchable)
         let pagesWithSensitiveTermOutsideRegions = pages(in: .sensitiveTermOutsideRegions)
+        let pagesWithSensitiveTermFragmentBesideRegion = pages(in: .sensitiveTermFragmentBesideRegion)
         let pagesWithFillArtifactInRegion = pages(in: .fillArtifactInRegion)
         let pagesWithTextOutsideRegionsOnly = pages(in: .textOutsideRegionsOnly)
         let pagesWithUnmappableImages = pages(in: .unmappable)
@@ -542,6 +558,24 @@ extension VerificationEngine {
             }
             return (.attention("Text matching your redactions is still readable on \(pagePhrase(pagesWithSensitiveTermOutsideRegions, list: list)) — read by OCR outside every redacted region"),
                     pagesWithSensitiveTermOutsideRegions.map { $0 - 1 },
+                    reviewTerms.isEmpty ? nil : reviewTerms, false, nil)
+        }
+        // The start or the end of a redacted term read right beside a box:
+        // the uncovered glyphs a box placed short of its text leaves on the
+        // page. Same tier and shape as the whole-term arm above (ATTENTION,
+        // content-free message, the term texts on the results row); below
+        // it, since a whole surviving occurrence says more.
+        if !pagesWithSensitiveTermFragmentBesideRegion.isEmpty {
+            let list = pagesWithSensitiveTermFragmentBesideRegion.map(String.init).joined(separator: ", ")
+            var seen = Set<String>()
+            var reviewTerms: [String] = []
+            for page in pagesWithSensitiveTermFragmentBesideRegion {
+                for text in reviewTermsByPage[page] ?? [] where seen.insert(text).inserted {
+                    reviewTerms.append(text)
+                }
+            }
+            return (.attention("Part of a redacted term is readable beside a redaction box on \(pagePhrase(pagesWithSensitiveTermFragmentBesideRegion, list: list)) — read by OCR at the box's edge"),
+                    pagesWithSensitiveTermFragmentBesideRegion.map { $0 - 1 },
                     reviewTerms.isEmpty ? nil : reviewTerms, false, nil)
         }
         if !pagesWithTextInRegionSearchable.isEmpty {
