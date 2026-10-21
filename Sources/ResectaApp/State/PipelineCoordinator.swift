@@ -244,10 +244,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         // ⇧⌘R, the resume banner's Restart and the purge re-run. A staged
         // review cannot be pending here (`canStartPipeline(with:)`).
         redactionState.dismissActiveSearch()
-        // The results card says Redact cleared the undo history; a stack
-        // that survived would let Undo unlink the built output after Keep
-        // Editing. Cleared here, the same funnel.
-        undoManager?.removeAllActions()
 
         // Snapshot pipeline-affecting settings once at run
         // entry. Subsequent reads (verify-for-run, fillColor, exportDPI,
@@ -510,6 +506,11 @@ final class PipelineCoordinator: @unchecked Sendable {
             // was built with and the results screen describes this run
             // (see RedactionState.LastRunInputs).
             redactionState.recordLastRunInputs(inputs)
+            // The results card says Redact cleared the undo history. It is
+            // cleared when the redacted copy exists, so Stop, a background
+            // pause or a failed run keep the history; an Undo after Keep
+            // Editing still cannot unlink the built output.
+            undoManager?.removeAllActions()
         case .verificationSkipped(let burnedRegionVersion):
             documentState.transition(to: .verified(report: .skipped))
             redactionState.markVerificationCurrent(burnedRegionVersion: burnedRegionVersion)

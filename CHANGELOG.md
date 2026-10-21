@@ -58,7 +58,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Done and Home reset the session through the one Start Over path, so a re-imported document no longer shows the previous document's form-field notice.
 - Home at the compact width: Cancel on the close dialog brings a presented search session back whole — its results and selections — instead of dropping it.
 - Redact and ⇧⌘R are unavailable while the search sheet holds selected matches that are not applied, with the hint "Apply or clear the selected matches first", instead of tearing the session down and dropping them.
-- Redact clears the undo history at the Apply seam, as the results card says; an Undo after Keep Editing no longer unlinks the built output.
+- Redact clears the undo history once the redacted copy is built, as the results card says; Stop, a background pause or a failed run keep it, and an Undo after Keep Editing no longer unlinks the built output.
 - Search sheet: the "unapplied matches cleared" toasts no longer count matches a region already covers.
 - Search sheet: the custom-term time-limit toast names neither the term nor the page, and is shown once for a scan instead of once per page.
 - Accessibility: the search sheet's header stacks Dismiss, the title and Apply on lines of their own at accessibility text sizes, so no button hyphenates and the title keeps its words.
