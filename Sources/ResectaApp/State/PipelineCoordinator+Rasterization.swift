@@ -101,6 +101,9 @@ extension PipelineCoordinator {
             throw PipelineError.redactionError(.reconstructionFailed)
         }
 
+        #if DEBUG
+        beforeOutputPromotionSeam?()
+        #endif
         // Atomic rename: same APFS volume (both in temporaryDirectory)
         _ = try FileManager.default.replaceItemAt(outputURL, withItemAt: tempURL)
 
