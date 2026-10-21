@@ -16,6 +16,8 @@ nonisolated enum ImportDoor: Sendable, Equatable {
     /// The Files picker on Home: a security-scoped URL.
     case files
     /// The workspace's drag-and-drop target.
+    /// The system Photos picker: one or more images, in the order picked.
+    case photos
     case drop
     /// The bundled sample document.
     case sample
@@ -25,11 +27,16 @@ nonisolated enum ImportDoor: Sendable, Equatable {
 /// the bytes and never consulted: the router reads the bytes.
 nonisolated enum ImportPayload: Sendable {
     case bytes(Data, declaredType: String?, door: ImportDoor)
+    /// Photos: one image's bytes at a time, in pick order, from a stream
+    /// that yields `count` items and throws when an item cannot be read.
+    /// At most one input's bytes are resident while the loader works.
+    case images(AsyncThrowingStream<Data, any Error>, count: Int, door: ImportDoor)
 
     /// The bytes to parse.
     var data: Data {
         switch self {
         case .bytes(let data, _, _): return data
+        case .images: return Data()
         }
     }
 
@@ -37,6 +44,7 @@ nonisolated enum ImportPayload: Sendable {
     var door: ImportDoor {
         switch self {
         case .bytes(_, _, let door): return door
+        case .images(_, _, let door): return door
         }
     }
 
@@ -44,6 +52,7 @@ nonisolated enum ImportPayload: Sendable {
     var declaredType: String? {
         switch self {
         case .bytes(_, let declaredType, _): return declaredType
+        case .images: return nil
         }
     }
 }
@@ -57,6 +66,18 @@ nonisolated struct ImportLimits: Sendable, Equatable {
     var maxPages: Int = 500
     /// The largest crop-box side admitted, in PDF points.
     var maxPagePoints: CGFloat = 5_000
+    /// The most pixels an image is decoded to; a larger image is downsampled
+    /// at decode so the page stays inside the OCR render caps.
+    var maxDecodedImagePixels: Int = 25_000_000
+    /// The longest side an imported image keeps, in pixels.
+    var maxImageSide: Int = 8_000
+    /// The largest pixel count an image may declare before any decode.
+    var maxDeclaredImagePixels: Int = 100_000_000
+    /// The shortest side an image must have, in pixels (the 10-pt geometry
+    /// floor at 300 pixels per inch).
+    var minImageSide: Int = 42
+    /// The most images one Photos pick turns into pages.
+    var maxImagesPerImport: Int = 20
 
     /// The production caps.
     static let standard = ImportLimits()
@@ -68,6 +89,8 @@ nonisolated struct ImportFacts: Sendable {
     /// What the pages were parsed from.
     enum Origin: Sendable, Equatable {
         case pdf
+        /// One page per imported image, drawn from the decoded pixels.
+        case images(count: Int)
     }
 
     let origin: Origin
