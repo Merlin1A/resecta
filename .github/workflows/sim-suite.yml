@@ -3,7 +3,9 @@
 # an iPhone 17 simulator under a watchdog, perf suites alone and
 # report-only. Both schemes run every Monday and on release tags, one job
 # each; a dispatch runs the scheme it names; ResectaApp alone runs on every
-# pull request to main as a non-required check (twenty to forty minutes).
+# pull request to main as a non-required check (twenty to forty minutes),
+# except a pull request that changes documentation only (the paths-ignore
+# list below), which starts no job here.
 # RedactionEngine here runs the engine package's suites on the simulator
 # (the package's one hosted run: a host `swift test` of the whole package
 # never reached a verdict on a hosted runner) and stays off pull requests
@@ -47,6 +49,13 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main]
+    # A pull request whose every changed file is documentation has nothing
+    # for the simulator suite to test and would take one of the account's
+    # macOS slots from a pull request that does. The suite is not a required
+    # check on pull requests, so a skipped run holds nothing up at merge.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
 
 permissions:
   contents: read
