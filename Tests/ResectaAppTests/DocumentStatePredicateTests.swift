@@ -14,18 +14,50 @@ struct DocumentStatePredicateTests {
 
     // MARK: - canStartImport
 
-    @Test("canStartImport is true for empty, editing, verified, failed")
+    @Test("canStartImport is true for empty and editing")
     func canStartImportPermittedPhases() {
         let permitted: [(String, () -> DocumentState.Phase)] = [
             ("empty", { .empty }),
             ("editing", { .editing }),
-            ("verified", { .verified(report: Self.makePassingReport()) }),
-            ("failed", { .failed(error: .importError(.corrupt), returnPhase: .empty) }),
         ]
         for (label, makePhase) in permitted {
             let doc = DocumentState()
             doc.phase = makePhase()
             #expect(doc.canStartImport, "Expected canStartImport == true for phase \(label)")
+        }
+    }
+
+    @Test("canStartImport is false on the results and error screens, which the table gives no import")
+    func canStartImportRefusesResultsAndError() {
+        let refused: [(String, () -> DocumentState.Phase)] = [
+            ("verified", { .verified(report: Self.makePassingReport()) }),
+            ("failed", { .failed(error: .importError(.corrupt), returnPhase: .empty) }),
+        ]
+        for (label, makePhase) in refused {
+            let doc = DocumentState()
+            doc.phase = makePhase()
+            #expect(!doc.canStartImport, "Expected canStartImport == false for phase \(label)")
+        }
+    }
+
+    @Test("canStartImport agrees with the transition table for every phase")
+    func canStartImportAgreesWithTheTable() {
+        let phases: [DocumentState.Phase] = [
+            .empty, .importing, .editing,
+            .detecting(progress: Self.detectingProgress()),
+            .redacting(progress: Self.redactingProgress()),
+            .verifying(progress: Self.verifyingProgress()),
+            .verified(report: Self.makePassingReport()),
+            .exporting,
+            .failed(error: .importError(.corrupt), returnPhase: .empty),
+        ]
+        for phase in phases {
+            let doc = DocumentState()
+            doc.phase = phase
+            let tableAdmits = DocumentState.legalTransitions.contains(
+                DocumentState.TransitionPair(doc.phaseKind, .importing))
+            #expect(doc.canStartImport == tableAdmits,
+                    "canStartImport must agree with the table for \(doc.phaseKind)")
         }
     }
 
