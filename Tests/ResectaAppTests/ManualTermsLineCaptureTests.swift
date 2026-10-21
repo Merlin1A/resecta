@@ -166,7 +166,10 @@ struct ManualTermsLineCaptureTests {
 
     @Test("The stop list: its count, lowercase, four scalars or more; the admission rule")
     func stopListPins() {
-        #expect(ManualTermStopWords.words.count == 151)
+        #expect(ManualTermStopWords.words.count == 144)
+        for nameLike in ["Will", "Page", "Price", "Field", "Street", "More", "Unit"] {
+            #expect(ManualTermStopWords.admits(nameLike), "\(nameLike): a word that is also a name is not listed")
+        }
         #expect(ManualTermStopWords.words.allSatisfy { $0 == $0.lowercased() && $0.unicodeScalars.count >= 4 })
         #expect(!ManualTermStopWords.admits("Account"))
         #expect(!ManualTermStopWords.admits("ACCOUNT"))

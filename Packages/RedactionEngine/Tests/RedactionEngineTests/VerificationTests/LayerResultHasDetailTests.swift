@@ -164,8 +164,8 @@ struct LayerResultHasDetailTests {
 
     // MARK: - Layer 3: manual regions on pages with no text layer
 
-    static let oneManualRegionDetail = "1 manual region is on a page with no text layer to capture terms from."
-    static let manyManualRegionsDetail = "3 manual regions are on pages with no text layer to capture terms from."
+    static let oneManualRegionDetail = "No term was captured from 1 manual region: it covers the whole page, or its page has no text layer."
+    static let manyManualRegionsDetail = "No term was captured from 3 manual regions: each covers the whole page, or its page has no text layer."
 
     @Test("Layer 3 INFO (no terms) with manual regions on pages with no text layer carries the one detail sentence")
     func layer3InfoCarriesManualRegionsDetail() async throws {

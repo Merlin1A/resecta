@@ -167,7 +167,7 @@ extension VerificationCorpusRunnerTests {
     /// line of two or more words as its verbatim span, unbounded, plus each
     /// word the admission rule keeps (`VerificationCorpusStopWords.admits`).
     /// On any other page the region is counted, not captured. A whole-page
-    /// region (area ≥ 0.95) is skipped; a below-floor or out-of-range seed
+    /// region (area ≥ 0.95) adds no term and is counted; a below-floor or out-of-range seed
     /// never became a region and is ignored.
     static func manualRegionTerms(
         seeds: [RegionSeed], doc: PDFDocument, polygon: Bool,
@@ -182,7 +182,10 @@ extension VerificationCorpusRunnerTests {
             guard seed.page >= 0, seed.page < doc.pageCount,
                   let region = region(from: seed, polygon: polygon) else { continue }
             let rect = region.normalizedRect
-            if rect.width * rect.height >= 0.95 { continue }
+            if rect.width * rect.height >= 0.95 {
+                withoutText += 1
+                continue
+            }
             guard textLayerStatus[seed.page] == .rich, let page = doc.page(at: seed.page) else {
                 withoutText += 1
                 continue
