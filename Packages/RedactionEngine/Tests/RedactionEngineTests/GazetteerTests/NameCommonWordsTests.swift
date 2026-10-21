@@ -110,16 +110,17 @@ struct NameCommonWordsTests {
         #expect(!v.hadAnyHit && !v.hadSupport)
     }
 
-    @Test("A non-member surname is unchanged: exact credit, pair credit, fuzzy credit")
+    @Test("A non-member surname is unchanged: exact credit, pair credit, fuzzy credit; a fuzzy hit is a boost, not support")
     func nonMember_unchanged() throws {
         let g = try gazetteer(curating: ["smith"])
         #expect(g.queryBoosted(candidate: "Garcia").boost == 0.10)
         #expect(g.queryBoosted(candidate: "James Garcia").boost == 0.15)
         let fuzzy = g.queryBoosted(candidate: "Garcio", fuzzy: true)
         #expect(fuzzy.fuzzySurnameHit && fuzzy.boost == 0.05)
-        for v in [g.queryBoosted(candidate: "Garcia"), g.queryBoosted(candidate: "James Garcia"), fuzzy] {
+        for v in [g.queryBoosted(candidate: "Garcia"), g.queryBoosted(candidate: "James Garcia")] {
             #expect(!v.commonWordSurname && v.hadSupport)
         }
+        #expect(fuzzy.fuzzySurnameHit && !fuzzy.hadSupport)
     }
 
     @Test("No sidecar → no demotion (fail-open)")
