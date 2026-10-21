@@ -3,8 +3,8 @@ import RedactionEngine
 
 // The Verification Details disclosure of the results screen: the header
 // row and, expanded, the page-modes section, the deselection row and the
-// per-layer rows grouped by outcome — FINDINGS → COULD NOT VERIFY → NOTES →
-// the pass cluster. Moved out of
+// per-layer rows grouped by outcome — Findings → Could not verify → Notes →
+// Nothing to check → the pass cluster. Moved out of
 // `VerificationResultsView` (the page stack stays there): the parent keeps
 // the auto-expand state (`detailsExpanded` + `didAutoExpand` +
 // `shouldAutoExpand`) and threads it in as `isExpanded`; this view owns
@@ -80,8 +80,8 @@ struct VerificationDetailsSection: View {
                 headerLabel
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Verification Details, \(detailsSummary)")
-            .accessibilityHint(isExpanded ? "Tap to collapse" : "Tap to expand")
+            .accessibilityLabel(VerificationResultsView.detailsHeaderAccessibilityLabel(for: report))
+            .accessibilityHint(isExpanded ? "Hides the checks" : "Shows the checks")
 
             if isExpanded {
                 groups
@@ -215,22 +215,10 @@ struct VerificationDetailsSection: View {
             // the rows are keyed by that index.
             let partition = VerificationLayerPartition(
                 layers: report.layers, perPageModes: report.perPageModes)
-            if !partition.findings.isEmpty {
+            ForEach(Self.groups(partition), id: \.header) { group in
                 VStack(alignment: .leading, spacing: 0) {
-                    sectionHeader("FINDINGS")
-                    layerRows(partition.findings)
-                }
-            }
-            if !partition.couldNotVerify.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
-                    sectionHeader("COULD NOT VERIFY", caption: "Share will ask you to confirm.")
-                    layerRows(partition.couldNotVerify)
-                }
-            }
-            if !partition.notes.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
-                    sectionHeader("NOTES")
-                    layerRows(partition.notes)
+                    sectionHeader(group.header, count: group.indices.count)
+                    layerRows(group.indices)
                 }
             }
             if !partition.cluster.isEmpty {
@@ -287,8 +275,8 @@ struct VerificationDetailsSection: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(clusterTitle)
-            .accessibilityHint(isOpen ? "Tap to collapse" : "Tap to expand")
+            .accessibilityLabel(partition.clusterSpokenLabel)
+            .accessibilityHint(isOpen ? "Hides the passed checks" : "Shows the passed checks")
             .accessibilityIdentifier("passedChecksCluster")
 
             if isOpen {
@@ -335,25 +323,26 @@ struct VerificationDetailsSection: View {
         .accessibilityIdentifier("deselectionRow")
     }
 
-    /// A group's header; a caption under it joins the header's one
-    /// VoiceOver element.
-    @ViewBuilder
-    private func sectionHeader(_ label: String, caption: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
-            Text(label)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                .textCase(.uppercase)
-            if let caption {
-                Text(caption)
-                    .font(.caption)
-                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, ResectaTokens.Spacing.xs)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
+    /// The groups above the cluster, in screen order, each with its rows'
+    /// engine indices; an empty group is left out.
+    static func groups(_ partition: VerificationLayerPartition) -> [(header: String, indices: [Int])] {
+        [
+            ("Findings", partition.findings),
+            ("Could not verify", partition.couldNotVerify),
+            ("Notes", partition.notes),
+            ("Nothing to check", partition.nothingToCheck),
+        ].filter { !$0.1.isEmpty }
+    }
+
+    /// A group's header with its count, one VoiceOver header.
+    private func sectionHeader(_ header: String, count: Int) -> some View {
+        Text(VerificationLayerPartition.sectionHeader(header, count: count))
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, ResectaTokens.Spacing.xs)
+            .accessibilityLabel(VerificationLayerPartition.sectionHeaderSpoken(header, count: count))
+            .accessibilityAddTraits(.isHeader)
     }
 
     /// The hairline between the Page Modes section and the deselection
@@ -442,7 +431,7 @@ struct VerificationDetailsSection: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Page Modes, \(modeChipSummary)")
-            .accessibilityHint("Tap to \(showPageModes ? "collapse" : "expand") details")
+            .accessibilityHint(showPageModes ? "Hides details" : "Shows details")
 
             // Expanded: color-coded page chips
             if showPageModes {
@@ -510,15 +499,11 @@ struct VerificationDetailsSection: View {
                     if report.perPageFallbackReasons.hasAnyFallbackReason {
                         VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
                             ForEach(
-                                Array(report.perPageFallbackReasons.enumerated())
-                                    .compactMap { index, reason in
-                                        reason.map { (index: index, reason: $0) }
-                                    },
-                                id: \.index
-                            ) { entry in
-                                Text(VerificationResultsView.fallbackReasonRowText(
-                                    pageNumber: entry.index + 1,
-                                    reason: entry.reason))
+                                VerificationResultsView.fallbackReasonRowTexts(
+                                    reasons: report.perPageFallbackReasons),
+                                id: \.self
+                            ) { line in
+                                Text(line)
                                     .font(.caption2)
                                     .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                             }
@@ -539,10 +524,7 @@ struct VerificationDetailsSection: View {
     }
 
     private var modeChipSummary: String {
-        let modes = report.perPageModes
-        let searchable = modes.count(where: { $0 == .searchableRedaction })
-        let secure = modes.count - searchable
-        return "\(searchable) Searchable, \(secure) Rasterized"
+        VerificationResultsView.pageModesSummaryText(modes: report.perPageModes)
     }
 
     /// The report's fallback reason for a page index, nil when the
@@ -592,12 +574,59 @@ extension VerificationResultsView {
         VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes).summaryText
     }
 
+    /// The header's spoken label: "Verification Details. 7 of 12 checks
+    /// passed. 1 needs review, 1 warning, …" — line 2's dots spoken as
+    /// commas.
+    static func detailsHeaderAccessibilityLabel(for report: VerificationReport) -> String {
+        let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
+        var label = "Verification Details. \(partition.summaryLine1)."
+        if let line2 = partition.summaryLine2 {
+            label += " " + line2.replacingOccurrences(of: " · ", with: ", ") + "."
+        }
+        return label
+    }
+
+    /// The Page Modes summary: "2 Searchable, 1 Rasterized", a zero clause
+    /// dropped ("3 Rasterized").
+    static func pageModesSummaryText(modes: [PipelineMode]) -> String {
+        let searchable = modes.count(where: { $0 == .searchableRedaction })
+        let rasterized = modes.count - searchable
+        return [
+            searchable > 0 ? "\(searchable) Searchable" : nil,
+            rasterized > 0 ? "\(rasterized) Rasterized" : nil,
+        ].compactMap { $0 }.joined(separator: ", ")
+    }
+
     /// Fallback-reason row copy. Static so tests pin the exact string (mirrors
     /// `deselectionRowText`).
     static func fallbackReasonRowText(
         pageNumber: Int, reason: TextLayerDetector.FallbackReason
     ) -> String {
-        "Page \(pageNumber) — Rasterized — \(reason.shortReasonText)"
+        "Page \(pageNumber) · Rasterized · \(reason.shortReasonText)"
+    }
+
+    /// The fallback lines, one per page, a run of three or more
+    /// consecutive pages with the same reason as one line: "Pages 1–200 ·
+    /// Rasterized · vertical text".
+    static func fallbackReasonRowTexts(
+        reasons: [TextLayerDetector.FallbackReason?]
+    ) -> [String] {
+        var lines: [String] = []
+        var index = 0
+        while index < reasons.count {
+            guard let reason = reasons[index] else { index += 1; continue }
+            var end = index
+            while end + 1 < reasons.count, reasons[end + 1]?.shortReasonText == reason.shortReasonText { end += 1 }
+            if end - index >= 2 {
+                lines.append("Pages \(index + 1)\u{2013}\(end + 1) · Rasterized · \(reason.shortReasonText)")
+            } else {
+                for page in index...end {
+                    lines.append(fallbackReasonRowText(pageNumber: page + 1, reason: reason))
+                }
+            }
+            index = end + 1
+        }
+        return lines
     }
 
     /// Chip VoiceOver label: carries the fallback reason when the page has
