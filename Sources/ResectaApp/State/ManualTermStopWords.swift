@@ -2,15 +2,18 @@ import Foundation
 
 // The English stop list the manual-region capture reads: a single token of a
 // multi-word run joins the verifier's term set only when it carries a digit,
-// or has four or more scalars and is not listed here — articles, prepositions,
-// pronouns, auxiliaries, conjunctions and the common nouns of forms and
-// statements. Non-English text keeps the four-scalar rule alone. The count
-// is pinned by a test; the verification corpus mirror carries the same list.
+// or is a capitalized word of two or three letters (a short surname), or has
+// four or more scalars — and in either case is not listed here: articles,
+// prepositions, pronouns, auxiliaries, conjunctions and the common nouns of
+// forms and statements. Non-English text keeps the scalar rules alone. The
+// count is pinned by a test; the verification corpus mirror carries the same
+// list.
 
 nonisolated enum ManualTermStopWords {
 
-    /// The list, lowercase, every entry four scalars or longer (shorter
-    /// tokens never reach it); a token is looked up lowercased.
+    /// The list, lowercase, every entry four scalars or longer (a shorter
+    /// token reaches it only as a capitalized two- or three-letter word); a
+    /// token is looked up lowercased.
     static let words: Set<String> = [
         // articles and determiners
         "this", "that", "these", "those", "each", "every", "some", "none",
@@ -43,12 +46,19 @@ nonisolated enum ManualTermStopWords {
     ]
 
     /// The admission rule for one token of a multi-word run: kept when it
-    /// carries a digit; else kept when it has four or more scalars and is
-    /// not listed.
+    /// carries a digit; else kept when it is a capitalized word of two or
+    /// three letters (a short surname: Lee, Kim, Ng — the first scalar
+    /// uppercase, the rest lowercase; an all-caps IBM or a lowercase "an"
+    /// is not) and is not listed; else kept when it has four or more
+    /// scalars and is not listed.
     static func admits(_ token: String) -> Bool {
-        if token.unicodeScalars.contains(where: { CharacterSet.decimalDigits.contains($0) }) {
+        let scalars = Array(token.unicodeScalars)
+        if scalars.contains(where: { CharacterSet.decimalDigits.contains($0) }) {
             return true
         }
-        return token.unicodeScalars.count >= 4 && !words.contains(token.lowercased())
+        let shortCapitalized = (2...3).contains(scalars.count)
+            && CharacterSet.uppercaseLetters.contains(scalars[0])
+            && scalars.dropFirst().allSatisfy { CharacterSet.lowercaseLetters.contains($0) }
+        return (shortCapitalized || scalars.count >= 4) && !words.contains(token.lowercased())
     }
 }

@@ -38,12 +38,19 @@ enum VerificationCorpusStopWords {
     ]
 
     /// The admission rule for one token of a multi-word run: kept when it
-    /// carries a digit; else kept when it has four or more scalars and is
-    /// not listed.
+    /// carries a digit; else kept when it is a capitalized word of two or
+    /// three letters (a short surname: Lee, Kim, Ng — the first scalar
+    /// uppercase, the rest lowercase; an all-caps IBM or a lowercase "an"
+    /// is not) and is not listed; else kept when it has four or more
+    /// scalars and is not listed.
     static func admits(_ token: String) -> Bool {
-        if token.unicodeScalars.contains(where: { CharacterSet.decimalDigits.contains($0) }) {
+        let scalars = Array(token.unicodeScalars)
+        if scalars.contains(where: { CharacterSet.decimalDigits.contains($0) }) {
             return true
         }
-        return token.unicodeScalars.count >= 4 && !words.contains(token.lowercased())
+        let shortCapitalized = (2...3).contains(scalars.count)
+            && CharacterSet.uppercaseLetters.contains(scalars[0])
+            && scalars.dropFirst().allSatisfy { CharacterSet.lowercaseLetters.contains($0) }
+        return (shortCapitalized || scalars.count >= 4) && !words.contains(token.lowercased())
     }
 }
