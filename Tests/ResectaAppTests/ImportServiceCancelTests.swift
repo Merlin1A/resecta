@@ -28,7 +28,7 @@ struct ImportServiceCancelTests {
 
     // MARK: - cancelActivePipeline behaviour
 
-    @Test("cancelActivePipeline on .importing transitions to .empty")
+    @Test("cancelActivePipeline on .importing with no open document transitions to .empty")
     func cancelFromImportingReturnsToEmpty() {
         let doc = DocumentState()
         let redaction = RedactionState()
@@ -87,6 +87,30 @@ struct ImportServiceCancelTests {
         #expect(doc.phaseKind == .editing)
         #expect(doc.sourceDocument === open)
         #expect(redaction.regions[0]?.map(\.id) == [region.id])
+    }
+
+    @Test("Leaving the app during an import cancels it without the paused banner")
+    func backgroundDuringImportRaisesNoPause() {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        doc.sourceDocument = makeTestPDFDocument()
+        doc.phase = .importing
+        ContentView.cancelForBackground(documentState: doc, redactionState: redaction)
+        #expect(doc.phaseKind == .editing)
+        #expect(doc.wasPausedByBackground == false)
+        #expect(doc.pausedFromPhase == nil)
+    }
+
+    @Test("Leaving the app during a run still raises the paused banner")
+    func backgroundDuringARunRaisesThePause() {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        doc.sourceDocument = makeTestPDFDocument()
+        doc.phase = .redacting(progress: .init(currentPage: 1, totalPages: 1, currentStep: "Page 1…"))
+        ContentView.cancelForBackground(documentState: doc, redactionState: redaction)
+        #expect(doc.phaseKind == .editing)
+        #expect(doc.wasPausedByBackground)
+        #expect(doc.pausedFromPhase == .redacting)
     }
 
     // MARK: - Per-page loop surrender

@@ -685,9 +685,9 @@ class DocumentState {
             // No `sourceDocument` mutation here — the import
             // path applies state only after validation succeeds (see
             // `ImportService.validateAndLoad`), so cancellation leaves
-            // any prior document untouched. Returning to `.empty` matches
-            // the documented user-facing contract for "Cancel Import."
-            transition(to: .empty)
+            // any prior document untouched. Cancel returns to that open
+            // document, else to the empty state.
+            transition(to: sourceDocument != nil ? .editing : .empty)
         case .detecting:
             transition(to: .editing)
         case .redacting:
@@ -750,6 +750,17 @@ extension DocumentState.PhaseKind {
     var isCancellable: Bool {
         switch self {
         case .detecting, .redacting, .verifying, .importing: true
+        default: false
+        }
+    }
+
+    /// The cancellable phases whose background pause raises the editor's
+    /// "Processing was paused" banner: a run the editor can restart. An
+    /// import cancelled by a background returns to the open document (or
+    /// the empty state) with nothing to restart.
+    var raisesResumeBanner: Bool {
+        switch self {
+        case .detecting, .redacting, .verifying: true
         default: false
         }
     }
