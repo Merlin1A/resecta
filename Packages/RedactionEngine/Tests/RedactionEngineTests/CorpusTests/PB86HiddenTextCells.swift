@@ -58,7 +58,8 @@ extension VerificationCorpusRunnerTests {
 
     /// The engine-factory hidden-text probe grid: the four original hidden classes ×
     /// covered/uncovered, the three optional-content forms × covered/uncovered,
-    /// and the crop-box page (uncovered only: the hidden line is off the page).
+    /// the crop-box page (uncovered only: the hidden line is off the page), and
+    /// the three faint-ink pages × covered/uncovered.
     /// Regions are fixed normalized boxes over the factories' known geometry
     /// (RawPDFBuilder anchor/hidden Td positions; ctLineDraw NATO column;
     /// ocgHiddenLayerPDF's 72,720 line).
@@ -107,6 +108,9 @@ extension VerificationCorpusRunnerTests {
         let inh = TestFixtures.ocgInheritedResourcesPDF()
         let xob = TestFixtures.ocgFormXObjectPDF()
         let crop = TestFixtures.offCropBoxTextPDF()
+        let nearWhite = TestFixtures.nearWhiteTextPDF()
+        let lowAlpha = TestFixtures.lowAlphaTextPDF()
+        let translucentBox = TestFixtures.translucentBoxCoveredTextPDF()
         // The crop-box page is 600 pt tall: its anchor line at y 400 sits at
         // 0.667 of the visible page; the hidden line is outside the box, so
         // no region can cover it.
@@ -194,6 +198,38 @@ extension VerificationCorpusRunnerTests {
                   notes: "region over the visible anchor; the line outside the crop box cannot be covered by any region — the pure re-exposure probe"),
              rows("pb86-off-crop", set: "pb86-uncovered",
                   cls: "off_crop", covered: [], uncovered: ["PLANT-ENGCROP-01"])),
+            // Faint ink: near-white, nearly transparent and nearly covered
+            // text — the ink test's tolerance band reads each as no ink.
+            (cell("pb86-near-white", nearWhite, set: "pb86-covered",
+                  seeds: hiddenRegion, terms: ["PLANT-ENGNW-01"],
+                  notes: "region over the near-white (0.985 grey) line"),
+             rows("pb86-near-white", set: "pb86-covered",
+                  cls: "near_white", covered: ["PLANT-ENGNW-01"], uncovered: [])),
+            (cell("pb86-near-white", nearWhite, set: "pb86-uncovered",
+                  seeds: anchorRegion, terms: ["NW VISIBLE ANCHOR LINE"],
+                  notes: "region over the visible anchor only; the near-white line is untouched"),
+             rows("pb86-near-white", set: "pb86-uncovered",
+                  cls: "near_white", covered: [], uncovered: ["PLANT-ENGNW-01"])),
+            (cell("pb86-low-alpha", lowAlpha, set: "pb86-covered",
+                  seeds: hiddenRegion, terms: ["PLANT-ENGLA-01"],
+                  notes: "region over the line drawn at fill alpha 0.02"),
+             rows("pb86-low-alpha", set: "pb86-covered",
+                  cls: "low_alpha", covered: ["PLANT-ENGLA-01"], uncovered: [])),
+            (cell("pb86-low-alpha", lowAlpha, set: "pb86-uncovered",
+                  seeds: anchorRegion, terms: ["LA VISIBLE ANCHOR LINE"],
+                  notes: "region over the visible anchor only; the low-alpha line is untouched"),
+             rows("pb86-low-alpha", set: "pb86-uncovered",
+                  cls: "low_alpha", covered: [], uncovered: ["PLANT-ENGLA-01"])),
+            (cell("pb86-translucent-box", translucentBox, set: "pb86-covered",
+                  seeds: hiddenRegion, terms: ["PLANT-ENGTB-01"],
+                  notes: "region over the line under a box painted at fill alpha 0.97"),
+             rows("pb86-translucent-box", set: "pb86-covered",
+                  cls: "translucent_box", covered: ["PLANT-ENGTB-01"], uncovered: [])),
+            (cell("pb86-translucent-box", translucentBox, set: "pb86-uncovered",
+                  seeds: anchorRegion, terms: ["TB VISIBLE ANCHOR LINE"],
+                  notes: "region over the visible anchor only; the box-covered line is untouched"),
+             rows("pb86-translucent-box", set: "pb86-uncovered",
+                  cls: "translucent_box", covered: [], uncovered: ["PLANT-ENGTB-01"])),
         ]
     }
 

@@ -236,7 +236,8 @@ struct VerificationCorpusRunnerTests {
                 perPageModes: outcome.perPageModes,
                 perPageFallbackReasons: outcome.perPageFallbackReasons,
                 appliedSearches: appliedSearches,
-                manualRegionsWithoutText: manual.regionsWithoutText)
+                manualRegionsWithoutText: manual.regionsWithoutText,
+                sourceDocument: SendablePDFDocument(doc))
             try report.jsonData().write(
                 to: URL(fileURLWithPath: "\(cellDir)/report-run-\(sweep).json"),
                 options: .atomic)

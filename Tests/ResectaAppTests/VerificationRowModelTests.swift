@@ -394,6 +394,26 @@ struct VerificationRowModelTests {
         }
     }
 
+    @Test("The OCR Check's fragment arm captions with its own sentence and remedy — the box, not a search; the whole-term arm is unchanged")
+    func fragmentCaption() {
+        func result(_ terms: [String], pages: [Int]?, fragment: Bool) -> LayerResult {
+            LayerResult(name: VerificationLayer.ocrCheck.name, symbolName: "shield", status: .attention("x"),
+                        shortDescription: "Engine short line.", detailDescription: "", pageReferences: pages,
+                        durationSeconds: 0, reviewTermTexts: terms, layer: .ocrCheck, reviewIsFragment: fragment)
+        }
+        let one = VerificationRowModel(layer: result(["123-45-6789"], pages: [1], fragment: true), perPageModes: [])
+        #expect(one.outcome == .needsReview)
+        #expect(one.caption == "Part of '123-45-6789' is readable beside a redaction box on page 2. Adjust the box and redact again.")
+        #expect(one.captionIsPrivacySensitive)
+        let two = VerificationRowModel(layer: result(["Delia", "Hartwell"], pages: [0, 2], fragment: true), perPageModes: [])
+        #expect(two.caption == "Parts of 'Delia', 'Hartwell' are readable beside redaction boxes on pages 1 and 3. Adjust the boxes and redact again.")
+        let whole = VerificationRowModel(layer: result(["Delia"], pages: [1], fragment: false), perPageModes: [])
+        #expect(whole.caption == "'Delia' is still readable on page 2. It matches text you redacted elsewhere. Use text search to redact remaining instances.")
+        #expect(LayerResultRow.rowSubtitleText(layer: result(["123-45-6789"], pages: [1], fragment: true))
+                == "Part of '123-45-6789' is readable beside a redaction box on page 2. Adjust the box and redact again.")
+        #expect(LayerResultRow.rowSubtitleIsPrivacySensitive(layer: result(["123-45-6789"], pages: [1], fragment: true)))
+    }
+
     @Test("The spoken label is the title, the status word and the caption")
     func spokenLabelPerOutcome() {
         let cases: [(LayerResult, [PipelineMode], String)] = [

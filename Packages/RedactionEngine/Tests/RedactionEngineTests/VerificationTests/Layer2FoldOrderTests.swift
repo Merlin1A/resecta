@@ -271,6 +271,8 @@ struct Layer2FoldOrderTests {
         }
         #expect(bucket(.textInRegion, .secureRasterization) == .textInRegionSecureRaster)
         #expect(bucket(.textInRegion, .searchableRedaction) == .textInRegionSearchable)
+        #expect(bucket(.textInRegionAndSensitiveTermFragmentBesideRegion, .secureRasterization) == .textInRegionSecureRaster)
+        #expect(bucket(.textInRegionAndSensitiveTermFragmentBesideRegion, .searchableRedaction) == .sensitiveTermFragmentBesideRegion)
     }
 
     /// Secure-raster mode's outside-text arm: PASS with the detail when the
