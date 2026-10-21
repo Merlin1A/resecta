@@ -79,6 +79,16 @@ struct PipelineRunner {
     let coordinator: PipelineCoordinator
     let sink: @MainActor (PipelineRunEvent) -> Void
 
+    /// The source copy the verification's coverage check reads: the search
+    /// path's copy, unlocked with the session's password. nil for no
+    /// document, bytes PDFKit could not emit, or a copy that stayed locked
+    /// — never a locked copy that would read as a document with no text.
+    nonisolated static func verificationSourceCopy(
+        of source: SendablePDFDocument?, unlockingWith holder: DocumentPasswordHolder
+    ) -> SendablePDFDocument? {
+        source.flatMap { SearchCopy.make(of: $0, unlockingWith: holder) }
+    }
+
     /// Perform `kind`. Throws `CancellationError` on cancellation and
     /// `PipelineRunFailure` on any other error.
     func run(kind: PipelineRunKind) async throws -> PipelineRunOutcome {
@@ -413,11 +423,15 @@ struct PipelineRunner {
         // The Search Re-check's coverage check re-runs each applied search
         // on the ORIGINAL pages: it reads its own copy of the source (the
         // per-consumer discipline of the search path — the live instance
-        // stays the view's), built off MainActor. nil ⇒ the check does not
-        // run; the layer then reports as it did without it.
+        // stays the view's), built off MainActor and unlocked with the
+        // session's password the way the search path's copy is (a 128-bit
+        // password document's bytes re-emit encrypted). nil — no document,
+        // bytes PDFKit could not emit, or a copy that stayed locked — ⇒ the
+        // check cannot run, and the layer reports that it did not.
         let liveSource = coordinator.documentState.sourceDocument.map(SendablePDFDocument.init)
+        let passwordHolder = coordinator.documentState.documentPassword
         let sourceCopy: SendablePDFDocument? = await Task.detached {
-            liveSource.flatMap(DocumentState.makeSearchCopy(of:))
+            Self.verificationSourceCopy(of: liveSource, unlockingWith: passwordHolder)
         }.value
 
         let report = try await VerificationOrchestrator().run(

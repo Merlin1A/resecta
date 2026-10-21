@@ -53,8 +53,13 @@ struct SearchRecheck: Sendable {
     /// `runLayer` contract). With `sourceDocument`, every applied request
     /// (typed or scan) is also re-run on the ORIGINAL pages and each match
     /// compared with the boxes applied over it (`RegionCoverage`): a box
-    /// that leaves part of its match uncovered fails the layer, whatever
-    /// placed the box. Without a source the coverage check does not run.
+    /// that leaves part of its match uncovered fails the layer — a box
+    /// moved, resized or placed by another path. The re-run is the same
+    /// searcher that placed the boxes, so an error in its own placement is
+    /// outside this check. Without a readable source — none given, or a
+    /// copy that stayed locked — the coverage check does not run, and the
+    /// layer says so whenever a request was applied: never a PASS by
+    /// silence.
     func run(
         outputDocument: SendablePDFDocument,
         requests: [SearchRecheckRequest],
@@ -63,10 +68,17 @@ struct SearchRecheck: Sendable {
         regions: [Int: [RedactionRegion]] = [:]
     ) async throws -> Outcome {
         try Task.checkCancellation()
+        // The coverage check needs the ORIGINAL pages readable. No source,
+        // or a copy that stayed locked (a 128-bit password document's bytes
+        // re-emit encrypted), means it did not run — reported below whenever
+        // a request was applied, never folded into a PASS.
+        let coverageSource = sourceDocument.flatMap { $0.document.isLocked ? nil : $0 }
+        let coverageRan = coverageSource != nil
+        let appliedAny = requests.contains { $0.origin == .applied }
         var shortfalls: [Shortfall] = []
-        if let sourceDocument {
+        if let coverageSource {
             shortfalls = await RegionCoverage.shortfalls(
-                source: sourceDocument, requests: requests, regions: regions
+                source: coverageSource, requests: requests, regions: regions
             ).map { Shortfall(page: $0.pageIndex, displayText: requests[$0.requestIndex].record.query.displayText) }
             try Task.checkCancellation()
         }
@@ -75,6 +87,9 @@ struct SearchRecheck: Sendable {
         guard !typedRequests.isEmpty else {
             if !shortfalls.isEmpty {
                 return Self.shortfallOutcome(shortfalls, queryLines: nil)
+            }
+            if appliedAny, !coverageRan {
+                return Self.coverageNotRunOutcome()
             }
             return Outcome(
                 status: .info(Self.infoMessage), copyOverride: nil,
@@ -91,7 +106,7 @@ struct SearchRecheck: Sendable {
         }
         try Task.checkCancellation()
         return Self.fold(requests: typedRequests, observations: observed, pageCount: pageCount,
-                         shortfalls: shortfalls)
+                         shortfalls: shortfalls, coverageRan: coverageRan)
     }
 
     /// One partly covered match, as the fold reports it: its 0-based page
@@ -120,7 +135,29 @@ struct SearchRecheck: Sendable {
     }
 
     /// The coverage sentence of the detail copy.
-    static let coverageLead = "Each applied search and scan was also re-run on the original page and every match compared with the boxes applied over it; a box that leaves part of its match uncovered is reported here, whatever placed it."
+    static let coverageLead = "Each applied search and scan was also re-run on the original page by the same search engine that placed its boxes, and every match compared with the boxes applied over it; a box that leaves part of its match uncovered — moved, resized or placed by another path — is reported here. An error in that engine's own placement is outside this check."
+
+    /// The coverage check's own could-not-verify clause: the original pages
+    /// were not readable (no source copy, or one that stayed locked), so
+    /// no match was compared with its boxes. Content-free.
+    static let coverageNotRunClause = "the original pages could not be read, so the coverage check did not run"
+
+    /// The detail sentence behind that clause.
+    static let coverageNotRunDetail = "The original pages could not be read, so the coverage check — each applied search and scan re-run on the original page and compared with its boxes — did not run."
+
+    /// WARN for a run with applied scans only whose coverage check could
+    /// not run: there is no typed search to re-run on the output, and the
+    /// one check the layer had was not possible. A WARN, so the aggregate
+    /// reads could-not-verify; never the idle INFO.
+    static func coverageNotRunOutcome() -> Outcome {
+        let message = "The original pages could not be read, so the coverage check did not run"
+        return Outcome(
+            status: .warn(message),
+            copyOverride: LayerCopy(short: message, detail: Self.coverageNotRunDetail),
+            pageReferences: nil,
+            reviewTermTexts: nil,
+            queryLines: nil)
+    }
 
     // MARK: - Fold (pure)
 
@@ -130,7 +167,8 @@ struct SearchRecheck: Sendable {
         requests: [SearchRecheckRequest],
         observations: [PageObservation],
         pageCount: Int,
-        shortfalls: [Shortfall] = []
+        shortfalls: [Shortfall] = [],
+        coverageRan: Bool = true
     ) -> Outcome {
         let requestCount = requests.count
         var remainingByRequest = [Int](repeating: 0, count: requestCount)
@@ -265,8 +303,10 @@ struct SearchRecheck: Sendable {
             let remainSentence = "\(m) \(m == 1 ? "match remains" : "matches remain") on \(pagePhrase(remainingPages, list: list))"
             let message = "Re-ran \(searches) — \(remainSentence)"
                 + (k == 0 ? "" : ", \(uncheckedClause)")
+                + (coverageRan ? "" : "; \(Self.coverageNotRunClause)")
             let detail = joined([Self.detailLead, routeSentence, remainSentence + ".",
-                                 k == 0 ? "" : uncheckedClause + "."])
+                                 k == 0 ? "" : uncheckedClause + ".",
+                                 coverageRan ? "" : Self.coverageNotRunDetail])
             let reviewTerms = requests.enumerated()
                 .filter { remainingByRequest[$0.offset] > 0 }
                 .map { $0.element.record.query.displayText }
@@ -278,13 +318,19 @@ struct SearchRecheck: Sendable {
                 queryLines: queryLines)
         }
 
-        if k > 0 {
-            let message = "Re-ran \(searches); \(uncheckedClause)"
-            let detail = joined([Self.detailLead, routeSentence, uncheckedClause + "."])
+        // The could-not-verify WARN: pages the re-run could not check, the
+        // coverage check that could not run, or both — each named.
+        if k > 0 || !coverageRan {
+            let clauses = [uncheckedClause, coverageRan ? "" : Self.coverageNotRunClause]
+                .filter { !$0.isEmpty }.joined(separator: "; ")
+            let message = "Re-ran \(searches); \(clauses)"
+            let detail = joined([Self.detailLead, routeSentence,
+                                 k == 0 ? "" : uncheckedClause + ".",
+                                 coverageRan ? "" : Self.coverageNotRunDetail])
             return Outcome(
                 status: .warn(message),
                 copyOverride: LayerCopy(short: message, detail: detail),
-                pageReferences: uncheckedPages,
+                pageReferences: k == 0 ? nil : uncheckedPages,
                 reviewTermTexts: nil,
                 queryLines: queryLines)
         }
