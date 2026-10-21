@@ -498,15 +498,17 @@ public final class PageRasterizer: @unchecked Sendable {
     static let hiddenTextMinimumBoxArea: Int = 4
 
     /// The ink test behind the `.hiddenText` fallback: true when any
-    /// surviving glyph's pixel box is UNIFORM — every pixel equal to its
-    /// first. White-on-white and invisible-render-mode text read the page
-    /// colour throughout; a content-stream box painted over text reads the
-    /// box colour throughout; real ink of any contrast breaks uniformity.
-    /// The box is the glyph's displayed-frame bounds through the fills'
-    /// own mapping (`normalizedToFillPixels`: pixel-aligned, a 1-px halo)
-    /// and the fills' own reader (`verifyFill`, against the box's first
-    /// pixel), so the test sees exactly the pixels the fills and the verify
-    /// loop see. A box wholly outside the visible page shows no ink to the
+    /// surviving glyph's pixel box is NEAR-UNIFORM — every pixel within
+    /// `InkContrastFloor.tolerance` levels of its first on every channel.
+    /// White-on-white and invisible-render-mode text read the page colour
+    /// throughout; a content-stream box painted over text reads the box
+    /// colour throughout; near-white, nearly transparent and nearly covered
+    /// text sit inside the band; ink of ordinary contrast breaks it (the
+    /// band was set below the faintest inked glyph of a born-digital
+    /// census). The box is the glyph's displayed-frame bounds through the
+    /// fills' own mapping (`normalizedToFillPixels`: pixel-aligned, a 1-px
+    /// halo), read by the floor's band reader over the same BGRA buffer the
+    /// fills and the verify loop see. A box wholly outside the visible page shows no ink to the
     /// reader and answers true before any pixel is read; whitespace-lineage
     /// glyphs and boxes under `hiddenTextMinimumBoxArea` are exempt. Cooperative cancellation every
     /// 256 glyphs. A test that cannot run — no bitmap data to read, no page
@@ -516,11 +518,9 @@ public final class PageRasterizer: @unchecked Sendable {
     static func hasInklessGlyph(
         context: CGContext, entries: [CharacterInfo], pageSize: CGSize
     ) throws -> Bool {
-        guard inkTestCanRun(context: context, pageSize: pageSize),
-              let data = context.data else {
+        guard inkTestCanRun(context: context, pageSize: pageSize) else {
             return true
         }
-        let buffer = data.assumingMemoryBound(to: UInt8.self)
         let bitmap = CGRect(x: 0, y: 0, width: context.width, height: context.height)
         let visiblePage = CGRect(x: 0, y: 0, width: 1, height: 1)
         var band = 0
@@ -541,10 +541,7 @@ public final class PageRasterizer: @unchecked Sendable {
             ).intersection(bitmap)
             guard !box.isEmpty,
                   Int(box.width) * Int(box.height) >= hiddenTextMinimumBoxArea else { continue }
-            let memoryRow = context.height - 1 - Int(box.minY)
-            let first = buffer + memoryRow * context.bytesPerRow + Int(box.minX) * 4
-            let expected = ExpectedPixelBGRA(b: first[0], g: first[1], r: first[2], a: first[3])
-            if try verifyFill(context: context, rect: box, expectedColor: expected) {
+            if try InkContrastFloor.isNearUniform(context: context, rect: box) {
                 return true
             }
         }

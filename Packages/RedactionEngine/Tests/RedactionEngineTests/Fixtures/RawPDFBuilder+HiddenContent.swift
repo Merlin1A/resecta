@@ -8,8 +8,9 @@ import CoreGraphics
 // page's own `/Properties` entry: a default configuration whose base state
 // turns every layer off, a resource dictionary the page inherits from the
 // page tree, and a form XObject that carries the group (or names it through
-// its own resources). One page puts its text outside the crop box. Every
-// page draws the shared anchor line at
+// its own resources). One page puts its text outside the crop box. Three
+// pages draw text that shows almost no ink: near-white, nearly transparent,
+// and under a nearly opaque box. Every page draws the shared anchor line at
 // `hiddenPlantAnchorTd` and the hidden line at `hiddenPlantHiddenTd` (the
 // crop-box page moves them inside and outside the box), so the hidden-text
 // probe cells can burn a region over exactly one of them.
@@ -168,6 +169,67 @@ extension TestFixtures {
                 << /Type /Page /Parent 2 0 R \
                 /MediaBox [0 0 612 792] /CropBox [0 0 612 600] \
                 /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+                """),
+            PDFObject(id: 4, content: "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"),
+            PDFObject(id: 5, content: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
+        ], rootId: 1)
+    }
+
+    // MARK: - Faint ink
+
+    /// The hidden line is drawn in a near-white grey (`0.985 g`) on the
+    /// undrawn white page.
+    static func nearWhiteTextPDF(
+        visible: String = "NW VISIBLE ANCHOR LINE",
+        hidden: String = "PLANT-ENGNW-01"
+    ) -> Data {
+        faintInkPage(stream: """
+            BT /F1 18 Tf 72 700 Td (\(visible)) Tj ET
+            0.985 g
+            BT /F1 18 Tf 72 400 Td (\(hidden)) Tj ET
+            0 g
+            """)
+    }
+
+    /// The hidden line is drawn black through an extended graphics state
+    /// whose fill alpha is 0.02.
+    static func lowAlphaTextPDF(
+        visible: String = "LA VISIBLE ANCHOR LINE",
+        hidden: String = "PLANT-ENGLA-01"
+    ) -> Data {
+        faintInkPage(stream: """
+            BT /F1 18 Tf 72 700 Td (\(visible)) Tj ET
+            q /GSLow gs
+            BT /F1 18 Tf 72 400 Td (\(hidden)) Tj ET
+            Q
+            """)
+    }
+
+    /// The hidden line is drawn black, then a black box at fill alpha 0.97 is
+    /// painted over it in the content stream.
+    static func translucentBoxCoveredTextPDF(
+        visible: String = "TB VISIBLE ANCHOR LINE",
+        hidden: String = "PLANT-ENGTB-01"
+    ) -> Data {
+        faintInkPage(stream: """
+            BT /F1 18 Tf 72 700 Td (\(visible)) Tj ET
+            BT /F1 18 Tf 72 400 Td (\(hidden)) Tj ET
+            q /GSBox gs 0 g 66 392 220 30 re f Q
+            """)
+    }
+
+    /// One page over `stream` with the Helvetica font and the two extended
+    /// graphics states the faint-ink pages use.
+    private static func faintInkPage(stream: String) -> Data {
+        buildRawPDF(objects: [
+            PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            PDFObject(id: 3, content: """
+                << /Type /Page /Parent 2 0 R \
+                /MediaBox [0 0 612 792] \
+                /Contents 4 0 R \
+                /Resources << /Font << /F1 5 0 R >> \
+                /ExtGState << /GSLow << /ca 0.02 /CA 0.02 >> /GSBox << /ca 0.97 /CA 0.97 >> >> >> >>
                 """),
             PDFObject(id: 4, content: "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"),
             PDFObject(id: 5, content: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
