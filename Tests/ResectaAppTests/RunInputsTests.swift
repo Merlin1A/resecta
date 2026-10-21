@@ -46,6 +46,29 @@ struct RunInputsTests {
         #expect(pages.allSatisfy { !$0.hasText }, "secure pages skip the text read")
     }
 
+    @Test("A box past the page edge keeps its on-page part; a sliver or a box wholly off the page is dropped")
+    func boxesAtThePageEdge() {
+        let doc = makeMultiPagePDFDocument(pages: 1)
+        let partlyOff = RedactionRegion(
+            id: UUID(), normalizedRect: CGRect(x: 0.95, y: 0.2, width: 0.1, height: 0.1), source: .manual)
+        let sliver = RedactionRegion(
+            id: UUID(), normalizedRect: CGRect(x: 0.9995, y: 0.4, width: 0.01, height: 0.1), source: .manual)
+        let whollyOff = RedactionRegion(
+            id: UUID(), normalizedRect: CGRect(x: 1.2, y: 0.6, width: 0.1, height: 0.1), source: .manual)
+
+        let pages = RunInputs.pageData(
+            document: doc, regions: [0: [partlyOff, sliver, whollyOff]],
+            textLayerStatus: [0: .rich], sourceHasHiddenOCG: false,
+            settings: settings(), effectiveMode: .secureRasterization)
+
+        let rects = pages[0].regions.map(\.normalizedRect)
+        #expect(rects.count == 1, "the sliver and the wholly off-page box are dropped: \(rects)")
+        #expect(rects.first == CGRect(x: 0.95, y: 0.2, width: 0.05, height: 0.1),
+                "the box past the edge keeps its on-page part")
+        #expect(rects.allSatisfy { $0.width > 0.001 && $0.height > 0.001 },
+                "no region reaches the pipeline below the floor after the clamp")
+    }
+
     @Test("Searchable mode: a rich page is searchable with text; a sparse page falls back for want of text")
     func searchableModeFallsBackPerPage() {
         let snapshot = settings()

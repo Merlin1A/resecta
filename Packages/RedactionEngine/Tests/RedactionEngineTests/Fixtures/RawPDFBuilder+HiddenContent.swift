@@ -154,10 +154,20 @@ extension TestFixtures {
 
     /// A page whose crop box (`[0 0 612 600]`) is shorter than its media box:
     /// the visible anchor sits inside the box, the hidden line outside it.
+    /// PDFKit leaves text outside the crop box out of `page.string`, so that
+    /// line never reaches the layer. With `cropBoxPastMediaBox` the boxes
+    /// swap: the media box is the short one and the crop box reaches past
+    /// it. The visible page is their intersection, so the line at 700 is
+    /// never rendered, but PDFKit extracts it — the layer would carry it
+    /// without the visible-page arm of the ink test.
     static func offCropBoxTextPDF(
         visible: String = "CROP VISIBLE ANCHOR LINE",
-        hidden: String = "PLANT-ENGCROP-01"
+        hidden: String = "PLANT-ENGCROP-01",
+        cropBoxPastMediaBox: Bool = false
     ) -> Data {
+        let boxes = cropBoxPastMediaBox
+            ? "/MediaBox [0 0 612 600] /CropBox [0 0 612 792]"
+            : "/MediaBox [0 0 612 792] /CropBox [0 0 612 600]"
         let stream = """
             BT /F1 18 Tf 72 400 Td (\(visible)) Tj ET
             BT /F1 18 Tf 72 700 Td (\(hidden)) Tj ET
@@ -167,7 +177,7 @@ extension TestFixtures {
             PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
             PDFObject(id: 3, content: """
                 << /Type /Page /Parent 2 0 R \
-                /MediaBox [0 0 612 792] /CropBox [0 0 612 600] \
+                \(boxes) \
                 /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
                 """),
             PDFObject(id: 4, content: "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"),
