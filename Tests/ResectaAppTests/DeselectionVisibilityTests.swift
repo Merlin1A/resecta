@@ -216,7 +216,7 @@ struct DeselectionApplyCommitCaptureTests {
 @MainActor
 struct DeselectionRowTests {
 
-    @Test("Row shows for a snapshot with at least one deselection, on every report, and auto-expands the details")
+    @Test("Row shows for a snapshot with at least one deselection, on every report")
     func rowVisibilityGate() {
         // Plain `==` comparisons on named locals: `#expect(!call(.init(…)))`
         // trips a swift-testing macro-capture quirk (the call's value is
@@ -232,10 +232,6 @@ struct DeselectionRowTests {
         // the user's own count stands beside it (a swept item may be
         // stated twice).
         #expect(VerificationResultsView.shouldShowDeselectionRow(snapshot: twoDeselected) == true)
-        // The auto-expand returns with the row.
-        #expect(VerificationResultsView.shouldAutoExpand(
-            status: .pass, hasMixedModes: false,
-            hasDeselection: VerificationResultsView.shouldShowDeselectionRow(snapshot: twoDeselected)) == true)
     }
 
     @Test("Row copy names the counts and pluralizes on total")

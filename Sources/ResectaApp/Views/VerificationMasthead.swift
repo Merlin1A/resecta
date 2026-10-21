@@ -101,8 +101,8 @@ extension VerificationResultsView {
             case 0:
                 return outputExists
                     ? "Look over the redacted PDF in Preview before you share it." : outputMissingSentence
-            case 1:  return "Read the note in Verification Details before you share the PDF."
-            default: return "Read the notes in Verification Details before you share the PDF."
+            case 1:  return "Read the note below before you share the PDF."
+            default: return "Read the notes below before you share the PDF."
             }
         case .warn:
             let couldNotVerify = partition.couldNotVerify.map { report.layers[$0] }
@@ -193,5 +193,223 @@ extension VerificationResultsView {
 
     private static func partition(_ report: VerificationReport) -> VerificationLayerPartition {
         VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
+    }
+}
+
+// MARK: - The masthead
+
+/// The results masthead, said once: the count ring, the row-word title and
+/// one sentence naming the control to use. One VoiceOver header element
+/// whose label also states the counts; the ring itself is hidden from
+/// VoiceOver.
+struct VerificationMasthead: View {
+    let report: VerificationReport
+    let outputExists: Bool
+    let mode: VerificationResultsView.RunMode
+
+    var body: some View {
+        let sentence = VerificationResultsView.mastheadSubtitle(report: report, outputExists: outputExists, mode: mode)
+        let quotesTerms = VerificationResultsView.mastheadSubtitleIsPrivacySensitive(report: report)
+        VStack(spacing: 0) {
+            CountRing(content: VerificationMasthead.ringContent(report: report),
+                      drawKey: VerificationMasthead.drawKey(for: report))
+            BalancedLines {
+                Text(VerificationResultsView.mastheadTitle(report: report))
+                    .font(.title.bold())
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.top, ResectaTokens.Results.ringToTitle)
+            if let sentence {
+                BalancedLines {
+                    Text(sentence)
+                        .font(.subheadline)
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: ResectaTokens.Results.sentenceMaxWidth)
+                .padding(.top, ResectaTokens.Results.titleToSentence)
+                    // The ATTENTION sentence can quote the review terms —
+                    // text the checks found still readable in the output.
+                    .privacySensitive(quotesTerms)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(VerificationResultsView.mastheadAccessibilityLabel(
+            report: report, outputExists: outputExists, mode: mode))
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("verificationMasthead")
+        .privacySensitive(quotesTerms)
+    }
+
+    /// What the ring shows: SKIPPED's slot, or P of T with the verdict's
+    /// tone. T counts every check; INFO reads as a pass.
+    static func ringContent(report: VerificationReport) -> CountRing.Content {
+        let tone: CountRing.Tone
+        switch report.overallStatus {
+        case .skipped: return .skipped
+        case .pass, .info: tone = .pass
+        case .warn: tone = .warn
+        case .attention: tone = .attention
+        case .fail: tone = .fail
+        }
+        let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
+        return .count(passed: partition.passedCount, total: partition.total, tone: tone)
+    }
+
+    /// The report the arc last drew in for: a remount (after Share, Cancel
+    /// or the capture shield) shows the same report static.
+    private static var lastDrawnKey: String?
+
+    /// The report's identity for the draw-in.
+    static func drawKey(for report: VerificationReport) -> String {
+        "\(report.overallStatus)|\(report.layers.count)|\(report.durationSeconds)"
+    }
+
+    /// Whether the arc draws in, claimed once per report when the ring
+    /// appears: a fresh report, never a seeded or UI-test launch, never a
+    /// remount of the same report.
+    static func claimsDrawIn(key: String) -> Bool {
+        guard !CommandLine.arguments.contains("--uitesting") else { return false }
+        defer { lastDrawnKey = key }
+        return lastDrawnKey != key
+    }
+}
+
+/// The count ring: a tertiary track, a round-capped arc from twelve
+/// o'clock for P of T in the verdict's text colour, the figure and the
+/// word `passed` inside. P = 0 draws the whole track tinted, never a solid
+/// ring; SKIPPED draws the track with `shield.slash`. Fixed size at every
+/// Dynamic Type size; hidden from VoiceOver (the masthead's label speaks
+/// the count).
+struct CountRing: View {
+    enum Tone: Equatable { case pass, warn, attention, fail }
+    enum Content: Equatable {
+        case count(passed: Int, total: Int, tone: Tone)
+        case skipped
+    }
+
+    let content: Content
+    /// The report's draw-in key (`VerificationMasthead.drawKey(for:)`).
+    let drawKey: String
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var drawn: CGFloat?
+
+    private var size: CGFloat { ResectaTokens.Results.ringSize }
+    private var stroke: CGFloat { ResectaTokens.Results.ringStroke }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(trackColor, lineWidth: stroke)
+            switch content {
+            case .skipped:
+                Image(systemName: "shield.slash")
+                    .font(.system(size: ResectaTokens.Results.ringSkippedGlyph))
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+            case .count(let passed, let total, let tone):
+                if passed > 0 {
+                    Circle()
+                        .trim(from: 0, to: drawn ?? Self.progress(passed: passed, total: total))
+                        .stroke(Self.arcColor(tone), style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                }
+                figure(passed: passed, total: total)
+            }
+        }
+        .padding(stroke / 2)
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+        .onAppear {
+            guard case .count(let passed, let total, _) = content, passed > 0 else { return }
+            let target = Self.progress(passed: passed, total: total)
+            guard !reduceMotion, VerificationMasthead.claimsDrawIn(key: drawKey) else { drawn = target; return }
+            drawn = 0
+            withAnimation(ResectaTokens.Results.arcDrawIn.delay(ResectaTokens.Results.arcDrawInDelay)) {
+                drawn = target
+            }
+        }
+    }
+
+    private func figure(passed: Int, total: Int) -> some View {
+        let size = Self.figureSize(total: total)
+        return VStack(spacing: 1) {
+            Text("\(passed)\(Text("/").font(.system(size: size, weight: .light)).foregroundStyle(ResectaTokens.SemanticColor.supportText))\(total)")
+                .font(.system(size: size, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.primary)
+            Text("passed")
+                .font(.system(size: ResectaTokens.Results.ringWord))
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+        }
+        .lineLimit(1)
+        .offset(y: -0.5)
+    }
+
+    private var trackColor: Color {
+        if case .count(0, _, let tone) = content {
+            return Self.arcColor(tone).opacity(colorScheme == .dark
+                ? ResectaTokens.Results.zeroTrackOpacityDark : ResectaTokens.Results.zeroTrackOpacityLight)
+        }
+        return Color(red: 116 / 255, green: 116 / 255, blue: 128 / 255).opacity(colorScheme == .dark
+            ? ResectaTokens.Results.trackOpacityDark : ResectaTokens.Results.trackOpacityLight)
+    }
+
+    /// The arc's share of the ring.
+    static func progress(passed: Int, total: Int) -> CGFloat {
+        total > 0 ? CGFloat(passed) / CGFloat(total) : 0
+    }
+
+    /// The figure's size: 22 pt below ten checks, 20 pt from ten.
+    static func figureSize(total: Int) -> CGFloat {
+        total < 10 ? ResectaTokens.Results.ringFigureSmallCount : ResectaTokens.Results.ringFigureLargeCount
+    }
+
+    /// The arc in the text tier; the light WARN arc is the ring-only orange.
+    static func arcColor(_ tone: Tone) -> Color {
+        switch tone {
+        case .pass: ResectaTokens.SemanticColor.passText
+        case .warn: ResectaTokens.Results.warnRing
+        case .attention: ResectaTokens.SemanticColor.attentionText
+        case .fail: ResectaTokens.SemanticColor.failText
+        }
+    }
+}
+
+/// Lays one wrapping text out at the narrowest width that keeps its line
+/// count, so a two-line title or sentence breaks into balanced lines
+/// instead of a long line and a short one.
+struct BalancedLines: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let text = subviews.first else { return .zero }
+        let width = balancedWidth(text, proposal: proposal)
+        return text.sizeThatFits(ProposedViewSize(width: width, height: nil))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let text = subviews.first else { return }
+        let width = balancedWidth(text, proposal: ProposedViewSize(width: bounds.width, height: nil))
+        let size = text.sizeThatFits(ProposedViewSize(width: width, height: nil))
+        text.place(at: CGPoint(x: bounds.midX, y: bounds.minY), anchor: .top,
+                   proposal: ProposedViewSize(width: size.width, height: size.height))
+    }
+
+    private func balancedWidth(_ text: LayoutSubview, proposal: ProposedViewSize) -> CGFloat? {
+        guard let available = proposal.width, available.isFinite else { return proposal.width }
+        let height = text.sizeThatFits(ProposedViewSize(width: available, height: nil)).height
+        let single = text.sizeThatFits(ProposedViewSize(width: nil, height: nil))
+        guard single.width > available else { return available }
+        var low = available / 2, high = available
+        for _ in 0..<12 {
+            let mid = (low + high) / 2
+            if text.sizeThatFits(ProposedViewSize(width: mid, height: nil)).height > height + 0.5 {
+                low = mid
+            } else {
+                high = mid
+            }
+        }
+        return ceil(high)
     }
 }

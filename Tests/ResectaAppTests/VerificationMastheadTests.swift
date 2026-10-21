@@ -53,12 +53,11 @@ struct VerificationMastheadTests {
 
     // MARK: - The sentences, fixture by fixture
 
-    /// The sentence each forged report shows (the shipped layout's PASS
-    /// note pair names Verification Details until the grouped layout).
+    /// The sentence each forged report shows.
     static let fixtureSentences: [(String, String)] = [
         ("secureAllPass", "Look over the redacted PDF in Preview before you share it."),
-        ("secureScreenshot", "Read the note in Verification Details before you share the PDF."),
-        ("secureScanOnly", "Read the note in Verification Details before you share the PDF."),
+        ("secureScreenshot", "Read the note below before you share the PDF."),
+        ("secureScanOnly", "Read the note below before you share the PDF."),
         ("searchableAllPass", "Look over the redacted PDF in Preview before you share it."),
         ("searchableAllRasterized", "Look over the redacted PDF in Preview before you share it."),
         ("searchableAttentionMixed", "\(keepEditing), then use text\u{00A0}search to redact \u{201C}Delia\u{201D}."),
@@ -70,7 +69,7 @@ struct VerificationMastheadTests {
         ("secureAllFailed", "\(keepEditing) to fix what failed, or share after review."),
         ("searchableSkipInduced", "Run Redact again from \(keepEditing) to include the skipped checks."),
         ("pageCountGate", "\(keepEditing) and run Redact again; the other checks did not run."),
-        ("securePassRidingNote", "Read the note in Verification Details before you share the PDF."),
+        ("securePassRidingNote", "Read the note below before you share the PDF."),
         ("secureWarningOnly", "Read the warning below before you share the PDF."),
         ("searchableSkippedCancelled", "Stopped early. Run\u{00A0}Verification, or run Redact for all checks."),
     ]
@@ -148,7 +147,7 @@ struct VerificationMastheadTests {
         #expect(Results.mastheadSubtitle(report: Fixtures.secureFail, outputExists: false)
                 == Results.mastheadSubtitle(report: Fixtures.secureFail))
         #expect(Results.mastheadSubtitle(report: Fixtures.secureScreenshot, outputExists: false)
-                == "Read the note in Verification Details before you share the PDF.")
+                == "Read the note below before you share the PDF.")
     }
 
     @Test("The run's mode: Secure only when every page rasterized with no fallback reason")
@@ -179,15 +178,11 @@ struct VerificationMastheadTests {
 
     // MARK: - The completion line and the gate run
 
-    @Test("The completion line: duration and checks, the minutes form, the gate's stop")
+    @Test("The completion line: the duration, the minutes form, the gate's stop")
     func completionLine() {
-        #expect(Results.completionLineText(report: Fixtures.secureAllPass) == "Completed in 4.1 seconds · 7 checks")
-        #expect(Results.completionLineText(report: Fixtures.searchableAttentionLong)
-                == "Completed in 5 min 12 s · 12 checks")
+        #expect(Results.completionLineText(report: Fixtures.secureAllPass) == "Completed in 4.1 seconds.")
+        #expect(Results.completionLineText(report: Fixtures.searchableAttentionLong) == "Completed in 5 min 12 s.")
         #expect(Results.completionLineText(report: Fixtures.pageCountGate) == "Stopped at the Page Count check.")
-        #expect(Results.completionLineText(report: VerificationReport(
-            layers: [Self.row(.pass, .ocrCheck)], overallStatus: .pass, durationSeconds: 0.04))
-                == "Completed in under 0.1 seconds · 1 check")
         #expect(Results.isPageCountGateRun(Fixtures.pageCountGate))
         #expect(!Results.isPageCountGateRun(Self.report(.fail("f"), [Self.row(.fail("f"), nil)])))
         #expect(Results.minutesText(120.4) == "2 min 0 s")
@@ -196,8 +191,8 @@ struct VerificationMastheadTests {
     @Test("No masthead string makes an outcome promise")
     func mastheadStringsAreMechanismWorded() throws {
         let stems = try Regex(#"\b(guarantee[ds]?|ensure[ds]?|impossible|find(?:s|ing)?|catch(?:es|ing)?|perfectly|flawlessly|best)\b|100%"#).ignoresCase() // LegalPhrases:safe (test data — the ban list itself)
-        var strings = Self.fixtureSentences.map(\.1) + [Results.outputMissingSentence, Results.shareConfirmHint,
-                                                         Results.keepEditingBodyText, Results.keepEditingAccessibilityLabel]
+        var strings = Self.fixtureSentences.map(\.1) + [Results.outputMissingSentence, VerificationResultsActions.shareConfirmHint,
+                                                         Results.undoFootnote, Results.keepEditingAccessibilityLabel]
         for reason in [VerificationReport.SkipReason.autoVerifyOff, .cancelled, .error] {
             strings += [Results.skippedSubtitle(reason: reason, mode: .secure), Results.skippedSubtitle(reason: reason)]
         }

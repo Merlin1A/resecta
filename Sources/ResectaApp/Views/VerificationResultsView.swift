@@ -1,14 +1,14 @@
 import SwiftUI
 import RedactionEngine
 
-// Verification results recomposed around HomeView's grammar:
-// status masthead →
-// action choice stack (Share / Keep Editing / Preview HomeChoiceCards) →
-// chevron-disclosed details (page modes + per-layer rows) → trust strip
-// → footer block (timing line + audit-scope disclaimer). The
-// segmented Picker and the prior contained status
-// card are gone; Preview is a NavigationLink push now (matches HomeView's
-// "tap card → go deeper" idiom). Action-bar and export dialogs are still
+// The verification results page, grouped: the system grouped background
+// inside the results view's own NavigationStack (the nav bar stays the
+// editor's), the masthead said once (the count ring, the row-word title,
+// one sentence), the actions (Share as a capsule, the action rows, the
+// undo footnote), the check sections with their counts, the headerless run
+// section, the passed checks, the completion line and the legal text as
+// the last section's footer, the trust line. A page link pushes the Preview
+// at that page on this same stack. Action-bar and export dialogs are still
 // mounted by DocumentEditorView.
 
 struct VerificationResultsView: View {
@@ -28,7 +28,7 @@ struct VerificationResultsView: View {
     /// former isFailPreOverride gate). Computed once on DocumentEditorView and
     /// threaded in like `canExport`, since this view does not inject RedactionState.
     let previewAvailable: Bool
-    /// Tap handler for the Share `HomeChoiceCard`. Mirrors the bar's
+    /// Tap handler for the Share capsule. Mirrors the bar's
     /// `onExport` so ⌘E reaches `handleExportTap(report:)` from either
     /// surface.
     var onExport: () -> Void
@@ -57,78 +57,67 @@ struct VerificationResultsView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    @State private var detailsExpanded = false
-    @State private var didAutoExpand = false
+    @State private var previewPage: PreviewPage?
+
+    /// A page the Preview opens at (0-based), pushed on this view's stack.
+    struct PreviewPage: Hashable, Identifiable {
+        let index: Int
+        var id: Int { index }
+    }
 
     var body: some View {
         NavigationStack {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: ResectaTokens.Spacing.xl) {
-                    statusMasthead
-                    if !runFactsLines.isEmpty {
-                        runFactsStrip
+            ZStack {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        VerificationMasthead(report: report, outputExists: outputExists,
+                                             mode: runFacts.runMode)
+                        VerificationResultsActions(
+                            report: report, canExport: canExport, outputExists: outputExists,
+                            isVerificationStale: isVerificationStale, previewAvailable: previewAvailable,
+                            onExport: onExport, onRunVerification: onRunVerification)
+                            .padding(.top, ResectaTokens.Results.blockGap)
+                        VerificationDetailsSection(
+                            report: report, deselectionSnapshot: deselectionSnapshot,
+                            runFactsLines: runFactsLines, previewAvailable: previewAvailable,
+                            onOpenPage: openPreview(at:))
+                        footerBlock
+                        trustStrip
+                            .padding(.top, ResectaTokens.Spacing.xl)
                     }
-                    actionChoiceStack
-                    if Self.shouldShowRunBreakdown(report: report) {
-                        detailsSection
-                    }
-                    trustStrip
-                    // The timing footer and the audit-scope
-                    // disclaimer close the page as ONE footer block — the
-                    // disclaimer is the LAST element on every verdict,
-                    // beneath "Completed in … · N checks". One
-                    // gate-wrapped mount, no per-status placement
-                    // branches. The block's spacing is
-                    // `disclaimerFootGap` (144 pt, was 8) so the note
-                    // starts below the first screen on the 6.3″ and 6.9″
-                    // phones at the default type size — the timing line
-                    // stays in view, the note is one scroll away. On
-                    // SKIPPED there is no timing line (`layers.isEmpty`),
-                    // so the block holds only the disclaimer, one section
-                    // gap under the trust strip — accepted as-falls. The
-                    // always-true `shouldShowHonestyDisclaimer` gate
-                    // stays: its exhaustive switch forces a mount
-                    // decision if a new verdict status is ever added.
-                    VStack(spacing: Self.disclaimerFootGap) {
-                        if Self.shouldShowRunBreakdown(report: report) {
-                            footer
-                        }
-                        if Self.shouldShowHonestyDisclaimer(
-                            overallStatus: report.overallStatus) {
-                            honestyDisclaimer
-                        }
-                    }
+                    .padding(.horizontal, ResectaTokens.Spacing.md)
+                    .padding(.top, ResectaTokens.Spacing.lg)
+                    .padding(.bottom, dynamicTypeSize.isAccessibilitySize
+                        ? ResectaTokens.Spacing.lg : ResectaTokens.Spacing.xxl)
+                    .frame(maxWidth: columnMaxWidth)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, ResectaTokens.Spacing.md)
-                // The verdict title leads the page 24 pt under the
-                // bar at every Dynamic Type size; the bottom edge keeps
-                // its prior behavior.
-                .padding(.top, ResectaTokens.Spacing.lg)
-                .padding(.bottom, dynamicTypeSize.isAccessibilitySize
-                    ? ResectaTokens.Spacing.lg : ResectaTokens.Spacing.xxl)
-                .frame(maxWidth: .infinity)
+                .scrollBounceBehavior(.basedOnSize)
+                .accessibilityIdentifier("verificationResults")
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .accessibilityIdentifier("verificationResults")
-            // Auto-expand the details disclosure (broadened)
-            // on WARN, FAIL, or any mixed-mode page set. PASS + uniform
-            // modes ships collapsed so the masthead leads the page.
-            .onAppear {
-                guard !didAutoExpand else { return }
-                didAutoExpand = true
-                if Self.shouldAutoExpand(
-                    status: report.overallStatus,
-                    hasMixedModes: report.perPageModes.hasMixedModes,
-                    hasDeselection: Self.shouldShowDeselectionRow(
-                        snapshot: deselectionSnapshot)
-                ) {
-                    detailsExpanded = true
-                }
+            .navigationDestination(item: $previewPage) { page in
+                RedactedPreviewView(verdict: report.overallStatus, page: page.index)
             }
         }
         // VerificationActionBar is placed by the phase router in
         // DocumentEditorView as .safeAreaInset, not embedded here. Export
         // dialogs are also mounted on DocumentEditorView.
+    }
+
+    /// A page link: push the Preview at that page. A page past the
+    /// document's end (a seeded report's pages on a short sample) is
+    /// dropped; no phase changes.
+    private func openPreview(at page: Int) {
+        guard previewAvailable, Self.isPageInDocument(page, pageCount: documentState.pageCount) else { return }
+        previewPage = PreviewPage(index: page)
+    }
+
+    /// Whether a 0-based page exists in a document of `pageCount` pages; an
+    /// unknown count (0) admits every page.
+    static func isPageInDocument(_ page: Int, pageCount: Int) -> Bool {
+        page >= 0 && (pageCount == 0 || page < pageCount)
     }
 
     // MARK: - Layout helpers
@@ -140,86 +129,19 @@ struct VerificationResultsView: View {
             : ResectaTokens.BrandedSurface.panelMaxWidthCompact
     }
 
-    /// The details disclosure and the timing footer both describe a
-    /// run's layer results. On the skipped sentinel (`layers.isEmpty`) there
-    /// is no run to describe — the disclosure read "0 of 0 checks passed"
-    /// and expanded to nothing, and the footer read "0 checks". One gate for
-    /// both mounts. Static so it's unit-testable without a SwiftUI host
-    /// (mirrors `shouldAutoExpand`).
+    /// The page's run breakdown — the check sections and the completion
+    /// line — describes a run's layer results. On the skipped sentinel
+    /// (`layers.isEmpty`) there is no run to describe. One gate for both.
+    /// Static so it's unit-testable without a SwiftUI host.
     static func shouldShowRunBreakdown(report: VerificationReport) -> Bool {
         !report.layers.isEmpty
     }
 
-    /// Phase 2 auto-expand gate. Lifted to a static helper so it's testable
-    /// without a SwiftUI host (mirrors the `shouldAutoReturnHome`
-    /// pattern). PASS + uniform modes → collapsed; WARN/FAIL or mixed
-    /// modes → expanded.
-    ///
-    /// A snapshot with at least one deselected result also forces
-    /// the expansion, regardless of verdict — the exact case
-    /// `shouldShowDeselectionRow` gates the deselection row on. PASS is
-    /// precisely the verdict where "N of M results were left un-checked"
-    /// is easiest to miss if the disclosure ships collapsed, since a PASS
-    /// masthead reads as "no issues" even though it only speaks to what
-    /// was actually redacted. `hasDeselection` defaults to `false` so
-    /// call sites that never had a deselection concept (tests pinning the
-    /// original status/hasMixedModes contract) are unaffected; the one
-    /// production caller (`.onAppear` above) always passes the real
-    /// value.
-    static func shouldAutoExpand(
-        status: VerificationStatus,
-        hasMixedModes: Bool,
-        hasDeselection: Bool = false
-    ) -> Bool {
-        if hasMixedModes || hasDeselection { return true }
-        switch status {
-        case .pass, .info, .skipped:  return false
-        case .warn, .attention, .fail: return true
-        }
-    }
-
-    // MARK: - Status masthead
-    //
-    // Neutral chrome — no card background; the masthead reads as part of
-    // the page. The row-word title, then ONE sentence on every verdict
-    // that names the control to use, and one combined accessibility label
-    // that also speaks the counts.
-
-    private var statusMasthead: some View {
-        VStack(spacing: ResectaTokens.Spacing.sm) {
-            Text(Self.mastheadTitle(report: report))
-                .font(.largeTitle.weight(.semibold))
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.center)
-
-            if let mastheadSubtitle {
-                Text(mastheadSubtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 320)
-                    // The ATTENTION sentence can quote the review terms —
-                    // text the checks found still readable in the output —
-                    // so it carries the same privacy marking as the search
-                    // and review surfaces; every other arm is mechanism copy.
-                    .privacySensitive(Self.mastheadSubtitleIsPrivacySensitive(report: report))
-            }
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Self.mastheadAccessibilityLabel(
-            report: report, outputExists: outputExists, mode: runFacts.runMode))
-    }
-
-    private var mastheadSubtitle: String? {
-        Self.mastheadSubtitle(report: report, outputExists: outputExists, mode: runFacts.runMode)
-    }
-
     // MARK: - Run facts strip
     //
-    // 0-2 conditional caption-weight lines stating what this run's
-    // detection did not cover. Mounted directly beneath the masthead,
-    // above the action stack, on every verdict — a routine PASS with
-    // nothing to state renders no strip (no empty container). Every line
+    // 0-2 conditional lines stating what this run's detection did not
+    // cover, the first rows of the headerless run section, on every
+    // verdict — a routine PASS with nothing to state renders none. Every line
     // is a pinned static builder so the rendered text is unit-testable
     // without a SwiftUI host. Whether the detectors ran on the output is
     // no longer stated here in prose: the verification ledger measures it.
@@ -287,54 +209,10 @@ struct VerificationResultsView: View {
 
     private var runFactsLines: [String] { RunFactsStrip.lines(for: runFacts) }
 
-    private var runFactsStrip: some View {
-        VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
-            ForEach(Array(runFactsLines.enumerated()), id: \.offset) { _, line in
-                Text(line)
-                    .font(.footnote)
-                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .frame(maxWidth: columnMaxWidth)
-        .accessibilityIdentifier("runFactsStrip")
-    }
-
-    // MARK: - Action choice stack
-    //
-    // Phase 2 lock, amended by the preview/share-tint decouple:
-    // Share / Keep Editing always; the Preview card appears whenever a
-    // redacted output exists on disk (`previewAvailable`), independent of
-    // the verdict. ⌘E binds to the Share card's wrapping Button (locked
-    // landing point — Phase 3 parked it on the bar's overflow menu).
-
-    private var actionChoiceStack: some View {
-        VStack(spacing: ResectaTokens.Spacing.md) {
-            if Self.shouldShowRunVerificationCard(report: report) {
-                runVerificationCard
-            }
-            shareCard
-            keepEditingCard
-            if previewAvailable {
-                previewCard
-            }
-        }
-        .frame(maxWidth: columnMaxWidth)
-    }
-
-    // MARK: - Run Verification card
-    //
-    // A skipped report previously stranded the user: the only "Re-verify"
-    // affordance was an overlay in DocumentEditorView gated on a phase whose
-    // router branch renders THIS view instead — mutually exclusive by
-    // construction, so it never appeared. The recovery CTA now lives where
-    // the skipped report is actually shown, above Share so running the
-    // checks reads as the primary next step.
+    // MARK: - The actions' rules and words (the view is VerificationResultsActions)
 
     /// Card visibility — skipped reports only. Static so the mount condition
-    /// is unit-testable without a SwiftUI host (mirrors `shouldAutoExpand`).
+    /// is unit-testable without a SwiftUI host (mirrors `shouldShowRunBreakdown`).
     static func shouldShowRunVerificationCard(report: VerificationReport) -> Bool {
         report.overallStatus.isSkipped
     }
@@ -343,23 +221,6 @@ struct VerificationResultsView: View {
     /// reason; the masthead sentence carries the reason.
     static let runVerificationCardBodyText =
         "Run the checks on the redacted PDF before you share it."
-
-    private var runVerificationCard: some View {
-        HomeChoiceCard(
-            symbol: "checkmark.shield",
-            style: .subtle,
-            title: "Run Verification",
-            bodyText: LocalizedStringKey(Self.runVerificationCardBodyText),
-            affordance: "Run Checks →",
-            action: onRunVerification
-        )
-        .accessibilityLabel("Run Verification. \(Self.runVerificationCardBodyText)")
-        .accessibilityIdentifier("runVerificationCard")
-    }
-
-    // (removed — Preview visibility now keys on `previewAvailable`; Share red
-    //  tint now keys on `Self.shouldTintShareRed(report:)`. The two facts are
-    //  intentionally separate inputs so they cannot re-couple.)
 
     /// VoiceOver label for the Share card. Promoted to a `static` constant
     /// so the rebuild can't silently alter the spoken string and so it's
@@ -378,7 +239,7 @@ struct VerificationResultsView: View {
     /// Defense-in-depth gate for the Share card: Share is enabled
     /// exactly when a fresh, valid output exists (`canExport`). Lifted to a
     /// `static` helper so the gate is a single source of truth and is
-    /// unit-testable without a SwiftUI host (mirrors `shouldAutoExpand`).
+    /// unit-testable without a SwiftUI host (mirrors `shouldShowRunBreakdown`).
     /// Simplified to a single `canExport` input — the WARN confirmation and
     /// FAIL override gates were removed. Do not invert or inline.
     static func shareDisabled(canExport: Bool) -> Bool { !canExport }
@@ -402,32 +263,8 @@ struct VerificationResultsView: View {
         return nil
     }
 
-    /// The Share hint: spoken only, exactly when tapping Share opens a
-    /// confirm. It reads the live confirm predicates with their
-    /// acknowledgements — never the rows — so after a completed share,
-    /// whose acknowledgement stays spent, no hint promises a confirm.
-    static let shareConfirmHint = "Asks you to confirm before sharing."
-
-    /// Whether Share will ask for confirmation: Share is enabled and one of
-    /// the three confirm families is armed.
-    static func shareWillConfirm(
-        report: VerificationReport, canExport: Bool,
-        failAcknowledged: Bool, skippedAcknowledged: Bool, incompleteWarnAcknowledged: Bool
-    ) -> Bool {
-        canExport && (
-            DocumentEditorView.shareNeedsFailConfirm(report: report, acknowledged: failAcknowledged)
-            || DocumentEditorView.shareNeedsSkippedConfirm(report: report, acknowledged: skippedAcknowledged)
-            || DocumentEditorView.shareNeedsIncompleteWarnConfirm(
-                report: report, acknowledged: incompleteWarnAcknowledged))
-    }
-
-    private var shareWillConfirm: Bool {
-        Self.shareWillConfirm(
-            report: report, canExport: canExport,
-            failAcknowledged: documentState.failShareAcknowledged,
-            skippedAcknowledged: documentState.skippedShareAcknowledged,
-            incompleteWarnAcknowledged: documentState.incompleteWarnShareAcknowledged)
-    }
+    /// The undo footnote under the actions, on every run.
+    static let undoFootnote = "Redact cleared undo; use Delete\u{00A0}Region instead."
 
     /// Red-tints the Share tile on ANY verification FAIL verdict. Keyed on the
     /// status verdict ALONE — independent of userOverrodeFailure — so the tint
@@ -438,16 +275,6 @@ struct VerificationResultsView: View {
         report.overallStatus.isFail
     }
 
-    /// Share-tile tint per verdict: FAIL keeps the red tint (above);
-    /// ATTENTION tints in its own status color so the tile matches the
-    /// masthead without borrowing FAIL's red. Independent of
-    /// userOverrodeFailure for the same reason as `shouldTintShareRed`.
-    static func shareTintColor(report: VerificationReport) -> Color? {
-        if shouldTintShareRed(report: report) { return .red }
-        if report.overallStatus.isAttention { return .pink }
-        return nil
-    }
-
     /// The Share-card caption for a source that was encrypted. Static so the
     /// copy is pinned without a SwiftUI host.
     static func notProtectedCaption(hadRestrictions: Bool) -> String {
@@ -456,165 +283,57 @@ struct VerificationResultsView: View {
             : "The redacted copy is not password-protected."
     }
 
-    private var shareCard: some View {
-        // One control per card: a real Button whose label is non-interactive
-        // chrome (`HomeChoiceCardContent`). The prior structure nested a
-        // `HomeChoiceCard` — itself a Button — inside this Button and tried
-        // to neutralize it with `.allowsHitTesting(false)` + a trailing
-        // `.contentShape(Rectangle())`; that left the outer Button with no
-        // working tap target (SwiftUI does not support a Button whose label
-        // is a Button). A single Button restores the tap surface, the ⌘E
-        // binding, and the press animation from `HomeChoiceCardButtonStyle`.
-        // ⌘E is the locked landing point (Phase 2 plan; Phase 3 parked the
-        // bar's copy on the overflow menu).
-        VStack(spacing: ResectaTokens.Spacing.xs) {
-            Button {
-                onExport()
-            } label: {
-                HomeChoiceCardContent(
-                    symbol: "square.and.arrow.up",
-                    style: .primary,
-                    title: "Share Document",
-                    bodyText: "Save the redacted PDF or share it from this device.",
-                    affordance: "Share →",
-                    tintOverride: Self.shareTintColor(report: report)
-                )
-            }
-            .buttonStyle(HomeChoiceCardButtonStyle())
-            .disabled(Self.shareDisabled(canExport: canExport))
-            .keyboardShortcut("e", modifiers: .command)
-            .accessibilityLabel(Self.shareCardAccessibilityLabel)
-            .accessibilityHint(shareWillConfirm ? Self.shareConfirmHint : "")
-
-            // A disabled card with no copy reads as broken; say why and what
-            // to do. Rendered only when the gate actually disables Share, so
-            // the caption can never contradict an enabled card.
-            if Self.shareDisabled(canExport: canExport),
-               let reason = Self.shareDisabledReason(
-                   outputExists: outputExists, isStale: isVerificationStale
-               ) {
-                Text(reason)
-                    .font(.footnote)
-                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityIdentifier("shareDisabledReason")
-            }
-
-            // The source was encrypted: say what the redacted copy carries,
-            // at the moment the user decides to share it.
-            if documentState.sourceFacts.wasEncrypted {
-                Text(Self.notProtectedCaption(hadRestrictions: documentState.sourceFacts.hadRestrictions))
-                    .font(.footnote)
-                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityIdentifier("shareNotProtectedCaption")
-            }
-        }
-    }
-
-    /// Keep Editing body copy states the undo boundary where it bites —
-    /// Redact cleared the undo stack, so returning to the editor cannot
-    /// Cmd-Z back past it. Static so the a11y label and the card speak the
-    /// same words and the wording is pinned without a host.
-    static let keepEditingBodyText =
-        "Return to the editor to adjust regions, then run Redact again. "
-        + "Redact cleared undo; use Delete\u{00A0}Region instead."
-
     /// Keep Editing's spoken label: the action, then the undo boundary.
     static let keepEditingAccessibilityLabel =
         "Keep Editing. Return to the editor to adjust regions, then run Redact again. "
         + "Redact cleared undo; use Delete Region instead."
 
-    private var keepEditingCard: some View {
-        HomeChoiceCard(
-            symbol: "pencil.and.outline",
-            style: .subtle,
-            title: "Keep Editing",
-            bodyText: LocalizedStringKey(Self.keepEditingBodyText),
-            affordance: "Open Editor →",
-            action: { documentState.transition(to: .editing) }
-        )
-        .accessibilityLabel(Self.keepEditingAccessibilityLabel)
-    }
-
-    private var previewCard: some View {
-        // One control per card: a real NavigationLink whose label is
-        // non-interactive chrome. NavigationLink honors the custom
-        // `.buttonStyle`, so the card's material/shadow chrome and the
-        // press animation render. The destination resolves against the
-        // NavigationStack in `body` (DocumentEditorView hosts no stack).
-        NavigationLink {
-            // The preview carries the live verdict so a user
-            // reviewing a FAILed or unverified output sees an in-context
-            // cue (nav-bar capsule) instead of a bare document.
-            RedactedPreviewView(verdict: report.overallStatus)
-        } label: {
-            HomeChoiceCardContent(
-                symbol: "eye",
-                style: .subtle,
-                title: "Preview Redacted Document",
-                bodyText: LocalizedStringKey(Self.previewCardBodyText),
-                affordance: "Open Preview →"
-            )
-        }
-        .buttonStyle(HomeChoiceCardButtonStyle())
-        .accessibilityLabel(Self.previewCardAccessibilityLabel)
-    }
-
-    // MARK: - Details disclosure
-    //
-    // The disclosure — header row, page modes, the deselection row and the
-    // per-layer rows — is `VerificationDetailsSection`; this view keeps the
-    // auto-expand state and threads it in as a binding.
-
-    private var detailsSection: some View {
-        VerificationDetailsSection(
-            report: report,
-            deselectionSnapshot: deselectionSnapshot,
-            isExpanded: $detailsExpanded,
-            columnMaxWidth: columnMaxWidth
-        )
-    }
-
     // MARK: - Trust strip
     //
-    // Mirrors HomeView's strip exactly ("On-device · No tracking · Open
-    // source") and is status-independent: the strip states standing facts
-    // about the app, while the run's outcome lives in the status banner and
-    // the footer. The former PASS/INFO-gated "Verification complete" item is
-    // gone entirely, and with it the outcome-promise concern.
+    // HomeView's words ("On-device · No tracking · Open source") as one
+    // plain centred line, the page's last: standing facts about the app,
+    // status-independent; the run's outcome lives in the masthead.
 
     private var trustStrip: some View {
-        FlowLayout(spacing: ResectaTokens.Spacing.sm, alignment: .center) {
-            TrustItem(label: "On-device")
-            Text("·").foregroundStyle(.tertiary).font(.footnote)
-            TrustItem(label: "No tracking")
-            Text("·").foregroundStyle(.tertiary).font(.footnote)
-            TrustItem(label: "Open source")
-        }
-        .frame(maxWidth: columnMaxWidth)
+        Text("On-device · No tracking · Open source")
+            .font(.footnote)
+            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
     }
 
     // MARK: - Footer
 
-    private var footer: some View {
-        Text(Self.completionLineText(report: report))
-        .font(.footnote)
-        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, ResectaTokens.Spacing.sm)
+    /// The completion line, then the legal text as the last section's
+    /// footer: 18 pt under the completion line; on SKIPPED, with no run to
+    /// describe, 32 pt under the undo footnote.
+    private var footerBlock: some View {
+        VStack(alignment: .leading, spacing: ResectaTokens.Results.completionToLegal) {
+            if Self.shouldShowRunBreakdown(report: report) {
+                Text(Self.completionLineText(report: report))
+                    .font(.footnote)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+            }
+            if Self.shouldShowHonestyDisclaimer(overallStatus: report.overallStatus) {
+                honestyDisclaimer
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, ResectaTokens.Spacing.md)
+        .padding(.top, Self.shouldShowRunBreakdown(report: report)
+            ? ResectaTokens.Spacing.xs + ResectaTokens.Spacing.xxs
+            : ResectaTokens.Results.undoToLegalSkipped)
     }
 
-    /// The completion line: the duration and the number of checks, the
+    /// The completion line: the duration (the ring states the count), the
     /// minutes form from 60 s; the page-count gate's report, where no check
     /// completed, says where it stopped.
     static func completionLineText(report: VerificationReport) -> String {
         if isPageCountGateRun(report) { return "Stopped at the Page Count check." }
-        let n = report.layers.count
-        let checks = n == 1 ? "1 check" : "\(n) checks"
-        guard report.durationSeconds > 0 else { return checks }
-        return "Completed in \(durationText(report.durationSeconds)) · \(checks)"
+        guard report.durationSeconds > 0 else {
+            return report.layers.count == 1 ? "1 check." : "\(report.layers.count) checks."
+        }
+        return "Completed in \(durationText(report.durationSeconds))."
     }
 
     /// "under 0.1 seconds" · "4.1 seconds" · "5 min 12 s" (whole seconds,
@@ -634,32 +353,14 @@ struct VerificationResultsView: View {
     // MARK: - Honesty disclaimer
     //
     // The legally reviewed scope-limitation copy (`HonestyDisclaimer`,
-    // `.redacted` profile) had zero production call sites — no surface named
-    // the checks' epistemic limits at the point where the share decision is
-    // made. It mounts at ONE site on every verdict: it is
-    // the last element of the page, in the footer block beneath the
-    // timing line — `disclaimerFootGap` under it (8 pt originally, 144 pt
-    // now). The component supplies its own caption styling,
-    // centered alignment, and accessibility label; the call site owns the
-    // spacing; Dynamic Type flows through `Text`.
-
-    /// The footer block's spacing — the distance from the
-    /// timing line to the audit-scope note. 3 × `Spacing.xxl` = 144 pt,
-    /// sized from the measured PASS layout at the default type size (the
-    /// 2026-09-24 re-measure, with the Verification Details header a
-    /// 60-pt mini-card): the timing line ends ≈847 pt from the top of the
-    /// screen — ≈27 pt above the 874-pt 6.3″ fold, ≈109 pt above the
-    /// 956-pt 6.9″ one — so the note's top edge lands ≈117 pt below the
-    /// 6.3″ screen (≈35 pt below the 6.9″) — the first screen, which is the
-    /// App Store frame, shows the verdict through the timing line and the
-    /// note is one scroll away. Static so the value is pinned without a
-    /// SwiftUI host (`HonestySurfacesTests`).
-    static let disclaimerFootGap: CGFloat = ResectaTokens.Spacing.xxl * 3
+    // `.redacted` profile) mounts at ONE site on every verdict: the last
+    // section's footer, under the completion line. The component supplies
+    // its text and accessibility label; the call site owns the placement.
 
     /// Disclaimer mount gate. Deliberately true for EVERY verdict state —
     /// the exhaustive switch (no `default`) forces a decision here if a new
     /// status is ever added. Static so the all-statuses rule is
-    /// unit-testable without a SwiftUI host (mirrors `shouldAutoExpand`).
+    /// unit-testable without a SwiftUI host (mirrors `shouldShowRunBreakdown`).
     static func shouldShowHonestyDisclaimer(
         overallStatus: VerificationStatus
     ) -> Bool {
@@ -672,9 +373,7 @@ struct VerificationResultsView: View {
         // The disclaimer's copy is markCount-independent (its switch binds
         // no value); this view does not inject RedactionState, so 0 stands
         // in rather than threading a count the component never reads.
-        HonestyDisclaimer(profile: .redacted(markCount: 0))
-            .frame(maxWidth: columnMaxWidth)
+        HonestyDisclaimer(profile: .redacted(markCount: 0), style: .sectionFooter)
             .accessibilityIdentifier("honestyDisclaimer")
     }
-
 }
