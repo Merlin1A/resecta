@@ -304,6 +304,7 @@ struct TrustLine: View {
         .foregroundStyle(ResectaTokens.SemanticColor.supportText)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Self.spokenLabel)
+        .accessibilityAddTraits(.isStaticText)
     }
 }
 
