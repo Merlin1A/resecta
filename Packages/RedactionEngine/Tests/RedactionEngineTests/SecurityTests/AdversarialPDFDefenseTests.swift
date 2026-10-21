@@ -113,6 +113,44 @@ struct AdversarialPDFDefenseTests {
         }
     }
 
+    // MARK: - The widened walk: base state, inherited resources, form XObjects
+
+    static let widenedHiddenForms: [(String, Data)] = [
+        ("base state off", TestFixtures.ocgBaseStateOffPDF()),
+        ("inherited resources", TestFixtures.ocgInheritedResourcesPDF()),
+        ("form xobject with /OC", TestFixtures.ocgFormXObjectPDF()),
+        ("nested form xobject naming the group", TestFixtures.ocgFormXObjectPDF(nested: true)),
+    ]
+
+    static let widenedCleanForms: [(String, Data)] = [
+        ("plain page", TestFixtures.blankPage()),
+        ("base state off with every group on", TestFixtures.ocgBaseStateOffPDF(everyGroupOn: true)),
+    ]
+
+    @Test("The document walk and the page walk read the three widened forms as hidden",
+          arguments: widenedHiddenForms)
+    func widenedFormsReadHidden(name: String, data: Data) throws {
+        let provider = try #require(CGDataProvider(data: data as CFData))
+        let cgDoc = try #require(CGPDFDocument(provider))
+        #expect(TextLayerExtractor.documentHasHiddenOCG(cgDoc), "\(name): document walk")
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+        #expect(TextLayerExtractor.pageReferencesHiddenOCG(page, hasHiddenOCG: true),
+                "\(name): page walk")
+    }
+
+    @Test("A plain page and an OFF base state that turns every group back on are clean",
+          arguments: widenedCleanForms)
+    func widenedCleanFormsPass(name: String, data: Data) throws {
+        let provider = try #require(CGDataProvider(data: data as CFData))
+        let cgDoc = try #require(CGPDFDocument(provider))
+        #expect(!TextLayerExtractor.documentHasHiddenOCG(cgDoc), "\(name): document walk")
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+        #expect(!TextLayerExtractor.pageReferencesHiddenOCG(page, hasHiddenOCG: false),
+                "\(name): page walk")
+    }
+
     @Test("Hidden-OCG without precomputed flag still falls open (M1 documents requirement)")
     func ocgDefenseRequiresPrecomputedFlag() async throws {
         // Default-false call site preserves the legacy behaviour (no throw).
