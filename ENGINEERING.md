@@ -252,8 +252,12 @@ constructors, the BSD `socket(` / `connect(` / `getaddrinfo(` calls,
 `openURL`, `UIApplication.shared.open(` and an `import Network` line, with
 comments and string literals skipped. Every hit must be a site pinned in the
 script with its reason; today that is one site, the Settings view's feedback
-link, a `mailto:` hand-off to Mail. A new site fails the hook and the gate,
-so the property holds going forward, not just today. The in-app
+link, a `mailto:` hand-off to Mail. A new use of one of those symbols fails
+the hook and the gate. The lint names those symbols and no others: a
+`Data(contentsOf:)` on a remote URL, SwiftUI's `AsyncImage`, an `import
+WebKit` or a configuration type such as `URLSessionConfiguration` is outside
+it and is held by review, so the property holds for what the lint names, not
+for every way the platform can reach the network. The in-app
 legal/support links open in a Safari view or Mail, each in its own process —
 the binary embeds no web engine of its own. The privacy manifest ships at `Resources/PrivacyInfo.xcprivacy`
 and declares no collected data types and no tracking, matching `PRIVACY.md`
