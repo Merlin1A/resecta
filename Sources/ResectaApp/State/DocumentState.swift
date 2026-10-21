@@ -351,10 +351,18 @@ class DocumentState {
         }
     }
 
+    /// True while the live search session holds selections the user has
+    /// not applied — touched by hand, or an auto-selected set never
+    /// reviewed: the predicate the sheet's own dismiss gates read. Redact
+    /// refuses on it and Home asks before closing on it.
+    static func hasUnappliedSelections(_ redactionState: RedactionState) -> Bool {
+        redactionState.activeSearch?.requiresDismissConfirmation ?? false
+    }
+
     /// The refusal that holds now, or nil when Redact may start. The
     /// selected matches come first, then the missing regions.
     func redactRefusal(with redactionState: RedactionState) -> RedactRefusal? {
-        if redactionState.activeSearch?.requiresDismissConfirmation ?? false { return .selectedMatches }
+        if Self.hasUnappliedSelections(redactionState) { return .selectedMatches }
         if !redactionState.hasEffectiveRegions { return .noRegions }
         if !canStartPipeline(with: redactionState) { return .busy }
         return nil

@@ -92,6 +92,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The paused banner's Restart no longer starts a run that Redact itself would refuse: with selected matches not yet applied, or no region left to redact, it shows Redact's notice and leaves the search, the regions and the undo history as they were. The purge Re-run and Run Verification's full run are refused the same way when no region is left.
 - Cancel on the Importing card, or leaving the app, while a dropped document imports over an open one returns to that document instead of a blank editor.
 - Keep Editing after verification was interrupted by leaving the app no longer shows the Processing was paused banner over a finished redaction.
+- Home asks before closing when the search sheet holds selected matches that are not applied; Redact and the sheet's own Dismiss already guard them.
 
 ### Internal
 

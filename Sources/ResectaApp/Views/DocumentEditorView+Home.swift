@@ -63,7 +63,8 @@ extension DocumentEditorView {
         guard !homeCloseAwaitsSheetDismissal else { return }
         let needsConfirm = Self.homeNeedsCloseConfirm(
             hasDrawnRegions: hasDrawnRegions,
-            hasPendingTriage: redactionState.pendingTriage != nil
+            hasPendingTriage: redactionState.pendingTriage != nil,
+            hasUnappliedSelections: DocumentState.hasUnappliedSelections(redactionState)
         )
         switch Self.homeCloseRoute(needsConfirm: needsConfirm,
                                    sheetPresented: editorSheetIsPresented) {
@@ -203,12 +204,15 @@ extension DocumentEditorView {
 
     /// Pure gate for the Home close confirm (mirrors
     /// `batchOpsMenuShouldShow` / `shareNeedsFailConfirm`): drawn or
-    /// applied regions — the gate Done uses — or a staged Scan review
-    /// awaiting the user (`pendingTriage`), the one editing-only work
-    /// state Done never sees. An active search session with nothing
-    /// applied is transient, not work — no confirm.
-    static func homeNeedsCloseConfirm(hasDrawnRegions: Bool, hasPendingTriage: Bool) -> Bool {
-        hasDrawnRegions || hasPendingTriage
+    /// applied regions — the gate Done uses — a staged Scan review
+    /// awaiting the user (`pendingTriage`), or search selections not yet
+    /// applied (`DocumentState.hasUnappliedSelections`, the rule Redact
+    /// and the sheet's own Dismiss read). An untouched search session with
+    /// nothing selected is transient, not work — no confirm.
+    static func homeNeedsCloseConfirm(
+        hasDrawnRegions: Bool, hasPendingTriage: Bool, hasUnappliedSelections: Bool
+    ) -> Bool {
+        hasDrawnRegions || hasPendingTriage || hasUnappliedSelections
     }
 
     /// Message for the shared close dialog, switched on phase. The

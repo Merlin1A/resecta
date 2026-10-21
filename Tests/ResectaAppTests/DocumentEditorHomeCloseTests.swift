@@ -8,9 +8,10 @@ import Foundation
 // shared "Close this document?" dialog. Two pure seams are pinned here
 // without a SwiftUI host:
 //
-//  1. `homeNeedsCloseConfirm(hasDrawnRegions:hasPendingTriage:)` — the
-//     confirm gate: drawn/applied regions (Done's own confirm gate) OR a
-//     staged Scan review awaiting the user. Neither → Home closes directly.
+//  1. `homeNeedsCloseConfirm(hasDrawnRegions:hasPendingTriage:hasUnappliedSelections:)`
+//     — the confirm gate: drawn/applied regions (Done's own confirm gate),
+//     a staged Scan review awaiting the user, or search selections not yet
+//     applied. None → Home closes directly.
 //  2. `closeDialogMessage(phaseKind:)` — the shared dialog's message: the
 //     `.verified` literal stays byte-identical to the copy pinned by
 //     `VerificationActionBarDoneConfirmationTests`; every other phase reads
@@ -25,25 +26,51 @@ struct DocumentEditorHomeCloseTests {
     @Test("No regions, no pending review → Home closes directly")
     func noWorkClosesDirectly() {
         #expect(DocumentEditorView.homeNeedsCloseConfirm(
-            hasDrawnRegions: false, hasPendingTriage: false) == false)
+            hasDrawnRegions: false, hasPendingTriage: false, hasUnappliedSelections: false) == false)
     }
 
     @Test("Drawn regions alone → confirm")
     func regionsAloneConfirm() {
         #expect(DocumentEditorView.homeNeedsCloseConfirm(
-            hasDrawnRegions: true, hasPendingTriage: false) == true)
+            hasDrawnRegions: true, hasPendingTriage: false, hasUnappliedSelections: false) == true)
     }
 
     @Test("Pending review alone → confirm")
     func pendingReviewAloneConfirms() {
         #expect(DocumentEditorView.homeNeedsCloseConfirm(
-            hasDrawnRegions: false, hasPendingTriage: true) == true)
+            hasDrawnRegions: false, hasPendingTriage: true, hasUnappliedSelections: false) == true)
     }
 
     @Test("Regions and a pending review → confirm")
     func bothConfirm() {
         #expect(DocumentEditorView.homeNeedsCloseConfirm(
-            hasDrawnRegions: true, hasPendingTriage: true) == true)
+            hasDrawnRegions: true, hasPendingTriage: true, hasUnappliedSelections: false) == true)
+    }
+
+    @Test("Unapplied search selections alone → confirm")
+    func unappliedSelectionsAloneConfirm() {
+        #expect(DocumentEditorView.homeNeedsCloseConfirm(
+            hasDrawnRegions: false, hasPendingTriage: false, hasUnappliedSelections: true) == true)
+    }
+
+    @Test("Home reads the selections rule Redact reads: touched selections owe a confirm, an untouched search does not")
+    func homeReadsTheSelectionsRule() {
+        let redactionState = RedactionState()
+        #expect(DocumentState.hasUnappliedSelections(redactionState) == false)
+        let untouched = SearchState(defaults: makeScratchDefaults().0)
+        redactionState.activeSearch = untouched
+        #expect(DocumentState.hasUnappliedSelections(redactionState) == false)
+        let touched = SearchState(defaults: makeScratchDefaults().0)
+        touched.userModifiedSelections = true
+        redactionState.activeSearch = touched
+        let needsConfirm = DocumentEditorView.homeNeedsCloseConfirm(
+            hasDrawnRegions: false, hasPendingTriage: false,
+            hasUnappliedSelections: DocumentState.hasUnappliedSelections(redactionState))
+        #expect(needsConfirm)
+        #expect(DocumentEditorView.homeCloseRoute(needsConfirm: needsConfirm, sheetPresented: true)
+                == .parkSheetThenDialog)
+        #expect(DocumentEditorView.homeCloseRoute(needsConfirm: needsConfirm, sheetPresented: false)
+                == .presentDialog)
     }
 
     // MARK: - Dialog message
