@@ -229,20 +229,22 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// Run the complete Redact → Verify → Results pipeline.
     /// Stores the Task in documentState.activePipelineTask for cancellation.
     func runFullPipeline(documentOverride: PipelineMode?) {
-        // Defensive entry-point guard. Mirrors the
-        // Redact button's `.disabled` predicate so a stray invocation
-        // (programmatic call, KI-4 re-run handler firing after the
-        // user already kicked off a pipeline) does not corrupt state.
-        // Covers the existing `activePipelineTask == nil` check plus
-        // the triage-sheet check and phase-must-be-`.editing` rule.
-        guard documentState.canStartPipeline(with: redactionState) else { return }
+        // The Redact button's rule, read before any side effect: every
+        // route into a run (the paused banner's Restart, the purge Re-run,
+        // Run Verification's full route) is refused where the button is
+        // disabled, with the button's hint as a notice.
+        if let refusal = documentState.redactRefusal(with: redactionState) {
+            if !refusal.hint.isEmpty { enqueueToast(refusal.hint, severity: .warning) }
+            return
+        }
 
         // At the Apply seam, the Search & Redact sheet mutates
         // `redactionState.regions` and is incompatible with the phases this
         // run enters, and the editor's ONE `.sheet(item:)` slot sits above
         // its phase switch. Tear it down here, the single funnel for Redact,
-        // ⇧⌘R, the resume banner's Restart and the purge re-run. A staged
-        // review cannot be pending here (`canStartPipeline(with:)`).
+        // ⇧⌘R, the resume banner's Restart and the purge re-run. Neither
+        // unapplied selections nor a staged review can be pending here
+        // (`redactRefusal(with:)`).
         redactionState.dismissActiveSearch()
 
         // Snapshot pipeline-affecting settings once at run

@@ -34,7 +34,7 @@ struct RedactionStateDismissActiveSearchTests {
         let source = try loadRepoFile("Sources/ResectaApp/State/PipelineCoordinator.swift")
         guard let fn = source.range(of: "func runFullPipeline(documentOverride: PipelineMode?) {"),
               let startGuard = source.range(
-                of: "guard documentState.canStartPipeline(with: redactionState) else { return }",
+                of: "if let refusal = documentState.redactRefusal(with: redactionState) {",
                 range: fn.upperBound..<source.endIndex),
               let teardown = source.range(
                 of: "redactionState.dismissActiveSearch()",

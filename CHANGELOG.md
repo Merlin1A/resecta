@@ -89,6 +89,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Tapping an already-selected region, or one region of a selected group, without moving it no longer records a Move or Resize step, re-arms Redo or clears the sheet's applied markers.
 - With Add to Selection on, a marquee adds to the selection and an empty marquee leaves it unchanged.
 - VoiceOver announces region resizes.
+- The paused banner's Restart no longer starts a run that Redact itself would refuse: with selected matches not yet applied, or no region left to redact, it shows Redact's notice and leaves the search, the regions and the undo history as they were. The purge Re-run and Run Verification's full run are refused the same way when no region is left.
 
 ### Internal
 

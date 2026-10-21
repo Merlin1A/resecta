@@ -329,6 +329,37 @@ class DocumentState {
         canStartPipeline && redactionState.pendingTriage == nil
     }
 
+    /// Why Redact may not start now. The button, ⇧⌘R and the run funnel
+    /// (`PipelineCoordinator.runFullPipeline`) read this one rule.
+    enum RedactRefusal: Equatable {
+        /// The live search session holds selections the user has not
+        /// applied; a run would tear the session down and drop them.
+        case selectedMatches
+        /// No region survives the minimum-dimension filter.
+        case noRegions
+        /// The pipeline-start predicate is false (another phase, a run in
+        /// flight, or a pending review); no hint.
+        case busy
+
+        /// The hint the button speaks and the funnel shows.
+        var hint: String {
+            switch self {
+            case .selectedMatches: return "Apply or clear the selected matches first"
+            case .noRegions: return "Draw regions or apply Scan or Search results first"
+            case .busy: return ""
+            }
+        }
+    }
+
+    /// The refusal that holds now, or nil when Redact may start. The
+    /// selected matches come first, then the missing regions.
+    func redactRefusal(with redactionState: RedactionState) -> RedactRefusal? {
+        if redactionState.activeSearch?.requiresDismissConfirmation ?? false { return .selectedMatches }
+        if !redactionState.hasEffectiveRegions { return .noRegions }
+        if !canStartPipeline(with: redactionState) { return .busy }
+        return nil
+    }
+
     /// True when caller mutations of `redactionState.regions` /
     /// `redactionState.regionMetadata` are a safe transition. False during
     /// phases that the pipeline owns (`.detecting`, `.redacting`,
