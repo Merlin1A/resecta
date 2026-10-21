@@ -199,4 +199,58 @@ struct SearchCoreTests {
         #expect(SearchCore.baseSpan(start: 2, length: 2, offsetMap: map) == 3..<5)
         #expect(SearchCore.baseSpan(start: 3, length: 2, offsetMap: map) == nil)
     }
+
+    // MARK: - The raw page map
+
+    /// Pages that are not single-unit ASCII, each with the SSN after the
+    /// feature: Characters wider than one UTF-16 unit (the emoji, the
+    /// decomposed accent, the non-BMP letter, CR LF), an expansion (the
+    /// ligature), an expansion balanced by a contraction (the compatibility
+    /// jamo pair composes), a cluster that re-forms across a boundary, a
+    /// jamo pair whose pieces re-cluster, and a soft hyphen whose fold to
+    /// "-" joins the combining mark after it.
+    static let mappedPages: [(String, String)] = [
+        ("emoji before", "\u{1F464} SSN 123-45-6789"),
+        ("decomposed accent before", "Jose\u{0301} 123-45-6789"),
+        ("math bold letter before", "\u{1D400} 123-45-6789"),
+        ("CR LF before", "a\r\nb 123-45-6789"),
+        ("ligature before", "\u{FB03}le 123-45-6789"),
+        ("balanced expansion and contraction", "\u{FB01} \u{3131}\u{314F} 123-45-6789"),
+        ("a cluster that re-forms across a boundary", "\u{3131}\u{314F} \u{FB01}le 123-45-6789"),
+        ("a jamo pair that re-clusters", "\u{3131}\u{3187} 123-45-6789"),
+        ("soft hyphen before a combining mark", "x\u{00AD}\u{0301} 123-45-6789"),
+    ]
+
+    @Test("normalizedPage: a single-unit ASCII page carries no map — its Character offsets are the raw UTF-16 offsets")
+    func asciiPageNoMap() {
+        let page = SearchCore.preparePage("SSN 123-45-6789", options: SearchOptions())
+        #expect(page.rawMap == nil)
+        #expect(page.rawNSRange(baseStart: 4, length: 11) == NSRange(location: 4, length: 11))
+        let regexPage = SearchCore.regexPage("SSN 123-45-6789", options: SearchOptions())
+        #expect(regexPage.rawCharacterOfUnit == nil)
+        #expect(regexPage.rawNSRange(NSRange(location: 4, length: 11)) == NSRange(location: 4, length: 11))
+        #expect(regexPage.rawNSRange(NSRange(location: 4, length: 0)) == nil)
+    }
+
+    @Test("normalizedPage: every other page carries a map, one entry per Character, that lands the literal match on its raw UTF-16 range",
+          arguments: mappedPages)
+    func mappedPageLandsOnRawRange(name: String, raw: String) throws {
+        let page = SearchCore.preparePage(raw, options: SearchOptions())
+        let map = try #require(page.rawMap, "\(name)")
+        #expect(map.rawFirst.count == page.baseText.count, "\(name): one entry per base Character")
+        #expect(map.rawUTF16Offsets.last == (raw as NSString).length, "\(name)")
+        let spans = SearchCore.literalSpans(in: page, query: "123-45-6789", comparison: [], wholeWord: false, cap: nil).spans
+        let span = try #require(spans.first, "\(name)")
+        let base = span.base ?? span.searchedCharacters
+        #expect(page.rawNSRange(baseStart: base.lowerBound, length: base.count) == (raw as NSString).range(of: "123-45-6789"),
+                "\(name)")
+    }
+
+    @Test("regexPage: a match range in the normalized text maps to its raw UTF-16 range", arguments: mappedPages)
+    func regexPageLandsOnRawRange(name: String, raw: String) throws {
+        let page = SearchCore.regexPage(raw, options: SearchOptions())
+        let regex = try NSRegularExpression(pattern: "\\d{3}-\\d{2}-\\d{4}")
+        let match = try #require(regex.firstMatch(in: page.text, range: NSRange(location: 0, length: (page.text as NSString).length)), "\(name)")
+        #expect(page.rawNSRange(match.range) == (raw as NSString).range(of: "123-45-6789"), "\(name)")
+    }
 }
