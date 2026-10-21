@@ -97,16 +97,19 @@ struct EULAGateView: View {
             .frame(maxWidth: .infinity, minHeight: viewportHeight, alignment: .center)
         }
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            geometry.containerSize.height - geometry.contentInsets.top - geometry.contentInsets.bottom
+            // containerSize is already inset by the status bar and the I Agree inset.
+            geometry.containerSize.height
         } action: { _, height in
             viewportHeight = max(0, height)
         }
         .scrollBounceBehavior(.basedOnSize)
-        // "I Agree" pinned beneath the scrolling text in a bottom safe-area
-        // inset: the text scrolls under it and fades at the soft edge. The
-        // filled brand tier (the home screen's primary tile), so the
-        // capsule reads the same in both themes.
-        .safeAreaInset(edge: .bottom) {
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
+        // "I Agree" pinned beneath the scrolling text as a bottom bar: the
+        // text scrolls under it and fades at the soft scroll edge (a bar
+        // gets the edge effect; a plain inset does not). The filled brand
+        // tier (the home screen's primary tile), so the capsule reads the
+        // same in both themes.
+        .safeAreaBar(edge: .bottom) {
             Button {
                 disclaimerAccepted = true
                 // Drop any superseded EULA keys so a key bump does not
@@ -126,7 +129,6 @@ struct EULAGateView: View {
             .padding(.vertical, ResectaTokens.Spacing.md)
             .accessibilityIdentifier("eulaAccept")
         }
-        .scrollEdgeEffectStyle(.soft, for: .bottom)
         // Read-only document sheet OVER the gate. `.sheet(item:)`
         // so each document presents its own copy; dismissal clears the item
         // and the un-accepted gate is what remains underneath.

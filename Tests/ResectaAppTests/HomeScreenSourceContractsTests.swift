@@ -145,7 +145,7 @@ struct HomeScreenSourceContractsTests {
         let lineRefs = try NSRegularExpression(pattern: #"\.swift:[0-9]"#)
         #expect(lineRefs.firstMatch(in: gate, range: NSRange(gate.startIndex..., in: gate)) == nil, "a stale file:line reference")
         #expect(!gate.contains("Full-screen cover"))
-        #expect(gate.contains(".safeAreaInset(edge: .bottom)"), "I Agree is pinned beneath the scrolling text")
+        #expect(gate.contains(".safeAreaBar(edge: .bottom)"), "I Agree is pinned beneath the scrolling text as a bar, so the soft edge fades the text under it")
     }
 
     @Test("The progress screen's trust words use the shared line, not the item strip")

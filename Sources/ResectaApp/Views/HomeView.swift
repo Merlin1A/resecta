@@ -63,10 +63,12 @@ struct HomeView: View {
                     .frame(maxWidth: .infinity, minHeight: viewportHeight, alignment: .center)
                 }
                 .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                    geometry.containerSize.height - geometry.contentInsets.top - geometry.contentInsets.bottom
+                    // containerSize is already inset by the bar and the home indicator.
+                    geometry.containerSize.height
                 } action: { _, height in
                     viewportHeight = max(0, height)
                 }
+
                 .scrollBounceBehavior(.basedOnSize)
             }
             .toolbarTitleDisplayMode(.inline)
