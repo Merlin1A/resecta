@@ -128,6 +128,19 @@ struct AdversarialPDFDefenseTests {
          TestFixtures.ocgMembershipDictionaryPDF(reference: .visibilityExpression)),
         ("usage application /AS with every group on",
          TestFixtures.ocgMembershipDictionaryPDF(reference: .usageApplication)),
+        ("type 3 font naming the group, /OFF", TestFixtures.ocgResourceKindPDF(kind: .type3Font)),
+        ("tiling pattern naming the group, /OFF", TestFixtures.ocgResourceKindPDF(kind: .tilingPattern)),
+        ("soft-mask form carrying /OC, /OFF", TestFixtures.ocgResourceKindPDF(kind: .softMask)),
+        ("type 3 font naming a membership dictionary, every group on",
+         TestFixtures.ocgResourceKindPDF(kind: .type3Font, membership: true)),
+        ("tiling pattern naming a membership dictionary, every group on",
+         TestFixtures.ocgResourceKindPDF(kind: .tilingPattern, membership: true)),
+        ("soft-mask form carrying a membership dictionary, every group on",
+         TestFixtures.ocgResourceKindPDF(kind: .softMask, membership: true)),
+        ("/Properties that is an array", TestFixtures.ocgMalformedPDF(shape: .propertiesNotDictionary)),
+        ("form XObject with /OC and no /Subtype", TestFixtures.ocgMalformedPDF(shape: .xobjectWithoutSubtype)),
+        ("/OFF that is a group reference, not an array", TestFixtures.ocgMalformedPDF(shape: .offNotArray)),
+        ("/XObject entry that is a dictionary, not a stream", TestFixtures.ocgMalformedPDF(shape: .xobjectNotStream)),
     ]
 
     static let widenedCleanForms: [(String, Data)] = [
@@ -159,6 +172,55 @@ struct AdversarialPDFDefenseTests {
         let page = try #require(doc.page(at: 0))
         #expect(!TextLayerExtractor.pageReferencesHiddenOCG(page, hasHiddenOCG: false),
                 "\(name): page walk")
+    }
+
+    /// Pages that name no optional content at all: the page walk, told the
+    /// document can hide a layer, still reads them as clean (the control the
+    /// hidden forms above are measured against).
+    static let noOptionalContentPages: [(String, Data)] = [
+        ("plain page", TestFixtures.blankPage()),
+        ("form chain at the depth bound", TestFixtures.plainNestedFormsPDF(depth: TextLayerExtractor.maxFormXObjectDepth)),
+        ("two forms naming each other and themselves", TestFixtures.cyclicFormsPDF()),
+        ("page tree at the depth bound (the page and its ancestors fill the bound)",
+         TestFixtures.deepPageTreePDF(depth: TextLayerExtractor.maxPageTreeDepth - 1)),
+    ]
+
+    @Test("A page naming no optional content reads clean in a document that can hide a layer",
+          arguments: noOptionalContentPages)
+    func noOptionalContentReadsClean(name: String, data: Data) throws {
+        let provider = try #require(CGDataProvider(data: data as CFData))
+        let cgDoc = try #require(CGPDFDocument(provider))
+        #expect(!TextLayerExtractor.documentHasHiddenOCG(cgDoc), "\(name): document walk")
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+        #expect(!TextLayerExtractor.pageReferencesHiddenOCG(page, hasHiddenOCG: true),
+                "\(name): page walk, told the document can hide a layer")
+    }
+
+    @Test("A form chain one past the depth bound is not known clean")
+    func formChainPastTheBoundReadsHidden() throws {
+        let data = TestFixtures.plainNestedFormsPDF(depth: TextLayerExtractor.maxFormXObjectDepth + 1)
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+        #expect(TextLayerExtractor.pageReferencesHiddenOCG(page, hasHiddenOCG: true))
+    }
+
+    @Test("A page whose /Parent chain is a cycle is not known clean")
+    func parentCycleReadsHidden() throws {
+        let data = TestFixtures.parentCyclePDF()
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+        #expect(TextLayerExtractor.pageReferencesHiddenOCG(page, hasHiddenOCG: true))
+    }
+
+    @Test("A page tree one past the depth bound is not known clean")
+    func pageTreePastTheBoundReadsHidden() throws {
+        // The walk reads the page and then its ancestors; one ancestor past
+        // the bound leaves the root, which carries the resources, unread.
+        let data = TestFixtures.deepPageTreePDF(depth: TextLayerExtractor.maxPageTreeDepth)
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+        #expect(TextLayerExtractor.pageReferencesHiddenOCG(page, hasHiddenOCG: true))
     }
 
     @Test("Thousands of forms sharing one resource dictionary: the walk reads the dictionary once and reaches the last form's /OC")
