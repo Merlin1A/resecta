@@ -7,7 +7,8 @@ import PDFKit
 // The hidden-text ink test (C12-01). A Searchable page whose surviving
 // text-layer glyphs include an ink-less box — white-on-white text, an
 // invisible render mode, a box painted over the text in the content
-// stream — is rasterized as an image with the `.hiddenText` reason, so the
+// stream, near-white text, nearly transparent text, text under a nearly
+// opaque box — is rasterized as an image with the `.hiddenText` reason, so the
 // output's text layer never re-exposes what the page hides. Pages whose
 // glyphs all carry ink keep their text layer: ordinary text, pale grey
 // text, small text, text separated by non-breaking-space runs, white text
@@ -60,6 +61,9 @@ struct PageRasterizerHiddenTextTests {
         ("invisible-render-mode", TestFixtures.ctLineDrawCourierPDF()),
         ("one-white-glyph",
          rawPage("BT /F1 12 Tf 72 700 Td (Visible line) Tj ET 1 g BT /F1 12 Tf 72 400 Td (X) Tj ET")),
+        ("near-white", TestFixtures.nearWhiteTextPDF()),
+        ("low-alpha", TestFixtures.lowAlphaTextPDF()),
+        ("translucent-box", TestFixtures.translucentBoxCoveredTextPDF()),
     ]
 
     static let inkedFixtures: [(String, Data)] = [
@@ -93,6 +97,34 @@ struct PageRasterizerHiddenTextTests {
         #expect(result.fallbackReason == nil, "\(name)")
         #expect((result.pageOutput.textLayerEntries?.count ?? 0) > 0, "\(name)")
         #expect(result.filterDigest != nil, "\(name)")
+    }
+
+    // MARK: - The floor's band
+
+    @Test("a box within the tolerance of one colour reads as showing no ink; one level past it does not")
+    func floorBandEdges() throws {
+        let context = try #require(createBitmapContext(width: 16, height: 16))
+        context.setFillColor(CGColor(gray: 200.0 / 255.0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 16, height: 16))
+        let buffer = try #require(context.data).assumingMemoryBound(to: UInt8.self)
+        let box = CGRect(x: 2, y: 2, width: 8, height: 8)
+        // One pixel inside the box, on its last row, moved by Δ then Δ + 1
+        // on one channel.
+        let base = Int(buffer[0])
+        let offset = (context.height - 1 - 9) * context.bytesPerRow + 9 * 4 + 1
+        buffer[offset] = UInt8(base - InkContrastFloor.tolerance)
+        #expect(try InkContrastFloor.maximumDeviation(context: context, rect: box)
+                == InkContrastFloor.tolerance)
+        #expect(try InkContrastFloor.isNearUniform(context: context, rect: box))
+        buffer[offset] = UInt8(base - InkContrastFloor.tolerance - 1)
+        #expect(try InkContrastFloor.maximumDeviation(context: context, rect: box)
+                == InkContrastFloor.tolerance + 1)
+        #expect(try !InkContrastFloor.isNearUniform(context: context, rect: box))
+        // With the box uniform again, a pixel outside it moves nothing.
+        buffer[offset] = UInt8(base)
+        buffer[(context.height - 1 - 12) * context.bytesPerRow + 12 * 4] = 0
+        #expect(try InkContrastFloor.maximumDeviation(context: context, rect: box) == 0)
+        #expect(try InkContrastFloor.isNearUniform(context: context, rect: box))
     }
 
     // MARK: - The visible page
