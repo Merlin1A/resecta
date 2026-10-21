@@ -8,12 +8,22 @@ import RedactionEngine
 
 struct HonestyDisclaimer: View {
     var profile: DocumentProfile
+    /// `.centered` — a block of its own; `.sectionFooter` — a section's
+    /// footer: leading, in the support tier.
+    var style: Style = .centered
+
+    enum Style {
+        case centered
+        case sectionFooter
+    }
 
     var body: some View {
         Text(disclaimerText)
             .font(.caption)
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
+            .foregroundStyle(style == .sectionFooter
+                ? AnyShapeStyle(ResectaTokens.SemanticColor.supportText) : AnyShapeStyle(.secondary))
+            .multilineTextAlignment(style == .sectionFooter ? .leading : .center)
+            .lineSpacing(style == .sectionFooter ? 2 : 0)
             .accessibilityLabel("Disclaimer: \(disclaimerText)")
     }
 
