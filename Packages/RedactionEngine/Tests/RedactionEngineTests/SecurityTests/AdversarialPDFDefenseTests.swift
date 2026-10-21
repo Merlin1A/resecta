@@ -120,14 +120,24 @@ struct AdversarialPDFDefenseTests {
         ("inherited resources", TestFixtures.ocgInheritedResourcesPDF()),
         ("form xobject with /OC", TestFixtures.ocgFormXObjectPDF()),
         ("nested form xobject naming the group", TestFixtures.ocgFormXObjectPDF(nested: true)),
+        ("base state off, /ON naming one group twice and the other never",
+         TestFixtures.ocgBaseStateOffPDF(duplicateOn: true)),
+        ("membership dictionary /P /AllOff with every group on",
+         TestFixtures.ocgMembershipDictionaryPDF(reference: .allOff)),
+        ("membership dictionary /VE [/Not g] with every group on",
+         TestFixtures.ocgMembershipDictionaryPDF(reference: .visibilityExpression)),
+        ("usage application /AS with every group on",
+         TestFixtures.ocgMembershipDictionaryPDF(reference: .usageApplication)),
     ]
 
     static let widenedCleanForms: [(String, Data)] = [
         ("plain page", TestFixtures.blankPage()),
         ("base state off with every group on", TestFixtures.ocgBaseStateOffPDF(everyGroupOn: true)),
+        ("every group on, a plain group reference",
+         TestFixtures.ocgMembershipDictionaryPDF(reference: .plainGroup)),
     ]
 
-    @Test("The document walk and the page walk read the three widened forms as hidden",
+    @Test("The document walk and the page walk read the widened forms as hidden",
           arguments: widenedHiddenForms)
     func widenedFormsReadHidden(name: String, data: Data) throws {
         let provider = try #require(CGDataProvider(data: data as CFData))
@@ -139,7 +149,7 @@ struct AdversarialPDFDefenseTests {
                 "\(name): page walk")
     }
 
-    @Test("A plain page and an OFF base state that turns every group back on are clean",
+    @Test("A plain page, an OFF base state that turns every group back on, and a plain group in an all-on document are clean",
           arguments: widenedCleanForms)
     func widenedCleanFormsPass(name: String, data: Data) throws {
         let provider = try #require(CGDataProvider(data: data as CFData))
@@ -149,6 +159,18 @@ struct AdversarialPDFDefenseTests {
         let page = try #require(doc.page(at: 0))
         #expect(!TextLayerExtractor.pageReferencesHiddenOCG(page, hasHiddenOCG: false),
                 "\(name): page walk")
+    }
+
+    @Test("Thousands of forms sharing one resource dictionary: the walk reads the dictionary once and reaches the last form's /OC")
+    func sharedResourceDictionaryWalkedOnce() throws {
+        let data = TestFixtures.ocgSharedResourceDictionaryPDF(forms: 3_000)
+        let provider = try #require(CGDataProvider(data: data as CFData))
+        let cgDoc = try #require(CGPDFDocument(provider))
+        #expect(TextLayerExtractor.documentHasHiddenOCG(cgDoc), "document walk: the /OFF array")
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+        #expect(TextLayerExtractor.pageReferencesHiddenOCG(page, hasHiddenOCG: true),
+                "page walk: the last form carries /OC")
     }
 
     @Test("Hidden-OCG without precomputed flag still falls open (M1 documents requirement)")
