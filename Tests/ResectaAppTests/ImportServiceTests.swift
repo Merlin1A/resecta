@@ -99,10 +99,9 @@ struct ImportServiceTests {
         #expect(doc.textLayerStatus.count == doc.pageCount)
     }
 
-    // MARK: - Image bytes are refused
+    // MARK: - Image bytes open as a page
 
-    /// Resecta opens PDF files only: image bytes meet the unsupported-format
-    /// refusal at the data door, before any decode, and nothing is loaded.
+    /// The unsupported-format refusal at the data door, before any decode.
     private func expectUnsupportedFormatRefusal(_ doc: DocumentState) {
         #expect(doc.phaseKind == .failed)
         #expect(doc.sourceDocument == nil)
@@ -115,8 +114,18 @@ struct ImportServiceTests {
         }
     }
 
-    @Test("JPEG bytes are refused as an unsupported format")
-    func jpegBytesRefusedAsUnsupportedFormat() async {
+    /// JPEG, PNG and HEIC bytes take the image loader: one page drawn from
+    /// the decoded pixels, with the image facts recorded on the state.
+    private func expectOnePageImage(_ doc: DocumentState) {
+        #expect(doc.phaseKind == .editing)
+        #expect(doc.sourceDocument?.pageCount == 1)
+        #expect(doc.sourceFacts.origin == .images(count: 1))
+        #expect(doc.textLayerStatus == [0: TextLayerStatus.none])
+        #expect(doc.sourceHasHiddenOCG == false)
+    }
+
+    @Test("JPEG bytes open as a one-page document")
+    func jpegBytesOpenAsOnePage() async {
         let doc = DocumentState()
         let redaction = RedactionState()
 
@@ -124,11 +133,11 @@ struct ImportServiceTests {
             data: makeJPEGImageData(), suggestedType: "jpg",
             documentState: doc, redactionState: redaction)
 
-        expectUnsupportedFormatRefusal(doc)
+        expectOnePageImage(doc)
     }
 
-    @Test("PNG bytes are refused as an unsupported format")
-    func pngBytesRefusedAsUnsupportedFormat() async {
+    @Test("PNG bytes open as a one-page document")
+    func pngBytesOpenAsOnePage() async {
         let doc = DocumentState()
         let redaction = RedactionState()
 
@@ -136,11 +145,11 @@ struct ImportServiceTests {
             data: makePNGImageData(), suggestedType: "png",
             documentState: doc, redactionState: redaction)
 
-        expectUnsupportedFormatRefusal(doc)
+        expectOnePageImage(doc)
     }
 
-    @Test("Image bytes are refused whatever type the caller declares")
-    func imageBytesRefusedWhateverTheDeclaredType() async {
+    @Test("Image bytes take the image loader whatever type the caller declares")
+    func imageBytesRouteByTheirBytesWhateverTheDeclaredType() async {
         let doc = DocumentState()
         let redaction = RedactionState()
 
@@ -149,7 +158,73 @@ struct ImportServiceTests {
             data: makeJPEGImageData(), suggestedType: "pdf",
             documentState: doc, redactionState: redaction)
 
-        expectUnsupportedFormatRefusal(doc)
+        expectOnePageImage(doc)
+    }
+
+    @Test("A WEBP payload is refused as an unsupported format before any decode")
+    func webpBytesRefusedAsUnsupportedFormat() async {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        let webp = Data([0x52, 0x49, 0x46, 0x46, 0x1A, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+                         0x56, 0x50, 0x38, 0x4C, 0x0E, 0x00, 0x00, 0x00, 0x2F, 0x00, 0x00, 0x00,
+                         0x00, 0x07, 0x10, 0x11, 0x11, 0x88, 0x88, 0xFE, 0x07, 0x00])
+
+        await ImportService.importDocument(
+            data: webp, suggestedType: "webp",
+            documentState: doc, redactionState: redaction)
+
+        #expect(doc.phaseKind == .failed)
+        #expect(doc.sourceDocument == nil)
+        if case .failed(let error, _) = doc.phase {
+            if case .importError(.unsupportedFormat) = error {
+                // Expected
+            } else {
+                Issue.record("Expected .importError(.unsupportedFormat), got \(error)")
+            }
+        }
+    }
+
+    @Test("The Photos door opens picked images as pages in pick order")
+    func photosDoorOpensImagesInOrder() async {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        let items = [makeJPEGImageData(), makePNGImageData(), makeJPEGImageData()]
+        let stream = AsyncThrowingStream<Data, any Error> { continuation in
+            for item in items { continuation.yield(item) }
+            continuation.finish()
+        }
+
+        let outcome = await ImportService.importImages(
+            stream, count: items.count, documentState: doc, redactionState: redaction)
+
+        #expect(outcome == .completed)
+        #expect(doc.phaseKind == .editing)
+        #expect(doc.sourceDocument?.pageCount == 3)
+        #expect(doc.sourceFacts.origin == .images(count: 3))
+    }
+
+    @Test("A Photos pick whose stream refuses an item refuses the whole import")
+    func photosDoorRefusesTheWholeImport() async {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        let stream = AsyncThrowingStream<Data, any Error> { continuation in
+            continuation.yield(makeJPEGImageData())
+            continuation.finish(throwing: PipelineError.importError(.unsupportedFormat))
+        }
+
+        let outcome = await ImportService.importImages(
+            stream, count: 2, documentState: doc, redactionState: redaction)
+
+        #expect(outcome == .refused)
+        #expect(doc.phaseKind == .failed)
+        #expect(doc.sourceDocument == nil)
+        if case .failed(let error, _) = doc.phase {
+            if case .importError(.unsupportedFormat) = error {
+                // Expected
+            } else {
+                Issue.record("Expected .importError(.unsupportedFormat), got \(error)")
+            }
+        }
     }
 
     // MARK: - Validation Failures
@@ -280,15 +355,15 @@ struct ImportServiceTests {
         }
     }
 
-    @Test("An oversized image is refused as an unsupported format, before any decode")
-    func oversizedImageRefusedBeforeDecode() async {
+    @Test("A 5,001 × 100 image opens as a page of its pixel size at 300 pixels per inch")
+    func wideImageOpensAtItsPixelSize() async {
         let doc = DocumentState()
         let redaction = RedactionState()
-        // One dimension past the page cap: the refusal is the format's, not
-        // the page-size check's, because the image is never decoded.
+        // One dimension past the PDF page cap in points is no cap for an
+        // image: the page is px × 72/300 pt, inside the page limits.
         let size = CGSize(width: 5001, height: 100)
         let renderer = UIGraphicsImageRenderer(size: size)
-        let data = renderer.jpegData(withCompressionQuality: 0.5) { ctx in
+        let data = renderer.jpegData(withCompressionQuality: 0.8) { ctx in
             UIColor.white.setFill()
             ctx.fill(CGRect(origin: .zero, size: size))
         }
@@ -297,7 +372,18 @@ struct ImportServiceTests {
             data: data, suggestedType: "jpg",
             documentState: doc, redactionState: redaction)
 
-        expectUnsupportedFormatRefusal(doc)
+        #expect(doc.phaseKind == .editing)
+        // The renderer draws at the screen scale, so read the fixture's own
+        // pixel size; the page is that size at 300 pixels per inch, with a
+        // long side kept to 8,000 pixels.
+        let source = CGImageSourceCreateWithData(data as CFData, nil)!
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] ?? [:]
+        let pixelWidth = props[kCGImagePropertyPixelWidth] as? Int ?? 0
+        let pixelHeight = props[kCGImagePropertyPixelHeight] as? Int ?? 0
+        let box = doc.sourceDocument?.page(at: 0)?.bounds(for: .mediaBox) ?? .zero
+        let expectedWidth = CGFloat(min(pixelWidth, 8_000)) * 72 / 300
+        #expect(abs(box.width - expectedWidth) < 0.5, "fixture \(pixelWidth)×\(pixelHeight) px → page \(box.width)×\(box.height) pt")
+        #expect(abs(box.width / box.height - CGFloat(pixelWidth) / CGFloat(pixelHeight)) < 0.5, "the aspect is kept")
     }
 
     @Test("Import preserves old document until validation succeeds")
