@@ -113,11 +113,11 @@ struct VerificationScheduleTests {
             shortDescription: SearchRecheck.infoMessage,
             detailDescription: "",
             pageReferences: nil, durationSeconds: 0, layer: .searchRecheck)
-        // The results view's grouping predicates: NOTES = info; FINDINGS =
-        // warn / attention / fail / skipped.
+        // The results view's grouping predicates: an idle re-check has
+        // nothing to check; Findings = warn / attention / fail / skipped.
         #expect(row.status.isInfo)
         #expect(!row.status.isWarn && !row.status.isAttention && !row.status.isFail && !row.status.isSkipped)
-        #expect(LayerResultRow.rowSubtitleText(layer: row) == SearchRecheck.infoMessage)
+        #expect(VerificationRowModel(layer: row, perPageModes: []).caption == "No searches to re-run.")
         #expect(row.completionAnnouncement(layerNumber: 6)
                 == "Layer 6, Search Re-check, \(row.status.layerAccessibilityPhrase) \(SearchRecheck.infoMessage)")
     }

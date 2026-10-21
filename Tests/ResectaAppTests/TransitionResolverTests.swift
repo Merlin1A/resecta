@@ -80,8 +80,8 @@ struct TransitionResolverTests {
         // The ref's own count — a drift here means either a site was
         // added/removed elsewhere, or (more likely) a comment mentioning
         // `.move(edge` inflated the count; keep this in sync deliberately.
-        #expect(totalMoveEdgeSites == 11,
-                "expected 11 `.move(edge` sites under Sources/ResectaApp/Views, found \(totalMoveEdgeSites)")
+        #expect(totalMoveEdgeSites == 9,
+                "expected 9 `.move(edge` sites under Sources/ResectaApp/Views, found \(totalMoveEdgeSites)")
     }
 
     /// For every occurrence of a REAL `.move(edge: .something)` call in

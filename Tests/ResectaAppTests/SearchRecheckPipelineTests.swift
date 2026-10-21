@@ -234,8 +234,8 @@ struct SearchRecheckPipelineTests {
         #expect(last.reviewTermTexts == [Self.term], "the BARE query text — the row quotes it itself")
         #expect(last.pageReferences == [1])
         #expect(last.queryLines?.first?.remainingCount == 1)
-        #expect(LayerResultRow.rowSubtitleText(layer: last)
-                == LayerResultRow.reviewRowText(termTexts: [Self.term], pages: [1]))
+        #expect(VerificationRowModel(layer: last, perPageModes: []).caption
+                == "Your search \u{201C}\(Self.term)\u{201D} still has 1 match on\u{00A0}page\u{00A0}2.")
         #expect(LayerResultRow.queryLineTexts(layer: last)
                 == ["\u{201C}\(Self.term)\u{201D} · 2 found · 2 redacted · 1 remaining"])
 

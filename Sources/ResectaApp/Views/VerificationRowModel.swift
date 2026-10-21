@@ -138,10 +138,14 @@ nonisolated struct VerificationRowModel: Equatable {
     /// pages.
     let spokenLabel: String
 
-    init(layer: LayerResult, perPageModes: [PipelineMode]) {
+    /// `pagesOnChips`: the row's page links carry the pages, so an
+    /// app-composed caption drops its page phrase (engine captions stay
+    /// verbatim); false while the redacted PDF is missing.
+    init(layer: LayerResult, perPageModes: [PipelineMode], pagesOnChips: Bool = false) {
         let outcome = Self.outcome(for: layer, perPageModes: perPageModes)
         let title = Self.title(for: layer)
-        let caption = Self.caption(for: layer, outcome: outcome, perPageModes: perPageModes)
+        let caption = Self.caption(for: layer, outcome: outcome, perPageModes: perPageModes,
+                                   pagesOnChips: pagesOnChips)
         self.title = title
         self.explainer = layer.layer.map { Self.explainer(for: $0, perPageModes: perPageModes) }
         self.rule = Self.rule(for: layer)
@@ -332,14 +336,14 @@ nonisolated struct VerificationRowModel: Equatable {
 
     /// The caption under the title, by outcome — never by text.
     static func caption(for layer: LayerResult, outcome: VerificationOutcome,
-                        perPageModes: [PipelineMode] = []) -> String? {
+                        perPageModes: [PipelineMode] = [], pagesOnChips: Bool = false) -> String? {
         switch outcome {
         case .passed:
             return layer.layer.map { explainer(for: $0, perPageModes: perPageModes) } ?? layer.shortDescription
         case .nothingToCheck:
             return layer.layer.flatMap(nothingToCheckReason(for:)) ?? layer.shortDescription
         case .note:
-            return hasItemsRemaining(layer) ? sweepRemainingCaption(layer) : layer.shortDescription
+            return hasItemsRemaining(layer) ? sweepRemainingCaption(layer, pagesOnChips: pagesOnChips) : layer.shortDescription
         case .couldNotVerify where layer.status.isSkipped:
             return skippedCaption
         case .warning, .couldNotVerify, .failed:
@@ -347,11 +351,13 @@ nonisolated struct VerificationRowModel: Equatable {
         case .needsReview:
             if composesTermCaption(layer) {
                 return layer.reviewIsFragment
-                    ? fragmentSentence(termTexts: layer.reviewTermTexts ?? [], pages: layer.pageReferences)
-                    : reviewSentence(termTexts: layer.reviewTermTexts ?? [], pages: layer.pageReferences)
+                    ? fragmentSentence(termTexts: layer.reviewTermTexts ?? [], pages: layer.pageReferences,
+                                       pagesOnChips: pagesOnChips)
+                    : reviewSentence(termTexts: layer.reviewTermTexts ?? [], pages: layer.pageReferences,
+                                     pagesOnChips: pagesOnChips)
             }
             if composesRecheckCaption(layer) {
-                return recheckReviewCaption(layer)
+                return recheckReviewCaption(layer, pagesOnChips: pagesOnChips)
             }
             return layer.shortDescription
         }
@@ -369,9 +375,14 @@ nonisolated struct VerificationRowModel: Equatable {
                     ? "Run it again with OCR on to redact the rest."
                     : "Run them again with OCR on to redact the rest."]
             }
-            if composesTermCaption(layer), layer.layer == .operatorReExtraction,
-               let stop = contentStreamStopLine(pages: layer.pageReferences, pageCount: perPageModes.count) {
-                return [stop]
+            if composesTermCaption(layer) {
+                let terms = normalizedTerms(layer.reviewTermTexts ?? [])
+                var lines = [reviewLead(termCount: terms.count)]
+                if layer.layer == .operatorReExtraction,
+                   let stop = contentStreamStopLine(pages: layer.pageReferences, pageCount: perPageModes.count) {
+                    lines.append(stop)
+                }
+                return lines
             }
             return []
         default:
@@ -428,39 +439,47 @@ nonisolated struct VerificationRowModel: Equatable {
         listPhrase(terms.map { "\u{201C}\($0)\u{201D}" })
     }
 
-    /// The needs-review caption of a term row: names the term(s), where they
-    /// remain, and the remedy. Pages are 0-based storage, displayed 1-based.
-    static func reviewSentence(termTexts: [String], pages: [Int]?) -> String {
+    /// The needs-review caption of a term row: names the term(s) and where
+    /// they remain — the pages on the chips when they show, else "on page
+    /// 2", else "in the PDF". Pages are 0-based storage, displayed 1-based.
+    static func reviewSentence(termTexts: [String], pages: [Int]?, pagesOnChips: Bool = false) -> String {
         let terms = normalizedTerms(termTexts)
-        let one = terms.count == 1
+        let verb = terms.count == 1 ? "is" : "are"
+        let hasPages = !(pages ?? []).isEmpty
+        if pagesOnChips, hasPages { return "\(quotedList(terms)) \(verb) still readable." }
         let location = pageLocation(pages) ?? "in the PDF"
-        let matchClause = one ? "It matches text you redacted." : "They match text you redacted."
-        return "\(quotedList(terms)) \(one ? "is" : "are") still readable \(location). \(matchClause) "
-            + "Use text\u{00A0}search to redact the rest."
+        return "\(quotedList(terms)) \(verb) still readable \(location)."
+    }
+
+    /// A term row's lead: what the text is and the remedy.
+    static func reviewLead(termCount: Int) -> String {
+        (termCount == 1 ? "It matches text you redacted." : "They match text you redacted.")
+            + " Use text\u{00A0}search to redact the rest."
     }
 
     /// The needs-review caption of the OCR Check's edge-fragment arm
     /// (`LayerResult.reviewIsFragment`): part of the term is readable
     /// beside a redaction box — the box is short of its text, so the remedy
     /// is the box, not a search. Pages are 0-based storage, displayed 1-based.
-    static func fragmentSentence(termTexts: [String], pages: [Int]?) -> String {
+    static func fragmentSentence(termTexts: [String], pages: [Int]?, pagesOnChips: Bool = false) -> String {
         let terms = normalizedTerms(termTexts)
         let one = terms.count == 1
-        let location = pageLocation(pages) ?? "in the PDF"
         let oneBox = (pages?.count ?? 1) == 1
         let boxes = oneBox ? "a redaction box" : "redaction boxes"
         let remedy = oneBox ? "Adjust the box and redact again." : "Adjust the boxes and redact again."
-        return "\(one ? "Part" : "Parts") of \(quotedList(terms)) \(one ? "is" : "are") readable beside \(boxes) \(location). \(remedy)"
+        let hasPages = !(pages ?? []).isEmpty
+        let location = pagesOnChips && hasPages ? "" : " \(pageLocation(pages) ?? "in the PDF")"
+        return "\(one ? "Part" : "Parts") of \(quotedList(terms)) \(one ? "is" : "are") readable beside \(boxes)\(location). \(remedy)"
     }
 
     /// The Search Re-check's needs-review caption: the searches that still
     /// match, how many matches remain and where.
-    static func recheckReviewCaption(_ layer: LayerResult) -> String {
+    static func recheckReviewCaption(_ layer: LayerResult, pagesOnChips: Bool = false) -> String {
         let lines = matchingQueryLines(layer)
         let total = lines.reduce(0) { $0 + $1.remainingCount }
         let labels = listPhrase(lines.map(\.label))
         let matches = total == 1 ? "1 match" : "\(total) matches"
-        let location = pageLocation(layer.pageReferences).map { " \($0)" } ?? ""
+        let location = pagesOnChips ? "" : (pageLocation(layer.pageReferences).map { " \($0)" } ?? "")
         return lines.count == 1
             ? "Your search \(labels) still has \(matches)\(location)."
             : "Your searches \(labels) still have \(matches)\(location)."
@@ -483,13 +502,17 @@ nonisolated struct VerificationRowModel: Equatable {
     /// otherwise — an applied scan's line counts what the user left, which
     /// the report does not separate — "Further possible items remain on
     /// pages 1 and 3.".
-    static func sweepRemainingCaption(_ layer: LayerResult) -> String {
+    static func sweepRemainingCaption(_ layer: LayerResult, pagesOnChips: Bool = false) -> String {
         let lines = layer.queryLines ?? []
         let total = lines.reduce(0) { $0 + $1.remainingCount }
-        let location = pageLocation(layer.pageReferences).map { " \($0)" } ?? ""
+        let pages = layer.pageReferences ?? []
+        let location = pageLocation(pages).map { " \($0)" } ?? ""
         if !lines.isEmpty, lines.allSatisfy(isUnappliedSweepLine), total > 0 {
             let items = total == 1 ? "1 possible item remains" : "\(total) possible items remain"
-            return "\(items)\(location)."
+            return pagesOnChips ? "\(items)." : "\(items)\(location)."
+        }
+        if pagesOnChips, !pages.isEmpty {
+            return "Further possible items remain on \(pages.count == 1 ? "1 page" : "\(pages.count) pages")."
         }
         return "Further possible items remain\(location)."
     }

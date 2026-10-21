@@ -267,24 +267,12 @@ struct VerificationDisplayTests {
                 == "Keep\u{00A0}Editing, then use text\u{00A0}search to redact the terms below.")
     }
 
-    @Test("Share tile tint: FAIL red, ATTENTION pink, WARN none")
-    func shareTintPerVerdict() {
-        func report(_ status: VerificationStatus) -> VerificationReport {
-            VerificationReport(layers: [], overallStatus: status, durationSeconds: 0)
-        }
-        #expect(VerificationResultsView.shareTintColor(report: report(.fail("f"))) == .red)
-        #expect(VerificationResultsView.shareTintColor(report: report(.attention("a"))) == .pink)
-        #expect(VerificationResultsView.shareTintColor(report: report(.warn("w"))) == nil)
-        #expect(VerificationResultsView.shareTintColor(report: report(.pass)) == nil)
-    }
-
     // MARK: - Privacy-sensitive marking
 
-    // The masthead subtitle and the collapsed row subtitle render user text
-    // on exactly one arm each — the ATTENTION sentence that quotes the
-    // review terms. The views read these predicates for `.privacySensitive`,
-    // so the mechanism copy on every other arm stays readable under a
-    // capture while the quoted text does not.
+    // The masthead sentence renders user text on one arm — the ATTENTION
+    // sentence that quotes the review terms. The view reads this predicate
+    // for `.privacySensitive`, so the mechanism copy on every other arm
+    // stays readable under a capture while the quoted text does not.
 
     @Test("Masthead subtitle is privacy-sensitive on ATTENTION only — the one arm that quotes user text",
           arguments: [
@@ -303,28 +291,6 @@ struct VerificationDisplayTests {
         #expect(VerificationResultsView.mastheadSubtitleIsPrivacySensitive(report: report) == expected)
     }
 
-    @Test("Row subtitle is privacy-sensitive only for an ATTENTION row that names terms")
-    func rowSubtitlePrivacyPredicate() {
-        func row(_ status: VerificationStatus, terms: [String]?) -> LayerResult {
-            LayerResult(name: "Binary String Search", symbolName: "shield", status: status,
-                        shortDescription: "short", detailDescription: "",
-                        pageReferences: [1], durationSeconds: 0,
-                        reviewTermTexts: terms)
-        }
-        // The one true combination: attention plus at least one term.
-        #expect(LayerResultRow.rowSubtitleIsPrivacySensitive(layer: row(.attention("a"), terms: ["DELIA"])))
-        // Attention without terms falls back to `shortDescription` — mechanism copy.
-        #expect(!LayerResultRow.rowSubtitleIsPrivacySensitive(layer: row(.attention("a"), terms: nil)))
-        #expect(!LayerResultRow.rowSubtitleIsPrivacySensitive(layer: row(.attention("a"), terms: [])))
-        // Every other status shows its own description, terms or not.
-        for status in [VerificationStatus.pass, .warn("w"), .fail("f"), .skipped, .info("i")] {
-            #expect(!LayerResultRow.rowSubtitleIsPrivacySensitive(layer: row(status, terms: ["DELIA"])),
-                    "\(status) must not be marked")
-            #expect(!LayerResultRow.rowSubtitleIsPrivacySensitive(layer: row(status, terms: nil)),
-                    "\(status) must not be marked")
-        }
-    }
-
     // MARK: - Details summary line (stock copy; exact-string pins)
 
     private func layer(_ status: VerificationStatus) -> LayerResult {
@@ -336,7 +302,7 @@ struct VerificationDisplayTests {
     // MARK: - Masthead sentence on PASS
 
     // PASS names Preview when no note shows, and the notes when they do;
-    // the Verification Details header still carries the counts. INFO never
+    // the sections still carry the counts. INFO never
     // aggregates; it reads as a pass.
     @Test("PASS masthead sentence — 5-check, 10-check, and INFO-bearing runs")
     func passMastheadSentence() {
@@ -353,7 +319,7 @@ struct VerificationDisplayTests {
             layers: [layer(.pass), layer(.pass), layer(.info("a")), layer(.info("b"))],
             overallStatus: .pass, durationSeconds: 1.0)
         #expect(VerificationResultsView.mastheadSubtitle(report: withNotes)
-                == "Read the notes in Verification Details before you share the PDF.")
+                == "Read the notes below before you share the PDF.")
         // The count and the notes survive one row down; a note is not a pass.
         #expect(VerificationResultsView.detailsSummaryText(for: withNotes)
                 == "2 of 4 checks passed · 2\u{00A0}notes")
@@ -361,7 +327,7 @@ struct VerificationDisplayTests {
         let info = VerificationReport(
             layers: [layer(.info("i"))], overallStatus: .info("i"), durationSeconds: 0)
         #expect(VerificationResultsView.mastheadSubtitle(report: info)
-                == "Read the note in Verification Details before you share the PDF.")
+                == "Read the note below before you share the PDF.")
     }
 
     @Test("Every non-PASS verdict keeps a masthead subtitle",
@@ -482,57 +448,33 @@ struct AttentionRowCompositionTests {
             reviewTermTexts: terms, layer: .binaryStringSearch)
     }
 
-    private let one = " It matches text you redacted. Use text\u{00A0}search to redact the rest."
-
     @Test("Single term, two pages — the PD-15 sample shape")
     func singleTermTwoPages() {
-        let text = LayerResultRow.reviewRowText(termTexts: ["DELIA"], pages: [1, 2])
-        #expect(text == "\u{201C}DELIA\u{201D} is still readable on pages 2\u{00A0}and\u{00A0}3." + one)
+        let text = VerificationRowModel.reviewSentence(termTexts: ["DELIA"], pages: [1, 2])
+        #expect(text == "\u{201C}DELIA\u{201D} is still readable on pages 2\u{00A0}and\u{00A0}3.")
+        #expect(VerificationRowModel.reviewSentence(termTexts: ["DELIA"], pages: [1, 2], pagesOnChips: true)
+                == "\u{201C}DELIA\u{201D} is still readable.")
     }
 
     @Test("Single term, one page")
     func singleTermOnePage() {
-        let text = LayerResultRow.reviewRowText(termTexts: ["DELIA"], pages: [1])
-        #expect(text == "\u{201C}DELIA\u{201D} is still readable on\u{00A0}page\u{00A0}2." + one)
+        let text = VerificationRowModel.reviewSentence(termTexts: ["DELIA"], pages: [1])
+        #expect(text == "\u{201C}DELIA\u{201D} is still readable on\u{00A0}page\u{00A0}2.")
     }
 
     @Test("Multiple terms, three pages")
     func multiTermThreePages() {
-        let text = LayerResultRow.reviewRowText(
-            termTexts: ["DELIA", "Hartwell"], pages: [0, 1, 4])
+        let text = VerificationRowModel.reviewSentence(termTexts: ["DELIA", "Hartwell"], pages: [0, 1, 4])
         #expect(text == "\u{201C}DELIA\u{201D} and \u{201C}Hartwell\u{201D} are still readable on pages 1, "
-                + "2,\u{00A0}and\u{00A0}5. They match text you redacted. Use text\u{00A0}search to redact the rest.")
+                + "2,\u{00A0}and\u{00A0}5.")
+        #expect(VerificationRowModel.reviewLead(termCount: 2)
+                == "They match text you redacted. Use text\u{00A0}search to redact the rest.")
     }
 
     @Test("No page references falls back to a document-wide phrase")
     func noPages() {
-        let text = LayerResultRow.reviewRowText(termTexts: ["acme"], pages: nil)
-        #expect(text == "\u{201C}acme\u{201D} is still readable in the PDF." + one)
-    }
-
-    @Test("rowSubtitleText composes for attention rows with terms")
-    func subtitleComposesForAttention() {
-        let layer = attentionLayer(terms: ["DELIA"], pages: [1, 2])
-        #expect(LayerResultRow.rowSubtitleText(layer: layer)
-                == LayerResultRow.reviewRowText(termTexts: ["DELIA"], pages: [1, 2]))
-    }
-
-    @Test("rowSubtitleText falls back to shortDescription without terms")
-    func subtitleFallsBackWithoutTerms() {
-        let noTerms = attentionLayer(terms: nil, pages: [1])
-        #expect(LayerResultRow.rowSubtitleText(layer: noTerms) == "engine short line")
-        let emptyTerms = attentionLayer(terms: [], pages: [1])
-        #expect(LayerResultRow.rowSubtitleText(layer: emptyTerms) == "engine short line")
-    }
-
-    @Test("Non-attention rows keep their shortDescription")
-    func nonAttentionUnchanged() {
-        let warn = LayerResult(
-            name: "OCR Check", symbolName: "shield", status: .warn("w"),
-            shortDescription: "warn line", detailDescription: "",
-            pageReferences: nil, durationSeconds: 0,
-            reviewTermTexts: ["should be ignored"])
-        #expect(LayerResultRow.rowSubtitleText(layer: warn) == "warn line")
+        let text = VerificationRowModel.reviewSentence(termTexts: ["acme"], pages: nil, pagesOnChips: true)
+        #expect(text == "\u{201C}acme\u{201D} is still readable in the PDF.")
     }
 
     @Test("Spoken row label speaks the composed attention sentence")
@@ -639,9 +581,6 @@ struct SearchRecheckQueryLineDisplayTests {
             status: .attention("Re-ran 1 search — 1 match remains on page 2"),
             queryLines: [line], reviewTermTexts: ["Delia"], pages: [1])
 
-        // The collapsed subtitle IS the Layer-3 sentence — no copy fork.
-        #expect(LayerResultRow.rowSubtitleText(layer: layer)
-                == LayerResultRow.reviewRowText(termTexts: ["Delia"], pages: [1]))
         let spoken = LayerResultRow.accessibilityLabel(model: .init(layer: layer, perPageModes: []), layer: layer)
         #expect(spoken == "Search Re-check, Needs review. Your search \u{201C}Delia\u{201D} still has 1 match "
                 + "on\u{00A0}page\u{00A0}2. Page 2.")
@@ -666,10 +605,9 @@ struct SearchRecheckQueryLineDisplayTests {
                 == "Keep\u{00A0}Editing, then use text\u{00A0}search to redact \u{201C}Delia\u{201D}.")
         #expect(VerificationResultsView.reviewTermTexts(report: report) == ["Delia"])
         #expect(VerificationResultsView.detailsSummaryText(for: report) == "0 of 3 checks passed · 3\u{00A0}need review")
-        // The OCR check's attention row reuses the same sentence — no copy
-        // fork for a third layer.
-        #expect(LayerResultRow.rowSubtitleText(layer: layer2)
-                == LayerResultRow.reviewRowText(termTexts: ["Delia"], pages: [1]))
+        // The OCR check's row composes the same sentence as the bytes search.
+        #expect(VerificationRowModel(layer: layer2, perPageModes: []).caption
+                == VerificationRowModel(layer: layer3, perPageModes: []).caption)
     }
 
     // MARK: - Privacy-sensitive marking
