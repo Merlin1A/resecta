@@ -2,12 +2,13 @@ import Foundation
 import RedactionEngine
 
 /// Decides a payload's route from its leading bytes. The type a door
-/// declares is never consulted. Resecta opens PDF files only: every image
-/// signature meets the unsupported-format refusal before any decode;
-/// `%PDF` and unknown payloads reach the PDF parser, which decides.
+/// declares is never consulted. JPEG, PNG and HEIC signatures take the
+/// image loader; every other image signature meets the unsupported-format
+/// refusal before any decode; `%PDF` and unknown payloads reach the PDF
+/// parser, which decides.
 nonisolated enum ImportRouter {
 
-    /// An image format a later loader may decode. Refused today.
+    /// An image format the image loader decodes.
     enum ImageFormat: Sendable, Equatable {
         case jpeg
         case png
@@ -18,10 +19,9 @@ nonisolated enum ImportRouter {
     /// What the first bytes say a payload is.
     enum PayloadKind: Sendable, Equatable {
         case pdf
-        /// A decodable image format, refused at the router until a loader
-        /// for it exists.
+        /// An image format the image loader decodes.
         case image(ImageFormat)
-        /// An image format no loader will decode: WEBP, GIF, TIFF, BMP.
+        /// An image format no loader will decode: WEBP, GIF, TIFF, BMP, AVIF.
         case unsupportedImage
         /// No recognised signature; the PDF parser decides.
         case unknown
@@ -61,9 +61,16 @@ nonisolated enum ImportRouter {
            bytes[4] == 0x66, bytes[5] == 0x74, bytes[6] == 0x79, bytes[7] == 0x70 {
             let brand: [UInt8] = [bytes[8], bytes[9], bytes[10], bytes[11]]
             if heicBrands.contains(brand) { return .image(.heic) }
+            if avifBrands.contains(brand) { return .unsupportedImage }
         }
         return .unknown
     }
+
+    /// The ISO BMFF brands of AVIF images and sequences: no loader decodes them.
+    private static let avifBrands: [[UInt8]] = [
+        [0x61, 0x76, 0x69, 0x66], // avif
+        [0x61, 0x76, 0x69, 0x73], // avis
+    ]
 
     /// The ISO BMFF brands of HEIC/HEIF still images.
     private static let heicBrands: [[UInt8]] = [
@@ -79,28 +86,30 @@ nonisolated enum ImportRouter {
         [0x68, 0x65, 0x76, 0x73], // hevs
     ]
 
-    /// The loader for a payload. Every image kind throws the
-    /// unsupported-format refusal before any decode; `%PDF` and unknown
-    /// payloads take the PDF loader.
+    /// The loader for a payload. JPEG, PNG and HEIC take the image loader;
+    /// every other image kind throws the unsupported-format refusal before
+    /// any decode; `%PDF` and unknown payloads take the PDF loader.
     static func route(data: Data) throws -> any DocumentLoader {
         switch kind(of: data) {
         case .pdf, .unknown:
             return PDFImportLoader()
-        case .image, .unsupportedImage:
+        case .image:
+            return ImageImportLoader()
+        case .unsupportedImage:
             throw PipelineError.importError(.unsupportedFormat)
         }
     }
 
     /// The drop door: whether a dropped payload may enter the import path.
-    /// A payload whose leading bytes carry an image signature is refused
-    /// before dispatch. `%PDF` and unknown payloads are admitted: an
+    /// A payload whose leading bytes carry an image signature other than
+    /// JPEG, PNG or HEIC is refused before dispatch. `%PDF` and unknown payloads are admitted: an
     /// unknown payload reaches the PDF parser, which reports anything it
     /// cannot open (refusing unknown bytes would also refuse a PDF whose
     /// `%PDF` header is not at offset 0).
     static func admitsDroppedPayload(_ data: Data) -> Bool {
         switch kind(of: data) {
-        case .pdf, .unknown: return true
-        case .image, .unsupportedImage: return false
+        case .pdf, .unknown, .image: return true
+        case .unsupportedImage: return false
         }
     }
 }
