@@ -25,6 +25,9 @@ struct FailedStateView: View {
     // downgrade in `performStartOver()`, mirroring
     // `DocumentEditorView.performDoneCloseSession()`.
     @Environment(PipelineCoordinator.self) private var coordinator
+    // The door the document came through: "Choose Another File" and
+    // "Choose Other Photos" ask the next home screen to open it again.
+    @Environment(AppCoordinator.self) private var appCoordinator
 
     @State private var safariURL: URL?
     // Confirmation gates Start Over when drawn regions
@@ -217,15 +220,19 @@ struct FailedStateView: View {
     }
 
     private var primaryButtonLabel: String {
-        Self.primaryActionLabel(Self.primaryAction(error: error, returnPhase: returnPhase))
+        Self.primaryActionLabel(
+            Self.primaryAction(error: error, returnPhase: returnPhase),
+            door: appCoordinator.openedDoor)
     }
 
     /// The primary button's title — the way back the screen offers; the
     /// drop refusal's sentence names it (`DocumentState.importRefusalMessage`).
-    static func primaryActionLabel(_ action: PrimaryAction) -> String {
+    /// The choose-another arm names photos when the document came through
+    /// the Photos door.
+    static func primaryActionLabel(_ action: PrimaryAction, door: ImportDoor? = nil) -> String {
         switch action {
         case .reopenDocument:    "Re-open Document"
-        case .chooseAnotherFile: "Choose Another File"
+        case .chooseAnotherFile: door == .photos ? "Choose Other Photos" : "Choose Another File"
         case .returnToEditor:    "Return to Editor"
         case .returnToResults:   "Return to Results"
         }
@@ -235,7 +242,12 @@ struct FailedStateView: View {
 
     private func performPrimaryAction() {
         switch Self.primaryAction(error: error, returnPhase: returnPhase) {
-        case .reopenDocument, .chooseAnotherFile:
+        case .chooseAnotherFile:
+            // The next home screen re-opens the door the document came
+            // through (Files or Photos); the sample opens no picker.
+            appCoordinator.requestReopenDoor()
+            documentState.transition(to: .empty)
+        case .reopenDocument:
             documentState.transition(to: .empty)
         case .returnToEditor:
             documentState.transition(to: .editing)

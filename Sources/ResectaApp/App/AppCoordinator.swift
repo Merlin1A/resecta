@@ -24,6 +24,13 @@ final class AppCoordinator {
 
     var activeWorkspace: ActiveWorkspace = .home
 
+    /// The door the open workspace's document came through, so the failed
+    /// screen's primary action can name it and open it again; nil at home.
+    private(set) var openedDoor: ImportDoor?
+    /// A door the next home screen presents on arrival, requested by the
+    /// failed screen's "Choose Another File" / "Choose Other Photos".
+    private var reopenRequested: ImportDoor?
+
     private let settingsState: SettingsState
     private let userTermsStore: UserTermsStore
 
@@ -41,8 +48,11 @@ final class AppCoordinator {
         }
     }
 
-    func openRedact() {
+    /// A fresh workspace with no document yet; `door` records where the
+    /// document is about to come from (nil for a bootstrap that opens none).
+    func openRedact(door: ImportDoor? = nil) {
         tearDownCurrentWorkspace()
+        openedDoor = door
         activeWorkspace = .redact(RedactWorkspace(settingsState: settingsState, userTermsStore: userTermsStore))
     }
 
@@ -50,6 +60,7 @@ final class AppCoordinator {
     /// Workspace transition is synchronous; import runs asynchronously after.
     func openRedactWithDocument(url: URL) async {
         tearDownCurrentWorkspace()
+        openedDoor = .files
         let workspace = RedactWorkspace(settingsState: settingsState, userTermsStore: userTermsStore)
         activeWorkspace = .redact(workspace)
         let outcome = await ImportService.importDocument(
@@ -68,6 +79,7 @@ final class AppCoordinator {
     /// and import the picked images, one page each, in pick order.
     func openRedactWithImages(_ images: AsyncThrowingStream<Data, any Error>, count: Int) async {
         tearDownCurrentWorkspace()
+        openedDoor = .photos
         let workspace = RedactWorkspace(settingsState: settingsState, userTermsStore: userTermsStore)
         activeWorkspace = .redact(workspace)
         await ImportService.importImages(
@@ -78,7 +90,23 @@ final class AppCoordinator {
 
     func returnHome() {
         tearDownCurrentWorkspace()
+        openedDoor = nil
         activeWorkspace = .home
+    }
+
+    /// Ask the next home screen to present the door the document came
+    /// through (Files or Photos); the sample and a bootstrap open no picker.
+    func requestReopenDoor() {
+        switch openedDoor {
+        case .files, .photos: reopenRequested = openedDoor
+        default: reopenRequested = nil
+        }
+    }
+
+    /// The door requested for re-opening, handed over once.
+    func consumeReopenDoor() -> ImportDoor? {
+        defer { reopenRequested = nil }
+        return reopenRequested
     }
 
     private func tearDownCurrentWorkspace() {
