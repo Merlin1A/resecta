@@ -60,6 +60,51 @@ struct CoordinatorCommitGuardTests {
         #expect(state.regions[0]?.first?.normalizedRect == moved)
     }
 
+    /// Two regions on page 0, both selected as a group.
+    private func seededGroup() -> (coordinator: PDFViewCoordinator, state: RedactionState, first: RedactionRegion, second: RedactionRegion) {
+        let (coordinator, state, first) = seeded()
+        let second = RedactionRegion(
+            id: UUID(),
+            normalizedRect: CGRect(x: 0.10, y: 0.30, width: 0.30, height: 0.05),
+            source: .manual
+        )
+        state.addRegion(second, page: 0, undoManager: nil)
+        state.selectedRegionIDs = [first.id, second.id]
+        return (coordinator, state, first, second)
+    }
+
+    @Test("A group move at the stored rects records no step")
+    func groupMoveAtTheStoredRectsIsANoOp() {
+        let (coordinator, state, first, second) = seededGroup()
+        let undoManager = UndoManager()
+        let version = state.regionVersion
+        coordinator.commitMoveMultiple(
+            [(id: first.id, newRect: first.normalizedRect), (id: second.id, newRect: second.normalizedRect)],
+            page: 0,
+            undoManager: undoManager
+        )
+        #expect(undoManager.canUndo == false)
+        #expect(state.regionVersion == version)
+    }
+
+    @Test("A group move with one real change records one step and moves only that region")
+    func groupMoveWithOneChangeMovesOnlyThatRegion() {
+        let (coordinator, state, first, second) = seededGroup()
+        let undoManager = UndoManager()
+        let moved = second.normalizedRect.offsetBy(dx: 0.05, dy: 0)
+        coordinator.commitMoveMultiple(
+            [(id: first.id, newRect: first.normalizedRect), (id: second.id, newRect: moved)],
+            page: 0,
+            undoManager: undoManager
+        )
+        #expect(undoManager.canUndo)
+        #expect(state.regions[0]?.first(where: { $0.id == second.id })?.normalizedRect == moved)
+        #expect(state.regions[0]?.first(where: { $0.id == first.id })?.normalizedRect == first.normalizedRect)
+        undoManager.undo()
+        #expect(state.regions[0]?.first(where: { $0.id == second.id })?.normalizedRect == second.normalizedRect)
+        #expect(undoManager.canUndo == false)
+    }
+
     /// A two-page view wired to the coordinator, as the editor mounts it.
     private func twoPageView(
         _ coordinator: PDFViewCoordinator,
