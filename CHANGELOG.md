@@ -30,7 +30,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The "Marked N" notice is shorter so its "Not redacted until you tap Redact" clause fits at the default text size.
 - A saved search's suggested name no longer carries the query text.
 - The page bar stays while a match walk is parked.
-- Moving to another page clears the region selection.
+- Moving to another page keeps only the selected regions on the page in view; a delete or a nudge never reaches a region you cannot see.
 
 ### Removed
 

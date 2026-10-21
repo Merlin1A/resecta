@@ -109,11 +109,17 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
                         overlay.discardInProgressPolygon()
                     }
                 }
+                // The selection keeps only the regions on the page in
+                // view, so a delete or a nudge never reaches a region the
+                // user cannot see. Runs on every notice: the page bar
+                // writes the index before the view follows it.
+                if let state = self?.redactionState {
+                    let visible = state.selectedRegionIDs.filter { state.pageIndex(for: $0) == index }
+                    if visible != state.selectedRegionIDs {
+                        state.selectedRegionIDs = visible
+                    }
+                }
                 if docState?.currentPageIndex != index {
-                    // The selection stays on the page the user can see:
-                    // a delete or a nudge must never reach regions on a
-                    // page scrolled away from.
-                    self?.redactionState?.selectedRegionIDs = []
                     docState?.currentPageIndex = index
                 }
             }
