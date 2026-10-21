@@ -6,15 +6,20 @@ import Foundation
 /// colour. The exact-uniformity read the test made before this band let
 /// near-white text, nearly transparent text and text under a nearly opaque
 /// box through with their text layer: each shows a few levels of ink the eye
-/// does not see. `tolerance` was set from a census over the born-digital
-/// identity corpora at the production DPI — the largest value at which no
-/// census page's inked glyph box reads as uniform — so ordinary text at any
-/// weight stays above the band; the census is recorded with the change that
-/// introduced it.
+/// does not see. The band was first set from a census over the born-digital
+/// identity corpora at the production DPI — the largest value (24) at which
+/// no census page's inked glyph box reads as uniform — and then tightened to
+/// half that: at 24 a footer or a watermark one level lighter than the
+/// census's faintest inked fixture (0.905 grey on white, 24 levels) read as
+/// inkless and sent its page image-only. The faint-ink fixtures the band
+/// exists for sit well inside the narrower band (near-white 0.985 grey ≈ 4
+/// levels, 2 % alpha ≈ 5, a 97 % box over black ≈ 8), and every inked census
+/// glyph stays above it; the census is recorded with the change that
+/// introduced the band.
 enum InkContrastFloor {
 
     /// Levels of 255, per channel, alpha included.
-    static let tolerance: Int = 24
+    static let tolerance: Int = 12
 
     /// The largest per-channel distance between any pixel of `rect` and the
     /// box's first pixel, alpha included; nil when the aligned, clamped box

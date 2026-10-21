@@ -76,10 +76,16 @@ struct SearchRecheck: Sendable {
         let coverageRan = coverageSource != nil
         let appliedAny = requests.contains { $0.origin == .applied }
         var shortfalls: [Shortfall] = []
+        // The original pages the searcher could not read for a request whose
+        // boxes they carry: reported, never counted as covered.
+        var unreadPages: [Int] = []
         if let coverageSource {
-            shortfalls = await RegionCoverage.shortfalls(
-                source: coverageSource, requests: requests, regions: regions
-            ).map { Shortfall(page: $0.pageIndex, displayText: requests[$0.requestIndex].record.query.displayText) }
+            let coverage = await RegionCoverage.check(
+                source: coverageSource, requests: requests, regions: regions)
+            shortfalls = coverage.shortfalls.map {
+                Shortfall(page: $0.pageIndex, displayText: requests[$0.requestIndex].record.query.displayText)
+            }
+            unreadPages = coverage.unreadPages
             try Task.checkCancellation()
         }
         let typed = requests.enumerated().filter { !$0.element.record.query.isScan }
@@ -90,6 +96,9 @@ struct SearchRecheck: Sendable {
             }
             if appliedAny, !coverageRan {
                 return Self.coverageNotRunOutcome()
+            }
+            if !unreadPages.isEmpty {
+                return Self.coverageNotRunOutcome(unreadPages: unreadPages)
             }
             return Outcome(
                 status: .info(Self.infoMessage), copyOverride: nil,
@@ -106,7 +115,7 @@ struct SearchRecheck: Sendable {
         }
         try Task.checkCancellation()
         return Self.fold(requests: typedRequests, observations: observed, pageCount: pageCount,
-                         shortfalls: shortfalls, coverageRan: coverageRan)
+                         shortfalls: shortfalls, coverageRan: coverageRan, coverageUnreadPages: unreadPages)
     }
 
     /// One partly covered match, as the fold reports it: its 0-based page
@@ -145,16 +154,44 @@ struct SearchRecheck: Sendable {
     /// The detail sentence behind that clause.
     static let coverageNotRunDetail = "The original pages could not be read, so the coverage check — each applied search and scan re-run on the original page and compared with its boxes — did not run."
 
+    /// The per-page clause: original pages the coverage check could not
+    /// read for a request whose boxes they carry (a render over the OCR
+    /// caps, OCR that did not run, a page it could not open, a pattern that
+    /// ran out of time or was refused). Content-free; 0-based pages in.
+    static func coverageUnreadClause(_ pages: [Int]) -> String {
+        let n = pages.count
+        let list = pages.map { String($0 + 1) }.joined(separator: ", ")
+        return n == 1
+            ? "the coverage check could not read original page \(list)"
+            : "the coverage check could not read \(n) original pages: \(list)"
+    }
+
+    /// The detail sentence behind that clause.
+    static func coverageUnreadDetail(_ pages: [Int]) -> String {
+        let clause = Self.coverageUnreadClause(pages)
+        return "\(clause.prefix(1).uppercased())\(clause.dropFirst()) (a page too large to scan for text, one it could not open, or a pattern that ran out of time or was not accepted), so no match there was compared with its boxes."
+    }
+
     /// WARN for a run with applied scans only whose coverage check could
-    /// not run: there is no typed search to re-run on the output, and the
-    /// one check the layer had was not possible. A WARN, so the aggregate
-    /// reads could-not-verify; never the idle INFO.
-    static func coverageNotRunOutcome() -> Outcome {
-        let message = "The original pages could not be read, so the coverage check did not run"
+    /// not run — there is no typed search to re-run on the output, and the
+    /// one check the layer had was not possible — or ran but could not read
+    /// a page it had boxes on (`unreadPages`, 0-based). A WARN, so the
+    /// aggregate reads could-not-verify; never the idle INFO.
+    static func coverageNotRunOutcome(unreadPages: [Int] = []) -> Outcome {
+        let message: String
+        let detail: String
+        if unreadPages.isEmpty {
+            message = "The original pages could not be read, so the coverage check did not run"
+            detail = Self.coverageNotRunDetail
+        } else {
+            let clause = Self.coverageUnreadClause(unreadPages)
+            message = clause.prefix(1).uppercased() + clause.dropFirst()
+            detail = "\(Self.detailLead) \(Self.coverageLead) \(Self.coverageUnreadDetail(unreadPages))"
+        }
         return Outcome(
             status: .warn(message),
-            copyOverride: LayerCopy(short: message, detail: Self.coverageNotRunDetail),
-            pageReferences: nil,
+            copyOverride: LayerCopy(short: message, detail: detail),
+            pageReferences: unreadPages.isEmpty ? nil : unreadPages,
             reviewTermTexts: nil,
             queryLines: nil)
     }
@@ -168,7 +205,8 @@ struct SearchRecheck: Sendable {
         observations: [PageObservation],
         pageCount: Int,
         shortfalls: [Shortfall] = [],
-        coverageRan: Bool = true
+        coverageRan: Bool = true,
+        coverageUnreadPages: [Int] = []
     ) -> Outcome {
         let requestCount = requests.count
         var remainingByRequest = [Int](repeating: 0, count: requestCount)
@@ -304,9 +342,11 @@ struct SearchRecheck: Sendable {
             let message = "Re-ran \(searches) — \(remainSentence)"
                 + (k == 0 ? "" : ", \(uncheckedClause)")
                 + (coverageRan ? "" : "; \(Self.coverageNotRunClause)")
+                + (coverageUnreadPages.isEmpty ? "" : "; \(Self.coverageUnreadClause(coverageUnreadPages))")
             let detail = joined([Self.detailLead, routeSentence, remainSentence + ".",
                                  k == 0 ? "" : uncheckedClause + ".",
-                                 coverageRan ? "" : Self.coverageNotRunDetail])
+                                 coverageRan ? "" : Self.coverageNotRunDetail,
+                                 coverageUnreadPages.isEmpty ? "" : Self.coverageUnreadDetail(coverageUnreadPages)])
             let reviewTerms = requests.enumerated()
                 .filter { remainingByRequest[$0.offset] > 0 }
                 .map { $0.element.record.query.displayText }
@@ -319,18 +359,22 @@ struct SearchRecheck: Sendable {
         }
 
         // The could-not-verify WARN: pages the re-run could not check, the
-        // coverage check that could not run, or both — each named.
-        if k > 0 || !coverageRan {
-            let clauses = [uncheckedClause, coverageRan ? "" : Self.coverageNotRunClause]
+        // coverage check that could not run or could not read a page it had
+        // boxes on, or any of these together — each named.
+        if k > 0 || !coverageRan || !coverageUnreadPages.isEmpty {
+            let clauses = [uncheckedClause, coverageRan ? "" : Self.coverageNotRunClause,
+                           coverageUnreadPages.isEmpty ? "" : Self.coverageUnreadClause(coverageUnreadPages)]
                 .filter { !$0.isEmpty }.joined(separator: "; ")
             let message = "Re-ran \(searches); \(clauses)"
             let detail = joined([Self.detailLead, routeSentence,
                                  k == 0 ? "" : uncheckedClause + ".",
-                                 coverageRan ? "" : Self.coverageNotRunDetail])
+                                 coverageRan ? "" : Self.coverageNotRunDetail,
+                                 coverageUnreadPages.isEmpty ? "" : Self.coverageUnreadDetail(coverageUnreadPages)])
+            let pages = Array(Set(uncheckedPages + coverageUnreadPages)).sorted()
             return Outcome(
                 status: .warn(message),
                 copyOverride: LayerCopy(short: message, detail: detail),
-                pageReferences: k == 0 ? nil : uncheckedPages,
+                pageReferences: pages.isEmpty ? nil : pages,
                 reviewTermTexts: nil,
                 queryLines: queryLines)
         }

@@ -31,6 +31,88 @@ struct RegionCoverageTests {
         #expect(RegionCoverage.coveredFraction(of: match, by: []) == 0)
     }
 
+    @Test("coveredFraction samples along the run: one glyph of twenty uncovered at the end of a vertical match reads as a shortfall, as it does for the horizontal match")
+    func verticalRunSampling() {
+        // Twenty glyphs set vertically; the box leaves the top glyph (5 %) uncovered.
+        let vertical = CGRect(x: 0.5, y: 0.3, width: 0.02, height: 0.24)
+        let verticalFraction = RegionCoverage.coveredFraction(of: vertical, by: [region(0.5, 0.3, 0.02, 0.228)])
+        #expect(verticalFraction < RegionCoverage.coveredThreshold, "\(verticalFraction)")
+        #expect(verticalFraction > 0.9, "\(verticalFraction)")
+        let horizontal = CGRect(x: 0.3, y: 0.5, width: 0.24, height: 0.02)
+        let horizontalFraction = RegionCoverage.coveredFraction(of: horizontal, by: [region(0.3, 0.5, 0.228, 0.02)])
+        #expect(horizontalFraction == verticalFraction, "\(horizontalFraction) vs \(verticalFraction)")
+        // Fully covered either way.
+        #expect(RegionCoverage.coveredFraction(of: vertical, by: [region(0.49, 0.29, 0.04, 0.26)]) == 1)
+    }
+
+    @Test("pageShortfalls: a search box drifted clear of its match is a shortfall, a manual box that touches nothing is not; a neighbour's box grazing an unselected match is not a shortfall, a box short of its own match is")
+    func driftedAndNeighbouringBoxes() {
+        let first = CGRect(x: 0.10, y: 0.50, width: 0.20, height: 0.02)
+        let second = CGRect(x: 0.32, y: 0.50, width: 0.20, height: 0.02)
+        let matches = [RegionCoverage.PageMatch(requestIndex: 0, rect: first), RegionCoverage.PageMatch(requestIndex: 0, rect: second)]
+        func box(_ rect: CGRect, source: RedactionRegion.Source) -> RedactionRegion {
+            RedactionRegion(id: UUID(), normalizedRect: rect, source: source)
+        }
+        let searchSource = RedactionRegion.Source.searchMatch(term: "SEED")
+        // Drifted clear of both matches (two widths to the right): the first untouched match is reported.
+        let drifted = box(CGRect(x: 0.60, y: 0.50, width: 0.20, height: 0.02), source: searchSource)
+        let driftedShortfalls = RegionCoverage.pageShortfalls(page: 3, matches: matches, boxes: [drifted])
+        #expect(driftedShortfalls == [RegionCoverage.Shortfall(pageIndex: 3, requestIndex: 0, coveredFraction: 0)])
+        // The same box drawn by hand: the matches were left unselected.
+        #expect(RegionCoverage.pageShortfalls(page: 3, matches: matches, boxes: [box(drifted.normalizedRect, source: .manual)]).isEmpty)
+        // Two drifted boxes, two untouched matches: both reported; one drifted box beside one covered match: one.
+        let drifted2 = box(CGRect(x: 0.60, y: 0.60, width: 0.20, height: 0.02), source: .detectedPII(kind: .ssn))
+        #expect(RegionCoverage.pageShortfalls(page: 3, matches: matches, boxes: [drifted, drifted2]).count == 2)
+        let onFirst = box(first, source: searchSource)
+        let oneDrift = RegionCoverage.pageShortfalls(page: 3, matches: matches, boxes: [onFirst, drifted])
+        #expect(oneDrift == [RegionCoverage.Shortfall(pageIndex: 3, requestIndex: 0, coveredFraction: 0)])
+        // A box that covers the first match and grazes the second by a tenth: the second was left unselected.
+        let grazing = box(CGRect(x: 0.10, y: 0.50, width: 0.24, height: 0.02), source: searchSource)
+        #expect(RegionCoverage.pageShortfalls(page: 3, matches: matches, boxes: [grazing]).isEmpty)
+        // A box short of its own match (half of it) is still a shortfall, and so is one that grazes a match while covering no other.
+        let half = box(CGRect(x: 0.10, y: 0.50, width: 0.10, height: 0.02), source: searchSource)
+        let halfShortfalls = RegionCoverage.pageShortfalls(page: 3, matches: matches, boxes: [half])
+        #expect(halfShortfalls.count == 1 && halfShortfalls[0].requestIndex == 0 && abs(halfShortfalls[0].coveredFraction - 0.5) < 0.03, "\(halfShortfalls)")
+        let graze = box(CGRect(x: 0.28, y: 0.50, width: 0.06, height: 0.02), source: .manual)
+        #expect(RegionCoverage.pageShortfalls(page: 3, matches: matches, boxes: [graze]).count == 2)
+    }
+
+    @Test("A search box drifted clear of its match on the original page FAILS the layer; a header-only scanned page is re-run through OCR, so a box short of its OCR-placed match FAILS there too")
+    func driftedBoxAndSparsePage() async throws {
+        // Typed search on a text page: the box two widths to the right of "SEED".
+        let data = TestFixtures.textLayerPDF(text: "SEED 123")
+        let source = try #require(PDFDocument(data: data))
+        let page = try #require(source.page(at: 0))
+        let raw = try #require(page.string)
+        let range = (raw as NSString).range(of: "SEED")
+        let trueRect = try #require(DocumentSearcher().boundingRect(for: range, page: page))
+        let driftedRect = trueRect.offsetBy(dx: trueRect.width * 2, dy: 0)
+        let request = TestFixtures.textRequest("SEED")
+        let drifted = await RegionCoverage.check(
+            source: SendablePDFDocument(source), requests: [request],
+            regions: [0: [RedactionRegion(id: UUID(), normalizedRect: driftedRect, source: .searchMatch(term: "SEED"))]])
+        #expect(drifted.shortfalls.count == 1 && drifted.shortfalls.first?.pageIndex == 0, "\(drifted.shortfalls)")
+        let manual = await RegionCoverage.check(
+            source: SendablePDFDocument(source), requests: [request],
+            regions: [0: [RedactionRegion(id: UUID(), normalizedRect: driftedRect, source: .manual)]])
+        #expect(manual.shortfalls.isEmpty, "\(manual.shortfalls)")
+
+        // A scanned page with a three-character header: the search placed its box by OCR; the re-run must read the page the same way.
+        let scanned = try #require(PDFDocument(data: TestFixtures.sparseHeaderScannedPagePDF(header: "Hdr", body: "SEED")))
+        let scannedPage = try #require(scanned.page(at: 0))
+        #expect(TextLayerDetector.detectTextLayer(scannedPage) == .sparse)
+        // The image sits at (50, 520, 300 × 150) on a 612 × 792 page; the word fills its left part. A box over the
+        // image's right 60 % touches the word in part only.
+        let shortBox = CGRect(x: (50 + 120) / 612.0, y: 520 / 792.0, width: 180 / 612.0, height: 150 / 792.0)
+        let options = SearchOptions()
+        let ocrRequest = TestFixtures.textRequest("SEED", options: options)
+        let sparse = await RegionCoverage.check(
+            source: SendablePDFDocument(scanned), requests: [ocrRequest],
+            regions: [0: [RedactionRegion(id: UUID(), normalizedRect: shortBox, source: .searchMatch(term: "SEED"))]])
+        #expect(!sparse.shortfalls.isEmpty, "the OCR-read match under a short box is a shortfall; got \(sparse)")
+        #expect(sparse.unreadPages.isEmpty, "\(sparse)")
+    }
+
     @Test("fold: a shortfall is the layer's FAIL, ahead of remaining matches; its message names pages only")
     func foldShortfall() {
         let request = TestFixtures.textRequest("Delia")
@@ -57,7 +139,8 @@ struct RegionCoverageTests {
         ("emoji before", "\u{1F464} SSN 123-45-6789", "123-45-6789", "characters"),
         ("math bold letter before", "\u{1D400} 123-45-6789", "123-45-6789", "characters"),
         ("ffi ligatures before", "\u{FB03}le \u{FB03}le 123-45-6789", "123-45-6789", "normalized"),
-        ("devanagari name", "\u{0930}\u{093E}\u{092E} 123", "\u{0930}\u{093E}\u{092E}", "characters"),
+        // Ten or more meaningful characters, as a real page: a shorter page reads as sparse and is re-run through OCR.
+        ("devanagari name", "\u{0930}\u{093E}\u{092E} 123 on file here", "\u{0930}\u{093E}\u{092E}", "characters"),
     ]
 
     /// 1.2.0's range for the term: Character offsets of the raw text (the
@@ -172,6 +255,77 @@ struct RegionCoverageTests {
         #expect(stillLocked.status.isWarn, "got \(stillLocked.status)")
     }
 
+    @Test("fold: an original page the coverage check could not read is a could-not-verify WARN that names it, joins the unchecked and not-run clauses, and rides the ATTENTION message")
+    func foldCoverageUnreadPage() {
+        let request = TestFixtures.textRequest("Delia")
+        let clean = RecheckObservation(
+            pageIndex: 0, route: .textLayer, regexTimedOut: false,
+            counts: [0: RecheckObservation.Count(remaining: 0, hitCap: false, perTerm: [:])])
+        let one = SearchRecheck.fold(requests: [request], observations: [clean], pageCount: 3, coverageUnreadPages: [1])
+        guard case .warn(let message) = one.status else { Issue.record("expected WARN, got \(one.status)"); return }
+        #expect(message == "Re-ran 1 search; the coverage check could not read original page 2")
+        #expect(one.pageReferences == [1])
+        #expect(one.copyOverride?.detail.contains("so no match there was compared with its boxes.") == true)
+        let two = SearchRecheck.fold(requests: [request], observations: [clean], pageCount: 3, coverageUnreadPages: [1, 2])
+        #expect(two.status == .warn("Re-ran 1 search; the coverage check could not read 2 original pages: 2, 3"))
+        #expect(two.pageReferences == [1, 2])
+        // Beside an unchecked output page and a coverage check that did not run: every clause, the pages united.
+        let unchecked = RecheckObservation(pageIndex: 2, route: .ocrSkippedOversize, regexTimedOut: false, counts: [:])
+        let all = SearchRecheck.fold(requests: [request], observations: [clean, unchecked], pageCount: 3,
+                                     coverageRan: false, coverageUnreadPages: [1])
+        #expect(all.status == .warn("Re-ran 1 search; 1 page could not be checked: 3 (too large to scan for text); \(SearchRecheck.coverageNotRunClause); the coverage check could not read original page 2"))
+        #expect(all.pageReferences == [1, 2])
+        // Remaining matches keep ATTENTION with the clause appended.
+        let remaining = RecheckObservation(
+            pageIndex: 0, route: .textLayer, regexTimedOut: false,
+            counts: [0: RecheckObservation.Count(remaining: 1, hitCap: false, perTerm: ["Delia": 1])])
+        let attention = SearchRecheck.fold(requests: [request], observations: [remaining], pageCount: 3, coverageUnreadPages: [1])
+        #expect(attention.status == .attention("Re-ran 1 search — 1 match remains on page 1; the coverage check could not read original page 2"))
+        #expect(attention.pageReferences == [0])
+        // A shortfall still outranks it.
+        let failed = SearchRecheck.fold(requests: [request], observations: [clean], pageCount: 3,
+                                        shortfalls: [SearchRecheck.Shortfall(page: 0, displayText: "Delia")], coverageUnreadPages: [1])
+        #expect(failed.status.isFail)
+        // Scan-only: the same page named in the layer's WARN.
+        let scanOnly = SearchRecheck.coverageNotRunOutcome(unreadPages: [1])
+        #expect(scanOnly.status == .warn("The coverage check could not read original page 2"))
+        #expect(scanOnly.pageReferences == [1])
+    }
+
+    @Test("An original page the searcher cannot read — a blank page over the OCR pixel caps under a box — is reported as unread, never passed; a readable page beside it is not")
+    func unreadOriginalPage() async throws {
+        // Page 1 readable (a text layer); page 2 a 14,000-pt blank page: no text layer, and its render is over the OCR caps.
+        let readable = try #require(PDFDocument(data: TestFixtures.textLayerPDF(text: "nothing to see")))
+        let oversize = try #require(PDFDocument(data: TestFixtures.blankPage(width: 14_000, height: 14_000)))
+        let source = PDFDocument()
+        source.insert(try #require(readable.page(at: 0)), at: 0)
+        source.insert(try #require(oversize.page(at: 0)), at: 1)
+        try #require(source.pageCount == 2)
+        let box = region(0.1, 0.1, 0.2, 0.05)
+        let request = TestFixtures.textRequest("SEED", pages: [0, 1])
+        let direct = await RegionCoverage.check(
+            source: SendablePDFDocument(source), requests: [request], regions: [0: [box], 1: [box]])
+        #expect(direct.shortfalls.isEmpty)
+        #expect(direct.unreadPages == [1], "the oversize page under a box is unread; got \(direct.unreadPages)")
+        // A page the request's boxes are not on is not the check's question.
+        let elsewhere = await RegionCoverage.check(
+            source: SendablePDFDocument(source), requests: [TestFixtures.textRequest("SEED", pages: [0])], regions: [0: [box], 1: [box]])
+        #expect(elsewhere.unreadPages.isEmpty, "got \(elsewhere.unreadPages)")
+        let noBoxes = await RegionCoverage.check(
+            source: SendablePDFDocument(source), requests: [request], regions: [0: [box]])
+        #expect(noBoxes.unreadPages.isEmpty, "got \(noBoxes.unreadPages)")
+        // Through the layer: a could-not-verify WARN naming the page.
+        let output = try #require(PDFDocument(data: TestFixtures.textLayerPDF(text: "nothing to see")))
+        let result = await VerificationEngine().runLayer(
+            .searchRecheck, outputDocument: SendablePDFDocument(output), sourcePageCount: 2,
+            regions: [0: [box], 1: [box]], sensitiveTerms: [], pipelineMode: .searchableRedaction,
+            filterDigests: [nil], perPageModes: [.searchableRedaction],
+            appliedSearches: [request], sourceDocument: SendablePDFDocument(source))
+        #expect(result.status.isWarn && result.couldNotVerify, "got \(result.status)")
+        #expect(result.shortDescription == "Re-ran 1 search; the coverage check could not read original page 2")
+        #expect(result.pageReferences == [1])
+    }
+
     /// The 128-bit password fixtures (RC4 R3, AES R4): their bytes re-emit
     /// encrypted, so a copy made without the password stays locked.
     static let lockedFixtures = ["r3-rc4-128.pdf", "r4-aes-128.pdf"]
@@ -262,13 +416,36 @@ struct Layer2FragmentBesideRegionTests {
         #expect(VerificationEngine.fragmentTermTexts(hits: [hit("ffile ffile 123-", x: 0.30, width: 0.19)], pageRegions: [box], sensitiveTerms: [term]) == ["123-45-6789"])
     }
 
-    @Test("Not a fragment: a neighbouring word that is not the term's edge, a fragment far from any box, a fragment shorter than three characters, and the whole term (the outside-term arm)")
+    @Test("Not a fragment: a neighbouring word that is not the term's edge, a fragment far from any box, a line that merely ends in two characters of the term, and the whole term (the outside-term arm)")
     func notAFragment() {
         let delia = SensitiveTerm(text: "Delia")
         #expect(VerificationEngine.classifyPageOCR(hits: [hit("Delaware", x: 0.30, width: 0.19)], pageRegions: [box], sensitiveTerms: [delia]) == .textOutsideRegionsOnly)
         #expect(VerificationEngine.classifyPageOCR(hits: [hit("ffile ffile 123-", x: 0.05, width: 0.19)], pageRegions: [box], sensitiveTerms: [term]) == .textOutsideRegionsOnly)
-        #expect(VerificationEngine.classifyPageOCR(hits: [hit("SSN 12", x: 0.30, width: 0.19)], pageRegions: [box], sensitiveTerms: [term]) == .textOutsideRegionsOnly)
+        // A short residue counts only as the whole word beside the box: "SSN12" ends in "12" but is one word.
+        #expect(VerificationEngine.classifyPageOCR(hits: [hit("SSN12", x: 0.30, width: 0.19)], pageRegions: [box], sensitiveTerms: [term]) == .textOutsideRegionsOnly)
+        #expect(VerificationEngine.classifyPageOCR(hits: [hit("Robo", x: 0.30, width: 0.19)], pageRegions: [box], sensitiveTerms: [SensitiveTerm(text: "Bob")]) == .textOutsideRegionsOnly)
         #expect(VerificationEngine.classifyPageOCR(hits: [hit("SSN 123-45-6789", x: 0.30, width: 0.19)], pageRegions: [box], sensitiveTerms: [term]) == .sensitiveTermOutsideRegions)
+    }
+
+    @Test("A residue of one or two characters is a fragment when it is the whole word beside the box; a three-character term is checked the same way; the comparison ignores spaces, hyphens, soft hyphens and zero-width marks")
+    func shortResiduesAndSeparators() {
+        // Two characters of the term as the word right before the box.
+        #expect(VerificationEngine.classifyPageOCR(hits: [hit("SSN 12", x: 0.30, width: 0.19)], pageRegions: [box], sensitiveTerms: [term]) == .sensitiveTermFragmentBesideRegion)
+        // One character of the term's end as the word right after the box.
+        #expect(VerificationEngine.classifyPageOCR(hits: [hit("9 on file", x: 0.61, width: 0.15)], pageRegions: [box], sensitiveTerms: [term]) == .sensitiveTermFragmentBesideRegion)
+        // A three-character term: its two-character start and one-character end, whole words beside the box.
+        let bob = SensitiveTerm(text: "Bob")
+        #expect(VerificationEngine.classifyPageOCR(hits: [hit("see Bo", x: 0.30, width: 0.19)], pageRegions: [box], sensitiveTerms: [bob]) == .sensitiveTermFragmentBesideRegion)
+        #expect(VerificationEngine.classifyPageOCR(hits: [hit("b here", x: 0.61, width: 0.15)], pageRegions: [box], sensitiveTerms: [bob]) == .sensitiveTermFragmentBesideRegion)
+        #expect(VerificationEngine.fragmentTermTexts(hits: [hit("see Bo", x: 0.30, width: 0.19)], pageRegions: [box], sensitiveTerms: [bob]) == ["Bob"])
+        // Separators: the OCR line's spacing and hyphens need not match the term's.
+        #expect(VerificationEngine.classifyPageOCR(hits: [hit("SSN 123 45-", x: 0.30, width: 0.19)], pageRegions: [box], sensitiveTerms: [term]) == .sensitiveTermFragmentBesideRegion)
+        #expect(VerificationEngine.classifyPageOCR(hits: [hit("SSN 12345", x: 0.30, width: 0.19)], pageRegions: [box], sensitiveTerms: [term]) == .sensitiveTermFragmentBesideRegion)
+        #expect(VerificationEngine.classifyPageOCR(hits: [hit("SSN 123\u{00AD}45\u{200B}", x: 0.30, width: 0.19)], pageRegions: [box], sensitiveTerms: [term]) == .sensitiveTermFragmentBesideRegion)
+        let spaced = SensitiveTerm(text: "123 45 6789")
+        #expect(VerificationEngine.classifyPageOCR(hits: [hit("SSN 123-45-", x: 0.30, width: 0.19)], pageRegions: [box], sensitiveTerms: [spaced]) == .sensitiveTermFragmentBesideRegion)
+        // Still never the whole term (that is the outside-term arm), and never a residue away from any box.
+        #expect(VerificationEngine.classifyPageOCR(hits: [hit("SSN 12", x: 0.05, width: 0.10)], pageRegions: [box], sensitiveTerms: [term]) == .textOutsideRegionsOnly)
     }
 
     @Test("The fragment page folds to ATTENTION with the term texts, below the whole-term arm and above the in-region WARN")
@@ -305,8 +482,21 @@ struct Layer2FragmentBesideRegionTests {
         #expect(VerificationEngine.pageBucket(for: paired, effectiveMode: .secureRasterization) == .textInRegionSecureRaster)
         let whole = hit("SSN 123-45-6789", x: 0.05, width: 0.19)
         #expect(VerificationEngine.classifyPageOCR(hits: [whole, fragment], pageRegions: [box], sensitiveTerms: [term]) == .sensitiveTermOutsideRegions)
-        // The fill note keeps its place ahead of the whole-term arm (as before this check existed), never ahead of the fragment.
-        #expect(VerificationEngine.classifyPageOCR(hits: [artifact, whole], pageRegions: [box], sensitiveTerms: [term]) == .fillArtifactInRegion)
-        #expect(VerificationEngine.classifyPageOCR(hits: [artifact, whole, fragment], pageRegions: [box], sensitiveTerms: [term]) == .sensitiveTermFragmentBesideRegion)
+        // A whole occurrence beside a fill artifact reports the term, never the note: the aggregate counts a note as a
+        // pass, so the note masking the term read as a PASS on an output where the term was still readable.
+        let both = VerificationEngine.classifyPageOCR(hits: [artifact, whole], pageRegions: [box], sensitiveTerms: [term])
+        #expect(both == .sensitiveTermOutsideRegions)
+        #expect(VerificationEngine.classifyPageOCR(hits: [artifact, whole, fragment], pageRegions: [box], sensitiveTerms: [term]) == .sensitiveTermOutsideRegions)
+        // The page with both findings folds to ATTENTION on both page modes, with the term text for the results row.
+        for mode in [PipelineMode.searchableRedaction, .secureRasterization] {
+            let bucket = VerificationEngine.pageBucket(for: both, effectiveMode: mode)
+            #expect(bucket == .sensitiveTermOutsideRegions, "\(mode)")
+            let folded = VerificationEngine.foldLayer2PageOutcomes(
+                [(page: 1, bucket: bucket)], pipelineMode: mode, documentHasRegions: true, reviewTermsByPage: [1: [term.text]])
+            #expect(folded.0.isAttention, "\(mode): got \(folded.0)")
+            #expect(folded.2 == [term.text], "\(mode)")
+            #expect(VerificationEngine.foldLayer2PageOutcomes(
+                [(page: 1, bucket: .fillArtifactInRegion)], pipelineMode: mode, documentHasRegions: true).0.isInfo, "\(mode): the note alone stays INFO")
+        }
     }
 }
