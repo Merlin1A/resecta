@@ -757,10 +757,11 @@ extension DocumentState.PhaseKind {
     /// The cancellable phases whose background pause raises the editor's
     /// "Processing was paused" banner: a run the editor can restart. An
     /// import cancelled by a background returns to the open document (or
-    /// the empty state) with nothing to restart.
+    /// the empty state) with nothing to restart; a cancelled Verify lands
+    /// on the results screen, which offers Run Verification itself.
     var raisesResumeBanner: Bool {
         switch self {
-        case .detecting, .redacting, .verifying: true
+        case .detecting, .redacting: true
         default: false
         }
     }
