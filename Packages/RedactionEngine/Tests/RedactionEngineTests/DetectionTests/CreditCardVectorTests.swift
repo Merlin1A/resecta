@@ -72,6 +72,17 @@ struct CreditCardVectorTests {
         return PIIDetector().families.creditCard.detect(in: ns, range: NSRange(location: 0, length: ns.length)).map(\.text)
     }
 
+    @Test("American Express and Diners Club numbers in spaced or hyphenated 4-6-5 and 4-6-4 groups are cards")
+    func separatedAmexAndDinersGroupsAreCards() {
+        #expect(cards(in: "Card 3782 822463 10005 on file") == ["3782 822463 10005"])
+        #expect(cards(in: "Card 3714-496353-98431 on file") == ["3714-496353-98431"])
+        #expect(cards(in: "Card 3782 822463 10006 on file").isEmpty, "a Luhn-invalid 4-6-5 run is not a card")
+        // The 4-6-4 shape is admitted by the pattern; the prefix gate still
+        // decides, and it lists no Diners Club prefix, as before.
+        #expect(CreditCardDetector.ccPattern.firstMatch(in: "3056 930902 5904", range: NSRange(location: 0, length: 16)) != nil)
+        #expect(cards(in: "Card 3056 930902 5904 on file").isEmpty)
+    }
+
     @Test("a Luhn-valid run glued to a letter is not a card: the DL-shaped token U48670409492471")
     func letterAdjacentRunIsNotACard() {
         #expect(cards(in: "Secondary ID on file -- Driver Lic: U48670409492471").isEmpty)

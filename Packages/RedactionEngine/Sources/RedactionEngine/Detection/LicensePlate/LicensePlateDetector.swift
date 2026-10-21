@@ -31,11 +31,28 @@ struct LicensePlateDetector: FamilyDetector {
     // MARK: - License Plate Detection
 
     /// License plate labels: accepts "License plate", "Plate No", "Tag #",
-    /// "LP #", "Reg #", "Vehicle plate" followed by the plate value.
+    /// "LP #", "Reg #", "Vehicle plate" followed by the plate value (group 1).
+    /// The label reads case-insensitively; the value is read again as written
+    /// by `isPlateValue`, so a label followed by ordinary words ("Reg # on
+    /// file", "Reg # to be") is not a plate.
     static let licensePlateLabeled = try! NSRegularExpression(
-        pattern: #"\b(?:license\s+plate|plate\s+(?:no|number|#)\.?|tag\s+(?:no|number|#)\.?|lp\s*#|reg(?:istration)?\s*#|veh(?:icle)?\s+plate)[:#\s]+[A-Z0-9]{2,3}[-\s]?[A-Z0-9]{2,5}\b"#,
+        pattern: #"\b(?:license\s+plate|plate\s+(?:no|number|#)\.?|tag\s+(?:no|number|#)\.?|lp\s*#|reg(?:istration)?\s*#|veh(?:icle)?\s+plate)[:#\s]+([A-Z0-9]{2,3}[-\s]?[A-Z0-9]{2,5})\b"#,
         options: [.caseInsensitive]
     )
+
+    /// A plate value as written: upper-case letters and digits only, with at
+    /// least one digit. Lower-case words after a label are prose, not a plate.
+    static func isPlateValue(_ value: String) -> Bool {
+        var sawDigit = false
+        for scalar in value.unicodeScalars {
+            switch scalar {
+            case "0"..."9": sawDigit = true
+            case "A"..."Z", "-", " ", "\t": continue
+            default: return false
+            }
+        }
+        return sawDigit
+    }
 
     /// Detect license plates (labeled only). Gated by `runsLicensePlate`.
     ///
@@ -65,7 +82,8 @@ struct LicensePlateDetector: FamilyDetector {
             boostedConfidence: baseline.boostedConfidence,
             floor: baseline.floor
         )
-        return Self.licensePlateLabeled.matches(in: fullText, range: range).map { match in
+        return Self.licensePlateLabeled.matches(in: fullText, range: range).compactMap { match in
+            guard Self.isPlateValue(text.substring(with: match.range(at: 1))) else { return nil }
             // Pass doctype + gazetteer + documentHeader.
             let confidence = contextScorer.score(
                 text: fullText, matchRange: match.range, profile: profile,

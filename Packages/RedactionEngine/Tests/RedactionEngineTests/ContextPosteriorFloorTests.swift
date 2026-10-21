@@ -38,12 +38,13 @@ struct ContextPosteriorFloorTests {
 
     // MARK: - Raw-bar arithmetic (the apply helper)
 
-    @Test("Account keyword-confirmed (raw 0.75) floors to conservative 0.7, survives all presets")
+    @Test("Account keyword-confirmed (the detector's own raw) floors to conservative 0.7, survives all presets")
     func accountFloorsToConservative() {
+        let raw = AccountDetector.keywordConfirmedConfidence
         let floored = ContextPosteriorFloor.apply(
-            0.0006, family: "account", raw: 0.75,
+            0.0006, family: "account", raw: raw,
             conservativeCutoff: ContextPosteriorFloor.conservativeCutoff(forWire: "account"))
-        #expect(abs(floored - 0.7) < 1e-9, "min(0.75, 0.7) = 0.7; got \(floored)")
+        #expect(abs(floored - min(raw, 0.7)) < 1e-9, "min(raw, 0.7); got \(floored)")
         for cutoff in [0.01, 0.6, 0.7] {   // account aggressive/balanced/conservative
             #expect(floored >= cutoff, "floored account must clear \(cutoff)")
         }
@@ -83,7 +84,7 @@ struct ContextPosteriorFloorTests {
     @Test("The floor never lowers an already-higher posterior (no-op max)")
     func floorNoOpWhenPosteriorHigh() {
         // A strong-context / with-separator match already above the floor: unchanged.
-        #expect(ContextPosteriorFloor.apply(0.95, family: "account", raw: 0.75,
+        #expect(ContextPosteriorFloor.apply(0.95, family: "account", raw: AccountDetector.keywordConfirmedConfidence,
             conservativeCutoff: 0.7) == 0.95)
         #expect(ContextPosteriorFloor.apply(0.93, family: "phone", raw: 0.80,
             conservativeCutoff: 0.75) == 0.93)
@@ -104,21 +105,22 @@ struct ContextPosteriorFloorTests {
     func shippedScorerCollapsesAccountThenFloorReadmits() {
         let scorer = ContextScorerWeights.loadFromEngineBundle()
         let calibrated = CalibratedScorer()
-        let pageText = "Account #: 12345678"          // 8-digit, keyword-confirmed (raw 0.75)
+        let pageText = "Account #: 12345678"          // 8-digit, keyword-confirmed (the detector's raw)
         let digits = "12345678"
+        let raw = AccountDetector.keywordConfirmedConfidence
         let range = (pageText as NSString).range(of: digits)
-        let match = PIIDetector.PIIMatch(text: digits, range: range, kind: .account, confidence: 0.75)
+        let match = PIIDetector.PIIMatch(text: digits, range: range, kind: .account, confidence: raw)
         let features = contextFeatures(match: match,
             effectiveDoctype: .generic, pageText: pageText)
         let contextLogit = scorer.learnedContextLogit(family: "account", features: features)
-        let bare = calibrated.posterior(raw: 0.75, priorMean: 0.5, contextLogit: contextLogit)
+        let bare = calibrated.posterior(raw: raw, priorMean: 0.5, contextLogit: contextLogit)
         // The standardized digit_run_length term collapses the bare posterior below
         // every account preset cutoff (worst case ≈ 0.06 at the closest keyword).
         #expect(bare < 0.7, "bare posterior should be collapsed by the learned term: \(bare)")
         // The floor re-admits it at the conservative cutoff (preset-invariant).
-        let floored = ContextPosteriorFloor.apply(bare, family: "account", raw: 0.75,
+        let floored = ContextPosteriorFloor.apply(bare, family: "account", raw: raw,
             conservativeCutoff: ContextPosteriorFloor.conservativeCutoff(forWire: "account"))
-        #expect(abs(floored - 0.7) < 1e-9, "re-floored to 0.7; got \(floored)")
+        #expect(abs(floored - min(raw, 0.7)) < 1e-9, "re-floored to min(raw, 0.7); got \(floored)")
         #expect(floored >= bare, "the floor never lowers the posterior")
     }
 

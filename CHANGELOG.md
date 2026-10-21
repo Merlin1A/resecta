@@ -66,6 +66,14 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Accessibility: a staged search term's remove control is named "Remove" with the term and meets the 46-point target; the Custom Terms add row's Regex toggle and add button meet it too.
 - Accessibility: the parked strip's Apply capsule is named "Applied" once the match is marked, with the match's position as its value, and every element of the strip offers a "Show full sheet" action.
 - Accessibility: the page bar's counter is one spoken element, "Page k of N, n regions"; filter chips report when they are selected.
+- Scan: fewer name proposals on words that resemble a listed surname by only one letter; the near match still raises the score of an otherwise supported name.
+- Scan: a short account number beside its label is proposed at the balanced preset.
+- Scan: the keywords listed under 'Why this classification?' no longer change between launches.
+- Scan: on scanned pages, an address whose ZIP code belongs to a different state than its first three digits suggest is proposed.
+- Scan: a label line such as 'Reg # on file' is no longer proposed as a license plate.
+- Scan: a phone number whose opening parenthesis was lost in text recognition is proposed.
+- Scan: American Express numbers printed in spaced or hyphenated 4-6-5 groups are proposed.
+- Scan: a Social Security number written after a three-digit number and a space is proposed.
 - Custom terms and saved patterns: a regular expression holding a character whose uppercase form is two letters (such as ß or the ﬁ ligature) no longer stops the app when the pattern is validated.
 - Verification: the search re-check and the detection sweep list a page as not checked when a custom regular-expression term ran out of time on it, instead of counting the page as read.
 - Verification: the detection sweep reports a custom term added after a scan was applied as a possible item instead of discarding it as the scan's.
@@ -91,6 +99,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Internal
 
+- Detection: a date-collision rule that could never apply to a nine-digit number is removed.
 - The app's unit tests build their settings on a scratch defaults suite: the shared coordinator helpers take a fresh suite by default, and the source check that lists tests reading the shared defaults domain now fails on any such site.
 - The engine package's test copy of the app's per-page mode choice is removed; the app's tests check the production choice through the coordinator, on a right-to-left page and on every page of the bundled sample.
 - App tests: the six trapping requires in the mode-switch toast tests are throwing requires, and the hosting and transition smoke tests assert what they name; the two review-dismiss UI tests call their survival check from the test body.
