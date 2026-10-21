@@ -262,16 +262,21 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         refreshOverlay(for: page)
     }
 
-    /// The stored rect of a region. A tap on a selected region ends its
-    /// "drag" where it began; committing that would record a Move or
-    /// Resize step, re-arm Redo and clear the output for no change.
+    /// The stored rect of a region. A tap on a selected region, or on one
+    /// region of a selected group, ends its "drag" where it began; the
+    /// resize, move and group-move commits keep only the rects that
+    /// changed, so that tap records no Move or Resize step, re-arms no
+    /// Redo and leaves the output alone.
     private func storedRect(_ id: UUID, page: Int) -> CGRect? {
         redactionState?.regions[page]?.first(where: { $0.id == id })?.normalizedRect
     }
 
     /// Commit a batch move of multiple regions on the same page.
     func commitMoveMultiple(_ moves: [(id: UUID, newRect: CGRect)], page: Int, undoManager: UndoManager?) {
-        redactionState?.moveRegions(moves, page: page, undoManager: undoManager)
+        let changed = moves.filter { storedRect($0.id, page: page) != $0.newRect }
+        if !changed.isEmpty {
+            redactionState?.moveRegions(changed, page: page, undoManager: undoManager)
+        }
         refreshOverlay(for: page)
     }
 

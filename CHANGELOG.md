@@ -86,7 +86,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Save current search is disabled while the session has no query or terms.
 - The footer says how many selected matches a filter hides.
 - The Scan category chips wrap instead of clipping at the right edge.
-- Tapping an already-selected region without moving it no longer records a Move or Resize step, re-arms Redo or clears the sheet's applied markers.
+- Tapping an already-selected region, or one region of a selected group, without moving it no longer records a Move or Resize step, re-arms Redo or clears the sheet's applied markers.
 - With Add to Selection on, a marquee adds to the selection and an empty marquee leaves it unchanged.
 - VoiceOver announces region resizes.
 
