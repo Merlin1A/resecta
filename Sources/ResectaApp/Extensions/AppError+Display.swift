@@ -93,9 +93,9 @@ extension PipelineError {
             case .tooLarge(let bytes):
                 "This file is approximately \(bytes / (1024 * 1024)) MB. Try a smaller document or reduce the page count."
             case .unsupportedFormat:
-                "Resecta works with PDF files. Other formats are not supported."
+                "Resecta works with PDF files and JPEG, PNG and HEIC images. Other formats are not supported."
             case .invalidPageDimensions(let p):
-                "Page \(p + 1) has dimensions outside the supported range. Each page must be between 1 and 5,000 points."
+                "Page \(p + 1) has dimensions outside the supported range. A page must be between 1 and 5,000 points; an image must be at least 42 pixels on its shorter side and no more than 100 megapixels."
             case .activeContent:
                 // Mechanism description: names what the import walk saw and
                 // what the app does with it. Not the damaged-file copy.
