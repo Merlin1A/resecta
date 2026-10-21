@@ -384,7 +384,8 @@ extension VerificationCorpusRunnerTests {
         perPageModes: [PipelineMode],
         perPageFallbackReasons: [TextLayerDetector.FallbackReason?],
         appliedSearches: [SearchRecheckRequest] = [sweepRequest()],
-        manualRegionsWithoutText: Int = 0
+        manualRegionsWithoutText: Int = 0,
+        sourceDocument: SendablePDFDocument? = nil
     ) async throws -> VerificationReport {
         guard let sharedDoc = PDFDocument(url: outputURL) else {
             throw PipelineError.verificationError(.engineCrash(layerIndex: 0))
@@ -401,6 +402,10 @@ extension VerificationCorpusRunnerTests {
             perPageFallbackReasons: perPageFallbackReasons,
             appliedSearches: appliedSearches,
             manualRegionsWithoutText: manualRegionsWithoutText,
+            // The app passes its unlocked source copy; the mirror passes the
+            // cell's own (unlocked) document, so the Search Re-check's
+            // coverage half runs on an applied scan here as it does there.
+            sourceDocument: sourceDocument,
             provisionLayerDocuments: { layers in
                 // One independent PDFDocument per parallel layer (the app's
                 // loadParallelLayerDocuments contract); nil ⇒ the batch runs

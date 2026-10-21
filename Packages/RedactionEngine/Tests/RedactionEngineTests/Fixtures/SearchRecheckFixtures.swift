@@ -35,7 +35,12 @@ extension TestFixtures {
             pipelineMode: mode,
             filterDigests: Array(repeating: nil, count: n),
             perPageModes: Array(repeating: mode, count: n),
-            appliedSearches: requests
+            appliedSearches: requests,
+            // The output stands as its own source: these fixtures carry no
+            // regions, so the coverage half has nothing to compare and the
+            // tests read the output half alone. Without a source the layer
+            // would report that the coverage check did not run.
+            sourceDocument: doc
         )
     }
 

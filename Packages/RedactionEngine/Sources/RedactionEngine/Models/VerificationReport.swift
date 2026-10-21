@@ -158,6 +158,13 @@ public struct LayerResult: Sendable {
     /// never true on a non-WARN status. Set by the engine at the site that
     /// composes the WARN, so consumers key on it instead of the message.
     public let couldNotVerify: Bool
+    /// Display-only: true when the `.attention` behind `reviewTermTexts` is
+    /// the OCR Check's edge-fragment arm — the start or the end of a
+    /// redacted term read beside a redaction box — rather than a whole
+    /// occurrence readable elsewhere. The results row picks its sentence
+    /// and remedy by it (the box is short of its text; the remedy is the
+    /// box, not a search). False on every other result.
+    public let reviewIsFragment: Bool
 
     /// Whether the expanded row has a detail line to show — false when
     /// the check's short line already says everything it has to say.
@@ -169,7 +176,8 @@ public struct LayerResult: Sendable {
                 reviewTermTexts: [String]? = nil,
                 layer: VerificationLayer? = nil,
                 queryLines: [SearchRecheckQueryLine]? = nil,
-                couldNotVerify: Bool = false) {
+                couldNotVerify: Bool = false,
+                reviewIsFragment: Bool = false) {
         self.name = name
         self.symbolName = symbolName
         self.status = status
@@ -181,6 +189,7 @@ public struct LayerResult: Sendable {
         self.layer = layer
         self.queryLines = queryLines
         self.couldNotVerify = couldNotVerify
+        self.reviewIsFragment = reviewIsFragment
     }
 }
 

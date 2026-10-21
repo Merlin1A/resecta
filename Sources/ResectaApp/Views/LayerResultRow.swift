@@ -326,7 +326,9 @@ struct LayerResultRow: View {
               let terms = layer.reviewTermTexts, !terms.isEmpty else {
             return layer.shortDescription
         }
-        return reviewRowText(termTexts: terms, pages: layer.pageReferences)
+        return layer.reviewIsFragment
+            ? VerificationRowModel.fragmentSentence(termTexts: terms, pages: layer.pageReferences)
+            : reviewRowText(termTexts: terms, pages: layer.pageReferences)
     }
 
     /// The Detection Sweep's gate, as a fixed line of the collapsed row and

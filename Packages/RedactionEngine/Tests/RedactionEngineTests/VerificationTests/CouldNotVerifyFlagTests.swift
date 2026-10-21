@@ -60,7 +60,10 @@ struct CouldNotVerifyFlagTests {
             pipelineMode: mode,
             filterDigests: digests ?? Array(repeating: nil, count: n),
             perPageModes: modes ?? Array(repeating: mode, count: n),
-            appliedSearches: searches)
+            appliedSearches: searches,
+            // The output as its own source (no regions here): the re-check's
+            // coverage half is idle, and the flag reads the output half.
+            sourceDocument: SendablePDFDocument(doc))
     }
 
     /// The flag reads `expected`, and a `true` never rides a non-WARN status.
@@ -446,7 +449,7 @@ struct CouldNotVerifyFlagTests {
     /// classified here — the could-not-verify family (23 sites) and the
     /// routine-note WARNs — so a new site cannot land silently: an
     /// unclassified construction, a moved message or a changed count fails.
-    @Test("source census: the could-not-verify family is exactly 23 sites and every WARN construction is classified")
+    @Test("source census: the could-not-verify family is exactly 24 sites and every WARN construction is classified")
     func warnSiteCensus() throws {
         struct Marker { let text: String; let family: Bool; let sites: Int; let lines: Int }
         let markers: [String: [Marker]] = [
@@ -509,8 +512,12 @@ struct CouldNotVerifyFlagTests {
                 Marker(text: "Operator scanner unavailable for page", family: true, sites: 1, lines: 1),
                 Marker(text: "Operator scanner could not traverse page", family: true, sites: 1, lines: 1),
             ],
+            // The re-check's two WARN sites, both could-not-verify: the fold's
+            // (pages it could not check, a coverage check it could not run, or
+            // both) and the scan-only outcome for a coverage check it could
+            // not run.
             "SearchRecheck.swift": [
-                Marker(text: "status: .warn(message)", family: true, sites: 1, lines: 1),
+                Marker(text: "status: .warn(message)", family: true, sites: 2, lines: 2),
             ],
             // The sweep's one WARN family: pages it could not read (the
             // re-check's clause vocabulary).
@@ -526,7 +533,7 @@ struct CouldNotVerifyFlagTests {
             "VerificationEngine+Layer3.swift": 5,
             "Layer2OCRCheck+Sweep.swift": 3, "SandwichVerification.swift": 5,
             "SandwichVerification+Layer10.swift": 5,
-            "SearchRecheck.swift": 1, "DetectionSweep.swift": 1,
+            "SearchRecheck.swift": 2, "DetectionSweep.swift": 1,
         ]
 
         let sources = URL(fileURLWithPath: #filePath)
@@ -548,6 +555,6 @@ struct CouldNotVerifyFlagTests {
                 familySites += m.sites
             }
         }
-        #expect(familySites == 23, "the could-not-verify family is \(familySites) sites; the contract says 23")
+        #expect(familySites == 24, "the could-not-verify family is \(familySites) sites; the contract says 24")
     }
 }

@@ -106,10 +106,16 @@ extension VerificationEngine {
     /// box placed short of its glyphs leaves (the uncovered glyphs stay
     /// printed beside the fill). ATTENTION with the term texts; the Search
     /// Re-check's coverage check is the geometric FAIL for the same box.
+    /// `textInRegionAndSensitiveTermFragmentBesideRegion` carries that
+    /// fragment beside the page's in-region text, the way the whole-term
+    /// pair does: the page's mode picks the stronger one. The fragment arm
+    /// is never masked by the fill-artifact note: a page with both reports
+    /// the fragment.
     enum PageOCRFinding: Sendable, Equatable {
         case sensitiveTermInRegion
         case textInRegion
         case textInRegionAndSensitiveTermOutsideRegions
+        case textInRegionAndSensitiveTermFragmentBesideRegion
         case fillArtifactInRegion
         case sensitiveTermOutsideRegions
         case sensitiveTermFragmentBesideRegion
@@ -253,11 +259,17 @@ extension VerificationEngine {
         }
 
         if sawTextInRegion {
-            return sawSensitiveTermOutsideRegions ? .textInRegionAndSensitiveTermOutsideRegions : .textInRegion
+            if sawSensitiveTermOutsideRegions { return .textInRegionAndSensitiveTermOutsideRegions }
+            if sawSensitiveTermFragmentBesideRegion { return .textInRegionAndSensitiveTermFragmentBesideRegion }
+            return .textInRegion
         }
-        if sawFillArtifactInRegion { return .fillArtifactInRegion }
-        if sawSensitiveTermOutsideRegions { return .sensitiveTermOutsideRegions }
+        // A whole surviving occurrence says more than a fragment. The fill
+        // note keeps its place ahead of the whole-term arm on the same page,
+        // as it did before the fragment arm existed; it never masks the
+        // fragment arm — the shape a box short of its glyphs leaves.
+        if sawSensitiveTermOutsideRegions, !sawFillArtifactInRegion { return .sensitiveTermOutsideRegions }
         if sawSensitiveTermFragmentBesideRegion { return .sensitiveTermFragmentBesideRegion }
+        if sawFillArtifactInRegion { return .fillArtifactInRegion }
         if sawTextOutsideRegions { return .textOutsideRegionsOnly }
         return .none
     }

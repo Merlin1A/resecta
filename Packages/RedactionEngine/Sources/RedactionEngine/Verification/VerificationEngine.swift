@@ -151,6 +151,10 @@ public struct VerificationEngine: Sendable {
         // and 10, and the Search Re-check) — threaded into
         // LayerResult.reviewTermTexts; nil elsewhere.
         var layerReviewTerms: [String]? = nil
+        // True when Layer 2's `.attention` is its edge-fragment arm (part of
+        // a term read beside a box) rather than a whole occurrence readable
+        // elsewhere — threaded into LayerResult.reviewIsFragment.
+        var layerReviewIsFragment = false
         // A layer that supplies its own copy (the two post-sequential
         // checks; Layers 2 and 5 for a PASS that read something and reports
         // nothing; the Layer-7 promotion below is the precedent).
@@ -185,7 +189,7 @@ public struct VerificationEngine: Sendable {
                 // substring-match inside an unrelated word read off a raster.
                 // The third element carries the display-only term texts
                 // behind an `.attention` verdict (Layer 3's shape).
-                let (s1, pages1, terms1, cnv1, copy1) = try await runLayer2OCR(
+                let (s1, pages1, terms1, cnv1, copy1, fragment1) = try await runLayer2OCR(
                     doc, pipelineMode: pipelineMode,
                     regions: regions, sensitiveTerms: sensitiveTerms,
                     perPageModes: perPageModes)
@@ -194,6 +198,7 @@ public struct VerificationEngine: Sendable {
                 layerReviewTerms = terms1
                 couldNotVerify = cnv1
                 copyOverride = copy1
+                layerReviewIsFragment = fragment1
             case .binaryStringSearch:
                 let (s2, pages2, terms2, cnv2) = try runLayer3BinarySearch(doc, sensitiveTerms: sensitiveTerms)
                 status = s2
@@ -376,7 +381,8 @@ public struct VerificationEngine: Sendable {
             reviewTermTexts: layerReviewTerms,
             layer: layer,
             queryLines: layerQueryLines,
-            couldNotVerify: couldNotVerify
+            couldNotVerify: couldNotVerify,
+            reviewIsFragment: layerReviewIsFragment
         )
     }
 
