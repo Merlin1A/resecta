@@ -231,7 +231,9 @@ class Facts:
                 group["max_ns"] = s["duration_ns"] or 0
                 group["max_text"] = s.get("text", "")
         phases = self.log["phases"]
-        walls = [{"from": a.get("text", "?"), "wall_ns": b["t_ns"] - a["t_ns"]}
+        # Each wall is the time spent in the phase a transition entered,
+        # until the next transition.
+        walls = [{"phase": a["text"].split("→")[-1].strip() if "text" in a else "?", "wall_ns": b["t_ns"] - a["t_ns"]}
                  for a, b in zip(phases, phases[1:]) if a["t_ns"] is not None and b["t_ns"] is not None]
         order = ["Nominal", "Fair", "Serious", "Critical"]
         states = [t["state"] for t in self.thermal if t["state"] in order]
@@ -327,6 +329,7 @@ def self_test(samples=None, expect=None):
         "log.app_rows": 3,
         "log.phases.0.text": "Phase: editing → redacting",
         "log.phase_walls.0.wall_ns": 2500000000,
+        "log.phase_walls.0.phase": "redacting",
         "log.diagnostics.system": 1,
         "signposts.by_name.drawPDFPage.max_text": "page=3 dpi=200",
         "memory.peak_footprint_bytes": 314572800,

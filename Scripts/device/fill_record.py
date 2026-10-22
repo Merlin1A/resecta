@@ -72,14 +72,15 @@ def scrub(facts):
             group["max_text"] = ""
             dropped += 1
     for wall in (trace.get("log") or {}).get("phase_walls", []):
-        if wall.get("from") not in (None, "?") and not re.fullmatch(r"Phase: [A-Za-z]+ → [A-Za-z]+", wall["from"]):
-            wall["from"] = "?"
+        if wall.get("phase") not in (None, "?") and not re.fullmatch(r"[A-Za-z]+", wall["phase"]):
+            wall["phase"] = "?"
             dropped += 1
     return dropped
 
 
 def seconds(ns):
-    return f"{(ns or 0) / 1e9:.2f} s"
+    ns = ns or 0
+    return f"{ns / 1e9:.2f} s" if ns >= 100_000_000 else f"{ns / 1e6:.1f} ms"
 
 
 class Run:
@@ -145,7 +146,7 @@ class Run:
             walls = [w for t in traces for w in t["log"]["phase_walls"]]
             if not walls:
                 return "no Phase: lines in the trace" + wide
-            return "; ".join(f"{w['from'].replace('Phase: ', '')} {seconds(w['wall_ns'])}" for w in walls) + wide
+            return "; ".join(f"{w['phase']} {seconds(w['wall_ns'])}" for w in walls) + wide
         if kind == "diagnostics":
             app = sum(t["log"]["diagnostics"]["app"] for t in traces)
             system = sum(t["log"]["diagnostics"]["system"] for t in traces)
@@ -198,8 +199,7 @@ class Run:
         elif name == "pdf:unencrypted":
             bad = [f["file"] for f in files if f["encrypted"]]
         elif name == "pdf:no-exif":
-            bad = [f["file"] for f in files if f["strings_hits"] or f["make_or_model"]
-                   or any(f["metadata_tags"].get(g) for g in ("EXIF", "GPS", "MakerNotes"))]
+            bad = [f["file"] for f in files if any("metadata" in r or "strings" in r for r in f.get("reasons", []))]
         else:
             return f"unknown check {name}"
         return f"FAIL: {', '.join(bad)}" if bad else f"PASS over {len(files)} file(s)"
@@ -285,8 +285,8 @@ def self_test():
         trace = {"pids": {"42": {}}, "memory": {"peak_footprint_bytes": 300 * MIB, "recently_died": False},
                  "thermal": {"worst": "Nominal"},
                  "log": {"phases": [{"format": "query %{public}s", "text": "LEAKED-TERM"}],
-                         "phase_walls": [{"from": "Phase: editing → redacting", "wall_ns": 2500000000},
-                                         {"from": "LEAKED-TERM", "wall_ns": 1}],
+                         "phase_walls": [{"phase": "redacting", "wall_ns": 2500000000},
+                                         {"phase": "LEAKED TERM", "wall_ns": 1}],
                          "diagnostics": {"app": 0, "system": 0, "formats": []}},
                  "signposts": {"intervals": [{"name": "drawPDFPage", "duration_ns": 1200000000, "text": "page=3 dpi=200"},
                                              {"name": "other", "duration_ns": 1, "text": "LEAKED-TERM"}],
@@ -297,13 +297,13 @@ def self_test():
                                  "pdfs_outside_tmp": [], "tmp_outputs": []}},
                   open(os.path.join(run, "rows", "r2", "facts.json"), "w"))
         out = fill("# {{date}}\n{{header}}\n| r1 | {{row:r1}} |\n{{rows}}\n{{judge}}\n", run)
-    for want in ("# 2026-01-01", "**PASS** · ok ¦ fine", "peak footprint 300.0 MiB", "editing → redacting 2.50 s",
+    for want in ("# 2026-01-01", "**PASS** · ok ¦ fine", "peak footprint 300.0 MiB", "redacting 2.50 s",
                  "max 1.20 s (page=3 dpi=200)", "none for the app (1 JetsamEvent(s)", "| r2 | noted",
                  "peak footprint 300.0 MiB (run-wide)", "1/1 stores backup-excluded", "3 message text(s) dropped",
                  "(no PDF judged)"):
         if want not in out:
             failures.append(f"missing: {want!r}")
-    if "LEAKED-TERM" in out:
+    if "LEAKED" in out:
         failures.append("a non-allow-listed text reached the record")
     for line in failures:
         print("FAIL", line)

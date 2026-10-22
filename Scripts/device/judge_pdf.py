@@ -11,11 +11,16 @@ writes one verdict per file:
   structure    `qpdf --check` exit status; `qpdf --show-encryption`
                (expects an unencrypted file); `qpdf --show-npages`
   metadata     `exiftool -j -G`: how many EXIF, GPS, XMP and MakerNotes
-               tags and whether Make/Model are present; `strings -a`
-               lines naming GPS, Exif, xmpmeta or MakerNote (a count)
+               tags and whether Make/Model are present; each embedded
+               image's own metadata (its stream piped from qpdf to
+               exiftool), tag names only; `strings -a` keyword counts for
+               GPS, Exif, xmpmeta and MakerNote
 
 A file passes when no term is found, `qpdf --check` is clean, the file is
-not encrypted, and no EXIF/GPS/MakerNotes tag or `strings` hit is present.
+not encrypted, no GPS, camera, MakerNotes or XMP tag is present at the
+document level or in a page image, and a page image's EXIF block holds
+nothing beyond its colour space and pixel size (what an image encoder
+writes on its own).
 Counts and verdicts only: no page text, no metadata value and no byte of
 the file is written anywhere; no file is opened in an app or copied.
 
@@ -35,12 +40,34 @@ import tempfile
 from datetime import datetime
 
 STRINGS_RE = re.compile(r"GPS|Exif|xmpmeta|MakerNote", re.IGNORECASE)
+# EXIF tags an image encoder writes about the pixels themselves; anything
+# else in a page image's EXIF block (and any GPS, camera or XMP tag) fails.
+STRUCTURAL_EXIF = {"ColorSpace", "ExifImageWidth", "ExifImageHeight", "PixelXDimension", "PixelYDimension"}
 TOOLS = ("pdftotext", "qpdf", "exiftool", "strings")
 
 
-def run(cmd):
-    p = subprocess.run(cmd, capture_output=True)
+def run(cmd, stdin=None):
+    p = subprocess.run(cmd, capture_output=True, input=stdin)
     return p.returncode, p.stdout.decode("utf-8", "replace")
+
+
+def image_metadata(path):
+    """Tag names in each embedded image's own metadata, read through a pipe."""
+    rc, objs = run(["qpdf", "--json=1", "--json-key=objects", path])
+    try:
+        objects = json.loads(objs)["objects"] if rc in (0, 3) else {}
+    except ValueError:
+        objects = {}
+    images = [k.split()[0] for k, v in objects.items() if isinstance(v, dict) and v.get("/Subtype") == "/Image"]
+    tags = set()
+    for num in images:
+        raw = subprocess.run(["qpdf", f"--show-object={num}", "--raw-stream-data", path], capture_output=True).stdout
+        _, meta = run(["exiftool", "-j", "-G", "-"], stdin=raw)
+        try:
+            tags |= {k for k in json.loads(meta)[0] if ":" in k}
+        except (ValueError, IndexError):
+            pass
+    return len(images), tags
 
 
 def judge(path, terms):
@@ -71,7 +98,17 @@ def judge(path, terms):
     out["metadata_tags"] = groups
     out["make_or_model"] = any(k.endswith((":Make", ":Model")) for k in tags)
     _, strings = run(["strings", "-a", path])
-    out["strings_hits"] = sum(1 for line in strings.splitlines() if STRINGS_RE.search(line))
+    keywords = {}
+    for match in STRINGS_RE.finditer(strings):
+        word = match.group(0).lower()
+        keywords[word] = keywords.get(word, 0) + 1
+    out["strings_hits"] = sum(keywords.values())
+    out["strings_keywords"] = keywords
+    count, image_tags = image_metadata(path)
+    out["images"] = count
+    out["image_metadata"] = sorted(t for t in image_tags if t.split(":", 1)[0] in ("EXIF", "XMP", "MakerNotes", "IPTC", "Photoshop"))
+    risky = sorted(t for t in image_tags if (t.startswith("EXIF:") and t.split(":", 1)[1] not in STRUCTURAL_EXIF)
+                   or t.split(":", 1)[0] in ("XMP", "MakerNotes", "GPS"))
     reasons = []
     if not out["text_readable"]:
         reasons.append("text layer unreadable (pdftotext failed)")
@@ -83,8 +120,12 @@ def judge(path, terms):
         reasons.append("encrypted")
     if any(groups.get(g) for g in ("EXIF", "GPS", "MakerNotes")) or out["make_or_model"]:
         reasons.append("EXIF/GPS metadata")
-    if out["strings_hits"]:
-        reasons.append(f"{out['strings_hits']} metadata strings")
+    if risky:
+        reasons.append(f"page-image metadata beyond pixel facts: {', '.join(risky)}")
+    if any(keywords.get(k) for k in ("gps", "xmpmeta", "makernote")):
+        reasons.append("GPS/XMP/MakerNote strings")
+    if keywords.get("exif") and not count:
+        reasons.append("Exif strings outside any image")
     out["verdict"] = "FAIL" if reasons else "PASS"
     out["reasons"] = reasons
     return out
@@ -109,18 +150,35 @@ def judge_inbox(inbox, terms, since=None):
 
 
 # ── self-test ──────────────────────────────────────────────────────────
-def minimal_pdf(text=None, xmp=False):
-    """A one-page PDF written by hand (offsets computed), optionally with text and an XMP stream."""
+def jpeg_with_exif(gps):
+    """SOI + an Exif APP1 (one GPS latitude-ref tag, or one colour-space tag) + EOI."""
+    import struct
+    tag, sub = (0x8825, struct.pack("<HHI4s", 0x0001, 2, 2, b"N\0\0\0")) if gps else \
+        (0x8769, struct.pack("<HHIHH", 0xA001, 3, 1, 1, 0))
+    tiff = b"II*\0" + struct.pack("<I", 8) + struct.pack("<HHHII", 1, tag, 4, 1, 26) + struct.pack("<I", 0)
+    tiff += struct.pack("<H", 1) + sub + struct.pack("<I", 0)
+    body = b"Exif\0\0" + tiff
+    return b"\xff\xd8\xff\xe1" + struct.pack(">H", len(body) + 2) + body + b"\xff\xd9"
+
+
+def minimal_pdf(text=None, xmp=False, image=None):
+    """A one-page PDF written by hand (offsets computed), optionally with text,
+    an XMP stream, or a JPEG image XObject."""
     content = f"BT /F1 24 Tf 72 700 Td ({text}) Tj ET".encode() if text else b""
+    if image:
+        content += b" q 10 0 0 10 72 72 cm /Im1 Do Q"
     objs = [b"<< /Type /Catalog /Pages 2 0 R" + (b" /Metadata 6 0 R" if xmp else b"") + b" >>",
             b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
             b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R"
-            b" /Resources << /Font << /F1 5 0 R >> >> >>",
+            b" /Resources << /Font << /F1 5 0 R >>" + (b" /XObject << /Im1 6 0 R >>" if image else b"") + b" >> >>",
             b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream",
             b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
     if xmp:
         meta = b'<x:xmpmeta xmlns:x="adobe:ns:meta/"></x:xmpmeta>'
         objs.append(b"<< /Type /Metadata /Subtype /XML /Length %d >>\nstream\n" % len(meta) + meta + b"\nendstream")
+    if image:
+        objs.append(b"<< /Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray"
+                    b" /BitsPerComponent 8 /Filter /DCTDecode /Length %d >>\nstream\n" % len(image) + image + b"\nendstream")
     data, offsets = b"%PDF-1.4\n", []
     for i, body in enumerate(objs, 1):
         offsets.append(len(data))
@@ -147,7 +205,9 @@ def self_test(samples=None, expect=None):
     with tempfile.TemporaryDirectory() as tmp:
         for name, body in (("leaky.pdf", minimal_pdf("Sample Holder 123")),
                            ("clean.pdf", minimal_pdf()),
-                           ("xmp.pdf", minimal_pdf(xmp=True))):
+                           ("xmp.pdf", minimal_pdf(xmp=True)),
+                           ("photo-gps.pdf", minimal_pdf(image=jpeg_with_exif(gps=True))),
+                           ("photo-plain.pdf", minimal_pdf(image=jpeg_with_exif(gps=False)))):
             with open(os.path.join(tmp, name), "wb") as fh:
                 fh.write(body)
         with open(os.path.join(tmp, "broken.pdf"), "wb") as fh:
@@ -162,6 +222,9 @@ def self_test(samples=None, expect=None):
         (r["xmp.pdf"]["strings_hits"] > 0, True),
         (r["broken.pdf"]["verdict"], "FAIL"),
         (r["broken.pdf"]["text_readable"], False),
+        (r["photo-gps.pdf"]["verdict"], "FAIL"),
+        (r["photo-plain.pdf"]["image_metadata"], ["EXIF:ColorSpace"]),
+        ([x for x in r["photo-plain.pdf"]["reasons"] if "metadata" in x or "strings" in x], []),
     ]
     for i, (got, want) in enumerate(checks):
         if got != want:
