@@ -75,6 +75,17 @@ struct ZIPStateTableLoader: Sendable {
         guard prefix.count == 3 else { return nil }
         return scfTable[prefix]
     }
+
+    /// Map a full ZIP (five digits, or ZIP+4) to a 2-letter state code: the
+    /// shipped five-digit overrides first (a ZIP whose state differs from the
+    /// one its three-digit prefix suggests), then the prefix table.
+    func state(forZIP zip: String) -> String? {
+        let five = String(zip.prefix(5))
+        if five.count == 5, let override = overrides[five] {
+            return override
+        }
+        return state(forZIPPrefix: String(zip.prefix(3)))
+    }
 }
 
 // MARK: - Wire format

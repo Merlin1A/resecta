@@ -236,25 +236,23 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// Run the complete Redact → Verify → Results pipeline.
     /// Stores the Task in documentState.activePipelineTask for cancellation.
     func runFullPipeline(documentOverride: PipelineMode?) {
-        // Defensive entry-point guard. Mirrors the
-        // Redact button's `.disabled` predicate so a stray invocation
-        // (programmatic call, KI-4 re-run handler firing after the
-        // user already kicked off a pipeline) does not corrupt state.
-        // Covers the existing `activePipelineTask == nil` check plus
-        // the triage-sheet check and phase-must-be-`.editing` rule.
-        guard documentState.canStartPipeline(with: redactionState) else { return }
+        // The Redact button's rule, read before any side effect: every
+        // route into a run (the paused banner's Restart, the purge Re-run,
+        // Run Verification's full route) is refused where the button is
+        // disabled, with the button's hint as a notice.
+        if let refusal = documentState.redactRefusal(with: redactionState) {
+            if !refusal.hint.isEmpty { enqueueToast(refusal.hint, severity: .warning) }
+            return
+        }
 
         // At the Apply seam, the Search & Redact sheet mutates
         // `redactionState.regions` and is incompatible with the phases this
         // run enters, and the editor's ONE `.sheet(item:)` slot sits above
         // its phase switch. Tear it down here, the single funnel for Redact,
-        // ⇧⌘R, the resume banner's Restart and the purge re-run. A staged
-        // review cannot be pending here (`canStartPipeline(with:)`).
+        // ⇧⌘R, the resume banner's Restart and the purge re-run. Neither
+        // unapplied selections nor a staged review can be pending here
+        // (`redactRefusal(with:)`).
         redactionState.dismissActiveSearch()
-        // The results card says Redact cleared the undo history; a stack
-        // that survived would let Undo unlink the built output after Keep
-        // Editing. Cleared here, the same funnel.
-        undoManager?.removeAllActions()
 
         // Snapshot pipeline-affecting settings once at run
         // entry. Subsequent reads (verify-for-run, fillColor, exportDPI,
@@ -517,6 +515,11 @@ final class PipelineCoordinator: @unchecked Sendable {
             // was built with and the results screen describes this run
             // (see RedactionState.LastRunInputs).
             redactionState.recordLastRunInputs(inputs)
+            // The results card says Redact cleared the undo history. It is
+            // cleared when the redacted copy exists, so Stop, a background
+            // pause or a failed run keep the history; an Undo after Keep
+            // Editing still cannot unlink the built output.
+            undoManager?.removeAllActions()
         case .verificationSkipped(let burnedRegionVersion):
             documentState.transition(to: .verified(report: .skipped))
             redactionState.markVerificationCurrent(burnedRegionVersion: burnedRegionVersion)
@@ -614,6 +617,16 @@ final class PipelineCoordinator: @unchecked Sendable {
     @MainActor
     func enqueueToast(_ message: String, severity: ToastSeverity) {
         toastManager?.enqueue(message, severity: severity)
+    }
+
+    /// The one document boundary: a new document (a drop over an open one,
+    /// the Home open, the password re-run) starts with an empty undo
+    /// history and no notices from the previous document. The window's
+    /// undo manager and toast queue outlive the document, and the editor
+    /// stays mounted across a drop, so its close-time clear never runs.
+    func documentDidChange() {
+        undoManager?.removeAllActions()
+        toastManager?.clearAll()
     }
 
     // MARK: - Session-close protection downgrade

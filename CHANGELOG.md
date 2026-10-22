@@ -35,7 +35,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The "Marked N" notice is shorter so its "Not redacted until you tap Redact" clause fits at the default text size.
 - A saved search's suggested name no longer carries the query text.
 - The page bar stays while a match walk is parked.
-- Moving to another page clears the region selection.
+- Moving to another page keeps only the selected regions on the page in view; a delete or a nudge never reaches a region you cannot see.
 
 ### Removed
 
@@ -57,6 +57,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
 ### Fixed
 
+- Verification results: when a run applied a scan and no typed search, the Search Re-check row reads the check's own line saying what the coverage check compared, instead of the re-run explainer; and the fragment row counts its boxes by the terms it names, not by the pages.
 - Verification: on a password-protected document with 128-bit encryption, the Search Re-check's coverage check now reads the original pages unlocked with the session's password. Before, it read a copy that stayed locked, found no matches and passed. When the original pages cannot be read, the check now reports "could not verify" instead of passing; and the OCR Check reports the start or the end of a redacted term read beside a box on a page that also carries a fill artifact, with the results row naming the term and the box as the remedy.
 - Verification: the Search Re-check also re-runs each applied search and scan on the original page and fails when a redaction box leaves part of a match uncovered, and the OCR Check reports the start or the end of a redacted term read beside a box. Before, a box placed off its text by one or more characters passed every check while the uncovered characters stayed printed on the page: the rebuilt text layer dropped them, the text-reading checks read that layer, and the OCR Check read only the box.
 - Search: a match's rect now covers the matched glyphs on every page, in Text mode and in Regex mode. Before, on a page whose text layer carries a ligature or another character that normalization expands, the rect sat as many characters to the right as the expansions before the match had added (and Regex mode still placed it there); and on a page with an emoji, a letter written with a separate accent mark or another character wider than one text unit before the match, the rect sat to the left of the match and short by those units.
@@ -80,6 +81,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The password sheet says Resecta does not store the password, and that any offer to save it is the system's own.
 - Settings: the Searchable Redaction description and the mode picker's hint state the limit the README states — text covered by a picture in the page can still enter the text layer.
 - Redact clears the undo history at the Apply seam, as the results card says; an Undo after Keep Editing no longer unlinks the built output.
+- Redact clears the undo history once the redacted copy is built, as the results card says; Stop, a background pause or a failed run keep it, and an Undo after Keep Editing no longer unlinks the built output.
 - Search sheet: the "unapplied matches cleared" toasts no longer count matches a region already covers.
 - Search sheet: the custom-term time-limit toast names neither the term nor the page, and is shown once for a scan instead of once per page.
 - Accessibility: the search sheet's header stacks Dismiss, the title and Apply on lines of their own at accessibility text sizes, so no button hyphenates and the title keeps its words.
@@ -88,6 +90,14 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Accessibility: a staged search term's remove control is named "Remove" with the term and meets the 46-point target; the Custom Terms add row's Regex toggle and add button meet it too.
 - Accessibility: the parked strip's Apply capsule is named "Applied" once the match is marked, with the match's position as its value, and every element of the strip offers a "Show full sheet" action.
 - Accessibility: the page bar's counter is one spoken element, "Page k of N, n regions"; filter chips report when they are selected.
+- Scan: fewer name proposals on words that resemble a listed surname by only one letter; the near match still raises the score of an otherwise supported name.
+- Scan: a short account number beside its label is proposed at the balanced preset.
+- Scan: the keywords listed under 'Why this classification?' no longer change between launches.
+- Scan: on scanned pages, an address whose ZIP code belongs to a different state than its first three digits suggest is proposed.
+- Scan: a label line such as 'Reg # on file' is no longer proposed as a license plate.
+- Scan: a phone number whose opening parenthesis was lost in text recognition is proposed.
+- Scan: American Express numbers printed in spaced or hyphenated 4-6-5 groups are proposed.
+- Scan: a Social Security number written after a three-digit number and a space is proposed.
 - Custom terms and saved patterns: a regular expression holding a character whose uppercase form is two letters (such as ß or the ﬁ ligature) no longer stops the app when the pattern is validated.
 - Verification: the search re-check and the detection sweep list a page as not checked when a custom regular-expression term ran out of time on it, instead of counting the page as read.
 - Verification: the detection sweep reports a custom term added after a scan was applied as a possible item instead of discarding it as the scan's.
@@ -109,14 +119,24 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Save current search is disabled while the session has no query or terms.
 - The footer says how many selected matches a filter hides.
 - The Scan category chips wrap instead of clipping at the right edge.
-- Tapping an already-selected region without moving it no longer records a Move or Resize step, re-arms Redo or clears the sheet's applied markers.
+- Tapping an already-selected region, or one region of a selected group, without moving it no longer records a Move or Resize step, re-arms Redo or clears the sheet's applied markers.
 - With Add to Selection on, a marquee adds to the selection and an empty marquee leaves it unchanged.
 - VoiceOver announces region resizes.
+- The paused banner's Restart no longer starts a run that Redact itself would refuse: with selected matches not yet applied, or no region left to redact, it shows Redact's notice and leaves the search, the regions and the undo history as they were. The purge Re-run and Run Verification's full run are refused the same way when no region is left.
+- Cancel on the Importing card, or leaving the app, while a dropped document imports over an open one returns to that document instead of a blank editor.
+- Keep Editing after verification was interrupted by leaving the app no longer shows the Processing was paused banner over a finished redaction.
+- Home asks before closing when the search sheet holds selected matches that are not applied; Redact and the sheet's own Dismiss already guard them.
+- Redact, Home and the sheet's Dismiss read the live selection — a selected match no region covers — instead of a tracker any selection gesture armed: Deselect All no longer disables Redact or makes Home ask with nothing to apply, and an undone apply gates Redact again until its matches are applied or cleared.
+- Home → Cancel brings a parked search session back only over the same document, matched by a per-import token rather than the document object's address; a file dropped in behind the close dialog does not inherit the old session's results.
+- The Run Verification card's full run holds the Redact gate too: with selected matches not applied it shows the hint instead of dropping the session.
+- A refused drop on the results screen or an error screen names that screen's way back: Keep Editing, Return to Editor, Return to Results, Choose Another File or Re-open Document.
+- A document dropped over an open one starts with an empty undo history, the redaction mode set in Settings and no notices from the previous document; a drop on the results or error screen is refused with a notice instead of doing nothing.
 
 ### Internal
 
 - CI: the simulator suite runs on every pull request to `main` again, documentation-only ones included, because its honesty tests read the README, ENGINEERING, THREAT-MODEL, PRIVACY and EULA text.
 - CI: the pull-request gate also compiles the engine package's test bundle; the weekly simulator suite leaves out the 12-page searchable preflight and the two suites that call text recognition directly, which stall the hosted runner; the pre-push hook posts a `local-suites` commit status for each pushed commit it passed.
+- Detection: a date-collision rule that could never apply to a nine-digit number is removed.
 - The app's unit tests build their settings on a scratch defaults suite: the shared coordinator helpers take a fresh suite by default, and the source check that lists tests reading the shared defaults domain now fails on any such site.
 - The engine package's test copy of the app's per-page mode choice is removed; the app's tests check the production choice through the coordinator, on a right-to-left page and on every page of the bundled sample.
 - App tests: the six trapping requires in the mode-switch toast tests are throwing requires, and the hosting and transition smoke tests assert what they name; the two review-dismiss UI tests call their survival check from the test body.

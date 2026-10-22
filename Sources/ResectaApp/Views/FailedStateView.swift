@@ -217,7 +217,13 @@ struct FailedStateView: View {
     }
 
     private var primaryButtonLabel: String {
-        switch Self.primaryAction(error: error, returnPhase: returnPhase) {
+        Self.primaryActionLabel(Self.primaryAction(error: error, returnPhase: returnPhase))
+    }
+
+    /// The primary button's title — the way back the screen offers; the
+    /// drop refusal's sentence names it (`DocumentState.importRefusalMessage`).
+    static func primaryActionLabel(_ action: PrimaryAction) -> String {
+        switch action {
         case .reopenDocument:    "Re-open Document"
         case .chooseAnotherFile: "Choose Another File"
         case .returnToEditor:    "Return to Editor"

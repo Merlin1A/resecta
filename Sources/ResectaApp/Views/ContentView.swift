@@ -112,15 +112,8 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, newPhase in
             // Reach into active workspace for pipeline cancellation
             if newPhase == .background,
-               case .redact(let ws) = appCoordinator.activeWorkspace,
-               ws.documentState.phaseKind.isCancellable {
-                // Capture the phase being cancelled BEFORE
-                // cancelActivePipeline transitions to .editing, so the
-                // editing-phase resume banner can offer the matching pipeline
-                // (detect-only vs. full redact).
-                ws.documentState.pausedFromPhase = ws.documentState.phaseKind
-                ws.documentState.cancelActivePipeline(redactionState: ws.redactionState)
-                ws.documentState.wasPausedByBackground = true
+               case .redact(let ws) = appCoordinator.activeWorkspace {
+                Self.cancelForBackground(documentState: ws.documentState, redactionState: ws.redactionState)
             }
             // Do NOT clear wasPausedByBackground on .active here.
             // The InlineWarningBanner in DocumentEditorView handles dismissal.
@@ -137,5 +130,17 @@ struct ContentView: View {
         .onChange(of: appCoordinator.activeWorkspace.kind) { _, _ in
             toastManager.clearAll()
         }
+    }
+
+    /// The background rule: every cancellable phase is cancelled; only a
+    /// run the editor can restart raises the paused banner. The phase is
+    /// captured BEFORE the cancel transitions away, so the banner can offer
+    /// the matching pipeline (detect-only vs. full redact).
+    static func cancelForBackground(documentState: DocumentState, redactionState: RedactionState) {
+        let kind = documentState.phaseKind
+        guard kind.isCancellable else { return }
+        if kind.raisesResumeBanner { documentState.pausedFromPhase = kind }
+        documentState.cancelActivePipeline(redactionState: redactionState)
+        if kind.raisesResumeBanner { documentState.wasPausedByBackground = true }
     }
 }

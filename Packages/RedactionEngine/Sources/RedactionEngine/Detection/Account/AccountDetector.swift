@@ -29,18 +29,22 @@ struct AccountDetector: FamilyDetector {
         negativeKeywords: [],
         windowRadius: 5,
         baseConfidence: 0.0,      // strict: no signal without context
-        // The boosted RAW confidence dropped below the unstructured peers
-        // it would otherwise suppress in resolveOverlaps. Raw arbitration runs
-        // BEFORE the posterior seam and the
-        // preset gate. account is the lowest-priority generic kind
-        // (priorityRank 1, DetectionOrchestrator+OverlapResolution.swift:180); a
-        // bare 6–15 digit run next to "account" must not out-confidence address
-        // (0.70) or phone (0.60/0.80). 0.58 < 0.60 keeps account losing every
-        // contested overlap with an unstructured peer while still surviving as a
-        // sole-hit group (a lone account match has no overlap rival to lose to).
-        boostedConfidence: 0.58,
+        // The boosted RAW confidence sits exactly on the posterior floor's
+        // keyword-confirmed bar (ContextPosteriorFloor.keywordConfirmedRaw), so
+        // a keyword-confirmed account the learned context term collapses is
+        // re-floored to the conservative cutoff and clears the balanced preset.
+        // Below the bar (0.58 before) the floor never fired and no real
+        // account survived at balanced. Account stays the lowest-priority
+        // generic kind in overlap resolution (priorityRank 1): at an equal raw
+        // the rank decides against it, and the G8 trial at this raw moved no
+        // other family.
+        boostedConfidence: 0.70,
         floor: 0.0
     )
+
+    /// The raw a keyword-confirmed account carries — the tests that compose
+    /// the posterior floor read it here instead of hand-feeding a number.
+    static var keywordConfirmedConfidence: Double { profile.boostedConfidence }
 
     private let scorer = ContextWindowScorer()
 

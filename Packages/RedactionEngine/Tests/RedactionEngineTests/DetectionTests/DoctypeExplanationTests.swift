@@ -41,6 +41,25 @@ struct DoctypeExplanationTests {
                 "shared computeLogits kernel must agree on primary class")
     }
 
+    @Test("With more than five equal-weight keyword hits, classify and explain list the same keywords in sorted order")
+    func topKeywordsAreStableAcrossCalls() async {
+        let classifier = DocumentTypeClassifier()
+        let text = """
+            MRN patient diagnosis physician hospital discharge medical record
+            admission chart radiology clinical prescription dosage
+            """
+        let explanation = await classifier.explain(pageText: text)
+        let result = await classifier.classify(pageText: text)
+        let listed = explanation.keywordContributors.map(\.keyword)
+        #expect(listed.count == 5)
+        #expect(listed == result.topKeywords.map(\.keyword))
+        let weights = explanation.keywordContributors.map(\.weight)
+        #expect(weights == weights.sorted(by: >))
+        for (a, b) in zip(explanation.keywordContributors, explanation.keywordContributors.dropFirst()) where a.weight == b.weight {
+            #expect(a.keyword < b.keyword, "equal weights read in keyword order")
+        }
+    }
+
     @Test("explain() keywordContributors capped at 5")
     func keywordContributorsCapped() async {
         let classifier = DocumentTypeClassifier()

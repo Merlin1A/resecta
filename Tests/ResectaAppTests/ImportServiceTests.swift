@@ -437,4 +437,28 @@ struct ImportServiceTests {
         #expect(doc.sourceDocument == nil)
         #expect(doc.phaseKind == .importing)
     }
+
+    @Test("A cancelled import keeps the open document's password")
+    func cancelledImportKeepsThePassword() async {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        await ImportService.importDocument(
+            data: makeTestPDFData(), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+        #expect(doc.phaseKind == .editing)
+        doc.documentPassword.set("open-sesame")
+
+        let second: Task<ImportOutcome, Never> = Task {
+            await ImportService.importDocument(
+                data: makeTestPDFData(), suggestedType: "pdf",
+                documentState: doc, redactionState: redaction)
+        }
+        second.cancel()
+        let outcome = await second.value
+        #expect(outcome == .refused, "a cancelled import surrenders")
+        doc.cancelActivePipeline(redactionState: redaction)
+
+        #expect(doc.phaseKind == .editing, "Cancel returns to the open document")
+        #expect(doc.documentPassword.withPassword { $0 } == "open-sesame", "the holder survives the cancelled import")
+    }
 }

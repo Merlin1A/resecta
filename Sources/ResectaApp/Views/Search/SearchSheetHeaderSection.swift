@@ -165,7 +165,7 @@ extension SearchAndRedactSheet {
                     // out. An untouched, non-preselected sheet still
                     // dismisses directly so the common no-op case adds
                     // no friction.
-                    if searchState.requiresDismissConfirmation {
+                    if DocumentState.hasUnappliedSelections(redactionState) {
                         showDismissConfirmation = true
                     } else {
                         performDismiss(afterConfirmation: false)

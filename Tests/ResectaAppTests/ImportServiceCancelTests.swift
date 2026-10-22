@@ -28,7 +28,7 @@ struct ImportServiceCancelTests {
 
     // MARK: - cancelActivePipeline behaviour
 
-    @Test("cancelActivePipeline on .importing transitions to .empty")
+    @Test("cancelActivePipeline on .importing with no open document transitions to .empty")
     func cancelFromImportingReturnsToEmpty() {
         let doc = DocumentState()
         let redaction = RedactionState()
@@ -58,6 +58,59 @@ struct ImportServiceCancelTests {
         // Post-cancel: still no sourceDocument applied
         #expect(doc.sourceDocument == nil)
         #expect(doc.phaseKind == .empty)
+    }
+
+    @Test("Cancel during a drop import over an open document returns to that document")
+    func cancelOverAnOpenDocumentReturnsToTheEditor() async throws {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        let open = makeTestPDFDocument()
+        doc.sourceDocument = open
+        doc.phase = .editing
+        let region = RedactionRegion(
+            id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.1), source: .manual)
+        redaction.addRegion(region, page: 0, undoManager: nil)
+        let data = makeMultiPagePDFData(pages: 250)
+
+        let importTask = Task {
+            await ImportService.importDocument(
+                data: data, suggestedType: "pdf", door: .drop,
+                documentState: doc, redactionState: redaction)
+        }
+        for _ in 0..<500 where doc.phaseKind != .importing {
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        try #require(doc.phaseKind == .importing, "the drop import never started")
+        doc.cancelActivePipeline(redactionState: redaction)
+        await importTask.value
+
+        #expect(doc.phaseKind == .editing)
+        #expect(doc.sourceDocument === open)
+        #expect(redaction.regions[0]?.map(\.id) == [region.id])
+    }
+
+    @Test("Leaving the app during an import cancels it without the paused banner")
+    func backgroundDuringImportRaisesNoPause() {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        doc.sourceDocument = makeTestPDFDocument()
+        doc.phase = .importing
+        ContentView.cancelForBackground(documentState: doc, redactionState: redaction)
+        #expect(doc.phaseKind == .editing)
+        #expect(doc.wasPausedByBackground == false)
+        #expect(doc.pausedFromPhase == nil)
+    }
+
+    @Test("Leaving the app during a run still raises the paused banner")
+    func backgroundDuringARunRaisesThePause() {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        doc.sourceDocument = makeTestPDFDocument()
+        doc.phase = .redacting(progress: .init(currentPage: 1, totalPages: 1, currentStep: "Page 1…"))
+        ContentView.cancelForBackground(documentState: doc, redactionState: redaction)
+        #expect(doc.phaseKind == .editing)
+        #expect(doc.wasPausedByBackground)
+        #expect(doc.pausedFromPhase == .redacting)
     }
 
     // MARK: - Per-page loop surrender

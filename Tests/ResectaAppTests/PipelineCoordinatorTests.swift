@@ -385,27 +385,69 @@ struct PipelineCoordinatorTests {
 
     // MARK: - The Apply seam
 
-    @Test("Redact clears the undo history at the Apply seam, as the results card says")
-    func runFullPipelineClearsUndoHistory() async {
-        let coord = makeCoordinator()
-        coord.documentState.sourceDocument = makeTestPDFDocument()
-        coord.documentState.phase = .editing
-        coord.redactionState.regions[0] = [RedactionRegion(id: UUID(),
+    /// A loaded coordinator with one effective region, auto-verify off so a
+    /// run ends at `.verified(.skipped)` quickly, and one undoable step on
+    /// the window's undo manager.
+    private func undoSeededCoordinator() -> (coord: PipelineCoordinator, undo: UndoManager) {
+        let coord = makeLoadedCoordinator()
+        coord.settingsState.paranoidMode = false
+        coord.settingsState.autoVerify = false
+        coord.redactionState.addRegion(RedactionRegion(id: UUID(),
             normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
-            source: .manual)]
+            source: .manual), page: 0, undoManager: nil)
         let undo = UndoManager()
         undo.groupsByEvent = false
-        undo.beginUndoGrouping()
-        undo.registerUndo(withTarget: coord.redactionState) { _ in }
-        undo.endUndoGrouping()
-        #expect(undo.canUndo)
+        registerStep(on: undo, target: coord.redactionState)
         coord.undoManager = undo
+        return (coord, undo)
+    }
+
+    private func registerStep(on undo: UndoManager, target: RedactionState) {
+        undo.beginUndoGrouping()
+        undo.registerUndo(withTarget: target) { _ in }
+        undo.endUndoGrouping()
+    }
+
+    private func awaitVerified(_ coord: PipelineCoordinator) async throws {
+        _ = await coord.documentState.activePipelineTask?.value
+        for _ in 0..<300 {
+            if case .verified = coord.documentState.phase { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        Issue.record("Expected .verified, got \(coord.documentState.phaseKind)")
+    }
+
+    @Test("Stop before the redacted copy is built keeps the undo history")
+    func stopBeforeTheCopyKeepsTheUndoHistory() async {
+        let (coord, undo) = undoSeededCoordinator()
+        #expect(undo.canUndo)
 
         coord.runFullPipeline(documentOverride: .secureRasterization)
-        #expect(!undo.canUndo, "the stack is cleared before the run")
         let task = coord.documentState.activePipelineTask
         coord.documentState.cancelActivePipeline(redactionState: coord.redactionState)
         _ = await task?.value
+        #expect(coord.documentState.phaseKind == .editing)
+        #expect(undo.canUndo, "Stop keeps the history; only a built copy clears it")
+    }
+
+    @Test("A finished run clears the undo history, as the results card says")
+    func finishedRunClearsTheUndoHistory() async throws {
+        let (coord, undo) = undoSeededCoordinator()
+
+        coord.runFullPipeline(documentOverride: .secureRasterization)
+        try await awaitVerified(coord)
+        #expect(coord.redactionState.outputURL != nil)
+        #expect(!undo.canUndo)
+    }
+
+    @Test("A step registered during the run's entry is cleared with the rest")
+    func stepRegisteredDuringTheRunIsCleared() async throws {
+        let (coord, undo) = undoSeededCoordinator()
+
+        coord.runFullPipeline(documentOverride: .secureRasterization)
+        registerStep(on: undo, target: coord.redactionState)
+        try await awaitVerified(coord)
+        #expect(!undo.canUndo)
     }
 
     // MARK: - Helpers
