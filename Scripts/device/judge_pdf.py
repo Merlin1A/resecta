@@ -46,7 +46,8 @@ def run(cmd):
 def judge(path, terms):
     out = {"file": os.path.basename(path), "bytes": os.path.getsize(path),
            "modified": datetime.fromtimestamp(os.path.getmtime(path)).isoformat(timespec="seconds")}
-    _, text = run(["pdftotext", "-layout", path, "-"])
+    text_rc, text = run(["pdftotext", "-layout", path, "-"])
+    out["text_readable"] = text_rc == 0
     folded = text.lower()
     out["text_chars"] = len(text.strip())
     out["term_hits"] = {f"term{i + 1}": folded.count(t.lower()) for i, t in enumerate(terms)}
@@ -63,6 +64,8 @@ def judge(path, terms):
     groups = {}
     for key in tags:
         group = key.split(":", 1)[0] if ":" in key else ""
+        if group == "EXIF" and key.split(":", 1)[1].startswith("GPS"):
+            group = "GPS"  # with -G, GPS tags arrive in the EXIF family
         if group in ("EXIF", "GPS", "XMP", "MakerNotes"):
             groups[group] = groups.get(group, 0) + 1
     out["metadata_tags"] = groups
@@ -70,6 +73,8 @@ def judge(path, terms):
     _, strings = run(["strings", "-a", path])
     out["strings_hits"] = sum(1 for line in strings.splitlines() if STRINGS_RE.search(line))
     reasons = []
+    if not out["text_readable"]:
+        reasons.append("text layer unreadable (pdftotext failed)")
     if any(out["term_hits"].values()):
         reasons.append("term in text layer")
     if out["qpdf_check_rc"] != 0:
@@ -140,12 +145,14 @@ def self_test(samples=None, expect=None):
         return 1
     failures = []
     with tempfile.TemporaryDirectory() as tmp:
-        for name, body in (("leaky.pdf", minimal_pdf("Jordan Avery 123")),
+        for name, body in (("leaky.pdf", minimal_pdf("Sample Holder 123")),
                            ("clean.pdf", minimal_pdf()),
                            ("xmp.pdf", minimal_pdf(xmp=True))):
             with open(os.path.join(tmp, name), "wb") as fh:
                 fh.write(body)
-        r = {f["file"]: f for f in judge_inbox(tmp, ["jordan avery", "absent"])["files"]}
+        with open(os.path.join(tmp, "broken.pdf"), "wb") as fh:
+            fh.write(b"%PDF-1.4 not a document")
+        r = {f["file"]: f for f in judge_inbox(tmp, ["sample holder", "absent"])["files"]}
     checks = [
         (r["leaky.pdf"]["term_hits"], {"term1": 1, "term2": 0}),
         (r["leaky.pdf"]["verdict"], "FAIL"),
@@ -153,11 +160,13 @@ def self_test(samples=None, expect=None):
         (r["clean.pdf"]["qpdf_check_rc"], 0),
         (r["clean.pdf"]["pages"], 1),
         (r["xmp.pdf"]["strings_hits"] > 0, True),
+        (r["broken.pdf"]["verdict"], "FAIL"),
+        (r["broken.pdf"]["text_readable"], False),
     ]
     for i, (got, want) in enumerate(checks):
         if got != want:
             failures.append(f"synthetic check {i}: got {got!r}, want {want!r}")
-    if "Jordan" in json.dumps(r):
+    if "Holder" in json.dumps(r):
         failures.append("synthetic: a term or page text reached the report")
     if samples:
         wanted = json.load(open(expect, encoding="utf-8")) if expect else {}

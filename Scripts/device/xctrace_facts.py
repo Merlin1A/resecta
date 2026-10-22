@@ -254,11 +254,14 @@ class Facts:
 
 
 def reduce_files(paths, process):
-    facts = Facts(process)
+    facts, unreadable = Facts(process), []
     for path in paths:
-        for schema, row in iter_rows(path):
-            facts.add(schema, row)
-    return facts.result()
+        try:
+            for schema, row in iter_rows(path):
+                facts.add(schema, row)
+        except ET.ParseError as e:
+            unreadable.append(f"{os.path.basename(path)}: {e}")
+    return dict(facts.result(), unreadable=unreadable)
 
 
 # ── self-test ──────────────────────────────────────────────────────────
@@ -335,6 +338,11 @@ def self_test(samples=None, expect=None):
             failures.append(f"synthetic {key}: got {dotted(f, key)!r}, want {want!r}")
     if "SECRET-NAME" in json.dumps(f):
         failures.append("synthetic: a non-allow-listed message reached the facts")
+    with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as fh:
+        empty = fh.name
+    if not reduce_files([empty], DEFAULT_PROCESS)["unreadable"]:
+        failures.append("synthetic: an empty export was not reported as unreadable")
+    os.unlink(empty)
     if samples:
         wanted = json.load(open(expect, encoding="utf-8")) if expect else {}
         for name in sorted(os.listdir(samples)):

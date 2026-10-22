@@ -27,7 +27,8 @@
 #   sitting.sh probe
 #   sitting.sh self-test [--samples DIR [--expect FILE]]
 # Common options:
-#   --out DIR         the run directory (default Scripts/device/device-runs/DATE)
+#   --out DIR         the run directory (default Scripts/device/device-runs/DATE;
+#                     --run is the same option)
 #   --bundle-id ID    the app under test (default com.resecta.app)
 #   --process NAME    its executable name (default ResectaApp)
 #   --repo DIR        the source checkout preflight reads (default this one)
@@ -58,8 +59,9 @@ dc() {
     # The JSON flag goes first: after an app's launch arguments it would reach the app.
     xcrun devicectl --json-output "$json" "$@" > "${json%.json}.log" 2>&1
 }
-# xt ARGS… — every xctrace call.
-xt() { xcrun xctrace "$@"; }
+# xt ARGS… — every xctrace call (XT also serves the one backgrounded recording).
+XT=(xcrun xctrace)
+xt() { "${XT[@]}" "$@"; }
 
 # jq-free JSON reads: pyjson FILE 'EXPR over d'.
 pyjson() {
@@ -159,11 +161,6 @@ listings() {  # listings DIR SUFFIX — the container and the crash-log folder
         || say "  (crash-log listing failed: $1/crashes-$2.log)"
 }
 
-app_pid() {
-    dc "$OUT/processes.json" device info processes --device "$UUID" >/dev/null 2>&1 || return 1
-    pyjson "$OUT/processes.json" "[p['processIdentifier'] for p in d['result']['runningProcesses'] if str(p.get('executable','')).endswith('/$PROCESS')][0]"
-}
-
 record_start() {
     local id="$1" launch="$2" dir="$OUT/rows/$1" rung started pid
     need_device
@@ -174,28 +171,48 @@ record_start() {
         /usr/bin/grep -qx "$rung" "$OUT/refused-rungs" 2>/dev/null && continue
         rm -rf "$dir/row.trace"
         IFS='|' read -r -a args <<< "$(rung_args "$rung")"
-        nohup xcrun xctrace record --device "$UDID" "${args[@]}" --all-processes \
+        nohup "${XT[@]}" record --device "$UDID" "${args[@]}" --all-processes \
             --time-limit "${CAP}m" --output "$dir/row.trace" --no-prompt > "$dir/xctrace.log" 2>&1 < /dev/null &
         pid=$!
+        echo "$pid" > "$dir/xctrace.pid"
         started=""
-        for _ in $(seq 1 90); do
+        for _ in $(seq 1 180); do
             /usr/bin/grep -q 'Ctrl-C to stop' "$dir/xctrace.log" && { started=1; break; }
             kill -0 "$pid" 2>/dev/null || break
             sleep 0.5
         done
         if [ -n "$started" ]; then
-            echo "$pid" > "$dir/xctrace.pid"
             printf '{"row":"%s","rung":"%s","t0":"%s","t0_epoch":%s,"cap_min":%s}\n' "$id" "$rung" "$(now)" "$(date +%s)" "$CAP" > "$dir/start.json"
             say "row $id: recording ($rung) — T0 $(now)"
             [ "$launch" = 1 ] && launch_app "$dir"
             return 0
         fi
-        kill -INT "$pid" 2>/dev/null
+        if kill -0 "$pid" 2>/dev/null; then
+            # Still starting after 90 s: a slow device, not a refusal. Stop it and give up on this row.
+            stop_recorder "$pid" "$dir"
+            rm -f "$dir/xctrace.pid"
+            die "row $id: the recording did not start within 90 s (see $dir/xctrace.log); retry the row"
+        fi
+        rm -f "$dir/xctrace.pid"
         echo "$rung" >> "$OUT/refused-rungs"
         printf '%s\t%s\t%s\n' "$(now)" "$rung" "$(/usr/bin/grep -v '^ *0x' "$dir/xctrace.log" | tail -3 | tr '\n' ' ')" >> "$OUT/refused-rungs.log"
         say "row $id: the $rung recording was refused; trying the next rung"
     done
     die "row $id: every recording rung was refused (see $OUT/refused-rungs.log)"
+}
+
+# stop_recorder PID DIR — SIGINT (xctrace then saves), up to 2 minutes; a recorder
+# still alive after that is terminated so it cannot overlap the next row.
+stop_recorder() {
+    local pid="$1" dir="$2"
+    kill -INT "$pid" 2>/dev/null
+    for _ in $(seq 1 240); do
+        /usr/bin/grep -q 'Output file saved' "$dir/xctrace.log" && return 0
+        kill -0 "$pid" 2>/dev/null || return 0
+        sleep 0.5
+    done
+    kill -TERM "$pid" 2>/dev/null
+    say "  the recorder did not save within 2 minutes; terminated"
 }
 
 launch_app() {  # the app under test, with any argument-domain defaults in LAUNCH_ARGS
@@ -209,13 +226,7 @@ record_stop() {
     local id="$1" verdict="$2" note="$3" dir="$OUT/rows/$1" pid t1 rung
     need_device
     if [ -f "$dir/xctrace.pid" ]; then
-        pid="$(cat "$dir/xctrace.pid")"
-        kill -INT "$pid" 2>/dev/null
-        for _ in $(seq 1 240); do
-            /usr/bin/grep -q 'Output file saved' "$dir/xctrace.log" && break
-            kill -0 "$pid" 2>/dev/null || break
-            sleep 0.5
-        done
+        stop_recorder "$(cat "$dir/xctrace.pid")" "$dir"
         /usr/bin/grep -q 'Output file saved' "$dir/xctrace.log" || say "row $id: the recording did not report a save (see $dir/xctrace.log)"
         rm -f "$dir/xctrace.pid"
     fi
@@ -236,15 +247,18 @@ run_rows() {
     local rows="$1" from="$2" go="" id class cap how pass checks ans
     [ -f "$rows" ] || die "no rows file $rows"
     need_device
-    cp "$rows" "$OUT/rows.tsv"
+    [ "$rows" -ef "$OUT/rows.tsv" ] || cp "$rows" "$OUT/rows.tsv"
     [ -z "$from" ] && go=1
-    while IFS=$'\t' read -r id class cap how pass checks <&3; do
+    # Tabs become a non-whitespace separator first: with a tab IFS, bash merges
+    # adjacent tabs and an empty column would shift the ones after it.
+    while IFS=$'\037' read -r id class cap how pass checks <&3; do
         case "$id" in ''|'#'*|id) continue ;; esac
+        case "$cap" in ''|*[!0-9]*) die "rows file: step $id has no whole-minute cap ('$cap')" ;; esac
         if [ -z "$go" ]; then
             [ "$id" = "$from" ] || continue
             go=1
         fi
-        ROW_CLASS="$class"; ROW_CHECKS="$checks"; CAP="${cap:-15}"
+        ROW_CLASS="$class"; ROW_CHECKS="$checks"; CAP="$cap"
         say ""; say "── $id ($class) ─ $how"; say "   pass: $pass"
         case "$class" in
             X) read -r -p "   not reachable on every build — run it? [y/N] " ans
@@ -259,7 +273,7 @@ run_rows() {
         record_start "$id" 0
         read -r -p "   ⏎ STOP " ans
         record_stop "$id" "" ""
-    done 3< "$rows"
+    done 3< <(tr '\t' '\037' < "$rows")
     say ""; say "run complete: $OUT/rows.jsonl"
 }
 
@@ -267,16 +281,25 @@ run_rows() {
 SCHEMAS="os-log os-signpost-interval sysmon-process device-thermal-state-intervals process-info"
 pull() {
     need_device
-    local dir id schema toc rel name
-    for dir in "$OUT"/rows/*/; do
-        dir="${dir%/}"; id="$(basename "$dir")"
+    local dir id schema toc rel name base prev_stop=""
+    [ -f "$OUT/rows.jsonl" ] || die "no rows.jsonl in $OUT"
+    # In recording order, so a crash report written between two steps is
+    # attributed to the later one (its baseline is the previous step's stop listing).
+    for id in $($PY -c 'import json,sys
+seen=[]
+for l in open(sys.argv[1]):
+    r=json.loads(l)["row"]
+    if r not in seen: seen.append(r)
+print(" ".join(seen))' "$OUT/rows.jsonl"); do
+        dir="$OUT/rows/$id"
+        [ -d "$dir" ] || continue
         if [ -d "$dir/row.trace" ]; then
             mkdir -p "$dir/tables"
             toc="$(xt export --input "$dir/row.trace" --toc 2>/dev/null)"
             for schema in $SCHEMAS; do
                 printf '%s' "$toc" | /usr/bin/grep -q "schema=\"$schema\"" || continue
-                xt export --input "$dir/row.trace" --xpath "/trace-toc/run[@number=\"1\"]/data/table[@schema=\"$schema\"]" \
-                    --output "$dir/tables/$schema.xml" > /dev/null 2>&1
+                export_table "$dir" "$schema" || export_table "$dir" "$schema" \
+                    || { rm -f "$dir/tables/$schema.xml"; say "  row $id: the $schema table exported empty twice"; }
             done
             if ls "$dir"/tables/*.xml > /dev/null 2>&1; then
                 $PY "$HERE/xctrace_facts.py" --process "$PROCESS" --out "$dir/trace-facts.json" "$dir"/tables/*.xml
@@ -286,10 +309,11 @@ pull() {
             $PY "$HERE/container_facts.py" summary "$dir/container-stop.json" --out "$dir/container-summary.json"
             [ -f "$dir/container-start.json" ] && $PY "$HERE/container_facts.py" diff "$dir/container-start.json" "$dir/container-stop.json" --out "$dir/container-diff.json"
         fi
-        if [ -f "$dir/crashes-start.json" ] && [ -f "$dir/crashes-stop.json" ]; then
-            $PY "$HERE/container_facts.py" diff "$dir/crashes-start.json" "$dir/crashes-stop.json" --out "$dir/crash-diff.json"
+        base="${prev_stop:-$dir/crashes-start.json}"
+        if [ -f "$base" ] && [ -f "$dir/crashes-stop.json" ]; then
+            $PY "$HERE/container_facts.py" diff "$base" "$dir/crashes-stop.json" --out "$dir/crash-diff.json"
             mkdir -p "$dir/ips"
-            for rel in $(pyjson "$dir/crash-diff.json" "' '.join(p for p in d['added'] if p.endswith('.ips'))" | tr -d '"'); do
+            for rel in $(pyjson "$dir/crash-diff.json" "' '.join(p for p in d.get('added', []) if p.endswith('.ips'))"); do
                 name="$(basename "$rel")"
                 [ -f "$dir/ips/$name" ] || dc "$dir/ips/$name.copy.json" device copy from --device "$UUID" \
                     --domain-type systemCrashLogs --source "$rel" --destination "$dir/ips/$name"
@@ -304,8 +328,15 @@ for k,f in (("trace","trace-facts.json"),("container","container-summary.json"),
 t=os.path.join(d,"row.trace")
 if os.path.isdir(t): out["trace_bytes"]=sum(os.path.getsize(os.path.join(r,n)) for r,_,ns in os.walk(t) for n in ns)
 json.dump(out,open(os.path.join(d,"facts.json"),"w"),indent=1)' "$dir"
+        [ -f "$dir/crashes-stop.json" ] && prev_stop="$dir/crashes-stop.json"
         say "pulled $id"
     done
+}
+
+export_table() {  # export_table ROW-DIR SCHEMA — nonzero when the export came back empty
+    xt export --input "$1/row.trace" --xpath "/trace-toc/run[@number=\"1\"]/data/table[@schema=\"$2\"]" \
+        --output "$1/tables/$2.xml" > /dev/null 2>&1
+    [ -s "$1/tables/$2.xml" ]
 }
 
 # ── state: argument-domain defaults for the next launch ────────────────
@@ -346,8 +377,7 @@ for r in rows:
 self_test() {
     local rc=0 f
     for f in xctrace_facts crash_facts container_facts judge_pdf fill_record; do
-        $PY "$HERE/$f.py" --self-test "$@" | tail -1
-        [ "${PIPESTATUS[0]}" -eq 0 ] || rc=1
+        $PY "$HERE/$f.py" --self-test "$@" || rc=1
     done
     bash -n "$0" && say "sitting.sh syntax: PASS" || rc=1
     return $rc
@@ -361,7 +391,7 @@ POS=(); ROWS=""; FROM=""; INBOX=""; SINCE=""; TERMS=""; TERMS_FILE=""; TEMPLATE=
 VERDICT=""; NOTE=""; MODE=""; LAUNCH=0; PASS_THROUGH=()
 while [ $# -gt 0 ]; do
     case "$1" in
-        --out) OUT="$2"; shift 2 ;;
+        --out|--run) OUT="$2"; shift 2 ;;
         --device) DEVICE_SEL="$2"; shift 2 ;;
         --bundle-id) BUNDLE_ID="$2"; shift 2 ;;
         --process) PROCESS="$2"; shift 2 ;;
@@ -381,13 +411,14 @@ while [ $# -gt 0 ]; do
         --mode) MODE="$2"; shift 2 ;;
         --samples|--expect) PASS_THROUGH+=("$1" "$2"); shift 2 ;;
         -h|--help) VERB=help; shift ;;
+        -*) die "unknown option $1 (see --help)" ;;
         *) POS+=("$1"); shift ;;
     esac
 done
 
 case "$VERB:$SUB" in
     preflight:) preflight ;;
-    record:start) [ ${#POS[@]} -eq 1 ] || die "record start ROW-ID"; ROW_CLASS=""; record_start "${POS[0]}" "$LAUNCH" ;;
+    record:start) [ ${#POS[@]} -eq 1 ] || die "record start ROW-ID"; record_start "${POS[0]}" "$LAUNCH" ;;
     record:stop) [ ${#POS[@]} -eq 1 ] || die "record stop ROW-ID"; record_stop "${POS[0]}" "$VERDICT" "$NOTE" ;;
     run:) [ -n "$ROWS" ] || die "run --rows FILE.tsv"; run_rows "$ROWS" "$FROM" ;;
     pull:) pull ;;

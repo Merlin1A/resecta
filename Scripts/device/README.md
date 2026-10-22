@@ -26,7 +26,7 @@ All output goes to one run directory (`--out DIR`, default
 | `record start ID` | Lists the container and the crash-log folder, then starts an Instruments recording of all processes (Activity Monitor with os_log, os_signpost and Thermal State; if the device refuses that, fewer instruments, then the Logging template — the refusal is remembered for the run). T0 is stamped when xctrace reports it is recording. `--cap MIN` bounds the recording (default 15); `--launch` relaunches the app under test after T0. |
 | `record stop ID` | Ends the recording, lists the two folders again and appends the verdict to `rows.jsonl` (prompted, or `--verdict p\|f\|n --note TEXT`). |
 | `run --rows FILE` | The loop over a rows file: prints each step's instructions and pass line, waits for Enter to start and to stop, then asks for the verdict. `--from ID` resumes. |
-| `pull` | Exports each recording's tables and reduces them with the three readers below; copies any crash report that appeared during a step; writes `rows/ID/facts.json`. |
+| `pull` | Exports each recording's tables (an empty export is retried once) and reduces them with the three readers below; copies any crash report that appeared since the previous step's last listing; writes `rows/ID/facts.json`. |
 | `judge --inbox DIR` | Runs `judge_pdf.py` over the exported PDFs (`--terms`, `--terms-file`, `--since`). |
 | `record --template FILE` | Runs `fill_record.py`: the template plus the run directory gives the record (`--record-out FILE`). |
 | `state --mode secure\|searchable` | Relaunches the app with the pipeline mode as a launch-argument default, then asks the operator to confirm it in Settings (the default does not persist). |
@@ -86,9 +86,14 @@ hand; run from your own terminal, `judge --inbox ~/Downloads` works too.
 - Write to the app's data container or to another app's container.
 - Use `sudo`, `log collect` (it needs root), or any non-Apple device tool.
 - Boot or touch a simulator.
-- Open a PDF in an app or copy one anywhere; print page text, metadata
-  values or log message text outside the allow-listed phase names and
-  numeric or key-only signpost messages.
+- Open a PDF in an app or copy one anywhere; put page text, metadata
+  values or log message text into `facts.json` or the record beyond the
+  allow-listed phase names and numeric or key-only signpost messages.
+
+The run directory itself is raw: each `row.trace`, its exported
+`tables/*.xml` (the log text of every process on the device) and any
+copied `.ips` report stay there, on this Mac. Share `facts.json`,
+`rows.jsonl`, `judge.json` and the record, not the run directory.
 
 ## Not yet
 
