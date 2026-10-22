@@ -124,6 +124,14 @@ struct LegalLinkExistenceTests {
         }
     }
 
+    @Test("Rate Resecta on the App Store opens the App Store's review page for the app")
+    func testRateLinkOpensTheReviewPage() {
+        let url = SettingsView.Links.rateOnTheAppStore
+        #expect(url.host == "apps.apple.com", "expected the App Store host: \(url)")
+        #expect(url.path == "/app/id6786922787", "expected Resecta's App Store id: \(url)")
+        #expect(url.query == "action=write-review", "expected the write-review action: \(url)")
+    }
+
     @Test("Source-Code + Report-an-Issue use the canonical org, not the placeholder")
     func testSourceLinksUseCorrectOrg() {
         for url in [SettingsView.Links.sourceCode, SettingsView.Links.reportIssue] {
