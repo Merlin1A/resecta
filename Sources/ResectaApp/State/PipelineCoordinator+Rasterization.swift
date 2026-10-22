@@ -101,8 +101,21 @@ extension PipelineCoordinator {
             throw PipelineError.redactionError(.reconstructionFailed)
         }
 
+        #if DEBUG
+        beforeOutputPromotionSeam?()
+        #endif
+        // A Stop that landed during the finalize: the run is no longer the
+        // active one, so its reports are dropped and its recovery is
+        // skipped — a promoted output would sit in the session directory
+        // until the sweep. Not promoted; the temp file goes with the defer.
+        try Task.checkCancellation()
         // Atomic rename: same APFS volume (both in temporaryDirectory)
         _ = try FileManager.default.replaceItemAt(outputURL, withItemAt: tempURL)
+        // The same Stop, landed during the rename itself.
+        if Task.isCancelled {
+            try? FileManager.default.removeItem(at: outputURL)
+            throw CancellationError()
+        }
 
         return PipelineRunContext(
             outputURL: outputURL,

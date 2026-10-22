@@ -5,8 +5,9 @@ import RedactionEngine
 // `RedactWorkspaceView` over the failed state a locked import leaves, from
 // `RedactWorkspace.lockedImport`; the hold carries the document's bytes and
 // the attempts so far. The field is a plain secure field: no content type
-// (so the system offers no save-to-Passwords), no autocorrection, no
-// capitalisation; the typed value is copied to the session's holder on
+// (it asks the system for no AutoFill; whether iOS offers to save a typed
+// secure value is the system's own behaviour, and the copy says so), no
+// autocorrection, no capitalisation; the typed value is copied to the session's holder on
 // success and the binding is emptied on every exit. The outcome of a
 // submitted password is derived by `ImportPasswordFlow`, pure and testable
 // without a host.
@@ -71,7 +72,7 @@ enum ImportPasswordFlow {
     // MARK: - Copy
 
     static let title = "This document needs a password."
-    static let body = "Enter the password to open it. The password is used on this device to unlock the document and is not written to storage."
+    static let body = "Enter the password to open it. The password is used on this device to unlock the document; Resecta does not store it. If iOS offers to save it, that offer is the system's own Passwords feature."
     static let placeholder = "Password"
     static let fieldAccessibilityLabel = "Document password"
     static let open = "Open"

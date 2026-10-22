@@ -31,6 +31,9 @@ struct ResectaApp: App {
     // own layout would not span the whole scene). No animation change to
     // the obscure path here.
     @State private var obscureContent = false
+    // The cover's own window: above presented sheets, which the ZStack
+    // overlay below does not reach (`SnapshotPrivacyWindowController`).
+    @State private var privacyWindow = SnapshotPrivacyWindowController()
 
     // Tracks scene phase at the root so we can drive `obscureContent`
     // alongside the existing pipeline-cancel behavior.
@@ -313,8 +316,10 @@ struct ResectaApp: App {
                 switch SnapshotPrivacyPolicy.action(for: newPhase) {
                 case .obscureSynchronously:
                     withAnimation(.none) { obscureContent = true }
+                    privacyWindow.show()
                 case .revealAnimated:
                     withAnimation(.easeIn(duration: 0.15)) { obscureContent = false }
+                    privacyWindow.hide()
                 case .none:
                     break
                 }

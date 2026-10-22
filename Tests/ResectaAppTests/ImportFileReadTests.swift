@@ -65,6 +65,23 @@ struct ImportFileReadTests {
         #expect(data.starts(with: Array("%PDF".utf8)))
     }
 
+    @Test("The bytes read are a private copy: rewriting the file in place afterwards leaves them unchanged")
+    func readIsAPrivateCopy() throws {
+        let url = try makeScratchFile(bytes: 1_048_576, permissions: 0o600, name: "rewritten")
+        defer { remove(url) }
+
+        let data = try ImportService.readPayload(from: url)
+        #expect(data.starts(with: Array("%PDF".utf8)))
+
+        // The same length, different leading bytes: a mapping would read them.
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.seek(toOffset: 0)
+        try handle.write(contentsOf: Data("XXXX".utf8))
+        try handle.close()
+
+        #expect(data.starts(with: Array("%PDF".utf8)), "the imported bytes follow the file on disk")
+    }
+
     @Test("A smaller cap refuses a small file by its size, naming the size")
     func smallerCapNamesTheSize() throws {
         let url = try makeScratchFile(bytes: 4_096, permissions: 0o600, name: "capped")

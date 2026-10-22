@@ -51,6 +51,13 @@ final class PipelineCoordinator: @unchecked Sendable {
     var lastReconstructorAppendOrder: [Int] = []
 
     #if DEBUG
+    /// Test seam: runs on the run's task just before the reconstructed
+    /// output is promoted to its URL (after `finalize()`); never read by
+    /// production code. `StopDuringFinalizeTests` takes Stop from it.
+    var beforeOutputPromotionSeam: (() -> Void)?
+    #endif
+
+    #if DEBUG
     /// Test-only residency telemetry:
     /// the peak value of `inFlight + pending.count + 1` observed during the
     /// most recent `rasterizePagesInParallel` run, reset at function entry.
