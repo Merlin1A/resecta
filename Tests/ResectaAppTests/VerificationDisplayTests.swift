@@ -161,12 +161,12 @@ struct VerificationDisplayTests {
         #expect(!status.accessibilityLabel.isEmpty)
     }
 
-    // The spoken WARN label follows the retitled masthead.
-    @Test("WARN accessibilityLabel matches the completed-with-notes framing")
+    @Test("WARN accessibilityLabel opens with the Completed with Warnings title the screen shows")
     func warnAccessibilityLabelCompletedFraming() {
         #expect(VerificationStatus.warn("w").accessibilityLabel
-                == "Verification completed with notes. Review the notes before sharing.")
+                == "Completed with warnings. Review the warnings before sharing.")
     }
+
 
     // MARK: - Status text tier
 

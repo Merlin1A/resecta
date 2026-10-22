@@ -82,14 +82,16 @@ extension VerificationStatus {
 
     // MARK: - Accessibility
 
+    /// The spoken label opens with the title the screen shows (pinned:
+    /// VoiceOver says what is on screen), then the one sentence of advice.
     var accessibilityLabel: String {
         switch self {
-        case .pass:    "Verification passed. All checks completed without issues."
-        case .warn:    "Verification completed with notes. Review the notes before sharing."
+        case .pass:    "Checks passed. All checks completed without issues."
+        case .warn:    "Completed with warnings. Review the warnings before sharing."
         case .info:    "Document metadata note. Informational only."
-        case .attention: "Attention needed. Unredacted text remains — review before sharing."
-        case .fail:    "Verification found issues. Review issues below before sharing."
-        case .skipped: "Verification was skipped. Consider verifying before sharing."
+        case .attention: "Needs review. Unredacted text remains — review before sharing."
+        case .fail:    "Checks failed. Review the issues below before sharing."
+        case .skipped: "Verification skipped. Consider verifying before sharing."
         }
     }
 
