@@ -280,9 +280,10 @@ extension VerificationEngine {
                 // drops the out-of-rect sliver, so the solid bar demotes cleanly under
                 // the ORIGINAL floors (no threshold loosening). The classifier still uses
                 // the WHOLE box for the in-region COVERAGE decision; only this fill SAMPLE
-                // is clipped. Residual: a contrived edge-straddle LEAK demotes to WARN,
-                // never a clean PASS — the precision-only bar holds (the verifier may route the
-                // out-of-rect portion to the out-of-region WARN).
+                // is clipped. A straddle box that keeps `straddleOutsideFraction` or more
+                // of its area outside every region has its line read for the whole term
+                // too (classifyPageOCR), so a term printed past the bar's edge reports
+                // ATTENTION instead of folding into the fill note (2026-10-22).
                 let raw = box.intersection(chosen.rect)
                 guard !raw.isNull, !raw.isEmpty else {
                     return BoxFillSample(fillFraction: 0, contrastFraction: 1, maxDeviation: 1)

@@ -189,6 +189,11 @@ extension VerificationEngine {
             var hitHasReadableInRegionBox = false
             var hitHasFillArtifactInRegionBox = false
             var hitHasOutOfRegionBox = false
+            // A fill-demoted box that still reaches outside every region
+            // (`straddleOutsideFraction`): its line is read for the whole
+            // term too, so an occurrence printed past the box's edge is never
+            // folded into the fill note.
+            var hitHasStraddleOutside = false
 
             for (index, box) in boxes.enumerated() {
                 // One word box over the bar pulls the hit in — the shared
@@ -205,6 +210,9 @@ extension VerificationEngine {
                     let fillConsistent = index < samples.count && isFillConsistent(samples[index])
                     if fillConsistent {
                         hitHasFillArtifactInRegionBox = true
+                        if outsideFraction(of: box, regions: pageRegions) >= straddleOutsideFraction {
+                            hitHasStraddleOutside = true
+                        }
                     } else {
                         hitHasReadableInRegionBox = true
                     }
@@ -225,7 +233,7 @@ extension VerificationEngine {
             // signal to its own bucket on both page modes and the fold reports
             // ATTENTION; `outsideRegionTermTexts` re-walks the same geometry for
             // the term texts the results row names.
-            if hitHasOutOfRegionBox,
+            if hitHasOutOfRegionBox || hitHasStraddleOutside,
                hit.confidence >= sensitiveTermFailConfidenceThreshold,
                let text = hit.text,
                validTerms.contains(where: { containsTerm(text, $0) }) {
@@ -376,6 +384,22 @@ extension VerificationEngine {
     /// by a sliver is not in-region; a box substantially inside (a paint
     /// miss) still is. Shared by `classifyPageOCR` and `outsideRegionTermTexts`
     /// so the verdict and the term texts read the SAME geometry.
+    /// The share of a box's own area a fill-demoted box may keep outside
+    /// every region before its line is read for the whole term as well
+    /// (2026-10-22): above it the box reaches past the bar's edge into
+    /// printed space — a sample of the in-region portion alone would fold a
+    /// term printed there into the fill note, which counts as a pass. Below
+    /// it is the rounding sliver a hallucination box leaves at the bar's edge.
+    static let straddleOutsideFraction: CGFloat = 0.10
+
+    /// The share of `box` outside every region: one minus its largest
+    /// coverage by any one region. 0 for a degenerate box.
+    static func outsideFraction(of box: CGRect, regions: [RedactionRegion]) -> CGFloat {
+        guard box.width > 0, box.height > 0 else { return 0 }
+        let inside = regions.map { coverageFraction(of: box, inside: $0.normalizedRect) }.max() ?? 0
+        return max(0, 1 - inside)
+    }
+
     static func boxLiesInRegion(_ box: CGRect, of pageRegions: [RedactionRegion]) -> Bool {
         pageRegions.contains { region in
             coverageFraction(of: box, inside: region.normalizedRect) >= inRegionCoverageThreshold
@@ -403,7 +427,12 @@ extension VerificationEngine {
             guard hit.confidence >= sensitiveTermFailConfidenceThreshold,
                   let text = hit.text else { continue }
             let boxes = inRegionCandidateBoxes(of: hit)
-            guard boxes.contains(where: { !boxLiesInRegion($0, of: pageRegions) }) else { continue }
+            let samples = hit.boxFill
+            guard boxes.enumerated().contains(where: { index, box in
+                !boxLiesInRegion(box, of: pageRegions)
+                    || (index < samples.count && isFillConsistent(samples[index])
+                        && outsideFraction(of: box, regions: pageRegions) >= straddleOutsideFraction)
+            }) else { continue }
             for term in validTerms where containsTerm(text, term) && seen.insert(term.text).inserted {
                 texts.append(term.text)
             }

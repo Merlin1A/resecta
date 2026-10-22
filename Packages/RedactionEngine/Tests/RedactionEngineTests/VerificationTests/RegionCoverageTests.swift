@@ -478,6 +478,25 @@ struct Layer2FragmentBesideRegionTests {
     private let box = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.50, y: 0.40, width: 0.10, height: 0.03), source: .manual)
     private let term = SensitiveTerm(text: "123-45-6789")
 
+    @Test("A fill-demoted word box that reaches past the box's edge has its line read for the whole term: ATTENTION naming it; fill tokens on the same box stay the note; an edge sliver stays the note")
+    func straddleBoxLineIsReadForTheTerm() {
+        let fill = VerificationEngine.BoxFillSample(fillFraction: 1, contrastFraction: 0, maxDeviation: 0)
+        func straddle(_ text: String, x: CGFloat, width: CGFloat) -> VerificationEngine.OCRHit {
+            VerificationEngine.OCRHit(box: CGRect(x: x, y: 0.405, width: width, height: 0.02), wordBoxes: [], text: text, confidence: 0.9, boxFill: [fill])
+        }
+        // 70 % inside the box (in-region, fill-demoted), 30 % past its right edge, reading the term.
+        let term70 = straddle("123-45-6789", x: 0.53, width: 0.10)
+        #expect(VerificationEngine.boxLiesInRegion(term70.box, of: [box]))
+        #expect(VerificationEngine.classifyPageOCR(hits: [term70], pageRegions: [box], sensitiveTerms: [term]) == .sensitiveTermOutsideRegions)
+        #expect(VerificationEngine.outsideRegionTermTexts(hits: [term70], pageRegions: [box], sensitiveTerms: [term]) == ["123-45-6789"])
+        // The same geometry reading fill tokens: the fill note, as before.
+        #expect(VerificationEngine.classifyPageOCR(hits: [straddle("III", x: 0.53, width: 0.10)], pageRegions: [box], sensitiveTerms: [term]) == .fillArtifactInRegion)
+        // A 5 % sliver past the edge (the hallucination box's rounding): the fill note.
+        let sliver = straddle("123-45-6789", x: 0.51, width: 0.0947)
+        #expect(VerificationEngine.outsideFraction(of: sliver.box, regions: [box]) < VerificationEngine.straddleOutsideFraction)
+        #expect(VerificationEngine.classifyPageOCR(hits: [sliver], pageRegions: [box], sensitiveTerms: [term]) == .fillArtifactInRegion)
+    }
+
     private func hit(_ text: String, x: CGFloat, width: CGFloat) -> VerificationEngine.OCRHit {
         VerificationEngine.OCRHit(box: CGRect(x: x, y: 0.40, width: width, height: 0.03), wordBoxes: [], text: text, confidence: 0.9)
     }
