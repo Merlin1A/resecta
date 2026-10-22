@@ -1,0 +1,4 @@
+id	class	cap_min	how	pass	checks
+setup	A	0	The recorder reads the checkout and the installed app	the versions are recorded	preflight:versions
+redact	C	10	Open the bundled sample, search a name, apply, redact	the run completes; the app is not terminated	phase:walls,memory:peak,jetsam:none-for-app
+export	C	5	Share the output and move it into the inbox	the searched name is absent from the text layer	pdf:no-terms,pdf:unencrypted
