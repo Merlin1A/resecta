@@ -1223,21 +1223,20 @@ final class SearchState: Identifiable {
     /// `applyFindings(.stagedDetections)`), the review-arrival re-target
     /// resets it (`DocumentEditorView.presentReviewInScanInterface`, a
     /// fresh all-deselected context), and `clear()` resets it on session
-    /// teardown. See `requiresDismissConfirmation`.
+    /// teardown. See `hasUnappliedSelections(liveApplied:)`.
     var hasUnreviewedPreselection: Bool = false
 
     /// True while the Home close dialog holds this session parked: the
     /// sheet's teardown then spares it, so Cancel re-presents it whole.
     var parkedForHomeClose: Bool = false
 
-    /// The single predicate both dismiss-gate sites
-    /// (`DocumentEditorView`'s `.interactiveDismissDisabled` and
-    /// `SearchSheetHeaderSection`'s Dismiss handler) read: true when
-    /// either the user touched selections, or an auto-selected set has
-    /// never been reviewed. Either fact means a silent dismiss would
-    /// discard work the user hasn't confirmed away.
-    var requiresDismissConfirmation: Bool {
-        userModifiedSelections || hasUnreviewedPreselection
+    /// The document state's per-import token the session was parked over: restored only over that document.
+    var parkedDocument: UUID?
+
+    /// Selections not yet applied, from the rows (never a gesture tracker): a selected result no live applied
+    /// region covers (`liveApplied` = `RedactionState.liveAppliedSearchResultIDs`; covered counts as applied), or an unreviewed preselect.
+    func hasUnappliedSelections(liveApplied: Set<UUID>) -> Bool {
+        hasUnreviewedPreselection || results.contains { $0.isSelected && !liveApplied.contains($0.id) && !coveredResultIDs.contains($0.id) }
     }
 
     /// Buffer a result from the search stream. Flushed in batches

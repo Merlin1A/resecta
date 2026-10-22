@@ -1,44 +1,40 @@
 import Testing
 import Foundation
+import PDFKit
 @testable import ResectaApp
 
-// The text-layer toast must fire once per import, on the
-// import-completion transition (.importing -> .editing), for EVERY import path.
-// Original gap: the Home -> redact load (AppCoordinator.openRedactWithDocument)
-// runs its import AFTER the workspace view mounts, so the in-view post-import
-// calls never covered it. Centralizing on the phase transition covers all paths;
-// these pin the transition rule — pipeline returns to .editing and import
-// failures must NOT re-fire the toast.
+// The import-completion toasts (the text-layer notice, the encrypted-source
+// line) fire once per import, when a new document is loaded, for EVERY
+// import path. Original gap: the Home -> redact load
+// (AppCoordinator.openRedactWithDocument) runs its import AFTER the workspace
+// view mounts, so the in-view post-import calls never covered it. Keying on
+// the document swap covers all paths; a cancelled import over an open
+// document, an import failure and a pipeline returning to the editor leave
+// the document as it was and must NOT re-fire the toasts.
 
-@Suite("Text-layer toast import-completion gate")
+@Suite("Import-completion toast gate")
 @MainActor
 struct RedactWorkspaceTextLayerToastTests {
 
-    @Test("fires on import completion (.importing -> .editing)")
-    func firesOnImportCompletion() {
-        #expect(RedactWorkspaceView.shouldCheckTextLayerOnImportCompletion(
-            from: .importing, to: .editing) == true)
+    @Test("fires when a document arrives in an empty workspace")
+    func firesOnFirstImport() {
+        #expect(RedactWorkspaceView.isDocumentSwap(from: nil, to: makeTestPDFDocument()))
     }
 
-    @Test("does not fire on pipeline returns to .editing")
-    func doesNotFireOnPipelineReturn() {
-        #expect(RedactWorkspaceView.shouldCheckTextLayerOnImportCompletion(
-            from: .detecting, to: .editing) == false)
-        #expect(RedactWorkspaceView.shouldCheckTextLayerOnImportCompletion(
-            from: .redacting, to: .editing) == false)
-        #expect(RedactWorkspaceView.shouldCheckTextLayerOnImportCompletion(
-            from: .verifying, to: .editing) == false)
-        #expect(RedactWorkspaceView.shouldCheckTextLayerOnImportCompletion(
-            from: .verified, to: .editing) == false)
+    @Test("fires when a new document replaces the open one")
+    func firesOnReplacement() {
+        #expect(RedactWorkspaceView.isDocumentSwap(from: makeTestPDFDocument(), to: makeTestPDFDocument()))
     }
 
-    @Test("does not fire on import failure or non-editing targets")
-    func doesNotFireOnFailureOrOtherTargets() {
-        #expect(RedactWorkspaceView.shouldCheckTextLayerOnImportCompletion(
-            from: .importing, to: .failed) == false)
-        #expect(RedactWorkspaceView.shouldCheckTextLayerOnImportCompletion(
-            from: .empty, to: .editing) == false)
-        #expect(RedactWorkspaceView.shouldCheckTextLayerOnImportCompletion(
-            from: .importing, to: .importing) == false)
+    @Test("does not fire when the open document stays — a cancelled import over it, or a pipeline return")
+    func doesNotFireWhenTheDocumentStays() {
+        let open = makeTestPDFDocument()
+        #expect(!RedactWorkspaceView.isDocumentSwap(from: open, to: open))
+    }
+
+    @Test("does not fire when the document is closed")
+    func doesNotFireOnClose() {
+        #expect(!RedactWorkspaceView.isDocumentSwap(from: makeTestPDFDocument(), to: nil))
+        #expect(!RedactWorkspaceView.isDocumentSwap(from: nil, to: nil))
     }
 }

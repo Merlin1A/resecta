@@ -39,13 +39,14 @@ struct RedactWorkspaceView: View {
 
     var body: some View {
         navigationContainer
-            // Fire the text-layer toast on import completion for EVERY
-            // import path. The Home -> redact load (openRedactWithDocument) runs
-            // its import in AppCoordinator AFTER this view mounts, so the in-view
-            // post-import calls never covered it — keying off the
-            // .importing -> .editing transition covers all paths uniformly.
-            .onChange(of: workspace.documentState.phaseKind) { oldPhase, newPhase in
-                if Self.shouldCheckTextLayerOnImportCompletion(from: oldPhase, to: newPhase) {
+            // Fire the import-completion toasts when a new document is
+            // loaded, for EVERY import path. The Home -> redact load
+            // (openRedactWithDocument) runs its import in AppCoordinator AFTER
+            // this view mounts, so the in-view post-import calls never covered
+            // it — keying off the document swap covers all paths uniformly.
+            .onChange(of: workspace.documentState.sourceDocument) { oldDocument, newDocument in
+                if Self.isDocumentSwap(from: oldDocument, to: newDocument) {
+                    workspace.coordinator.documentDidChange()
                     checkImportToasts()
                 }
             }
@@ -64,21 +65,18 @@ struct RedactWorkspaceView: View {
                     enqueueImportRefusedNotPDFToast()
                     return true
                 }
-                // Reject drops while the pipeline is
-                // active OR a detection review is open. A drop replaces an
-                // open document with no confirmation, so it consults the
-                // composed `canStartImport(with:)` gate directly — a stranded
-                // triage sheet over a replacement document could stamp the prior
-                // document's page-coordinate regions onto the new one. The drop
-                // handler returns true on accept; on reject we still return true
-                // so the system snaps the payload back rather than leaving it
-                // dangling, and we surface the precise reason via toast.
-                guard workspace.documentState.canStartImport(with: workspace.redactionState) else {
-                    if workspace.documentState.canStartImport {
-                        enqueueImportBlockedDuringTriageToast()
-                    } else {
-                        enqueueImportBlockedToast()
-                    }
+                // Reject drops while the pipeline is active, a detection
+                // review is open, or the results or error screen is up. A
+                // drop replaces an open document with no confirmation, so it
+                // consults the composed `canStartImport(with:)` gate directly
+                // — a stranded triage sheet over a replacement document could
+                // stamp the prior document's page-coordinate regions onto the
+                // new one. The drop handler returns true on accept; on reject
+                // we still return true so the system snaps the payload back
+                // rather than leaving it dangling, and we surface the precise
+                // reason via toast.
+                if let refusal = workspace.documentState.importRefusalMessage(with: workspace.redactionState) {
+                    toastManager.enqueue(refusal, severity: .warning)
                     return true
                 }
                 // Phase admission has already passed by this point; the
@@ -185,19 +183,13 @@ struct RedactWorkspaceView: View {
 
     // MARK: - Toast Helpers
 
-    /// The text-layer toast fires once per import — on the import-
-    /// completion transition (.importing -> .editing). This is the single signal
-    /// for every import path, including the Home -> redact load whose import runs
-    /// in `AppCoordinator.openRedactWithDocument` AFTER this view mounts (so the
-    /// in-view post-import calls never ran for it — the original gap). Pipeline
-    /// returns to .editing (from .detecting/.redacting/.verifying/.verified) and
-    /// import failures (.importing -> .failed) do not re-fire it. Static so the
-    /// transition rule is testable without a SwiftUI host.
-    static func shouldCheckTextLayerOnImportCompletion(
-        from oldPhase: DocumentState.PhaseKind,
-        to newPhase: DocumentState.PhaseKind
-    ) -> Bool {
-        oldPhase == .importing && newPhase == .editing
+    /// A new document replaced the one shown, or arrived in an empty
+    /// workspace. Its one writer is `ImportService.apply`, so this holds
+    /// once per completed import: a cancelled or failed import, and a
+    /// pipeline returning to the editor, leave the document as it was.
+    /// Static so the rule is testable without a SwiftUI host.
+    static func isDocumentSwap(from oldDocument: PDFDocument?, to newDocument: PDFDocument?) -> Bool {
+        newDocument != nil && newDocument !== oldDocument
     }
 
     /// The import-completion toasts: the text-layer notice, and for a
@@ -278,34 +270,12 @@ struct RedactWorkspaceView: View {
         }
     }
 
-    /// Surface the rejection when a drop arrives while the pipeline owns
-    /// in-flight state. Mechanism-description copy lives on
-    /// `DocumentState.importBlockedDuringPipelineMessage` so unit tests
-    /// can assert on the exact string without crossing the View boundary.
-    private func enqueueImportBlockedToast() {
-        toastManager.enqueue(
-            DocumentState.importBlockedDuringPipelineMessage,
-            severity: .warning
-        )
-    }
-
     /// Surface the refusal when a dropped payload is not a PDF (an image,
     /// refused at the drop door). The copy is the unsupported-format
     /// message, held on `DocumentState.importRefusedNotPDFMessage`.
     private func enqueueImportRefusedNotPDFToast() {
         toastManager.enqueue(
             DocumentState.importRefusedNotPDFMessage,
-            severity: .warning
-        )
-    }
-
-    /// Surface the rejection when a drop arrives while a detection
-    /// review (triage) is open for the current document. Mechanism-description
-    /// copy lives on `DocumentState.importBlockedDuringTriageMessage` so unit
-    /// tests can assert on the exact string without crossing the View boundary.
-    private func enqueueImportBlockedDuringTriageToast() {
-        toastManager.enqueue(
-            DocumentState.importBlockedDuringTriageMessage,
             severity: .warning
         )
     }

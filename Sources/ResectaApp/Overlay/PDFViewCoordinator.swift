@@ -109,11 +109,17 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
                         overlay.discardInProgressPolygon()
                     }
                 }
+                // The selection keeps only the regions on the page in
+                // view, so a delete or a nudge never reaches a region the
+                // user cannot see. Runs on every notice: the page bar
+                // writes the index before the view follows it.
+                if let state = self?.redactionState {
+                    let visible = state.selectedRegionIDs.filter { state.pageIndex(for: $0) == index }
+                    if visible != state.selectedRegionIDs {
+                        state.selectedRegionIDs = visible
+                    }
+                }
                 if docState?.currentPageIndex != index {
-                    // The selection stays on the page the user can see:
-                    // a delete or a nudge must never reach regions on a
-                    // page scrolled away from.
-                    self?.redactionState?.selectedRegionIDs = []
                     docState?.currentPageIndex = index
                 }
             }
@@ -256,16 +262,21 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         refreshOverlay(for: page)
     }
 
-    /// The stored rect of a region. A tap on a selected region ends its
-    /// "drag" where it began; committing that would record a Move or
-    /// Resize step, re-arm Redo and clear the output for no change.
+    /// The stored rect of a region. A tap on a selected region, or on one
+    /// region of a selected group, ends its "drag" where it began; the
+    /// resize, move and group-move commits keep only the rects that
+    /// changed, so that tap records no Move or Resize step, re-arms no
+    /// Redo and leaves the output alone.
     private func storedRect(_ id: UUID, page: Int) -> CGRect? {
         redactionState?.regions[page]?.first(where: { $0.id == id })?.normalizedRect
     }
 
     /// Commit a batch move of multiple regions on the same page.
     func commitMoveMultiple(_ moves: [(id: UUID, newRect: CGRect)], page: Int, undoManager: UndoManager?) {
-        redactionState?.moveRegions(moves, page: page, undoManager: undoManager)
+        let changed = moves.filter { storedRect($0.id, page: page) != $0.newRect }
+        if !changed.isEmpty {
+            redactionState?.moveRegions(changed, page: page, undoManager: undoManager)
+        }
         refreshOverlay(for: page)
     }
 

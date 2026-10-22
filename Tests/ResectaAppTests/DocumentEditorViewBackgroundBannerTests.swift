@@ -88,6 +88,19 @@ struct DocumentEditorViewBackgroundBannerTests {
         )
     }
 
+    @Test("The full-pipeline leg holds the Redact gate: unapplied selections block it, the verify-only leg is untouched")
+    func testFullPipelineLegHoldsTheRedactGate() {
+        #expect(DocumentEditorView.runVerificationRoute(
+            hasOutput: false, isVerificationStale: true, hasUnappliedSelections: true) == .blockedBySelections)
+        #expect(DocumentEditorView.runVerificationRoute(
+            hasOutput: true, isVerificationStale: true, hasUnappliedSelections: true) == .blockedBySelections)
+        #expect(DocumentEditorView.runVerificationRoute(
+            hasOutput: true, isVerificationStale: false, hasUnappliedSelections: true) == .verifyOnly,
+            "verify-only keeps the session; nothing to hold")
+        #expect(DocumentEditorView.runVerificationRoute(
+            hasOutput: false, isVerificationStale: true, hasUnappliedSelections: false) == .fullPipeline)
+    }
+
     @Test("Full-pipeline route when regions modified after redact")
     func testFullPipelineRouteWhenRegionsModified() {
         let redaction = RedactionState()
@@ -168,5 +181,34 @@ struct DocumentEditorViewBackgroundBannerTests {
         #expect(documentState.wasPausedByBackground == false)
         #expect(documentState.pausedFromPhase == nil)
         #expect(documentState.phaseKind == .editing, "the phase is the run's to move, not the banner's")
+    }
+
+    /// Leaving the app during Verify lands on the results screen, where
+    /// nothing reads the pause pair. Left set, Keep Editing (a bare
+    /// transition to `.editing`) mounted the paused banner over a finished
+    /// redaction. A background during Verify raises no pause.
+    @Test("Keep Editing after a background during Verify shows no paused banner")
+    func testBackgroundDuringVerifyRaisesNoPause() {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        doc.sourceDocument = makeTestPDFDocument()
+        redaction.outputURL = URL(fileURLWithPath: "/tmp/verify-background.pdf")
+        doc.phase = .verifying(progress:
+            .init(currentLayer: 1, totalLayers: 5, layerName: "Layer 1",
+                  completedLayers: []))
+
+        ContentView.cancelForBackground(documentState: doc, redactionState: redaction)
+
+        guard case .verified(let report) = doc.phase else {
+            Issue.record("Expected .verified after a background during Verify, got \(doc.phaseKind)")
+            return
+        }
+        #expect(report.overallStatus == .skipped)
+        #expect(doc.wasPausedByBackground == false)
+        #expect(doc.pausedFromPhase == nil)
+
+        doc.transition(to: .editing)
+        #expect(!(doc.wasPausedByBackground && doc.phaseKind == .editing),
+                "the banner's mount predicate reads false after Keep Editing")
     }
 }
