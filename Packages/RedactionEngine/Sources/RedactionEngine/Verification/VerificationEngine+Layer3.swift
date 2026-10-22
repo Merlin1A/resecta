@@ -12,14 +12,14 @@ extension VerificationEngine {
     // MARK: - Layer 3: Binary String Search
 
     /// The one detail sentence Layer 3 adds behind its PASS or INFO line
-    /// when manual regions sat on pages with no text layer to read: their
-    /// text identity could not be captured, so the string search had
-    /// nothing of theirs to look for. Mechanism wording; no count of what
-    /// might be under them.
+    /// when manual regions added no term: a region covering its whole page,
+    /// or one on a page with no text layer to read — either way the string
+    /// search had nothing of theirs to look for. Mechanism wording; no
+    /// count of what might be under them.
     static func manualRegionsWithoutTextDetail(_ count: Int) -> String {
         count == 1
-            ? "1 manual region is on a page with no text layer to capture terms from."
-            : "\(count) manual regions are on pages with no text layer to capture terms from."
+            ? "No term was captured from 1 manual region: it covers the whole page, or its page has no text layer."
+            : "No term was captured from \(count) manual regions: each covers the whole page, or its page has no text layer."
     }
 
     /// Layer 3's copy for a run with such regions: the clean line (PASS's

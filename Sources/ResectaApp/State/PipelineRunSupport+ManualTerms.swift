@@ -9,13 +9,15 @@ import RedactionEngine
 // sensitive-term set, so a manual region is checked by the term layers
 // exactly as a typed search or a detected region is. Regions on pages
 // whose text layer is not rich cannot be captured and are counted for
-// Layer 3's detail line; whole-page regions are skipped. Pure statics in
+// Layer 3's detail line; a whole-page region adds no term and is counted
+// with them. Pure statics in
 // the `sensitiveTerms(fromAppliedRegions:metadata:audit:)` shape, run off
 // the MainActor; the value lives only in the run's
 // inputs and is cleared with the output.
 
 /// The verifier's term input for one run: the terms and the count of manual
-/// regions whose page carried no text layer to capture from.
+/// regions that added no term — a whole-page region, or one whose page
+/// carried no text layer to capture from.
 nonisolated struct SensitiveTermSet: Sendable, Equatable {
     let terms: [SensitiveTerm]
     let manualRegionsWithoutText: Int
@@ -31,14 +33,15 @@ nonisolated struct SensitiveTermSet: Sendable, Equatable {
 extension PipelineCoordinator {
 
     /// A region covering this fraction of the page or more is a whole-page
-    /// redaction: it adds no term and is not counted (the page-bar action's
-    /// "Mark Whole Page" and any hand-drawn equivalent).
+    /// redaction (the page-bar action's "Mark Whole Page" and any hand-drawn
+    /// equivalent): it adds no term, and it is counted with the regions the
+    /// string search could not capture, so Layer 3's note names it.
     nonisolated static let wholePageRegionArea: CGFloat = 0.95
 
     /// The run's term set: the applied-region terms plus the manual capture.
     ///
     /// Per `.manual` region (page by page, in region order): a whole-page
-    /// region is skipped; on a page whose text layer is `.rich` the words
+    /// region adds no term and is counted; on a page whose text layer is `.rich` the words
     /// the Searchable filter would touch (`ManualCapturePageWords.lines`;
     /// its polygon honoured) are captured — a region over exactly one word
     /// keeps that word as one bounded token (the user's intent); otherwise
@@ -75,7 +78,10 @@ extension PipelineCoordinator {
             var words: ManualCapturePageWords??
             for region in pageRegions where region.source == .manual {
                 let rect = region.normalizedRect.clampedToNormalized()
-                if rect.width * rect.height >= Self.wholePageRegionArea { continue }
+                if rect.width * rect.height >= Self.wholePageRegionArea {
+                    withoutText += 1
+                    continue
+                }
                 guard textLayerStatus[pageIndex] == .rich, let page else {
                     withoutText += 1
                     continue
@@ -152,7 +158,8 @@ nonisolated struct ManualCapturePageWords {
     static let edgeTolerancePoints: CGFloat = 0.5
 
     /// `CharacterFilter.safetyMarginPoints`: the removal's halo, in PDF
-    /// points, on a line the region itself touches.
+    /// points, on a line the region itself touches. Both values are pinned
+    /// to the engine's by `ManualTermsMirrorParityTests`.
     static let removalHaloPoints: CGFloat = 3.0
 
     private let entries: [(text: String, box: CGRect, range: NSRange)]
