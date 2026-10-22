@@ -14,8 +14,7 @@ import RedactionEngine
 // and WRITES its backing cache var mid-body-evaluation. With those vars
 // observation-wrapped, the write fired `ObservationRegistrar.willSet` inside
 // the in-flight GraphHost transaction → `AG::precondition_failure` (SIGABRT).
-// The fix marks the 8 backing cache/key vars (and RedactionState's
-// `_cachedEffectiveCount`) `@ObservationIgnored`.
+// The fix marks the 8 backing cache/key vars `@ObservationIgnored`.
 //
 // These tests host `SearchResultsSection` — the exact view the crash lived
 // in — inside a scene-attached key UIWindow, pump the run loop so the
@@ -84,37 +83,6 @@ struct SearchResultsListObservationCrashTests {
         #expect(searchState.appliedResultIDs == selectedIDs)
 
         host.window.isHidden = true
-    }
-
-    /// RedactionState carries the structurally identical pattern:
-    /// `effectiveRegionCount` writes `_cachedEffectiveCount` on a miss. With
-    /// the cache var `@ObservationIgnored`, the getter must register its
-    /// tracking dependency through the observed `regions` read on EVERY
-    /// access — including cache hits — or views stop updating on region
-    /// mutations. Pin both halves: cache-hit reads still fire onChange, and
-    /// the recomputed count is correct.
-    @Test("effectiveRegionCount cache hit still registers regions dependency")
-    func effectiveRegionCountTracksRegionsOnCacheHit() async {
-        let redactionState = RedactionState()
-        redactionState.addRegion(
-            makeRegion(x: 0.1), page: 0, undoManager: nil)
-
-        // Prime the cache so the tracked read below is a cache HIT.
-        #expect(redactionState.effectiveRegionCount == 1)
-
-        // willSet fires synchronously inside addRegion's regions mutation,
-        // so the confirmation resolves before the closure returns.
-        await confirmation("onChange fires for a cache-hit read") { fired in
-            withObservationTracking {
-                _ = redactionState.effectiveRegionCount
-            } onChange: {
-                fired()
-            }
-            redactionState.addRegion(
-                makeRegion(x: 0.3), page: 0, undoManager: nil)
-        }
-
-        #expect(redactionState.effectiveRegionCount == 2)
     }
 
     // MARK: - Hosting

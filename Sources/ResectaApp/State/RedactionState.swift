@@ -326,17 +326,6 @@ class RedactionState {
     /// Security-relevant: stale verification is a data-leakage vector.
     private(set) var regionsModifiedSinceVerification = false
 
-    // MARK: - Performance Caches
-
-    /// Cached effective region count — invalidated on any region mutation.
-    /// Avoids O(n) reduce+filter on every view body evaluation.
-    /// @ObservationIgnored: `effectiveRegionCount` writes this on a cache
-    /// miss; a registrar-wrapped write during a SwiftUI body evaluation
-    /// re-enters the observation graph and SIGABRTs (same pattern as the
-    /// SearchState filter caches). Views tracking `effectiveRegionCount`
-    /// still update via the observed `regions` read inside the getter.
-    @ObservationIgnored private var _cachedEffectiveCount: Int?
-
     /// Reverse index: region UUID → page index. O(1) lookup instead of O(n×m) scan.
     private var regionPageIndex: [UUID: Int] = [:]
 
@@ -344,23 +333,6 @@ class RedactionState {
     /// This is the ONLY public path for setting the flag to false.
     func markVerificationCurrent() {
         regionsModifiedSinceVerification = false
-    }
-
-    /// Count of regions surviving the minimum-dimension filter (> 0.001 on both axes).
-    /// Raw region count includes sub-threshold regions that produce no visible fill.
-    /// Cached — invalidated on region mutations, computed lazily on access.
-    var effectiveRegionCount: Int {
-        // Read the observed `regions` BEFORE the cache check: with the cache
-        // var @ObservationIgnored, this read is what registers the tracking
-        // dependency, so a cache-hit access still re-evaluates when regions
-        // mutate. O(1) — binds the dictionary, no traversal.
-        let regions = self.regions
-        if let cached = _cachedEffectiveCount { return cached }
-        let count = regions.values.reduce(0) { $0 + $1.count(where: {
-            $0.normalizedRect.width > 0.001 && $0.normalizedRect.height > 0.001
-        })}
-        _cachedEffectiveCount = count
-        return count
     }
 
     /// True when at least one region survives the minimum-dimension filter.
@@ -381,11 +353,6 @@ class RedactionState {
     /// Find the page index containing a given region ID. O(1) via reverse index.
     func pageIndex(for regionID: UUID) -> Int? {
         regionPageIndex[regionID]
-    }
-
-    /// Invalidate cached counts after any region mutation.
-    private func invalidateRegionCaches() {
-        _cachedEffectiveCount = nil
     }
 
     // MARK: - Cleanup
@@ -441,7 +408,6 @@ class RedactionState {
         // boundary.
         manualDrawNudgeSuppressedForSession = false
         pendingManualDrawNudge = nil
-        invalidateRegionCaches()
         regionPageIndex.removeAll()
     }
 
@@ -512,7 +478,6 @@ class RedactionState {
         regionVersion += 1
         regions[page, default: []].append(region)
         regionPageIndex[region.id] = page
-        invalidateRegionCaches()
         regionsModifiedSinceVerification = true
         clearOutput()
         let regionID = region.id
@@ -550,7 +515,6 @@ class RedactionState {
         let removed = pageRegions.remove(at: index)
         regions[page] = pageRegions
         regionPageIndex.removeValue(forKey: id)
-        invalidateRegionCaches()
         let removedMetadata = regionMetadata.removeValue(forKey: id) // Capture metadata
         regionsModifiedSinceVerification = true
         clearOutput()
@@ -572,7 +536,6 @@ class RedactionState {
         let oldRect = pageRegions[index].normalizedRect
         pageRegions[index].normalizedRect = newRect
         regions[page] = pageRegions
-        invalidateRegionCaches()
         regionsModifiedSinceVerification = true
         clearOutput()
         registerUndo(undoManager, "Resize Redaction") { target in
@@ -591,7 +554,6 @@ class RedactionState {
         let oldRect = pageRegions[index].normalizedRect
         pageRegions[index].normalizedRect = newRect
         regions[page] = pageRegions
-        invalidateRegionCaches()
         regionsModifiedSinceVerification = true
         clearOutput()
         registerUndo(undoManager, "Move Redaction") { target in
@@ -610,7 +572,6 @@ class RedactionState {
             pageRegions[index].normalizedRect = move.newRect
         }
         regions[page] = pageRegions
-        invalidateRegionCaches()
         regionsModifiedSinceVerification = true
         clearOutput()
         let snapshot = mutableOldRects
@@ -633,7 +594,6 @@ class RedactionState {
         }
         regions[page] = pageRegions
         for id in ids { regionPageIndex.removeValue(forKey: id) }
-        invalidateRegionCaches()
         regionsModifiedSinceVerification = true
         clearOutput()
         selectedRegionIDs.subtract(ids)
@@ -646,7 +606,6 @@ class RedactionState {
                     target.regionMetadata[item.region.id] = meta
                 }
             }
-            target.invalidateRegionCaches()
             target.regionsModifiedSinceVerification = true
             target.clearOutput()
             // Undo re-inserts the deleted regions — bump so the overlay
@@ -1028,7 +987,7 @@ class RedactionState {
 
     /// The single write-back transaction every apply origin commits
     /// through: one `regionVersion` bump, region + reverse-index
-    /// insert, metadata + audit merge, cache/verification/output
+    /// insert, metadata + audit merge, verification/output
     /// invalidation, and ONE two-leg undo registration. Undo removes
     /// the created regions with their metadata AND audit records in
     /// lockstep; redo re-inserts all three.
@@ -1057,7 +1016,6 @@ class RedactionState {
         }
         regionMetadata.merge(createdMetadata) { _, new in new }
         appliedMatchAudit.merge(createdAudit) { _, new in new }
-        invalidateRegionCaches()
         regionsModifiedSinceVerification = true
         clearOutput()
 
@@ -1076,7 +1034,6 @@ class RedactionState {
             for id in auditSnapshot.keys {
                 target.appliedMatchAudit.removeValue(forKey: id)
             }
-            target.invalidateRegionCaches()
             target.regionsModifiedSinceVerification = true
             target.clearOutput()
             // The undo leg is a region mutation like any other: bump
@@ -1093,7 +1050,6 @@ class RedactionState {
                 }
                 target2.regionMetadata.merge(metaSnapshot) { _, new in new }
                 target2.appliedMatchAudit.merge(auditSnapshot) { _, new in new }
-                target2.invalidateRegionCaches()
                 target2.regionsModifiedSinceVerification = true
                 target2.clearOutput()
                 // Redo re-inserts regions — a region mutation; the bump

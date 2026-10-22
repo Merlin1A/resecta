@@ -10,9 +10,9 @@ import CoreGraphics
 @MainActor
 struct RegionManagerTests {
 
-    // MARK: - Effective Region Count
+    // MARK: - Effective regions
 
-    @Test("effectiveRegionCount filters sub-threshold regions")
+    @Test("hasEffectiveRegions ignores sub-threshold regions")
     func effectiveCountFiltering() {
         let state = RedactionState()
         let tinyRegion = RedactionRegion(
@@ -26,11 +26,10 @@ struct RegionManagerTests {
             source: .manual
         )
         state.regions[0] = [tinyRegion, normalRegion]
-        #expect(state.effectiveRegionCount == 1)
         #expect(state.hasEffectiveRegions == true)
     }
 
-    @Test("effectiveRegionCount is zero when all regions are sub-threshold")
+    @Test("hasEffectiveRegions is false when all regions are sub-threshold")
     func effectiveCountAllTiny() {
         let state = RedactionState()
         state.regions[0] = [
@@ -38,7 +37,6 @@ struct RegionManagerTests {
                 normalizedRect: CGRect(x: 0, y: 0, width: 0.0001, height: 0.0001),
                 source: .manual)
         ]
-        #expect(state.effectiveRegionCount == 0)
         #expect(state.hasEffectiveRegions == false)
     }
 
@@ -412,15 +410,6 @@ struct RegionManagerTests {
         #expect(state.selectedRegionID == nil)
         #expect(state.outputURL == nil)
         #expect(state.isVerificationStale == false)
-    }
-
-    @Test("effectiveRegionCount sums across pages")
-    func regionCountMultiPage() {
-        let state = RedactionState()
-        state.addRegion(makeRegion(), page: 0, undoManager: nil)
-        state.addRegion(makeRegion(), page: 0, undoManager: nil)
-        state.addRegion(makeRegion(), page: 1, undoManager: nil)
-        #expect(state.effectiveRegionCount == 3)
     }
 
     // MARK: - Remove Region Metadata Cleanup
