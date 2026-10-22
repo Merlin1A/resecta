@@ -138,42 +138,60 @@ struct AccessibilityLabelTests {
         )
     }
 
-    @Test("Toast lifts to 3 lines at AX5 for every severity",
+    @Test("Toast has no line cap at the accessibility sizes, for every severity",
           arguments: [
             ToastSeverity.info,
             .success,
             .warning,
             .error,
           ])
-    func testToastAtAX5LiftsToThreeLines(severity: ToastSeverity) {
-        // At .accessibility5 the cap lifts to 3
-        // lines for all severities, mirroring the InlineWarningBanner
-        // pattern. Same lift applies regardless
-        // of the per-severity baseline so long messages remain readable
-        // when the text size is at its accessibility maximum.
+    func testToastAtAccessibilitySizesHasNoCap(severity: ToastSeverity) {
+        for size in [DynamicTypeSize.accessibility1, .accessibility2, .accessibility3, .accessibility4, .accessibility5] {
+            #expect(ToastView.toastLineLimit(severity: severity, dynamicTypeSize: size) == nil, "\(size)")
+        }
+        #expect(ToastView.toastLineLimit(severity: severity, dynamicTypeSize: .xxxLarge) == 2,
+                "the largest standard size keeps the two-line cap")
+    }
+
+    @Test("Toast has no cap at AX5 for every severity",
+          arguments: [
+            ToastSeverity.info,
+            .success,
+            .warning,
+            .error,
+          ])
+    func testToastAtAX5HasNoCap(severity: ToastSeverity) {
         #expect(
             ToastView.toastLineLimit(
                 severity: severity,
                 dynamicTypeSize: .accessibility5
-            ) == 3
+            ) == nil
         )
     }
 
-    @Test("Toast stays at the severity baseline at AX4")
-    func testToastAtAX4HoldsBaseline() {
-        // .accessibility4 is the boundary below the AX5 lift — the
-        // 2-line baseline still applies; the 3-line lift hasn't kicked in.
+    @Test("The toast's icon stacks above the text at the accessibility sizes, beside it at the standard sizes")
+    func testToastIconStacksAtAccessibilitySizes() {
+        for size in [DynamicTypeSize.accessibility1, .accessibility3, .accessibility5] {
+            #expect(ToastView.stacksIconAboveText(size), "\(size)")
+        }
+        for size in [DynamicTypeSize.large, .xxxLarge] {
+            #expect(!ToastView.stacksIconAboveText(size), "\(size)")
+        }
+    }
+
+    @Test("Toast has no cap at AX4 (the second sentence shows whole)")
+    func testToastAtAX4HasNoCap() {
         #expect(
             ToastView.toastLineLimit(
                 severity: .info,
                 dynamicTypeSize: .accessibility4
-            ) == 2
+            ) == nil
         )
         #expect(
             ToastView.toastLineLimit(
                 severity: .warning,
                 dynamicTypeSize: .accessibility4
-            ) == 2
+            ) == nil
         )
     }
 

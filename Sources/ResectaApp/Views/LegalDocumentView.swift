@@ -12,15 +12,29 @@ import SwiftUI
 // published at resecta.app.
 
 /// The two bundled legal documents the first-launch gate can present.
-enum LegalDocument: String, Identifiable {
+enum LegalDocument: String, Identifiable, CaseIterable {
     case eula = "EULA"
     case privacyPolicy = "PRIVACY"
+    /// The repo-root NOTICE: the third-party data and typeface attributions
+    /// the product ships (Apache License 2.0, section 4(d)).
+    case acknowledgements = "NOTICE"
 
     var id: String { rawValue }
 
-    /// Bundle resource name (repo-root Markdown, routed through project.yml
+    /// Bundle resource name (repo-root files, routed through project.yml
     /// `sources:` with an explicit resources buildPhase).
     var resourceName: String { rawValue }
+
+    /// The repo-root file's extension: Markdown for the two legal texts,
+    /// none for NOTICE.
+    var fileExtension: String? {
+        self == .acknowledgements ? nil : "md"
+    }
+
+    /// The repo-root file name (`EULA.md`, `PRIVACY.md`, `NOTICE`).
+    var fileName: String {
+        fileExtension.map { "\(resourceName).\($0)" } ?? resourceName
+    }
 
     /// Navigation title — shares the gate link-label string so the sheet the
     /// user lands in is named exactly what they tapped.
@@ -28,6 +42,7 @@ enum LegalDocument: String, Identifiable {
         switch self {
         case .eula: "eula_view_eula"
         case .privacyPolicy: "eula_view_privacy"
+        case .acknowledgements: "eula_view_acknowledgements"
         }
     }
 }
@@ -85,7 +100,7 @@ struct LegalDocumentView: View {
     private var blocks: [Block] {
         guard
             let url = Bundle.main.url(
-                forResource: document.resourceName, withExtension: "md"),
+                forResource: document.resourceName, withExtension: document.fileExtension),
             let contents = try? String(contentsOf: url, encoding: .utf8)
         else {
             return [.paragraph(String(
@@ -115,7 +130,11 @@ struct LegalDocumentView: View {
                 .padding(.top, level == 1 ? 0 : ResectaTokens.Spacing.sm)
                 .accessibilityAddTraits(.isHeader)
         case .paragraph(let text):
+            // The acknowledgements file is plain text with hard line breaks
+            // and lined section breaks: a monospaced footnote keeps its
+            // layout readable.
             Text(Self.inlineMarkdown(text))
+                .font(document == .acknowledgements ? .system(.footnote, design: .monospaced) : nil)
                 .font(.body)
         }
     }

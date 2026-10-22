@@ -80,6 +80,11 @@ struct EULAGateView: View {
                                 presentedDocument = .privacyPolicy
                             }
                             .accessibilityIdentifier("eulaViewPrivacy")
+
+                            Button(String(localized: "eula_view_acknowledgements", table: "Legal")) {
+                                presentedDocument = .acknowledgements
+                            }
+                            .accessibilityIdentifier("eulaViewAcknowledgements")
                         }
                         .buttonStyle(.borderless)
                         .padding(.top, ResectaTokens.Spacing.sm)
