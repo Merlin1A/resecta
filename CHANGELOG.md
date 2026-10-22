@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Added
 
 - Settings: a "Rate Resecta on the App Store" row under Support opens the App Store's review page for the app.
+- Acknowledgements: the third-party data and typeface notices the app ships (the repo-root NOTICE) are bundled and readable in-app, from the first-launch gate beside the EULA and Privacy Policy and from Settings.
 - Double-tap the page to return to the fit zoom.
 - Page bar: a Mark Whole Page control beside the page chevrons adds one redaction region covering the page on screen, through the same path a drawn region takes — the counter reads "1 region", Undo removes it in one step, and no search term is captured from it.
 - Import: a password-protected PDF can be opened by entering its password; the import checks run on the unlocked document, and the redacted copy is not password-protected. The password is held in memory while the document is open and released when the session closes; the failed-state card beneath the password sheet reads as locked rather than damaged. A document that was encrypted — one opened with a password, or one carrying only an owner password — shows a notice at import and a caption on the Share card saying the redacted copy carries neither the password nor the original's usage restrictions.
@@ -66,6 +67,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Redact: the per-page retry's memory check estimates the 150-DPI render it performs, instead of a 96-DPI render the rasterizer never makes.
 - Done and Home reset the session through the one Start Over path, so a re-imported document no longer shows the previous document's form-field notice.
 - Home at the compact width: Cancel on the close dialog brings a presented search session back whole — its results and selections — instead of dropping it.
+- The page sidebar renders each thumbnail on the main actor, behind its cache, instead of drawing a page of the open document from another thread while the canvas draws it.
+- Toasts have no line cap at the accessibility text sizes (the standard sizes keep two lines), so a two-sentence toast's second sentence — the one that says what to do — is no longer cut off.
 - Redact and ⇧⌘R are unavailable while the search sheet holds selected matches that are not applied, with the hint "Apply or clear the selected matches first", instead of tearing the session down and dropping them.
 - Redact: a Stop that lands while the output is being finalized leaves no output file behind in the session folder.
 - The app-switcher cover sits in its own window above every presented sheet, so the Search & Redact sheet and Settings → Custom Terms are covered too.

@@ -22,33 +22,33 @@ struct LegalDocumentBundleTests {
     // nonisolated: consumed by `@Test(arguments:)` (hoisted nonisolated peer
     // under the SE-0466 MainActor default — same posture as
     // MarkdownContentGuardTests.legalDocs).
-    nonisolated static let documents: [LegalDocument] = [.eula, .privacyPolicy]
+    nonisolated static let documents: [LegalDocument] = LegalDocument.allCases
 
     @Test("Legal document ships in the app bundle", arguments: documents)
     func documentIsBundled(document: LegalDocument) {
         #expect(
-            appBundle.url(forResource: document.resourceName, withExtension: "md") != nil,
-            "\(document.resourceName).md missing from the app bundle — its project.yml sources: entry (buildPhase: resources) is gone; the gate's view-only link would open an empty sheet"
+            appBundle.url(forResource: document.resourceName, withExtension: document.fileExtension) != nil,
+            "\(document.fileName) missing from the app bundle — its project.yml sources: entry (buildPhase: resources) is gone; the gate's view-only link would open an empty sheet"
         )
     }
 
     @Test("Bundled bytes match the repo-root source", arguments: documents)
     func bundledCopyMatchesRepoRoot(document: LegalDocument) throws {
         let bundledURL = try #require(
-            appBundle.url(forResource: document.resourceName, withExtension: "md"),
-            "\(document.resourceName).md missing from the app bundle"
+            appBundle.url(forResource: document.resourceName, withExtension: document.fileExtension),
+            "\(document.fileName) missing from the app bundle"
         )
         let repoRoot = URL(fileURLWithPath: "\(#filePath)")
             .deletingLastPathComponent()   // Tests/ResectaAppTests
             .deletingLastPathComponent()   // Tests
             .deletingLastPathComponent()   // <repo root>
-        let repoURL = repoRoot.appendingPathComponent("\(document.resourceName).md")
+        let repoURL = repoRoot.appendingPathComponent(document.fileName)
 
         let bundled = try Data(contentsOf: bundledURL)
         let source = try Data(contentsOf: repoURL)
         #expect(
             bundled == source,
-            "app-bundle \(document.resourceName).md differs from the repo-root file — the gate would show a user text that is not the published \(document.resourceName).md (stale build? rebuild after editing legal docs)"
+            "app-bundle \(document.fileName) differs from the repo-root file — the gate would show a user text that is not the published \(document.resourceName).md (stale build? rebuild after editing legal docs)"
         )
     }
 }

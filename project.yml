@@ -72,6 +72,10 @@ targets:
         buildPhase: resources
       - path: PRIVACY.md
         buildPhase: resources
+      # The repo-root NOTICE (third-party data and typeface attributions),
+      # shown in-app as Acknowledgements; byte-compared like the two above.
+      - path: NOTICE
+        buildPhase: resources
       # DEBUG-only: committed synthetic UI-test document fixtures, bundled
       # via `sources:` because the target's `resources:` block silently
       # fails to enumerate. Loaded by the `--loadTestDocument` /
