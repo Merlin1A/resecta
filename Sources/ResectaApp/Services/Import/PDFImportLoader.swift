@@ -140,12 +140,23 @@ extension ImportService {
         // exporting.
         let annotationResult = await AnnotationAnalyzer().analyze(document: doc)
         let filledFormFieldCount = ImportAnnotationNoticeBanner.filledFormFieldCount(in: doc)
+        // XFA form data and embedded files: the viewer may draw the one and
+        // list the other; the rebuilt output carries neither. One
+        // document-level entry beside the analyzer's stages the fact for
+        // the same notice.
+        var findings = annotationResult.findings
+        if ImportAnnotationNoticeBanner.carriesFormDataOrAttachments(in: doc) {
+            findings.append(PDFFinding(
+                id: ImportAnnotationNoticeBanner.formDataOrAttachmentsFindingID,
+                summary: "The source carries XFA form data or embedded files; the rebuilt output carries neither.",
+                severity: .info))
+        }
 
         let facts = ImportFacts(
             origin: .pdf,
             textLayerStatus: textLayerStatus,
             hasHiddenOCG: hasHiddenOCG,
-            annotationFindings: annotationResult.findings,
+            annotationFindings: findings,
             filledFormFieldCount: filledFormFieldCount,
             wasEncrypted: wasEncrypted,
             hadRestrictions: hadRestrictions
