@@ -52,6 +52,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Fixed
 
 - Search: a phrase whose words are separated by more than one space, a tab, a line break or an invisible character is now found, and a match that wraps onto a second line gets a box on each line, counted once per line. Before, such a phrase was not found at all.
+- Search: in Regex mode, the start and end anchors (`^` and `$`) match at each line of the page. Before, they matched only the start and the end of the whole page.
 - Search: with every term required, the result cap counts the matches that pass the every-term test. Before, a page dense in one term alone could fill the cap and leave later pages unread.
 - Search: in Regex mode on a scanned page, a match that runs across two recognised lines is boxed on every line it touches. Before, the box covered only the line where the match began.
 - Scan: a name read after a role word or honorific ("Mr.", "Patient:", "Plaintiff") is boxed to its full width when the page text carries more than one space between the name's words. Before, the box was one character short per extra space, the name's last character stayed visible, and the coverage check, which re-runs the same reading, did not report the gap.
