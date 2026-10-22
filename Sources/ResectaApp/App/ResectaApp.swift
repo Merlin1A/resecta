@@ -199,6 +199,8 @@ struct ResectaApp: App {
                                     // flush re-resolves, differs by page count);
                                     // `--linkDoc` loads the one-page link
                                     // fixture. See `fixtureArgMap`.
+                                    let sampleName = Self.testDocumentName(
+                                        for: launchArguments)
                                     if let imageName = Self.testImageName(for: launchArguments) {
                                         // `--loadTestImage`: one bundled synthetic
                                         // image through the image loader, the
@@ -209,8 +211,6 @@ struct ResectaApp: App {
                                             documentState: ws.documentState,
                                             redactionState: ws.redactionState)
                                     } else {
-                                        let sampleName = Self.testDocumentName(
-                                            for: launchArguments)
                                         await ImportService.loadSampleDocument(
                                             named: sampleName,
                                             documentState: ws.documentState,
