@@ -134,8 +134,7 @@ struct LegalDocumentView: View {
             // and lined section breaks: a monospaced footnote keeps its
             // layout readable.
             Text(Self.inlineMarkdown(text))
-                .font(document == .acknowledgements ? .system(.footnote, design: .monospaced) : nil)
-                .font(.body)
+                .font(document == .acknowledgements ? .system(.footnote, design: .monospaced) : .body)
         }
     }
 
