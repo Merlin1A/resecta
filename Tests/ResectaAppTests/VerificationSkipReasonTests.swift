@@ -118,14 +118,19 @@ struct VerificationSkipReasonTests {
 
     // MARK: - Display
 
-    @Test("skippedSubtitle names the real cause per reason")
-    func skippedSubtitleVariants() {
-        #expect(VerificationResultsView.skippedSubtitle(reason: .autoVerifyOff)
-                == "Verification is turned off in Settings. Run Redact again with verification on, or share unverified.")
-        #expect(VerificationResultsView.skippedSubtitle(reason: .cancelled)
-                == "Verification was stopped before it finished. Run it again before sharing.")
-        #expect(VerificationResultsView.skippedSubtitle(reason: .error)
-                == "Verification could not be completed. Run it again before sharing.")
+    @Test("skippedSubtitle names the real cause per reason, then the step per mode",
+          arguments: [
+            (VerificationReport.SkipReason.autoVerifyOff, "Off in Settings."),
+            (.cancelled, "Stopped early."),
+            (.error, "Could not finish."),
+          ])
+    func skippedSubtitleVariants(reason: VerificationReport.SkipReason, cause: String) {
+        #expect(VerificationResultsView.skippedSubtitle(reason: reason, mode: .secure)
+                == "\(cause) Run\u{00A0}Verification below before you share the PDF.")
+        #expect(VerificationResultsView.skippedSubtitle(reason: reason, mode: .searchableOrUnknown)
+                == "\(cause) Run\u{00A0}Verification, or run Redact for all checks.")
+        #expect(VerificationResultsView.skippedSubtitle(reason: reason, mode: .secure).count <= 70)
+        #expect(VerificationResultsView.skippedSubtitle(reason: reason).count <= 70)
     }
 
     @Test("Masthead a11y label is reason-specific for skipped reports",
@@ -141,12 +146,16 @@ struct VerificationSkipReasonTests {
                 "Skipped masthead a11y label must carry the same variant as the visible subtitle")
     }
 
-    @Test("Masthead a11y label keeps the status-level label for non-skipped reports")
+    @Test("Masthead a11y label speaks the title, the counts and the sentence for non-skipped reports")
     func mastheadAccessibilityLabelNonSkipped() {
+        let pass = LayerResult(name: "L", symbolName: "shield", status: .pass, shortDescription: "",
+                               detailDescription: "", pageReferences: nil, durationSeconds: 0)
         let report = VerificationReport(
-            layers: [], overallStatus: .pass, durationSeconds: 0)
+            layers: Array(repeating: pass, count: 7), overallStatus: .pass, durationSeconds: 0)
         #expect(VerificationResultsView.mastheadAccessibilityLabel(report: report)
-                == VerificationStatus.pass.accessibilityLabel)
+                == "Checks Passed. 7 of 7 checks passed. Look over the redacted PDF in Preview before you share it.")
+        #expect(VerificationResultsView.mastheadAccessibilityLabel(report: .skipped(reason: .autoVerifyOff), mode: .secure)
+                == "Verification Skipped. Off in Settings. Run\u{00A0}Verification below before you share the PDF.")
     }
 
     @Test("No outcome-promise language in the reason-specific strings",
