@@ -39,6 +39,16 @@ struct ContentView: View {
             value: appCoordinator.activeWorkspace.kind
         )
         .environment(toastManager) // inject toast manager
+        #if DEBUG
+        // Sim-verification hook: `--showToast` enqueues a two-sentence
+        // warning toast once the workspace is up, so the toast's line cap
+        // can be photographed at accessibility sizes.
+        .task {
+            guard CommandLine.arguments.contains("--showToast") else { return }
+            try? await Task.sleep(for: .seconds(2))
+            toastManager.enqueue(DocumentEditorView.purgeRerunToastMessage, severity: .warning)
+        }
+        #endif
         // Bottom toasts (info, success) — above page navigation bar
         // Container animation routed through `Anim.resolved` so
         // the slide-in spring crossfades to the opacity-only

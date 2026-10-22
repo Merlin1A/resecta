@@ -29,11 +29,15 @@ struct ToastView: View {
     let toastManager: ToastQueueManager
 
     var body: some View {
+        let layout = Self.layout(for: dynamicTypeSize)
         // The icon scales with the message (the same text style) and
         // sits on the text's first baseline inside a MINIMUM frame:
         // the former fixed 20-pt box let the glyph grow over its own
-        // edge onto the first character at accessibility sizes.
-        HStack(alignment: .firstTextBaseline, spacing: ResectaTokens.Spacing.sm) {
+        // edge onto the first character at accessibility sizes. At the
+        // accessibility sizes the icon stacks above the text instead, so
+        // every line gets the toast's full width (beside the icon, a
+        // two-sentence toast at AX5 ran past the screen).
+        return layout {
             Image(systemName: item.severity.sfSymbol)
                 .font(Self.toastIconFont)
                 .foregroundStyle(item.severity.tintColor)
@@ -82,15 +86,28 @@ struct ToastView: View {
         .accessibilityAddTraits(.isStaticText)
     }
 
-    /// Toast line cap predicate. Below AX5 every
+    /// The toast's layout: the icon beside the text at the standard
+    /// sizes, above it at the accessibility sizes (pinned by
+    /// `AccessibilityLabelTests`).
+    static func stacksIconAboveText(_ size: DynamicTypeSize) -> Bool {
+        size.isAccessibilitySize
+    }
+
+    private static func layout(for size: DynamicTypeSize) -> AnyLayout {
+        stacksIconAboveText(size)
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: ResectaTokens.Spacing.xs))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: ResectaTokens.Spacing.sm))
+    }
+
+    /// Toast line cap predicate. At the standard sizes every
     /// severity caps at 2 lines. The original compact-capsule
     /// contract held info/success to 1 line, but real shipped messages
     /// exceed one capsule line at standard text sizes (the text-layer
     /// notice and the dismissal-cleared counts truncated mid-sentence),
     /// so the info/success baseline was raised to the warning/error cap.
-    /// At `.accessibility5` or larger the cap lifts to 3 lines for all
-    /// severities so multi-clause messages remain readable when the text
-    /// size is at its accessibility maximum. `severity` stays in the
+    /// At the accessibility sizes there is no cap: the toast grows to its
+    /// text, so a two-sentence message keeps the sentence that says what
+    /// to do. `severity` stays in the
     /// signature so the per-severity contract remains directly
     /// assertable. Exposed as a `static` so the contract can be
     /// unit-tested without rendering the view (mirrors
@@ -105,9 +122,13 @@ struct ToastView: View {
     static func toastLineLimit(
         severity: ToastSeverity,
         dynamicTypeSize: DynamicTypeSize
-    ) -> Int {
-        if dynamicTypeSize >= .accessibility5 {
-            return 3
+    ) -> Int? {
+        // No cap at the accessibility sizes: at AX3 a two-sentence toast
+        // needs well over three lines, and the second sentence is the one
+        // that says what to do. The toast grows to its text; its display
+        // time already scales with its words. The standard sizes keep two.
+        if dynamicTypeSize.isAccessibilitySize {
+            return nil
         }
         return 2
     }
