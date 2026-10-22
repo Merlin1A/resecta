@@ -470,6 +470,7 @@ class DocumentState {
     private(set) var failShareAcknowledged: Bool = false
     private(set) var skippedShareAcknowledged: Bool = false
     private(set) var incompleteWarnShareAcknowledged: Bool = false
+    var concealedAnnotationsShareAcknowledged: Bool = false   // DocumentState+ConcealedAnnotations.swift
 
     /// Mark the current verification report as user-overridden (FAIL
     /// override). Sets `failShareAcknowledged` — the shadow
@@ -507,24 +508,20 @@ class DocumentState {
         incompleteWarnShareAcknowledged = true
     }
 
-    /// Re-arm all three share-risk confirms.
-    /// Called when the user backs out of the share sheet without sending
-    /// — the acknowledgement given was scoped to that one send attempt,
-    /// not to the report forever, so the NEXT Share tap for the same
-    /// report must confirm again. A completed send leaves the
-    /// shadows spent for that report by design; a genuinely fresh report
-    /// re-arms them via `transition(to:)`'s reset instead of this
-    /// function. Clears all three shadows unconditionally, then — under
-    /// the `.verified` guard, since only that phase has a report to
-    /// mirror into — mirrors `userOverrodeFailure` /
-    /// `userAcknowledgedSkippedShare` back to `false` on the live report
-    /// so mirror and shadow never disagree.
-    /// `incompleteWarnShareAcknowledged` has no report-side mirror (same
-    /// asymmetry as `acknowledgeIncompleteWarnShare()`).
+    /// Re-arm the four share confirms when the user backs out of the share
+    /// sheet without sending: an acknowledgement covers one send attempt, so
+    /// the NEXT Share tap for the same report confirms again (a completed
+    /// send leaves them spent by design; a fresh report re-arms them in
+    /// `transition(to:)`). Clears every shadow, then — under the `.verified`
+    /// guard, the only phase with a report to mirror into — sets
+    /// `userOverrodeFailure` / `userAcknowledgedSkippedShare` back to false
+    /// so mirror and shadow never disagree. The incomplete-WARN and
+    /// concealing-annotations flags have no report-side mirror.
     func rearmShareRiskConfirms() {
         failShareAcknowledged = false
         skippedShareAcknowledged = false
         incompleteWarnShareAcknowledged = false
+        concealedAnnotationsShareAcknowledged = false
         guard case .verified(var report) = phase else { return }
         report.userOverrodeFailure = false
         report.userAcknowledgedSkippedShare = false
@@ -616,6 +613,7 @@ class DocumentState {
                 failShareAcknowledged = false
                 skippedShareAcknowledged = false
                 incompleteWarnShareAcknowledged = false
+                concealedAnnotationsShareAcknowledged = false
             }
             syncProgress(from: newPhase)
         }
