@@ -24,15 +24,37 @@ struct CreditCardDetector: FamilyDetector {
         pattern: #"(?<![\p{L}\p{N}])(?:\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,7}|\d{4}[\s-]\d{6}[\s-]\d{4,5})(?![\p{L}\p{N}])"#
     )
 
+    /// The digit-run shape of `ccPattern` on its own. It runs as a second
+    /// pass: matches of one pattern do not overlap, so a grouped match that
+    /// fails Luhn (`1234 567890 4111` in `1234 567890 4111 1111 1111 1111`)
+    /// would otherwise take the first group of the card that follows it.
+    static let digitRunPattern = try! NSRegularExpression(
+        pattern: #"(?<![\p{L}\p{N}])\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,7}(?![\p{L}\p{N}])"#
+    )
+
     func detect(in text: NSString, range: NSRange) -> [PIIMatch] {
-        Self.ccPattern.matches(in: text as String, range: range).compactMap { match in
-            let matchedText = text.substring(with: match.range)
-            let digits = matchedText.filter(\.isWholeNumber)
-            // Triple gate: regex → Luhn → prefix
-            guard Self.luhnCheck(digits), Self.hasValidCardPrefix(digits) else { return nil }
-            return PIIMatch(text: matchedText, range: match.range, kind: .creditCard,
-                           confidence: 0.95)
+        let source = text as String
+        // Each pass is gated on its own: regex → Luhn → prefix. Where cards
+        // from the two passes overlap, the earlier-starting one is kept, and
+        // on a tie the first pass's, so every card the first pass proposes
+        // alone is still proposed.
+        let cards = [Self.ccPattern, Self.digitRunPattern].flatMap { pattern in
+            pattern.matches(in: source, range: range).compactMap { match -> PIIMatch? in
+                let matchedText = text.substring(with: match.range)
+                let digits = matchedText.filter(\.isWholeNumber)
+                guard Self.luhnCheck(digits), Self.hasValidCardPrefix(digits) else { return nil }
+                return PIIMatch(text: matchedText, range: match.range, kind: .creditCard,
+                               confidence: 0.95)
+            }
         }
+        var kept: [PIIMatch] = []
+        for card in cards.enumerated().sorted(by: {
+            ($0.element.range.location, $0.offset) < ($1.element.range.location, $1.offset)
+        }).map(\.element) {
+            if let last = kept.last, NSIntersectionRange(last.range, card.range).length > 0 { continue }
+            kept.append(card)
+        }
+        return kept
     }
 
     /// Luhn checksum validation.

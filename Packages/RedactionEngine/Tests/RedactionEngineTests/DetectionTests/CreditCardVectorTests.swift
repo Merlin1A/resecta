@@ -83,6 +83,14 @@ struct CreditCardVectorTests {
         #expect(cards(in: "Card 3056 930902 5904 on file").isEmpty)
     }
 
+    @Test("A grouped run that fails Luhn does not take the first group of the card after it")
+    func failedGroupedRunKeepsTheNextCard() {
+        #expect(cards(in: "Ref 1234 567890 4111 1111 1111 1111") == ["4111 1111 1111 1111"])
+        #expect(cards(in: "Ref 1234 567890\n4111 1111 1111 1111") == ["4111 1111 1111 1111"])
+        #expect(cards(in: "Card 3782 822463 10005 then 4111 1111 1111 1111")
+                == ["3782 822463 10005", "4111 1111 1111 1111"], "two cards, in page order")
+    }
+
     @Test("a Luhn-valid run glued to a letter is not a card: the DL-shaped token U48670409492471")
     func letterAdjacentRunIsNotACard() {
         #expect(cards(in: "Secondary ID on file -- Driver Lic: U48670409492471").isEmpty)
