@@ -78,10 +78,13 @@ nonisolated struct ImportFacts: Sendable {
     /// documentURL). Drives `TextLayerExtractor.pageReferencesHiddenOCG`.
     let hasHiddenOCG: Bool
     /// Non-Widget source annotations, one entry per subtype, from the
-    /// engine's `AnnotationAnalyzer`. Drives the import notice banner:
-    /// annotations are drawn by the on-screen PDFKit view but are not
-    /// part of the page content stream the export raster is built from,
-    /// so their presence is surfaced to the user at import.
+    /// engine's `AnnotationAnalyzer`, plus one document-level entry
+    /// (`ImportAnnotationNoticeBanner.formDataOrAttachmentsFindingID`) when
+    /// the source carries XFA form data or an embedded file. Drives the
+    /// import notice banner: annotations are drawn by the on-screen PDFKit
+    /// view but are not part of the page content stream the export raster
+    /// is built from, and the rebuilt output carries no form data packet
+    /// and no attachment, so their presence is surfaced to the user at import.
     let annotationFindings: [PDFFinding]
     /// Widget annotations whose field carries a value, counted by
     /// `ImportAnnotationNoticeBanner.filledFormFieldCount(in:)`. The

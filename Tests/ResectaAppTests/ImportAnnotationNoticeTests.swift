@@ -331,6 +331,87 @@ struct ImportAnnotationNoticeTests {
             pausedBannerActive: false, detectionBannerActive: true))
     }
 
+    // MARK: - XFA form data and embedded files
+
+    /// A catalog whose `/AcroForm` carries an `/XFA` packet stream.
+    private static func xfaFormPDF() -> Data {
+        let xdp = "<xdp:xdp xmlns:xdp=\"http://ns.adobe.com/xdp/\"></xdp:xdp>"
+        return rawPDF([
+            "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [] /XFA 5 0 R >> >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << >> >>",
+            "<< /Length 0 >>\nstream\n\nendstream",
+            "<< /Length \(xdp.utf8.count) >>\nstream\n\(xdp)\nendstream",
+        ])
+    }
+
+    /// A catalog whose `/Names` tree carries one embedded file.
+    private static func embeddedFilePDF() -> Data {
+        rawPDF([
+            "<< /Type /Catalog /Pages 2 0 R /Names << /EmbeddedFiles << /Names [(secret.txt) 5 0 R] >> >> >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << >> >>",
+            "<< /Length 0 >>\nstream\n\nendstream",
+            "<< /Type /Filespec /F (secret.txt) /EF << /F 6 0 R >> >>",
+            "<< /Length 11 >>\nstream\nhello world\nendstream",
+        ])
+    }
+
+    @Test("XFA form data and an embedded file are read from the catalog; a plain page and a filled form are not")
+    func formDataAndAttachmentsAreRead() throws {
+        let xfa = try #require(PDFDocument(data: Self.xfaFormPDF()))
+        #expect(ImportAnnotationNoticeBanner.carriesFormDataOrAttachments(in: xfa))
+        let attachment = try #require(PDFDocument(data: Self.embeddedFilePDF()))
+        #expect(ImportAnnotationNoticeBanner.carriesFormDataOrAttachments(in: attachment))
+        let plain = try #require(PDFDocument(data: makeTextPDFData(text: "No fields")))
+        #expect(!ImportAnnotationNoticeBanner.carriesFormDataOrAttachments(in: plain))
+        let form = try #require(PDFDocument(data: Self.acroFormPDF(fields: Self.filledForm)))
+        #expect(!ImportAnnotationNoticeBanner.carriesFormDataOrAttachments(in: form))
+    }
+
+    @Test("An XFA form stages the document-level entry and shows the notice; a clean import clears it")
+    func formDataImportStagesFindingAndShowsNotice() async {
+        let doc = DocumentState()
+        let redaction = RedactionState()
+
+        await ImportService.importDocument(
+            data: Self.xfaFormPDF(), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+
+        #expect(doc.phaseKind == .editing)
+        #expect(ImportAnnotationNoticeBanner.carriesFormDataOrAttachments(doc.sourceAnnotationFindings))
+        #expect(doc.sourceFilledFormFieldCount == 0)
+        let count = ImportAnnotationNoticeBanner.noticeWorthyCount(doc.sourceAnnotationFindings)
+        #expect(count == 1, "the document-level entry counts toward the notice gate")
+        #expect(ImportAnnotationNoticeBanner.isVisible(
+            phaseKind: .editing, annotationTypeCount: count,
+            filledFormFieldCount: 0, dismissed: false,
+            pausedBannerActive: false, detectionBannerActive: false))
+
+        await ImportService.importDocument(
+            data: makeTextPDFData(text: "No fields"), suggestedType: "pdf",
+            documentState: doc, redactionState: redaction)
+        #expect(!ImportAnnotationNoticeBanner.carriesFormDataOrAttachments(doc.sourceAnnotationFindings))
+        #expect(doc.sourceAnnotationFindings.isEmpty)
+    }
+
+    @Test("Notice copy: the form-data-and-attachments sentence alone and beside the others")
+    func formDataAndAttachmentsCopy() {
+        #expect(ImportAnnotationNoticeBanner.formDataOrAttachmentsSentence
+                == "Form data and attachments are not carried into the redacted copy.")
+        #expect(ImportAnnotationNoticeBanner.noticeMessage(
+                    annotationCount: 0, filledFormFieldCount: 0, carriesFormDataOrAttachments: true)
+                == "Form data and attachments are not carried into the redacted copy. Check the preview before sharing.")
+        let all = ImportAnnotationNoticeBanner.noticeMessage(
+            annotationCount: 1, filledFormFieldCount: 2, carriesFormDataOrAttachments: true)
+        #expect(all.hasPrefix("This document contains annotations such as boxes, stamps, or notes."))
+        #expect(all.contains("It also contains 2 filled form fields; their values are not carried into the output. Form data and attachments are not carried into the redacted copy."))
+        #expect(all.hasSuffix("Check the preview before sharing."))
+        // The default keeps the two-count paragraph as it was.
+        #expect(ImportAnnotationNoticeBanner.noticeMessage(annotationCount: 0, filledFormFieldCount: 1)
+                == "This document contains 1 filled form field; its value is not carried into the output. Check the preview before sharing.")
+    }
+
     // MARK: - Copy
 
     @Test("Notice copy is the pinned mechanism description")
