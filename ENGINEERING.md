@@ -112,10 +112,10 @@ Details a reviewer should know exist:
   while every could-not-verify condition keeps its severity. A warning tier
   that fires on every normal document carries no information.
 - Verification is advisory by design. A failed or attention-level verdict, a
-  check that reports something it could not verify, skipped checks in a
-  report with no other warning, or a verification that did not run does not
-  hard-block export — it routes the share action through an explicit
-  confirmation instead. I chose that over hard-blocking because the check has
+  check that reports something it could not verify, any skipped check, or a
+  verification that did not run does not hard-block export — it routes the
+  share action through an explicit confirmation instead, which names each
+  such check and its outcome. I chose that over hard-blocking because the check has
   known epistemic limits (below), and a tool that refuses to hand you your own
   document on the strength of a heuristic is making a judgment it cannot back.
 
