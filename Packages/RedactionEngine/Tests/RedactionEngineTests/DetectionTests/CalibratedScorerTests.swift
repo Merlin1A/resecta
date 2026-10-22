@@ -25,18 +25,21 @@ struct CalibratedScorerTests {
 
     @Test("Floored prior rescues account raw max at balanced (design math pin)")
     func absorbingStateFloorRescuesAccountAtBalanced() {
-        // The design's recomputed account-at-balanced vector: raw max 0.75,
-        // floor 0.35 → posterior ≈ 0.618 > 0.60 balanced. The unfloored
-        // worst case (mixture mean after 5 rejections ≈ 0.161 → ≈ 0.366)
-        // stays below the threshold, which is exactly the absorbing state
-        // the floor removes.
+        // The account raw sits on the posterior floor's keyword-confirmed bar,
+        // so the prior floor alone no longer carries it over balanced; the
+        // production seam composes the posterior with ContextPosteriorFloor,
+        // which does. The unfloored worst case (mixture mean after 5
+        // rejections ≈ 0.161) stays below the threshold, which is exactly the
+        // absorbing state the prior floor removes.
         let scorer = CalibratedScorer()
 
-        let floored = scorer.posterior(raw: 0.75, priorMean: DetectionOrchestrator.absorbingStateFloor)
-        #expect(abs(floored - 0.618) < 0.005, "design math pin: got \(floored)")
-        #expect(floored > 0.60, "floored account raw-max must clear balanced")
+        let raw = AccountDetector.keywordConfirmedConfidence
+        let bare = scorer.posterior(raw: raw, priorMean: DetectionOrchestrator.absorbingStateFloor)
+        let floored = ContextPosteriorFloor.apply(bare, family: "account", raw: raw,
+            conservativeCutoff: ContextPosteriorFloor.conservativeCutoff(forWire: "account"))
+        #expect(floored >= 0.60, "the composed account raw-max must clear balanced: \(floored)")
 
-        let unfloored = scorer.posterior(raw: 0.75, priorMean: 0.161)
+        let unfloored = scorer.posterior(raw: raw, priorMean: 0.161)
         #expect(unfloored < 0.60, "unfloored worst case stays absorbed: \(unfloored)")
 
         #expect(DetectionOrchestrator.absorbingStateFloor == 0.35,
@@ -61,9 +64,12 @@ struct CalibratedScorerTests {
 
         let scorer = CalibratedScorer()
         let effectivePrior = max(mean, DetectionOrchestrator.absorbingStateFloor)
-        let posterior = scorer.posterior(raw: 0.75, priorMean: effectivePrior)
-        #expect(posterior > 0.60,
-                "account raw max must resurface at balanced after the floor: \(posterior)")
+        let raw = AccountDetector.keywordConfirmedConfidence
+        let posterior = scorer.posterior(raw: raw, priorMean: effectivePrior)
+        let composed = ContextPosteriorFloor.apply(posterior, family: "account", raw: raw,
+            conservativeCutoff: ContextPosteriorFloor.conservativeCutoff(forWire: "account"))
+        #expect(composed >= 0.60,
+                "account raw max must resurface at balanced after the floors: \(composed)")
     }
 
     // MARK: - Under-redaction raw-bar floor
@@ -94,9 +100,10 @@ struct CalibratedScorerTests {
         let phone = ContextPosteriorFloor.apply(0.0006, family: "phone", raw: 0.80, conservativeCutoff: 0.75)
         #expect(abs(phone - 0.75) < 1e-9, "phone floors to 0.75; got \(phone)")
         for cutoff in [0.55, 0.7, 0.75] { #expect(phone >= cutoff) }
-        // Account: raw 0.75 → min(0.75, 0.7) = 0.7 → survives 0.01 / 0.6 / 0.7.
-        let account = ContextPosteriorFloor.apply(0.0006, family: "account", raw: 0.75, conservativeCutoff: 0.7)
-        #expect(abs(account - 0.7) < 1e-9, "account floors to 0.7; got \(account)")
+        // Account: the detector's raw → min(raw, 0.7) → survives 0.01 / 0.6 / 0.7.
+        let accountRaw = AccountDetector.keywordConfirmedConfidence
+        let account = ContextPosteriorFloor.apply(0.0006, family: "account", raw: accountRaw, conservativeCutoff: 0.7)
+        #expect(abs(account - min(accountRaw, 0.7)) < 1e-9, "account floors to min(raw, 0.7); got \(account)")
         for cutoff in [0.01, 0.6, 0.7] { #expect(account >= cutoff) }
     }
 

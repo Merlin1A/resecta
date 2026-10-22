@@ -43,17 +43,6 @@ struct ContextWindowScorer: Sendable {
 
     init() {}
 
-    // Pre-compiled date patterns for collision dampening.
-    // Candidate inside a date span gets score floor 0.05.
-    private static let datePatterns: [NSRegularExpression] = {
-        [
-            // MM/DD/YYYY or MM-DD-YYYY
-            try! NSRegularExpression(pattern: #"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}"#),
-            // YYYY-MM-DD
-            try! NSRegularExpression(pattern: #"\d{4}-\d{1,2}-\d{1,2}"#),
-        ]
-    }()
-
     /// Score a match's confidence based on surrounding context.
     ///
     /// Phase 1: the optional `category`/`doctype`/`gazetteer` trio enables
@@ -90,12 +79,6 @@ struct ContextWindowScorer: Sendable {
         documentHeader: String? = nil
     ) -> Double {
         let nsText = text as NSString
-
-        // Date-collision dampener: if the match is embedded in a date pattern,
-        // return the floor or 0.05, whichever is lower (per A6 spec).
-        if isInsideDatePattern(text: nsText, matchRange: matchRange) {
-            return min(profile.floor, 0.05)
-        }
 
         // Extract context window: ±windowRadius tokens around the match.
         let contextWindow = extractContextWindow(
@@ -207,12 +190,6 @@ struct ContextWindowScorer: Sendable {
         profile: KeywordProfile
     ) -> MatchRationale.Signal? {
         let nsText = text as NSString
-        // Mirror score()'s date-collision dampener: a date-embedded match
-        // is suppressed wholesale; we don't emit a per-keyword breakdown
-        // for it (no positive keywords could have contributed).
-        if isInsideDatePattern(text: nsText, matchRange: matchRange) {
-            return nil
-        }
         let window = extractContextWindow(
             text: nsText, matchRange: matchRange, radius: profile.windowRadius
         ).lowercased()
@@ -256,7 +233,6 @@ struct ContextWindowScorer: Sendable {
         gazetteer: NegativeContextGazetteer
     ) -> MatchRationale.Signal? {
         let nsText = text as NSString
-        if isInsideDatePattern(text: nsText, matchRange: matchRange) { return nil }
         let contextWindow = extractContextWindow(
             text: nsText, matchRange: matchRange, radius: 5
         ).lowercased()
@@ -267,29 +243,6 @@ struct ContextWindowScorer: Sendable {
     }
 
     // MARK: - Private Helpers
-
-    /// Check if the match range is embedded within a date pattern.
-    private func isInsideDatePattern(text: NSString, matchRange: NSRange) -> Bool {
-        // Expand search area: ±20 characters around the match.
-        let searchStart = max(0, matchRange.location - 20)
-        let searchEnd = min(text.length, matchRange.location + matchRange.length + 20)
-        let searchRange = NSRange(location: searchStart, length: searchEnd - searchStart)
-        let searchText = text.substring(with: searchRange)
-
-        let adjustedMatchStart = matchRange.location - searchStart
-        let adjustedMatchRange = NSRange(location: adjustedMatchStart, length: matchRange.length)
-
-        for pattern in Self.datePatterns {
-            let matches = pattern.matches(in: searchText, range: NSRange(location: 0, length: (searchText as NSString).length))
-            for dateMatch in matches {
-                // Check if the date match fully contains the SSN candidate
-                if NSIntersectionRange(dateMatch.range, adjustedMatchRange).length == adjustedMatchRange.length {
-                    return true
-                }
-            }
-        }
-        return false
-    }
 
     /// Extract text within ±radius whitespace-separated tokens of the match.
     private func extractContextWindow(text: NSString, matchRange: NSRange, radius: Int) -> String {

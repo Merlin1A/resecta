@@ -168,11 +168,13 @@ public struct NameGazetteer: Sendable {
         public var hadAnyHit: Bool { surnameHit || givenHit || fuzzySurnameHit }
 
         /// Inventory SUPPORT for the first pass's gate: an exact surname hit
-        /// that is not a common word, or a fuzzy surname hit (never offered to
-        /// a common word). Given-name membership alone is not support here —
-        /// the caller's lone-token given-name fallback covers that case, as it
-        /// does on the strict pass.
-        public var hadSupport: Bool { (surnameHit && !commonWordSurname) || fuzzySurnameHit }
+        /// that is not a common word. A fuzzy (one-edit) surname hit raises the
+        /// score of an otherwise supported name but is not support on its own:
+        /// about three in ten seven-letter non-members have a one-edit
+        /// neighbour in the inventory. Given-name membership alone is not
+        /// support here — the caller's lone-token given-name fallback covers
+        /// that case, as it does on the strict pass.
+        public var hadSupport: Bool { surnameHit && !commonWordSurname }
 
         public init(surnameHit: Bool, givenHit: Bool, fuzzySurnameHit: Bool,
                     fuzzyScore: Double?, boost: Double, commonWordSurname: Bool = false) {
@@ -344,8 +346,8 @@ public struct NameGazetteer: Sendable {
     /// is overwhelmingly ASCII so this is an acceptable simplification for
     /// Phase 2; Phase 3 can extend the alphabet if needed.
     ///
-    /// Called from `queryBoosted` when the fuzzy option is on; a hit feeds
-    /// `hadSupport` through `fuzzySurnameHit`.
+    /// Called from `queryBoosted` when the fuzzy option is on; a hit sets
+    /// `fuzzySurnameHit` and its boost, never `hadSupport`.
     internal func fuzzyContains(surname: String) -> Double? {
         let input = TextNormalizer.normalize(surname).lowercased()
         guard !input.isEmpty else { return nil }

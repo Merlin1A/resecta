@@ -17,9 +17,11 @@ struct CreditCardDetector: FamilyDetector {
     // A digit run that starts or ends inside a letter-or-digit token is not a
     // card (a DL-shaped `U48670409492471` is refused before Luhn); a `#`, `.`,
     // space or line edge still admits one. Both lookarounds are one scalar
-    // wide, so the pattern stays linear (ReDoSFuzzTests).
+    // wide, so the pattern stays linear (ReDoSFuzzTests). The second shape is
+    // the separated 4-6-5 (American Express) and 4-6-4 (Diners Club) grouping;
+    // unseparated runs of those lengths already fit the first shape.
     static let ccPattern = try! NSRegularExpression(
-        pattern: #"(?<![\p{L}\p{N}])\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,7}(?![\p{L}\p{N}])"#
+        pattern: #"(?<![\p{L}\p{N}])(?:\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{1,7}|\d{4}[\s-]\d{6}[\s-]\d{4,5})(?![\p{L}\p{N}])"#
     )
 
     func detect(in text: NSString, range: NSRange) -> [PIIMatch] {
