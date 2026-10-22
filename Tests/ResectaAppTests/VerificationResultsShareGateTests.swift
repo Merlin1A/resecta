@@ -545,7 +545,7 @@ struct ShareRiskConfirmSheetTests {
         )
     }
 
-    @Test("Item list includes only FAIL/ATTENTION layers, in layer order, composed from the title")
+    @Test("Item list: the FAIL/ATTENTION layers in layer order, then the checks that did not run in full, composed from the title")
     func itemListDerivation() {
         let mixedReport = VerificationReport(
             layers: [
@@ -560,7 +560,8 @@ struct ShareRiskConfirmSheetTests {
             overallStatus: .fail("x"), durationSeconds: 0
         )
         let lines = DocumentEditorView.atRiskItemLines(report: mixedReport)
-        #expect(lines == ["Layer: failed", "Layer: needs review"])
+        #expect(lines == ["Layer: failed", "Layer: needs review", "Layer: skipped"],
+                "the skipped check follows the at-risk ones; pass, info and warn never appear")
         // Content-free: never the matched text (reviewTermTexts) or an
         // engine sentence.
         let joined = lines.joined()
