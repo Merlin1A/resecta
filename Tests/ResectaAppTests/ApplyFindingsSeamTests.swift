@@ -14,8 +14,7 @@ import RedactionEngine
 //   1. Search-origin preservation — the outputs the pre-seam search
 //      apply produced, produced identically by the seam.
 //   3. One undo implementation — undo removes regions + metadata +
-//      audit in lockstep and restores recorded decisions; redo
-//      re-inserts all three without re-recording decisions.
+//      audit in lockstep; redo re-inserts all three.
 //   4. The mutation re-guard — every origin refuses to mutate while
 //      the pipeline owns `regions`, re-checked inside the action.
 //   5. The single-result origin — the compact handle's
@@ -193,35 +192,6 @@ struct ApplySeamSearchOriginTests {
 @Suite("Apply seam — one undo implementation")
 @MainActor
 struct ApplySeamUndoTests {
-
-    @Test("Search-apply undo leaves priors untouched — no decision snapshot for that origin")
-    func searchUndoDoesNotTouchPriors() async {
-        let state = RedactionState()
-        let undo = UndoManager()
-        undo.groupsByEvent = false
-        // Seed a non-default prior so an accidental restore would move it.
-        state.priors = state.priors.updated(category: .ssn, decision: .accepted)
-        let priorMean = state.priors.mean(.ssn)
-
-        let search = SearchState()
-        search.results = [makeSearchResult()]
-        state.activeSearch = search
-
-        undo.beginUndoGrouping()
-        _ = await state.applyFindings(.selectedSearchResults, undoManager: undo)
-        undo.endUndoGrouping()
-        let versionAfterApply = state.regionVersion
-        undo.undo()
-
-        #expect(state.priors.mean(.ssn) == priorMean,
-                "the search origin records no decisions, so undo restores none")
-        #expect(state.regions.values.flatMap { $0 }.isEmpty)
-        #expect(state.appliedMatchAudit.isEmpty)
-        #expect(state.regionVersion > versionAfterApply,
-                "search-origin undo bumps past the recorded apply version so `shouldClearAppliedMarkers` can distinguish it from the apply's own bump")
-        #expect(state.regionVersion != state.lastAppliedSearchRegionVersion,
-                "the marker handler reads this inequality as a real undo")
-    }
 
     @Test("The applied-search stamp rides the lockstep undo: gone on undo, back on redo, byte-equal")
     func searchRecordRidesLockstepUndo() async {

@@ -234,80 +234,6 @@ class RedactionState {
     /// (c) Metadata survives undo/redo because it keys on the stable region UUID.
     var regionMetadata: [UUID: RegionMetadata] = [:]
 
-    // --- Priors + surface-form propagation ---
-
-    /// Per-category Beta priors. Updated on triage accept/reject. Passed by
-    /// value into `DetectionOrchestrator.detectPage(...)` per page, merged
-    /// back here at yield.
-    ///
-    /// Priors now PERSIST across
-    /// document sessions — hydrated at WORKSPACE creation (RedactWorkspace
-    /// init; a bare `RedactionState()` stays inert so tests are isolated),
-    /// saved (then rehydrated) by clearAll() so the next document starts
-    /// with the accumulated triage history. The stored payload is
-    /// per-category accept/reject counts only: behavioral curation
-    /// metadata, never document content, values, or timestamps. Streaks
-    /// are session-scoped and reset on restore.
-    var priors: PerCategoryPriors = PerCategoryPriors()
-
-    // MARK: - priors persistence
-
-    /// Versioned storage key; a format change bumps to v2 and ignores v1.
-    static let priorsStorageKey = "perCategoryPriors.v1"
-
-    /// Persistence target for the clearAll() save/rehydrate hook.
-    /// `.standard` in production; tests inject a scratch suite so the
-    /// shared test-host defaults stay clean.
-    @ObservationIgnored var priorsDefaults: UserDefaults = .standard
-
-    /// Encode alpha/beta per category into a plain plist-safe dictionary
-    /// (`[String: [String: Double]]`) — no Codable struct crossing the
-    /// @Observable boundary per the design. Streaks are not stored.
-    static func savePriors(_ priors: PerCategoryPriors, defaults: UserDefaults = .standard) {
-        var payload: [String: [String: Double]] = [:]
-        for (category, beta) in priors.byCategory {
-            payload[category.rawValue] = ["alpha": beta.alpha, "beta": beta.beta]
-        }
-        defaults.set(payload, forKey: priorsStorageKey)
-    }
-
-    /// Fail-closed hydration: a missing key or any malformed entry
-    /// degrades to the uniform Beta(1,1) default for that category.
-    /// Values are clamped to the G10 invariants (α, β ≥ 1; ESS ≤ 50) so
-    /// a tampered plist cannot poison scoring; streaks reset on restore
-    /// (cross-session streak continuation is not meaningful).
-    static func loadPriors(defaults: UserDefaults = .standard) -> PerCategoryPriors {
-        guard let payload = defaults.dictionary(forKey: priorsStorageKey)
-                as? [String: [String: Double]] else {
-            return PerCategoryPriors()
-        }
-        var byCategory: [PIICategory: PerCategoryPriors.Beta] = [:]
-        for (rawValue, values) in payload {
-            guard let category = PIICategory(rawValue: rawValue),
-                  let alpha = values["alpha"], let beta = values["beta"],
-                  alpha.isFinite, beta.isFinite else { continue }
-            var clampedAlpha = max(1.0, alpha)
-            var clampedBeta = max(1.0, beta)
-            let total = clampedAlpha + clampedBeta
-            if total > 50 {
-                let scale = 50 / total
-                clampedAlpha = max(1.0, clampedAlpha * scale)
-                clampedBeta = max(1.0, clampedBeta * scale)
-            }
-            byCategory[category] = PerCategoryPriors.Beta(
-                alpha: clampedAlpha, beta: clampedBeta, streakDir: 0, streakLen: 0
-            )
-        }
-        return PerCategoryPriors(byCategory: byCategory)
-    }
-
-    /// "Reset Detection History" affordance: drop the
-    /// persisted history. Callers with a live instance should also reset
-    /// the in-memory `priors` so clearAll() cannot re-save the old state.
-    static func clearPersistedPriors(defaults: UserDefaults = .standard) {
-        defaults.removeObject(forKey: priorsStorageKey)
-    }
-
     // Active search session.
     // Non-nil triggers search sheet presentation. Ephemeral — never persisted.
     //
@@ -1432,12 +1358,6 @@ class RedactionState {
         regionMetadata = [:]
         // Audit is per-document-session only; never leaks across docs.
         appliedMatchAudit = [:]
-        // Priors are saved BEFORE the wipe (the wipe
-        // would otherwise store an empty history) and rehydrated from the
-        // just-written payload so the next document in this app session
-        // starts with the accumulated triage history, streaks reset.
-        Self.savePriors(priors, defaults: priorsDefaults)
-        priors = Self.loadPriors(defaults: priorsDefaults)
     }
 
     // MARK: - Undo Helper

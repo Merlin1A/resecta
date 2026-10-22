@@ -126,12 +126,6 @@ struct RedactWorkspaceView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .environment(settingsState)
-                    // Reset Detection History also
-                    // wipes the live document's in-memory priors — inject
-                    // explicitly (mirrors the settingsState line) so the
-                    // sheet does not depend on inheriting the outer
-                    // workspace environment.
-                    .environment(workspace.redactionState)
                     .presentationDetents([.medium, .large])
             }
             // Environment injection — satisfies @Environment reads in

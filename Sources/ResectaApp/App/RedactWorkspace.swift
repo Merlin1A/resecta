@@ -19,12 +19,6 @@ final class RedactWorkspace {
     init(settingsState: SettingsState, userTermsStore: UserTermsStore) {
         let doc = DocumentState()
         let red = RedactionState()
-        // Hydrate the persisted triage priors at
-        // workspace creation (document open). Hydration lives here — not
-        // in RedactionState.init — so bare instances stay inert and
-        // test isolation holds; tearDown() → clearAll() is the matching
-        // save point.
-        red.priors = RedactionState.loadPriors()
         self.documentState = doc
         self.redactionState = red
         self.coordinator = PipelineCoordinator(
