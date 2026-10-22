@@ -5,9 +5,7 @@ import SwiftUI
 // The Sort `Menu` migrated out of the footer and
 // into the `SearchToolbarSection.chipRowSubstrate` chip-row consumer.
 //
-// Under the unified review surface the footer serves BOTH result
-// origins: search/scan-run results (reading `searchState`) and staged
-// detections under review (via `ReviewFooterModel`). It is the
+// The footer reads search/scan-run results (`searchState`). It is the
 // surface's ONE selection authority — the "M of N selected" count and
 // the prominent global Select All (the affordance set that makes
 // all-deselected arrival livable). The "Add to selection" predicate
@@ -18,25 +16,9 @@ struct SearchFooterSection: View {
     @Bindable var searchState: SearchState
     @Environment(RedactionState.self) private var redactionState
 
-    /// Review-origin inputs. nil → the footer reads `searchState`
-    /// (search origin). Non-nil → counts and Select All target the
-    /// staged detection findings.
-    var review: ReviewFooterModel? = nil
-
-    struct ReviewFooterModel {
-        /// Explicit-true selection count across ALL staged detections
-        /// (what the toolbar's "Apply N" will apply).
-        let selectedCount: Int
-        /// Count of detections visible under the active kind filter —
-        /// the Select All target.
-        let visibleCount: Int
-        let allVisibleSelected: Bool
-        let onToggleSelectAll: () -> Void
-    }
-
     var body: some View {
         VStack(spacing: ResectaTokens.Spacing.xxs) {
-            if review == nil, searchState.resultsAtCap {
+            if searchState.resultsAtCap {
                 // The cap banner carries the unscanned remainder
                 // so "showing first N" stops reading as full coverage.
                 Text(Self.capBannerText(
@@ -59,10 +41,9 @@ struct SearchFooterSection: View {
                 // counter's filtered remap (and the Select All gate
                 // below, which already compared filtered-to-filtered).
                 Text(Self.selectionCountLabel(
-                    selected: review?.selectedCount ?? searchState.selectedFilteredCount,
-                    total: review?.visibleCount ?? searchState.filteredCount,
-                    hiddenSelected: review == nil
-                        ? max(0, searchState.selectedCount - searchState.selectedFilteredCount) : 0
+                    selected: searchState.selectedFilteredCount,
+                    total: searchState.filteredCount,
+                    hiddenSelected: max(0, searchState.selectedCount - searchState.selectedFilteredCount)
                 ))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -72,8 +53,7 @@ struct SearchFooterSection: View {
                 // Grouping toggle. The piiScan "By Category"
                 // sibling was deleted (redundant with the category
                 // chips); piiScan results always group by page.
-                if review == nil,
-                   searchState.searchModeType == .multiTerm && searchState.searchTerms.count > 1 {
+                if searchState.searchModeType == .multiTerm && searchState.searchTerms.count > 1 {
                     Toggle("By Term", isOn: $searchState.groupByTerm)
                         .toggleStyle(.button)
                         .controlSize(.small)
@@ -93,14 +73,12 @@ struct SearchFooterSection: View {
     /// arrival); the "Deselect All" state keeps the quiet style.
     @ViewBuilder
     private var selectAllButton: some View {
-        let allSelected = review?.allVisibleSelected
-            ?? (searchState.selectedFilteredCount == searchState.filteredCount)
-        let action: () -> Void = review?.onToggleSelectAll
-            ?? {
-                searchState.toggleSelectAll()
-                // Conditional dismiss: footer bulk selection is user selection work.
-                searchState.userModifiedSelections = true
-            }
+        let allSelected = searchState.selectedFilteredCount == searchState.filteredCount
+        let action: () -> Void = {
+            searchState.toggleSelectAll()
+            // Conditional dismiss: footer bulk selection is user selection work.
+            searchState.userModifiedSelections = true
+        }
         // Closure-label form so the floor can sit on
         // the label; `Text(...)` reproduces the exact
         // string-initializer label, so the accessible name is

@@ -23,16 +23,13 @@ struct RunEntryPendingRunGateTests {
     @Test("An import is refused while a run is pending, in every phase that otherwise admits one")
     func importRefusedWhileRunPending() async {
         let doc = DocumentState()
-        let redaction = RedactionState()
         doc.phase = .editing
         #expect(doc.canStartImport == true, "precondition: editing with no run admits an import")
-        #expect(doc.canStartImport(with: redaction) == true)
 
         let pending = Task<Void, Never> { await Task.yield() }
         doc.activePipelineTask = pending
         #expect(doc.canStartImport == false,
                 "a run pending in `.editing` (the capture window) must refuse the drop and the pickers")
-        #expect(doc.canStartImport(with: redaction) == false)
 
         doc.activePipelineTask = nil
         #expect(doc.canStartImport == true, "the gate reopens when the run ends")

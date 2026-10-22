@@ -25,7 +25,7 @@ import XCTest
 /// `SkippedShareGateTests`). The toggle is restored to ON in `tearDown`
 /// so the simulator is left as found regardless of where the test stops.
 ///
-/// nonisolated for the same reason as `DetectionTriageDismissUITests`:
+/// nonisolated because
 /// an XCUITest drives a separate process and touches no @MainActor app
 /// state; under the SE-0466 MainActor-default flip the lifecycle
 /// overrides would otherwise mismatch XCTestCase's nonisolated ObjC
@@ -55,10 +55,10 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
         setVerifyBeforeExport(on: false)
 
         app.terminate()
-        app.launchArguments = ["--uitesting", "--seedTriage"]
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--openSearchSheet", "--searchQuery=Amount"]
         app.launch()
 
-        awaitSeededReviewAndApplyAll()
+        awaitSearchAndApplyAll()
         runRedactFromOverflowMenu()
 
         XCTAssertTrue(
@@ -163,17 +163,17 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
             .firstMatch
     }
 
-    // MARK: - Seeded review → Redact
+    // MARK: - The launch-seeded search → Redact
 
-    private func awaitSeededReviewAndApplyAll() {
+    private func awaitSearchAndApplyAll() {
         let dismissButton = app.buttons["searchDismissButton"]
         XCTAssertTrue(
             dismissButton.waitForExistence(timeout: 30),
-            "Seeded review sheet never presented — check the --seedTriage launch hook."
+            "Search sheet never presented — check the --openSearchSheet launch hook."
         )
 
         let selectAll = app.buttons["footerSelectAllButton"]
-        XCTAssertTrue(selectAll.waitForExistence(timeout: 10), "Select All button not found.")
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 30), "Select All never appeared: the search found nothing.")
         selectAll.tap()
 
         let apply = app.buttons["searchApplyButton"]
@@ -188,7 +188,7 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
     }
 
     /// The editor's trailing toolbar overflows on this device/width after
-    /// the seeded-review round trip — Redact resolves through the
+    /// the search round trip — Redact resolves through the
     /// system overflow menu rather than directly on the bar.
     private func runRedactFromOverflowMenu() {
         let overflow = app.buttons["OverflowBarButtonItem"]

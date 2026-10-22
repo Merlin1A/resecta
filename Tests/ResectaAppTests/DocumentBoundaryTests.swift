@@ -74,7 +74,6 @@ struct DocumentBoundaryTests {
 
     @Test("A drop on the results or error screen is refused with a notice")
     func dropOnResultsOrErrorIsRefusedWithANotice() {
-        let redaction = RedactionState()
         // The notice names the screen's own way back (its button's title).
         for (phase, wayBack): (DocumentState.Phase, String) in [
             (.verified(report: .skipped), "Keep Editing"),
@@ -82,16 +81,13 @@ struct DocumentBoundaryTests {
         ] {
             let doc = DocumentState()
             doc.phase = phase
-            #expect(doc.importRefusalMessage(with: redaction)
+            #expect(doc.importRefusalMessage()
                     == "Cannot import from this screen. Tap \(wayBack) first.")
         }
         let editing = DocumentState()
         editing.phase = .editing
-        #expect(editing.importRefusalMessage(with: redaction) == nil)
+        #expect(editing.importRefusalMessage() == nil)
         editing.phase = .importing
-        #expect(editing.importRefusalMessage(with: redaction) == DocumentState.importBlockedDuringPipelineMessage)
-        editing.phase = .editing
-        redaction.pendingTriage = [0: [DetectionResult.mock()]]
-        #expect(editing.importRefusalMessage(with: redaction) == DocumentState.importBlockedDuringTriageMessage)
+        #expect(editing.importRefusalMessage() == DocumentState.importBlockedDuringPipelineMessage)
     }
 }

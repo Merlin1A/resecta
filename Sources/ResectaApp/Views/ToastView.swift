@@ -24,8 +24,7 @@ struct ToastView: View {
     // traps (EXC_BREAKPOINT — the strict-Observation "state during update"
     // assertion). Passing it in sidesteps that read. Structural guard:
     // ToastManagerLetInjectionTests (asserts this stays a `let`, never an
-    // `@Environment(ToastQueueManager.self)` read); crash-path guard:
-    // DetectionTriageDismissUITests.
+    // `@Environment(ToastQueueManager.self)` read).
     let toastManager: ToastQueueManager
 
     var body: some View {

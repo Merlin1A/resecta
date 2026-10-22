@@ -280,9 +280,6 @@ final class SearchState: Identifiable {
     /// (`deselectedCount`), so the two surfaces read from one
     /// definition and cannot disagree. Nil for plain-text sessions or
     /// before a scan lands — the results screen renders nothing then.
-    /// Detection-triage rejections (`RedactionState.triageSelections`)
-    /// are NOT counted: the panel's counter never included them, and its
-    /// selection state is discarded on triage apply/dismiss.
     func deselectionSnapshotForRun() -> RedactionState.DeselectionSnapshot? {
         guard searchModeType == .piiScan, lastCoverageReport != nil else {
             return nil

@@ -201,10 +201,7 @@ extension SearchAndRedactSheet {
         )
     }
 
-    /// Restore-target resolution at Undo-tap time. A pending
-    /// detection review owns the surface (restoring a search session
-    /// under it would bury the review behind parked entry points), so
-    /// the tap no-ops there. Otherwise the LIVE session — whichever
+    /// Restore-target resolution at Undo-tap time: the LIVE session — whichever
     /// sheet is up when the user taps — is the target; with no sheet up
     /// the restore mints one and presents it (assigning
     /// `activeSearch` is the presentation trigger), because an Undo
@@ -212,7 +209,6 @@ extension SearchAndRedactSheet {
     /// back. Pinned by `ModeSwitchToastTests`.
     @MainActor
     static func modeSwitchRestoreTarget(in redactionState: RedactionState) -> SearchState? {
-        guard redactionState.pendingTriage == nil else { return nil }
         if let live = redactionState.activeSearch { return live }
         let fresh = SearchState()
         redactionState.activeSearch = fresh

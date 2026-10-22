@@ -145,7 +145,7 @@ struct DocumentEditorViewBackgroundBannerTests {
     // MARK: - KI-4 purge re-run round-trips verified -> editing
 
     /// The purge re-run toast fires only from `.verified`, but
-    /// `runFullPipeline` guards `canStartPipeline(with:)` which requires
+    /// `runFullPipeline` guards `canStartPipeline` which requires
     /// `.editing`. The action's preamble must round-trip the phase so the guard
     /// passes — otherwise the "Re-run" button silently no-ops and strands the
     /// user (gone output, disabled Share). The Run Verification card's
@@ -156,13 +156,13 @@ struct DocumentEditorViewBackgroundBannerTests {
         let redaction = RedactionState()
         doc.phase = .verified(report: .skipped)
         // Bug repro: the pipeline guard rejects from .verified.
-        #expect(doc.canStartPipeline(with: redaction) == false)
+        #expect(doc.canStartPipeline == false)
 
         DocumentEditorView.prepareForPurgeRerun(
             documentState: doc, redactionState: redaction)
 
         #expect(doc.phaseKind == .editing)                       // legal round-trip
-        #expect(doc.canStartPipeline(with: redaction) == true)   // guard now passes
+        #expect(doc.canStartPipeline == true)   // guard now passes
     }
 
     /// The primary action clears the pause state before it launches the

@@ -491,9 +491,7 @@ struct PipelineCoordinatorTests {
 }
 
 // collectSensitiveTerms is scoped to the APPLIED
-// redactions (its prior pass harvested every detection in detectionResults,
-// including triage-deselected ones — which surfaced as false "Sensitive text
-// in region" Layer-2 reports). These pin the scoping on the pure seam and
+// redactions. These pin the scoping on the pure seam and
 // through the instance method.
 //
 // Re-pin: single-token name matched text is INCLUDED with
@@ -561,18 +559,12 @@ struct CollectSensitiveTermsScopingTests {
             account.id:    .mock(piiKind: .pii(.account), matchedText: "4100773265"),
             search.id:     .mock(piiKind: .searchMatch(term: "Wrenfield"), matchedText: "Wrenfield"),
         ]
-        // A detection the user DESELECTED in triage: it lingers in
-        // detectionResults but has no applied region → must not be a term.
-        coord.redactionState.detectionResults = [
-            0: [DetectionResult.mock(kind: .pii(.ssn), matchedText: "999-00-1234")]
-        ]
 
         let terms = termTable(coord.collectSensitiveTerms())
         #expect(terms["Delia Hartwell"] == false)  // multi-word name: plain substring
         #expect(terms["4100773265"] == false)      // non-name single token: plain
         #expect(terms["Wrenfield"] == false)       // the matched text of the typed row
         #expect(terms["Hartwell"] == true)         // single-word name: boundary-matched
-        #expect(terms["999-00-1234"] == nil)       // deselected detection not hunted
     }
 
     @Test("collectSensitiveTerms reads the record the apply seam stamped: the query as typed joins the matched text")

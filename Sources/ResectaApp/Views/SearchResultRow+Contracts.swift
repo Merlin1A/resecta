@@ -182,7 +182,7 @@ extension SearchResultRow {
     /// The merged row element's spoken label — the shape "Address,
     /// page 1, medium confidence, applied": the category word where
     /// the row has one (a PII hit's category; a literal / regex /
-    /// custom hit keeps the adapter's "Search match"), the page, the
+    /// custom hit reads "Search match"), the page, the
     /// tier descriptor where the row is graded (spoken for parity with
     /// the bar, no longer mirrored by a visible word), and "applied"
     /// once the match is marked (the visual marker's non-visual twin).
@@ -194,7 +194,7 @@ extension SearchResultRow {
         isApplied: Bool = false
     ) -> String {
         var parts = [Self.spokenCategory(for: result).map { "\($0), page \(result.pageIndex + 1)" }
-                     ?? FindingRowModel(result: result).accessibilityDescription]
+                     ?? "Search match, page \(result.pageIndex + 1)"]
         if showsTier { parts.append(tier.descriptor) }
         if isApplied { parts.append("applied") }
         return parts.joined(separator: ", ")

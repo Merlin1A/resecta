@@ -109,21 +109,6 @@ struct DocumentStatePredicateTests {
         #expect(doc.canStartPipeline)
     }
 
-    @Test("canStartPipeline(with:) returns false while triage is pending")
-    func canStartPipelineWithBlockedByTriage() {
-        let doc = DocumentState()
-        let red = RedactionState()
-        doc.phase = .editing
-
-        #expect(doc.canStartPipeline(with: red))
-
-        red.pendingTriage = [0: [DetectionResult.mock()]]
-        #expect(!doc.canStartPipeline(with: red))
-
-        red.pendingTriage = nil
-        #expect(doc.canStartPipeline(with: red))
-    }
-
     // MARK: - canMutateRegions
 
     @Test("canMutateRegions is true for empty, editing, importing, verified, failed")

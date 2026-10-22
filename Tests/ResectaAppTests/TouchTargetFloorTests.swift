@@ -17,7 +17,7 @@ import Foundation
 //      "fixing" the frame must not be able to drop `.plain`).
 //
 // The visual/hit-test verification these source pins can't reach
-// (actual on-screen frame size, the accessibility-merged FindingRow
+// (actual on-screen frame size, the accessibility-merged result-row
 // selection circle, the resize handles) is a simulator/XCUITest or
 // coordinate-probe pass — see ResizeHandleHitTestTests for the
 // resize-handle geometry's pure-function coverage instead.
@@ -43,11 +43,9 @@ struct TouchTargetFloorTests {
     @Test("Every floored site references ResectaTokens.TouchTarget.minimum, not a bare 46")
     func everySiteReferencesTheSharedToken() throws {
         let sites = [
-            "Sources/ResectaApp/Views/Search/FindingRow.swift",
             "Sources/ResectaApp/Views/FilterChip.swift",
             "Sources/ResectaApp/Views/PageNavigationBar.swift",
             "Sources/ResectaApp/Views/SearchResultRow.swift",
-            "Sources/ResectaApp/Views/Search/ScanReviewSection.swift",
             // `SearchResultsSection`'s only floored
             // control — the "Add to selection…" menu — relocated into
             // `SearchFooterSection`, then the menu was removed
@@ -79,7 +77,6 @@ struct TouchTargetFloorTests {
     @Test("The new stable identifiers this program added are present in source")
     func newIdentifiersArePresent() throws {
         let expectations: [(path: String, identifier: String)] = [
-            ("Sources/ResectaApp/Views/Search/ScanReviewSection.swift", "detectorEvaluationButton"),
             ("Sources/ResectaApp/Views/SearchResultRow.swift", "rationaleDisclosureButton"),
             ("Sources/ResectaApp/Views/SearchAndRedactSheet.swift", "rescanButton"),
             ("Sources/ResectaApp/Views/SearchAndRedactSheet.swift", "savedSearchesBookmark"),

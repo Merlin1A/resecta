@@ -75,33 +75,18 @@ struct WalkSummaryTests {
         #expect(same.walkSummary(for: same.results[0], pageCount: 3).accessibilityValue == "Delia, Page 1 of 3")
     }
 
-    @Test("The walk is live with results on board, or with the staged review owning the Scan interface (the review walk)")
+    @Test("The walk is live with results on board")
     func walkLiveness() {
         let search = state(mode: .text, results: [result(matched: "x", term: "x")])
-        #expect(search.isWalkLive(reviewPending: false))
-        // A pending review touches only the Scan interface; a Search session stays live on its results.
-        #expect(search.isWalkLive(reviewPending: true))
+        #expect(search.isWalkLive)
         let scan = state(mode: .piiScan, results: [result(matched: "x", term: "x", category: .ssn)])
-        #expect(scan.isWalkLive(reviewPending: false))
-        // The review walk: a pending review on the Scan interface is live with stale results —
-        #expect(scan.isWalkLive(reviewPending: true))
-        #expect(scan.reviewOwnsInterface(reviewPending: true))
-        // — and with none; a Search session with nothing on board is not.
-        #expect(state(mode: .piiScan, results: [], current: nil).isWalkLive(reviewPending: true))
-        #expect(!state(mode: .text, results: [], current: nil).isWalkLive(reviewPending: false))
-        #expect(!state(mode: .text, results: [], current: nil).isWalkLive(reviewPending: true))
+        #expect(scan.isWalkLive)
+        // A session with nothing on board is not.
+        #expect(!state(mode: .piiScan, results: [], current: nil).isWalkLive)
+        #expect(!state(mode: .text, results: [], current: nil).isWalkLive)
         let store = RedactionState()
         #expect(!store.walkLive)
         store.activeSearch = search
         #expect(store.walkLive)
-        // The editor's read follows the review walk too — the page bar
-        // steps aside beneath the parked review.
-        let review = RedactionState()
-        review.activeSearch = state(mode: .piiScan, results: [], current: nil)
-        #expect(!review.walkLive)
-        review.pendingTriage = [0: [DetectionResult(
-            normalizedRect: CGRect(x: 0.1, y: 0.5, width: 0.2, height: 0.03),
-            kind: .pii(.ssn), confidence: 0.9, matchedText: "123-45-6789")]]
-        #expect(review.walkLive)
     }
 }

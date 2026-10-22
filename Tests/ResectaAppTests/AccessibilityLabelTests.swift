@@ -17,8 +17,8 @@ struct AccessibilityLabelTests {
     // controls: the batch menu's job moved to the footer Select All +
     // Select-Where predicates, and the review-side confidence slider
     // followed the per-run Confidence slider out (predicates are the
-    // confidence tools). The unified review surface's spoken contracts
-    // are pinned by `FindingRowFamilyTests`.
+    // confidence tools). The result row's spoken contracts are pinned
+    // by `SearchResultRowContractTests`.
 
     // MARK: - Settings picker hints
 

@@ -130,27 +130,25 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
 
     // MARK: - Detection Sweep row
 
-    /// The seeded review (the Scan interface over the bundled one-page
-    /// fixture): Select All → Apply → Redact. The run carries no typed
-    /// search, so the Search Re-check reads as an informational note and the
-    /// seventh row — the Detection Sweep — reports what the detectors
-    /// observed on the output. The run-facts strip carries no line about
-    /// detection having or not having run: the row measures it.
-    func testDetectionSweep_seededScanApplied_rowPresentAndNoDetectionLine() {
-        app.launchArguments = ["--uitesting", "--loadTestDocument", "--seedTriage"]
+    /// One drawn box over the bundled one-page fixture → Redact. The run
+    /// carries no typed search, so the Search Re-check reads as an
+    /// informational note and the seventh row — the Detection Sweep —
+    /// reports what the detectors observed on the output. The run-facts
+    /// strip carries no line about detection having or not having run:
+    /// the row measures it.
+    func testDetectionSweep_drawnBox_rowPresentAndNoDetectionLine() {
+        app.launchArguments = ["--uitesting", "--loadTestDocument"]
         app.launch()
 
-        let dismiss = app.buttons["searchDismissButton"]
-        XCTAssertTrue(dismiss.waitForExistence(timeout: 30),
-                      "Seeded review sheet never presented — check the --seedTriage launch hook.")
-        let selectAll = app.buttons["footerSelectAllButton"]
-        XCTAssertTrue(selectAll.waitForExistence(timeout: 10), "Select All button not found.")
-        selectAll.tap()
-        let apply = app.buttons["searchApplyButton"]
-        XCTAssertTrue(apply.waitForExistence(timeout: 10), "Apply button not found.")
-        apply.tap()
-        XCTAssertTrue(dismiss.waitForExistence(timeout: 10), "Dismiss button not found after Apply.")
-        dismiss.tap()
+        let drawTool = app.buttons["drawTool"]
+        XCTAssertTrue(drawTool.waitForExistence(timeout: 30),
+                      "The editor's Rectangle tool never appeared — check the --loadTestDocument launch hook.")
+        drawTool.tap()
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.30))
+            .press(forDuration: 0.05,
+                   thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.70, dy: 0.36)))
+        drawTool.tap()
 
         let overflow = app.buttons["OverflowBarButtonItem"]
         XCTAssertTrue(overflow.waitForExistence(timeout: 10), "Toolbar overflow button never appeared.")

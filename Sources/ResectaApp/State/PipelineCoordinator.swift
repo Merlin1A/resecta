@@ -679,14 +679,6 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// Collect unique matched PII text from the APPLIED redactions for Layer 3
     /// binary string search verification. Terms below 3 characters
     /// are included here; the Aho-Corasick layer applies its own minimum filter.
-    ///
-    /// Scoped to the regions actually applied. The
-    /// prior pass also harvested `redactionState.detectionResults.values` (EVERY
-    /// detection, including triage-deselected / auxiliary ones —
-    /// the staged-review apply filters `regions` by selection at
-    /// `RedactionState.swift:775` but never prunes `detectionResults`), so terms
-    /// for un-redacted detections were hunted across body text and surfaced as
-    /// false "Sensitive text within a redacted region" Layer-2 reports.
     func collectSensitiveTerms() -> [SensitiveTerm] {
         Self.sensitiveTerms(
             fromAppliedRegions: redactionState.regions,

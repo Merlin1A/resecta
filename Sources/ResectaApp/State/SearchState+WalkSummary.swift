@@ -7,10 +7,7 @@ import RedactionEngine
 // `walkLive` is the ONE read of "a walk is on" — the editor's bottom-chrome
 // model hides the page bar on it, and the sheet's compact strip mounts its
 // ‹ › cluster and per-item Apply / Select on the same predicate — so the
-// two surfaces cannot drift. Live = search results on board, or the staged
-// detection review pending on the Scan interface (the review walk,
-// `ReviewWalk`: the review owns the Scan interface while it is pending,
-// so stale sheet-scan results never show a walk under it).
+// two surfaces cannot drift. Live = search results on board.
 //
 // The walk summary (`WalkSummary`): kind · page · text for the current
 // match — Scan names the category, Search the term, and the matched text
@@ -18,41 +15,29 @@ import RedactionEngine
 // (case-insensitively); regex and multi-term keep it. Nothing is drawn
 // for it: the parked strip's Apply / Select carries it as its
 // accessibility value (`accessibilityValue`), so VoiceOver names the
-// match the sighted user sees marked on the page. The review origin
-// builds the same summary from its row (`WalkSummary.init(item:pageCount:)`).
+// match the sighted user sees marked on the page.
 // `WalkSummaryTests` pins the rules.
 
 extension SearchState {
-    /// Whether a walk is live for this search session: the review walk
-    /// while the staged review owns the Scan interface, else the search
-    /// walk over the results on board. `reviewPending` is the store's
-    /// `pendingTriage != nil`, passed in because the review belongs to
-    /// `RedactionState`.
-    func isWalkLive(reviewPending: Bool) -> Bool {
-        reviewOwnsInterface(reviewPending: reviewPending) || !results.isEmpty
-    }
-
-    /// The staged review is pending AND this session is on the Scan
-    /// interface — the review's surface (`SearchAndRedactSheet.isReviewActive`).
-    func reviewOwnsInterface(reviewPending: Bool) -> Bool {
-        reviewPending && searchModeType.interface == .scan
+    /// Whether a walk is live for this search session: the search walk
+    /// over the results on board.
+    var isWalkLive: Bool {
+        !results.isEmpty
     }
 }
 
 extension RedactionState {
     /// The one published read of the walk's liveness for the editor:
-    /// false with no sheet session; else the session's own predicate
-    /// against this store's pending review.
+    /// false with no sheet session; else the session's own predicate.
     var walkLive: Bool {
-        activeSearch?.isWalkLive(reviewPending: pendingTriage != nil) ?? false
+        activeSearch?.isWalkLive ?? false
     }
 }
 
 // MARK: - The walk summary
 
 /// What VoiceOver hears for the walk's current result on the parked
-/// strip's Apply / Select — a search result here, a staged detection
-/// through `ReviewWalk`.
+/// strip's Apply / Select.
 struct WalkSummary: Equatable {
     /// Scan: the PII category's display name; Search: the term.
     let kind: String

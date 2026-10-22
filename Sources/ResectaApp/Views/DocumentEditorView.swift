@@ -66,14 +66,6 @@ struct DocumentEditorView: View {
     /// is actually down. A second Home tap during the park is absorbed.
     @State var homeCloseAwaitsSheetDismissal = false
 
-    /// True while a parked sheet carried the staged Scan review.
-    /// The review itself stays in `redactionState.pendingTriage` (only the
-    /// sheet goes down, not the work); backing out of the dialog
-    /// re-presents it through the review bridge
-    /// (`restoreParkedReviewIfNeeded()`), Close tears it down with the
-    /// session.
-    @State var homeCloseParkedReview = false
-
     /// A search session parked for the close dialog, kept whole for Cancel
     /// (`restoreParkedSearchIfNeeded()`); Close drops it with the session.
     @State var parkedEditorSearch: SearchState?
@@ -126,10 +118,7 @@ struct DocumentEditorView: View {
     /// P1.3: single sheet slot for the editor. Precedence search >
     /// rationale is enforced by the binding's getter so two
     /// near-simultaneous transitions in the same runloop tick can't drop a
-    /// sheet silently. The former `.triage` case is absorbed: staged
-    /// detection findings present INSIDE the search sheet's Scan
-    /// interface (`ScanReviewSection`), and the `pendingTriage`
-    /// observer below opens/switches that one sheet for every producer.
+    /// sheet silently.
     private enum ActiveSheet: Identifiable {
         case search(SearchState)
         case rationale(UUID)
@@ -447,10 +436,7 @@ struct DocumentEditorView: View {
         }
         // P1.3: single `.sheet(item:)` slot for search / rationale.
         // Precedence search > rationale; the getter returns the
-        // highest-precedence active source. Staged
-        // detections ride the search case — the `pendingTriage`
-        // observer below keeps `activeSearch` populated while
-        // detections are pending. The slot sits ABOVE the phase
+        // highest-precedence active source. The slot sits ABOVE the phase
         // switch, so a live session would ride over every phase;
         // The Apply seam keeps it out of the pipeline phases by tearing the
         // session down at the Apply seam (`runFullPipeline`)
@@ -473,9 +459,8 @@ struct DocumentEditorView: View {
                     // invokes this set: closure inside its own update/dismiss
                     // transaction. Mutating @Observable state here is re-entrant
                     // within an active update pass — the same class as the fixed
-                    // `.sheet(isPresented:)` crash (dismissTriage()
-                    // clears two properties; activeSearch=nil fires a didSet that
-                    // writes two more). Defer each write one runloop turn via
+                    // `.sheet(isPresented:)` crash (activeSearch=nil fires a
+                    // didSet that writes further state). Defer each write one runloop turn via
                     // `Task { @MainActor }`. The synchronous reads snapshot which
                     // arm to clear (the values are already committed inside the
                     // update pass); only the write is deferred. The in-Task
@@ -486,16 +471,6 @@ struct DocumentEditorView: View {
                         Task { @MainActor in
                             guard redactionState.activeSearch != nil else { return }
                             redactionState.activeSearch = nil
-                            // A system-initiated dismissal (swipe /
-                            // programmatic) with staged findings pending
-                            // discards the review — same semantics as
-                            // the sheet's own Dismiss. Without this the
-                            // findings would strand: the sheet is gone
-                            // but the pending set keeps the Scan/Search
-                            // entry points disabled.
-                            if redactionState.pendingTriage != nil {
-                                redactionState.dismissTriage()
-                            }
                         }
                     } else if redactionState.pendingCanvasRationaleRequest != nil {
                         Task { @MainActor in
@@ -572,17 +547,6 @@ struct DocumentEditorView: View {
                     )
                 }
             }
-        }
-        // Absorbed-review presentation bridge: whenever staged detections
-        // arrive (pipeline staging, banner Review, the DEBUG seed hook),
-        // surface them in the ONE sheet's Scan interface. Observation
-        // here is presentation-only — the same job the retired
-        // `.triage` sheet-getter arm did — and never triggers a run
-        // (the auto-run flag stays unarmed). `initial: true` covers a
-        // producer that wrote before this view mounted.
-        .onChange(of: redactionState.pendingTriage != nil, initial: true) { _, hasPending in
-            guard hasPending else { return }
-            presentReviewInScanInterface()
         }
         // iPad hover popover — observe hoveredRegionID on RedactionState
         // VoiceOver announcement on selection count change
@@ -853,12 +817,7 @@ struct DocumentEditorView: View {
                 state.pendingAutoRunScan = true
                 redactionState.activeSearch = state
             }
-            // `pendingTriage != nil` normally implies the sheet is
-            // already up (the review bridge presents it); the explicit
-            // clause is a belt so a fresh auto-run can never arm while
-            // staged detections await review.
             .disabled(documentState.phaseKind != .editing
-                      || redactionState.pendingTriage != nil
                       || redactionState.activeSearch != nil)
             // Identifier is PLUMBING and carries over from the
             // Auto-Detect entry this button renames — UI tests anchor
@@ -871,7 +830,6 @@ struct DocumentEditorView: View {
                 redactionState.activeSearch = SearchState()
             }
             .disabled(documentState.phaseKind != .editing
-                      || redactionState.pendingTriage != nil
                       || redactionState.activeSearch != nil)
             .keyboardShortcut("f", modifiers: .command)
             .accessibilityIdentifier("searchRedact")
@@ -1611,7 +1569,7 @@ struct DocumentEditorView: View {
     /// State preamble for the purge re-run action, extracted as a
     /// static so the transition is testable without a SwiftUI host (mirrors
     /// `shouldShowPurgeRerunToast`). The purge toast fires only from `.verified`,
-    /// but `runFullPipeline` guards `canStartPipeline(with:)` which requires
+    /// but `runFullPipeline` guards `canStartPipeline` which requires
     /// `.editing` — without this round-trip the "Re-run" button silently no-ops
     /// and strands the user (the output is gone and Share is disabled). The
     /// `verified -> editing` transition is legal.

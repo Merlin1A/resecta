@@ -99,23 +99,6 @@ struct SearchSheetDismissRuleTests {
         #expect(state.userModifiedSelections == false)
     }
 
-    // MARK: - Review-origin arm
-
-    @Test("Review dismissal discards the staged findings (dismissTriage contract)")
-    func reviewDismissDiscardsFindings() {
-        let redactionState = RedactionState()
-        let det = DetectionResult(
-            normalizedRect: CGRect(x: 0.1, y: 0.5, width: 0.3, height: 0.04),
-            kind: .pii(.ssn), confidence: 0.9, matchedText: "123-45-6789"
-        )
-        redactionState.pendingTriage = [0: [det]]
-        // Review-first arrival: an empty map (absent = not accepted).
-        redactionState.triageSelections = [:]
-        redactionState.dismissTriage()
-        #expect(redactionState.pendingTriage == nil)
-        #expect(redactionState.triageSelections.isEmpty)
-    }
-
     // MARK: - Copy pins
 
     @Test("Confirmation copy is mechanism-description (no outcome-promise phrases)")
@@ -141,23 +124,16 @@ struct SearchSheetDismissRuleTests {
     // The `.sheet(item:)` set:
     // closure in DocumentEditorView defers each @Observable teardown one
     // runloop turn via `Task { @MainActor }` with an in-Task re-check
-    // guard. Under the absorbed review, the search arm's deferred clear
-    // ALSO discards a pending review (a system-initiated dismissal with
-    // staged findings would otherwise strand them behind a closed sheet).
-    // This mirrors the production closure against real state.
-    @Test("Sheet-binding teardown defers the clear and discards a pending review with it")
-    func sheetBindingTeardownIsDeferredAndClearsReview() async {
+    // guard. This mirrors the production closure against real state.
+    @Test("Sheet-binding teardown defers the clear")
+    func sheetBindingTeardownIsDeferred() async {
         let redactionState = RedactionState()
         redactionState.activeSearch = SearchState()
-        redactionState.pendingTriage = [0: []]
 
         if redactionState.activeSearch != nil {
             Task { @MainActor in
                 guard redactionState.activeSearch != nil else { return }
                 redactionState.activeSearch = nil
-                if redactionState.pendingTriage != nil {
-                    redactionState.dismissTriage()
-                }
             }
         }
 
@@ -165,12 +141,9 @@ struct SearchSheetDismissRuleTests {
         // write is deferred, not re-entrant inside the update pass.
         #expect(redactionState.activeSearch != nil,
                 "the clear must be deferred, not synchronous")
-        #expect(redactionState.pendingTriage != nil)
 
         await Task.yield()
         #expect(redactionState.activeSearch == nil,
                 "the deferred clear must fire on the next runloop turn")
-        #expect(redactionState.pendingTriage == nil,
-                "a pending review must not strand behind a dismissed sheet")
     }
 }

@@ -20,25 +20,24 @@ struct ImportRefusalMessageTests {
     func resultsScreen() {
         let documentState = DocumentState()
         documentState.phase = .verified(report: report())
-        #expect(documentState.importRefusalMessage(with: RedactionState())
+        #expect(documentState.importRefusalMessage()
                 == "Cannot import from this screen. Tap Keep Editing first.")
     }
 
     @Test("An error screen names its own button: Return to Editor, Return to Results, Choose Another File, Re-open Document")
     func errorScreens() {
         let documentState = DocumentState()
-        let redactionState = RedactionState()
         documentState.phase = .failed(error: .importError(.unsupportedFormat), returnPhase: .editing)
-        #expect(documentState.importRefusalMessage(with: redactionState)
+        #expect(documentState.importRefusalMessage()
                 == "Cannot import from this screen. Tap Return to Editor first.")
         documentState.phase = .failed(error: .importError(.unsupportedFormat), returnPhase: .empty)
-        #expect(documentState.importRefusalMessage(with: redactionState)
+        #expect(documentState.importRefusalMessage()
                 == "Cannot import from this screen. Tap Choose Another File first.")
         documentState.phase = .failed(error: .redactionError(.reconstructionFailed), returnPhase: .verified(report: report()))
-        #expect(documentState.importRefusalMessage(with: redactionState)
+        #expect(documentState.importRefusalMessage()
                 == "Cannot import from this screen. Tap Return to Results first.")
         documentState.phase = .failed(error: .exportError(.filePurged), returnPhase: .empty)
-        #expect(documentState.importRefusalMessage(with: redactionState)
+        #expect(documentState.importRefusalMessage()
                 == "Cannot import from this screen. Tap Re-open Document first.")
     }
 

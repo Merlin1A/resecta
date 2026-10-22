@@ -27,7 +27,7 @@ import XCTest
 /// branch is pinned in-process by `SearchResultsListObservationCrashTests`
 /// (ResectaAppTests), which hosts the same List body over seeded PII results.
 ///
-/// nonisolated for the same reason as `DetectionTriageDismissUITests`: an
+/// nonisolated for the same reason as `ShareRiskSheetUITests`: an
 /// XCUITest drives a separate process and touches no @MainActor app state;
 /// under the SE-0466 MainActor-default flip the lifecycle overrides would
 /// otherwise mismatch XCTestCase's nonisolated ObjC lifecycle methods.

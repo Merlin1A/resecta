@@ -98,8 +98,7 @@ struct SearchAndRedactSheet: View {
     // is deselected in-place on the way
     // out); once the USER has modified selections this session
     // (`searchState.userModifiedSelections`), Dismiss routes through a
-    // confirmation dialog. This generalizes the retired triage sheet's
-    // confirm-if-selections-touched rule to the whole surface: under
+    // confirmation dialog. Under
     // all-deselected arrival, every live selection is deliberate opt-in
     // work, so a one-tap-always dismiss would silently discard it. See
     // `SearchAndRedactSheet+DiscardUndo.swift` for the selection helpers
@@ -150,42 +149,6 @@ struct SearchAndRedactSheet: View {
     /// scaleEffect doesn't drift if the animation visual+state diverge.
     @State private var grabberPulseScale: CGFloat = 1.0
 
-    /// Review-mode kind filter, hoisted to the sheet so the footer's
-    /// Select All can target the VISIBLE (kind-filtered) findings —
-    /// mirroring the search footer's filtered-only semantics.
-    @State private var reviewFilterKind: DetectionResult.Kind? = nil
-    /// The review-origin walk's cursor (`ReviewWalk`); read and written
-    /// through `liveReviewWalk` / `stepWalk` (`+Walk.swift`).
-    @State var reviewWalk = ReviewWalk()
-
-    // MARK: - Absorbed review (detection findings)
-
-    /// Whether the Scan interface is presenting staged detections
-    /// for review. The staged set (`pendingTriage`) is the
-    /// store of record; the unified sheet is its one surface.
-    var isReviewActive: Bool {
-        redactionState.pendingTriage != nil
-            && searchState.searchModeType.interface == .scan
-    }
-
-    private var reviewFindings: [(page: Int, detection: DetectionResult)] {
-        ScanReviewSection.flattenedFindings(redactionState.pendingTriage)
-    }
-
-    /// Toolbar "Apply N" count for the review origin — explicit-true
-    /// entries only. Producer sites write an explicit entry per staged
-    /// detection with an explicit true entry, so this count and the apply's
-    /// accepted set describe the same selections.
-    var reviewAcceptedCount: Int {
-        redactionState.triageSelections.values.count { $0 }
-    }
-
-    private var reviewVisibleIDs: [UUID] {
-        ScanReviewSection.filteredFindings(
-            reviewFindings, filterKind: reviewFilterKind, viewMode: .byPage
-        ).map(\.detection.id)
-    }
-
     /// Full-chrome composition (medium / large detents). The
     /// presentation-level modifier chain (single modal slot, onChange
     /// handlers, sheet-local toast host, shield) lives on `body`'s
@@ -206,86 +169,51 @@ struct SearchAndRedactSheet: View {
         // scroll↔detent cooperation is native (measured: listY 415→62
         // cooperative expand with the full chrome load in the inset).
         Group {
-            if isReviewActive {
-                VStack(spacing: 0) {
-                    // Absorbed review: staged detections render
-                    // inside the Scan interface. Run affordances are
-                    // parked while the review is pending — resolve it
-                    // (Apply / Dismiss) to scan again.
-                    ScanReviewSection(
-                        searchState: searchState,
-                        filterKind: $reviewFilterKind,
-                        onRequestWhy: { request in
-                            activeModal = .rationale(request)
-                        },
-                        // A review row tap focuses the review walk on
-                        // its id through the one walk seam (`+Walk.swift`).
-                        onNavigateToFinding: focusWalk(onReview:)
-                    )
-                    .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                SearchResultsSection(
+                    searchState: searchState,
+                    selectedDetent: $selectedDetent,
+                    onRequestWhy: presentReverseRationale,
+                    onApplyShortcut: applyFromKeyboardShortcut,
+                    applyShortcutEnabled: applyShortcutEnabled,
+                    onRequestShowRationale: { rowID in
+                        activeModal = .rowRationale(rowID: rowID)
+                    },
+                    onTriggerSearch: triggerSearch,
+                    onFocusWalk: focusWalk(on:parking:)
+                )
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    // The Search interface's whole fixed chrome
+                    // joins the header in ONE inset stack — the
+                    // search bar, toolbar, and separator must not
+                    // re-offset the results list's frame (the same
+                    // safe-area threshold noted above).
+                    VStack(spacing: 0) {
                         sheetHeaderChrome
-                    }
-
-                    if !reviewFindings.isEmpty {
-                        SearchFooterSection(
+                        searchBar
+                        SearchToolbarSection(
                             searchState: searchState,
-                            review: SearchFooterSection.ReviewFooterModel(
-                                selectedCount: reviewAcceptedCount,
-                                visibleCount: reviewVisibleIDs.count,
-                                allVisibleSelected: allReviewVisibleSelected,
-                                onToggleSelectAll: toggleReviewSelectAll
-                            )
+                            duplicateTermMessage: $duplicateTermMessage,
+                            onTriggerSearch: triggerSearch,
+                            onRequestSaveCurrentRegex: {
+                                savedRegexSaveLabel = ""
+                                savedRegexSaveError = nil
+                                showSavedRegexSavePrompt = true
+                            }
                         )
+                        Divider()
                     }
+                    .background(.background)
                 }
-            } else {
-                VStack(spacing: 0) {
-                    SearchResultsSection(
-                        searchState: searchState,
-                        selectedDetent: $selectedDetent,
-                        onRequestWhy: presentReverseRationale,
-                        onApplyShortcut: applyFromKeyboardShortcut,
-                        applyShortcutEnabled: applyShortcutEnabled,
-                        onRequestShowRationale: { rowID in
-                            activeModal = .rowRationale(rowID: rowID)
-                        },
-                        onTriggerSearch: triggerSearch,
-                        onFocusWalk: focusWalk(on:parking:)
-                    )
-                    .safeAreaInset(edge: .top, spacing: 0) {
-                        // The Search interface's whole fixed chrome
-                        // joins the header in ONE inset stack — the
-                        // search bar, toolbar, and separator must not
-                        // re-offset the results list's frame (the same
-                        // safe-area threshold noted above).
-                        VStack(spacing: 0) {
-                            sheetHeaderChrome
-                            searchBar
-                            SearchToolbarSection(
-                                searchState: searchState,
-                                duplicateTermMessage: $duplicateTermMessage,
-                                onTriggerSearch: triggerSearch,
-                                onRequestSaveCurrentRegex: {
-                                    savedRegexSaveLabel = ""
-                                    savedRegexSaveError = nil
-                                    showSavedRegexSavePrompt = true
-                                }
-                            )
-                            Divider()
-                        }
-                        .background(.background)
-                    }
 
-                    if searchState.filteredCount > 0 {
-                        SearchFooterSection(
-                            searchState: searchState,
-                        )
-                    }
+                if searchState.filteredCount > 0 {
+                    SearchFooterSection(
+                        searchState: searchState,
+                    )
                 }
             }
         }
-        // Conditional dismiss confirmation, generalized from the retired
-        // triage sheet's donor rule. Copy is a mechanism description —
+        // Conditional dismiss confirmation. Copy is a mechanism description —
         // names what the action does without an outcome promise.
         // Attached to the content Group (not the outer modifier chain)
         // to stay inside the type-checker budget beside the
@@ -628,8 +556,8 @@ struct SearchAndRedactSheet: View {
         .shieldedSheetContent(monitor: captureMonitor)
     }
 
-    // The compact detent's composition (`compactFloatStrip`, the title,
-    // the review walk's counter) lives in `Search/SearchAndRedactSheet+CompactStrip.swift`
+    // The compact detent's composition (`compactFloatStrip`, the title)
+    // lives in `Search/SearchAndRedactSheet+CompactStrip.swift`
     // (the M-6 hub cap).
 
     // MARK: - Search Bar
@@ -750,9 +678,7 @@ struct SearchAndRedactSheet: View {
                 .accessibilityLabel("Cancel search")
             }
 
-            // Prev/Next navigation + position indicator — also gated
-            // on the pending review (a detections list has no
-            // "current" to walk).
+            // Prev/Next navigation + position indicator.
             if showsResultNavCluster {
                 resultNavigationControls
             }
@@ -787,10 +713,7 @@ struct SearchAndRedactSheet: View {
     }
 
     /// Bookmark button presenting the saved-searches list through the
-    /// single modal slot. Parked while staged detections await review:
-    /// a recall re-triggers a run, and a run must not race the pending
-    /// review for the Scan surface. Resolve the review (Apply /
-    /// Dismiss) first. This is the one live bookmark for BOTH
+    /// single modal slot. This is the one live bookmark for BOTH
     /// interfaces (Scan renders it from the search bar's leading
     /// branch; the scope-row sibling is dormant).
     private var savedSearchesBookmark: some View {
@@ -803,7 +726,6 @@ struct SearchAndRedactSheet: View {
             Self.circularIconLabel("bookmark")
         }
         .buttonStyle(.circularIcon)
-        .disabled(redactionState.pendingTriage != nil)
         .accessibilityLabel("Saved Searches")
         .accessibilityIdentifier("savedSearchesBookmark")
     }
@@ -870,11 +792,10 @@ struct SearchAndRedactSheet: View {
     /// The ‹ k/N › cluster renders at EITHER site only while a walk is
     /// live — the ONE published predicate (`SearchState.isWalkLive`,
     /// which the editor's page-bar hide reads through
-    /// `RedactionState.walkLive`): search results on board, or the
-    /// staged detection review owning the Scan interface (the review
-    /// walk). The compact handle's per-item Apply / Select rides it.
+    /// `RedactionState.walkLive`): search results on board. The compact
+    /// handle's per-item Apply / Select rides it.
     var showsResultNavCluster: Bool {
-        searchState.isWalkLive(reviewPending: redactionState.pendingTriage != nil)
+        searchState.isWalkLive
     }
 
     /// The medium+ search-bar site of the ‹ k/N › cluster. Geometry
@@ -957,13 +878,10 @@ struct SearchAndRedactSheet: View {
     /// signals that the current result is hidden by the filter.
     /// Rendered at both sites — the strings and a11y labels are
     /// unchanged; only the font follows the site (caption at the
-    /// search bar, subheadline on the parked strip). The review walk's
-    /// counter (`reviewWalkCounter`) takes the slot on the review origin.
+    /// search bar, subheadline on the parked strip).
     @ViewBuilder
     func resultNavCounter(site: ResultNavSite) -> some View {
-        if isReviewActive {
-            reviewWalkCounter(site: site)
-        } else if let idx = searchState.currentResultIndex {
+        if let idx = searchState.currentResultIndex {
             if searchState.filteredCount == searchState.totalCount {
                 Text("\(idx + 1)/\(searchState.totalCount)")
                     .font(site.counterFont)
@@ -1045,10 +963,7 @@ struct SearchAndRedactSheet: View {
     static let dismissMessage = "Selected matches will not be applied to the document."
 
     /// Shared dismiss path for the direct (untouched) and confirmed
-    /// (touched) routes. Closes BOTH sheet arms: a live selection is
-    /// deselected in-place; a pending review is discarded (the retired
-    /// triage sheet's Dismiss semantics — the summary banner's Review
-    /// re-stages the findings, and re-running detection rebuilds them).
+    /// (touched) routes: a live selection is deselected in-place.
     /// `afterConfirmation` suppresses the loss-naming toasts — the
     /// dialog already named the drop, and dialog + toast on one dismiss
     /// would double-message.
@@ -1056,8 +971,7 @@ struct SearchAndRedactSheet: View {
         if searchState.selectedCount > 0 {
             let snapshot = Self.currentSelectionSnapshot(in: searchState)
             Self.clearSelection(in: searchState, snapshot: snapshot)
-        } else if redactionState.pendingTriage == nil,
-                  !afterConfirmation,
+        } else if !afterConfirmation,
                   let message = Self.dismissClearedMessage(
                       unappliedCount: Self.unappliedMatchCount(in: searchState),
                       interface: searchState.searchModeType.interface
@@ -1066,14 +980,6 @@ struct SearchAndRedactSheet: View {
             // unapplied matches exist so the loss isn't silent. The
             // toast manager outlives the sheet.
             toastManager.enqueue(message, severity: .info)
-        }
-        if redactionState.pendingTriage != nil {
-            if !afterConfirmation {
-                // Carried from the retired review surface — the info
-                // trace that staged findings were dropped.
-                toastManager.enqueue(Self.detectionResultsDismissedToast, severity: .info)
-            }
-            redactionState.dismissTriage()
         }
         redactionState.activeSearch = nil
     }
@@ -1121,57 +1027,6 @@ struct SearchAndRedactSheet: View {
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("degradedDetectionBanner")
         .accessibilityAddTraits(.isHeader)
-    }
-
-    // MARK: - Apply (review origin)
-
-    /// Toolbar Apply for the review origin: the staged detections
-    /// promote through the one `applyFindings` path, which writes their
-    /// metadata + audit records, owns the undo registration, and
-    /// re-checks the mutation guard inside the action (passing
-    /// `documentState` arms the path-internal re-check — the action
-    /// guard here is the second site of the two-site discipline, and
-    /// the path is the third, race-proof one).
-    func applyReviewFindings() {
-        // Refuse mutations while the pipeline owns
-        // `redactionState.regions` — re-checked in the action against a
-        // pipeline that started after the last render.
-        guard documentState.canMutateRegions else { return }
-        Task { @MainActor in
-            guard let outcome = await redactionState.applyFindings(
-                .stagedDetections,
-                undoManager: undoManager,
-                documentState: documentState
-            ) else { return }
-            // Commit feedback through the shared copy builder so the
-            // count stays in lockstep with every other apply surface.
-            // The sheet stays up (the review resolves in place); the
-            // sheet-local toast host renders it. The conditional-dismiss
-            // tracker reset is owned by the apply path.
-            if let message = CommitFeedback.markedMessage(applied: outcome.applied) {
-                toastManager.enqueue(message, severity: .success)
-            }
-        }
-    }
-
-    /// Footer Select All over the VISIBLE (kind-filtered) review
-    /// detections; hidden detections retain their selection state,
-    /// mirroring the search footer's filtered-only semantics.
-    private var allReviewVisibleSelected: Bool {
-        let visible = reviewVisibleIDs
-        guard !visible.isEmpty else { return false }
-        return visible.allSatisfy { redactionState.triageSelections[$0] ?? false }
-    }
-
-    private func toggleReviewSelectAll() {
-        let visible = reviewVisibleIDs
-        guard !visible.isEmpty else { return }
-        let target = !allReviewVisibleSelected
-        for id in visible {
-            redactionState.triageSelections[id] = target
-        }
-        // Conditional dismiss: bulk select/deselect is user selection work.
-        searchState.userModifiedSelections = true
     }
 
     // `debounceSearch(query:)`, `triggerSearch()`, the two apply
